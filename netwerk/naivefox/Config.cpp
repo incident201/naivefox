@@ -325,7 +325,6 @@ class JsonParser final {
     bool sawListen = false;
     bool sawProxy = false;
     bool sawTransport = false;
-    bool sawNoConnectKey = false;
     bool sawLog = false;
     bool sawHostResolverRules = false;
     bool sawExtraHeaders = false;
@@ -371,23 +370,9 @@ class JsonParser final {
           return Error("transport must be classic or no-connect");
         }
       } else if (key.EqualsLiteral("no-connect-key")) {
-        if (sawNoConnectKey) {
-          return Error("duplicate no-connect-key field");
-        }
-        sawNoConnectKey = true;
-        MOZ_TRY(ParseString(parsed.mNoConnectKey,
-                            "no-connect-key must be a string"));
-        if (parsed.mNoConnectKey.Length() < 32 ||
-            parsed.mNoConnectKey.Length() > 1024) {
-          return Error(
-              "no-connect-key must contain 32 through 1024 ASCII bytes");
-        }
-        for (size_t index = 0; index < parsed.mNoConnectKey.Length(); ++index) {
-          const char value = parsed.mNoConnectKey.CharAt(index);
-          if (value < 0x20 || value > 0x7e) {
-            return Error("no-connect-key must contain printable ASCII only");
-          }
-        }
+        return Error(
+            "no-connect-key is no longer supported; remove it and use "
+            "user:password in the proxy URI for both transports");
       } else if (key.EqualsLiteral("log")) {
         if (sawLog) {
           return Error("duplicate log field");
@@ -501,21 +486,12 @@ class JsonParser final {
       parsed.mTransport = *aTransportOverride;
     }
     if (parsed.mTransport == TransportMode::NoConnect) {
-      if (!sawNoConnectKey) {
-        return Error("no-connect transport requires no-connect-key");
-      }
-      if (parsed.mPreamble.mMode != PreambleMode::Off ||
-          parsed.mPreamble.ModeForProtocol(ProxyProtocol::H2) !=
-              PreambleMode::Off ||
-          parsed.mPreamble.ModeForProtocol(ProxyProtocol::H3) !=
-              PreambleMode::Off ||
-          parsed.mOuterSessionGate || !parsed.mExtraHeaders.IsEmpty() ||
-          parsed.mDiagnosticFirstSocksTunnelUrgentStart ||
-          parsed.mDiagnosticOptimisticLocalReply) {
-        return Error(
-            "no-connect transport does not accept classic preamble, "
-            "headers, gate, or diagnostic options");
-      }
+      parsed.mPreamble = PreambleConfig{};
+      parsed.mExtraHeaders.Clear();
+      parsed.mOuterSessionGate = false;
+      parsed.mImplicitPreambleGate = false;
+      parsed.mDiagnosticFirstSocksTunnelUrgentStart = false;
+      parsed.mDiagnosticOptimisticLocalReply = false;
     }
     if (!sawPreamble && parsed.mTransport == TransportMode::Classic) {
       bool hasExplicitH2Proxy = false;

@@ -95,7 +95,6 @@ struct TunnelConfig final {
         mProxyPassword(aOther.mProxyPassword),
         mProtocol(aOther.mProtocol),
         mTransport(aOther.mTransport),
-        mNoConnectKey(aOther.mNoConnectKey),
         mHostResolverRule(aOther.mHostResolverRule),
         mPreamble(aOther.mPreamble),
         mOuterSessionGate(aOther.mOuterSessionGate),
@@ -113,7 +112,6 @@ struct TunnelConfig final {
       mProxyPassword = aOther.mProxyPassword;
       mProtocol = aOther.mProtocol;
       mTransport = aOther.mTransport;
-      mNoConnectKey = aOther.mNoConnectKey;
       mHostResolverRule = aOther.mHostResolverRule;
       mPreamble = aOther.mPreamble;
       mOuterSessionGate = aOther.mOuterSessionGate;
@@ -132,7 +130,6 @@ struct TunnelConfig final {
   nsCString mProxyPassword;
   ProxyProtocol mProtocol = ProxyProtocol::H2;
   TransportMode mTransport = TransportMode::Classic;
-  nsCString mNoConnectKey;
   Maybe<HostResolverRule> mHostResolverRule;
   nsTArray<ExtraHeader> mExtraHeaders;
   PreambleConfig mPreamble;

@@ -147,16 +147,24 @@ H3 raw tunnels preserve byte-stream behavior without copying H2 internals:
 ## Transport and protocol selection
 
 `transport` chooses `classic` or `no-connect`; omission selects `classic`.
-The `proxy` URI independently selects strict H2 or H3. Configuration carries a
-separate application key for `no-connect`, and never reuses proxy-auth userinfo.
-The classic preamble and padding negotiation do not run in `no-connect`.
+The `proxy` URI independently selects strict H2 or H3. Both transports use its
+same parsed username and password. Classic uses Necko proxy authentication;
+no-connect carries their Basic value in a TLS-protected application AUTH frame.
+The Caddy forward-proxy instance supplies the shared authentication and access
+policy; there is no separate key or target list. The config parser validates
+all fields, then disables valid classic-only preamble, extra-header, gate and
+diagnostic settings for no-connect. Classic padding negotiation never runs in
+no-connect.
 
 `no-connect` ports only the experimental cell/multiplexer and bounded
 `continuous-bulk-pipeline` lifecycle into native C++. It opens ordinary Necko
 channels, validates response status/capacity/encoding and uses NSS randomness
 for filler. The experiment's Firefox process, DOM, animation, JavaScript
-scheduler and loopback WSS bridge are outside the port. See
-[NO-CONNECT.md](NO-CONNECT.md) for the maintained boundary and limits.
+scheduler and loopback WSS bridge are outside the port. A carrier holds at
+most 32 streams; new carriers provide further concurrent capacity without a
+client-wide 32-stream limit. Stream byte offsets wrap modulo 2^32 while exact
+offset checks and bounded credit remain mandatory, so the byte counter does
+not cap stream size. See [NO-CONNECT.md](NO-CONNECT.md) for the maintained boundary and limits.
 
 The following fallback rules describe `classic`; the opt-in application
 transport has no automatic downgrade to `classic`:

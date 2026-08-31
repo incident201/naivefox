@@ -6,6 +6,7 @@ import argparse
 import importlib.util
 import json
 import os
+import re
 from pathlib import Path
 import secrets
 import shlex
@@ -28,6 +29,7 @@ class AndroidFixture:
         self.adb = [str(args.adb)] + (["-s", args.serial] if args.serial else [])
         self.remote = f"/data/local/tmp/naivefox-no-connect-{secrets.token_hex(8)}"
         self.ports = set()
+        self.shared_configs = {}
         self.processes = []
         self.runtime = self.remote + "/runtime"
         self.call("shell", "mkdir", "-p", self.runtime)
@@ -48,6 +50,8 @@ class AndroidFixture:
 
     def probe(self, ports, listener, target_port, operation, length=0, slow=False, host="localhost"):
         ack = (struct.pack("!Q", length) + suite.payload_digest(length)).hex() if operation == "upload" else "-"
+        if operation == "auth-partition":
+            ack = str(ports["http"])
         command = [self.remote + "/probe", listener, str(ports[listener]), host,
                    str(target_port), operation, str(length), ack]
         if slow:
@@ -59,13 +63,19 @@ class AndroidFixture:
         suite.require(result.returncode == 0, f"Android {listener} {operation} failed ({result.returncode}); {log_path}")
 
     def install_probes(self):
-        suite.download = lambda ports, listener, target_port, length=1024*1024, slow=False: self.probe(
-            ports, listener, target_port, "download", length, slow)
-        suite.upload = lambda ports, listener, target_port, length=1024*1024: self.probe(
-            ports, listener, target_port, "upload", length)
+        suite.download = lambda ports, listener, target_port, length=1024*1024, slow=False, host="localhost": self.probe(
+            ports, listener, target_port, "download", length, slow, host)
+        suite.upload = lambda ports, listener, target_port, length=1024*1024, host="localhost": self.probe(
+            ports, listener, target_port, "upload", length, host=host)
         suite.echo_wake = lambda ports, listener, target_port: self.probe(
             ports, listener, target_port, "idle")
         suite.cancel_stream = lambda ports, target_port: self.probe(ports, "socks", target_port, "reset")
+        suite.concurrent_open_streams = lambda ports, target_port, count=40: self.probe(
+            ports, "socks", target_port, "concurrent", count)
+        suite.auth_partition_streams = lambda ports, target_port: self.probe(
+            ports, "socks", target_port, "auth-partition")
+        suite.reject_policy = lambda ports, listener, target_port, host="localhost": self.probe(
+            ports, listener, target_port, "policy-reject", host=host)
         def reject(ports, listener, target_port, host="localhost", rejected=False):
             suite.require(rejected, "positive Android workloads must run in the native probe")
             self.probe(ports, listener, target_port, "reject", host=host)
@@ -75,53 +85,160 @@ class AndroidFixture:
         with (self.work / "adb.log").open("ab") as log:
             return subprocess.run(self.adb + list(args), stdout=log, stderr=log, check=check)
 
+    def capture_command(self, destination, *arguments):
+        """Keep bounded, private diagnostic output without masking the failure."""
+        try:
+            result = subprocess.run(self.adb + list(arguments), stdout=subprocess.PIPE,
+                                    stderr=subprocess.STDOUT, timeout=10, check=False)
+            destination.write_bytes(result.stdout)
+            destination.chmod(0o600)
+            return result
+        except (OSError, subprocess.SubprocessError) as error:
+            destination.write_text(type(error).__name__ + "\n")
+            destination.chmod(0o600)
+            return None
+
+    def choose_listener_ports(self, args, directory, ports):
+        fixed = getattr(args, "listener_ports", None)
+        if fixed is None:
+            output = directory / "guest-listener-ports.txt"
+            result = self.capture_command(output, "shell", self.remote + "/probe",
+                                          "--allocate-listeners")
+            suite.require(result is not None and result.returncode == 0,
+                          f"Android guest listener allocation failed; {output}")
+            match = re.fullmatch(rb"([0-9]+) ([0-9]+)\r?\n", result.stdout)
+            suite.require(match is not None, "invalid Android guest listener allocation")
+            selected = dict(zip(("socks", "http"), (int(value) for value in match.groups())))
+        else:
+            # check_shared_config records the first device-selected ports and
+            # requires exactly those ports for every later transport selection.
+            suite.require(dict(ports) == dict(fixed), "shared Android listener ports drifted")
+            selected = dict(fixed)
+        suite.require(set(selected) == {"socks", "http"} and
+                      all(type(port) is int and 1 <= port <= 65535
+                          for port in selected.values()) and
+                      selected["socks"] != selected["http"],
+                      "invalid Android listener port pair")
+        suite.require(not self.ports.intersection(selected.values()),
+                      "Android listener is still owned by an active runtime")
+        self.ports.update(selected.values())
+        ports.clear()
+        ports.update(selected)
+
+    def capture_failure(self, directory, remote, phase, exit_code, error=None):
+        diagnostics = directory / ("diagnostics-" + phase)
+        diagnostics.mkdir(mode=0o700, exist_ok=True)
+        details = {"phase": phase, "adb_shell_exit_code": exit_code,
+                   "error_type": type(error).__name__ if error else None,
+                   "cause": "undetermined; inspect retained result and owned-process diagnostics"}
+        pid_result = self.capture_command(diagnostics / "pid.txt", "shell", "cat", remote + "/pid")
+        result = self.capture_command(diagnostics / "result.txt", "shell", "cat", remote + "/result")
+        details["harness_result_available"] = result is not None and result.returncode == 0
+        pid = pid_result.stdout.strip() if pid_result is not None and pid_result.returncode == 0 else b""
+        if pid.isdigit() and int(pid) > 0:
+            owned_pid = pid.decode("ascii")
+            details["owned_pid"] = int(owned_pid)
+            self.capture_command(diagnostics / "logcat.txt", "logcat", "-b", "main", "-b", "system",
+                                 "-b", "crash", "-d", "--pid=" + owned_pid,
+                                 "-v", "threadtime", "-t", "1000")
+            self.capture_command(diagnostics / "process-status.txt", "shell", "cat",
+                                 "/proc/" + owned_pid + "/status")
+        else:
+            details["owned_pid"] = None
+        suite.private_json(diagnostics / "summary.json", details)
+
     def start(self, args, directory, config, env, ports):
         remote = self.remote + "/client-" + secrets.token_hex(6)
         self.call("shell", "mkdir", "-p", remote + "/profile")
         self.call("shell", "chmod", "700", remote, remote + "/profile")
         config = dict(config)
-        for listener in ports:
-            while ports[listener] in self.ports:
-                ports[listener] = suite.free_port()
-            self.ports.add(ports[listener])
+        self.choose_listener_ports(args, directory, ports)
         config["listen"] = [f"{listener}://127.0.0.1:{port}" for listener, port in ports.items()]
         config["host-resolver-rules"] = f"MAP localhost {self.args.host_alias}"
-        suite.private_json(directory / "config.json", config)
-        self.call("push", str(directory / "config.json"), remote + "/config.json")
-        self.call("shell", "chmod", "600", remote + "/config.json")
+        config_path = Path(getattr(args, "client_config_path", directory / "config.json"))
+        shared = getattr(args, "client_config_path", None) is not None
+        if shared:
+            label = str(config_path)
+            if label not in self.shared_configs:
+                self.shared_configs[label] = self.remote + "/shared-config-" + secrets.token_hex(6) + ".json"
+            remote_config = self.shared_configs[label]
+        else:
+            remote_config = remote + "/config.json"
+        suite.private_json(config_path, config)
+        self.call("push", str(config_path), remote_config)
+        self.call("shell", "chmod", "600", remote_config)
         environment = [f"LD_LIBRARY_PATH={self.runtime}"]
         if env.get("SSL_CERT_FILE"):
             self.call("push", env["SSL_CERT_FILE"], remote + "/ca.crt")
             environment.append(f"SSL_CERT_FILE={remote}/ca.crt")
         argv = ["env", *environment, self.remote + "/harness", self.runtime + "/libxul.so",
-                remote + "/config.json", remote + "/profile", self.runtime,
+                remote_config, remote + "/profile", self.runtime,
                 remote + "/stop", remote + "/ready", remote + "/result"]
         command = "cd " + shlex.quote(remote) + " && echo $$ > pid && exec " + shlex.join(argv)
         fixture = self
 
         class AndroidProcess(suite.Process):
+            def __init__(self, *arguments):
+                super().__init__(*arguments)
+                self.released_ports = False
+                self.failure_captures = set()
+
+            def capture_failure(self, phase, error=None):
+                if phase in self.failure_captures:
+                    return
+                self.failure_captures.add(phase)
+                try:
+                    fixture.capture_failure(directory, remote, phase, self.process.poll(), error)
+                except (OSError, RuntimeError, subprocess.SubprocessError) as capture_error:
+                    # The original failure is authoritative even if ADB or the
+                    # local disk also fails while collecting diagnostics.
+                    try:
+                        with (directory / "diagnostic-capture-error.log").open("a") as log:
+                            log.write(type(capture_error).__name__ + "\n")
+                    except OSError:
+                        print("Android failure diagnostics could not be written", flush=True)
+
+            def release_ports(self):
+                if not self.released_ports:
+                    self.released_ports = True
+                    for port in ports.values():
+                        fixture.ports.discard(port)
+
+            def executed_config(self):
+                result = subprocess.run(fixture.adb + ["shell", "cat", remote_config],
+                                        text=True, capture_output=True, check=True)
+                return json.loads(result.stdout)
+
             def stop(self):
+                if self.process.poll() not in (None, 0):
+                    self.capture_failure("before-stop")
                 if self.process.poll() is None:
                     fixture.call("shell", "touch", remote + "/stop")
                     try:
                         self.process.wait(timeout=30)
-                    except subprocess.TimeoutExpired:
+                    except subprocess.TimeoutExpired as error:
+                        self.capture_failure("stop-timeout", error)
                         result = subprocess.run(fixture.adb + ["shell", "cat", remote + "/pid"],
                                                 text=True, capture_output=True, check=True)
                         pid = result.stdout.strip()
                         suite.require(pid.isdecimal(), "invalid owned Android harness PID")
                         fixture.call("shell", "kill", pid)
                 super().stop()
+                if self.process.poll() != 0:
+                    self.capture_failure("after-stop")
+                self.release_ports()
 
             def exited_cleanly(self):
                 try:
                     status = self.process.wait(timeout=45)
-                except subprocess.TimeoutExpired as error:
-                    raise RuntimeError("Android embedded runtime did not drain") from error
-                suite.require(status == 0, "Android embedded runtime failed")
-                result = subprocess.run(fixture.adb + ["shell", "cat", remote + "/result"],
-                                        text=True, capture_output=True, check=True)
-                suite.require("status=0" in result.stdout, "Android embedded result failed")
+                    suite.require(status == 0, "Android embedded runtime failed")
+                    result = subprocess.run(fixture.adb + ["shell", "cat", remote + "/result"],
+                                            text=True, capture_output=True, check=True)
+                    suite.require("status=0" in result.stdout, "Android embedded result failed")
+                except (OSError, RuntimeError, subprocess.SubprocessError) as error:
+                    self.capture_failure("runtime-exit", error)
+                    raise
+                self.release_ports()
 
         process = AndroidProcess(self.adb + ["shell", command], directory, "client", dict(os.environ))
         self.processes.append(process)
@@ -130,7 +247,11 @@ class AndroidFixture:
             text = process.log_path.read_text(errors="replace")
             return all(f"listening on 127.0.0.1:{port}" in text for port in ports.values())
 
-        suite.wait_until(ready, "Android listeners did not start", process, timeout=60)
+        try:
+            suite.wait_until(ready, "Android listeners did not start", process, timeout=60)
+        except (OSError, RuntimeError, subprocess.SubprocessError) as error:
+            process.capture_failure("startup", error)
+            raise
         return process, ports
 
     def close(self):

@@ -16,6 +16,7 @@
 #include "NoConnectCodec.h"
 #include "RuntimeLogging.h"
 #include "TunnelSession.h"
+#include "mozilla/Base64.h"
 #include "mozilla/RefPtr.h"
 #include "nsIChannel.h"
 #include "nsIHttpChannel.h"
@@ -117,6 +118,7 @@ class CarrierRequest final : public nsIStreamListener {
   Bytes mBody;
   nsCString mCookie;
   nsCString mProfile;
+  nsCString mAuthScheme;
   nsCString mState;
 
  private:
@@ -176,6 +178,7 @@ NS_IMETHODIMP CarrierRequest::OnStartRequest(nsIRequest* aRequest) {
   }
   (void)http->GetResponseHeader("Set-Cookie"_ns, mCookie);
   (void)http->GetResponseHeader("X-App-Profile"_ns, mProfile);
+  (void)http->GetResponseHeader("X-App-Auth"_ns, mAuthScheme);
   if (mHeaders) {
     auto headers = std::move(mHeaders);
     headers();
@@ -269,10 +272,15 @@ class NoConnectCarrier final {
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(NoConnectCarrier)
   explicit NoConnectCarrier(const TunnelConfig& aConfig) : mConfig(aConfig) {}
   bool Closed() const { return mClosed; }
+  bool CanAttach() const {
+    return !mClosed && mStreams.size() < noconnect::kMaxStreams &&
+           mHighestStream != UINT32_MAX;
+  }
   bool Matches(const TunnelConfig& aConfig) const {
     if (mClosed || mConfig.mProtocol != aConfig.mProtocol ||
         !mConfig.mProxyUrl.Equals(aConfig.mProxyUrl) ||
-        !mConfig.mNoConnectKey.Equals(aConfig.mNoConnectKey) ||
+        !mConfig.mProxyUser.Equals(aConfig.mProxyUser) ||
+        !mConfig.mProxyPassword.Equals(aConfig.mProxyPassword) ||
         mConfig.mHostResolverRule.isSome() !=
             aConfig.mHostResolverRule.isSome()) {
       return false;
@@ -377,7 +385,7 @@ nsresult NoConnectStream::Start(const nsACString& aAuthority,
                                        }),
                         sCarriers.end());
         for (const auto& carrier : sCarriers) {
-          if (carrier->Matches(state.config)) {
+          if (carrier->Matches(state.config) && carrier->CanAttach()) {
             carrier->Attach(self);
             return;
           }
@@ -571,8 +579,7 @@ bool NoConnectCarrier::Open(const nsACString& aPath, const Bytes* aUpload,
 
 void NoConnectCarrier::Attach(NoConnectStream* aStream) {
   MOZ_ASSERT(NS_IsMainThread());
-  if (mClosed || mStreams.size() >= noconnect::kMaxStreams ||
-      mHighestStream == UINT32_MAX) {
+  if (!CanAttach()) {
     aStream->Finish(NS_ERROR_NOT_AVAILABLE, false);
     return;
   }
@@ -630,7 +637,8 @@ void NoConnectCarrier::Fail(nsresult aStatus) {
   }
   mStreams.clear();
   mCookie.Truncate();
-  mConfig.mNoConnectKey.Truncate();
+  mConfig.mProxyUser.Truncate();
+  mConfig.mProxyPassword.Truncate();
   mResets.clear();
   RuntimeLogEvent("No-connect carrier closed status=0x%08x\n",
                   static_cast<unsigned>(aStatus));
@@ -643,6 +651,7 @@ void NoConnectCarrier::Start() {
   Open("/"_ns, nullptr, 4096, 200, false,
        [self](CarrierRequest* request, nsresult) {
          if (!request->mProfile.EqualsLiteral("continuous-bulk-pipeline") ||
+             !request->mAuthScheme.EqualsLiteral("basic") ||
              request->mCookie.Length() < 77 ||
              !StringBeginsWith(request->mCookie, "app_session="_ns) ||
              request->mCookie.CharAt(76) != ';') {
@@ -685,8 +694,16 @@ bool NoConnectCarrier::Upload(size_t aCapacity, Bytes& aBody) {
   if (!mAuthed) {
     Frame auth;
     auth.kind = Kind::Auth;
-    const auto& key = mConfig.mNoConnectKey;
-    auth.body.assign(key.BeginReading(), key.EndReading());
+    nsAutoCString credentials(mConfig.mProxyUser);
+    credentials.Append(':');
+    credentials.Append(mConfig.mProxyPassword);
+    nsAutoCString authorization("Basic ");
+    nsresult rv = Base64EncodeAppend(credentials, authorization);
+    if (NS_FAILED(rv)) {
+      Fail(rv);
+      return false;
+    }
+    auth.body.assign(authorization.BeginReading(), authorization.EndReading());
     if (auth.Size() > budget) {
       Fail(NS_ERROR_INVALID_ARG);
       return false;
@@ -879,6 +896,22 @@ void NoConnectCarrier::Continue() {
 }
 
 void NoConnectCarrier::Tick() {
+  // Keep one warm carrier per route after a burst. Finish acknowledging FIN
+  // and RESET uploads before dropping an extra carrier, so the server can
+  // release every target connection without waiting for session expiry.
+  if (mStreams.empty() && mResets.empty() && mRequests.empty() && !mBusy &&
+      !mIdle && !mWaking) {
+    if (!CanAttach()) {
+      Fail(NS_OK);
+      return;
+    }
+    for (const auto& carrier : sCarriers) {
+      if (carrier.get() != this && carrier->Matches(mConfig)) {
+        Fail(NS_OK);
+        return;
+      }
+    }
+  }
   if (mIdle) {
     IdleWake();
     return;

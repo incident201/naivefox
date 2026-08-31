@@ -12,6 +12,7 @@ import tempfile
 def live_checks(binary, caddy, work_dir, protocols):
     import importlib.util
     import secrets
+    from urllib.parse import quote
 
     spec = importlib.util.spec_from_file_location(
         "no_connect_fixture", Path(__file__).with_name("run-no-connect-tests.py"))
@@ -28,22 +29,25 @@ def live_checks(binary, caddy, work_dir, protocols):
             target = fixture.TargetServer()
             processes = []
             try:
-                key, user, password = (
-                    secrets.token_hex(32), secrets.token_hex(8), secrets.token_hex(24))
+                user = "cli-user@" + secrets.token_hex(8)
+                password = "cli:p@ss-" + secrets.token_hex(24)
                 server_args = argparse.Namespace(caddy=caddy)
                 server, proxy_port = fixture.start_caddy(
                     server_args, directory, protocol, target.server_address[1],
-                    key, user, password)
+                    user, password)
                 processes.append(server)
                 ports = {"socks": fixture.free_port(), "http": fixture.free_port()}
                 while ports["http"] == ports["socks"]:
                     ports["http"] = fixture.free_port()
                 scheme = "quic" if protocol == "h3" else "https"
+                credentials = quote(user, safe="") + ":" + quote(password, safe="")
                 config = {
                     "listen": [f"socks://127.0.0.1:{ports['socks']}",
                                f"http://127.0.0.1:{ports['http']}"],
-                    "proxy": f"{scheme}://{user}:{password}@localhost:{proxy_port}",
-                    "no-connect-key": key, "preamble": {"mode": "off"},
+                    "proxy": f"{scheme}://{credentials}@localhost:{proxy_port}",
+                    "preamble": {"mode": "document-complete", "path": "/"},
+                    "extra-headers": "X-Classic-Only: enabled\r\n",
+                    "outer-session-gate": True,
                     "host-resolver-rules": "MAP localhost 127.0.0.1",
                     "max-connections": 2, "log": "",
                 }
@@ -51,10 +55,12 @@ def live_checks(binary, caddy, work_dir, protocols):
                 fixture.private_json(config_path, config)
                 original = config_path.read_bytes()
                 classic_count = 0
-                for name, options in (
-                    ("default-classic", []),
-                    ("no-connect", ["--transport", "no-connect"]),
-                    ("override-classic", ["--transport=classic"]),
+                for name, transport, options in (
+                    ("default-classic", "classic", []),
+                    ("no-connect", "no-connect", ["--transport", "no-connect"]),
+                    ("override-classic", "classic", ["--transport=classic"]),
+                    ("no-connect-again", "no-connect", ["--transport=no-connect"]),
+                    ("classic-again", "classic", ["--transport", "classic"]),
                 ):
                     before = fixture.access_requests(directory)
                     temporary = directory / name
@@ -83,9 +89,9 @@ def live_checks(binary, caddy, work_dir, protocols):
                     fixture.require(config_path.read_bytes() == original,
                                     "transport override changed the shared config")
                     output = client.log_path.read_text(errors="replace")
-                    fixture.require(not any(value in output for value in (key, user, password)),
+                    fixture.require(not any(value in output for value in (user, password, quote(user, safe=""), quote(password, safe=""))),
                                     "transport override leaked authentication")
-                    if name != "no-connect":
+                    if transport != "no-connect":
                         classic_count += 2
                         fixture.wait_until(
                             lambda: sum(request.get("method") == "CONNECT" for request in
@@ -98,16 +104,18 @@ def live_checks(binary, caddy, work_dir, protocols):
                                                 for request in requests),
                                         "no-connect CLI emitted an outer CONNECT")
                         fixture.require(not any(
-                            key.lower() in {"authorization", "proxy-authorization"}
+                            key.lower() in {"authorization", "proxy-authorization", "x-classic-only"}
                             for request in requests for key in request.get("headers", {})),
-                            "no-connect forwarded unused classic credentials")
+                            "no-connect sent classic-only headers instead of application authentication")
                     print(f"PASS {protocol} shared-config CLI {name}: both listeners", flush=True)
                 server.stop()
                 fixture.require(not target.failures, "shared-config target stream failed")
                 summaries.append({"protocol": protocol, "status": "PASS",
                                   "unchanged_config": True, "classic_connects": classic_count,
                                   "no_connect_outer_connects": 0,
-                                  "unused_classic_auth_headers": 0})
+                                  "classic_only_headers_in_no_connect": 0,
+                                  "shared_proxy_credentials": True,
+                                  "separate_transport_key": False})
             finally:
                 for process in reversed(processes):
                     process.stop()
@@ -160,7 +168,7 @@ def main():
             if result.returncode != status or expected not in output:
                 raise AssertionError(f"{name}: unexpected status or diagnostic (status {result.returncode})")
             if any(value in output for value in (secret, "switch-user", "switch-password")) or "SOCKS5 listening" in output or "NaiveFox started" in output:
-                raise AssertionError(f"{name}: leaked key or started the runtime")
+                raise AssertionError(f"{name}: leaked credentials or started the runtime")
             checks += 1
 
         check("default classic", [], base, ready)
@@ -168,10 +176,9 @@ def main():
         check("classic option uses default path", ["--transport", "classic"], base, ready)
         check("help documents transport", ["--help"], base, "--transport classic|no-connect", 0)
 
-        keyed = {**base, "no-connect-key": secret,
-                 "proxy": "https://switch-user:switch-password@proxy.invalid"}
+        shared = {**base, "proxy": "https://switch-user:switch-password@proxy.invalid"}
         for json_mode in (None, "classic", "no-connect"):
-            config = dict(keyed)
+            config = dict(shared)
             if json_mode:
                 config["transport"] = json_mode
             for arguments in (
@@ -182,17 +189,37 @@ def main():
                 ["--transport=no-connect", "selected.json"],
             ):
                 check(f"no-connect precedence {json_mode} {arguments}", arguments, config, ready)
-        native = {**keyed, "transport": "no-connect"}
-        check("JSON no-connect without override", ["selected.json"], native, ready)
-        check("classic override retains unused key", ["--transport=classic", "selected.json"], native, ready)
-        check("classic override does not require unused key", ["--transport", "classic"], {**base, "transport": "no-connect"}, ready)
-        check("default classic retains unused valid key", [], keyed, ready)
-        check("explicit classic retains unused valid key", [], {**keyed, "transport": "classic"}, ready)
-        check("override requires private config key", ["--transport=no-connect"], base, "no-connect transport requires no-connect-key")
-        check("no-connect accepts unused classic credentials", ["--transport=no-connect"], keyed, ready)
-        check("override still rejects active preamble", ["--transport=no-connect"], {**keyed, "preamble": {"mode": "document-complete", "path": "/"}}, "no-connect transport does not accept classic preamble")
-        check("override still validates unused key", ["--transport=classic"], {**native, "no-connect-key": "short"}, "no-connect-key must contain 32 through 1024")
-        check("override does not hide invalid JSON transport", ["--transport=classic"], {**base, "transport": "invalid"}, "transport must be classic or no-connect")
+        native = {**shared, "transport": "no-connect"}
+        check("JSON no-connect uses proxy credentials", ["selected.json"], native, ready)
+        check("same credentials classic override", ["--transport=classic", "selected.json"], native, ready)
+        check("default classic shared credentials", [], shared, ready)
+        check("explicit classic shared credentials", [], {**shared, "transport": "classic"}, ready)
+        for proxy in ("https://proxy.invalid", "https://user:@proxy.invalid",
+                      "https://:password@proxy.invalid", "https://:@proxy.invalid"):
+            for mode in ("classic", "no-connect"):
+                check(f"empty credential parsing {mode}", [f"--transport={mode}"],
+                      {**base, "proxy": proxy}, ready)
+        classic_options = {
+            **shared, "preamble": {"mode": "document-complete", "path": "/"},
+            "extra-headers": "X-Classic-Only: enabled\r\n", "outer-session-gate": True,
+            "diagnostic-optimistic-local-reply": True,
+            "diagnostic-first-socks-tunnel-urgent-start": True,
+        }
+        check("no-connect ignores valid classic options", ["--transport=no-connect"], classic_options, ready)
+        check("classic keeps classic options", ["--transport=classic"], classic_options, ready)
+        check("inactive preamble still has strict syntax", ["--transport=no-connect"],
+              {**shared, "preamble": True}, "preamble")
+        check("inactive headers still have strict syntax", ["--transport=no-connect"],
+              {**shared, "extra-headers": "invalid"}, "header")
+        check("override does not hide invalid JSON transport", ["--transport=classic"],
+              {**base, "transport": "invalid"}, "transport must be classic or no-connect")
+        for value in (secret, None, False, 42, {}):
+            for mode in ("classic", "no-connect"):
+                check(f"removed key migration {mode}", [f"--transport={mode}"],
+                      {**shared, "no-connect-key": value}, "no-connect-key is no longer supported")
+        for field in ("username", "password", "no-connect-user", "no-connect-password"):
+            check("no extra authentication fields", ["--transport=no-connect"],
+                  {**shared, field: "unused"}, "unsupported config field")
 
         for arguments in (
             ["--transport"],

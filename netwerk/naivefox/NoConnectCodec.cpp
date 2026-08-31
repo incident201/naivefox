@@ -6,7 +6,6 @@
 
 #include <algorithm>
 #include <cstring>
-#include <limits>
 #include <utility>
 
 #include "pk11pub.h"
@@ -29,10 +28,6 @@ void WriteUint32(uint8_t* aBytes, uint32_t aValue) {
 
 bool ValidKind(Kind aKind) {
   return aKind >= Kind::Open && aKind <= Kind::Opened;
-}
-
-bool CanAdvance(uint32_t aSequence, size_t aLength) {
-  return aLength <= std::numeric_limits<uint32_t>::max() - aSequence;
 }
 
 }  // namespace
@@ -154,10 +149,10 @@ bool StreamState::Receive(const Frame& aFrame) {
       if (!mOpened || mReceivedFin || aFrame.sequence != mNextReceive ||
           aFrame.body.empty() ||
           aFrame.body.size() > kMaxCell - kCellHeader - kFrameHeader ||
-          aFrame.body.size() > mReceiveCredit ||
-          !CanAdvance(mNextReceive, aFrame.body.size())) {
+          aFrame.body.size() > mReceiveCredit) {
         return Fail();
       }
+      // Byte offsets wrap modulo 2^32; outstanding data remains credit-bound.
       mNextReceive += static_cast<uint32_t>(aFrame.body.size());
       mReceiveCredit -= static_cast<uint32_t>(aFrame.body.size());
       mBufferedBytes += static_cast<uint32_t>(aFrame.body.size());
@@ -197,9 +192,6 @@ bool StreamState::MakeData(const uint8_t* aData, size_t aLength,
       aLength > kMaxCell - kCellHeader - kFrameHeader ||
       aLength > mSendCredit) {
     return false;
-  }
-  if (!CanAdvance(mNextSend, aLength)) {
-    return Fail();
   }
   Frame frame{Kind::Data, mId, mNextSend,
               std::vector<uint8_t>(aData, aData + aLength)};

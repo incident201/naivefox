@@ -56,6 +56,96 @@ TEST(NaiveFoxHttpConnectParser, ArbitraryFragmentation)
   }
 }
 
+TEST(NaiveFoxHttpConnectParser, PreservesAbsoluteDomainAcrossFragmentation)
+{
+  for (const char* host :
+       {"localhost.", "Example.COM.", "a.", "xn--e1afmkfd.xn--p1ai."}) {
+    nsAutoCString authority(host);
+    authority.AppendLiteral(":443");
+    nsAutoCString request("CONNECT "_ns);
+    request.Append(authority);
+    request.AppendLiteral(" HTTP/1.1\r\n\r\n");
+    for (size_t split = 0; split <= request.Length(); ++split) {
+      HttpConnectParser parser;
+      size_t consumed = 0;
+      auto event = Consume(parser, Substring(request, 0, split), consumed);
+      EXPECT_EQ(consumed, split);
+      if (split < request.Length()) {
+        EXPECT_EQ(event, HttpConnectParser::Event::NeedMore);
+        event = Consume(parser, Substring(request, split), consumed);
+        EXPECT_EQ(consumed, request.Length() - split);
+      }
+      EXPECT_EQ(event, HttpConnectParser::Event::RequestReady)
+          << authority.get();
+      EXPECT_TRUE(parser.Target().mHost.Equals(host));
+      EXPECT_EQ(parser.Target().mPort, 443);
+      EXPECT_FALSE(parser.Target().mIPv6);
+      EXPECT_EQ(parser.Target().Authority(), authority);
+    }
+  }
+}
+
+TEST(NaiveFoxHttpConnectParser, AbsoluteDomainStillRejectsMalformedAuthority)
+{
+  for (const char* authority :
+       {".:443", "..:443", ".example.com.:443", "example..com.:443",
+        "example.com..:443", "-example.com.:443", "example-.com.:443",
+        "example.com-.:443", "example/com.:443", "user@example.com.:443",
+        "example.\tcom.:443",
+        "example.\x01"
+        "com.:443",
+        "123.:443", "127.0.0.1.:443", "[::1].:443", "::1.:443",
+        "example.com.:0", "example.com.:65536", "example.com.:443."}) {
+    nsAutoCString request("CONNECT "_ns);
+    request.Append(authority);
+    request.AppendLiteral(" HTTP/1.1\r\n\r\n");
+    HttpConnectParser parser;
+    size_t consumed = 0;
+    EXPECT_EQ(Consume(parser, request, consumed),
+              HttpConnectParser::Event::ProtocolError)
+        << authority;
+  }
+}
+
+TEST(NaiveFoxHttpConnectParser, AbsoluteDomainRetainsDnsLengthLimits)
+{
+  for (size_t lastLabelLength = 61; lastLabelLength <= 64; ++lastLabelLength) {
+    nsAutoCString host;
+    for (size_t label = 0; label < 3; ++label) {
+      for (size_t i = 0; i < 63; ++i) {
+        host.Append('a');
+      }
+      host.Append('.');
+    }
+    for (size_t i = 0; i < lastLabelLength; ++i) {
+      host.Append('b');
+    }
+    host.Append('.');
+    nsAutoCString request("CONNECT "_ns);
+    request.Append(host);
+    request.AppendLiteral(":443 HTTP/1.1\r\n\r\n");
+    HttpConnectParser parser;
+    size_t consumed = 0;
+    EXPECT_EQ(Consume(parser, request, consumed),
+              lastLabelLength == 61 ? HttpConnectParser::Event::RequestReady
+                                    : HttpConnectParser::Event::ProtocolError)
+        << host.Length();
+    if (lastLabelLength == 61) {
+      EXPECT_EQ(host.Length(), 254U);
+      EXPECT_EQ(parser.Target().mHost, host);
+    }
+  }
+  nsAutoCString request("CONNECT "_ns);
+  for (size_t i = 0; i < 64; ++i) {
+    request.Append('a');
+  }
+  request.AppendLiteral(".example.:443 HTTP/1.1\r\n\r\n");
+  HttpConnectParser parser;
+  size_t consumed = 0;
+  EXPECT_EQ(Consume(parser, request, consumed),
+            HttpConnectParser::Event::ProtocolError);
+}
+
 TEST(NaiveFoxHttpConnectParser, ByteByByteAndSplitCrlf)
 {
   const nsAutoCString request(
@@ -130,6 +220,30 @@ TEST(NaiveFoxHttpConnectParser, RejectsOversizedHeaders)
   EXPECT_EQ(Consume(parser, request, consumed),
             HttpConnectParser::Event::HeaderTooLarge);
   EXPECT_EQ(consumed, HttpConnectParser::kMaximumHeaderBytes);
+}
+
+TEST(NaiveFoxHttpConnectParser, RejectsNulAnywhereInAuthority)
+{
+  struct Case final {
+    const char* mPrefix;
+    const char* mSuffix;
+  };
+  static constexpr Case kCases[] = {
+      {"127.0.0.1", ".evil:443"}, {"[::1", ".evil]:443"},
+      {"example", ".com:443"},    {"example.com:4", "43"},
+      {"127.0.0.1:443", ""},      {"", "example.com:443"},
+  };
+  for (const auto& test : kCases) {
+    nsAutoCString request("CONNECT "_ns);
+    request.Append(test.mPrefix);
+    request.Append('\0');
+    request.Append(test.mSuffix);
+    request.AppendLiteral(" HTTP/1.1\r\n\r\n");
+    HttpConnectParser parser;
+    size_t consumed = 0;
+    EXPECT_EQ(Consume(parser, request, consumed),
+              HttpConnectParser::Event::ProtocolError);
+  }
 }
 
 }  // namespace mozilla::naivefox

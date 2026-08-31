@@ -15,7 +15,10 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <memory>
 #include <string>
+#include <utility>
+#include <vector>
 
 namespace {
 
@@ -23,11 +26,14 @@ constexpr uint32_t kMaxBody = 8 * 1024 * 1024;
 constexpr size_t kMaxHeader = 16 * 1024;
 
 enum class Reply { Accepted, Rejected, Invalid };
-enum class Operation { Download, Upload, Idle, Reset, Reject };
+enum class Operation {
+  Download, Upload, Idle, Reset, Reject, Concurrent, AuthPartition, PolicyReject
+};
 
 struct Options {
   bool socks = false;
   uint16_t localPort = 0;
+  uint16_t alternatePort = 0;
   std::string targetHost;
   uint16_t targetPort = 0;
   Operation operation = Operation::Download;
@@ -54,7 +60,8 @@ class Socket final {
 
 void Timeout(int) {
   constexpr char error[] = "FAIL: operation timed out\n";
-  (void)write(STDERR_FILENO, error, sizeof(error) - 1);
+  const ssize_t ignored = write(STDERR_FILENO, error, sizeof(error) - 1);
+  (void)ignored;
   _exit(1);
 }
 
@@ -63,11 +70,49 @@ int Fail(const char* aMessage) {
   return 1;
 }
 
+// Choose ports in the guest network namespace, keeping both bound until both
+// numbers have been read. The client cannot inherit these descriptors, so a
+// later bind failure must still fail the fixture and retain its diagnostics.
+int AllocateListeners() {
+  std::array<uint16_t, 2> ports{};
+  {
+    std::array<Socket, 2> sockets;
+    for (size_t index = 0; index < sockets.size(); ++index) {
+      sockaddr_in address{};
+      address.sin_family = AF_INET;
+      address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+      if (sockets[index].Get() < 0 ||
+          bind(sockets[index].Get(), reinterpret_cast<sockaddr*>(&address),
+               sizeof(address)) != 0) {
+        return Fail("guest listener port allocation failed");
+      }
+    }
+    for (size_t index = 0; index < sockets.size(); ++index) {
+      sockaddr_in address{};
+      socklen_t length = sizeof(address);
+      if (getsockname(sockets[index].Get(),
+                      reinterpret_cast<sockaddr*>(&address), &length) != 0 ||
+          length != sizeof(address) || address.sin_family != AF_INET ||
+          !address.sin_port) {
+        return Fail("guest listener port lookup failed");
+      }
+      ports[index] = ntohs(address.sin_port);
+    }
+    if (ports[0] == ports[1]) {
+      return Fail("guest listener ports overlap");
+    }
+  }
+  std::printf("%u %u\n", static_cast<unsigned>(ports[0]),
+              static_cast<unsigned>(ports[1]));
+  return 0;
+}
+
 int Usage() {
   std::fputs(
-      "Usage: android_transport_probe socks|http LOCALPORT TARGETHOST "
-      "TARGETPORT download|upload|idle|reset|reject LENGTH "
-      "[ACK_HEX|-] [slow]\n",
+      "Usage: android_transport_probe --allocate-listeners\n"
+      "       android_transport_probe socks|http LOCALPORT TARGETHOST "
+      "TARGETPORT download|upload|idle|reset|reject|concurrent|auth-partition|policy-reject "
+      "LENGTH [ACK_HEX|HTTPPORT|-] [slow]\n",
       stderr);
   return 2;
 }
@@ -144,11 +189,21 @@ bool Parse(int aCount, char** aArguments, Options& aOptions) {
     aOptions.operation = Operation::Reset;
   } else if (std::strcmp(operation, "reject") == 0) {
     aOptions.operation = Operation::Reject;
+  } else if (std::strcmp(operation, "concurrent") == 0) {
+    aOptions.operation = Operation::Concurrent;
+  } else if (std::strcmp(operation, "auth-partition") == 0) {
+    aOptions.operation = Operation::AuthPartition;
+  } else if (std::strcmp(operation, "policy-reject") == 0) {
+    aOptions.operation = Operation::PolicyReject;
   } else {
     return false;
   }
-  if (aOptions.operation != Operation::Download &&
-      aOptions.operation != Operation::Upload && aOptions.length != 0) {
+  if (aOptions.operation == Operation::Concurrent) {
+    if (!aOptions.socks || aOptions.length <= 32 || aOptions.length > 128) {
+      return false;
+    }
+  } else if (aOptions.operation != Operation::Download &&
+             aOptions.operation != Operation::Upload && aOptions.length != 0) {
     return false;
   }
 
@@ -163,7 +218,15 @@ bool Parse(int aCount, char** aArguments, Options& aOptions) {
     }
     aOptions.slow = true;
   }
-  if (aOptions.operation == Operation::Upload) {
+  if (aOptions.operation == Operation::AuthPartition) {
+    uint32_t alternatePort = 0;
+    if (!aOptions.socks || aOptions.slow ||
+        !Number(acknowledgement, 65535, alternatePort) || !alternatePort ||
+        alternatePort == aOptions.localPort) {
+      return false;
+    }
+    aOptions.alternatePort = static_cast<uint16_t>(alternatePort);
+  } else if (aOptions.operation == Operation::Upload) {
     if (std::strlen(acknowledgement) != 80) {
       return false;
     }
@@ -335,6 +398,97 @@ Reply HttpConnect(int aSocket, const Options& aOptions) {
   return Reply::Invalid;
 }
 
+bool Concurrent(const Options& aOptions) {
+  std::vector<std::unique_ptr<Socket>> sockets;
+  sockets.reserve(aOptions.length);
+  for (uint32_t index = 0; index < aOptions.length; ++index) {
+    auto local = std::make_unique<Socket>();
+    if (!ConnectLocal(local->Get(), aOptions) ||
+        SocksConnect(local->Get(), aOptions) != Reply::Accepted) {
+      return false;
+    }
+    sockets.push_back(std::move(local));
+  }
+
+  std::array<uint8_t, 69> request{};
+  request[0] = 'E';
+  for (size_t i = 5; i < request.size(); ++i) {
+    request[i] = static_cast<uint8_t>(i);
+  }
+  for (uint32_t index = 0; index < aOptions.length; ++index) {
+    request[1] = static_cast<uint8_t>(index >> 24);
+    request[2] = static_cast<uint8_t>(index >> 16);
+    request[3] = static_cast<uint8_t>(index >> 8);
+    request[4] = static_cast<uint8_t>(index);
+    if (!WriteAll(sockets[index]->Get(), request.data(), request.size())) {
+      return false;
+    }
+  }
+  for (uint32_t index = 0; index < aOptions.length; ++index) {
+    std::array<uint8_t, 68> response{};
+    if (!ReadAll(sockets[index]->Get(), response.data(), response.size())) {
+      return false;
+    }
+    const uint32_t received = (uint32_t(response[0]) << 24) |
+                              (uint32_t(response[1]) << 16) |
+                              (uint32_t(response[2]) << 8) | response[3];
+    if (received != index) {
+      return false;
+    }
+    for (size_t i = 4; i < response.size(); ++i) {
+      if (response[i] != static_cast<uint8_t>(i + 1)) {
+        return false;
+      }
+    }
+    if (shutdown(sockets[index]->Get(), SHUT_WR) != 0) {
+      return false;
+    }
+  }
+  for (const auto& local : sockets) {
+    if (!EndOfStream(local->Get())) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool AuthPartition(const Options& aOptions) {
+  Socket first;
+  const uint8_t echo = 'E';
+  const std::array<uint8_t, 16> payload{
+      0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+  auto exchange = [&](int aSocket) {
+    std::array<uint8_t, 16> received{};
+    return WriteAll(aSocket, payload.data(), payload.size()) &&
+           ReadAll(aSocket, received.data(), received.size()) &&
+           received == payload;
+  };
+  if (!ConnectLocal(first.Get(), aOptions) ||
+      SocksConnect(first.Get(), aOptions) != Reply::Accepted ||
+      !WriteAll(first.Get(), &echo, 1) || !exchange(first.Get())) {
+    return false;
+  }
+
+  Options rejectedOptions = aOptions;
+  rejectedOptions.localPort = aOptions.alternatePort;
+  rejectedOptions.socks = false;
+  Socket rejected;
+  if (!ConnectLocal(rejected.Get(), rejectedOptions) ||
+      HttpConnect(rejected.Get(), rejectedOptions) != Reply::Rejected ||
+      !exchange(first.Get())) {
+    return false;
+  }
+
+  Socket second;
+  if (!ConnectLocal(second.Get(), aOptions) ||
+      SocksConnect(second.Get(), aOptions) != Reply::Accepted ||
+      !WriteAll(second.Get(), &echo, 1) || !exchange(second.Get())) {
+    return false;
+  }
+  return shutdown(second.Get(), SHUT_WR) == 0 && EndOfStream(second.Get()) &&
+         shutdown(first.Get(), SHUT_WR) == 0 && EndOfStream(first.Get());
+}
+
 bool SendRequest(int aSocket, uint8_t aKind, uint32_t aLength) {
   const uint8_t request[]{aKind, static_cast<uint8_t>(aLength >> 24),
                           static_cast<uint8_t>(aLength >> 16),
@@ -439,6 +593,9 @@ bool Reset(int aSocket) {
 }  // namespace
 
 int main(int argc, char** argv) {
+  if (argc == 2 && std::strcmp(argv[1], "--allocate-listeners") == 0) {
+    return AllocateListeners();
+  }
   Options options;
   if (!Parse(argc, argv, options)) {
     return Usage();
@@ -451,13 +608,39 @@ int main(int argc, char** argv) {
     return Fail("timeout setup failed");
   }
   alarm(60);
+  if (options.operation == Operation::Concurrent) {
+    if (!Concurrent(options)) {
+      return Fail("concurrent OPEN barrier or stream lifecycle failed");
+    }
+    alarm(0);
+    std::puts("PASS: simultaneous logical streams");
+    return 0;
+  }
+  if (options.operation == Operation::AuthPartition) {
+    if (!AuthPartition(options)) {
+      return Fail("carrier credential partition or stream lifecycle failed");
+    }
+    alarm(0);
+    std::puts("PASS: authenticated carrier credential partition");
+    return 0;
+  }
   Socket local;
   if (!ConnectLocal(local.Get(), options)) {
     return Fail("local proxy connection failed");
   }
   const Reply reply = options.socks ? SocksConnect(local.Get(), options)
                                     : HttpConnect(local.Get(), options);
-  if (options.operation == Operation::Reject) {
+  if (options.operation == Operation::PolicyReject) {
+    if (reply == Reply::Accepted) {
+      const timeval timeout{5, 0};
+      if (setsockopt(local.Get(), SOL_SOCKET, SO_RCVTIMEO, &timeout,
+                     sizeof(timeout)) != 0 || !EndOfStream(local.Get())) {
+        return Fail("policy-denied tunnel did not close without target data");
+      }
+    } else if (reply != Reply::Rejected) {
+      return Fail("invalid policy refusal reply");
+    }
+  } else if (options.operation == Operation::Reject) {
     if (reply != Reply::Rejected) {
       return Fail("local proxy did not reject the request");
     }
@@ -480,6 +663,9 @@ int main(int argc, char** argv) {
         success = Reset(local.Get());
         break;
       case Operation::Reject:
+      case Operation::Concurrent:
+      case Operation::AuthPartition:
+      case Operation::PolicyReject:
         break;
     }
     if (!success) {

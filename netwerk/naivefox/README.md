@@ -33,28 +33,26 @@ reads `./config.json`; one positional argument selects another config:
 
 `--transport classic|no-connect` overrides the JSON `transport` field. It may
 precede or follow the optional config path; without a path, it uses
-`./config.json`. The `--transport=value` form is also accepted. A no-connect
-key must remain in the private config, never on the command line. An explicit
-classic selection retains a valid no-connect key but does not use it.
-Selection occurs before mode validation and implicit preamble defaults;
-incompatible options still fail. Diagnostic CLI modes cannot be combined with
-this config-mode override.
+`./config.json`. The `--transport=value` form is also accepted. Both transports
+use the same percent-decoded username and password from the private `proxy`
+URI. No separate transport secret or authentication field is needed.
 
-One private config can contain both credentials and work unchanged with either
-transport. With no override this example uses classic; add
-`--transport no-connect` to select the application protocol:
+This file uses classic by default; add `--transport no-connect` to select the
+application protocol without changing its credentials:
 
 ```json
 {
   "listen": "socks://127.0.0.1:1080",
-  "proxy": "https://user:password@proxy.example:443",
-  "no-connect-key": "REPLACE-WITH-A-PRIVATE-RANDOM-SECRET",
-  "preamble": {"mode": "off"}
+  "proxy": "https://user:password@proxy.example:443"
 }
 ```
 
-The key never enables no-connect by itself. Proxy URI credentials remain
-available for classic and are not sent by no-connect.
+Transport selection occurs before implicit preamble defaults. Valid classic
+preamble, extra-header, gate and diagnostic settings remain inactive in
+no-connect mode, so the same file switches back to classic unchanged.
+Malformed settings still fail validation. Diagnostic CLI modes cannot be
+combined with this config-mode override. Remove the obsolete `no-connect-key`
+field from older configs; authentication now comes only from the proxy URI.
 
 The staged Windows package provides `run-naivefox.cmd` beside its runtime and
 accepts the same optional config path.
@@ -82,13 +80,11 @@ The supported config is a strict NaiveProxy-compatible subset:
 
 - `transport` is `"classic"` by default or `"no-connect"` for the optional
   application transport. This is independent of H2/H3 selection in `proxy`.
-  `no-connect-key` is required for the effective `no-connect` selection and
-  contains 32 through 1024 printable ASCII bytes shared with the server; keep it
-  in a private config. A valid key may remain unused in classic mode; its
-  presence never changes the selected transport. No-connect ignores the parsed
-  upstream URI credentials and never sends them. Active classic preambles,
-  extra CONNECT headers, enabled outer-session gates and classic diagnostic
-  options are rejected in this mode. Local SOCKS authentication remains available.
+  Both modes use the same proxy URI credentials and the server's shared
+  forward-proxy authentication and access policy. No-connect does not run a
+  classic preamble or send extra CONNECT headers; valid classic-only settings
+  are parsed but remain inactive in this mode. Local SOCKS authentication
+  remains available.
 - `listen` is one URI or a non-empty array. `socks://` serves SOCKS5 CONNECT;
   without userinfo it uses the normal no-auth method. SOCKS credentials are
   optional, percent-decoded, and checked with RFC 1929 username/password
@@ -99,7 +95,10 @@ The supported config is a strict NaiveProxy-compatible subset:
   over QUIC. Upstream credentials are optional and percent-decoded; when
   userinfo is present it uses `username:password`, so either side may be
   empty (`user:`, `:password`, or `:@`). Classic passes them to Necko's
-  proxy-auth path; no-connect leaves them unused. Port 443 is used when omitted.
+  proxy-auth path; no-connect authenticates its application carrier with the
+  same pair. Missing or empty credentials retain the same parsing semantics;
+  the server decides whether they satisfy its authentication policy.
+  Port 443 is used when omitted.
 - `insecure-concurrency` accepts a positive JSON integer or a decimal string for
   NaiveProxy/Exclave config compatibility. NaiveFox validates the value and
   ignores it; connection pooling, concurrency, and tunnel lifecycle remain
@@ -526,29 +525,28 @@ and fallback details. Downstream Firefox hooks are inventoried in
 
 ## Opting into no-connect
 
-Use the normal config-file launcher with a separately provisioned transport key:
+Build Caddy with `forwardproxy@naive` and `naivefox_transport`, then select
+the transport using the existing proxy URI:
 
 ```json
 {
-  "listen": ["socks://127.0.0.1:1080", "http://127.0.0.1:8080"],
-  "proxy": "quic://proxy.example:443",
-  "transport": "no-connect",
-  "no-connect-key": "REPLACE-WITH-A-PRIVATE-RANDOM-SECRET"
+  "listen": "socks://127.0.0.1:1080",
+  "proxy": "quic://user:password@proxy.example:443",
+  "transport": "no-connect"
 }
 ```
 
-`https://` selects strict H2 and `quic://` selects strict H3 in either transport.
-The key is an application credential, separate from classic proxy user/password.
-No automatic fallback from `no-connect` to `classic` occurs. To use `classic`,
-remove `no-connect-key` and set `transport` to `classic` or omit it; restore
-upstream URI credentials if the forward proxy requires them.
+Configure forward-proxy credentials and its normal destination policy once
+on the server; both transports share that authority. There is no separate
+application key or no-connect target list. Changing only `transport` to
+`classic`, omitting it, or using `--transport classic` returns to the stable
+protocol with the same credentials. No automatic fallback between transports
+occurs.
 
-The native client does not run the experimental browser worker, JavaScript,
-DOM, graphics, or loopback WebSocket bridge. Its HTTP bodies interoperate with
-the module's `continuous-bulk-pipeline` profile. The exact port boundary,
-server setup, resource bounds and validation requirements are in
-[NO-CONNECT.md](NO-CONNECT.md). Historical full-browser measurements are not
-measurements of the native implementation.
+The matching server, migration notes, protocol limits and exact lean port
+boundary are documented in [NO-CONNECT.md](NO-CONNECT.md). Historical
+browser-worker measurements are not claims about this native client.
+
 
 ## Building and testing
 

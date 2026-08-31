@@ -15,53 +15,53 @@ Its registered Caddy module is `http.handlers.naivefox_transport`.
 ```json
 {
   "listen": ["socks://127.0.0.1:1080", "http://127.0.0.1:8080"],
-  "proxy": "quic://user:password@proxy.example:443",
-  "no-connect-key": "REPLACE-WITH-A-PRIVATE-RANDOM-SECRET",
-  "preamble": {"mode": "off"}
+  "proxy": "quic://user:password@proxy.example:443"
 }
 ```
 
 Launch this private file with `./naivefox /absolute/path/to/config.json` to
-use the default classic transport. To change only the transport, use
-`./naivefox /absolute/path/to/config.json --transport no-connect` or
-`./naivefox --transport=classic /absolute/path/to/config.json`. The option may
-precede or follow the path; omission of the path reads `./config.json`.
-Replace the example key with a cryptographically random secret shared with the
-module. `no-connect-key` accepts 32 through 1024 printable ASCII bytes and is
-required when the effective transport is `no-connect`; it is never a CLI
-argument, URL parameter or log field. A valid key is retained but unused
-whenever classic is selected; the key never enables no-connect by itself.
-The proxy URI can retain classic credentials for either selection, but
-no-connect never puts them in its request headers. The same file can therefore
-switch in either direction without editing either secret. Selection precedes
-validation and implicit preamble defaults; malformed fields
-and incompatible mode options are not bypassed. JSON values do not expand
-environment variables. Protect the config file as a credential. Diagnostic CLI
-modes cannot be combined with `--transport`.
+use classic by default. Select no-connect with
+`./naivefox /absolute/path/to/config.json --transport no-connect`, and switch
+back with `./naivefox --transport=classic /absolute/path/to/config.json`.
+The option may precede or follow the path; omission of the path reads
+`./config.json`. JSON `"transport":"no-connect"` selects the same mode.
+Credentials never select a transport implicitly.
 
-No-connect rejects extra CONNECT headers, active classic preambles, enabled
-outer-session gates and classic diagnostic options. Explicit
-`preamble: {"mode":"off"}` and false diagnostic values remain harmless.
-Local SOCKS username/password authentication, listener mapping,
+Both modes authenticate using the same percent-decoded username and password
+from `proxy`. No-connect carries their Basic authentication value inside a
+TLS-protected application AUTH frame; classic uses normal proxy authentication.
+There is no separate client key, server key or no-connect target allowlist.
+Keep credentials in the private config, not command-line authentication flags,
+query parameters or logs. JSON values do not expand environment variables.
+
+The removed `no-connect-key` field is rejected with a migration error, even
+when classic is selected. Delete that field and retain the existing forward-proxy
+credentials in the URI. Upgrade older key-based servers together with clients;
+the native carrier rejects servers that do not advertise the shared Basic
+authentication contract.
+
+Valid classic preambles, extra CONNECT headers, outer-session gates and classic
+diagnostic settings are inactive when no-connect is selected. Their values are
+still parsed strictly, and switching back to classic reapplies the unchanged
+configuration. No-connect never sends those extra CONNECT headers or emits an
+implicit classic preamble. Local SOCKS authentication, listener mapping,
 `host-resolver-rules`, certificate trust and `max-connections` keep their usual
-meaning. A host mapping changes the physical destination, not TLS hostname
-validation. There is no automatic downgrade to `classic`.
+meaning. Missing or explicitly empty URI credentials retain classic parsing
+semantics; authentication acceptance belongs to the server. There is no
+automatic downgrade to classic.
 
-Build Caddy with both the forward-proxy and transport modules, using the
-module repository's maintained
-[build and configuration instructions](https://github.com/incident201/naivefox-transport#readme).
-Its [combined Caddyfile example](https://github.com/incident201/naivefox-transport/blob/main/examples/Caddyfile)
-routes ordinary application requests to `naivefox_transport` and passes CONNECT
-to `forward_proxy`. One TLS endpoint can therefore serve both client modes;
-classic authentication and the application key remain separate. Configure an
-exact target `host:port` allowlist, valid TLS certificates, and the
-`continuous-bulk-pipeline` profile. An arbitrary existing static website or a
-Caddy binary with only forwardproxy cannot serve no-connect.
+Build Caddy with both modules using the server repository's
+[build and configuration instructions](https://github.com/incident201/naivefox-transport#readme)
+and [combined Caddyfile example](https://github.com/incident201/naivefox-transport/blob/main/examples/Caddyfile).
+Configure `forward_proxy` authentication and its normal `hosts`, `ports` and
+`acl` policy once. The transport module uses that same forward-proxy authority
+for authentication and destination access, while preserving valid TLS
+certificates and the `continuous-bulk-pipeline` profile. An arbitrary static
+website or a Caddy binary with only forwardproxy cannot serve no-connect.
 
 The module owns the server SPA/assets and protocol endpoints. Native clients
 consume that HTTP contract without executing or rendering the SPA. Match the
-module and client protocol/profile versions during upgrades; do not assume all
-historical experimental profiles are compatible with the native client.
+module and client authentication contract and profile during upgrades.
 
 ## Exact port boundary
 
@@ -81,14 +81,14 @@ dependencies of native no-connect.
 Application cells sit inside normal HTTP bodies. Necko still owns H2/H3
 streams, pooling, flow control and packetization; NSS/PSM and Neqo still own
 TLS and QUIC. The client never turns a local SOCKS target hostname into a local
-DNS query. The authenticated server checks the target allowlist and opens the
-target connection.
+DNS query. The authenticated server applies the shared forward-proxy access policy
+before opening the target connection.
 
 The protocol preserves finite declared body capacities, ordinary HTTP
 completion, ordered application cells and per-stream credit. A partial response
 or invalid body cannot be accepted as successful completion. Target errors,
-invalid authentication, malformed cells, sequence exhaustion and transport
-failure must release the local stream with an error rather than replaying data
+invalid authentication, malformed cells, unexpected sequence offsets and
+transport failure must release the local stream with an error rather than replaying data
 or falling back to another transport.
 
 ## Selected protocol and limits
@@ -100,13 +100,16 @@ uses 16-KiB uploads and 256-KiB responses, with at most two ordered responses
 in flight. Idle uses one finite 512-byte long-poll response, held for at most
 30 seconds, with an explicit upload to wake local activity.
 
-The multiplexer permits at most 32 logical streams and bounds per-stream
-receive credit to 512 KiB. Stream byte sequences are 32-bit; a stream must fail
-before wrapping. Useful payload displaces cryptographic filler within granted
-capacity. This can cost extra traffic and latency; the selected profile is not
-a throughput or indistinguishability guarantee.
+Each carrier multiplexes up to 32 logical streams; additional connections can
+use additional carriers, so 32 is not a client-wide connection limit.
+Per-stream receive credit stays bounded at 512 KiB. Byte offsets wrap modulo
+2^32, with exact expected-offset checks and unchanged credit accounting; they
+do not impose a fixed stream-size limit or stop a transfer at 4 GiB.
+Useful payload displaces cryptographic filler within granted capacity. This
+can cost extra traffic and latency; the selected profile is not a throughput
+or indistinguishability guarantee.
 
-Session resumption, transparent reconnect/replay and automatic key rotation
+Session resumption, transparent reconnect/replay and automatic credential rotation
 are outside the current contract. Normal application retry after a reported
 connection failure remains the local client's responsibility.
 
@@ -127,14 +130,14 @@ python3 netwerk/naivefox/test/integration/run-transport-cli-tests.py \
 ```
 
 Add `--caddy /absolute/path/to/combined-caddy` to that command for an active
-H2/H3 check of one unchanged config containing both credentials. It starts
-classic by default, selects no-connect through the CLI, then selects classic
-again; both local listeners must work and no-connect must send neither outer
-CONNECT nor unused classic authentication headers.
+H2/H3 check of one unchanged config containing a single proxy URI credential
+pair. It starts classic by default, selects no-connect through the CLI, then
+selects classic again. Both local listeners must work; no-connect must emit no
+outer CONNECT and must not forward classic-only extra headers.
 
 Acceptance covers both transports against one Caddy process, H2 and H3, and
 SOCKS5 and HTTP CONNECT listeners. No-connect additionally needs authentication
-and allowlist failures, invalid/truncated cells, sequence/credit bounds,
+and shared access-policy failures, invalid/truncated cells, sequence/credit bounds,
 byte-exact uploads/downloads, concurrency, slow consumers, half-close, idle
 wake, cancellation and shutdown. Server request observations must show zero
 outer CONNECT for no-connect and successful CONNECT for classic. Do not disable

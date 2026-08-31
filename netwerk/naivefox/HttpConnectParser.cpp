@@ -73,16 +73,22 @@ bool ParsePort(const nsACString& aText, uint16_t& aPort) {
 }
 
 bool IsDomain(const nsACString& aHost) {
-  if (aHost.IsEmpty() || aHost.Length() > 253 || aHost.First() == '.' ||
-      aHost.Last() == '.') {
+  if (aHost.IsEmpty()) {
+    return false;
+  }
+  // A final dot denotes the DNS root (RFC 1034 section 3.1). Validate labels
+  // without that one dot, but preserve the original authority for remote DNS.
+  const nsDependentCSubstring host =
+      Substring(aHost, 0, aHost.Length() - (aHost.Last() == '.' ? 1 : 0));
+  if (host.IsEmpty() || host.Length() > 253 || host.First() == '.') {
     return false;
   }
   size_t labelLength = 0;
   bool labelStartsWithHyphen = false;
   bool allNumericOrDots = true;
   char previous = 0;
-  for (size_t i = 0; i < aHost.Length(); ++i) {
-    const char value = aHost.CharAt(i);
+  for (size_t i = 0; i < host.Length(); ++i) {
+    const char value = host.CharAt(i);
     if (value == '.') {
       if (labelLength == 0 || labelStartsWithHyphen || previous == '-') {
         return false;
@@ -105,7 +111,7 @@ bool IsDomain(const nsACString& aHost) {
     allNumericOrDots &= value >= '0' && value <= '9';
     previous = value;
   }
-  return labelLength != 0 && !labelStartsWithHyphen && aHost.Last() != '-' &&
+  return labelLength != 0 && !labelStartsWithHyphen && host.Last() != '-' &&
          !allNumericOrDots;
 }
 
@@ -188,7 +194,9 @@ HttpConnectParser::Event HttpConnectParser::ParseRequest() {
 
 bool HttpConnectParser::ParseAuthority(const nsACString& aAuthority) {
   nsAutoCString portText;
-  if (aAuthority.IsEmpty()) {
+  // inet_pton consumes a C string; reject embedded NUL before it can validate
+  // only an address prefix while the length-aware authority retains a suffix.
+  if (aAuthority.IsEmpty() || aAuthority.FindChar('\0') >= 0) {
     return false;
   }
   if (aAuthority.First() == '[') {

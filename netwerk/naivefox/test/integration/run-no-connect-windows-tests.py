@@ -67,19 +67,23 @@ def worker(path):
     module = fixture_module()
     job = json.loads(path.read_text())
     if job["action"] == "call":
-        allowed = {"download", "upload", "echo_wake", "cancel_stream", "open_tunnel"}
+        allowed = {"download", "upload", "echo_wake", "cancel_stream", "open_tunnel", "concurrent_open_streams", "auth_partition_streams", "reject_policy"}
         module.require(job["function"] in allowed, "unknown Windows workload")
         getattr(module, job["function"])(*job["args"], **job["kwargs"])
         return 0
     module.require(job["action"] == "client", "unknown Windows worker action")
     directory = Path(job["directory"])
-    ports = {"socks": module.free_port(), "http": module.free_port()}
-    while ports["http"] == ports["socks"]:
-        ports["http"] = module.free_port()
+    ports = job.get("listener_ports")
+    if ports is None:
+        ports = {"socks": module.free_port(), "http": module.free_port()}
+        while ports["http"] == ports["socks"]:
+            ports["http"] = module.free_port()
+    module.require(ports["socks"] != ports["http"], "shared Windows listeners overlap")
     config = job["config"]
     config["listen"] = [
         f"socks://127.0.0.1:{ports['socks']}", f"http://127.0.0.1:{ports['http']}"]
-    module.private_json(directory / "config.json", config)
+    config_path = Path(job.get("config_path", directory / "config.json"))
+    module.private_json(config_path, config)
     env = {key: value for key, value in os.environ.items() if key not in {
         "NAIVEFOX_PROFILE", "NAIVEFOX_PROXY_USER", "NAIVEFOX_PROXY_PASS",
         "SSL_CERT_FILE", "SSLKEYLOGFILE", "MOZ_LOG", "MOZ_LOG_FILE",
@@ -101,7 +105,7 @@ def worker(path):
     subprocess.Popen = hidden_popen
     try:
         process = module.Process(
-            [str(runtime), str(directory / "config.json")], directory, "client", env)
+            [str(runtime), str(config_path)], directory, "client", env)
     finally:
         subprocess.Popen = original_popen
     kernel = handle = None
@@ -234,10 +238,14 @@ def run_inside(args):
             [str(args.windows_python), worker_script, "--worker", winpath(specification)],
             stdout=log, stderr=subprocess.STDOUT)
 
-    def client_factory(unused, directory, config, env, ports):
+    def client_factory(inputs, directory, config, env, ports):
         job = {"action": "client", "directory": winpath(directory),
                "runtime": winpath(args.runtime), "config": config,
                "ca": winpath(env["SSL_CERT_FILE"]) if env.get("SSL_CERT_FILE") else None}
+        if getattr(inputs, "client_config_path", None) is not None:
+            job["config_path"] = winpath(inputs.client_config_path)
+        if getattr(inputs, "listener_ports", None) is not None:
+            job["listener_ports"] = dict(inputs.listener_ports)
         process = launch(job, directory, "worker")
         client = NativeClient(module, process, directory)
         try:
@@ -281,7 +289,7 @@ def run_inside(args):
 
     args.client_factory = client_factory
     module.start_caddy = start_caddy
-    for name in ("download", "upload", "echo_wake", "cancel_stream", "open_tunnel"):
+    for name in ("download", "upload", "echo_wake", "cancel_stream", "open_tunnel", "concurrent_open_streams", "auth_partition_streams", "reject_policy"):
         setattr(module, name, lambda *a, _name=name, **kw: call(_name, *a, **kw))
     try:
         modules = subprocess.check_output([str(args.caddy), "list-modules"], text=True)

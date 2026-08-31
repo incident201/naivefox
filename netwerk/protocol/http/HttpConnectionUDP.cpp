@@ -820,6 +820,21 @@ void HttpConnectionUDP::Close(nsresult reason, bool aIsShutdown) {
     mHttp3Session = nullptr;
   }
 
+#ifdef MOZ_NAIVEFOX
+  // Detach both queues before the first callback. Closing a transaction may
+  // reenter this connection; callbacks must not mutate the arrays being walked
+  // or have newly queued transactions erased by a trailing Clear().
+  nsTArray<RefPtr<nsHttpTransaction>> queuedHttpConnect =
+      std::move(mQueuedHttpConnectTransaction);
+  nsTArray<RefPtr<nsHttpTransaction>> queuedConnectUdp =
+      std::move(mQueuedConnectUdpTransaction);
+  for (const auto& trans : queuedHttpConnect) {
+    trans->Close(reason);
+  }
+  for (const auto& trans : queuedConnectUdp) {
+    trans->Close(reason);
+  }
+#else
   for (const auto& trans : mQueuedHttpConnectTransaction) {
     trans->Close(reason);
   }
@@ -828,6 +843,7 @@ void HttpConnectionUDP::Close(nsresult reason, bool aIsShutdown) {
     trans->Close(reason);
   }
   mQueuedConnectUdpTransaction.Clear();
+#endif
 #ifdef MOZ_NAIVEFOX
   if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
     NAIVEFOX_LIFECYCLE_LOG(
@@ -1305,8 +1321,22 @@ void HttpConnectionUDP::CloseTransaction(nsAHttpTransaction* trans,
   if (mHttp3Session) {
     // When proxy connnect failed, we call Http3Session::SetCleanShutdown to
     // force Http3Session to release this UDP connection.
-    mHttp3Session->SetCleanShutdown(aIsShutdown || transInQueue ||
-                                    (mIsInTunnel && !mProxyConnectSucceeded));
+    bool cleanShutdown = aIsShutdown || transInQueue ||
+                         (mIsInTunnel && !mProxyConnectSucceeded);
+#ifdef MOZ_NAIVEFOX
+    // Before the outer proxy handshake succeeds, CONNECT transactions live in
+    // this UDP connection's queues rather than the H3 session's stream maps.
+    // A terminal certificate failure must release the session now: Shutdown()
+    // cancels its timer and there may be no stream-owned mConnection to resume
+    // QUIC draining. Waiting for CLOSED would strand the queued transactions
+    // without their original TLS error or a local SOCKS/HTTP failure reply.
+    const bool failedProxyTLSHandshake =
+        trans == mHttp3Session && !mConnected && !mIsInTunnel && mConnInfo &&
+        mConnInfo->IsHttp3ProxyConnection() &&
+        NS_ERROR_GET_MODULE(reason) == NS_ERROR_MODULE_SECURITY;
+    cleanShutdown |= failedProxyTLSHandshake;
+#endif
+    mHttp3Session->SetCleanShutdown(cleanShutdown);
     mHttp3Session->Close(reason);
     if (!mHttp3Session->IsClosed()) {
       // During closing phase we still keep mHttp3Session session,
