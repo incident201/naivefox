@@ -50,6 +50,7 @@ PRODUCT_DOCS = {
     "CAPTURE.md",
     "SHIMS.md",
     "test/integration/README.md",
+    "test/integration/hybrid_app/BENCHMARK.md",
 }
 FORBIDDEN_BASENAMES = {
     "AGENTS.md",

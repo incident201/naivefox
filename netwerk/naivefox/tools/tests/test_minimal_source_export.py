@@ -7,9 +7,11 @@ import importlib.util
 import json
 import os
 import pathlib
+import posixpath
 import sys
 import tempfile
 import unittest
+import urllib.parse
 
 TOOLS = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(TOOLS))
@@ -48,9 +50,12 @@ class MinimalSourceExportTest(unittest.TestCase):
             "netwerk/naivefox/KNOWN-ISSUES.md": "# Known issues\n",
             "netwerk/naivefox/NO-CONNECT.md": "# No-connect\n",
             "netwerk/naivefox/FRONTING-PAGE.md": "# Fronting page\n",
-            "netwerk/naivefox/CAPTURE.md": "# Capture\n",
+            "netwerk/naivefox/CAPTURE.md": (
+                "# Capture\n[benchmark](test/integration/hybrid_app/BENCHMARK.md)\n"
+            ),
             "netwerk/naivefox/SHIMS.md": "# Shims\n",
             "netwerk/naivefox/test/integration/README.md": "# Integration\n",
+            "netwerk/naivefox/test/integration/hybrid_app/BENCHMARK.md": "# Benchmark\n",
         }
         self.plan = self.make_plan()
         self.write_export()
@@ -145,13 +150,33 @@ class MinimalSourceExportTest(unittest.TestCase):
 
     def test_operator_documents_are_required(self) -> None:
         for path in ("netwerk/naivefox/NO-CONNECT.md",
-                     "netwerk/naivefox/FRONTING-PAGE.md"):
+                     "netwerk/naivefox/FRONTING-PAGE.md",
+                     "netwerk/naivefox/test/integration/hybrid_app/BENCHMARK.md"):
             plan = dict(self.plan)
             plan["entries"] = [
                 entry for entry in self.plan["entries"] if entry["path"] != path
             ]
             with self.assertRaisesRegex(ValueError, "product document mapping"):
                 create_public_manifest(plan)
+
+    def test_actual_product_markdown_links_stay_within_exported_documents(self) -> None:
+        repo = TOOLS.parents[2]
+        for destination, source in PRODUCT_DOC_SOURCES.items():
+            content = (repo / source).read_text(encoding="utf-8")
+            if destination == "README.md":
+                content = render_root_readme(content)
+            for link in validator.markdown_destinations(content):
+                parsed = urllib.parse.urlsplit(link)
+                if parsed.scheme or parsed.netloc or not parsed.path:
+                    continue
+                path = urllib.parse.unquote(parsed.path)
+                if not path.lower().endswith(".md"):
+                    continue
+                target = posixpath.normpath(posixpath.join(
+                    posixpath.dirname(destination), path
+                ))
+                with self.subTest(document=destination, link=link):
+                    self.assertIn(target, PRODUCT_DOC_SOURCES)
 
     def test_missing_file_is_rejected(self) -> None:
         (self.root / "config.example.json").unlink()

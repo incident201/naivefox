@@ -31,6 +31,9 @@ PRODUCT_DOC_SOURCES = {
     "netwerk/naivefox/test/integration/README.md": (
         "netwerk/naivefox/test/integration/README.md"
     ),
+    "netwerk/naivefox/test/integration/hybrid_app/BENCHMARK.md": (
+        "netwerk/naivefox/test/integration/hybrid_app/BENCHMARK.md"
+    ),
 }
 ROOT_README_LINKS = {
     "ARCHITECTURE.md": "netwerk/naivefox/ARCHITECTURE.md",

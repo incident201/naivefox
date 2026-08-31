@@ -64,6 +64,7 @@ PRODUCT_DOCS = {
     pathlib.PurePosixPath("netwerk/naivefox/CAPTURE.md"),
     pathlib.PurePosixPath("netwerk/naivefox/SHIMS.md"),
     pathlib.PurePosixPath("netwerk/naivefox/test/integration/README.md"),
+    pathlib.PurePosixPath("netwerk/naivefox/test/integration/hybrid_app/BENCHMARK.md"),
 }
 CONTROL_PLANE_PREFIX = pathlib.PurePosixPath(".github", "workflows")
 MANIFEST_KEYS = {
