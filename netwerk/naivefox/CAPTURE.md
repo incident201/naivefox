@@ -4596,79 +4596,12 @@ pre-refinement smoke rows into that matrix or label them final results.
 
 ### Superseded idle-reference diagnostic
 
-**Not accepted as a final matched-workload measurement.** This diagnostic
-compared an idle Firefox reference after bootstrap with active proxy clients,
-cut Whole at two seconds, opened fresh target TLS sessions for small curl
-requests, configured both native listeners, and predated the WebSocket MAP
-routing correction. These are material workload/configuration mismatches,
-not merely a statistical sample-size limitation. A new matched active-app
-benchmark is required; the numbers below are retained transparently and must
-not be promoted as its result.
-
-The then-current implementation completed ten randomized blocks per protocol:
-160/160 cold participants and all 480 native warm transfer stages passed.
-No failed or pre-refinement sample was substituted into this dataset. Collection
-took approximately 29 minutes on the isolated, unshaped WSL loopback fixture.
-The client/server binaries remained unchanged from the admitted refinement
-smoke through the complete run. Machine-readable values, both contemporary
-baselines, every warm stage, confidence intervals and selected provenance are
-in [the superseded diagnostic evidence](test/integration/evidence/hybrid-ws-idle-diagnostic.json).
-Private inputs remain below the existing product objdir's
-`hybrid-ws/matrix-final-10`; they are not part of that public evidence.
-
-The residual columns below use the new strict packet-window observer and
-matched Firefox SPA controls. Lower is closer to those controls. **Whole means
-all origin traffic inside the fixed two-second cold window**, during which the
-reference completes its HTTP application startup and opens an idle WS. It does
-not mean an indefinitely long WS lifetime. The separate speed/traffic columns
-are for the identical warm 8-MiB download, relative to contemporary native
-classic; they include that stage's post-completion capture tail in wire bytes,
-but not in transfer time.
-
-| Startup / selected ingress | p1--16 | p17--32 | Whole, 2 s | 8-MiB rate loss vs classic | 8-MiB extra traffic vs classic |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| H2 / SOCKS5 | 0.15478 | 0.42026 | 0.37488 | 36.63% | +7.28% |
-| H2 / HTTP CONNECT | 0.16310 | 0.41710 | 0.37690 | 31.46% | +7.44% |
-| H3 / SOCKS5 | 0.12034 | 0.31383 | 0.42814 | 41.78% | +7.99% |
-| H3 / HTTP CONNECT | 0.08402 | 0.31665 | 0.42812 | 45.88% | +7.84% |
-
-Every native participant configured both local listeners, then exercised the
-row's selected ingress. In particular, the classic H2 SOCKS baseline therefore
-uses the mixed-listener first-buffer policy, not the canonical SOCKS-only
-first-buffer-task policy. This common configuration is held constant across
-classic, no-connect and hybrid. Together with the different reference SPA and
-strict early-window definition, it prevents treating these values as another
-row of the historical implicit-default dashboard.
-
-Against the **native finite no-connect** control, warm download rate increased
-by 12.65% / 19.51% / 10.41% / 5.91%, respectively in table order, while download
-wire bytes fell by 4.81--6.60%. Upload rate also increased by 20.96--28.75%,
-with 17.69--20.44% fewer bytes. Parallel downloads improved only modestly and
-spent 13.30--15.84% more wire bytes. These are measured loopback means, not WAN
-speed predictions or a claim of equivalence to classic.
-
-The residual result is mixed. Relative to finite no-connect, H2 Whole improved
-by about 9%, but H3 Whole regressed by about 28--30%; early packet means do not
-improve consistently. Cold hybrid page loading spent 188--230% more outer
-traffic than classic, although it used 7--10% less than finite no-connect.
-Small work is a substantial weakness: the warm 4-KiB request used about
-0.50--0.52 MB of outer IP traffic and took about 20 ms. That is 300--318% more
-traffic and 43--48% effective-rate loss versus finite no-connect; versus
-classic the traffic increase is roughly 4,707--4,903%. The fixed capacity
-classes are therefore expensive for short interactive transfers.
-
-The observer includes every captured origin TCP/QUIC flow, including short
-connection probes and their SYN/RST bytes, rather than assuming there must be
-exactly two physical flows. Every successful hybrid/reference carrier still
-established exactly one WebSocket after the validated startup. H3 here names
-the startup protocol; its subsequent WebSocket uses H1 over TCP.
-
-These observations describe only the superseded diagnostic workloads. They
-cannot establish the hybrid's camouflage, latency or traffic tradeoff for a
-matched active application. Ten blocks also remain below the 30-block
-paired-inference floor and provide no absolute indistinguishability verdict.
-Classic remains the default. Historical worker results and this diagnostic
-must not substitute for the new application-matched measurements.
+The earlier idle-reference experiment is invalid as a matched-workload
+comparison: it used an idle browser WS against active proxy clients, cropped
+Whole at two seconds, and predated the listener and routing corrections.
+Its report and diagnostic dataset remain in
+[Git history](https://github.com/incident201/naivefox/tree/6cbb73c8c6136eaee86906d268b3f4afeb16bc61/netwerk/naivefox/test/integration/evidence).
+They are excluded from the active matrix below and must not be pooled with it.
 
 ### Replacement measurement with the same active application
 

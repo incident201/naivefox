@@ -1,9 +1,8 @@
 # Matched active-application benchmark
 
-This is a new benchmark, not a continuation or relabeling of the idle-reference
-results in `hybrid-ws-idle-diagnostic.json`. The old harness and datasets remain
-available as explicitly superseded diagnostics. No old sample is eligible for
-this study.
+This benchmark supersedes the invalid idle-reference experiment retained in
+[Git history](https://github.com/incident201/naivefox/tree/6cbb73c8c6136eaee86906d268b3f4afeb16bc61/netwerk/naivefox/test/integration/evidence).
+No sample from that experiment is eligible for this study.
 
 ## Frozen workload and participants
 
