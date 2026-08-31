@@ -148,7 +148,10 @@ NFC1 cell and stream sequences continue across the transition. Each direction
 uses only 512-byte control/idle, 64-KiB active, and 256-KiB bulk messages. Useful
 frames displace cryptographic filler. An active message uses 64 KiB, or
 256 KiB when at least 128 KiB is queued. A 2-ms application scheduling turn
-coalesces activity; the startup transition does not depend on that timer.
+coalesces partial payloads and new OPENs. A full 256-KiB queue or pure stream
+control proceeds on the next event turn without that delay; newly ready
+capacity can replace a pending partial-payload timer. The startup transition
+does not depend on these timers.
 Idle application heartbeats occur every 25
 seconds. Client queueing is limited to one unacknowledged native WebSocket
 message, in addition to the existing per-stream buffers and 512-KiB credits.

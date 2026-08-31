@@ -4559,6 +4559,41 @@ A separate isolated 400-byte UDP regression proves that readiness and drain
 markers are present in the actual capture while exactly one 428-byte origin
 IP packet enters the observer; no marker contributes to its wire totals.
 
+### Full-capacity WebSocket dispatch refinement
+
+`matrix-smoke-2` (seed `2026083103`) admitted all 16 participants, including
+all warm stages, with the corrected capture boundary. It is retained as the
+pre-refinement plumbing result, not a final matrix or paired inference. The
+warm download result exposed a remaining native implementation limit: both
+sides waited two milliseconds even when an entire application cell was
+already available; client delivery credits also used that wait. Uploads and
+downloads did not have the same direction of improvement, so a general speed
+claim was not justified.
+
+The new per-idea history preflight compared all-ref message/pickaxe history,
+the timed raw-server coalescing rejection, finite read-through/budgeted
+responses, application download-lease coalescing (`02f96ed1e0b4`, server
+`c211251`), bounded credit-state hints (`43f7020043a3`), and progress-qualified
+handoff (`dbe4909bb426`, server `114930d`). Those experiments changed response
+boundaries, lease/state selection or local worker acknowledgement. They did
+not remove an unconditional delay from an already-full outer WebSocket cell;
+that delay was introduced with the new hybrid implementation. This refinement
+does not add raw-read batching, optimistic delivery credit or a larger window.
+
+Preregister immediate event-target dispatch for a fully available 256-KiB
+cell and for pure delivery CREDIT/FIN/RESET work without OPEN or payload.
+A newly satisfied immediate condition also promotes an already-pending
+partial-cell timer. Server full-capacity data likewise skips the coalescing
+wait. Partial data and OPEN retain the existing two-millisecond aggregation;
+64/256-KiB data and 512-byte control capacities, cryptographic filler, stream
+credit bounds, the complete HTTP startup and the single-WS lifecycle stay
+unchanged. This tests avoidable scheduling delay, not a response-size sweep.
+
+After functional/race admission and a new complete plumbing block, the final
+ten-block H2/H3 and listener matrix must use one newly frozen client/server
+pair and fresh contemporary classic/no-connect controls. Never splice the
+pre-refinement smoke rows into that matrix or label them final results.
+
 ## Sensitive data handling
 
 Raw packet captures, NSS key logs, copied profiles, screenshots, bodies, and

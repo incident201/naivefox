@@ -329,6 +329,8 @@ class NoConnectCarrier final {
   void StartWebSocket();
   void WebSocketTick(bool aHeartbeat = false);
   void ScheduleWebSocket(uint32_t aDelay, bool aHeartbeat);
+  bool HasPendingOpen() const;
+  uint32_t WebSocketDelay(size_t aBytes) const;
 
   TunnelConfig mConfig;
   nsCString mCookie;
@@ -360,6 +362,7 @@ class NoConnectCarrier final {
   nsCOMPtr<nsITimer> mWebSocketDeadline;
   size_t mWebSocketPending = 0;
   uint32_t mWebSocketAck = 0;
+  uint32_t mWebSocketScheduledDelay = 0;
   bool mWebSocketReady = false;
   bool mWebSocketHeartbeat = false;
 };
@@ -969,7 +972,7 @@ void NoConnectCarrier::Tick() {
       bool control = false;
       const size_t bytes = Pressure(control);
       if (bytes || control) {
-        ScheduleWebSocket(2, false);
+        ScheduleWebSocket(WebSocketDelay(bytes), false);
       }
     }
     return;
@@ -1193,8 +1196,9 @@ void NoConnectCarrier::StartWebSocket() {
         if (!self->mWebSocketPending) {
           bool control = false;
           const size_t bytes = self->Pressure(control);
-          self->ScheduleWebSocket(bytes || control ? 2 : 25000,
-                                  !bytes && !control);
+          self->ScheduleWebSocket(
+              bytes || control ? self->WebSocketDelay(bytes) : 25000,
+              !bytes && !control);
           self->Wake();
         }
       },
@@ -1207,18 +1211,31 @@ void NoConnectCarrier::StartWebSocket() {
   }
 }
 
+bool NoConnectCarrier::HasPendingOpen() const {
+  return std::any_of(mStreams.begin(), mStreams.end(), [](const auto& stream) {
+    return stream->mImpl->openPending;
+  });
+}
+
+uint32_t NoConnectCarrier::WebSocketDelay(size_t aBytes) const {
+  return aBytes >= noconnect::kMaxCell || (!aBytes && !HasPendingOpen()) ? 0
+                                                                         : 2;
+}
+
 void NoConnectCarrier::ScheduleWebSocket(uint32_t aDelay, bool aHeartbeat) {
   if (mClosed || !mWebSocketReady || mWebSocketPending) {
     return;
   }
   if (mWebSocketTimer) {
-    if (!mWebSocketHeartbeat || aHeartbeat) {
+    if (aHeartbeat ||
+        (!mWebSocketHeartbeat && aDelay >= mWebSocketScheduledDelay)) {
       return;
     }
     mWebSocketTimer->Cancel();
     mWebSocketTimer = nullptr;
   }
   mWebSocketHeartbeat = aHeartbeat;
+  mWebSocketScheduledDelay = aDelay;
   RefPtr self = this;
   auto timer = NS_NewTimerWithCallback(
       [self, aHeartbeat](nsITimer*) {
@@ -1243,9 +1260,7 @@ void NoConnectCarrier::WebSocketTick(bool aHeartbeat) {
     ScheduleWebSocket(25000, true);
     return;
   }
-  const bool opening = std::any_of(
-      mStreams.begin(), mStreams.end(),
-      [](const auto& stream) { return stream->mImpl->openPending; });
+  const bool opening = HasPendingOpen();
   const size_t capacity = bytes >= 131072    ? 262144
                           : bytes || opening ? 65536
                                              : 512;
