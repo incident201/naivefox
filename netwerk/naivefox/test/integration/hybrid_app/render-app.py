@@ -22,6 +22,7 @@ def render():
             raise ValueError("application template marker count is invalid")
     source = source.replace("__MANIFEST_JSON__", raw.decode().strip()).replace(
         "__MANIFEST_SHA256__", hashlib.sha256(raw).hexdigest())
+    source = "\n".join(line.removeprefix("  ") for line in source.splitlines()) + "\n"
     body = source.encode()
     overhead = len(b"\n/*\n*/\n")
     if len(body) + overhead > CAPACITY:

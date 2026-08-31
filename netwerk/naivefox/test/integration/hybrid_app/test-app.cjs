@@ -40,7 +40,7 @@ async function until(condition) {
   }
 }
 
-async function exercise({ hold = false, malformed = null, delayLoad = false, badDigest = false } = {}) {
+async function exercise({ hold = false, malformed = null, delayLoad = false, badDigest = false, consumerFault = null } = {}) {
   const state = { bootstrap: 0, websockets: 0, clientControls: 0, serverControls: 0,
                   clientBinary: 0, serverBinary: 0, hashes: 0, peakJobs: 0, done: [],
                   jobs: new Map(), loadListeners: [], errors: [] };
@@ -207,10 +207,32 @@ async function exercise({ hold = false, malformed = null, delayLoad = false, bad
     assert.equal(name, "load");
     state.loadListeners.push(listener);
   } };
-  const document = { readyState: delayLoad ? "loading" : "complete", getElementById() { return null; } };
+  const sizes = [["/assets/site.css", 12288], ["/assets/app.js", 24576],
+    ...[1, 2, 3, 4].map(index => ["/assets/image-" + index + ".svg", 8192])];
+  const navigation = { name: "https://app.invalid/", responseStatus: 200, decodedBodySize: 4096, nextHopProtocol: "h2" };
+  const resources = sizes.map(([assetPath, size]) => ({
+    name: "https://app.invalid" + assetPath, responseStatus: 200, decodedBodySize: size, nextHopProtocol: "h2",
+  }));
+  if (consumerFault === "body") resources[1].decodedBodySize = 1;
+  if (consumerFault === "timing") delete resources[1].responseStatus;
+  const images = [1, 2, 3, 4].map(index => ({
+    currentSrc: "https://app.invalid/assets/image-" + index + ".svg", complete: true,
+    naturalWidth: consumerFault === "image" && index === 1 ? 0 : 32, naturalHeight: 32, async decode() {},
+  }));
+  const document = {
+    readyState: delayLoad ? "loading" : "complete", images, getElementById() { return null; },
+    querySelectorAll(selector) {
+      assert.equal(selector, "link[rel~=stylesheet]");
+      return [{ href: "https://app.invalid/assets/site.css", disabled: false, sheet: { cssRules: [{}] } }];
+    },
+  };
+  const browserPerformance = {
+    now: () => performance.now(), timeOrigin: performance.timeOrigin,
+    getEntriesByType(type) { return type === "navigation" ? [navigation] : type === "resource" ? resources : []; },
+  };
   const context = {
-    window, document, performance,
-    location: { href: "https://app.invalid/" + (hold ? "#hold" : ""), protocol: "https:", hash: hold ? "#hold" : "" },
+    window, document, performance: browserPerformance,
+    location: { href: "https://app.invalid/" + (hold ? "#hold" : ""), origin: "https://app.invalid", protocol: "https:", hash: hold ? "#hold" : "" },
     URL, WebSocket: Socket, TextEncoder, TextDecoder, Uint8Array, ArrayBuffer, DataView,
     AbortController, Map, Set, console,
     crypto: { subtle: { digest(...args) {
@@ -271,6 +293,15 @@ async function exercise({ hold = false, malformed = null, delayLoad = false, bad
   }
   await until(() => window.__NFB_RESULT__ || window.__NFB_ERROR__ || state.errors.length);
   assert.deepEqual(state.errors, []);
+  if (consumerFault) {
+    assert.equal(window.__NFB_ERROR__, consumerFault === "image" ? "consumer_image_incomplete" :
+      consumerFault === "body" ? "consumer_body_incomplete" : "consumer_timing_unavailable");
+    assert.equal(state.bootstrap, 0);
+    assert.equal(state.websockets, 0);
+    assert.equal(window.__NFB_READY__, false);
+    assert.equal(window.__NFB_RESULT__, null);
+    return;
+  }
   if (malformed || badDigest) {
     assert.equal(window.__NFB_ERROR__, badDigest ? "job_digest_mismatch" :
       malformed === "offset" ? "binary_offset_or_credit_invalid" : "binary_payload_invalid");
@@ -283,6 +314,14 @@ async function exercise({ hold = false, malformed = null, delayLoad = false, bad
   assert.equal(result.manifest_sha256, manifestSHA);
   assert.equal(result.app_sha256, crypto.createHash("sha256").update(script).digest("hex"));
   assert.equal(result.assets.length, 6);
+  assert.equal(result.consumer.navigation.decoded_body_size, 4096);
+  assert.equal(result.consumer.navigation.response_status, 200);
+  assert.equal(result.consumer.navigation.next_hop_protocol, "h2");
+  assert.equal(result.consumer.resources.length, 6);
+  assert.equal(result.consumer.images.length, 4);
+  assert.equal(result.consumer.stylesheet_loaded, true);
+  assert(result.consumer.images.every(image => image.complete && image.decoded && image.natural_width > 0));
+  assert(result.consumer.collected_ms <= result.websocket.open_ms);
   assert.equal(result.uploaded_bytes, 1069056);
   assert.equal(result.downloaded_bytes, 10506240);
   assert.equal(result.websocket.opened, 1);
@@ -315,5 +354,8 @@ async function exercise({ hold = false, malformed = null, delayLoad = false, bad
   await exercise({ malformed: "offset" });
   await exercise({ malformed: "payload" });
   await exercise({ badDigest: true });
+  await exercise({ consumerFault: "image" });
+  await exercise({ consumerFault: "body" });
+  await exercise({ consumerFault: "timing" });
   console.log("PASS shared application: manifest/payload hashes, load milestone, one-shot hold, atomic parallel jobs, exact protocol counts, bounded writer, timestamps, malformed data rejection");
 })().catch(error => { console.error(error); process.exitCode = 1; });

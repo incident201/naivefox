@@ -9,6 +9,7 @@
   const controls = [];
   const catalog = [];
   let assetInventory = [];
+  let consumer = null;
   const assetSizes = new Map([
     ["/assets/site.css", 12288], ["/assets/app.js", 24576],
     ...[1, 2, 3, 4].map(index => ["/assets/image-" + index + ".svg", 8192]),
@@ -480,11 +481,58 @@
       manifest_sha256: manifestSHA, time_origin_ms: performance.timeOrigin,
       uploaded_bytes: uploaded, downloaded_bytes: downloaded,
       app_sha256: assetInventory.find(asset => asset.path === "/assets/app.js").sha256,
-      assets: assetInventory,
+      assets: assetInventory, consumer,
       stages: stageResults, websocket: { ...websocket },
     };
     status("All archive jobs verified");
     return window.__NFB_RESULT__;
+  }
+
+  async function consumerProof() {
+    check(typeof performance.getEntriesByType === "function", "consumer_timing_unavailable");
+    const timing = (entry, size) => {
+      check(entry && typeof entry.responseStatus === "number" &&
+        typeof entry.decodedBodySize === "number" && typeof entry.nextHopProtocol === "string",
+        "consumer_timing_unavailable");
+      check(entry.responseStatus === 200 && entry.decodedBodySize === size &&
+        entry.nextHopProtocol.length > 0, "consumer_body_incomplete");
+      return { decoded_body_size: entry.decodedBodySize, response_status: entry.responseStatus,
+        next_hop_protocol: entry.nextHopProtocol };
+    };
+    const path = name => {
+      const url = new URL(name);
+      check(url.origin === location.origin, "consumer_origin_mismatch");
+      return url.pathname;
+    };
+    const navigation = performance.getEntriesByType("navigation");
+    check(navigation.length === 1 && path(navigation[0].name) === "/", "consumer_navigation_invalid");
+    const resources = performance.getEntriesByType("resource").filter(entry => {
+      const url = new URL(entry.name);
+      return url.origin === location.origin && assetSizes.has(url.pathname);
+    });
+    check(resources.length === 6 && new Set(resources.map(entry => path(entry.name))).size === 6,
+      "consumer_resources_incomplete");
+    const images = Array.from(document.images).filter(image => {
+      const url = new URL(image.currentSrc);
+      return url.origin === location.origin && /^\/assets\/image-[1-4]\.svg$/.test(url.pathname);
+    });
+    check(images.length === 4 && new Set(images.map(image => path(image.currentSrc))).size === 4,
+      "consumer_images_incomplete");
+    const decoded = [];
+    for (const image of images) {
+      check(image.complete && image.naturalWidth > 0 && image.naturalHeight > 0 &&
+        typeof image.decode === "function", "consumer_image_incomplete");
+      await image.decode();
+      decoded.push({ path: path(image.currentSrc), complete: image.complete,
+        natural_width: image.naturalWidth, natural_height: image.naturalHeight, decoded: true });
+    }
+    const styles = Array.from(document.querySelectorAll("link[rel~=stylesheet]")).filter(
+      link => path(link.href) === "/assets/site.css");
+    check(styles.length === 1 && !styles[0].disabled && styles[0].sheet &&
+      styles[0].sheet.cssRules.length > 0, "consumer_stylesheet_incomplete");
+    return { navigation: timing(navigation[0], 4096),
+      resources: resources.map(entry => ({ path: path(entry.name), ...timing(entry, assetSizes.get(path(entry.name))) })),
+      images: decoded, stylesheet_loaded: true, collected_ms: performance.now() };
   }
 
   const initialized = (async () => {
@@ -497,6 +545,7 @@
     if (document.readyState !== "complete") {
       await new Promise(resolve => window.addEventListener("load", resolve, { once: true }));
     }
+    consumer = await consumerProof();
     window.__NFB_READY__ = true;
     status("Application ready");
   })();
