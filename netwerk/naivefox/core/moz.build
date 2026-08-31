@@ -4,6 +4,7 @@
 
 SOURCES += [
     "../AutoFallback.cpp",
+    "../CliSignalStop.cpp",
     "../Config.cpp",
     "../GeckoRuntime.cpp",
     "../HeaderPadding.cpp",

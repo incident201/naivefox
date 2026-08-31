@@ -7,6 +7,7 @@
 #include <cstring>
 #include <mutex>
 
+#include "CliSignalStop.h"
 #include "Config.h"
 #include "GeckoRuntime.h"
 #include "HttpClient.h"
@@ -383,6 +384,17 @@ extern "C" NAIVEFOX_EXPORT int NaiveFoxMain(int aArgc, char* aArgv[]) {
     }
 
     const auto runtimeProtocol = RuntimeProtocol(config);
+    RefPtr<mozilla::naivefox::LocalProxyServerControl> control;
+#if defined(XP_LINUX) && !defined(ANDROID)
+    control = new mozilla::naivefox::LocalProxyServerControl();
+    mozilla::naivefox::CliSignalStop signalStop;
+    rv = signalStop.Start(control);
+    if (NS_FAILED(rv)) {
+      std::fprintf(stderr, "NaiveFox signal monitor failed: 0x%08x\n",
+                   static_cast<unsigned>(rv));
+      return 1;
+    }
+#endif
 
     mozilla::naivefox::GeckoRuntime runtime;
     rv = runtime.Initialize(
@@ -409,8 +421,13 @@ extern "C" NAIVEFOX_EXPORT int NaiveFoxMain(int aArgc, char* aArgv[]) {
       }
       auto tunnelConfigs = MakeTunnelConfigs(config);
       rv = mozilla::naivefox::RunLocalProxyServer(
-          config.mListeners, tunnelConfigs, config.mMaxConnections);
+          config.mListeners, tunnelConfigs, config.mMaxConnections, control);
     }
+#if defined(XP_LINUX) && !defined(ANDROID)
+    if (signalStop.Failed()) {
+      rv = NS_ERROR_FAILURE;
+    }
+#endif
     if (NS_FAILED(rv)) {
       std::fprintf(stderr, "NaiveFox failed: 0x%08x\n",
                    static_cast<unsigned>(rv));

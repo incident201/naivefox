@@ -184,6 +184,18 @@ resources, API requests, active WebSocket jobs and idle periods as the proxied
 application. The earlier idle-WebSocket capture is a superseded diagnostic,
 not a valid baseline for active Whole, throughput or traffic comparisons.
 
+The Linux configuration-file CLI handles SIGINT and SIGTERM through the
+existing local-server stop control. It closes listeners and active requests,
+then leaves the event loop and shuts down the runtime. The embedded API and
+other platforms retain their existing shutdown interfaces. Exercise both
+signals in all three transports, with unfinished requests on both frontends:
+
+```bash
+python3 netwerk/naivefox/test/integration/run-cli-shutdown-tests.py \
+  --objdir /absolute/path/to/warm-obj-naivefox-linux \
+  --work-dir /absolute/path/to/warm-obj-naivefox-linux/hybrid-ws/cli-shutdown
+```
+
 From the repository root, run:
 
 ```bash
