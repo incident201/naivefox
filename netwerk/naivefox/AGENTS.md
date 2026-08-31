@@ -76,6 +76,10 @@ the documented profile, ordered OPENs and cell sequences, credit only after
 local delivery, HTTP completion checks, and per-stream half-close. Do not import
 the experimental browser worker, DOM, JavaScript engine, or WSS bridge into the
 lean runtime. Transport selection in JSON and the desktop CLI must agree.
+Both transports use only the existing proxy URI credentials and the server's
+shared forward-proxy authentication/access policy; never add a separate
+no-connect key or target allowlist. Valid classic-only options are inactive
+under no-connect, but malformed fields remain errors.
 
 ## Build and test policy
 

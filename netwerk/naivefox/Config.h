@@ -218,8 +218,6 @@ enum class RuntimeLogMode : uint8_t { Disabled, Console, File };
 
 struct Config final {
   TransportMode mTransport = TransportMode::Classic;
-  // Retained but unused by classic so one config can select either transport.
-  nsCString mNoConnectKey;
   nsTArray<ListenerConfig> mListeners;
   nsTArray<UpstreamProxyConfig> mProxies;
   Maybe<HostResolverRule> mHostResolverRule;

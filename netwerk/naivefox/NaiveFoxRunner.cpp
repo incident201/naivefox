@@ -199,7 +199,6 @@ nsTArray<mozilla::naivefox::TunnelConfig> MakeTunnelConfigs(
     tunnelConfig.mProxyPassword = proxy.mPassword;
     tunnelConfig.mProtocol = proxy.mProtocol;
     tunnelConfig.mTransport = aConfig.mTransport;
-    tunnelConfig.mNoConnectKey = aConfig.mNoConnectKey;
     tunnelConfig.mHostResolverRule = aConfig.mHostResolverRule;
     tunnelConfig.mExtraHeaders.AppendElements(aConfig.mExtraHeaders);
     tunnelConfig.mPreamble = aConfig.mPreamble;
@@ -362,8 +361,8 @@ extern "C" NAIVEFOX_EXPORT int NaiveFoxMain(int aArgc, char* aArgv[]) {
       PrintUsage(aArgv[0]);
       return 2;
     }
-    nsresult rv = mozilla::naivefox::LoadConfigFile(
-        configPath, config, error, transportOverride);
+    nsresult rv = mozilla::naivefox::LoadConfigFile(configPath, config, error,
+                                                    transportOverride);
     if (NS_SUCCEEDED(rv)) {
       rv = mozilla::naivefox::ConfigureRuntimeLogging(config.mLogMode,
                                                       config.mLogPath, error);
