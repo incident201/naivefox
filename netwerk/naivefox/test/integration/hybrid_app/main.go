@@ -906,7 +906,15 @@ func (b *backend) websocket(w http.ResponseWriter, r *http.Request) {
 	b.stats.WSOpened++
 	id := uint32(b.stats.WSOpened)
 	b.connections[conn] = true
+	publicationError := writeAtomicJSON(b.statsPath, b.stats)
+	if publicationError != nil {
+		b.stats.WSClosed++
+		delete(b.connections, conn)
+	}
 	b.mu.Unlock()
+	if publicationError != nil {
+		return
+	}
 	ctx, cancel := context.WithCancel(b.ctx)
 	defer cancel()
 	a := &application{backend: b, conn: conn, ctx: ctx, start: time.Now(), stats: connectionStats{ID: id, BootstrapPairs: 20, WSOpened: 1}, jobs: make(map[uint32]*activeJob), seen: make(map[uint32]bool), reports: make(map[uint32]*jobStats), retiredCredit: make(map[uint32]uint32)}

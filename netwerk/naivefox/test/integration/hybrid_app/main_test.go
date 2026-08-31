@@ -313,6 +313,39 @@ func TestMatchedApplicationWholeManifest(t *testing.T) {
 			t.Fatal("actual asset delivery")
 		}
 	}
+	if path := os.Getenv("NFB_TEST_BACKEND_TRACE"); path != "" {
+		if err := writeAtomicJSON(path, f.backend.stats); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestWebSocketOpenIsPublishedBeforeAnyJobs(t *testing.T) {
+	f := newAppFixture(t)
+	f.bootstrap()
+	conn, _, err := f.dial()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		body, err := os.ReadFile(f.backend.statsPath)
+		if err == nil {
+			var stats backendStats
+			if json.Unmarshal(body, &stats) != nil {
+				t.Fatal("partially published stats")
+			}
+			if stats.WSOpened == 1 {
+				if stats.WSClosed != 0 || len(stats.Connections) != 0 || stats.BootstrapCompleted != 1 || stats.APIPosts != 20 || stats.APIGets != 20 {
+					t.Fatal("open routing proof includes completed workload")
+				}
+				return
+			}
+		}
+		time.Sleep(time.Millisecond)
+	}
+	t.Fatal("open websocket was not published before active jobs")
 }
 
 func TestBootstrapBeforeWebSocketAndCookieBinding(t *testing.T) {
