@@ -162,6 +162,23 @@ resampled, and no idle-reference or pre-fix dataset is spliced into the result.
 All generated state belongs beneath the existing warm objdir's
 `hybrid-ws/matched-app` subtree. The Firefox browser is reused, never rebuilt.
 
+## Independent audit and publication
+
+After collection stops successfully, run `audit-matched-app-results.py` against
+the completed campaign directory. It independently recounts raw receive-side IP
+bytes and directions, validates both endpoints' job and message inventories,
+and recomputes traffic/rate ratios and residual means/medians. Its explicit PASS
+is bound to the matrix, audit source and hashes of raw captures and sidecars.
+A new audit replaces any stale PASS with an in-progress marker before checking.
+
+`publish-matched-app-results.py --input CAMPAIGN --output DRAFT_JSON --section
+DRAFT_MARKDOWN` then refuses anything except the complete 160-participant
+primary and its matching audit. Draft outputs must be beneath the campaign's
+parent directory and outside the campaign itself. Review those safe aggregates
+before copying them into `test/integration/evidence/` and `CAPTURE.md`; never
+publish raw captures, credentials, profiles or logs. Both scripts live in the
+parent integration directory and require no rebuild of Firefox or NaiveFox.
+
 ## Initial implementation checks
 
 The independent link check observed roughly 41 ms TCP/UDP RTT and less than

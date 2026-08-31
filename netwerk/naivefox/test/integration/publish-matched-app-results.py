@@ -487,7 +487,9 @@ def make_report(inputs):
                         "Whole covers startup, all active jobs, the two declared idle periods and teardown; it is not an arbitrary long-lived WS lifetime or a two-second cold crop.",
                         "Timing and traffic are reported separately. All carrier filler, connection establishment and attributable teardown traffic remain in complete-session IP totals.",
                         "One application or carrier WebSocket does not imply one physical connection. Every observed outer flow is included.",
-                        "Runtime binary/package hashes and build identities are distinct from the capture checkout revision; no absent native source-to-binary attestation is invented."],
+                        "Runtime binary/package hashes and build identities are distinct from the capture checkout revision; no absent native source-to-binary attestation is invented.",
+                        "The Caddy executable is pinned by its measured binary hash; no immutable module source-to-binary attestation is included.",
+                        "This measurement provides no Windows live-runtime or Android device result."],
     }
 
 
@@ -501,13 +503,21 @@ def section(report):
     for row in report["hybrid_rows"]:
         values = row["residual"]
         lines.append(f"| {row['startup_protocol'].upper()} / {row['listener']} | {values['initial_packets_16']['mean_distance']:.5f} | {values['packets_17_32']['mean_distance']:.5f} | {values['whole']['mean_distance']:.5f} |")
-    lines.extend(["", "The following costs compare hybrid with the unchanged native no-connect arm. "
+    def percent(value):
+        return "unresolved" if value is None else f"{value:+.2f}%"
+    lines.extend(["", "The distance is a bounded feature diagnostic, not a detection probability. "
+                  "The following costs use direct Firefox running the same active application as the baseline. "
+                  "Download and upload are the 8-MiB and 1-MiB stages; traffic covers the entire completed session.", "",
+                  "| Startup / listener | Download rate loss vs Firefox | Upload rate loss vs Firefox | Extra session IP traffic vs Firefox |",
+                  "| --- | ---: | ---: | ---: |"])
+    for row in report["hybrid_rows"]:
+        base = row["comparisons"]["firefox"]
+        lines.append(f"| {row['startup_protocol'].upper()} / {row['listener']} | {percent(base['stages']['download']['effective_rate_loss_percent'])} | {percent(base['stages']['upload']['effective_rate_loss_percent'])} | {percent(base['extra_complete_session_traffic_percent'])} |")
+    lines.extend(["", "The next costs compare hybrid with the unchanged native no-connect arm. "
                   "Positive rate loss or latency increase is worse; negative values are improvements. "
                   "Traffic is the complete-session outer IP total, with no arbitrary per-stage tail allocation.", "",
                   "| Startup / listener | Download rate loss | Upload rate loss | Small echo latency increase | Extra session traffic |",
                   "| --- | ---: | ---: | ---: | ---: |"])
-    def percent(value):
-        return "unresolved" if value is None else f"{value:+.2f}%"
     for row in report["hybrid_rows"]:
         base = row["comparisons"]["no-connect"]
         lines.append(f"| {row['startup_protocol'].upper()} / {row['listener']} | {percent(base['stages']['download']['effective_rate_loss_percent'])} | {percent(base['stages']['upload']['effective_rate_loss_percent'])} | {percent(base['stages']['small']['time_increase_percent'])} | {percent(base['extra_complete_session_traffic_percent'])} |")
@@ -516,6 +526,8 @@ def section(report):
                   "It also records immutable artifact identities and the independent raw-capture, workload, routing and numerical audit.", "",
                   "Ten blocks remain descriptive screening below the thirty-block inference floor. "
                   "These results neither establish absolute indistinguishability nor promote a default transport; prior idle-reference and failed-pilot datasets are not included.", ""])
+    lines.extend(["The measured Caddy is identified by its exact binary hash; this report does not assert an immutable module source-to-binary attestation. "
+                  "It contains no Windows live-runtime or Android device measurements.", ""])
     return "\n".join(lines)
 
 
