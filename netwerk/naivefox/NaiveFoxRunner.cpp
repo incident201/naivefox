@@ -97,14 +97,9 @@ bool ParseConfigArguments(
       }
       value = aArgv[index];
     }
-    if (std::strcmp(value, "classic") == 0) {
-      aTransport = mozilla::Some(mozilla::naivefox::TransportMode::Classic);
-    } else if (std::strcmp(value, "no-connect") == 0) {
-      aTransport = mozilla::Some(mozilla::naivefox::TransportMode::NoConnect);
-    } else if (std::strcmp(value, "no-connect-hybrid") == 0) {
-      aTransport =
-          mozilla::Some(mozilla::naivefox::TransportMode::NoConnectHybrid);
-    } else {
+    aTransport =
+        mozilla::naivefox::ParseTransportMode(nsDependentCString(value));
+    if (!aTransport) {
       aError.AssignLiteral(
           "--transport requires classic or no-connect or no-connect-hybrid");
       return false;
@@ -274,10 +269,20 @@ extern "C" NAIVEFOX_EXPORT void NaiveFoxRequestStop(void) {
 
 extern "C" NAIVEFOX_EXPORT int NaiveFoxRunEmbedded(const char* aConfigJson,
                                                    const char* aProfilePath,
-                                                   const char* aRuntimePath) {
+                                                   const char* aRuntimePath,
+                                                   const char* aTransport) {
   if (!aConfigJson || !*aConfigJson || !aProfilePath || !*aProfilePath ||
       !aRuntimePath || !*aRuntimePath) {
     return NAIVEFOX_STATUS_INVALID_ARGUMENT;
+  }
+
+  mozilla::Maybe<mozilla::naivefox::TransportMode> transportOverride;
+  if (aTransport) {
+    transportOverride =
+        mozilla::naivefox::ParseTransportMode(nsDependentCString(aTransport));
+    if (!transportOverride) {
+      return NAIVEFOX_STATUS_INVALID_ARGUMENT;
+    }
   }
 
   RefPtr<mozilla::naivefox::LocalProxyServerControl> control;
@@ -287,8 +292,8 @@ extern "C" NAIVEFOX_EXPORT int NaiveFoxRunEmbedded(const char* aConfigJson,
 
   mozilla::naivefox::Config config;
   nsAutoCString error;
-  nsresult rv = mozilla::naivefox::ParseConfig(nsDependentCString(aConfigJson),
-                                               config, error);
+  nsresult rv = mozilla::naivefox::ParseConfig(
+      nsDependentCString(aConfigJson), config, error, transportOverride);
   if (NS_SUCCEEDED(rv)) {
     rv = mozilla::naivefox::GeckoRuntime::ValidateEmbeddedLocations(
         nsDependentCString(aProfilePath), nsDependentCString(aRuntimePath));

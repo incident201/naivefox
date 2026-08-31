@@ -255,6 +255,7 @@ class ProfileDirectory final {
   bool mTemporary = false;
 };
 
+Maybe<TransportMode> ParseTransportMode(const nsACString& aValue);
 nsresult ParseConfig(
     const nsACString& aJson, Config& aConfig, nsACString& aError,
     const Maybe<TransportMode>& aTransportOverride = Nothing());

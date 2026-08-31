@@ -33,6 +33,12 @@ The option may precede or follow the path; omission of the path reads
 `./config.json`. JSON `"transport":"no-connect"` selects the same mode.
 Credentials never select a transport implicitly.
 
+Embedded hosts pass the same names as the fourth `NaiveFoxRunEmbedded`
+argument. `NULL` preserves JSON/default selection; an explicit name overrides
+it without changing the private JSON bytes. Empty or unknown names fail before
+Gecko initialization. See [the embedded API](README.md#android-embedded-runtime)
+for the required caller rebuild and the one-runtime-per-process contract.
+
 Both modes authenticate using the same percent-decoded username and password
 from `proxy`. No-connect carries their Basic authentication value inside a
 TLS-protected application AUTH frame; classic uses normal proxy authentication.

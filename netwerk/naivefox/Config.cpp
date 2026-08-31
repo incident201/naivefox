@@ -362,16 +362,12 @@ class JsonParser final {
         sawTransport = true;
         nsAutoCString value;
         MOZ_TRY(ParseString(value, "transport must be a string"));
-        if (value.EqualsLiteral("classic")) {
-          parsed.mTransport = TransportMode::Classic;
-        } else if (value.EqualsLiteral("no-connect")) {
-          parsed.mTransport = TransportMode::NoConnect;
-        } else if (value.EqualsLiteral("no-connect-hybrid")) {
-          parsed.mTransport = TransportMode::NoConnectHybrid;
-        } else {
+        auto transport = ParseTransportMode(value);
+        if (!transport) {
           return Error(
               "transport must be classic or no-connect or no-connect-hybrid");
         }
+        parsed.mTransport = *transport;
       } else if (key.EqualsLiteral("no-connect-key")) {
         return Error(
             "no-connect-key is no longer supported; remove it and use "
@@ -1758,6 +1754,19 @@ class JsonParser final {
 };
 
 }  // namespace
+
+Maybe<TransportMode> ParseTransportMode(const nsACString& aValue) {
+  if (aValue.EqualsLiteral("classic")) {
+    return Some(TransportMode::Classic);
+  }
+  if (aValue.EqualsLiteral("no-connect")) {
+    return Some(TransportMode::NoConnect);
+  }
+  if (aValue.EqualsLiteral("no-connect-hybrid")) {
+    return Some(TransportMode::NoConnectHybrid);
+  }
+  return Nothing();
+}
 
 nsresult ParseConfig(const nsACString& aJson, Config& aConfig,
                      nsACString& aError,

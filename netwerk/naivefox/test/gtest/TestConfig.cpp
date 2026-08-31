@@ -123,6 +123,19 @@ TEST(NaiveFoxConfig, StringListenerAndHttpsDefaults)
   EXPECT_FALSE(config.mDiagnosticOptimisticLocalReply);
 }
 
+TEST(NaiveFoxConfig, TransportSelectorUsesStrictSharedNames)
+{
+  EXPECT_EQ(ParseTransportMode("classic"_ns), Some(TransportMode::Classic));
+  EXPECT_EQ(ParseTransportMode("no-connect"_ns),
+            Some(TransportMode::NoConnect));
+  EXPECT_EQ(ParseTransportMode("no-connect-hybrid"_ns),
+            Some(TransportMode::NoConnectHybrid));
+  for (const char* value :
+       {"", "Classic", " no-connect", "no-connect ", "auto", "hybrid"}) {
+    EXPECT_FALSE(ParseTransportMode(nsDependentCString(value)));
+  }
+}
+
 TEST(NaiveFoxConfig, NoConnectKeepsStrictProtocolsWithoutClassicPreamble)
 {
   Config config;

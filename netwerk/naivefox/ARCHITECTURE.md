@@ -268,6 +268,14 @@ creates an Android application profile. Both frontends pass the chosen profile
 to the same Gecko initialization path and use the same JSON parser, listeners,
 sessions, transports, and shutdown machinery.
 
+The fourth `NaiveFoxRunEmbedded` argument selects a transport without editing
+the JSON. A null pointer preserves JSON selection and the `classic` default;
+an explicit valid name overrides JSON before classic preamble defaults are
+applied. JSON, CLI and embedded selectors share one strict name parser.
+Invalid embedded selectors fail before reserving the one-shot runtime, so a
+subsequent valid call remains possible. Switching after a successful run still
+requires a fresh process; this argument does not introduce live reconfiguration.
+
 ## Validation boundaries
 
 The reproducible loopback fixture proves strict transport selection, scoped

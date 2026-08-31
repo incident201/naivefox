@@ -33,7 +33,8 @@ NAIVEFOX_EXPORT int NaiveFoxActivationChildMain(int aArgc, char* aArgv[]);
 #endif
 NAIVEFOX_EXPORT int NaiveFoxRunEmbedded(const char* aConfigJson,
                                         const char* aProfilePath,
-                                        const char* aRuntimePath);
+                                        const char* aRuntimePath,
+                                        const char* aTransport);
 NAIVEFOX_EXPORT void NaiveFoxRequestStop(void);
 NAIVEFOX_EXPORT const char* NaiveFoxVersion(void);
 

@@ -16,6 +16,7 @@
 #include <fstream>
 #include <string>
 #include <thread>
+#include <vector>
 
 #include "NaiveFoxAPI.h"
 
@@ -115,11 +116,26 @@ T Resolve(void* aLibrary, const char* aName) {
 }
 
 int Run(int aArgc, char* aArgv[]) {
-  if (aArgc != 8) {
+  if (aArgc < 8) {
     fprintf(stderr,
-            "usage: %s LIBXUL CONFIG PROFILE RUNTIME STOP READY RESULT\n",
+            "usage: %s LIBXUL CONFIG PROFILE RUNTIME STOP READY RESULT "
+            "[--transport VALUE] [--reject-first VALUE]...\n",
             aArgv[0]);
     return 2;
+  }
+  const char* transport = nullptr;
+  std::vector<const char*> rejectedTransports;
+  for (int index = 8; index < aArgc; index += 2) {
+    if (index + 1 >= aArgc) {
+      return 2;
+    }
+    if (strcmp(aArgv[index], "--transport") == 0 && !transport) {
+      transport = aArgv[index + 1];
+    } else if (strcmp(aArgv[index], "--reject-first") == 0) {
+      rejectedTransports.push_back(aArgv[index + 1]);
+    } else {
+      return 2;
+    }
   }
 
   std::string config;
@@ -171,14 +187,26 @@ int Run(int aArgc, char* aArgv[]) {
   });
 
   running.store(true, std::memory_order_release);
-  int runStatus = run(config.c_str(), aArgv[3], aArgv[4]);
+  bool rejectedAsExpected = true;
+  for (const char* rejected : rejectedTransports) {
+    if (run(config.c_str(), aArgv[3], aArgv[4], rejected) !=
+        NAIVEFOX_STATUS_INVALID_ARGUMENT) {
+      rejectedAsExpected = false;
+      break;
+    }
+  }
+  int runStatus = rejectedAsExpected
+                      ? run(config.c_str(), aArgv[3], aArgv[4], transport)
+                      : NAIVEFOX_STATUS_RUNTIME_ERROR;
   finished.store(true, std::memory_order_release);
   controller.join();
 
   std::string result =
       std::string("version=") + versionValue +
       "\nstatus=" + std::to_string(runStatus) + "\nstop_requested=" +
-      (stopRequested.load(std::memory_order_acquire) ? "1\n" : "0\n");
+      (stopRequested.load(std::memory_order_acquire) ? "1\n" : "0\n") +
+      "rejected_transports=" +
+      std::to_string(rejectedAsExpected ? rejectedTransports.size() : 0) + "\n";
   bool wroteResult = WriteAtomically(aArgv[7], result);
   if (!wroteResult) {
     fprintf(stderr, "cannot write result marker\n");

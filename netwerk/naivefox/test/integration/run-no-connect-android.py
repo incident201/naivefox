@@ -164,8 +164,13 @@ class AndroidFixture:
             remote_config = self.shared_configs[label]
         else:
             remote_config = remote + "/config.json"
-        suite.private_json(config_path, config)
-        self.call("push", str(config_path), remote_config)
+        preserve_config = getattr(args, "preserve_client_config", False)
+        if preserve_config and config_path.exists():
+            suite.require(json.loads(config_path.read_bytes()) == config,
+                          "embedded transport override changed the shared configuration")
+        else:
+            suite.private_json(config_path, config)
+            self.call("push", str(config_path), remote_config)
         self.call("shell", "chmod", "600", remote_config)
         environment = [f"LD_LIBRARY_PATH={self.runtime}"]
         if env.get("SSL_CERT_FILE"):
@@ -174,6 +179,11 @@ class AndroidFixture:
         argv = ["env", *environment, self.remote + "/harness", self.runtime + "/libxul.so",
                 remote_config, remote + "/profile", self.runtime,
                 remote + "/stop", remote + "/ready", remote + "/result"]
+        transport = getattr(args, "transport_override", None)
+        if transport is not None:
+            argv.extend(("--transport", transport))
+        for rejected in getattr(args, "rejected_transports", ()):
+            argv.extend(("--reject-first", rejected))
         command = "cd " + shlex.quote(remote) + " && echo $$ > pid && exec " + shlex.join(argv)
         fixture = self
 
@@ -205,9 +215,17 @@ class AndroidFixture:
                         fixture.ports.discard(port)
 
             def executed_config(self):
+                return json.loads(self.executed_config_bytes())
+
+            def executed_config_bytes(self):
                 result = subprocess.run(fixture.adb + ["shell", "cat", remote_config],
-                                        text=True, capture_output=True, check=True)
-                return json.loads(result.stdout)
+                                        capture_output=True, timeout=10, check=True)
+                return result.stdout
+
+            def result_values(self):
+                result = subprocess.run(fixture.adb + ["shell", "cat", remote + "/result"],
+                                        text=True, capture_output=True, timeout=10, check=True)
+                return dict(line.split("=", 1) for line in result.stdout.splitlines())
 
             def stop(self):
                 if self.process.poll() not in (None, 0):

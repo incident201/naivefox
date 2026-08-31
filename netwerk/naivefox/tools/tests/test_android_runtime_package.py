@@ -28,7 +28,7 @@ class AndroidRuntimePackageTest(unittest.TestCase):
         self.stage.mkdir()
         (self.source / "netwerk/naivefox").mkdir(parents=True)
         (self.source / "netwerk/naivefox/NaiveFoxAPI.h").write_text(
-            "int NaiveFoxRunEmbedded(const char*, const char*, const char*);\n",
+            "int NaiveFoxRunEmbedded(const char*, const char*, const char*, const char*);\n",
             encoding="utf-8",
         )
         (self.source / "netwerk/naivefox/NAIVEFOX_VERSION").write_text(
