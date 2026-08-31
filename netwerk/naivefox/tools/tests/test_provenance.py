@@ -432,6 +432,33 @@ class ProvenanceTest(unittest.TestCase):
             else:
                 os.environ["NAIVEFOX_ENABLE_TESTS"] = previous
 
+    def test_staging_reads_rebuilt_output_without_reusing_old_package(self) -> None:
+        for target in collector.TARGETS:
+            with self.subTest(target=target["name"]):
+                objdir = Path(self.objdirs_temporary.name) / target["name"]
+                objdir.mkdir()
+                (objdir / "rebuilt-runtime").write_text("new build ID\n")
+                old_package = objdir / "package" / target["staged_package"]
+                old_package.mkdir(parents=True)
+                (old_package / "runtime").write_text("old build ID\n")
+                stager = (
+                    self.repo / "netwerk/naivefox/tools"
+                    / collector.STAGERS[target["name"]]
+                )
+                stager.write_text(
+                    'set -eu\nmkdir "$1"\n'
+                    'cp "$NAIVEFOX_OBJDIR/rebuilt-runtime" "$1/runtime"\n'
+                )
+                with tempfile.TemporaryDirectory(dir=objdir) as temporary:
+                    package = Path(temporary) / "fresh"
+                    collector.stage_target(
+                        self.repo, objdir, target, package, os.environ.copy()
+                    )
+                    self.assertEqual((package / "runtime").read_text(), "new build ID\n")
+                    self.assertEqual(
+                        (old_package / "runtime").read_text(), "old build ID\n"
+                    )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -24,6 +24,55 @@ analyzer = load_script("lean_closure_analyzer", "analyze-full-closure.py")
 assertions = load_script("lean_closure_assertions", "assert-closure.py")
 
 
+class StagedPackageSelectionTest(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+        self.objdir = self.root / "obj"
+        self.objdir.mkdir()
+        self.target = {"staged_package": "naivefox-test"}
+        self.canonical = self.objdir / "package/naivefox-test"
+        self.canonical.mkdir(parents=True)
+        (self.canonical / "binary").write_bytes(b"stale")
+        self.fresh = self.objdir / ".naivefox-evidence-test/package"
+        self.fresh.mkdir(parents=True)
+        (self.fresh / "binary").write_bytes(b"fresh")
+
+    def test_explicit_fresh_stage_takes_priority_without_modifying_canonical(self):
+        selected = analyzer.staged_package_dir(self.objdir, self.target, self.fresh)
+        self.assertEqual(selected, self.fresh)
+        self.assertEqual((selected / "binary").read_bytes(), b"fresh")
+        self.assertEqual((self.canonical / "binary").read_bytes(), b"stale")
+        self.assertEqual(
+            analyzer.staged_package_dir(self.objdir, self.target), self.canonical
+        )
+
+    def test_explicit_stage_requires_existing_directory_below_exact_objdir(self):
+        outside = self.root / "other-obj/package"
+        outside.mkdir(parents=True)
+        for path in (
+            outside, self.objdir, self.objdir / "missing", Path("relative"),
+            self.objdir / "package/../package/naivefox-test",
+        ):
+            with self.subTest(path=path):
+                with self.assertRaises(analyzer.AuditConsistencyError):
+                    analyzer.staged_package_dir(self.objdir, self.target, path)
+
+    def test_explicit_stage_rejects_symlink_directory_or_parent(self):
+        linked = self.objdir / "link"
+        linked.symlink_to(self.fresh.parent, target_is_directory=True)
+        for path in (linked, linked / "package"):
+            with self.subTest(path=path):
+                with self.assertRaises(analyzer.AuditConsistencyError):
+                    analyzer.staged_package_dir(self.objdir, self.target, path)
+
+    def test_explicit_stage_rejects_linked_runtime_files(self):
+        (self.fresh / "library").symlink_to(self.canonical / "binary")
+        with self.assertRaises(analyzer.AuditConsistencyError):
+            analyzer.staged_package_dir(self.objdir, self.target, self.fresh)
+
+
 class ConfiguredToolchainTest(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()

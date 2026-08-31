@@ -644,15 +644,38 @@ def get_glean_inputs(topsrcdir, objdir):
     }
 
 
-def staged_package_dir(objdir, target_spec):
-    objdir_path = Path(objdir)
+def staged_package_dir(objdir, target_spec, explicit=None):
+    objdir_path = Path(objdir).resolve(strict=True)
     package_name = target_spec["staged_package"]
     candidates = (
         objdir_path / "package" / package_name,
         objdir_path / "naivefox-package" / package_name,
         objdir_path / package_name,
     )
-    return next((path for path in candidates if path.is_dir()), candidates[0])
+    selected = (
+        Path(explicit) if explicit is not None
+        else next((path for path in candidates if path.is_dir()), candidates[0])
+    )
+    if not selected.is_absolute():
+        raise AuditConsistencyError("staged package directory must be absolute")
+    try:
+        relative = selected.relative_to(objdir_path)
+    except ValueError as error:
+        raise AuditConsistencyError(
+            "staged package must remain below the exact objdir"
+        ) from error
+    if not relative.parts or ".." in relative.parts:
+        raise AuditConsistencyError("staged package must remain below the exact objdir")
+    current = objdir_path
+    for part in relative.parts:
+        current /= part
+        if current.is_symlink():
+            raise AuditConsistencyError("staged package path must not contain symlinks")
+    if not selected.is_dir():
+        raise AuditConsistencyError(f"staged package directory does not exist: {selected}")
+    if any(path.is_symlink() for path in selected.rglob("*")):
+        raise AuditConsistencyError("staged package contents must not contain symlinks")
+    return selected
 
 
 def analyze_target(
@@ -661,6 +684,7 @@ def analyze_target(
     target_spec,
     firefox_ref="firefox-upstream",
     naivefox_ref="naivefox-full-source",
+    package_dir=None,
 ):
     """Analyze comprehensive full link and source closure for target."""
     objdir_path = Path(objdir)
@@ -758,7 +782,7 @@ def analyze_target(
             if f.is_file():
                 dist_bin_files.append({"name": f.name, "size_bytes": f.stat().st_size})
 
-    staged_pkg_dir = staged_package_dir(objdir_path, target_spec)
+    staged_pkg_dir = staged_package_dir(objdir_path, target_spec, package_dir)
 
     staged_manifest_files = []
     if staged_pkg_dir.exists():
@@ -799,7 +823,7 @@ def analyze_target(
             "target_triple": target_triple,
             "mozconfig_path": mozconfig_relpath,
             "mozconfig_sha256": mozconfig_hash,
-            "analyzer_version": "2.7.1-three-target-active-relative-deps",
+            "analyzer_version": "2.7.2-three-target-fresh-staged-packages",
             **toolchain,
             "staged_runtime_manifest_count": len(staged_manifest_files),
         },
@@ -886,6 +910,9 @@ def main():
     parser.add_argument("--linux-objdir", type=Path)
     parser.add_argument("--windows-objdir", type=Path)
     parser.add_argument("--android-objdir", type=Path)
+    parser.add_argument("--linux-package-dir", type=Path)
+    parser.add_argument("--windows-package-dir", type=Path)
+    parser.add_argument("--android-package-dir", type=Path)
     parser.add_argument("--firefox-ref", default="firefox-upstream")
     parser.add_argument("--naivefox-ref", default="naivefox-full-source")
     args = parser.parse_args()
@@ -908,6 +935,11 @@ def main():
         "windows-x86_64": args.windows_objdir,
         "android-aarch64": args.android_objdir,
     }
+    supplied_packages = {
+        "linux-x86_64": args.linux_package_dir,
+        "windows-x86_64": args.windows_package_dir,
+        "android-aarch64": args.android_package_dir,
+    }
 
     print("Executing comprehensive multi-target link and source closure audit...")
     for target in TARGET_SPECS:
@@ -925,6 +957,7 @@ def main():
             target,
             firefox_ref=args.firefox_ref,
             naivefox_ref=args.naivefox_ref,
+            package_dir=supplied_packages[target["name"]],
         )
         filename = f"closure-report-{target['name']}.json"
         out_path = os.path.join(reports_dir, filename)

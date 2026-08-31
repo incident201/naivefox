@@ -193,6 +193,9 @@ python3 netwerk/naivefox/tools/collect-minimal-source-evidence.py \
   --work-dir /absolute/path/to/new-evidence-work
 ```
 
+The collector rebuilds each target and stages a fresh temporary package below
+its object directory before auditing the package inventory. Existing packages
+are left untouched and cannot supply stale hashes after a rebuild.
 The collector derives the Firefox and NaiveFox ancestry from Git. It rejects
 abbreviated, stale, or hand-entered provenance and atomically installs only:
 

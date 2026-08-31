@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import ExitStack
 import json
 import os
 import shutil
@@ -22,6 +23,11 @@ from provenance import (
 )
 
 TARGETS = TARGET_SPECS
+STAGERS = {
+    "linux-x86_64": "stage-runtime.sh",
+    "windows-x86_64": "stage-runtime-windows-x86_64.sh",
+    "android-aarch64": "stage-runtime-android-aarch64.sh",
+}
 
 
 def run(
@@ -155,6 +161,24 @@ def changed_paths(repo: Path) -> set[Path]:
     return {Path(line[3:]) for line in output.splitlines() if line}
 
 
+def stage_target(
+    repo: Path,
+    objdir: Path,
+    target: dict[str, object],
+    package: Path,
+    environment: dict[str, str],
+) -> None:
+    run(
+        [
+            "bash",
+            str(repo / "netwerk/naivefox/tools" / STAGERS[target["name"]]),
+            str(package),
+        ],
+        cwd=repo,
+        env={**environment, "NAIVEFOX_OBJDIR": str(objdir)},
+    )
+
+
 def validate_targets(reports: dict[Path, dict]) -> None:
     build_targets = {
         report.get("target")
@@ -272,17 +296,29 @@ def main() -> int:
         args.naivefox_ref,
     ]
     environment = evidence_environment()
+    stages = ExitStack()
     try:
+        package_args = []
         for target in TARGETS:
+            objdir = objdirs[target["name"]]
             build_target(
                 repo,
-                objdirs[target["name"]],
+                objdir,
                 target,
                 source,
                 args.firefox_ref,
                 args.naivefox_ref,
                 environment,
             )
+            stage_root = Path(
+                stages.enter_context(
+                    tempfile.TemporaryDirectory(prefix=".naivefox-evidence-", dir=objdir)
+                )
+            )
+            package = stage_root / "package"
+            stage_target(repo, objdir, target, package, environment)
+            platform = target["name"].split("-", 1)[0]
+            package_args.extend([f"--{platform}-package-dir", str(package)])
         validate_objdirs(repo, objdirs)
         run(
             [
@@ -298,6 +334,7 @@ def main() -> int:
                 str(objdirs["windows-x86_64"]),
                 "--android-objdir",
                 str(objdirs["android-aarch64"]),
+                *package_args,
                 *ref_args,
             ],
             env=environment,
@@ -368,6 +405,7 @@ def main() -> int:
     except (OSError, subprocess.CalledProcessError, ValueError) as error:
         raise SystemExit(str(error)) from error
     finally:
+        stages.close()
         if automatic_work:
             shutil.rmtree(work_dir, ignore_errors=True)
 
