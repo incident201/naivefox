@@ -115,6 +115,13 @@ credential pair fails the connection; it does not trigger a downgrade to `classi
 Session resumption and transparent replay after an outer-session failure are
 not supported. Credential provisioning and rotation remain an operator concern.
 
+Experimental `no-connect-hybrid` requires the matching WebSocket-capable
+server. The current Firefox implementation does not provide WS over HTTP/3:
+after H2/H3 startup the hybrid opens a separate H1 WSS/TCP connection. Its H3
+option therefore needs both UDP and TCP access and is explicitly different
+from strict UDP-only `no-connect`. No transparent fallback or reconnect is
+provided. The startup and WS connections must both be counted in measurements.
+
 The earlier experimental residual and throughput measurements used a full
 Firefox SPA worker. They cannot be attributed to the lean native client, which
 does not execute that page's JavaScript or render its UI. Functional

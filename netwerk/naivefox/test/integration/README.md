@@ -123,7 +123,48 @@ reuses a warm product NSS/NSPR build and can enable ASan/UBSan with
 The codec regressions cross the 4-GiB byte-offset boundary with bounded reusable
 buffers, preserving sequence validation, flow control, and FIN after wrap.
 
+## Hybrid WebSocket failure checks
+
+Run all eleven malformed-handshake, message and ACK cases through both startup
+protocols and both local listeners:
+
+```bash
+python3 netwerk/naivefox/test/integration/run-hybrid-adversarial-tests.py \
+  --objdir /absolute/path/to/warm-obj-naivefox-linux \
+  --caddy /absolute/path/to/combined-caddy \
+  --protocol both --listener both \
+  --work-dir /absolute/path/to/warm-obj-naivefox-linux/hybrid-ws/adversarial
+```
+
+The real module serves the complete startup. Only `/api/realtime` is routed to
+a bounded loopback test responder behind the same trusted Caddy TLS endpoint;
+there are no production fault hooks or disabled certificate checks. Each case
+requires prompt terminal failure, one target connection and no reconnect,
+HTTP-carrier resumption or CONNECT fallback. Bad subprotocol and unsolicited
+compression handshakes must fail without any binary message being sent.
+`--case` and `--listener` narrow an incremental check. Raw fixture files remain
+private below the selected object directory; `result.json` contains safe counts.
+
 ## Complete local gate
+
+The experimental hybrid uses the same native acceptance suite with an
+explicitly mixed server protocol policy:
+
+```bash
+python3 netwerk/naivefox/test/integration/run-no-connect-tests.py \
+  --objdir /absolute/path/to/warm-obj-naivefox-linux \
+  --caddy /absolute/path/to/combined-caddy \
+  --transport no-connect-hybrid \
+  --work-dir /absolute/path/to/warm-obj-naivefox-linux/hybrid-ws/functional
+```
+
+The startup remains strict H2 or H3. The fixture additionally enables H1 on
+TCP for Firefox's WebSocket handshake; `quic://` in this explicit mode is not
+a claim of UDP-only traffic. Server counters must prove a completed startup
+graph, successful WSS and bidirectional NFC1 cells, alongside the existing
+integrity, half-close, concurrency, policy, cancellation and shutdown checks.
+Run the original no-connect suite separately to retain its strict UDP-only
+H3 regression.
 
 From the repository root, run:
 

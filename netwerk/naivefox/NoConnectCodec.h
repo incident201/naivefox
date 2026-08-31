@@ -26,6 +26,7 @@ enum class Kind : uint8_t {
   Credit,
   Auth,
   Opened,
+  Ack,
 };
 
 struct Frame {
@@ -38,7 +39,7 @@ struct Frame {
 };
 
 // Output arguments remain unchanged on failure. Decode requires the complete
-// HTTP body, including filler, with the negotiated capacity.
+// HTTP body or WebSocket message, including filler, with its granted capacity.
 bool Encode(uint32_t aSequence, size_t aCapacity,
             const std::vector<Frame>& aFrames, std::vector<uint8_t>& aOutput);
 bool Decode(uint32_t aExpectedSequence, size_t aExpectedCapacity,

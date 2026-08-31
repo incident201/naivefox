@@ -16,6 +16,12 @@
 namespace mozilla {
 namespace net {
 
+#ifdef MOZ_NAIVEFOX
+using WebSocketLoadingNode = mozilla::dom::Node;
+#else
+using WebSocketLoadingNode = nsINode;
+#endif
+
 const static int32_t kDefaultWSPort = 80;
 const static int32_t kDefaultWSSPort = 443;
 
@@ -50,13 +56,13 @@ class BaseWebSocketChannel : public nsIWebSocketChannel,
   NS_IMETHOD GetPingTimeout(uint32_t* aSeconds) override;
   NS_IMETHOD SetPingTimeout(uint32_t aSeconds) override;
   NS_IMETHOD InitLoadInfoNative(
-      nsINode* aLoadingNode, nsIPrincipal* aLoadingPrincipal,
+      WebSocketLoadingNode* aLoadingNode, nsIPrincipal* aLoadingPrincipal,
       nsIPrincipal* aTriggeringPrincipal,
       nsICookieJarSettings* aCookieJarSettings, uint32_t aSecurityFlags,
       nsContentPolicyType aContentPolicyType,
       const Maybe<mozilla::dom::ClientInfo>& aClientInfo,
       uint32_t aSandboxFlags) override;
-  NS_IMETHOD InitLoadInfo(nsINode* aLoadingNode,
+  NS_IMETHOD InitLoadInfo(WebSocketLoadingNode* aLoadingNode,
                           nsIPrincipal* aLoadingPrincipal,
                           nsIPrincipal* aTriggeringPrincipal,
                           uint32_t aSecurityFlags,

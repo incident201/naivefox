@@ -366,8 +366,11 @@ class JsonParser final {
           parsed.mTransport = TransportMode::Classic;
         } else if (value.EqualsLiteral("no-connect")) {
           parsed.mTransport = TransportMode::NoConnect;
+        } else if (value.EqualsLiteral("no-connect-hybrid")) {
+          parsed.mTransport = TransportMode::NoConnectHybrid;
         } else {
-          return Error("transport must be classic or no-connect");
+          return Error(
+              "transport must be classic or no-connect or no-connect-hybrid");
         }
       } else if (key.EqualsLiteral("no-connect-key")) {
         return Error(
@@ -485,7 +488,7 @@ class JsonParser final {
     if (aTransportOverride) {
       parsed.mTransport = *aTransportOverride;
     }
-    if (parsed.mTransport == TransportMode::NoConnect) {
+    if (parsed.mTransport != TransportMode::Classic) {
       parsed.mPreamble = PreambleConfig{};
       parsed.mExtraHeaders.Clear();
       parsed.mOuterSessionGate = false;

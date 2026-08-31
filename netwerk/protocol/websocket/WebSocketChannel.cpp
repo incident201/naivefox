@@ -20,8 +20,10 @@
 #include "mozilla/StaticPrefs_privacy.h"
 #include "mozilla/TimeStamp.h"
 #include "mozilla/Utf8.h"
-#include "mozilla/glean/NetwerkProtocolWebsocketMetrics.h"
-#include "mozilla/net/WebSocketEventService.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/glean/NetwerkProtocolWebsocketMetrics.h"
+#  include "mozilla/net/WebSocketEventService.h"
+#endif
 #include "nsCRT.h"
 #include "nsCharSeparatedTokenizer.h"
 #include "nsComponentManagerUtils.h"
@@ -39,7 +41,9 @@
 #include "nsIIOService.h"
 #include "nsINSSErrorsService.h"
 #include "nsINetworkLinkService.h"
-#include "nsINode.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsINode.h"
+#endif
 #include "nsIObserverService.h"
 #include "nsIPrefBranch.h"
 #include "nsIProtocolProxyService.h"
@@ -620,6 +624,9 @@ class CallOnMessageAvailable final : public Runnable {
 
   NS_IMETHOD Run() override {
     MOZ_ASSERT(mChannel->IsOnTargetThread());
+#ifdef MOZ_NAIVEFOX
+    auto releaseCharge = MakeScopeExit([this]() { ReleaseNativeCharge(); });
+#endif
 
     if (mListenerMT) {
       nsresult rv;
@@ -642,8 +649,21 @@ class CallOnMessageAvailable final : public Runnable {
   }
 
  private:
-  ~CallOnMessageAvailable() = default;
+  ~CallOnMessageAvailable() {
+#ifdef MOZ_NAIVEFOX
+    ReleaseNativeCharge();
+#endif
+  }
 
+#ifdef MOZ_NAIVEFOX
+  void ReleaseNativeCharge() {
+    if (mNativeChargeHeld) {
+      mNativeChargeHeld = false;
+      mChannel->ReleaseNativeMessage(mData.Length());
+    }
+  }
+  bool mNativeChargeHeld = true;
+#endif
   RefPtr<WebSocketChannel> mChannel;
   RefPtr<BaseWebSocketChannel::ListenerAndContextContainer> mListenerMT;
   nsCString mData;
@@ -1241,11 +1261,13 @@ WebSocketChannel::WebSocketChannel()
 
   mFramePtr = mBuffer = static_cast<uint8_t*>(moz_xmalloc(mBufferSize));
 
+#ifndef MOZ_NAIVEFOX
   nsresult rv;
   mConnectionLogService = mozilla::components::Dashboard::Service(&rv);
   if (NS_FAILED(rv)) LOG(("Failed to initiate dashboard service."));
 
   mService = WebSocketEventService::GetOrCreate();
+#endif
 }
 
 WebSocketChannel::~WebSocketChannel() {
@@ -1274,7 +1296,9 @@ WebSocketChannel::~WebSocketChannel() {
 
   mListenerMT = nullptr;
 
+#ifndef MOZ_NAIVEFOX
   NS_ReleaseOnMainThread("WebSocketChannel::mService", mService.forget());
+#endif
 }
 
 NS_IMETHODIMP
@@ -1524,9 +1548,11 @@ nsresult WebSocketChannel::ProcessInput(uint8_t* buffer, uint32_t count) {
     int64_t payloadLength64 = mFramePtr[1] & kPayloadLengthBitsMask;
     uint8_t finBit = mFramePtr[0] & kFinalFragBit;
     uint8_t rsvBits = mFramePtr[0] & kRsvBitsMask;
+#ifndef MOZ_NAIVEFOX
     uint8_t rsvBit1 = mFramePtr[0] & kRsv1Bit;
     uint8_t rsvBit2 = mFramePtr[0] & kRsv2Bit;
     uint8_t rsvBit3 = mFramePtr[0] & kRsv3Bit;
+#endif
     uint8_t opcode = mFramePtr[0] & kOpcodeBitsMask;
     uint8_t maskBit = mFramePtr[1] & kMaskBit;
     uint32_t mask = 0;
@@ -1736,17 +1762,29 @@ nsresult WebSocketChannel::ProcessInput(uint8_t* buffer, uint32_t count) {
           return NS_ERROR_CANNOT_CONVERT_DATA;
         }
 
+#ifndef MOZ_NAIVEFOX
         RefPtr<WebSocketFrame> frame = mService->CreateFrameIfNeeded(
             finBit, rsvBit1, rsvBit2, rsvBit3, opcode, maskBit, mask, utf8Data);
+#endif
 
+#ifndef MOZ_NAIVEFOX
         if (frame) {
           mService->FrameReceived(mSerial, mInnerWindowID, frame.forget());
         }
+#endif
 
         if (nsCOMPtr<nsIEventTarget> target = GetTargetThread()) {
-          target->Dispatch(new CallOnMessageAvailable(this, std::move(listener),
-                                                      utf8Data, -1),
-                           NS_DISPATCH_NORMAL);
+#ifdef MOZ_NAIVEFOX
+          if (!ReserveNativeMessage(utf8Data.Length())) {
+            return NS_ERROR_FILE_TOO_BIG;
+          }
+#endif
+          rv = target->Dispatch(new CallOnMessageAvailable(
+                                    this, std::move(listener), utf8Data, -1),
+                                NS_DISPATCH_NORMAL);
+#ifdef MOZ_NAIVEFOX
+          NS_ENSURE_SUCCESS(rv, rv);
+#endif
         } else {
           return NS_ERROR_UNEXPECTED;
         }
@@ -1763,9 +1801,11 @@ nsresult WebSocketChannel::ProcessInput(uint8_t* buffer, uint32_t count) {
         return NS_ERROR_ILLEGAL_VALUE;
       }
 
+#ifndef MOZ_NAIVEFOX
       RefPtr<WebSocketFrame> frame = mService->CreateFrameIfNeeded(
           finBit, rsvBit1, rsvBit2, rsvBit3, opcode, maskBit, mask, payload,
           payloadLength);
+#endif
 
       if (opcode == nsIWebSocketFrame::OPCODE_CLOSE) {
         LOG(("WebSocketChannel:: close received\n"));
@@ -1800,12 +1840,14 @@ nsresult WebSocketChannel::ProcessInput(uint8_t* buffer, uint32_t count) {
           mCloseTimer = nullptr;
         }
 
+#ifndef MOZ_NAIVEFOX
         if (frame) {
           // We send the frame immediately becuase we want to have it dispatched
           // before the CallOnServerClose.
           mService->FrameReceived(mSerial, mInnerWindowID, frame.forget());
           frame = nullptr;
         }
+#endif
 
         if (RefPtr<BaseWebSocketChannel::ListenerAndContextContainer> listener =
                 GetListenerMT()) {
@@ -1822,6 +1864,11 @@ nsresult WebSocketChannel::ProcessInput(uint8_t* buffer, uint32_t count) {
         if (mClientClosed) ReleaseSession();
       } else if (opcode == nsIWebSocketFrame::OPCODE_PING) {
         LOG(("WebSocketChannel:: ping received\n"));
+#ifdef MOZ_NAIVEFOX
+        if (PendingNativePongs() >= 32) {
+          return NS_ERROR_FILE_TOO_BIG;
+        }
+#endif
         GeneratePong(payload, payloadLength);
       } else if (opcode == nsIWebSocketFrame::OPCODE_PONG) {
         // opcode OPCODE_PONG: the mere act of receiving the packet is all we
@@ -1846,9 +1893,11 @@ nsresult WebSocketChannel::ProcessInput(uint8_t* buffer, uint32_t count) {
         payloadLength = 0;
       }
 
+#ifndef MOZ_NAIVEFOX
       if (frame) {
         mService->FrameReceived(mSerial, mInnerWindowID, frame.forget());
       }
+#endif
     } else if (opcode == nsIWebSocketFrame::OPCODE_BINARY) {
       if (RefPtr<BaseWebSocketChannel::ListenerAndContextContainer> listener =
               GetListenerMT()) {
@@ -1877,18 +1926,30 @@ nsresult WebSocketChannel::ProcessInput(uint8_t* buffer, uint32_t count) {
           }
         }
 
+#ifndef MOZ_NAIVEFOX
         RefPtr<WebSocketFrame> frame =
             mService->CreateFrameIfNeeded(finBit, rsvBit1, rsvBit2, rsvBit3,
                                           opcode, maskBit, mask, binaryData);
+#endif
+#ifndef MOZ_NAIVEFOX
         if (frame) {
           mService->FrameReceived(mSerial, mInnerWindowID, frame.forget());
         }
+#endif
 
         if (nsCOMPtr<nsIEventTarget> target = GetTargetThread()) {
-          target->Dispatch(
+#ifdef MOZ_NAIVEFOX
+          if (!ReserveNativeMessage(binaryData.Length())) {
+            return NS_ERROR_FILE_TOO_BIG;
+          }
+#endif
+          rv = target->Dispatch(
               new CallOnMessageAvailable(this, std::move(listener), binaryData,
                                          binaryData.Length()),
               NS_DISPATCH_NORMAL);
+#ifdef MOZ_NAIVEFOX
+          NS_ENSURE_SUCCESS(rv, rv);
+#endif
         } else {
           return NS_ERROR_UNEXPECTED;
         }
@@ -2231,6 +2292,7 @@ void WebSocketChannel::PrimeNewOutgoingMessage() {
   // handful of bytes and might rotate the mask, so we can just do it locally.
   // For real data frames we ship the bulk of the payload off to ApplyMask()
 
+#ifndef MOZ_NAIVEFOX
   RefPtr<WebSocketFrame> frame = mService->CreateFrameIfNeeded(
       mOutHeader[0] & WebSocketChannel::kFinalFragBit,
       mOutHeader[0] & WebSocketChannel::kRsv1Bit,
@@ -2240,10 +2302,13 @@ void WebSocketChannel::PrimeNewOutgoingMessage() {
       mOutHeader[1] & WebSocketChannel::kMaskBit, mask, payload,
       mHdrOutToSend - (payload - mOutHeader), mCurrentOut->BeginOrigReading(),
       mCurrentOut->OrigLength());
+#endif
 
+#ifndef MOZ_NAIVEFOX
   if (frame) {
     mService->FrameSent(mSerial, mInnerWindowID, frame.forget());
   }
+#endif
 
   if (mask) {
     while (payload < (mOutHeader + mHdrOutToSend)) {
@@ -2723,6 +2788,10 @@ nsresult WebSocketChannel::HandleExtensions() {
   if (extensions.IsEmpty()) {
     return NS_OK;
   }
+#ifdef MOZ_NAIVEFOX
+  AbortSession(NS_ERROR_ILLEGAL_VALUE);
+  return NS_ERROR_ILLEGAL_VALUE;
+#endif
 
   LOG(
       ("WebSocketChannel::HandleExtensions: received "
@@ -2836,9 +2905,14 @@ nsresult WebSocketChannel::SetupRequest() {
     NS_ENSURE_SUCCESS(rv, rv);
   }
 
+  uint32_t additionalFlags = 0;
+#ifdef MOZ_NAIVEFOX
+  MOZ_TRY(mHttpChannel->GetLoadFlags(&additionalFlags));
+#endif
   rv = mHttpChannel->SetLoadFlags(
-      nsIRequest::LOAD_BACKGROUND | nsIRequest::INHIBIT_CACHING |
-      nsIRequest::LOAD_BYPASS_CACHE | nsIChannel::LOAD_BYPASS_SERVICE_WORKER);
+      additionalFlags | nsIRequest::LOAD_BACKGROUND |
+      nsIRequest::INHIBIT_CACHING | nsIRequest::LOAD_BYPASS_CACHE |
+      nsIChannel::LOAD_BYPASS_SERVICE_WORKER);
   NS_ENSURE_SUCCESS(rv, rv);
 
   // we never let websockets be blocked by head CSS/JS loads to avoid
@@ -2870,9 +2944,11 @@ nsresult WebSocketChannel::SetupRequest() {
     MOZ_ASSERT(NS_SUCCEEDED(rv));
   }
 
+#ifndef MOZ_NAIVEFOX
   rv = mHttpChannel->SetRequestHeader("Sec-WebSocket-Extensions"_ns,
                                       "permessage-deflate"_ns, false);
   MOZ_ASSERT(NS_SUCCEEDED(rv));
+#endif
 
   uint8_t* secKey;
   nsAutoCString secKeyString;
@@ -2940,6 +3016,20 @@ nsresult WebSocketChannel::ApplyForAdmission() {
 
   // Websockets has a policy of 1 session at a time being allowed in the
   // CONNECTING state per server IP address (not hostname)
+#ifdef MOZ_NAIVEFOX
+  if (mIsNativeChannel) {
+    MOZ_TRY(mURI->GetFilePath(mPath));
+    MOZ_TRY(mURI->GetPort(&mPort));
+    if (mPort == -1) {
+      mPort = kDefaultWSSPort;
+    }
+    RefPtr<WebSocketChannel> self = this;
+    return NS_DispatchToMainThread(
+        NS_NewRunnableFunction("WebSocketChannel::NativeAdmission", [self]() {
+          self->OnLookupComplete(nullptr, nullptr, NS_ERROR_FAILURE);
+        }));
+  }
+#endif
 
   // Check to see if a proxy is being used before making DNS call
   nsCOMPtr<nsIProtocolProxyService> pps;
@@ -3104,7 +3194,9 @@ void WebSocketChannel::ReportConnectionTelemetry(nsresult aStatusCode) {
       (didProxy ? (1 << 0) : 0);
 
   LOG(("WebSocketChannel::ReportConnectionTelemetry() %p %d", this, value));
+#ifndef MOZ_NAIVEFOX
   glean::websockets::handshake_type.AccumulateSingleSample(value);
+#endif
 }
 
 // nsIDNSListener
@@ -3444,13 +3536,59 @@ WebSocketChannel::AsyncOpen(nsIURI* aURI, const nsACString& aOrigin,
                             uint64_t aInnerWindowID,
                             nsIWebSocketListener* aListener,
                             nsISupports* aContext, JSContext* aCx) {
+#ifdef MOZ_NAIVEFOX
+  return NS_ERROR_NOT_IMPLEMENTED;
+#else
   OriginAttributes attrs;
   if (!aOriginAttributes.isObject() || !attrs.Init(aCx, aOriginAttributes)) {
     return NS_ERROR_INVALID_ARG;
   }
   return AsyncOpenNative(aURI, aOrigin, attrs, aInnerWindowID, aListener,
                          aContext);
+#endif
 }
+
+#ifdef MOZ_NAIVEFOX
+uint32_t WebSocketChannel::PendingNativePongs() const {
+  return mOutgoingPongMessages.GetSize() +
+         (mCurrentOut && mCurrentOut->GetMsgType() == kMsgTypePong ? 1 : 0);
+}
+
+bool WebSocketChannel::ReserveNativeMessage(uint32_t aLength) {
+  MOZ_ASSERT(mIOThread->IsOnCurrentThread());
+  constexpr uint32_t kMaximumBytes = 2 * 1024 * 1024;
+  if (mNativePendingMessages >= 32 || aLength > kMaximumBytes ||
+      mNativePendingBytes > kMaximumBytes - aLength) {
+    return false;
+  }
+  ++mNativePendingMessages;
+  mNativePendingBytes += aLength;
+  return true;
+}
+
+void WebSocketChannel::ReleaseNativeMessage(uint32_t aLength) {
+  MOZ_DIAGNOSTIC_ASSERT(mNativePendingMessages > 0);
+  MOZ_DIAGNOSTIC_ASSERT(mNativePendingBytes >= aLength);
+  mNativePendingBytes -= aLength;
+  --mNativePendingMessages;
+}
+
+void WebSocketChannel::CancelNative(nsresult aStatus) {
+  MOZ_ASSERT(NS_IsMainThread());
+  AbortSession(NS_FAILED(aStatus) ? aStatus : NS_BINDING_ABORTED);
+}
+
+nsresult WebSocketChannel::InitNativeChannel(nsIChannel* aChannel) {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (!aChannel || mWasOpened || mNativeChannel) {
+    return NS_ERROR_INVALID_ARG;
+  }
+  mNativeChannel = aChannel;
+  mLoadInfo = aChannel->LoadInfo();
+  mIsNativeChannel = true;
+  return NS_OK;
+}
+#endif
 
 NS_IMETHODIMP
 WebSocketChannel::AsyncOpenNative(nsIURI* aURI, const nsACString& aOrigin,
@@ -3589,6 +3727,13 @@ WebSocketChannel::AsyncOpenNative(nsIURI* aURI, const nsACString& aOrigin,
     return rv;
   }
 
+#ifdef MOZ_NAIVEFOX
+  if (!mNativeChannel || !mEncrypted || mIsServerSide) {
+    return NS_ERROR_NOT_INITIALIZED;
+  }
+  localChannel = mNativeChannel.forget();
+  mMaxMessageSize = 256 * 1024;
+#else
   rv = ioService->NewChannelFromURIWithProxyFlagsAndLoadInfo(
       localURI, mURI,
       nsIProtocolProxyService::RESOLVE_PREFER_SOCKS_PROXY |
@@ -3596,6 +3741,7 @@ WebSocketChannel::AsyncOpenNative(nsIURI* aURI, const nsACString& aOrigin,
           nsIProtocolProxyService::RESOLVE_ALWAYS_TUNNEL,
       mLoadInfo, getter_AddRefs(localChannel));
   NS_ENSURE_SUCCESS(rv, rv);
+#endif
 
   // Pass most GetInterface() requests through to our instantiator, but handle
   // nsIChannelEventSink in this object in order to deal with redirects

@@ -447,6 +447,42 @@ The focused TLS gate checks disabled and implicit classic preambles, explicit
 local failure within its bound, clean client exit, zero target connections, and
 a TCP canary on the H3 endpoint that detects forbidden fallback attempts.
 
+## NF-UPSTREAM-023: native WebSocket without browser execution
+
+Files:
+
+```text
+netwerk/protocol/moz.build
+netwerk/protocol/websocket/moz.build
+netwerk/protocol/websocket/BaseWebSocketChannel.cpp
+netwerk/protocol/websocket/BaseWebSocketChannel.h
+netwerk/protocol/websocket/WebSocketChannel.cpp
+netwerk/protocol/websocket/WebSocketChannel.h
+netwerk/protocol/websocket/WebSocketLog.h
+```
+
+The experimental hybrid carrier needs the existing Necko RFC6455 engine, but
+the lean product previously excluded the WebSocket implementation together
+with its DOM and content-process entry points. The NaiveFox-only path accepts
+a pre-created privileged HTTP channel, preserving the explicit origin route,
+host mapping and TLS validation. Browser-only initialization remains
+unsupported; event/dashboard instrumentation and cross-process actors are
+excluded from the lean graph. The real handshake, masking, fragmentation,
+bounded message parser, ping/pong and close machinery remain in Necko.
+Native queued message delivery is capped at 32 callbacks and 2 MiB, and queued
+PONG replies at 32. Unsolicited extensions are rejected before data processing;
+the native path never enables the decompressor. Focused gtests exercise the
+real parser with a blocked consumer and the response-header extension gate.
+
+Review obligations: ordinary Firefox builds retain their existing behavior;
+the opt-in native path is main-thread-only and cannot enable DOM or JavaScript;
+its message limit is 256 KiB, compression is disabled, and origin redirects or
+unexpected subprotocols fail closed. Test H2/H3 startup followed by genuine
+H1 WSS, both local listeners, shared authentication, application ACK/credit,
+half-close, cancellation and shutdown. Inspect linker closure for accidental
+DOM, graphics, IPC actor or JavaScript execution dependencies. This hook does
+not add WebSocket over H3 and must not be described as doing so.
+
 ## Adding or removing an entry
 
 Use the next stable identifier and record:

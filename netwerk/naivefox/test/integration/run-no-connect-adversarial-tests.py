@@ -127,14 +127,16 @@ def main():
     parser.add_argument("--objdir", type=Path, required=True)
     parser.add_argument("--caddy", type=Path, required=True)
     parser.add_argument("--runtime", type=Path)
+    parser.add_argument("--work-dir", type=Path)
     parser.add_argument("--protocol", choices=("h2", "h3", "both"), default="both")
     parser.add_argument("--case", choices=CASES, action="append")
     args = parser.parse_args()
     args.objdir = args.objdir.resolve(strict=True)
     args.caddy = args.caddy.resolve(strict=True)
     args.runtime = (args.runtime or args.objdir / "dist/bin/naivefox").resolve(strict=True)
-    root = args.objdir / "naivefox-fixture"
-    root.mkdir(exist_ok=True)
+    root = (args.work_dir or args.objdir / "naivefox-fixture").resolve()
+    fixture.require(root.is_relative_to(args.objdir), "work directory must stay below objdir")
+    root.mkdir(parents=True, exist_ok=True)
     previous_umask = os.umask(0o077)
     run = Path(tempfile.mkdtemp(prefix="no-connect-adversarial-", dir=root))
     try:

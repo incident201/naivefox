@@ -176,6 +176,30 @@ TEST(NaiveFoxConfig, TransportOptionsAreOrderIndependent)
   EXPECT_TRUE(config.mImplicitPreambleGate);
 }
 
+TEST(NaiveFoxConfig, HybridTransportIsExplicitAndDisablesClassicOptions)
+{
+  Config config;
+  nsAutoCString error;
+  const nsLiteralCString json =
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"quic://user:p%40ss@proxy.example","transport":"no-connect-hybrid","preamble":{"mode":"document-complete","path":"/"},"extra-headers":"X-Classic: yes\r\n","outer-session-gate":true})"_ns;
+  ASSERT_EQ(ParseConfig(json, config, error), NS_OK) << error.get();
+  EXPECT_EQ(config.mTransport, TransportMode::NoConnectHybrid);
+  EXPECT_EQ(config.mProxies[0].mProtocol, ProxyProtocol::H3);
+  EXPECT_TRUE(config.mProxies[0].mPassword.EqualsLiteral("p@ss"));
+  EXPECT_TRUE(config.mExtraHeaders.IsEmpty());
+  EXPECT_EQ(config.mPreamble.mMode, PreambleMode::Off);
+  EXPECT_FALSE(config.mOuterSessionGate);
+  EXPECT_FALSE(config.mImplicitPreambleGate);
+  ASSERT_EQ(ParseConfig(json, config, error, Some(TransportMode::NoConnect)),
+            NS_OK);
+  EXPECT_EQ(config.mTransport, TransportMode::NoConnect);
+  ASSERT_EQ(ParseConfig(json, config, error, Some(TransportMode::Classic)),
+            NS_OK);
+  EXPECT_EQ(config.mTransport, TransportMode::Classic);
+  EXPECT_EQ(config.mExtraHeaders.Length(), 1U);
+  EXPECT_TRUE(config.mOuterSessionGate);
+}
+
 TEST(NaiveFoxConfig, TransportOverridePrecedesDefaults)
 {
   Config config;

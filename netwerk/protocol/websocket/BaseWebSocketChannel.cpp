@@ -7,18 +7,24 @@
 #include "LoadInfo.h"
 #include "MainThreadUtils.h"
 #include "WebSocketLog.h"
-#include "mozilla/dom/ContentChild.h"
-#include "mozilla/dom/Document.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/dom/ContentChild.h"
+#  include "mozilla/dom/Document.h"
+#endif
 #include "nsContentUtils.h"
 #include "nsIClassifiedChannel.h"
 #include "nsIInterfaceRequestor.h"
 #include "nsILoadGroup.h"
-#include "nsINode.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsINode.h"
+#endif
 #include "nsITransportProvider.h"
 #include "nsProxyRelease.h"
 #include "nsStandardURL.h"
 
+#ifndef MOZ_NAIVEFOX
 using mozilla::dom::ContentChild;
+#endif
 
 namespace mozilla {
 namespace net {
@@ -47,10 +53,12 @@ BaseWebSocketChannel::BaseWebSocketChannel()
       mHttpChannelId(0) {
   // Generation of a unique serial ID.
   uint64_t processID = 0;
+#ifndef MOZ_NAIVEFOX
   if (XRE_IsContentProcess()) {
     ContentChild* cc = ContentChild::GetSingleton();
     processID = cc->GetID();
   }
+#endif
 
   uint64_t processBits =
       processID & ((uint64_t(1) << kWebSocketIDProcessBits) - 1);
@@ -217,13 +225,16 @@ BaseWebSocketChannel::SetPingTimeout(uint32_t aSeconds) {
 
 NS_IMETHODIMP
 BaseWebSocketChannel::InitLoadInfoNative(
-    nsINode* aLoadingNode, nsIPrincipal* aLoadingPrincipal,
+    WebSocketLoadingNode* aLoadingNode, nsIPrincipal* aLoadingPrincipal,
     nsIPrincipal* aTriggeringPrincipal,
     nsICookieJarSettings* aCookieJarSettings, uint32_t aSecurityFlags,
     nsContentPolicyType aContentPolicyType,
     const Maybe<mozilla::dom::ClientInfo>& aClientInfo,
     uint32_t aSandboxFlags) {
   MOZ_ASSERT(NS_IsMainThread());
+#ifdef MOZ_NAIVEFOX
+  return NS_ERROR_NOT_IMPLEMENTED;
+#else
   mLoadInfo = MOZ_TRY(LoadInfo::Create(
       aLoadingPrincipal, aTriggeringPrincipal, aLoadingNode, aSecurityFlags,
       aContentPolicyType, aClientInfo,
@@ -251,10 +262,11 @@ BaseWebSocketChannel::InitLoadInfoNative(
     }
   }
   return NS_OK;
+#endif
 }
 
 NS_IMETHODIMP
-BaseWebSocketChannel::InitLoadInfo(nsINode* aLoadingNode,
+BaseWebSocketChannel::InitLoadInfo(WebSocketLoadingNode* aLoadingNode,
                                    nsIPrincipal* aLoadingPrincipal,
                                    nsIPrincipal* aTriggeringPrincipal,
                                    uint32_t aSecurityFlags,
@@ -283,11 +295,15 @@ BaseWebSocketChannel::SetSerial(uint32_t aSerial) {
 NS_IMETHODIMP
 BaseWebSocketChannel::SetServerParameters(
     nsITransportProvider* aProvider, const nsACString& aNegotiatedExtensions) {
+#ifdef MOZ_NAIVEFOX
+  return NS_ERROR_NOT_IMPLEMENTED;
+#else
   MOZ_ASSERT(aProvider);
   mServerTransportProvider = aProvider;
   mNegotiatedExtensions = aNegotiatedExtensions;
   mIsServerSide = true;
   return NS_OK;
+#endif
 }
 
 NS_IMETHODIMP

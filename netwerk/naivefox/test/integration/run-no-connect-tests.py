@@ -251,11 +251,15 @@ def start_caddy(args, run, protocol, target_port, user, password):
     mutator = getattr(args, "server_mutator", None)
     if mutator is not None:
         mutator(server)
+    hybrid = getattr(args, "transport", "no-connect") == "no-connect-hybrid"
+    if hybrid:
+        server["protocols"] = ["h1", protocol]
     private_json(run / "caddy.json", config)
     process = Process([str(args.caddy), "run", "--config", str(run / "caddy.json")], run, "caddy", env)
     wait_until(lambda: socket_listeners(port, udp=protocol == "h3"), "Caddy listener did not start", process)
     if protocol == "h3":
-        require(not socket_listeners(port), "strict H3 fixture unexpectedly listens on TCP")
+        require(socket_listeners(port) == hybrid,
+                "H3 fixture TCP availability does not match explicit hybrid policy")
     else:
         require(not socket_listeners(port, udp=True), "strict H2 fixture unexpectedly listens on UDP")
     return process, port
@@ -402,11 +406,11 @@ def upload(ports, listener, target_port, length=1024 * 1024, host="localhost"):
         require(result == struct.pack("!Q", length) + payload_digest(length), "upload integrity or half-close failed")
 
 
-def echo_wake(ports, listener, target_port):
+def echo_wake(ports, listener, target_port, idle_seconds=2):
     with open_tunnel(ports, listener, target_port) as sock:
         sock.sendall(b"E" + BLOCK[:4096])
         require(receive(sock, 4096) == BLOCK[:4096], "initial echo failed")
-        time.sleep(2)
+        time.sleep(idle_seconds)
         sock.sendall(BLOCK[256:4352])
         require(receive(sock, 4096) == BLOCK[256:4352], "idle wake echo failed")
         sock.shutdown(socket.SHUT_WR)
@@ -522,7 +526,7 @@ def check_port_policy(args, run, protocol, allowed_target, blocked_target, user,
         caddy, proxy_port = start_caddy(inputs, directory, protocol,
                                         allowed_target.server_address[1], user, password)
         processes.append(caddy)
-        for transport in ("no-connect", "classic"):
+        for transport in (getattr(args, "transport", "no-connect"), "classic"):
             client, ports = start_client(inputs, directory, transport, protocol, proxy_port,
                                          transport, user, password, 4)
             processes.append(client)
@@ -545,7 +549,8 @@ def check_shared_config(args, run, protocol, target_port, user, password):
     inputs = copy.copy(args)
     inputs.client_config_path = directory / "config.json"
     processes = []
-    sequence = ("classic", "no-connect", "classic", "no-connect")
+    selected_transport = getattr(args, "transport", "no-connect")
+    sequence = ("classic", selected_transport, "classic", selected_transport)
     baseline = None
     classic_requests = 0
     try:
@@ -606,7 +611,7 @@ def check_auth_partition(args, run, protocol, target, user, password):
                                         target.server_address[1], user, password)
         processes.append(caddy)
         client, ports = start_client(inputs, directory, "client", protocol, proxy_port,
-                                     "no-connect", user, password, 3)
+                                     getattr(args, "transport", "no-connect"), user, password, 3)
         processes.append(client)
         auth_partition_streams(ports, target.server_address[1])
         client.exited_cleanly()
@@ -621,7 +626,7 @@ def check_auth_partition(args, run, protocol, target, user, password):
             process.stop()
 
 
-def exercise(ports, target_port, label, parallel_batches=1):
+def exercise(ports, target_port, label, parallel_batches=1, idle_seconds=2):
     for listener in ("socks", "http"):
         try:
             download(ports, listener, target_port, slow=True)
@@ -641,7 +646,7 @@ def exercise(ports, target_port, label, parallel_batches=1):
                 except (OSError, RuntimeError) as error:
                     raise RuntimeError(f"{label} parallel batch {batch} transfer {index}: {error}") from error
     for listener in ("socks", "http"):
-        echo_wake(ports, listener, target_port)
+        echo_wake(ports, listener, target_port, idle_seconds if listener == "socks" else 2)
 
 
 def access_requests(run):
@@ -652,6 +657,8 @@ def access_requests(run):
 
 
 def run_protocol(args, base, protocol):
+    transport = getattr(args, "transport", "no-connect")
+    hybrid = transport == "no-connect-hybrid"
     run = base / protocol
     run.mkdir(mode=0o700)
     issue_certificates(run)
@@ -670,14 +677,15 @@ def run_protocol(args, base, protocol):
         policy_refusals = 2
         concurrent_connections = 40
         candidate, candidate_ports = start_client(
-            args, run, "no-connect", protocol, proxy_port, "no-connect", user, password,
+            args, run, "no-connect", protocol, proxy_port, transport, user, password,
             ordinary_connections + variety_connections + policy_refusals + concurrent_connections + 1)
         processes.append(candidate)
         classic, classic_ports = start_client(
             args, run, "classic", protocol, proxy_port, "classic", user, password,
             ordinary_connections + variety_connections + policy_refusals)
         processes.append(classic)
-        exercise(candidate_ports, target_port, f"{protocol} no-connect", batches)
+        exercise(candidate_ports, target_port, f"{protocol} {transport}", batches,
+                 getattr(args, "idle_seconds", 2))
         target_variety(candidate_ports, target_port, second_target.server_address[1])
         concurrent_open_streams(candidate_ports, target_port, concurrent_connections)
         print(f"PASS {protocol} no-connect: 40 simultaneously open logical streams", flush=True)
@@ -685,7 +693,7 @@ def run_protocol(args, base, protocol):
         for listener in ("socks", "http"):
             reject_policy(candidate_ports, listener, denied_target.server_address[1], host="127.0.0.2")
         candidate.exited_cleanly()
-        reject_credentials(args, run, protocol, proxy_port, "no-connect", user, password,
+        reject_credentials(args, run, protocol, proxy_port, transport, user, password,
                            target_port, processes)
         requests = access_requests(run)
         require(not any(item.get("method") == "CONNECT" for item in requests),
@@ -711,8 +719,16 @@ def run_protocol(args, base, protocol):
         require(stats["opens"] >= ordinary_connections + variety_connections + concurrent_connections,
                 "no-connect did not open expected logical streams")
         require(stats["rejected"] >= 1, "bad Basic credentials were not rejected")
-        require(stats["idle_started"] >= 1, "no-connect idle state was not exercised")
-        require(stats["idle_completed"] >= 1, "no-connect idle poll never completed")
+        if hybrid:
+            require(stats.get("ws_opened", 0) >= 1, "hybrid never established WebSocket")
+            require(stats.get("ws_messages_in", 0) >= 1 and stats.get("ws_messages_out", 0) >= 1,
+                    "hybrid did not exchange bidirectional WebSocket cells")
+            if getattr(args, "idle_seconds", 2) >= 27:
+                require(stats.get("idle_heartbeats", 0) >= 1,
+                        "hybrid long idle did not exercise application heartbeat")
+        else:
+            require(stats["idle_started"] >= 1, "no-connect idle state was not exercised")
+            require(stats["idle_completed"] >= 1, "no-connect idle poll never completed")
         peers = stats.get("peers", [])
         require(sum(peer.get("reset", 0) for peer in peers) >= 1,
                 "abrupt local cancellation did not reset its logical stream")
@@ -721,13 +737,16 @@ def run_protocol(args, base, protocol):
                 "concurrent streams did not use additional carrier sessions")
         require(max(peaks, default=0) <= 32, "one carrier exceeded its stream bound")
         expected_protocol = "HTTP/3.0" if protocol == "h3" else "HTTP/2.0"
-        require(set(stats["protocols"]) == {expected_protocol}, "carrier negotiated an unexpected outer protocol")
+        expected_protocols = {expected_protocol, "HTTP/1.1"} if hybrid else {expected_protocol}
+        require(set(stats["protocols"]) == expected_protocols, "carrier negotiated an unexpected outer protocol")
         port_policy = check_port_policy(args, run, protocol, target, second_target, user, password)
         shared_config = check_shared_config(args, run, protocol, target_port, user, password)
         auth_partition = check_auth_partition(args, run, protocol, target, user, password)
         require(not target.failures and not second_target.failures,
                 "target detected a truncated or failed data stream")
-        summary = {"protocol": protocol, "same_caddy_process": True, "strict_udp_only": protocol == "h3",
+        summary = {"protocol": protocol, "transport": transport, "same_caddy_process": True,
+                   "strict_udp_only": protocol == "h3" and not hybrid,
+                   "websocket_tcp": hybrid, "ws_opened": stats.get("ws_opened", 0),
                    "no_connect_outer_connects": 0, "classic_connects": stats["connect"],
                    "classic_preamble": getattr(args, "classic_preamble", "off"), "parallel_batches": batches,
                    "logical_opens": stats["opens"], "idle_started": stats["idle_started"],
@@ -757,14 +776,18 @@ def main():
     parser.add_argument("--caddy", type=Path, required=True)
     parser.add_argument("--runtime", type=Path)
     parser.add_argument("--protocol", choices=("h2", "h3", "both"), default="both")
+    parser.add_argument("--transport", choices=("no-connect", "no-connect-hybrid"), default="no-connect")
+    parser.add_argument("--work-dir", type=Path, help="private artifact parent below objdir")
+    parser.add_argument("--idle-seconds", type=int, choices=range(2, 31), default=2, metavar="2..30")
     parser.add_argument("--classic-preamble", choices=("off", "default"), default="off")
     parser.add_argument("--parallel-batches", type=int, choices=range(1, 129), default=1, metavar="1..128")
     args = parser.parse_args()
     args.objdir = args.objdir.resolve(strict=True)
     args.caddy = args.caddy.resolve(strict=True)
     args.runtime = (args.runtime or args.objdir / "dist/bin/naivefox").resolve(strict=True)
-    root = args.objdir / "naivefox-fixture"
-    root.mkdir(exist_ok=True)
+    root = (args.work_dir or args.objdir / "naivefox-fixture").resolve()
+    require(root.is_relative_to(args.objdir), "work directory must stay below objdir")
+    root.mkdir(parents=True, exist_ok=True)
     previous_umask = os.umask(0o077)
     run = Path(tempfile.mkdtemp(prefix="no-connect-", dir=root))
     try:

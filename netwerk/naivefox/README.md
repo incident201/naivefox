@@ -31,7 +31,7 @@ reads `./config.json`; one positional argument selects another config:
 ./naivefox --transport=classic /absolute/path/to/config.json
 ```
 
-`--transport classic|no-connect` overrides the JSON `transport` field. It may
+`--transport classic|no-connect|no-connect-hybrid` overrides the JSON `transport` field. It may
 precede or follow the optional config path; without a path, it uses
 `./config.json`. The `--transport=value` form is also accepted. Both transports
 use the same percent-decoded username and password from the private `proxy`
@@ -85,6 +85,11 @@ The supported config is a strict NaiveProxy-compatible subset:
   classic preamble or send extra CONNECT headers; valid classic-only settings
   are parsed but remain inactive in this mode. Local SOCKS authentication
   remains available.
+  Experimental `"no-connect-hybrid"` completes the same H2/H3 startup graph,
+  then uses one shaped native HTTP/1.1 WebSocket over TLS/TCP per carrier. It
+  requires a matching server and TCP access even when startup uses `quic://`;
+  this explicit mode does not promise WebSocket over H3. See
+  [the hybrid lifecycle](NO-CONNECT.md#experimental-hybrid-lifecycle).
 - `listen` is one URI or a non-empty array. `socks://` serves SOCKS5 CONNECT;
   without userinfo it uses the normal no-auth method. SOCKS credentials are
   optional, percent-decoded, and checked with RFC 1929 username/password

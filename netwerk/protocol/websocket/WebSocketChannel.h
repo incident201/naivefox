@@ -26,6 +26,7 @@
 #include "nsString.h"
 
 class nsIAsyncVerifyRedirectCallback;
+class nsIChannel;
 class nsIDashboardEventNotifier;
 class nsIEventTarget;
 class nsIHttpChannel;
@@ -108,6 +109,11 @@ class WebSocketChannel : public BaseWebSocketChannel,
                               uint32_t length) override;
   NS_IMETHOD GetSecurityInfo(nsITransportSecurityInfo** aSecurityInfo) override;
 
+#ifdef MOZ_NAIVEFOX
+  nsresult InitNativeChannel(nsIChannel* aChannel);
+  void CancelNative(nsresult aStatus);
+#endif
+
   WebSocketChannel();
   static void Shutdown();
 
@@ -145,6 +151,12 @@ class WebSocketChannel : public BaseWebSocketChannel,
   friend class CallOnStop;
   friend class CallOnServerClose;
   friend class CallAcknowledge;
+#ifdef MOZ_NAIVEFOX
+  friend class NaiveFoxWebSocketTestPeer;
+  bool ReserveNativeMessage(uint32_t aLength);
+  void ReleaseNativeMessage(uint32_t aLength);
+  uint32_t PendingNativePongs() const;
+#endif
 
   // Common send code for binary + text msgs
   [[nodiscard]] nsresult SendMsgCommon(const nsACString& aMsg, bool isBinary,
@@ -280,7 +292,15 @@ class WebSocketChannel : public BaseWebSocketChannel,
   const static int32_t kLingeringCloseTimeout = 1000;
   const static int32_t kLingeringCloseThreshold = 50;
 
+#ifndef MOZ_NAIVEFOX
   RefPtr<WebSocketEventService> mService;  // effectively const
+#endif
+#ifdef MOZ_NAIVEFOX
+  nsCOMPtr<nsIChannel> mNativeChannel;
+  bool mIsNativeChannel = false;
+  Atomic<uint32_t, Relaxed> mNativePendingMessages{0};
+  Atomic<uint32_t, Relaxed> mNativePendingBytes{0};
+#endif
 
   int32_t
       mMaxConcurrentConnections;  // only used in AsyncOpenNative on MainThread

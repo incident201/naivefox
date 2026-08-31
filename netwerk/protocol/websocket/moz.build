@@ -32,36 +32,47 @@ EXPORTS.mozilla.net += [
     "WebSocketFrame.h",
 ]
 
-UNIFIED_SOURCES += [
-    "BaseWebSocketChannel.cpp",
-    "IPCTransportProvider.cpp",
-    "WebSocketChannel.cpp",
-    "WebSocketChannelChild.cpp",
-    "WebSocketChannelParent.cpp",
-    "WebSocketConnection.cpp",
-    "WebSocketConnectionChild.cpp",
-    "WebSocketConnectionParent.cpp",
-    "WebSocketEventListenerChild.cpp",
-    "WebSocketEventListenerParent.cpp",
-    "WebSocketEventService.cpp",
-    "WebSocketFrame.cpp",
-    "WebSocketProtocolHandler.cpp",
-]
+if CONFIG["MOZ_NAIVEFOX"]:
+    SOURCES += [
+        "BaseWebSocketChannel.cpp",
+        "WebSocketChannel.cpp",
+    ]
+    LOCAL_INCLUDES += ["/netwerk/naivefox"]
+else:
+    UNIFIED_SOURCES += [
+        "BaseWebSocketChannel.cpp",
+        "IPCTransportProvider.cpp",
+        "WebSocketChannel.cpp",
+        "WebSocketChannelChild.cpp",
+        "WebSocketChannelParent.cpp",
+        "WebSocketConnection.cpp",
+        "WebSocketConnectionChild.cpp",
+        "WebSocketConnectionParent.cpp",
+        "WebSocketEventListenerChild.cpp",
+        "WebSocketEventListenerParent.cpp",
+        "WebSocketEventService.cpp",
+        "WebSocketFrame.cpp",
+        "WebSocketProtocolHandler.cpp",
+    ]
 
-IPDL_SOURCES += [
-    "PTransportProvider.ipdl",
-    "PWebSocket.ipdl",
-    "PWebSocketConnection.ipdl",
-    "PWebSocketEventListener.ipdl",
-]
+    IPDL_SOURCES += [
+        "PTransportProvider.ipdl",
+        "PWebSocket.ipdl",
+        "PWebSocketConnection.ipdl",
+        "PWebSocketEventListener.ipdl",
+    ]
+
+    FINAL_LIBRARY = "xul"
+
+    LOCAL_INCLUDES += [
+        "/dom/base",
+        "/netwerk/base",
+    ]
+
+if CONFIG["MOZ_NAIVEFOX"]:
+    FINAL_LIBRARY = "xul"
+    LOCAL_INCLUDES += ["/netwerk/base"]
 
 include("/ipc/chromium/chromium-config.mozbuild")
-
-FINAL_LIBRARY = "xul"
-
-LOCAL_INCLUDES += [
-    "/dom/base",
-    "/netwerk/base",
-]
 
 include("/tools/fuzzing/libfuzzer-config.mozbuild")

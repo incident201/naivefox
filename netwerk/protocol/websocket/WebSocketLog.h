@@ -5,9 +5,13 @@
 #ifndef WebSocketLog_h
 #define WebSocketLog_h
 
-#include "base/basictypes.h"
+#ifndef MOZ_NAIVEFOX
+#  include "base/basictypes.h"
+#endif
 #include "mozilla/Logging.h"
-#include "mozilla/net/NeckoChild.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/net/NeckoChild.h"
+#endif
 
 namespace mozilla {
 namespace net {
