@@ -4670,13 +4670,33 @@ paired-inference floor and provide no absolute indistinguishability verdict.
 Classic remains the default. Historical worker results and this diagnostic
 must not substitute for the new application-matched measurements.
 
+### Replacement measurement with the same active application
+
+The replacement is specified in
+[the matched application benchmark](test/integration/hybrid_app/BENCHMARK.md)
+and collected by `run-matched-app-matrix.py`. The same Firefox application
+runs directly for both controls and through the selected local proxy for
+each candidate. Every participant must load the same resources, complete the
+same semantic API bootstrap, and execute all eleven verified jobs on one
+application WebSocket. An idle reference cannot pass admission.
+
+Only the selected local listener is enabled. Kernel socket ownership proves
+the application route before active work. Capture starts before browser and
+native startup; a separate direct health endpoint cannot warm the measured
+origin. Whole includes the complete bounded application session and graceful
+producer shutdown, with observed TCP termination and drained shaping queues.
+Complete-session IP bytes and application I/O durations have separate, explicit
+denominators. No old diagnostic samples are eligible for this measurement.
+
 ## Sensitive data handling
 
 Raw packet captures, NSS key logs, copied profiles, screenshots, bodies, and
 process logs are sensitive. Runners create them with private permissions below
-the ignored object-directory fixture state. On success, they retain only safe
-aggregates and delete private inputs. On failure, they print the private path
-for local diagnosis; those files must never be committed or shared blindly.
+the ignored object-directory fixture state. Individual runners document whether
+they delete private inputs after producing safe aggregates. The matched active
+application runner retains its private inputs for independent capture audits.
+On failure, runners print the private path for local diagnosis; those files
+must never be committed or shared blindly.
 
 Safe summaries may contain protocol identifiers, setting values, frame types,
 stream identifiers, packet counts/length aggregates, hashes of build artifacts,

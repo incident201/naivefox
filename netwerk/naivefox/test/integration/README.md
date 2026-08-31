@@ -177,6 +177,13 @@ integrity, half-close, concurrency, policy, cancellation and shutdown checks.
 Run the original no-connect suite separately to retain its strict UDP-only
 H3 regression.
 
+For comparative measurements, use
+[the matched active application benchmark](hybrid_app/BENCHMARK.md) and
+`run-matched-app-matrix.py`. Its direct Firefox controls execute the same
+resources, API requests, active WebSocket jobs and idle periods as the proxied
+application. The earlier idle-WebSocket capture is a superseded diagnostic,
+not a valid baseline for active Whole, throughput or traffic comparisons.
+
 From the repository root, run:
 
 ```bash
