@@ -87,8 +87,8 @@ before opening the target connection.
 The protocol preserves finite declared body capacities, ordinary HTTP
 completion, ordered application cells and per-stream credit. A partial response
 or invalid body cannot be accepted as successful completion. Target errors,
-invalid authentication, malformed cells, sequence exhaustion and transport
-failure must release the local stream with an error rather than replaying data
+invalid authentication, malformed cells, unexpected sequence offsets and
+transport failure must release the local stream with an error rather than replaying data
 or falling back to another transport.
 
 ## Selected protocol and limits
@@ -100,11 +100,14 @@ uses 16-KiB uploads and 256-KiB responses, with at most two ordered responses
 in flight. Idle uses one finite 512-byte long-poll response, held for at most
 30 seconds, with an explicit upload to wake local activity.
 
-The multiplexer permits at most 32 logical streams and bounds per-stream
-receive credit to 512 KiB. Stream byte sequences are 32-bit; a stream must fail
-before wrapping. Useful payload displaces cryptographic filler within granted
-capacity. This can cost extra traffic and latency; the selected profile is not
-a throughput or indistinguishability guarantee.
+Each carrier multiplexes up to 32 logical streams; additional connections can
+use additional carriers, so 32 is not a client-wide connection limit.
+Per-stream receive credit stays bounded at 512 KiB. Byte offsets wrap modulo
+2^32, with exact expected-offset checks and unchanged credit accounting; they
+do not impose a fixed stream-size limit or stop a transfer at 4 GiB.
+Useful payload displaces cryptographic filler within granted capacity. This
+can cost extra traffic and latency; the selected profile is not a throughput
+or indistinguishability guarantee.
 
 Session resumption, transparent reconnect/replay and automatic credential rotation
 are outside the current contract. Normal application retry after a reported

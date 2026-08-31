@@ -245,7 +245,8 @@ TEST_F(NaiveFoxNoConnectCodec, UncreditedDataFailsClosed) {
   EXPECT_TRUE(stream.IsReset());
 }
 
-TEST_F(NaiveFoxNoConnectCodec, HalfClosePreservesOtherDirectionAndBufferedData) {
+TEST_F(NaiveFoxNoConnectCodec,
+       HalfClosePreservesOtherDirectionAndBufferedData) {
   StreamState stream(9);
   ASSERT_TRUE(stream.Receive({Kind::Opened, 9, 0, {}}));
   ASSERT_TRUE(stream.Receive({Kind::Data, 9, 0, {1, 2}}));
@@ -337,42 +338,117 @@ TEST_F(NaiveFoxNoConnectCodec, ResetIsTerminalAndMayRejectOpen) {
   EXPECT_FALSE(zero.MakeReset(frame));
 }
 
-TEST_F(NaiveFoxNoConnectCodec, ReceiveSequenceNeverWraps) {
+TEST_F(NaiveFoxNoConnectCodec, ReceiveSequenceWrapsWithExactDataAndFinOffsets) {
   StreamState stream(1);
   ASSERT_TRUE(stream.Receive({Kind::Opened, 1, 0, {}}));
   Frame data{Kind::Data, 1, 0,
              std::vector<uint8_t>(kMaxCell - kCellHeader - kFrameHeader, 0x41)};
-  const uint32_t maximum = std::numeric_limits<uint32_t>::max();
+  const uint64_t boundary = uint64_t{1} << 32;
+  uint64_t received = 0;
   Frame credit;
-  while (stream.ReceiveSequence() != maximum) {
-    const uint32_t length = std::min<uint32_t>(
-        data.body.size(), maximum - stream.ReceiveSequence());
+  while (received < boundary - 3) {
+    const uint32_t length = static_cast<uint32_t>(
+        std::min<uint64_t>(data.body.size(), boundary - 3 - received));
     data.body.resize(length);
-    data.sequence = stream.ReceiveSequence();
+    data.sequence = static_cast<uint32_t>(received);
     ASSERT_TRUE(stream.Receive(data));
     ASSERT_TRUE(stream.Delivered(length));
     ASSERT_TRUE(stream.TakeCredit(credit));
+    received += length;
   }
-  EXPECT_EQ(stream.ReceiveSequence(), maximum);
-  EXPECT_FALSE(stream.Receive({Kind::Data, 1, maximum, {1}}));
-  EXPECT_EQ(stream.ReceiveSequence(), maximum);
-  EXPECT_TRUE(stream.IsReset());
+  ASSERT_TRUE(stream.Receive({Kind::Data,
+                              1,
+                              static_cast<uint32_t>(received),
+                              {1, 2, 3, 4, 5, 6, 7, 8}}));
+  received += 8;
+  EXPECT_GT(received, boundary);
+  EXPECT_EQ(stream.ReceiveSequence(), 5U);
+  EXPECT_EQ(stream.ReceiveCredit(), kReceiveWindow - 8);
+  EXPECT_EQ(stream.BufferedBytes(), 8U);
+  EXPECT_FALSE(stream.IsReset());
+
+  StreamState outOfOrder(stream);
+  EXPECT_FALSE(outOfOrder.Receive({Kind::Data, 1, 0, {9}}));
+  EXPECT_TRUE(outOfOrder.IsReset());
+  StreamState oldOffset(stream);
+  EXPECT_FALSE(oldOffset.Receive(
+      {Kind::Data, 1, std::numeric_limits<uint32_t>::max() - 2, {9}}));
+  StreamState wrongFin(stream);
+  EXPECT_FALSE(wrongFin.Receive({Kind::Fin, 1, 0, {}}));
+
+  ASSERT_TRUE(stream.Delivered(3));
+  EXPECT_EQ(stream.ReceiveCredit(), kReceiveWindow - 8);
+  ASSERT_TRUE(stream.TakeCredit(credit));
+  EXPECT_EQ(stream.ReceiveCredit(), kReceiveWindow - 5);
+  ASSERT_TRUE(stream.Receive({Kind::Data, 1, 5, {9, 10}}));
+  EXPECT_EQ(stream.ReceiveSequence(), 7U);
+  ASSERT_TRUE(stream.Receive({Kind::Fin, 1, 7, {}}));
+  ASSERT_TRUE(stream.MakeFin(credit));
+  EXPECT_FALSE(stream.IsDrained());
+  ASSERT_TRUE(stream.Delivered(7));
+  ASSERT_TRUE(stream.TakeCredit(credit));
+  EXPECT_EQ(stream.ReceiveCredit(), kReceiveWindow);
+  EXPECT_TRUE(stream.IsDrained());
 }
 
-TEST_F(NaiveFoxNoConnectCodec, SendSequenceNeverWraps) {
+TEST_F(NaiveFoxNoConnectCodec, SendSequenceWrapsWithoutResettingCreditOrFin) {
   StreamState stream(1);
   const std::vector<uint8_t> data(kMaxCell - kCellHeader - kFrameHeader, 0x41);
-  const uint32_t maximum = std::numeric_limits<uint32_t>::max();
+  const uint64_t boundary = uint64_t{1} << 32;
+  uint64_t sent = 0;
   Frame frame;
-  while (stream.SendSequence() != maximum) {
-    const uint32_t length =
-        std::min<uint32_t>(data.size(), maximum - stream.SendSequence());
+  while (sent < boundary - 3) {
+    const uint32_t length = static_cast<uint32_t>(
+        std::min<uint64_t>(data.size(), boundary - 3 - sent));
     ASSERT_TRUE(stream.MakeData(data.data(), length, frame));
+    ASSERT_EQ(frame.sequence, static_cast<uint32_t>(sent));
     ASSERT_TRUE(stream.Receive(Credit(1, length)));
+    sent += length;
   }
-  EXPECT_EQ(stream.SendSequence(), maximum);
+  ASSERT_TRUE(stream.MakeData(data.data(), 8, frame));
+  EXPECT_EQ(frame.sequence, std::numeric_limits<uint32_t>::max() - 2);
+  sent += 8;
+  EXPECT_GT(sent, boundary);
+  EXPECT_EQ(stream.SendSequence(), 5U);
+  EXPECT_EQ(stream.SendCredit(), kReceiveWindow - 8);
+  EXPECT_FALSE(stream.IsReset());
+  ASSERT_TRUE(stream.Receive(Credit(1, 8)));
+  ASSERT_TRUE(stream.MakeData(data.data(), 2, frame));
+  EXPECT_EQ(frame.sequence, 5U);
+  EXPECT_EQ(stream.SendSequence(), 7U);
+  EXPECT_EQ(stream.SendCredit(), kReceiveWindow - 2);
+  ASSERT_TRUE(stream.MakeFin(frame));
+  EXPECT_EQ(frame.kind, Kind::Fin);
+  EXPECT_EQ(frame.sequence, 7U);
   EXPECT_FALSE(stream.MakeData(data.data(), 1, frame));
-  EXPECT_EQ(stream.SendSequence(), maximum);
+  EXPECT_FALSE(stream.IsReset());
+}
+
+TEST_F(NaiveFoxNoConnectCodec, ReceiveWindowRemainsBoundedAcrossSequenceWrap) {
+  StreamState stream(1);
+  ASSERT_TRUE(stream.Receive({Kind::Opened, 1, 0, {}}));
+  Frame data{Kind::Data, 1, 0, std::vector<uint8_t>(kReceiveWindow / 4, 0x41)};
+  const uint64_t boundary = uint64_t{1} << 32;
+  uint64_t received = 0;
+  Frame credit;
+  while (received < boundary - data.body.size()) {
+    data.sequence = static_cast<uint32_t>(received);
+    ASSERT_TRUE(stream.Receive(data));
+    ASSERT_TRUE(stream.Delivered(data.body.size()));
+    ASSERT_TRUE(stream.TakeCredit(credit));
+    received += data.body.size();
+  }
+  for (unsigned i = 0; i < 4; ++i) {
+    data.sequence = static_cast<uint32_t>(received);
+    ASSERT_TRUE(stream.Receive(data));
+    received += data.body.size();
+  }
+  EXPECT_GT(received, boundary);
+  EXPECT_EQ(stream.ReceiveSequence(), 3 * data.body.size());
+  EXPECT_EQ(stream.ReceiveCredit(), 0U);
+  EXPECT_EQ(stream.BufferedBytes(), kReceiveWindow);
+  EXPECT_FALSE(
+      stream.Receive({Kind::Data, 1, static_cast<uint32_t>(received), {1}}));
   EXPECT_TRUE(stream.IsReset());
 }
 

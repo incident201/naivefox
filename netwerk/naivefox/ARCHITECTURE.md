@@ -160,8 +160,11 @@ no-connect.
 `continuous-bulk-pipeline` lifecycle into native C++. It opens ordinary Necko
 channels, validates response status/capacity/encoding and uses NSS randomness
 for filler. The experiment's Firefox process, DOM, animation, JavaScript
-scheduler and loopback WSS bridge are outside the port. See
-[NO-CONNECT.md](NO-CONNECT.md) for the maintained boundary and limits.
+scheduler and loopback WSS bridge are outside the port. A carrier holds at
+most 32 streams; new carriers provide further concurrent capacity without a
+client-wide 32-stream limit. Stream byte offsets wrap modulo 2^32 while exact
+offset checks and bounded credit remain mandatory, so the byte counter does
+not cap stream size. See [NO-CONNECT.md](NO-CONNECT.md) for the maintained boundary and limits.
 
 The following fallback rules describe `classic`; the opt-in application
 transport has no automatic downgrade to `classic`:

@@ -79,7 +79,9 @@ lean runtime. Transport selection in JSON and the desktop CLI must agree.
 Both transports use only the existing proxy URI credentials and the server's
 shared forward-proxy authentication/access policy; never add a separate
 no-connect key or target allowlist. Valid classic-only options are inactive
-under no-connect, but malformed fields remain errors.
+under no-connect, but malformed fields remain errors. Stream byte offsets
+wrap modulo 2^32 without a 4-GiB transfer cap. Keep per-carrier stream and
+per-stream credit bounds without imposing a client-wide 32-stream limit.
 
 ## Build and test policy
 
