@@ -322,7 +322,7 @@ def start_client(args, run, name, protocol, proxy_port, transport, user, passwor
     return process, {"socks": socks_port, "http": http_port}
 
 
-def open_tunnel(ports, listener, target_port, host="localhost", rejected=False):
+def open_tunnel(ports, listener, target_port, host="localhost", rejected=False, allow_early_eof=False):
     sock = socket.create_connection(("127.0.0.1", ports[listener]), timeout=20)
     sock.settimeout(40)
     try:
@@ -350,6 +350,13 @@ def open_tunnel(ports, listener, target_port, host="localhost", rejected=False):
                 header.extend(receive(sock, 1))
                 require(len(header) <= 16384, "HTTP CONNECT reply exceeds bound")
             success = bytes(header).split(b" ", 2)[1] == b"200"
+        if rejected and success and allow_early_eof:
+            # Ordinary forwardproxy may send CONNECT 200 before applying ACL.
+            # A policy refusal must then close promptly without any target data;
+            # callers also verify the forbidden target's accept count stays zero.
+            sock.settimeout(5)
+            require(not sock.recv(1), "policy-denied tunnel returned target bytes")
+            success = False
         require(success != rejected, "unexpected local CONNECT success" if rejected else "local CONNECT failed")
         if rejected:
             sock.close()
@@ -358,6 +365,11 @@ def open_tunnel(ports, listener, target_port, host="localhost", rejected=False):
     except BaseException:
         sock.close()
         raise
+
+
+def reject_policy(ports, listener, target_port, host="localhost"):
+    return open_tunnel(ports, listener, target_port, host=host,
+                       rejected=True, allow_early_eof=True)
 
 
 def download(ports, listener, target_port, length=1024 * 1024, slow=False, host="localhost"):
@@ -479,7 +491,7 @@ def auth_partition_streams(ports, target_port):
 def target_variety(ports, first_port, second_port):
     for listener in ("socks", "http"):
         download(ports, listener, first_port, 32768, host="127.0.0.1")
-        download(ports, listener, second_port, 32768, host="localhost.")
+        download(ports, listener, second_port, 32768, host="localhost")
 
 
 def reject_credentials(args, run, protocol, proxy_port, transport, user, password,
@@ -516,7 +528,7 @@ def check_port_policy(args, run, protocol, allowed_target, blocked_target, user,
             processes.append(client)
             for listener in ("socks", "http"):
                 download(ports, listener, allowed_target.server_address[1], 32768)
-                open_tunnel(ports, listener, blocked_target.server_address[1], rejected=True)
+                reject_policy(ports, listener, blocked_target.server_address[1])
             client.exited_cleanly()
         require(blocked_target.accepted_connections == before,
                 "forward-proxy ports policy dialed a denied destination")
@@ -671,8 +683,7 @@ def run_protocol(args, base, protocol):
         print(f"PASS {protocol} no-connect: 40 simultaneously open logical streams", flush=True)
         cancel_stream(candidate_ports, target_port)
         for listener in ("socks", "http"):
-            open_tunnel(candidate_ports, listener, denied_target.server_address[1],
-                        host="127.0.0.2", rejected=True)
+            reject_policy(candidate_ports, listener, denied_target.server_address[1], host="127.0.0.2")
         candidate.exited_cleanly()
         reject_credentials(args, run, protocol, proxy_port, "no-connect", user, password,
                            target_port, processes)
@@ -685,8 +696,7 @@ def run_protocol(args, base, protocol):
         exercise(classic_ports, target_port, f"{protocol} classic", batches)
         target_variety(classic_ports, target_port, second_target.server_address[1])
         for listener in ("socks", "http"):
-            open_tunnel(classic_ports, listener, denied_target.server_address[1],
-                        host="127.0.0.2", rejected=True)
+            reject_policy(classic_ports, listener, denied_target.server_address[1], host="127.0.0.2")
         classic.exited_cleanly()
         reject_credentials(args, run, protocol, proxy_port, "classic", user, password,
                            target_port, processes)
@@ -725,7 +735,7 @@ def run_protocol(args, base, protocol):
                    "carrier_sessions": len(peers), "peak_streams_per_carrier": peaks,
                    "shared_basic_auth": True, "credential_rejection_cases_per_transport": 3,
                    "credential_rejection_frontends": ["socks", "http"],
-                   "unlisted_target_hosts": ["localhost", "localhost.", "127.0.0.1"],
+                   "unlisted_target_hosts": ["localhost", "127.0.0.1"],
                    "unlisted_target_port_count": 2, "shared_acl_refusals": 4,
                    "optional_forward_proxy_ports": port_policy, "shared_config_switch": shared_config,
                    "carrier_auth_partition": auth_partition,

@@ -67,7 +67,7 @@ def worker(path):
     module = fixture_module()
     job = json.loads(path.read_text())
     if job["action"] == "call":
-        allowed = {"download", "upload", "echo_wake", "cancel_stream", "open_tunnel", "concurrent_open_streams", "auth_partition_streams"}
+        allowed = {"download", "upload", "echo_wake", "cancel_stream", "open_tunnel", "concurrent_open_streams", "auth_partition_streams", "reject_policy"}
         module.require(job["function"] in allowed, "unknown Windows workload")
         getattr(module, job["function"])(*job["args"], **job["kwargs"])
         return 0
@@ -289,7 +289,7 @@ def run_inside(args):
 
     args.client_factory = client_factory
     module.start_caddy = start_caddy
-    for name in ("download", "upload", "echo_wake", "cancel_stream", "open_tunnel", "concurrent_open_streams", "auth_partition_streams"):
+    for name in ("download", "upload", "echo_wake", "cancel_stream", "open_tunnel", "concurrent_open_streams", "auth_partition_streams", "reject_policy"):
         setattr(module, name, lambda *a, _name=name, **kw: call(_name, *a, **kw))
     try:
         modules = subprocess.check_output([str(args.caddy), "list-modules"], text=True)

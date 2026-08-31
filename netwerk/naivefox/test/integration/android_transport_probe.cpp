@@ -27,7 +27,7 @@ constexpr size_t kMaxHeader = 16 * 1024;
 
 enum class Reply { Accepted, Rejected, Invalid };
 enum class Operation {
-  Download, Upload, Idle, Reset, Reject, Concurrent, AuthPartition
+  Download, Upload, Idle, Reset, Reject, Concurrent, AuthPartition, PolicyReject
 };
 
 struct Options {
@@ -72,7 +72,7 @@ int Fail(const char* aMessage) {
 int Usage() {
   std::fputs(
       "Usage: android_transport_probe socks|http LOCALPORT TARGETHOST "
-      "TARGETPORT download|upload|idle|reset|reject|concurrent|auth-partition "
+      "TARGETPORT download|upload|idle|reset|reject|concurrent|auth-partition|policy-reject "
       "LENGTH [ACK_HEX|HTTPPORT|-] [slow]\n",
       stderr);
   return 2;
@@ -154,6 +154,8 @@ bool Parse(int aCount, char** aArguments, Options& aOptions) {
     aOptions.operation = Operation::Concurrent;
   } else if (std::strcmp(operation, "auth-partition") == 0) {
     aOptions.operation = Operation::AuthPartition;
+  } else if (std::strcmp(operation, "policy-reject") == 0) {
+    aOptions.operation = Operation::PolicyReject;
   } else {
     return false;
   }
@@ -586,7 +588,17 @@ int main(int argc, char** argv) {
   }
   const Reply reply = options.socks ? SocksConnect(local.Get(), options)
                                     : HttpConnect(local.Get(), options);
-  if (options.operation == Operation::Reject) {
+  if (options.operation == Operation::PolicyReject) {
+    if (reply == Reply::Accepted) {
+      const timeval timeout{5, 0};
+      if (setsockopt(local.Get(), SOL_SOCKET, SO_RCVTIMEO, &timeout,
+                     sizeof(timeout)) != 0 || !EndOfStream(local.Get())) {
+        return Fail("policy-denied tunnel did not close without target data");
+      }
+    } else if (reply != Reply::Rejected) {
+      return Fail("invalid policy refusal reply");
+    }
+  } else if (options.operation == Operation::Reject) {
     if (reply != Reply::Rejected) {
       return Fail("local proxy did not reject the request");
     }
@@ -611,6 +623,7 @@ int main(int argc, char** argv) {
       case Operation::Reject:
       case Operation::Concurrent:
       case Operation::AuthPartition:
+      case Operation::PolicyReject:
         break;
     }
     if (!success) {

@@ -73,6 +73,8 @@ class AndroidFixture:
             ports, "socks", target_port, "concurrent", count)
         suite.auth_partition_streams = lambda ports, target_port: self.probe(
             ports, "socks", target_port, "auth-partition")
+        suite.reject_policy = lambda ports, listener, target_port, host="localhost": self.probe(
+            ports, listener, target_port, "policy-reject", host=host)
         def reject(ports, listener, target_port, host="localhost", rejected=False):
             suite.require(rejected, "positive Android workloads must run in the native probe")
             self.probe(ports, listener, target_port, "reject", host=host)

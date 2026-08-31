@@ -1,6 +1,7 @@
 import copy
 import importlib.util
 import json
+import socket
 from pathlib import Path
 import tempfile
 import threading
@@ -170,6 +171,58 @@ class NoConnectFixtureTests(unittest.TestCase):
             fixture.auth_partition_streams({"socks": 18080, "http": 18081}, 18082)
         self.assertEqual(calls, [("socks", False), ("http", True), ("socks", False)])
         self.assertEqual(live, [])
+
+    def policy_reply(self, *, accepted, tail=b"", timed_out=False, strict=False):
+        class Stream:
+            def __init__(self):
+                self.buffer = b"\x05\x00\x05" + (b"\x00" if accepted else b"\x02") + b"\x00\x01" + b"\x00" * 6
+                self.timeouts = []
+                self.closed = False
+
+            def sendall(self, _):
+                pass
+
+            def settimeout(self, timeout):
+                self.timeouts.append(timeout)
+
+            def recv(self, count):
+                if self.buffer:
+                    result, self.buffer = self.buffer[:count], self.buffer[count:]
+                    return result
+                if timed_out:
+                    raise socket.timeout("policy fixture timeout")
+                return tail
+
+            def close(self):
+                self.closed = True
+
+        stream = Stream()
+        with mock.patch.object(fixture.socket, "create_connection", return_value=stream):
+            if strict:
+                fixture.open_tunnel({"socks": 18080}, "socks", 18081, rejected=True)
+            else:
+                fixture.reject_policy({"socks": 18080}, "socks", 18081)
+        self.assertTrue(stream.closed)
+        return stream
+
+    def test_policy_refusal_accepts_explicit_reject(self):
+        self.policy_reply(accepted=False)
+
+    def test_policy_refusal_accepts_fast_open_only_with_prompt_empty_eof(self):
+        stream = self.policy_reply(accepted=True)
+        self.assertEqual(stream.timeouts[-1], 5)
+
+    def test_policy_refusal_rejects_target_data_after_fast_open(self):
+        with self.assertRaisesRegex(RuntimeError, "returned target bytes"):
+            self.policy_reply(accepted=True, tail=b"x")
+
+    def test_policy_refusal_does_not_treat_timeout_as_denial(self):
+        with self.assertRaises(socket.timeout):
+            self.policy_reply(accepted=True, timed_out=True)
+
+    def test_authentication_refusal_remains_strict_despite_fast_open_eof(self):
+        with self.assertRaisesRegex(RuntimeError, "unexpected local CONNECT success"):
+            self.policy_reply(accepted=True, strict=True)
 
     def shared_config_run(self, drift=False):
         ports = {"socks": 28080, "http": 28081}
