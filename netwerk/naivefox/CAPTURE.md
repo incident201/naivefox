@@ -4457,7 +4457,7 @@ before entering measurements. A same-day version string or caller-supplied
 revision by itself is not proof. Verification downloads only small public
 metadata; the existing archive and Firefox installation are reused.
 
-The preregistered complete native screen uses seed `2026083101`, ten
+The superseded idle-reference diagnostic used seed `2026083105`, ten
 randomized blocks per protocol, and the same official Firefox base
 `0b76543aaeeeb2a5748ce2675ee36e7c94cb1125`. Every block contains Firefox A/B,
 classic SOCKS/HTTP, finite no-connect SOCKS/HTTP, and hybrid SOCKS/HTTP: 160
@@ -4539,14 +4539,14 @@ NAIVEFOX_CAPTURE_ISOLATED_NETWORK=1 unshare --net -- \
   netwerk/naivefox/test/integration/run-camouflage-isolated-network.sh \
   "$ROOT/camouflage-venv/bin/python" \
   netwerk/naivefox/test/integration/run-hybrid-matrix.py \
-  --objdir "$ROOT" --root "$ROOT/hybrid-ws/matrix-2026083101" \
+  --objdir "$ROOT" --root "$ROOT/hybrid-ws/matrix-2026083105" \
   --runtime "$ROOT/dist/bin/naivefox" \
   --caddy "$ROOT/hybrid-ws/server/bin/caddy" \
   --firefox /home/zubastik/naivefox-refresh-20260830.fJHfmY/reference/firefox/firefox \
   --firefox-base 0b76543aaeeeb2a5748ce2675ee36e7c94cb1125 \
   --reference-proof "$ROOT/hybrid-ws/reference-verification/proof.json" \
   --geckodriver /root/.cache/selenium/geckodriver/linux64/0.37.1/geckodriver \
-  --protocol both --blocks 10 --seed 2026083101
+  --protocol both --blocks 10 --seed 2026083105
 ```
 
 The first full-workload plumbing attempt (`matrix-smoke-1`, seed
@@ -4593,6 +4593,82 @@ After functional/race admission and a new complete plumbing block, the final
 ten-block H2/H3 and listener matrix must use one newly frozen client/server
 pair and fresh contemporary classic/no-connect controls. Never splice the
 pre-refinement smoke rows into that matrix or label them final results.
+
+### Superseded idle-reference diagnostic
+
+**Not accepted as a final matched-workload measurement.** This diagnostic
+compared an idle Firefox reference after bootstrap with active proxy clients,
+cut Whole at two seconds, opened fresh target TLS sessions for small curl
+requests, configured both native listeners, and predated the WebSocket MAP
+routing correction. These are material workload/configuration mismatches,
+not merely a statistical sample-size limitation. A new matched active-app
+benchmark is required; the numbers below are retained transparently and must
+not be promoted as its result.
+
+The then-current implementation completed ten randomized blocks per protocol:
+160/160 cold participants and all 480 native warm transfer stages passed.
+No failed or pre-refinement sample was substituted into this dataset. Collection
+took approximately 29 minutes on the isolated, unshaped WSL loopback fixture.
+The client/server binaries remained unchanged from the admitted refinement
+smoke through the complete run. Machine-readable values, both contemporary
+baselines, every warm stage, confidence intervals and selected provenance are
+in [the superseded diagnostic evidence](test/integration/evidence/hybrid-ws-idle-diagnostic.json).
+Private inputs remain below the existing product objdir's
+`hybrid-ws/matrix-final-10`; they are not part of that public evidence.
+
+The residual columns below use the new strict packet-window observer and
+matched Firefox SPA controls. Lower is closer to those controls. **Whole means
+all origin traffic inside the fixed two-second cold window**, during which the
+reference completes its HTTP application startup and opens an idle WS. It does
+not mean an indefinitely long WS lifetime. The separate speed/traffic columns
+are for the identical warm 8-MiB download, relative to contemporary native
+classic; they include that stage's post-completion capture tail in wire bytes,
+but not in transfer time.
+
+| Startup / selected ingress | p1--16 | p17--32 | Whole, 2 s | 8-MiB rate loss vs classic | 8-MiB extra traffic vs classic |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| H2 / SOCKS5 | 0.15478 | 0.42026 | 0.37488 | 36.63% | +7.28% |
+| H2 / HTTP CONNECT | 0.16310 | 0.41710 | 0.37690 | 31.46% | +7.44% |
+| H3 / SOCKS5 | 0.12034 | 0.31383 | 0.42814 | 41.78% | +7.99% |
+| H3 / HTTP CONNECT | 0.08402 | 0.31665 | 0.42812 | 45.88% | +7.84% |
+
+Every native participant configured both local listeners, then exercised the
+row's selected ingress. In particular, the classic H2 SOCKS baseline therefore
+uses the mixed-listener first-buffer policy, not the canonical SOCKS-only
+first-buffer-task policy. This common configuration is held constant across
+classic, no-connect and hybrid. Together with the different reference SPA and
+strict early-window definition, it prevents treating these values as another
+row of the historical implicit-default dashboard.
+
+Against the **native finite no-connect** control, warm download rate increased
+by 12.65% / 19.51% / 10.41% / 5.91%, respectively in table order, while download
+wire bytes fell by 4.81--6.60%. Upload rate also increased by 20.96--28.75%,
+with 17.69--20.44% fewer bytes. Parallel downloads improved only modestly and
+spent 13.30--15.84% more wire bytes. These are measured loopback means, not WAN
+speed predictions or a claim of equivalence to classic.
+
+The residual result is mixed. Relative to finite no-connect, H2 Whole improved
+by about 9%, but H3 Whole regressed by about 28--30%; early packet means do not
+improve consistently. Cold hybrid page loading spent 188--230% more outer
+traffic than classic, although it used 7--10% less than finite no-connect.
+Small work is a substantial weakness: the warm 4-KiB request used about
+0.50--0.52 MB of outer IP traffic and took about 20 ms. That is 300--318% more
+traffic and 43--48% effective-rate loss versus finite no-connect; versus
+classic the traffic increase is roughly 4,707--4,903%. The fixed capacity
+classes are therefore expensive for short interactive transfers.
+
+The observer includes every captured origin TCP/QUIC flow, including short
+connection probes and their SYN/RST bytes, rather than assuming there must be
+exactly two physical flows. Every successful hybrid/reference carrier still
+established exactly one WebSocket after the validated startup. H3 here names
+the startup protocol; its subsequent WebSocket uses H1 over TCP.
+
+These observations describe only the superseded diagnostic workloads. They
+cannot establish the hybrid's camouflage, latency or traffic tradeoff for a
+matched active application. Ten blocks also remain below the 30-block
+paired-inference floor and provide no absolute indistinguishability verdict.
+Classic remains the default. Historical worker results and this diagnostic
+must not substitute for the new application-matched measurements.
 
 ## Sensitive data handling
 
