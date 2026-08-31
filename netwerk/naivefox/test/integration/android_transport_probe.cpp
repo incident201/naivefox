@@ -60,7 +60,8 @@ class Socket final {
 
 void Timeout(int) {
   constexpr char error[] = "FAIL: operation timed out\n";
-  (void)write(STDERR_FILENO, error, sizeof(error) - 1);
+  const ssize_t ignored = write(STDERR_FILENO, error, sizeof(error) - 1);
+  (void)ignored;
   _exit(1);
 }
 
@@ -69,9 +70,47 @@ int Fail(const char* aMessage) {
   return 1;
 }
 
+// Choose ports in the guest network namespace, keeping both bound until both
+// numbers have been read. The client cannot inherit these descriptors, so a
+// later bind failure must still fail the fixture and retain its diagnostics.
+int AllocateListeners() {
+  std::array<uint16_t, 2> ports{};
+  {
+    std::array<Socket, 2> sockets;
+    for (size_t index = 0; index < sockets.size(); ++index) {
+      sockaddr_in address{};
+      address.sin_family = AF_INET;
+      address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+      if (sockets[index].Get() < 0 ||
+          bind(sockets[index].Get(), reinterpret_cast<sockaddr*>(&address),
+               sizeof(address)) != 0) {
+        return Fail("guest listener port allocation failed");
+      }
+    }
+    for (size_t index = 0; index < sockets.size(); ++index) {
+      sockaddr_in address{};
+      socklen_t length = sizeof(address);
+      if (getsockname(sockets[index].Get(),
+                      reinterpret_cast<sockaddr*>(&address), &length) != 0 ||
+          length != sizeof(address) || address.sin_family != AF_INET ||
+          !address.sin_port) {
+        return Fail("guest listener port lookup failed");
+      }
+      ports[index] = ntohs(address.sin_port);
+    }
+    if (ports[0] == ports[1]) {
+      return Fail("guest listener ports overlap");
+    }
+  }
+  std::printf("%u %u\n", static_cast<unsigned>(ports[0]),
+              static_cast<unsigned>(ports[1]));
+  return 0;
+}
+
 int Usage() {
   std::fputs(
-      "Usage: android_transport_probe socks|http LOCALPORT TARGETHOST "
+      "Usage: android_transport_probe --allocate-listeners\n"
+      "       android_transport_probe socks|http LOCALPORT TARGETHOST "
       "TARGETPORT download|upload|idle|reset|reject|concurrent|auth-partition|policy-reject "
       "LENGTH [ACK_HEX|HTTPPORT|-] [slow]\n",
       stderr);
@@ -554,6 +593,9 @@ bool Reset(int aSocket) {
 }  // namespace
 
 int main(int argc, char** argv) {
+  if (argc == 2 && std::strcmp(argv[1], "--allocate-listeners") == 0) {
+    return AllocateListeners();
+  }
   Options options;
   if (!Parse(argc, argv, options)) {
     return Usage();
