@@ -31,7 +31,7 @@ reads `./config.json`; one positional argument selects another config:
 ./naivefox --transport=classic /absolute/path/to/config.json
 ```
 
-`--transport classic|no-connect` overrides the JSON `transport` field. It may
+`--transport classic|no-connect|no-connect-hybrid` overrides the JSON `transport` field. It may
 precede or follow the optional config path; without a path, it uses
 `./config.json`. The `--transport=value` form is also accepted. Both transports
 use the same percent-decoded username and password from the private `proxy`
@@ -85,6 +85,11 @@ The supported config is a strict NaiveProxy-compatible subset:
   classic preamble or send extra CONNECT headers; valid classic-only settings
   are parsed but remain inactive in this mode. Local SOCKS authentication
   remains available.
+  Experimental `"no-connect-hybrid"` completes the same H2/H3 startup graph,
+  then uses one shaped native HTTP/1.1 WebSocket over TLS/TCP per carrier. It
+  requires a matching server and TCP access even when startup uses `quic://`;
+  this explicit mode does not promise WebSocket over H3. See
+  [the hybrid lifecycle](NO-CONNECT.md#experimental-hybrid-lifecycle).
 - `listen` is one URI or a non-empty array. `socks://` serves SOCKS5 CONNECT;
   without userinfo it uses the normal no-auth method. SOCKS credentials are
   optional, percent-decoded, and checked with RFC 1929 username/password
@@ -451,7 +456,7 @@ runner on one host worker thread, and stops it from another thread:
 
 ```c
 int status = NaiveFoxRunEmbedded(config_json, writable_profile_dir,
-                                 runtime_lib_dir);
+                                 runtime_lib_dir, "no-connect");
 
 /* From another host thread while the call above is running. */
 NaiveFoxRequestStop();
@@ -460,7 +465,21 @@ NaiveFoxRequestStop();
 `config_json` is the same UTF-8 JSON contract documented above, not a file
 name. `writable_profile_dir` must be an existing writable directory, and
 `runtime_lib_dir` is the absolute `lib/arm64-v8a` directory containing
-`libxul.so`. `NaiveFoxVersion()` returns the product version. Return values are
+`libxul.so`. The fourth argument is `NULL` to honor the JSON transport (or
+default to `classic`), or exactly `"classic"`, `"no-connect"`, or
+`"no-connect-hybrid"` to override it. Empty and unknown values return
+`NAIVEFOX_STATUS_INVALID_ARGUMENT` before reserving or initializing Gecko.
+The override is applied before implicit preamble defaults; all JSON fields
+still undergo strict validation. Configuration bytes and credentials are not
+modified, and hybrid remains an experimental opt-in.
+
+This four-argument signature replaces the earlier three-argument C ABI.
+Recompile downstream callers and update dynamic-loader function pointer types
+using the packaged `NaiveFoxAPI.h`; an existing three-argument binary caller
+cannot safely load the updated runtime. Pass `NULL` explicitly when migrating
+an existing caller without changing its configured transport.
+
+`NaiveFoxVersion()` returns the product version. Return values are
 the `NaiveFoxStatus` constants in the public header. The first successful Gecko
 startup consumes the process-wide runtime; restarting it in the same process is
 not supported.

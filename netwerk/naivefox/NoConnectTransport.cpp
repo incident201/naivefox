@@ -14,6 +14,7 @@
 
 #include "NeckoTunnel.h"
 #include "NoConnectCodec.h"
+#include "NoConnectWebSocket.h"
 #include "RuntimeLogging.h"
 #include "TunnelSession.h"
 #include "mozilla/Base64.h"
@@ -120,6 +121,7 @@ class CarrierRequest final : public nsIStreamListener {
   nsCString mProfile;
   nsCString mAuthScheme;
   nsCString mState;
+  nsCString mRealtime;
 
  private:
   ~CarrierRequest() = default;
@@ -179,6 +181,7 @@ NS_IMETHODIMP CarrierRequest::OnStartRequest(nsIRequest* aRequest) {
   (void)http->GetResponseHeader("Set-Cookie"_ns, mCookie);
   (void)http->GetResponseHeader("X-App-Profile"_ns, mProfile);
   (void)http->GetResponseHeader("X-App-Auth"_ns, mAuthScheme);
+  (void)http->GetResponseHeader("X-App-Realtime"_ns, mRealtime);
   if (mHeaders) {
     auto headers = std::move(mHeaders);
     headers();
@@ -265,6 +268,12 @@ class NoConnectStream::Impl final {
   uint32_t finUpload = UINT32_MAX;
   bool finConfirmed = false;
   bool done = false;
+
+  size_t UploadLimit() const {
+    return config.mTransport == TransportMode::NoConnectHybrid
+               ? noconnect::kMaxCell
+               : kUploadBuffer;
+  }
 };
 
 class NoConnectCarrier final {
@@ -277,7 +286,8 @@ class NoConnectCarrier final {
            mHighestStream != UINT32_MAX;
   }
   bool Matches(const TunnelConfig& aConfig) const {
-    if (mClosed || mConfig.mProtocol != aConfig.mProtocol ||
+    if (mClosed || mConfig.mTransport != aConfig.mTransport ||
+        mConfig.mProtocol != aConfig.mProtocol ||
         !mConfig.mProxyUrl.Equals(aConfig.mProxyUrl) ||
         !mConfig.mProxyUser.Equals(aConfig.mProxyUser) ||
         !mConfig.mProxyPassword.Equals(aConfig.mProxyPassword) ||
@@ -304,6 +314,7 @@ class NoConnectCarrier final {
             std::function<void()>&& aHeaders = nullptr);
   bool Upload(size_t aCapacity, Bytes& aBody);
   bool Receive(CarrierRequest* aRequest);
+  bool ReceiveCell(const Bytes& aBody, bool aWebSocket);
   void ConfirmUpload(uint32_t aSequence);
   void RetireStreams();
   void Start();
@@ -315,6 +326,11 @@ class NoConnectCarrier final {
   void IdleWake();
   void Continue();
   size_t Pressure(bool& aControl) const;
+  void StartWebSocket();
+  void WebSocketTick(bool aHeartbeat = false);
+  void ScheduleWebSocket(uint32_t aDelay, bool aHeartbeat);
+  bool HasPendingOpen() const;
+  uint32_t WebSocketDelay(size_t aBytes) const;
 
   TunnelConfig mConfig;
   nsCString mCookie;
@@ -341,6 +357,14 @@ class NoConnectCarrier final {
   bool mFirstApplied = false;
   RefPtr<CarrierRequest> mBulkFirst;
   RefPtr<CarrierRequest> mBulkSecond;
+  RefPtr<NoConnectWebSocket> mWebSocket;
+  nsCOMPtr<nsITimer> mWebSocketTimer;
+  nsCOMPtr<nsITimer> mWebSocketDeadline;
+  size_t mWebSocketPending = 0;
+  uint32_t mWebSocketAck = 0;
+  uint32_t mWebSocketScheduledDelay = 0;
+  bool mWebSocketReady = false;
+  bool mWebSocketHeartbeat = false;
 };
 
 NS_IMPL_ISUPPORTS(NoConnectStream, nsIInputStreamCallback,
@@ -450,7 +474,7 @@ void NoConnectStream::Finish(nsresult aStatus, bool aReset) {
 void NoConnectStream::ArmRead() {
   auto& s = *mImpl;
   if (s.done || s.cancelled || !s.pump || s.eof || !s.state ||
-      !s.state->IsOpened() || s.upload.size() >= kUploadBuffer ||
+      !s.state->IsOpened() || s.upload.size() >= s.UploadLimit() ||
       s.upload.size() >= s.state->SendCredit()) {
     return;
   }
@@ -468,10 +492,10 @@ NS_IMETHODIMP NoConnectStream::OnInputStreamReady(nsIAsyncInputStream*) {
     return NS_OK;
   }
   std::array<uint8_t, 16384> buffer;
-  while (s.upload.size() < kUploadBuffer &&
+  while (s.upload.size() < s.UploadLimit() &&
          s.upload.size() < s.state->SendCredit()) {
     const size_t length =
-        std::min({buffer.size(), kUploadBuffer - s.upload.size(),
+        std::min({buffer.size(), s.UploadLimit() - s.upload.size(),
                   s.state->SendCredit() - s.upload.size()});
     uint32_t read = 0;
     nsresult rv =
@@ -625,6 +649,18 @@ void NoConnectCarrier::Fail(nsresult aStatus) {
     return;
   }
   mClosed = true;
+  if (mWebSocketTimer) {
+    mWebSocketTimer->Cancel();
+    mWebSocketTimer = nullptr;
+  }
+  if (mWebSocketDeadline) {
+    mWebSocketDeadline->Cancel();
+    mWebSocketDeadline = nullptr;
+  }
+  if (mWebSocket) {
+    RefPtr socket = std::move(mWebSocket);
+    socket->Close(aStatus);
+  }
   auto requests = std::move(mRequests);
   mBulkFirst = nullptr;
   mBulkSecond = nullptr;
@@ -652,6 +688,8 @@ void NoConnectCarrier::Start() {
        [self](CarrierRequest* request, nsresult) {
          if (!request->mProfile.EqualsLiteral("continuous-bulk-pipeline") ||
              !request->mAuthScheme.EqualsLiteral("basic") ||
+             (self->mConfig.mTransport == TransportMode::NoConnectHybrid &&
+              !request->mRealtime.EqualsLiteral("websocket-v1")) ||
              request->mCookie.Length() < 77 ||
              !StringBeginsWith(request->mCookie, "app_session="_ns) ||
              request->mCookie.CharAt(76) != ';') {
@@ -777,14 +815,32 @@ bool NoConnectCarrier::Upload(size_t aCapacity, Bytes& aBody) {
 }
 
 bool NoConnectCarrier::Receive(CarrierRequest* aRequest) {
+  if (!ReceiveCell(aRequest->mBody, false)) {
+    return false;
+  }
+  mRemote = aRequest->mState;
+  return true;
+}
+
+bool NoConnectCarrier::ReceiveCell(const Bytes& aBody, bool aWebSocket) {
   std::vector<Frame> frames;
-  if (mDown == UINT32_MAX || !noconnect::Decode(mDown, aRequest->mBody.size(),
-                                                aRequest->mBody, frames)) {
+  if (mDown == UINT32_MAX ||
+      !noconnect::Decode(mDown, aBody.size(), aBody, frames)) {
     Fail(NS_ERROR_CORRUPTED_CONTENT);
     return false;
   }
   ++mDown;
   for (auto& frame : frames) {
+    if (frame.kind == Kind::Ack) {
+      if (!aWebSocket || frame.stream || !frame.body.empty() ||
+          frame.sequence < mWebSocketAck || frame.sequence >= mUp) {
+        Fail(NS_ERROR_CORRUPTED_CONTENT);
+        return false;
+      }
+      mWebSocketAck = frame.sequence;
+      ConfirmUpload(frame.sequence);
+      continue;
+    }
     if (!frame.stream || frame.stream > mHighestStream ||
         frame.kind == Kind::Open || frame.kind == Kind::Auth) {
       Fail(NS_ERROR_CORRUPTED_CONTENT);
@@ -837,7 +893,6 @@ bool NoConnectCarrier::Receive(CarrierRequest* aRequest) {
     stream->Flush();
     stream->ArmRead();
   }
-  mRemote = aRequest->mState;
   RetireStreams();
   return true;
 }
@@ -900,7 +955,7 @@ void NoConnectCarrier::Tick() {
   // and RESET uploads before dropping an extra carrier, so the server can
   // release every target connection without waiting for session expiry.
   if (mStreams.empty() && mResets.empty() && mRequests.empty() && !mBusy &&
-      !mIdle && !mWaking) {
+      !mIdle && !mWaking && !mWebSocketPending) {
     if (!CanAttach()) {
       Fail(NS_OK);
       return;
@@ -912,6 +967,16 @@ void NoConnectCarrier::Tick() {
       }
     }
   }
+  if (mWebSocket) {
+    if (mWebSocketReady) {
+      bool control = false;
+      const size_t bytes = Pressure(control);
+      if (bytes || control) {
+        ScheduleWebSocket(WebSocketDelay(bytes), false);
+      }
+    }
+    return;
+  }
   if (mIdle) {
     IdleWake();
     return;
@@ -922,6 +987,10 @@ void NoConnectCarrier::Tick() {
   mBusy = true;
   if (mStartup < kStartupSlots.size()) {
     Startup();
+    return;
+  }
+  if (mConfig.mTransport == TransportMode::NoConnectHybrid) {
+    StartWebSocket();
     return;
   }
   if (mLease) {
@@ -1068,6 +1137,145 @@ void NoConnectCarrier::IdleWake() {
   });
 }
 
+void NoConnectCarrier::StartWebSocket() {
+  MOZ_ASSERT(mBootstrapped && mAssets == 6 &&
+             mStartup == kStartupSlots.size() && mRequests.empty());
+  mWebSocketAck = mUp - 1;
+  RefPtr self = this;
+  mWebSocket = new NoConnectWebSocket(
+      [self]() {
+        if (self->mClosed) {
+          return;
+        }
+        self->mWebSocketReady = true;
+        self->mBusy = false;
+        auto deadline = NS_NewTimerWithCallback(
+            [self](nsITimer*) { self->Fail(NS_ERROR_NET_TIMEOUT); }, 75000,
+            nsITimer::TYPE_ONE_SHOT, "NaiveFox::WebSocketReceiveDeadline"_ns);
+        if (deadline.isErr()) {
+          self->Fail(deadline.unwrapErr());
+          return;
+        }
+        self->mWebSocketDeadline = deadline.unwrap();
+        RuntimeLogEvent("No-connect hybrid websocket ready startup=%zu\n",
+                        self->mStartup);
+        self->Wake();
+        self->ScheduleWebSocket(25000, true);
+      },
+      [self](const nsACString& aMessage) {
+        if (self->mClosed) {
+          return;
+        }
+        const size_t length = aMessage.Length();
+        if (length != 512 && length != 65536 && length != 262144) {
+          self->Fail(NS_ERROR_CORRUPTED_CONTENT);
+          return;
+        }
+        const auto* data =
+            reinterpret_cast<const uint8_t*>(aMessage.BeginReading());
+        if (self->ReceiveCell(Bytes(data, data + length), true)) {
+          if (self->mWebSocketDeadline) {
+            nsresult rv = self->mWebSocketDeadline->SetDelay(75000);
+            if (NS_FAILED(rv)) {
+              self->Fail(rv);
+              return;
+            }
+          }
+          self->Wake();
+        }
+      },
+      [self](uint32_t aSize) {
+        if (self->mClosed) {
+          return;
+        }
+        if (aSize > self->mWebSocketPending) {
+          self->Fail(NS_ERROR_UNEXPECTED);
+          return;
+        }
+        self->mWebSocketPending -= aSize;
+        if (!self->mWebSocketPending) {
+          bool control = false;
+          const size_t bytes = self->Pressure(control);
+          self->ScheduleWebSocket(
+              bytes || control ? self->WebSocketDelay(bytes) : 25000,
+              !bytes && !control);
+          self->Wake();
+        }
+      },
+      [self](nsresult aStatus) {
+        self->Fail(NS_FAILED(aStatus) ? aStatus : NS_ERROR_NET_RESET);
+      });
+  nsresult rv = mWebSocket->Start(mConfig, mCookie, "/api/realtime"_ns);
+  if (NS_FAILED(rv)) {
+    Fail(rv);
+  }
+}
+
+bool NoConnectCarrier::HasPendingOpen() const {
+  return std::any_of(mStreams.begin(), mStreams.end(), [](const auto& stream) {
+    return stream->mImpl->openPending;
+  });
+}
+
+uint32_t NoConnectCarrier::WebSocketDelay(size_t aBytes) const {
+  return aBytes >= noconnect::kMaxCell || (!aBytes && !HasPendingOpen()) ? 0
+                                                                         : 2;
+}
+
+void NoConnectCarrier::ScheduleWebSocket(uint32_t aDelay, bool aHeartbeat) {
+  if (mClosed || !mWebSocketReady || mWebSocketPending) {
+    return;
+  }
+  if (mWebSocketTimer) {
+    if (aHeartbeat ||
+        (!mWebSocketHeartbeat && aDelay >= mWebSocketScheduledDelay)) {
+      return;
+    }
+    mWebSocketTimer->Cancel();
+    mWebSocketTimer = nullptr;
+  }
+  mWebSocketHeartbeat = aHeartbeat;
+  mWebSocketScheduledDelay = aDelay;
+  RefPtr self = this;
+  auto timer = NS_NewTimerWithCallback(
+      [self, aHeartbeat](nsITimer*) {
+        self->mWebSocketTimer = nullptr;
+        self->WebSocketTick(aHeartbeat);
+      },
+      aDelay, nsITimer::TYPE_ONE_SHOT, "NaiveFox::WebSocketApplicationSlot"_ns);
+  if (timer.isErr()) {
+    Fail(timer.unwrapErr());
+    return;
+  }
+  mWebSocketTimer = timer.unwrap();
+}
+
+void NoConnectCarrier::WebSocketTick(bool aHeartbeat) {
+  if (mClosed || !mWebSocketReady || mWebSocketPending) {
+    return;
+  }
+  bool control = false;
+  const size_t bytes = Pressure(control);
+  if (!bytes && !control && !aHeartbeat) {
+    ScheduleWebSocket(25000, true);
+    return;
+  }
+  const bool opening = HasPendingOpen();
+  const size_t capacity = bytes >= 131072    ? 262144
+                          : bytes || opening ? 65536
+                                             : 512;
+  Bytes body;
+  if (!Upload(capacity, body)) {
+    return;
+  }
+  mWebSocketPending = body.size();
+  nsresult rv = mWebSocket->Send(nsDependentCSubstring(
+      reinterpret_cast<const char*>(body.data()), body.size()));
+  if (NS_FAILED(rv)) {
+    Fail(rv);
+  }
+}
+
 void ShutdownNoConnectCarriers() {
   MOZ_ASSERT(NS_IsMainThread());
   auto carriers = std::move(sCarriers);
@@ -1075,6 +1283,7 @@ void ShutdownNoConnectCarriers() {
   for (const auto& carrier : carriers) {
     carrier->Fail(NS_BINDING_ABORTED);
   }
+  ShutdownNoConnectWebSockets();
 }
 
 }  // namespace mozilla::naivefox

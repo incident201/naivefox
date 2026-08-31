@@ -1,0 +1,2233 @@
+{
+  "admission": {
+    "admitted_participants": 160,
+    "browser_shutdown_evidence": "Normal application close, successful WebDriver quit/service exit 0, and no surviving tracked PIDs; no stronger claim about undocumented WebDriver internals.",
+    "capture_drops": 0,
+    "cold_origin_empty_before_navigation": 160,
+    "harness_forced_kills": 0,
+    "hybrid_carrier_websockets": 40,
+    "network_mutations": 0,
+    "normal_application_websockets": 160,
+    "outer_flow_ranges": [
+      {
+        "maximum": 1,
+        "minimum": 1,
+        "participant": "native-classic-socks",
+        "protocol": "h2"
+      },
+      {
+        "maximum": 1,
+        "minimum": 1,
+        "participant": "native-classic-http",
+        "protocol": "h2"
+      },
+      {
+        "maximum": 1,
+        "minimum": 1,
+        "participant": "native-no-connect-socks",
+        "protocol": "h2"
+      },
+      {
+        "maximum": 1,
+        "minimum": 1,
+        "participant": "native-no-connect-http",
+        "protocol": "h2"
+      },
+      {
+        "maximum": 2,
+        "minimum": 2,
+        "participant": "native-no-connect-hybrid-socks",
+        "protocol": "h2"
+      },
+      {
+        "maximum": 2,
+        "minimum": 2,
+        "participant": "native-no-connect-hybrid-http",
+        "protocol": "h2"
+      },
+      {
+        "maximum": 3,
+        "minimum": 3,
+        "participant": "firefox_a",
+        "protocol": "h2"
+      },
+      {
+        "maximum": 3,
+        "minimum": 3,
+        "participant": "firefox_b",
+        "protocol": "h2"
+      },
+      {
+        "maximum": 1,
+        "minimum": 1,
+        "participant": "native-classic-socks",
+        "protocol": "h3"
+      },
+      {
+        "maximum": 1,
+        "minimum": 1,
+        "participant": "native-classic-http",
+        "protocol": "h3"
+      },
+      {
+        "maximum": 1,
+        "minimum": 1,
+        "participant": "native-no-connect-socks",
+        "protocol": "h3"
+      },
+      {
+        "maximum": 1,
+        "minimum": 1,
+        "participant": "native-no-connect-http",
+        "protocol": "h3"
+      },
+      {
+        "maximum": 2,
+        "minimum": 2,
+        "participant": "native-no-connect-hybrid-socks",
+        "protocol": "h3"
+      },
+      {
+        "maximum": 2,
+        "minimum": 2,
+        "participant": "native-no-connect-hybrid-http",
+        "protocol": "h3"
+      },
+      {
+        "maximum": 3,
+        "minimum": 2,
+        "participant": "firefox_a",
+        "protocol": "h3"
+      },
+      {
+        "maximum": 3,
+        "minimum": 2,
+        "participant": "firefox_b",
+        "protocol": "h3"
+      }
+    ],
+    "private_numeric_cold_marker_fallbacks": 0,
+    "route_proofs": 160,
+    "surviving_owned_producers": 0,
+    "tcp_fin_completed": 1,
+    "tcp_flows": 185,
+    "tcp_reset_completed": 184,
+    "verified_application_asset_responses": 960,
+    "verified_application_jobs": 1760,
+    "verified_semantic_api_responses": 6400
+  },
+  "all_native_arm_residuals": {
+    "h2": {
+      "initial_packets_16": {
+        "native-classic-http": {
+          "bootstrap_ci95": [
+            0.10418405928562532,
+            0.14085066934750318
+          ],
+          "mean_distance": 0.12219706056608408,
+          "samples": 10
+        },
+        "native-classic-socks": {
+          "bootstrap_ci95": [
+            0.07840971840542596,
+            0.12343112035599678
+          ],
+          "mean_distance": 0.101899980058676,
+          "samples": 10
+        },
+        "native-no-connect-http": {
+          "bootstrap_ci95": [
+            0.10059894123291634,
+            0.15330350255648853
+          ],
+          "mean_distance": 0.1252970706571409,
+          "samples": 10
+        },
+        "native-no-connect-hybrid-http": {
+          "bootstrap_ci95": [
+            0.09376201084174061,
+            0.14237199324100677
+          ],
+          "mean_distance": 0.11769763124208543,
+          "samples": 10
+        },
+        "native-no-connect-hybrid-socks": {
+          "bootstrap_ci95": [
+            0.08845959149261065,
+            0.13474608831495577
+          ],
+          "mean_distance": 0.11283571422744769,
+          "samples": 10
+        },
+        "native-no-connect-socks": {
+          "bootstrap_ci95": [
+            0.09801284532432115,
+            0.12975743529413422
+          ],
+          "mean_distance": 0.11506050776538493,
+          "samples": 10
+        }
+      },
+      "initial_packets_32": {
+        "native-classic-http": {
+          "bootstrap_ci95": [
+            0.30083183624925053,
+            0.35419015103730384
+          ],
+          "mean_distance": 0.32815377234888277,
+          "samples": 10
+        },
+        "native-classic-socks": {
+          "bootstrap_ci95": [
+            0.29267893599756734,
+            0.3532670832964864
+          ],
+          "mean_distance": 0.3215591435920734,
+          "samples": 10
+        },
+        "native-no-connect-http": {
+          "bootstrap_ci95": [
+            0.1852449516278165,
+            0.29102644243677656
+          ],
+          "mean_distance": 0.23527368114163233,
+          "samples": 10
+        },
+        "native-no-connect-hybrid-http": {
+          "bootstrap_ci95": [
+            0.19032134041228158,
+            0.2486839615520108
+          ],
+          "mean_distance": 0.21953523608285722,
+          "samples": 10
+        },
+        "native-no-connect-hybrid-socks": {
+          "bootstrap_ci95": [
+            0.1701330062726025,
+            0.24984034661991802
+          ],
+          "mean_distance": 0.21074577886828694,
+          "samples": 10
+        },
+        "native-no-connect-socks": {
+          "bootstrap_ci95": [
+            0.16557251307601945,
+            0.19948662354598265
+          ],
+          "mean_distance": 0.1840662114723021,
+          "samples": 10
+        }
+      },
+      "initial_time_250ms": {
+        "native-classic-http": {
+          "bootstrap_ci95": [
+            0.521560563753522,
+            0.534094020843915
+          ],
+          "mean_distance": 0.5277345526426118,
+          "samples": 10
+        },
+        "native-classic-socks": {
+          "bootstrap_ci95": [
+            0.5145445828711259,
+            0.5322880223944316
+          ],
+          "mean_distance": 0.5246496643240368,
+          "samples": 10
+        },
+        "native-no-connect-http": {
+          "bootstrap_ci95": [
+            0.4319878900145002,
+            0.510873539166304
+          ],
+          "mean_distance": 0.47137045900521934,
+          "samples": 10
+        },
+        "native-no-connect-hybrid-http": {
+          "bootstrap_ci95": [
+            0.433474719784002,
+            0.5081710604611713
+          ],
+          "mean_distance": 0.4698486451245813,
+          "samples": 10
+        },
+        "native-no-connect-hybrid-socks": {
+          "bootstrap_ci95": [
+            0.4343408256661581,
+            0.4921248827374137
+          ],
+          "mean_distance": 0.46090202187603213,
+          "samples": 10
+        },
+        "native-no-connect-socks": {
+          "bootstrap_ci95": [
+            0.4004245556664299,
+            0.5106457468520814
+          ],
+          "mean_distance": 0.45525059480939795,
+          "samples": 10
+        }
+      },
+      "packets_17_32": {
+        "native-classic-http": {
+          "bootstrap_ci95": [
+            0.3649550155346786,
+            0.485504802268589
+          ],
+          "mean_distance": 0.42558292404134557,
+          "samples": 10
+        },
+        "native-classic-socks": {
+          "bootstrap_ci95": [
+            0.37661237201883624,
+            0.5020768160295006
+          ],
+          "mean_distance": 0.4319132176206402,
+          "samples": 10
+        },
+        "native-no-connect-http": {
+          "bootstrap_ci95": [
+            0.2866897211622266,
+            0.4520678689114781
+          ],
+          "mean_distance": 0.3640666685510791,
+          "samples": 10
+        },
+        "native-no-connect-hybrid-http": {
+          "bootstrap_ci95": [
+            0.2959584506020491,
+            0.38029026484404976
+          ],
+          "mean_distance": 0.3399051437985258,
+          "samples": 10
+        },
+        "native-no-connect-hybrid-socks": {
+          "bootstrap_ci95": [
+            0.27064712190802004,
+            0.4191131967669897
+          ],
+          "mean_distance": 0.3336861673485017,
+          "samples": 10
+        },
+        "native-no-connect-socks": {
+          "bootstrap_ci95": [
+            0.25128494422171604,
+            0.31076794681126435
+          ],
+          "mean_distance": 0.28282879428500923,
+          "samples": 10
+        }
+      },
+      "whole": {
+        "native-classic-http": {
+          "bootstrap_ci95": [
+            0.36976626658344636,
+            0.39157423536287583
+          ],
+          "mean_distance": 0.38070009219247225,
+          "samples": 10
+        },
+        "native-classic-socks": {
+          "bootstrap_ci95": [
+            0.3724099731140383,
+            0.3876938187820642
+          ],
+          "mean_distance": 0.3799486006816176,
+          "samples": 10
+        },
+        "native-no-connect-http": {
+          "bootstrap_ci95": [
+            0.37294049843379207,
+            0.40952992409741074
+          ],
+          "mean_distance": 0.3914346124604148,
+          "samples": 10
+        },
+        "native-no-connect-hybrid-http": {
+          "bootstrap_ci95": [
+            0.3189223661976468,
+            0.35214216415684507
+          ],
+          "mean_distance": 0.33489189779272477,
+          "samples": 10
+        },
+        "native-no-connect-hybrid-socks": {
+          "bootstrap_ci95": [
+            0.316292211053162,
+            0.34889662838396707
+          ],
+          "mean_distance": 0.33157765151181867,
+          "samples": 10
+        },
+        "native-no-connect-socks": {
+          "bootstrap_ci95": [
+            0.36747394535322514,
+            0.39835569903789064
+          ],
+          "mean_distance": 0.383251132327015,
+          "samples": 10
+        }
+      }
+    },
+    "h3": {
+      "initial_packets_16": {
+        "native-classic-http": {
+          "bootstrap_ci95": [
+            0.03706925312305671,
+            0.056476734102400325
+          ],
+          "mean_distance": 0.04682977838645605,
+          "samples": 10
+        },
+        "native-classic-socks": {
+          "bootstrap_ci95": [
+            0.036568222706470206,
+            0.07181919089381907
+          ],
+          "mean_distance": 0.053005465556866894,
+          "samples": 10
+        },
+        "native-no-connect-http": {
+          "bootstrap_ci95": [
+            0.04088378773852544,
+            0.07561250475054097
+          ],
+          "mean_distance": 0.05489600230941037,
+          "samples": 10
+        },
+        "native-no-connect-hybrid-http": {
+          "bootstrap_ci95": [
+            0.041443428026434526,
+            0.05182033542503905
+          ],
+          "mean_distance": 0.04630739120891063,
+          "samples": 10
+        },
+        "native-no-connect-hybrid-socks": {
+          "bootstrap_ci95": [
+            0.05044851923180928,
+            0.07511029292442964
+          ],
+          "mean_distance": 0.06230415615863268,
+          "samples": 10
+        },
+        "native-no-connect-socks": {
+          "bootstrap_ci95": [
+            0.03857003374085598,
+            0.05722239545399256
+          ],
+          "mean_distance": 0.04800309013940107,
+          "samples": 10
+        }
+      },
+      "initial_packets_32": {
+        "native-classic-http": {
+          "bootstrap_ci95": [
+            0.15635915666382785,
+            0.177070412801036
+          ],
+          "mean_distance": 0.16701984766005645,
+          "samples": 10
+        },
+        "native-classic-socks": {
+          "bootstrap_ci95": [
+            0.16145494558890544,
+            0.1951429174200686
+          ],
+          "mean_distance": 0.17726301522337967,
+          "samples": 10
+        },
+        "native-no-connect-http": {
+          "bootstrap_ci95": [
+            0.15322770508129768,
+            0.18118168054044861
+          ],
+          "mean_distance": 0.16701879944972134,
+          "samples": 10
+        },
+        "native-no-connect-hybrid-http": {
+          "bootstrap_ci95": [
+            0.1454178179620162,
+            0.17091254660306107
+          ],
+          "mean_distance": 0.15799061846316656,
+          "samples": 10
+        },
+        "native-no-connect-hybrid-socks": {
+          "bootstrap_ci95": [
+            0.15290290291570754,
+            0.20568662078845745
+          ],
+          "mean_distance": 0.1798007174741619,
+          "samples": 10
+        },
+        "native-no-connect-socks": {
+          "bootstrap_ci95": [
+            0.15570321930204856,
+            0.17982811334934262
+          ],
+          "mean_distance": 0.16723276807596027,
+          "samples": 10
+        }
+      },
+      "initial_time_250ms": {
+        "native-classic-http": {
+          "bootstrap_ci95": [
+            0.3840772619219465,
+            0.4278797677572433
+          ],
+          "mean_distance": 0.406931764279683,
+          "samples": 10
+        },
+        "native-classic-socks": {
+          "bootstrap_ci95": [
+            0.3925175934124035,
+            0.44740645639560306
+          ],
+          "mean_distance": 0.42026189318921237,
+          "samples": 10
+        },
+        "native-no-connect-http": {
+          "bootstrap_ci95": [
+            0.3768196634421844,
+            0.4182790349524814
+          ],
+          "mean_distance": 0.39744810846978496,
+          "samples": 10
+        },
+        "native-no-connect-hybrid-http": {
+          "bootstrap_ci95": [
+            0.34903811760088543,
+            0.41102419752977876
+          ],
+          "mean_distance": 0.3818701099827085,
+          "samples": 10
+        },
+        "native-no-connect-hybrid-socks": {
+          "bootstrap_ci95": [
+            0.28841425047465113,
+            0.3774976910633162
+          ],
+          "mean_distance": 0.33612618830142804,
+          "samples": 10
+        },
+        "native-no-connect-socks": {
+          "bootstrap_ci95": [
+            0.2840424665029894,
+            0.3898245967389697
+          ],
+          "mean_distance": 0.34521167523440754,
+          "samples": 10
+        }
+      },
+      "packets_17_32": {
+        "native-classic-http": {
+          "bootstrap_ci95": [
+            0.19729972850986613,
+            0.23699255600028718
+          ],
+          "mean_distance": 0.21612283118328585,
+          "samples": 10
+        },
+        "native-classic-socks": {
+          "bootstrap_ci95": [
+            0.19815591485665854,
+            0.24442860270867062
+          ],
+          "mean_distance": 0.22126013226480437,
+          "samples": 10
+        },
+        "native-no-connect-http": {
+          "bootstrap_ci95": [
+            0.1895304367567425,
+            0.23366820007517478
+          ],
+          "mean_distance": 0.21332091834513262,
+          "samples": 10
+        },
+        "native-no-connect-hybrid-http": {
+          "bootstrap_ci95": [
+            0.18070087979967303,
+            0.22903724875924497
+          ],
+          "mean_distance": 0.20505986798425124,
+          "samples": 10
+        },
+        "native-no-connect-hybrid-socks": {
+          "bootstrap_ci95": [
+            0.18740845695812453,
+            0.2598418008404104
+          ],
+          "mean_distance": 0.22239427081709878,
+          "samples": 10
+        },
+        "native-no-connect-socks": {
+          "bootstrap_ci95": [
+            0.19725805036932995,
+            0.23570757803959635
+          ],
+          "mean_distance": 0.21587776403774814,
+          "samples": 10
+        }
+      },
+      "whole": {
+        "native-classic-http": {
+          "bootstrap_ci95": [
+            0.2667032183977469,
+            0.28988750295034615
+          ],
+          "mean_distance": 0.2788842327502593,
+          "samples": 10
+        },
+        "native-classic-socks": {
+          "bootstrap_ci95": [
+            0.26508310580398475,
+            0.2947273779140609
+          ],
+          "mean_distance": 0.27959855935850314,
+          "samples": 10
+        },
+        "native-no-connect-http": {
+          "bootstrap_ci95": [
+            0.26961231439606576,
+            0.2923304942282471
+          ],
+          "mean_distance": 0.2811739190823695,
+          "samples": 10
+        },
+        "native-no-connect-hybrid-http": {
+          "bootstrap_ci95": [
+            0.23720663133998351,
+            0.2541315417353066
+          ],
+          "mean_distance": 0.2457579091991414,
+          "samples": 10
+        },
+        "native-no-connect-hybrid-socks": {
+          "bootstrap_ci95": [
+            0.23777974433171628,
+            0.2574052623093069
+          ],
+          "mean_distance": 0.24709274258791095,
+          "samples": 10
+        },
+        "native-no-connect-socks": {
+          "bootstrap_ci95": [
+            0.26615162490905253,
+            0.29541734887190435
+          ],
+          "mean_distance": 0.28022379855182733,
+          "samples": 10
+        }
+      }
+    }
+  },
+  "design": {
+    "application_useful_bytes": {
+      "client_to_server": 1069056,
+      "server_to_client": 10506240
+    },
+    "blocks_per_protocol": 10,
+    "cohorts": [
+      {
+        "participant": "native-classic-socks",
+        "protocol": "h2",
+        "samples": 10
+      },
+      {
+        "participant": "native-classic-http",
+        "protocol": "h2",
+        "samples": 10
+      },
+      {
+        "participant": "native-no-connect-socks",
+        "protocol": "h2",
+        "samples": 10
+      },
+      {
+        "participant": "native-no-connect-http",
+        "protocol": "h2",
+        "samples": 10
+      },
+      {
+        "participant": "native-no-connect-hybrid-socks",
+        "protocol": "h2",
+        "samples": 10
+      },
+      {
+        "participant": "native-no-connect-hybrid-http",
+        "protocol": "h2",
+        "samples": 10
+      },
+      {
+        "participant": "firefox_a",
+        "protocol": "h2",
+        "samples": 10
+      },
+      {
+        "participant": "firefox_b",
+        "protocol": "h2",
+        "samples": 10
+      },
+      {
+        "participant": "native-classic-socks",
+        "protocol": "h3",
+        "samples": 10
+      },
+      {
+        "participant": "native-classic-http",
+        "protocol": "h3",
+        "samples": 10
+      },
+      {
+        "participant": "native-no-connect-socks",
+        "protocol": "h3",
+        "samples": 10
+      },
+      {
+        "participant": "native-no-connect-http",
+        "protocol": "h3",
+        "samples": 10
+      },
+      {
+        "participant": "native-no-connect-hybrid-socks",
+        "protocol": "h3",
+        "samples": 10
+      },
+      {
+        "participant": "native-no-connect-hybrid-http",
+        "protocol": "h3",
+        "samples": 10
+      },
+      {
+        "participant": "firefox_a",
+        "protocol": "h3",
+        "samples": 10
+      },
+      {
+        "participant": "firefox_b",
+        "protocol": "h3",
+        "samples": 10
+      }
+    ],
+    "declared_application_ws_message_counts": {
+      "client_binary": 21,
+      "client_json": 190,
+      "server_binary": 165,
+      "server_json": 43
+    },
+    "failed_participant_resampling_within_campaign": false,
+    "link": {
+      "address_family": "IPv4",
+      "client_to_origin_mbit_s": 20,
+      "mtu_bytes": 1500,
+      "offloads_disabled": true,
+      "one_way_delay_ms": 20,
+      "origin_to_client_mbit_s": 20,
+      "rtt_ms": 40
+    },
+    "manifest": {
+      "bootstrap_rounds": 20,
+      "catalog_records_per_round": 64,
+      "chunk_bytes": 65536,
+      "idle_before_ms": 2000,
+      "idle_wake_ms": 2000,
+      "jobs": [
+        {
+          "bytes": 8388608,
+          "id": 1,
+          "kind": "download",
+          "sha256": "651c5cd36d6fad96ce3e6420a26876214ff384da29890e2aeeab7ebf89283041"
+        },
+        {
+          "bytes": 1048576,
+          "id": 2,
+          "kind": "upload",
+          "sha256": "e35d674f5de24ea0c9557d03e8b5463dd5466336cbb2fb1867e8e152a82ab640"
+        },
+        {
+          "bytes": 524288,
+          "id": 3,
+          "kind": "download",
+          "sha256": "776b2c281daba414865c0ea895a03b08f201fb6f0f0da24202971c18de8066e9"
+        },
+        {
+          "bytes": 524288,
+          "id": 4,
+          "kind": "download",
+          "sha256": "795fca6f51b4cd1a30214f2bd2fdfd4843b68cf3bb5716b910d31ba362373ad6"
+        },
+        {
+          "bytes": 524288,
+          "id": 5,
+          "kind": "download",
+          "sha256": "5994e8eec2c5da4bb498644413e4de1d054d5f948d94a3f85e7bedc409ae3e73"
+        },
+        {
+          "bytes": 524288,
+          "id": 6,
+          "kind": "download",
+          "sha256": "92198f0ccc3a566a6d0eae99f596e68df7a1cdd10f91a490f1e13092778ce89c"
+        },
+        {
+          "bytes": 4096,
+          "id": 7,
+          "kind": "echo",
+          "sha256": "f5cceb71f4558ca74183f89d4d0f12ff6e417eb477a2d0108d46fd2341d45749"
+        },
+        {
+          "bytes": 4096,
+          "id": 8,
+          "kind": "echo",
+          "sha256": "a8ea093f033c876ce4a0a23293d3a1fa8c871bdeb329d85b26e048b5390582c9"
+        },
+        {
+          "bytes": 4096,
+          "id": 9,
+          "kind": "echo",
+          "sha256": "16a817b07dda0d2916595525fa465e77a17c742dd2b760b722ec63421dd02cc3"
+        },
+        {
+          "bytes": 4096,
+          "id": 10,
+          "kind": "echo",
+          "sha256": "ff5a00a18b06910fc7ed7aaaa1e150bddd6b4cef960a5f9d7ff58a66f28676e4"
+        },
+        {
+          "bytes": 4096,
+          "id": 11,
+          "kind": "echo",
+          "sha256": "a1388648f821d1a5df821613984c0da357e8b38fd9a66126bd3f398cba23b8db"
+        }
+      ],
+      "max_jobs": 4,
+      "name": "nfbench.app",
+      "payload_algorithm": "u8(id*17+offset*31+(offset>>8))",
+      "protocol": "nfbench.app.v1",
+      "receive_window": 524288,
+      "stages": [
+        {
+          "job_ids": [
+            1
+          ],
+          "name": "download",
+          "parallel": false
+        },
+        {
+          "job_ids": [
+            2
+          ],
+          "name": "upload",
+          "parallel": false
+        },
+        {
+          "job_ids": [
+            3,
+            4,
+            5,
+            6
+          ],
+          "name": "parallel",
+          "parallel": true
+        },
+        {
+          "job_ids": [
+            7,
+            8,
+            9,
+            10
+          ],
+          "name": "small",
+          "parallel": false
+        },
+        {
+          "job_ids": [
+            11
+          ],
+          "name": "wake",
+          "parallel": false
+        }
+      ],
+      "version": 1
+    },
+    "message_count_proof": "Frozen collector admission plus independent browser/backend job, byte, direction, message-count and concurrency audit; raw backend records are not copied into this report.",
+    "observer": "All receive-side outer-origin TCP/QUIC and attributable ICMP through application close, producer shutdown, empty shaping queues and observed drain.",
+    "participants": 160,
+    "participants_per_block": 8,
+    "participants_per_protocol": 80,
+    "per_stage_wire_attribution": false,
+    "resampling_evidence": "Exactly the 160 scheduled identities, one admitted sidecar each, a matching fail-fast source-frozen collector and independent audit; no pilot or prior failed campaign samples are included.",
+    "same_firefox_application_for_every_participant": true,
+    "seed": 2026083121,
+    "whole_is_complete_session": true
+  },
+  "hybrid_rows": [
+    {
+      "blocks": 10,
+      "comparisons": {
+        "classic": {
+          "baseline_samples": 10,
+          "baseline_whole_ip_bytes_mean": 12596802.1,
+          "complete_app_ms": {
+            "baseline_ms": 12050.8,
+            "candidate_ms": 20962.9,
+            "time_increase_percent": 73.95442626215689
+          },
+          "extra_complete_session_traffic_percent": 198.68581010731288,
+          "residual": {
+            "initial_packets_16": {
+              "bootstrap_ci95": [
+                0.07840971840542596,
+                0.12343112035599678
+              ],
+              "mean_distance": 0.101899980058676,
+              "samples": 10
+            },
+            "initial_packets_32": {
+              "bootstrap_ci95": [
+                0.29267893599756734,
+                0.3532670832964864
+              ],
+              "mean_distance": 0.3215591435920734,
+              "samples": 10
+            },
+            "initial_time_250ms": {
+              "bootstrap_ci95": [
+                0.5145445828711259,
+                0.5322880223944316
+              ],
+              "mean_distance": 0.5246496643240368,
+              "samples": 10
+            },
+            "packets_17_32": {
+              "bootstrap_ci95": [
+                0.37661237201883624,
+                0.5020768160295006
+              ],
+              "mean_distance": 0.4319132176206402,
+              "samples": 10
+            },
+            "whole": {
+              "bootstrap_ci95": [
+                0.3724099731140383,
+                0.3876938187820642
+              ],
+              "mean_distance": 0.3799486006816176,
+              "samples": 10
+            }
+          },
+          "stages": {
+            "download": {
+              "baseline_io_ms": 3654.7,
+              "baseline_mbit_s": 18.36234547295264,
+              "candidate_io_ms": 7026.4,
+              "candidate_mbit_s": 9.550959808721394,
+              "effective_rate_loss_percent": 47.98616645793009,
+              "measurement": "complete stage I/O duration",
+              "time_increase_percent": 92.2565463649547,
+              "timer_resolved_ratio": true
+            },
+            "parallel": {
+              "baseline_io_ms": 926.5,
+              "baseline_mbit_s": 18.108166216945495,
+              "candidate_io_ms": 1230.3,
+              "candidate_mbit_s": 13.63668698691376,
+              "effective_rate_loss_percent": 24.69316426887751,
+              "measurement": "complete stage I/O duration",
+              "time_increase_percent": 32.79007015650297,
+              "timer_resolved_ratio": true
+            },
+            "small": {
+              "baseline_io_ms": 87.6,
+              "candidate_io_ms": 207.6,
+              "measurement": "mean single-echo I/O latency",
+              "time_increase_percent": 136.98630136986304,
+              "timer_resolved_ratio": true
+            },
+            "upload": {
+              "baseline_io_ms": 579.4,
+              "baseline_mbit_s": 14.478094580600622,
+              "candidate_io_ms": 775.7,
+              "candidate_mbit_s": 10.81424261956942,
+              "effective_rate_loss_percent": 25.306175067680815,
+              "measurement": "complete stage I/O duration",
+              "time_increase_percent": 33.87987573351745,
+              "timer_resolved_ratio": true
+            },
+            "wake": {
+              "baseline_io_ms": 88.4,
+              "candidate_io_ms": 334.4,
+              "measurement": "mean single-echo I/O latency",
+              "time_increase_percent": 278.2805429864253,
+              "timer_resolved_ratio": true
+            }
+          },
+          "startup_to_app_ws_ms": {
+            "baseline_ms": 2389.3,
+            "candidate_ms": 6412.5,
+            "time_increase_percent": 168.38404553634953
+          }
+        },
+        "firefox": {
+          "baseline_samples": 20,
+          "baseline_whole_ip_bytes_mean": 12511465.9,
+          "complete_app_ms": {
+            "baseline_ms": 11960.7,
+            "candidate_ms": 20962.9,
+            "time_increase_percent": 75.26482563729549
+          },
+          "extra_complete_session_traffic_percent": 200.7230383771417,
+          "stages": {
+            "download": {
+              "baseline_io_ms": 3640.7,
+              "baseline_mbit_s": 18.432956299612712,
+              "candidate_io_ms": 7026.4,
+              "candidate_mbit_s": 9.550959808721394,
+              "effective_rate_loss_percent": 48.1854150062621,
+              "measurement": "complete stage I/O duration",
+              "time_increase_percent": 92.9958524459582,
+              "timer_resolved_ratio": true
+            },
+            "parallel": {
+              "baseline_io_ms": 922.65,
+              "baseline_mbit_s": 18.18372730721292,
+              "candidate_io_ms": 1230.3,
+              "candidate_mbit_s": 13.63668698691376,
+              "effective_rate_loss_percent": 25.00609607412826,
+              "measurement": "complete stage I/O duration",
+              "time_increase_percent": 33.34417167940171,
+              "timer_resolved_ratio": true
+            },
+            "small": {
+              "baseline_io_ms": 86.2375,
+              "candidate_io_ms": 207.6,
+              "measurement": "mean single-echo I/O latency",
+              "time_increase_percent": 140.7305406580664,
+              "timer_resolved_ratio": true
+            },
+            "upload": {
+              "baseline_io_ms": 580.3,
+              "baseline_mbit_s": 14.455640186110633,
+              "candidate_io_ms": 775.7,
+              "candidate_mbit_s": 10.81424261956942,
+              "effective_rate_loss_percent": 25.19015083150704,
+              "measurement": "complete stage I/O duration",
+              "time_increase_percent": 33.67223849732899,
+              "timer_resolved_ratio": true
+            },
+            "wake": {
+              "baseline_io_ms": 86.8,
+              "candidate_io_ms": 334.4,
+              "measurement": "mean single-echo I/O latency",
+              "time_increase_percent": 285.2534562211981,
+              "timer_resolved_ratio": true
+            }
+          },
+          "startup_to_app_ws_ms": {
+            "baseline_ms": 2311.15,
+            "candidate_ms": 6412.5,
+            "time_increase_percent": 177.45927352183975
+          }
+        },
+        "no-connect": {
+          "baseline_samples": 10,
+          "baseline_whole_ip_bytes_mean": 18586155.0,
+          "complete_app_ms": {
+            "baseline_ms": 29345.2,
+            "candidate_ms": 20962.9,
+            "time_increase_percent": -28.564467101945123
+          },
+          "extra_complete_session_traffic_percent": 102.43487908069207,
+          "residual": {
+            "initial_packets_16": {
+              "bootstrap_ci95": [
+                0.09801284532432115,
+                0.12975743529413422
+              ],
+              "mean_distance": 0.11506050776538493,
+              "samples": 10
+            },
+            "initial_packets_32": {
+              "bootstrap_ci95": [
+                0.16557251307601945,
+                0.19948662354598265
+              ],
+              "mean_distance": 0.1840662114723021,
+              "samples": 10
+            },
+            "initial_time_250ms": {
+              "bootstrap_ci95": [
+                0.4004245556664299,
+                0.5106457468520814
+              ],
+              "mean_distance": 0.45525059480939795,
+              "samples": 10
+            },
+            "packets_17_32": {
+              "bootstrap_ci95": [
+                0.25128494422171604,
+                0.31076794681126435
+              ],
+              "mean_distance": 0.28282879428500923,
+              "samples": 10
+            },
+            "whole": {
+              "bootstrap_ci95": [
+                0.36747394535322514,
+                0.39835569903789064
+              ],
+              "mean_distance": 0.383251132327015,
+              "samples": 10
+            }
+          },
+          "stages": {
+            "download": {
+              "baseline_io_ms": 9927.6,
+              "baseline_mbit_s": 6.759827551472662,
+              "candidate_io_ms": 7026.4,
+              "candidate_mbit_s": 9.550959808721394,
+              "effective_rate_loss_percent": -41.28999203005807,
+              "measurement": "complete stage I/O duration",
+              "time_increase_percent": -29.22357870985939,
+              "timer_resolved_ratio": true
+            },
+            "parallel": {
+              "baseline_io_ms": 1451.3,
+              "baseline_mbit_s": 11.56012953903397,
+              "candidate_io_ms": 1230.3,
+              "candidate_mbit_s": 13.63668698691376,
+              "effective_rate_loss_percent": -17.963098431276926,
+              "measurement": "complete stage I/O duration",
+              "time_increase_percent": -15.227726865568803,
+              "timer_resolved_ratio": true
+            },
+            "small": {
+              "baseline_io_ms": 438.425,
+              "candidate_io_ms": 207.6,
+              "measurement": "mean single-echo I/O latency",
+              "time_increase_percent": -52.64868563608371,
+              "timer_resolved_ratio": true
+            },
+            "upload": {
+              "baseline_io_ms": 2635.1,
+              "baseline_mbit_s": 3.18341163523206,
+              "candidate_io_ms": 775.7,
+              "candidate_mbit_s": 10.81424261956942,
+              "effective_rate_loss_percent": -239.7060719350264,
+              "measurement": "complete stage I/O duration",
+              "time_increase_percent": -70.56278699100604,
+              "timer_resolved_ratio": true
+            },
+            "wake": {
+              "baseline_io_ms": 354.1,
+              "candidate_io_ms": 334.4,
+              "measurement": "mean single-echo I/O latency",
+              "time_increase_percent": -5.563400169443677,
+              "timer_resolved_ratio": true
+            }
+          },
+          "startup_to_app_ws_ms": {
+            "baseline_ms": 8816.6,
+            "candidate_ms": 6412.5,
+            "time_increase_percent": -27.26788104257878
+          }
+        }
+      },
+      "listener": "socks",
+      "residual": {
+        "initial_packets_16": {
+          "bootstrap_ci95": [
+            0.08845959149261065,
+            0.13474608831495577
+          ],
+          "mean_distance": 0.11283571422744769,
+          "samples": 10
+        },
+        "initial_packets_32": {
+          "bootstrap_ci95": [
+            0.1701330062726025,
+            0.24984034661991802
+          ],
+          "mean_distance": 0.21074577886828694,
+          "samples": 10
+        },
+        "initial_time_250ms": {
+          "bootstrap_ci95": [
+            0.4343408256661581,
+            0.4921248827374137
+          ],
+          "mean_distance": 0.46090202187603213,
+          "samples": 10
+        },
+        "packets_17_32": {
+          "bootstrap_ci95": [
+            0.27064712190802004,
+            0.4191131967669897
+          ],
+          "mean_distance": 0.3336861673485017,
+          "samples": 10
+        },
+        "whole": {
+          "bootstrap_ci95": [
+            0.316292211053162,
+            0.34889662838396707
+          ],
+          "mean_distance": 0.33157765151181867,
+          "samples": 10
+        }
+      },
+      "samples": 10,
+      "startup_protocol": "h2",
+      "whole_ip_bytes_mean": 37624860.4
+    },
+    {
+      "blocks": 10,
+      "comparisons": {
+        "classic": {
+          "baseline_samples": 10,
+          "baseline_whole_ip_bytes_mean": 12598266.3,
+          "complete_app_ms": {
+            "baseline_ms": 12043.7,
+            "candidate_ms": 20696.2,
+            "time_increase_percent": 71.84254008319701
+          },
+          "extra_complete_session_traffic_percent": 197.9447211716742,
+          "residual": {
+            "initial_packets_16": {
+              "bootstrap_ci95": [
+                0.10418405928562532,
+                0.14085066934750318
+              ],
+              "mean_distance": 0.12219706056608408,
+              "samples": 10
+            },
+            "initial_packets_32": {
+              "bootstrap_ci95": [
+                0.30083183624925053,
+                0.35419015103730384
+              ],
+              "mean_distance": 0.32815377234888277,
+              "samples": 10
+            },
+            "initial_time_250ms": {
+              "bootstrap_ci95": [
+                0.521560563753522,
+                0.534094020843915
+              ],
+              "mean_distance": 0.5277345526426118,
+              "samples": 10
+            },
+            "packets_17_32": {
+              "bootstrap_ci95": [
+                0.3649550155346786,
+                0.485504802268589
+              ],
+              "mean_distance": 0.42558292404134557,
+              "samples": 10
+            },
+            "whole": {
+              "bootstrap_ci95": [
+                0.36976626658344636,
+                0.39157423536287583
+              ],
+              "mean_distance": 0.38070009219247225,
+              "samples": 10
+            }
+          },
+          "stages": {
+            "download": {
+              "baseline_io_ms": 3654.2,
+              "baseline_mbit_s": 18.364857971649062,
+              "candidate_io_ms": 6902.1,
+              "candidate_mbit_s": 9.722963156140883,
+              "effective_rate_loss_percent": 47.05669289056954,
+              "measurement": "complete stage I/O duration",
+              "time_increase_percent": 88.88128728586287,
+              "timer_resolved_ratio": true
+            },
+            "parallel": {
+              "baseline_io_ms": 926.5,
+              "baseline_mbit_s": 18.108166216945495,
+              "candidate_io_ms": 1222.1,
+              "candidate_mbit_s": 13.728185909500041,
+              "effective_rate_loss_percent": 24.187873332787824,
+              "measurement": "complete stage I/O duration",
+              "time_increase_percent": 31.90501888828925,
+              "timer_resolved_ratio": true
+            },
+            "small": {
+              "baseline_io_ms": 87.55,
+              "candidate_io_ms": 207.675,
+              "measurement": "mean single-echo I/O latency",
+              "time_increase_percent": 137.20731010850943,
+              "timer_resolved_ratio": true
+            },
+            "upload": {
+              "baseline_io_ms": 578.6,
+              "baseline_mbit_s": 14.498112685793295,
+              "candidate_io_ms": 774.7,
+              "candidate_mbit_s": 10.82820188460049,
+              "effective_rate_loss_percent": 25.313024396540595,
+              "measurement": "complete stage I/O duration",
+              "time_increase_percent": 33.89215347390253,
+              "timer_resolved_ratio": true
+            },
+            "wake": {
+              "baseline_io_ms": 87.8,
+              "candidate_io_ms": 333.6,
+              "measurement": "mean single-echo I/O latency",
+              "time_increase_percent": 279.95444191343967,
+              "timer_resolved_ratio": true
+            }
+          },
+          "startup_to_app_ws_ms": {
+            "baseline_ms": 2384.0,
+            "candidate_ms": 6413.3,
+            "time_increase_percent": 169.01426174496646
+          }
+        },
+        "firefox": {
+          "baseline_samples": 20,
+          "baseline_whole_ip_bytes_mean": 12511465.9,
+          "complete_app_ms": {
+            "baseline_ms": 11960.7,
+            "candidate_ms": 20696.2,
+            "time_increase_percent": 73.03502303376892
+          },
+          "extra_complete_session_traffic_percent": 200.01176281030345,
+          "stages": {
+            "download": {
+              "baseline_io_ms": 3640.7,
+              "baseline_mbit_s": 18.432956299612712,
+              "candidate_io_ms": 6902.1,
+              "candidate_mbit_s": 9.722963156140883,
+              "effective_rate_loss_percent": 47.25228553628607,
+              "measurement": "complete stage I/O duration",
+              "time_increase_percent": 89.58167385392922,
+              "timer_resolved_ratio": true
+            },
+            "parallel": {
+              "baseline_io_ms": 922.65,
+              "baseline_mbit_s": 18.18372730721292,
+              "candidate_io_ms": 1222.1,
+              "candidate_mbit_s": 13.728185909500041,
+              "effective_rate_loss_percent": 24.502904835938132,
+              "measurement": "complete stage I/O duration",
+              "time_increase_percent": 32.45542730179374,
+              "timer_resolved_ratio": true
+            },
+            "small": {
+              "baseline_io_ms": 86.2375,
+              "candidate_io_ms": 207.675,
+              "measurement": "mean single-echo I/O latency",
+              "time_increase_percent": 140.8175097840267,
+              "timer_resolved_ratio": true
+            },
+            "upload": {
+              "baseline_io_ms": 580.3,
+              "baseline_mbit_s": 14.455640186110633,
+              "candidate_io_ms": 774.7,
+              "candidate_mbit_s": 10.82820188460049,
+              "effective_rate_loss_percent": 25.093584613398747,
+              "measurement": "complete stage I/O duration",
+              "time_increase_percent": 33.49991383767019,
+              "timer_resolved_ratio": true
+            },
+            "wake": {
+              "baseline_io_ms": 86.8,
+              "candidate_io_ms": 333.6,
+              "measurement": "mean single-echo I/O latency",
+              "time_increase_percent": 284.3317972350231,
+              "timer_resolved_ratio": true
+            }
+          },
+          "startup_to_app_ws_ms": {
+            "baseline_ms": 2311.15,
+            "candidate_ms": 6413.3,
+            "time_increase_percent": 177.49388832399453
+          }
+        },
+        "no-connect": {
+          "baseline_samples": 10,
+          "baseline_whole_ip_bytes_mean": 18413226.8,
+          "complete_app_ms": {
+            "baseline_ms": 29348.1,
+            "candidate_ms": 20696.2,
+            "time_increase_percent": -29.480272998933486
+          },
+          "extra_complete_session_traffic_percent": 103.85275111041375,
+          "residual": {
+            "initial_packets_16": {
+              "bootstrap_ci95": [
+                0.10059894123291634,
+                0.15330350255648853
+              ],
+              "mean_distance": 0.1252970706571409,
+              "samples": 10
+            },
+            "initial_packets_32": {
+              "bootstrap_ci95": [
+                0.1852449516278165,
+                0.29102644243677656
+              ],
+              "mean_distance": 0.23527368114163233,
+              "samples": 10
+            },
+            "initial_time_250ms": {
+              "bootstrap_ci95": [
+                0.4319878900145002,
+                0.510873539166304
+              ],
+              "mean_distance": 0.47137045900521934,
+              "samples": 10
+            },
+            "packets_17_32": {
+              "bootstrap_ci95": [
+                0.2866897211622266,
+                0.4520678689114781
+              ],
+              "mean_distance": 0.3640666685510791,
+              "samples": 10
+            },
+            "whole": {
+              "bootstrap_ci95": [
+                0.37294049843379207,
+                0.40952992409741074
+              ],
+              "mean_distance": 0.3914346124604148,
+              "samples": 10
+            }
+          },
+          "stages": {
+            "download": {
+              "baseline_io_ms": 9899.3,
+              "baseline_mbit_s": 6.779152465325832,
+              "candidate_io_ms": 6902.1,
+              "candidate_mbit_s": 9.722963156140883,
+              "effective_rate_loss_percent": -43.42446501789308,
+              "measurement": "complete stage I/O duration",
+              "time_increase_percent": -30.276888264826795,
+              "timer_resolved_ratio": true
+            },
+            "parallel": {
+              "baseline_io_ms": 1434.7,
+              "baseline_mbit_s": 11.693884435770544,
+              "candidate_io_ms": 1222.1,
+              "candidate_mbit_s": 13.728185909500041,
+              "effective_rate_loss_percent": -17.396285083053776,
+              "measurement": "complete stage I/O duration",
+              "time_increase_percent": -14.818428939848062,
+              "timer_resolved_ratio": true
+            },
+            "small": {
+              "baseline_io_ms": 438.025,
+              "candidate_io_ms": 207.675,
+              "measurement": "mean single-echo I/O latency",
+              "time_increase_percent": -52.58832258432737,
+              "timer_resolved_ratio": true
+            },
+            "upload": {
+              "baseline_io_ms": 2646.9,
+              "baseline_mbit_s": 3.1692198420794133,
+              "candidate_io_ms": 774.7,
+              "candidate_mbit_s": 10.82820188460049,
+              "effective_rate_loss_percent": -241.66774235187813,
+              "measurement": "complete stage I/O duration",
+              "time_increase_percent": -70.73179946352337,
+              "timer_resolved_ratio": true
+            },
+            "wake": {
+              "baseline_io_ms": 348.9,
+              "candidate_io_ms": 333.6,
+              "measurement": "mean single-echo I/O latency",
+              "time_increase_percent": -4.385210662080807,
+              "timer_resolved_ratio": true
+            }
+          },
+          "startup_to_app_ws_ms": {
+            "baseline_ms": 8815.7,
+            "candidate_ms": 6413.3,
+            "time_increase_percent": -27.251381058792834
+          }
+        }
+      },
+      "listener": "http",
+      "residual": {
+        "initial_packets_16": {
+          "bootstrap_ci95": [
+            0.09376201084174061,
+            0.14237199324100677
+          ],
+          "mean_distance": 0.11769763124208543,
+          "samples": 10
+        },
+        "initial_packets_32": {
+          "bootstrap_ci95": [
+            0.19032134041228158,
+            0.2486839615520108
+          ],
+          "mean_distance": 0.21953523608285722,
+          "samples": 10
+        },
+        "initial_time_250ms": {
+          "bootstrap_ci95": [
+            0.433474719784002,
+            0.5081710604611713
+          ],
+          "mean_distance": 0.4698486451245813,
+          "samples": 10
+        },
+        "packets_17_32": {
+          "bootstrap_ci95": [
+            0.2959584506020491,
+            0.38029026484404976
+          ],
+          "mean_distance": 0.3399051437985258,
+          "samples": 10
+        },
+        "whole": {
+          "bootstrap_ci95": [
+            0.3189223661976468,
+            0.35214216415684507
+          ],
+          "mean_distance": 0.33489189779272477,
+          "samples": 10
+        }
+      },
+      "samples": 10,
+      "startup_protocol": "h2",
+      "whole_ip_bytes_mean": 37535869.4
+    },
+    {
+      "blocks": 10,
+      "comparisons": {
+        "classic": {
+          "baseline_samples": 10,
+          "baseline_whole_ip_bytes_mean": 12625629.0,
+          "complete_app_ms": {
+            "baseline_ms": 11973.4,
+            "candidate_ms": 20781.6,
+            "time_increase_percent": 73.56473516294453
+          },
+          "extra_complete_session_traffic_percent": 197.37727997551647,
+          "residual": {
+            "initial_packets_16": {
+              "bootstrap_ci95": [
+                0.036568222706470206,
+                0.07181919089381907
+              ],
+              "mean_distance": 0.053005465556866894,
+              "samples": 10
+            },
+            "initial_packets_32": {
+              "bootstrap_ci95": [
+                0.16145494558890544,
+                0.1951429174200686
+              ],
+              "mean_distance": 0.17726301522337967,
+              "samples": 10
+            },
+            "initial_time_250ms": {
+              "bootstrap_ci95": [
+                0.3925175934124035,
+                0.44740645639560306
+              ],
+              "mean_distance": 0.42026189318921237,
+              "samples": 10
+            },
+            "packets_17_32": {
+              "bootstrap_ci95": [
+                0.19815591485665854,
+                0.24442860270867062
+              ],
+              "mean_distance": 0.22126013226480437,
+              "samples": 10
+            },
+            "whole": {
+              "bootstrap_ci95": [
+                0.26508310580398475,
+                0.2947273779140609
+              ],
+              "mean_distance": 0.27959855935850314,
+              "samples": 10
+            }
+          },
+          "stages": {
+            "download": {
+              "baseline_io_ms": 3580.0,
+              "baseline_mbit_s": 18.745492737430165,
+              "candidate_io_ms": 7036.9,
+              "candidate_mbit_s": 9.536708493796985,
+              "effective_rate_loss_percent": 49.12532507211982,
+              "measurement": "complete stage I/O duration",
+              "time_increase_percent": 96.56145251396646,
+              "timer_resolved_ratio": true
+            },
+            "parallel": {
+              "baseline_io_ms": 927.5,
+              "baseline_mbit_s": 18.08864258760108,
+              "candidate_io_ms": 1178.3,
+              "candidate_mbit_s": 14.238492743783418,
+              "effective_rate_loss_percent": 21.284901977425097,
+              "measurement": "complete stage I/O duration",
+              "time_increase_percent": 27.040431266846365,
+              "timer_resolved_ratio": true
+            },
+            "small": {
+              "baseline_io_ms": 87.6,
+              "candidate_io_ms": 207.425,
+              "measurement": "mean single-echo I/O latency",
+              "time_increase_percent": 136.78652968036533,
+              "timer_resolved_ratio": true
+            },
+            "upload": {
+              "baseline_io_ms": 620.4,
+              "baseline_mbit_s": 13.521289490651194,
+              "candidate_io_ms": 776.3,
+              "candidate_mbit_s": 10.805884323070979,
+              "effective_rate_loss_percent": 20.082442354759756,
+              "measurement": "complete stage I/O duration",
+              "time_increase_percent": 25.128949065119265,
+              "timer_resolved_ratio": true
+            },
+            "wake": {
+              "baseline_io_ms": 88.3,
+              "candidate_io_ms": 333.9,
+              "measurement": "mean single-echo I/O latency",
+              "time_increase_percent": 278.1426953567384,
+              "timer_resolved_ratio": true
+            }
+          },
+          "startup_to_app_ws_ms": {
+            "baseline_ms": 2344.8,
+            "candidate_ms": 6384.0,
+            "time_increase_percent": 172.2620266120778
+          }
+        },
+        "firefox": {
+          "baseline_samples": 20,
+          "baseline_whole_ip_bytes_mean": 12528924.7,
+          "complete_app_ms": {
+            "baseline_ms": 11807.15,
+            "candidate_ms": 20781.6,
+            "time_increase_percent": 76.00860495547188
+          },
+          "extra_complete_session_traffic_percent": 199.67258163823112,
+          "stages": {
+            "download": {
+              "baseline_io_ms": 3641.35,
+              "baseline_mbit_s": 18.42966592060637,
+              "candidate_io_ms": 7036.9,
+              "candidate_mbit_s": 9.536708493796985,
+              "effective_rate_loss_percent": 48.25349230485014,
+              "measurement": "complete stage I/O duration",
+              "time_increase_percent": 93.24975627171241,
+              "timer_resolved_ratio": true
+            },
+            "parallel": {
+              "baseline_io_ms": 923.1,
+              "baseline_mbit_s": 18.17486296175929,
+              "candidate_io_ms": 1178.3,
+              "candidate_mbit_s": 14.238492743783418,
+              "effective_rate_loss_percent": 21.658321310362382,
+              "measurement": "complete stage I/O duration",
+              "time_increase_percent": 27.64597551727872,
+              "timer_resolved_ratio": true
+            },
+            "small": {
+              "baseline_io_ms": 86.275,
+              "candidate_io_ms": 207.425,
+              "measurement": "mean single-echo I/O latency",
+              "time_increase_percent": 140.42306577803535,
+              "timer_resolved_ratio": true
+            },
+            "upload": {
+              "baseline_io_ms": 580.05,
+              "baseline_mbit_s": 14.461870528402725,
+              "candidate_io_ms": 776.3,
+              "candidate_mbit_s": 10.805884323070979,
+              "effective_rate_loss_percent": 25.280175190003863,
+              "measurement": "complete stage I/O duration",
+              "time_increase_percent": 33.83329023360056,
+              "timer_resolved_ratio": true
+            },
+            "wake": {
+              "baseline_io_ms": 87.0,
+              "candidate_io_ms": 333.9,
+              "measurement": "mean single-echo I/O latency",
+              "time_increase_percent": 283.7931034482758,
+              "timer_resolved_ratio": true
+            }
+          },
+          "startup_to_app_ws_ms": {
+            "baseline_ms": 2168.45,
+            "candidate_ms": 6384.0,
+            "time_increase_percent": 194.40383684198395
+          }
+        },
+        "no-connect": {
+          "baseline_samples": 10,
+          "baseline_whole_ip_bytes_mean": 18559614.0,
+          "complete_app_ms": {
+            "baseline_ms": 29504.8,
+            "candidate_ms": 20781.6,
+            "time_increase_percent": -29.565358856863966
+          },
+          "extra_complete_session_traffic_percent": 102.2981302305102,
+          "residual": {
+            "initial_packets_16": {
+              "bootstrap_ci95": [
+                0.03857003374085598,
+                0.05722239545399256
+              ],
+              "mean_distance": 0.04800309013940107,
+              "samples": 10
+            },
+            "initial_packets_32": {
+              "bootstrap_ci95": [
+                0.15570321930204856,
+                0.17982811334934262
+              ],
+              "mean_distance": 0.16723276807596027,
+              "samples": 10
+            },
+            "initial_time_250ms": {
+              "bootstrap_ci95": [
+                0.2840424665029894,
+                0.3898245967389697
+              ],
+              "mean_distance": 0.34521167523440754,
+              "samples": 10
+            },
+            "packets_17_32": {
+              "bootstrap_ci95": [
+                0.19725805036932995,
+                0.23570757803959635
+              ],
+              "mean_distance": 0.21587776403774814,
+              "samples": 10
+            },
+            "whole": {
+              "bootstrap_ci95": [
+                0.26615162490905253,
+                0.29541734887190435
+              ],
+              "mean_distance": 0.28022379855182733,
+              "samples": 10
+            }
+          },
+          "stages": {
+            "download": {
+              "baseline_io_ms": 10086.1,
+              "baseline_mbit_s": 6.653598913356004,
+              "candidate_io_ms": 7036.9,
+              "candidate_mbit_s": 9.536708493796985,
+              "effective_rate_loss_percent": -43.33158066762355,
+              "measurement": "complete stage I/O duration",
+              "time_increase_percent": -30.231705019779696,
+              "timer_resolved_ratio": true
+            },
+            "parallel": {
+              "baseline_io_ms": 1442.1,
+              "baseline_mbit_s": 11.633878371818875,
+              "candidate_io_ms": 1178.3,
+              "candidate_mbit_s": 14.238492743783418,
+              "effective_rate_loss_percent": -22.38818637019435,
+              "measurement": "complete stage I/O duration",
+              "time_increase_percent": -18.292767491852157,
+              "timer_resolved_ratio": true
+            },
+            "small": {
+              "baseline_io_ms": 438.95,
+              "candidate_io_ms": 207.425,
+              "measurement": "mean single-echo I/O latency",
+              "time_increase_percent": -52.745187378972545,
+              "timer_resolved_ratio": true
+            },
+            "upload": {
+              "baseline_io_ms": 2668.0,
+              "baseline_mbit_s": 3.1441559220389803,
+              "candidate_io_ms": 776.3,
+              "candidate_mbit_s": 10.805884323070979,
+              "effective_rate_loss_percent": -243.68156640474044,
+              "measurement": "complete stage I/O duration",
+              "time_increase_percent": -70.90329835082458,
+              "timer_resolved_ratio": true
+            },
+            "wake": {
+              "baseline_io_ms": 350.5,
+              "candidate_io_ms": 333.9,
+              "measurement": "mean single-echo I/O latency",
+              "time_increase_percent": -4.736091298145517,
+              "timer_resolved_ratio": true
+            }
+          },
+          "startup_to_app_ws_ms": {
+            "baseline_ms": 8952.7,
+            "candidate_ms": 6384.0,
+            "time_increase_percent": -28.691903001329212
+          }
+        }
+      },
+      "listener": "socks",
+      "residual": {
+        "initial_packets_16": {
+          "bootstrap_ci95": [
+            0.05044851923180928,
+            0.07511029292442964
+          ],
+          "mean_distance": 0.06230415615863268,
+          "samples": 10
+        },
+        "initial_packets_32": {
+          "bootstrap_ci95": [
+            0.15290290291570754,
+            0.20568662078845745
+          ],
+          "mean_distance": 0.1798007174741619,
+          "samples": 10
+        },
+        "initial_time_250ms": {
+          "bootstrap_ci95": [
+            0.28841425047465113,
+            0.3774976910633162
+          ],
+          "mean_distance": 0.33612618830142804,
+          "samples": 10
+        },
+        "packets_17_32": {
+          "bootstrap_ci95": [
+            0.18740845695812453,
+            0.2598418008404104
+          ],
+          "mean_distance": 0.22239427081709878,
+          "samples": 10
+        },
+        "whole": {
+          "bootstrap_ci95": [
+            0.23777974433171628,
+            0.2574052623093069
+          ],
+          "mean_distance": 0.24709274258791095,
+          "samples": 10
+        }
+      },
+      "samples": 10,
+      "startup_protocol": "h3",
+      "whole_ip_bytes_mean": 37545752.1
+    },
+    {
+      "blocks": 10,
+      "comparisons": {
+        "classic": {
+          "baseline_samples": 10,
+          "baseline_whole_ip_bytes_mean": 12621748.7,
+          "complete_app_ms": {
+            "baseline_ms": 11978.4,
+            "candidate_ms": 20924.0,
+            "time_increase_percent": 74.6810926334068
+          },
+          "extra_complete_session_traffic_percent": 201.2937050473838,
+          "residual": {
+            "initial_packets_16": {
+              "bootstrap_ci95": [
+                0.03706925312305671,
+                0.056476734102400325
+              ],
+              "mean_distance": 0.04682977838645605,
+              "samples": 10
+            },
+            "initial_packets_32": {
+              "bootstrap_ci95": [
+                0.15635915666382785,
+                0.177070412801036
+              ],
+              "mean_distance": 0.16701984766005645,
+              "samples": 10
+            },
+            "initial_time_250ms": {
+              "bootstrap_ci95": [
+                0.3840772619219465,
+                0.4278797677572433
+              ],
+              "mean_distance": 0.406931764279683,
+              "samples": 10
+            },
+            "packets_17_32": {
+              "bootstrap_ci95": [
+                0.19729972850986613,
+                0.23699255600028718
+              ],
+              "mean_distance": 0.21612283118328585,
+              "samples": 10
+            },
+            "whole": {
+              "bootstrap_ci95": [
+                0.2667032183977469,
+                0.28988750295034615
+              ],
+              "mean_distance": 0.2788842327502593,
+              "samples": 10
+            }
+          },
+          "stages": {
+            "download": {
+              "baseline_io_ms": 3579.2,
+              "baseline_mbit_s": 18.74968261063925,
+              "candidate_io_ms": 7090.1,
+              "candidate_mbit_s": 9.46515056205131,
+              "effective_rate_loss_percent": 49.518342477539115,
+              "measurement": "complete stage I/O duration",
+              "time_increase_percent": 98.09175234689317,
+              "timer_resolved_ratio": true
+            },
+            "parallel": {
+              "baseline_io_ms": 927.6,
+              "baseline_mbit_s": 18.08669253988788,
+              "candidate_io_ms": 1227.8,
+              "candidate_mbit_s": 13.664453494054408,
+              "effective_rate_loss_percent": 24.450236194819997,
+              "measurement": "complete stage I/O duration",
+              "time_increase_percent": 32.363087537731786,
+              "timer_resolved_ratio": true
+            },
+            "small": {
+              "baseline_io_ms": 87.675,
+              "candidate_io_ms": 209.5,
+              "measurement": "mean single-echo I/O latency",
+              "time_increase_percent": 138.95067008839465,
+              "timer_resolved_ratio": true
+            },
+            "upload": {
+              "baseline_io_ms": 622.4,
+              "baseline_mbit_s": 13.477840616966581,
+              "candidate_io_ms": 771.2,
+              "candidate_mbit_s": 10.877344398340249,
+              "effective_rate_loss_percent": 19.29460580912864,
+              "measurement": "complete stage I/O duration",
+              "time_increase_percent": 23.907455012853475,
+              "timer_resolved_ratio": true
+            },
+            "wake": {
+              "baseline_io_ms": 88.8,
+              "candidate_io_ms": 334.5,
+              "measurement": "mean single-echo I/O latency",
+              "time_increase_percent": 276.6891891891892,
+              "timer_resolved_ratio": true
+            }
+          },
+          "startup_to_app_ws_ms": {
+            "baseline_ms": 2346.9,
+            "candidate_ms": 6387.4,
+            "time_increase_percent": 172.16327921939575
+          }
+        },
+        "firefox": {
+          "baseline_samples": 20,
+          "baseline_whole_ip_bytes_mean": 12528924.7,
+          "complete_app_ms": {
+            "baseline_ms": 11807.15,
+            "candidate_ms": 20924.0,
+            "time_increase_percent": 77.2146538326353
+          },
+          "extra_complete_session_traffic_percent": 203.5259226994955,
+          "stages": {
+            "download": {
+              "baseline_io_ms": 3641.35,
+              "baseline_mbit_s": 18.42966592060637,
+              "candidate_io_ms": 7090.1,
+              "candidate_mbit_s": 9.46515056205131,
+              "effective_rate_loss_percent": 48.64176809918055,
+              "measurement": "complete stage I/O duration",
+              "time_increase_percent": 94.71075288011318,
+              "timer_resolved_ratio": true
+            },
+            "parallel": {
+              "baseline_io_ms": 923.1,
+              "baseline_mbit_s": 18.17486296175929,
+              "candidate_io_ms": 1227.8,
+              "candidate_mbit_s": 13.664453494054408,
+              "effective_rate_loss_percent": 24.816745398273333,
+              "measurement": "complete stage I/O duration",
+              "time_increase_percent": 33.00834145813021,
+              "timer_resolved_ratio": true
+            },
+            "small": {
+              "baseline_io_ms": 86.275,
+              "candidate_io_ms": 209.5,
+              "measurement": "mean single-echo I/O latency",
+              "time_increase_percent": 142.8281657490582,
+              "timer_resolved_ratio": true
+            },
+            "upload": {
+              "baseline_io_ms": 580.05,
+              "baseline_mbit_s": 14.461870528402725,
+              "candidate_io_ms": 771.2,
+              "candidate_mbit_s": 10.877344398340249,
+              "effective_rate_loss_percent": 24.78604771784233,
+              "measurement": "complete stage I/O duration",
+              "time_increase_percent": 32.954055684854765,
+              "timer_resolved_ratio": true
+            },
+            "wake": {
+              "baseline_io_ms": 87.0,
+              "candidate_io_ms": 334.5,
+              "measurement": "mean single-echo I/O latency",
+              "time_increase_percent": 284.48275862068965,
+              "timer_resolved_ratio": true
+            }
+          },
+          "startup_to_app_ws_ms": {
+            "baseline_ms": 2168.45,
+            "candidate_ms": 6387.4,
+            "time_increase_percent": 194.5606308653647
+          }
+        },
+        "no-connect": {
+          "baseline_samples": 10,
+          "baseline_whole_ip_bytes_mean": 18612210.9,
+          "complete_app_ms": {
+            "baseline_ms": 29542.1,
+            "candidate_ms": 20924.0,
+            "time_increase_percent": -29.172266020357384
+          },
+          "extra_complete_session_traffic_percent": 104.32034917463784,
+          "residual": {
+            "initial_packets_16": {
+              "bootstrap_ci95": [
+                0.04088378773852544,
+                0.07561250475054097
+              ],
+              "mean_distance": 0.05489600230941037,
+              "samples": 10
+            },
+            "initial_packets_32": {
+              "bootstrap_ci95": [
+                0.15322770508129768,
+                0.18118168054044861
+              ],
+              "mean_distance": 0.16701879944972134,
+              "samples": 10
+            },
+            "initial_time_250ms": {
+              "bootstrap_ci95": [
+                0.3768196634421844,
+                0.4182790349524814
+              ],
+              "mean_distance": 0.39744810846978496,
+              "samples": 10
+            },
+            "packets_17_32": {
+              "bootstrap_ci95": [
+                0.1895304367567425,
+                0.23366820007517478
+              ],
+              "mean_distance": 0.21332091834513262,
+              "samples": 10
+            },
+            "whole": {
+              "bootstrap_ci95": [
+                0.26961231439606576,
+                0.2923304942282471
+              ],
+              "mean_distance": 0.2811739190823695,
+              "samples": 10
+            }
+          },
+          "stages": {
+            "download": {
+              "baseline_io_ms": 10113.0,
+              "baseline_mbit_s": 6.635900721843172,
+              "candidate_io_ms": 7090.1,
+              "candidate_mbit_s": 9.46515056205131,
+              "effective_rate_loss_percent": -42.635505846179875,
+              "measurement": "complete stage I/O duration",
+              "time_increase_percent": -29.89122911104518,
+              "timer_resolved_ratio": true
+            },
+            "parallel": {
+              "baseline_io_ms": 1467.2,
+              "baseline_mbit_s": 11.43485278080698,
+              "candidate_io_ms": 1227.8,
+              "candidate_mbit_s": 13.664453494054408,
+              "effective_rate_loss_percent": -19.498289623717223,
+              "measurement": "complete stage I/O duration",
+              "time_increase_percent": -16.316793893129777,
+              "timer_resolved_ratio": true
+            },
+            "small": {
+              "baseline_io_ms": 439.15,
+              "candidate_io_ms": 209.5,
+              "measurement": "mean single-echo I/O latency",
+              "time_increase_percent": -52.29420471365137,
+              "timer_resolved_ratio": true
+            },
+            "upload": {
+              "baseline_io_ms": 2669.4,
+              "baseline_mbit_s": 3.1425069303963435,
+              "candidate_io_ms": 771.2,
+              "candidate_mbit_s": 10.877344398340249,
+              "effective_rate_loss_percent": -246.13589211618256,
+              "measurement": "complete stage I/O duration",
+              "time_increase_percent": -71.10961264703678,
+              "timer_resolved_ratio": true
+            },
+            "wake": {
+              "baseline_io_ms": 356.0,
+              "candidate_io_ms": 334.5,
+              "measurement": "mean single-echo I/O latency",
+              "time_increase_percent": -6.0393258426966305,
+              "timer_resolved_ratio": true
+            }
+          },
+          "startup_to_app_ws_ms": {
+            "baseline_ms": 8953.8,
+            "candidate_ms": 6387.4,
+            "time_increase_percent": -28.662690701154816
+          }
+        }
+      },
+      "listener": "http",
+      "residual": {
+        "initial_packets_16": {
+          "bootstrap_ci95": [
+            0.041443428026434526,
+            0.05182033542503905
+          ],
+          "mean_distance": 0.04630739120891063,
+          "samples": 10
+        },
+        "initial_packets_32": {
+          "bootstrap_ci95": [
+            0.1454178179620162,
+            0.17091254660306107
+          ],
+          "mean_distance": 0.15799061846316656,
+          "samples": 10
+        },
+        "initial_time_250ms": {
+          "bootstrap_ci95": [
+            0.34903811760088543,
+            0.41102419752977876
+          ],
+          "mean_distance": 0.3818701099827085,
+          "samples": 10
+        },
+        "packets_17_32": {
+          "bootstrap_ci95": [
+            0.18070087979967303,
+            0.22903724875924497
+          ],
+          "mean_distance": 0.20505986798425124,
+          "samples": 10
+        },
+        "whole": {
+          "bootstrap_ci95": [
+            0.23720663133998351,
+            0.2541315417353066
+          ],
+          "mean_distance": 0.2457579091991414,
+          "samples": 10
+        }
+      },
+      "samples": 10,
+      "startup_protocol": "h3",
+      "whole_ip_bytes_mean": 38028534.3
+    }
+  ],
+  "independent_audit": {
+    "audit_source_sha256": "4c5cda499718727fee1d9fc579482ebd6aa0e148688d0f7d050c4b035a840627",
+    "matrix_sha256": "c3c08e499a6c4be0935578c98352d8e7a89e62eae5ffca7a9d161c198318f80e",
+    "protocols": {
+      "h2": {
+        "all_six_arms_all_five_views_recomputed": true,
+        "audited_input_bundle_sha256": "156c52ac7e916492efb38c4ffca7fde7f17d2faa92bc67ea524ae9bf41131aa5",
+        "audited_input_files": 403,
+        "participants": 80,
+        "raw_ip_bytes": 1623781118,
+        "raw_packets": 1685822
+      },
+      "h3": {
+        "all_six_arms_all_five_views_recomputed": true,
+        "audited_input_bundle_sha256": "d2e39e332c99433c56733bbffce72622ea07af166f08bb16756d6e20e8743c52",
+        "audited_input_files": 403,
+        "participants": 80,
+        "raw_ip_bytes": 1630513384,
+        "raw_packets": 1608898
+      }
+    },
+    "schema": "independent-matched-app-audit-v1",
+    "status": "PASS"
+  },
+  "interpretation": {
+    "cold_markers": "Browser performance-clock navigation-to-application-WS-open and navigation-to-clean-app-close; WebDriver polling wall time is not substituted.",
+    "confidence_intervals": "Descriptive conditional bootstrap intervals, not confirmatory acceptance intervals.",
+    "distance": "Bounded passive-feature excess outside matched Firefox A/B control envelope; lower is closer under this declared metric.",
+    "effective_rate_loss_percent": "100 * (1 - baseline_mean_io_ms / candidate_mean_io_ms); negative means higher effective rate.",
+    "extra_complete_session_traffic_percent": "100 * (candidate_mean_complete_IP_bytes / baseline_mean_complete_IP_bytes - 1).",
+    "time_increase_percent": "100 * (candidate_mean_io_ms / baseline_mean_io_ms - 1); small/wake use mean single-echo I/O latency."
+  },
+  "limitations": [
+    "Ten paired blocks per protocol are below the preregistered thirty-block inference floor; no absolute camouflage or inferential relative-arm verdict is supported.",
+    "Results apply to one fixed active application and the declared symmetric 40-ms RTT / 20-Mbit/s-per-direction link, not arbitrary sites or Internet paths.",
+    "Whole covers startup, all active jobs, the two declared idle periods and teardown; it is not an arbitrary long-lived WS lifetime or a two-second cold crop.",
+    "Timing and traffic are reported separately. All carrier filler, connection establishment and attributable teardown traffic remain in complete-session IP totals.",
+    "One application or carrier WebSocket does not imply one physical connection. Every observed outer flow is included.",
+    "Runtime binary/package hashes and build identities are distinct from the capture checkout revision; no absent native source-to-binary attestation is invented.",
+    "The Caddy executable is pinned by its measured binary hash; no immutable module source-to-binary attestation is included.",
+    "This measurement provides no Windows live-runtime or Android device result."
+  ],
+  "provenance": {
+    "application": {
+      "backend_source_sha256": "76c6ac197ae6ef78c835394b0cb84e85aa771809ede2de16640ca660d46051be",
+      "image_source_sha256": "df8c647263703bd0ab3fd1df6deb02d7442ffb9a43b2916bfb6d47b8716a4efa",
+      "manifest_sha256": "3caeae3d8a8509d1453bcebda06150a63fe39b72c255f8a14ffd838abb1ce525",
+      "root_sha256": "86b355ac709cce4b9165759990d6e3517e0d2facc32784cf7698678d05fc443a",
+      "script_sha256": "4bfe590ff1f3c8688a66c85315acf18ec758d26fb782ceca88923e626a165da3",
+      "stylesheet_source_sha256": "ab7aa7f5a8270bbf452a508366522d47655ce925335fd8d8550761822936e9a9"
+    },
+    "capture_harness_sha256": "4246e2ff33e82de7c3b3f90b763071f16cf866067567759ab40838cf653e61dd",
+    "capture_source_revision": "78965b68277c44fa15c9d070ae8a97b0bd1cf1ba",
+    "firefox": {
+      "archive_bytes": 95290908,
+      "archive_sha512": "b3db575cea04d589a383cbeb8531c2b3a0348250a8a1361f9c81a897850c65facaf9788b8d17226966c5e4eeb31c3da1469a983c9559952bf0117b03916c7bc7",
+      "artifact_url": "https://firefoxci.taskcluster-artifacts.net/L5Q0X7WRRqCc5qenw0iRZQ/0/public/build/target.tar.xz",
+      "build_id": "20260829211045",
+      "executable_sha256": "a33c521a66187cd80ce4eaa3b5472c736dbe7ab1ecb174fe4b4b4c20d535a863",
+      "firefox_bin_sha256": "c171d069d0736a3b74ea54f19225901f03e158823012048eb890fb0cb02972d3",
+      "inventory_members": 47,
+      "inventory_sha256": "5bd99fd878f820dcfadb072b4da150a3fc972134130f633f6d573a49d0882479",
+      "libxul_sha256": "3d79dc2f1d24a58e0b076d221c01b82c5cdc7b3e0821fedd3144f9fd94cb9dd0",
+      "proof_sha256": "4ec9ec046de0d4c14a43656712eaeab4dbbf0bf9e931f34d68364ab11a5aefd0",
+      "task_id": "L5Q0X7WRRqCc5qenw0iRZQ",
+      "task_url": "https://firefox-ci-tc.services.mozilla.com/api/queue/v1/task/L5Q0X7WRRqCc5qenw0iRZQ"
+    },
+    "firefox_git_base": "0b76543aaeeeb2a5748ce2675ee36e7c94cb1125",
+    "firefox_hg_revision": "c64776bf9a03d7baae8c7aaca9e133ce1437f5ed",
+    "frozen_input_inventory_sha256": "a0ff3cc113e22d6bc0e1e0a7f42fb8fcf2e8ca1df6813446890583cfb6d84be3",
+    "frozen_input_members": 87,
+    "independent_audit_sha256": "85a2568f584bb0091978c06db0cf9f20c0b5c6570a0866776183adf00fdae654",
+    "input_matrix_sha256": "c3c08e499a6c4be0935578c98352d8e7a89e62eae5ffca7a9d161c198318f80e",
+    "input_provenance_sha256": "68201337b5901e1877a5e555d300a07839f8eec7f0bd4faa2aa2ff21bb4db799",
+    "native": {
+      "build_id": "20260831171336",
+      "executable_sha256": "cffea2442eea684575ee38c0c5cbf5dcb8192c3050cf5a015510aeeb70a77c09",
+      "inventory_members": 18,
+      "inventory_sha256": "7a22ee7b8b03802a336804ceb746520ba7e97234744dfcce3d40cef4ae633bb1",
+      "launcher_sha256": "b501a0223847b3154c4acfcb8e057b4dd09988129b44329017f9fb775441fad6",
+      "libxul_sha256": "79ef998805abb043302d55247399f5eb073cdfde0fcbb0f76c1097b187af1b8d",
+      "package_manifest_sha256": "90126b21c289896d28f526636acd5406b34b59c98a70b8e8b89f769ddc976e5e"
+    },
+    "public_input_bundle_sha256": "058739b838fbb482bbfc53ae6996b4707ec0cc2b14e50346f9e9b89c154ed641",
+    "report_generator_sha256": "57f974179c889f901b7a487a40ab8c84697674290635d15c49e2170dccac0e78",
+    "server": {
+      "application_backend_sha256": "c1d6b3ae3807c1f5649747feac518f96197113f9ff4109df0430eaa7d41f4dff",
+      "caddy_sha256": "f0c53b46d0c33137d02c02f35d6ed8f4898330a18a45cf9bbf759088ea6798ce"
+    },
+    "source_revision_scope": "Capture checkout identity; executable identities are separately attested by hashes and build IDs."
+  },
+  "purpose": "primary",
+  "schema": "naivefox-hybrid-matched-primary-public-v1",
+  "screening_only": true,
+  "status": "COMPLETE_AUDITED_SCREENING"
+}

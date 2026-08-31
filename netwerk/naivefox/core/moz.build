@@ -4,6 +4,7 @@
 
 SOURCES += [
     "../AutoFallback.cpp",
+    "../CliSignalStop.cpp",
     "../Config.cpp",
     "../GeckoRuntime.cpp",
     "../HeaderPadding.cpp",
@@ -19,6 +20,7 @@ SOURCES += [
     "../NeckoTunnel.cpp",
     "../NoConnectCodec.cpp",
     "../NoConnectTransport.cpp",
+    "../NoConnectWebSocket.cpp",
     "../OuterSessionGate.cpp",
     "../PaddingNegotiation.cpp",
     "../RuntimeLogging.cpp",

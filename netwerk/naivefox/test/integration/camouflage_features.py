@@ -176,7 +176,7 @@ def parse_tcp_option_order(raw):
     return result
 
 
-def extract_handshake(pcap, protocol, server_port, features):
+def extract_handshake(pcap, protocol, server_port, features, flow_filter=None):
     if protocol == "h2":
         decode = ["-d", f"tcp.port=={server_port},tls"]
         client_filter = f"tcp.dstport=={server_port} && tls.handshake.type==1"
@@ -185,6 +185,9 @@ def extract_handshake(pcap, protocol, server_port, features):
         decode = ["-d", f"udp.port=={server_port},quic"]
         client_filter = f"udp.dstport=={server_port} && tls.handshake.type==1"
         server_filter = f"udp.srcport=={server_port} && tls.handshake.type==2"
+    if flow_filter:
+        client_filter = f"({client_filter}) && ({flow_filter})"
+        server_filter = f"({server_filter}) && ({flow_filter})"
     fields = [
         "tls.handshake.length",
         "tls.record.version",
@@ -321,6 +324,8 @@ def packet_events_h2(pcap, server_port):
         for length in split_values(row["tls.record.length"]):
             records.append({
                 "time": event["time"],
+                "frame": event["frame"],
+                "flow": event["flow"],
                 "direction": event["direction"],
                 "length": integer(length),
             })

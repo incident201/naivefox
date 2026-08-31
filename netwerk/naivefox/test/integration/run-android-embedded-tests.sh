@@ -544,3 +544,14 @@ fi
 if [[ $protocol == h3 || $protocol == all ]]; then
   run_protocol h3
 fi
+
+transport_protocol=$protocol
+[[ $transport_protocol != all ]] || transport_protocol=both
+transport_serial=()
+[[ -z ${NAIVEFOX_ANDROID_SERIAL:-} ]] || transport_serial=(--serial "$NAIVEFOX_ANDROID_SERIAL")
+python3 "$INTEGRATION_DIR/run-android-transport-tests.py" \
+  --objdir "$OBJDIR" --package "$package_dir" --caddy "$CADDY_BIN" \
+  --ndk "$NDK_ROOT" --adb "$adb_bin" "${transport_serial[@]}" \
+  --host-alias "${NAIVEFOX_ANDROID_HOST_ALIAS:-10.0.2.2}" \
+  --protocol "$transport_protocol" \
+  --work-dir "${NAIVEFOX_ANDROID_TRANSPORT_WORK_DIR:-$STATE_ROOT}"

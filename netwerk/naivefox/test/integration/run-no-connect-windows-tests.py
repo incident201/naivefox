@@ -199,6 +199,7 @@ class NativeClient:
         self.module = module
         self.process = process
         self.directory = directory
+        self.log_path = directory / "client.log"
 
     def exited_cleanly(self):
         try:
@@ -217,11 +218,46 @@ class NativeClient:
                 self.process.wait(timeout=5)
 
 
+def relay_protocols(protocol, transport):
+    return ("h3", "h2") if protocol == "h3" and transport == "no-connect-hybrid" else (protocol,)
+
+
+def wait_for_relay(bridge, timeout=10):
+    deadline = time.monotonic() + timeout
+    pending = b""
+    with selectors.DefaultSelector() as poll:
+        poll.register(bridge.stdout, selectors.EVENT_READ)
+        while time.monotonic() < deadline:
+            for _, _ in poll.select(min(0.1, max(0, deadline - time.monotonic()))):
+                data = os.read(bridge.stdout.fileno(), 256)
+                if not data:
+                    raise RuntimeError("Windows loopback relay exited before readiness")
+                pending += data
+                if len(pending) > 256 or (b"\n" in pending and pending != b"ready\n"):
+                    raise RuntimeError("Windows loopback relay returned invalid readiness")
+                if pending == b"ready\n":
+                    return
+            if bridge.poll() is not None:
+                raise RuntimeError("Windows loopback relay exited before readiness")
+    raise RuntimeError("Windows loopback relay readiness timed out")
+
+
+def stop_relay(bridge):
+    if bridge.poll() is None:
+        bridge.terminate()
+        try:
+            bridge.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            bridge.kill()
+            bridge.wait(timeout=5)
+
+
 def run_inside(args):
     module = fixture_module()
     subprocess.run(["ip", "link", "set", "lo", "up"], check=True)
-    root = args.objdir / "naivefox-fixture"
-    root.mkdir(exist_ok=True)
+    root = (args.work_dir or args.objdir / "naivefox-fixture").resolve()
+    module.require(root.is_relative_to(args.objdir), "work directory must stay below objdir")
+    root.mkdir(parents=True, exist_ok=True)
     run = Path(tempfile.mkdtemp(prefix="no-connect-windows-", dir=root))
     worker_script = winpath(Path(__file__).resolve())
     logs = []
@@ -276,15 +312,31 @@ def run_inside(args):
     def start_caddy(*arguments):
         process, port = original_start(*arguments)
         protocol = arguments[2]
-        bridge = subprocess.Popen(
-            [sys.executable, str(Path(__file__).resolve()), "--relay",
-             str(args.host_pid), str(os.getpid()), str(port), protocol],
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        if bridge.stdout.readline().strip() != "ready":
-            process.stop()
-            bridge.wait(timeout=5)
-            raise RuntimeError("Windows loopback relay failed to start")
-        relays.append(bridge)
+        current_relays = []
+        original_stop = process.stop
+
+        def stop_caddy():
+            try:
+                original_stop()
+            finally:
+                for bridge in current_relays:
+                    stop_relay(bridge)
+
+        process.stop = stop_caddy
+        try:
+            for carrier_protocol in relay_protocols(protocol, getattr(arguments[0], "transport", "no-connect")):
+                relay_log = (run / f"relay-{port}-{carrier_protocol}.log").open("wb")
+                logs.append(relay_log)
+                bridge = subprocess.Popen(
+                    [sys.executable, str(Path(__file__).resolve()), "--relay",
+                     str(args.host_pid), str(os.getpid()), str(port), carrier_protocol],
+                    stdout=subprocess.PIPE, stderr=relay_log)
+                current_relays.append(bridge)
+                relays.append(bridge)
+                wait_for_relay(bridge)
+        except BaseException:
+            stop_caddy()
+            raise
         return process, port
 
     args.client_factory = client_factory
@@ -296,7 +348,8 @@ def run_inside(args):
         for expected in ("http.handlers.forward_proxy", "http.handlers.naivefox_transport"):
             module.require(expected in modules.splitlines(), "combined Caddy module is missing")
         protocols = ("h2", "h3") if args.protocol == "both" else (args.protocol,)
-        results = [module.run_protocol(args, run, protocol) for protocol in protocols]
+        protocol_runner = module.run_smoke_protocol if args.smoke else module.run_protocol
+        results = [protocol_runner(args, run, protocol) for protocol in protocols]
         module.private_json(run / "result.json",
                             {"status": "PASS", "platform": "windows-x86_64",
                              "native_process": True, "targets": results})
@@ -307,9 +360,7 @@ def run_inside(args):
         return 1
     finally:
         for bridge in relays:
-            if bridge.poll() is None:
-                bridge.terminate()
-                bridge.wait(timeout=10)
+            stop_relay(bridge)
         for log in logs:
             log.close()
 
@@ -326,6 +377,9 @@ def main():
     parser.add_argument("--caddy", required=True, type=Path)
     parser.add_argument("--windows-python", required=True, type=Path)
     parser.add_argument("--protocol", choices=("h2", "h3", "both"), default="both")
+    parser.add_argument("--transport", choices=("no-connect", "no-connect-hybrid"), default="no-connect")
+    parser.add_argument("--smoke", action="store_true")
+    parser.add_argument("--work-dir", type=Path, help="private artifact parent below objdir")
     parser.add_argument("--classic-preamble", choices=("off", "default"), default="off")
     parser.add_argument("--parallel-batches", type=int, choices=range(1, 129), default=1, metavar="1..128")
     parser.add_argument("--host-pid", type=int)

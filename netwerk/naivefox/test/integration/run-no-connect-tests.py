@@ -251,11 +251,15 @@ def start_caddy(args, run, protocol, target_port, user, password):
     mutator = getattr(args, "server_mutator", None)
     if mutator is not None:
         mutator(server)
+    hybrid = getattr(args, "transport", "no-connect") == "no-connect-hybrid"
+    if hybrid:
+        server["protocols"] = ["h1", protocol]
     private_json(run / "caddy.json", config)
     process = Process([str(args.caddy), "run", "--config", str(run / "caddy.json")], run, "caddy", env)
     wait_until(lambda: socket_listeners(port, udp=protocol == "h3"), "Caddy listener did not start", process)
     if protocol == "h3":
-        require(not socket_listeners(port), "strict H3 fixture unexpectedly listens on TCP")
+        require(socket_listeners(port) == hybrid,
+                "H3 fixture TCP availability does not match explicit hybrid policy")
     else:
         require(not socket_listeners(port, udp=True), "strict H2 fixture unexpectedly listens on UDP")
     return process, port
@@ -298,6 +302,9 @@ def start_client(args, run, name, protocol, proxy_port, transport, user, passwor
     else:
         config = copy.deepcopy(baseline)
         config["transport"] = transport
+    if getattr(args, "omit_transport", False):
+        require(transport == "classic", "only the default classic fixture may omit transport")
+        config.pop("transport", None)
     mapped_credentials = getattr(args, "proxy_credentials_by_listener", None)
     if mapped_credentials is not None:
         require(len(mapped_credentials) == len(config["listen"]), "fixture proxy mapping differs from listeners")
@@ -402,11 +409,11 @@ def upload(ports, listener, target_port, length=1024 * 1024, host="localhost"):
         require(result == struct.pack("!Q", length) + payload_digest(length), "upload integrity or half-close failed")
 
 
-def echo_wake(ports, listener, target_port):
+def echo_wake(ports, listener, target_port, idle_seconds=2):
     with open_tunnel(ports, listener, target_port) as sock:
         sock.sendall(b"E" + BLOCK[:4096])
         require(receive(sock, 4096) == BLOCK[:4096], "initial echo failed")
-        time.sleep(2)
+        time.sleep(idle_seconds)
         sock.sendall(BLOCK[256:4352])
         require(receive(sock, 4096) == BLOCK[256:4352], "idle wake echo failed")
         sock.shutdown(socket.SHUT_WR)
@@ -522,7 +529,7 @@ def check_port_policy(args, run, protocol, allowed_target, blocked_target, user,
         caddy, proxy_port = start_caddy(inputs, directory, protocol,
                                         allowed_target.server_address[1], user, password)
         processes.append(caddy)
-        for transport in ("no-connect", "classic"):
+        for transport in (getattr(args, "transport", "no-connect"), "classic"):
             client, ports = start_client(inputs, directory, transport, protocol, proxy_port,
                                          transport, user, password, 4)
             processes.append(client)
@@ -545,7 +552,8 @@ def check_shared_config(args, run, protocol, target_port, user, password):
     inputs = copy.copy(args)
     inputs.client_config_path = directory / "config.json"
     processes = []
-    sequence = ("classic", "no-connect", "classic", "no-connect")
+    selected_transport = getattr(args, "transport", "no-connect")
+    sequence = ("classic", selected_transport, "classic", selected_transport)
     baseline = None
     classic_requests = 0
     try:
@@ -606,7 +614,7 @@ def check_auth_partition(args, run, protocol, target, user, password):
                                         target.server_address[1], user, password)
         processes.append(caddy)
         client, ports = start_client(inputs, directory, "client", protocol, proxy_port,
-                                     "no-connect", user, password, 3)
+                                     getattr(args, "transport", "no-connect"), user, password, 3)
         processes.append(client)
         auth_partition_streams(ports, target.server_address[1])
         client.exited_cleanly()
@@ -621,7 +629,7 @@ def check_auth_partition(args, run, protocol, target, user, password):
             process.stop()
 
 
-def exercise(ports, target_port, label, parallel_batches=1):
+def exercise(ports, target_port, label, parallel_batches=1, idle_seconds=2):
     for listener in ("socks", "http"):
         try:
             download(ports, listener, target_port, slow=True)
@@ -641,7 +649,7 @@ def exercise(ports, target_port, label, parallel_batches=1):
                 except (OSError, RuntimeError) as error:
                     raise RuntimeError(f"{label} parallel batch {batch} transfer {index}: {error}") from error
     for listener in ("socks", "http"):
-        echo_wake(ports, listener, target_port)
+        echo_wake(ports, listener, target_port, idle_seconds if listener == "socks" else 2)
 
 
 def access_requests(run):
@@ -651,7 +659,105 @@ def access_requests(run):
     return [json.loads(line).get("request", {}) for line in path.read_text().splitlines() if line.strip()]
 
 
+def check_smoke_requests(requests, protocol, hybrid, classic=False):
+    expected_protocol = "HTTP/3.0" if protocol == "h3" else "HTTP/2.0"
+    connects = [item for item in requests if item.get("method") == "CONNECT"]
+    require(requests and (len(connects) == 2 if classic else not connects),
+            "smoke request methods did not match the selected transport")
+    websocket = []
+    for item in requests:
+        realtime = item.get("uri", "").split("?", 1)[0] == "/api/realtime"
+        if realtime:
+            websocket.append(item)
+        expected = "HTTP/1.1" if hybrid and not classic and realtime else expected_protocol
+        require(item.get("proto") == expected,
+                "smoke startup, WebSocket or classic CONNECT used the wrong protocol")
+        if not classic:
+            require(not any(name.lower() in {"authorization", "proxy-authorization"}
+                            for name in item.get("headers", {})),
+                    "application smoke exposed Basic credentials in origin headers")
+    require(len(websocket) == (1 if hybrid and not classic else 0),
+            "smoke selected the wrong WebSocket lifecycle")
+
+
+def run_smoke_protocol(args, base, protocol):
+    transport = getattr(args, "transport", "no-connect")
+    hybrid = transport == "no-connect-hybrid"
+    run = base / protocol
+    run.mkdir(mode=0o700)
+    issue_certificates(run)
+    target = TargetServer()
+    user, password = fixture_credentials()
+    processes = []
+    try:
+        caddy, proxy_port = start_caddy(args, run, protocol, target.server_address[1], user, password)
+        processes.append(caddy)
+        candidate, ports = start_client(args, run, "candidate", protocol, proxy_port,
+                                        transport, user, password, 6)
+        processes.append(candidate)
+        download(ports, "socks", target.server_address[1], 65536)
+        if hybrid:
+            wait_until(lambda: "No-connect hybrid websocket ready startup=20" in
+                       candidate.log_path.read_text(errors="replace"),
+                       "hybrid smoke never completed the WebSocket startup milestone", candidate, timeout=60)
+        upload(ports, "socks", target.server_address[1], 65536)
+        download(ports, "http", target.server_address[1], 65536)
+        upload(ports, "http", target.server_address[1], 65536)
+        for listener in ("socks", "http"):
+            echo_wake(ports, listener, target.server_address[1], idle_seconds=0.05)
+        candidate.exited_cleanly()
+        requests = access_requests(run)
+        check_smoke_requests(requests, protocol, hybrid)
+
+        default_args = copy.copy(args)
+        default_args.omit_transport = True
+        default_args.classic_preamble = "default"
+        classic, classic_ports = start_client(default_args, run, "default-classic", protocol,
+                                               proxy_port, "classic", user, password, 2)
+        processes.append(classic)
+        default_config = json.loads((run / "default-classic/config.json").read_text())
+        require("transport" not in default_config, "classic control did not use the absent transport default")
+        if hasattr(classic, "executed_config"):
+            require(classic.executed_config() == default_config, "device executed a different default config")
+        for listener in ("socks", "http"):
+            download(classic_ports, listener, target.server_address[1], 65536)
+        classic.exited_cleanly()
+        check_smoke_requests(access_requests(run)[len(requests):], protocol, hybrid, classic=True)
+        caddy.stop()
+        stats = json.loads((run / "server-stats.json").read_text())
+        require(stats.get("connect") == 2 and stats.get("opens") == 6,
+                "smoke transport/default selections did not open exactly the expected streams")
+        require(not target.failures and target.accepted_connections == 8,
+                "smoke target detected failed, truncated or extra streams")
+        if hybrid:
+            require(stats.get("ws_opened", 0) == 1 and stats.get("ws_messages_in", 0) >= 1 and
+                    stats.get("ws_messages_out", 0) >= 1,
+                    "hybrid smoke did not exchange bidirectional WebSocket cells")
+        else:
+            require(stats.get("ws_opened", 0) == 0, "finite HTTP smoke unexpectedly opened WebSocket")
+        expected_protocol = "HTTP/3.0" if protocol == "h3" else "HTTP/2.0"
+        expected_protocols = {expected_protocol, "HTTP/1.1"} if hybrid else {expected_protocol}
+        require(set(stats["protocols"]) == expected_protocols,
+                "smoke negotiated an unexpected outer protocol")
+        summary = {"protocol": protocol, "transport": transport, "status": "PASS", "smoke": True,
+                   "frontends": ["socks", "http"], "candidate_streams": 6, "default_classic_connects": 2,
+                   "download_bytes": 131072, "upload_bytes": 131072,
+                   "idle_echo_bytes_per_direction": 16384, "idle_seconds": 0.05,
+                   "startup_milestone": 20 if hybrid else None,
+                   "ws_opened": stats.get("ws_opened", 0), "no_connect_outer_connects": 0,
+                   "graceful_exit": True, "default_transport_unchanged": True}
+        private_json(run / "result.json", summary)
+        print(f"PASS {protocol} {transport} smoke: both listeners, bytes, half-close, idle, startup, default classic, shutdown", flush=True)
+        return summary
+    finally:
+        for process in reversed(processes):
+            process.stop()
+        target.close()
+
+
 def run_protocol(args, base, protocol):
+    transport = getattr(args, "transport", "no-connect")
+    hybrid = transport == "no-connect-hybrid"
     run = base / protocol
     run.mkdir(mode=0o700)
     issue_certificates(run)
@@ -670,14 +776,15 @@ def run_protocol(args, base, protocol):
         policy_refusals = 2
         concurrent_connections = 40
         candidate, candidate_ports = start_client(
-            args, run, "no-connect", protocol, proxy_port, "no-connect", user, password,
+            args, run, "no-connect", protocol, proxy_port, transport, user, password,
             ordinary_connections + variety_connections + policy_refusals + concurrent_connections + 1)
         processes.append(candidate)
         classic, classic_ports = start_client(
             args, run, "classic", protocol, proxy_port, "classic", user, password,
             ordinary_connections + variety_connections + policy_refusals)
         processes.append(classic)
-        exercise(candidate_ports, target_port, f"{protocol} no-connect", batches)
+        exercise(candidate_ports, target_port, f"{protocol} {transport}", batches,
+                 getattr(args, "idle_seconds", 2))
         target_variety(candidate_ports, target_port, second_target.server_address[1])
         concurrent_open_streams(candidate_ports, target_port, concurrent_connections)
         print(f"PASS {protocol} no-connect: 40 simultaneously open logical streams", flush=True)
@@ -685,7 +792,7 @@ def run_protocol(args, base, protocol):
         for listener in ("socks", "http"):
             reject_policy(candidate_ports, listener, denied_target.server_address[1], host="127.0.0.2")
         candidate.exited_cleanly()
-        reject_credentials(args, run, protocol, proxy_port, "no-connect", user, password,
+        reject_credentials(args, run, protocol, proxy_port, transport, user, password,
                            target_port, processes)
         requests = access_requests(run)
         require(not any(item.get("method") == "CONNECT" for item in requests),
@@ -711,8 +818,16 @@ def run_protocol(args, base, protocol):
         require(stats["opens"] >= ordinary_connections + variety_connections + concurrent_connections,
                 "no-connect did not open expected logical streams")
         require(stats["rejected"] >= 1, "bad Basic credentials were not rejected")
-        require(stats["idle_started"] >= 1, "no-connect idle state was not exercised")
-        require(stats["idle_completed"] >= 1, "no-connect idle poll never completed")
+        if hybrid:
+            require(stats.get("ws_opened", 0) >= 1, "hybrid never established WebSocket")
+            require(stats.get("ws_messages_in", 0) >= 1 and stats.get("ws_messages_out", 0) >= 1,
+                    "hybrid did not exchange bidirectional WebSocket cells")
+            if getattr(args, "idle_seconds", 2) >= 27:
+                require(stats.get("idle_heartbeats", 0) >= 1,
+                        "hybrid long idle did not exercise application heartbeat")
+        else:
+            require(stats["idle_started"] >= 1, "no-connect idle state was not exercised")
+            require(stats["idle_completed"] >= 1, "no-connect idle poll never completed")
         peers = stats.get("peers", [])
         require(sum(peer.get("reset", 0) for peer in peers) >= 1,
                 "abrupt local cancellation did not reset its logical stream")
@@ -721,13 +836,16 @@ def run_protocol(args, base, protocol):
                 "concurrent streams did not use additional carrier sessions")
         require(max(peaks, default=0) <= 32, "one carrier exceeded its stream bound")
         expected_protocol = "HTTP/3.0" if protocol == "h3" else "HTTP/2.0"
-        require(set(stats["protocols"]) == {expected_protocol}, "carrier negotiated an unexpected outer protocol")
+        expected_protocols = {expected_protocol, "HTTP/1.1"} if hybrid else {expected_protocol}
+        require(set(stats["protocols"]) == expected_protocols, "carrier negotiated an unexpected outer protocol")
         port_policy = check_port_policy(args, run, protocol, target, second_target, user, password)
         shared_config = check_shared_config(args, run, protocol, target_port, user, password)
         auth_partition = check_auth_partition(args, run, protocol, target, user, password)
         require(not target.failures and not second_target.failures,
                 "target detected a truncated or failed data stream")
-        summary = {"protocol": protocol, "same_caddy_process": True, "strict_udp_only": protocol == "h3",
+        summary = {"protocol": protocol, "transport": transport, "same_caddy_process": True,
+                   "strict_udp_only": protocol == "h3" and not hybrid,
+                   "websocket_tcp": hybrid, "ws_opened": stats.get("ws_opened", 0),
                    "no_connect_outer_connects": 0, "classic_connects": stats["connect"],
                    "classic_preamble": getattr(args, "classic_preamble", "off"), "parallel_batches": batches,
                    "logical_opens": stats["opens"], "idle_started": stats["idle_started"],
@@ -757,21 +875,27 @@ def main():
     parser.add_argument("--caddy", type=Path, required=True)
     parser.add_argument("--runtime", type=Path)
     parser.add_argument("--protocol", choices=("h2", "h3", "both"), default="both")
+    parser.add_argument("--transport", choices=("no-connect", "no-connect-hybrid"), default="no-connect")
+    parser.add_argument("--smoke", action="store_true", help="bounded basic byte/lifecycle gate without the full concurrency matrix")
+    parser.add_argument("--work-dir", type=Path, help="private artifact parent below objdir")
+    parser.add_argument("--idle-seconds", type=int, choices=range(2, 31), default=2, metavar="2..30")
     parser.add_argument("--classic-preamble", choices=("off", "default"), default="off")
     parser.add_argument("--parallel-batches", type=int, choices=range(1, 129), default=1, metavar="1..128")
     args = parser.parse_args()
     args.objdir = args.objdir.resolve(strict=True)
     args.caddy = args.caddy.resolve(strict=True)
     args.runtime = (args.runtime or args.objdir / "dist/bin/naivefox").resolve(strict=True)
-    root = args.objdir / "naivefox-fixture"
-    root.mkdir(exist_ok=True)
+    root = (args.work_dir or args.objdir / "naivefox-fixture").resolve()
+    require(root.is_relative_to(args.objdir), "work directory must stay below objdir")
+    root.mkdir(parents=True, exist_ok=True)
     previous_umask = os.umask(0o077)
     run = Path(tempfile.mkdtemp(prefix="no-connect-", dir=root))
     try:
         modules = subprocess.check_output([str(args.caddy), "list-modules"], text=True)
         for module in ("http.handlers.forward_proxy", "http.handlers.naivefox_transport"):
             require(module in modules.splitlines(), "combined Caddy module is missing")
-        results = [run_protocol(args, run, protocol) for protocol in
+        protocol_runner = run_smoke_protocol if args.smoke else run_protocol
+        results = [protocol_runner(args, run, protocol) for protocol in
                    (("h2", "h3") if args.protocol == "both" else (args.protocol,))]
         private_json(run / "result.json", {"status": "PASS", "targets": results})
         print(f"Private fixture and sanitized result: {run}")

@@ -7,6 +7,7 @@
 #include <cstring>
 #include <mutex>
 
+#include "CliSignalStop.h"
 #include "Config.h"
 #include "GeckoRuntime.h"
 #include "HttpClient.h"
@@ -46,7 +47,8 @@ class AutoLogging final {
 
 void PrintUsage(const char* aProgram) {
   std::printf(
-      "Usage: %s [CONFIG_PATH] [--transport classic|no-connect]\n"
+      "Usage: %s [CONFIG_PATH] [--transport "
+      "classic|no-connect|no-connect-hybrid]\n"
       "       %s --version\n"
       "       %s --profile PATH --runtime-smoke\n"
       "       %s --profile PATH --activation-process-smoke\n"
@@ -89,17 +91,17 @@ bool ParseConfigArguments(
     const char* value = argument + 12;
     if (std::strcmp(argument, "--transport") == 0) {
       if (++index == aArgc) {
-        aError.AssignLiteral("--transport requires classic or no-connect");
+        aError.AssignLiteral(
+            "--transport requires classic or no-connect or no-connect-hybrid");
         return false;
       }
       value = aArgv[index];
     }
-    if (std::strcmp(value, "classic") == 0) {
-      aTransport = mozilla::Some(mozilla::naivefox::TransportMode::Classic);
-    } else if (std::strcmp(value, "no-connect") == 0) {
-      aTransport = mozilla::Some(mozilla::naivefox::TransportMode::NoConnect);
-    } else {
-      aError.AssignLiteral("--transport requires classic or no-connect");
+    aTransport =
+        mozilla::naivefox::ParseTransportMode(nsDependentCString(value));
+    if (!aTransport) {
+      aError.AssignLiteral(
+          "--transport requires classic or no-connect or no-connect-hybrid");
       return false;
     }
   }
@@ -267,10 +269,20 @@ extern "C" NAIVEFOX_EXPORT void NaiveFoxRequestStop(void) {
 
 extern "C" NAIVEFOX_EXPORT int NaiveFoxRunEmbedded(const char* aConfigJson,
                                                    const char* aProfilePath,
-                                                   const char* aRuntimePath) {
+                                                   const char* aRuntimePath,
+                                                   const char* aTransport) {
   if (!aConfigJson || !*aConfigJson || !aProfilePath || !*aProfilePath ||
       !aRuntimePath || !*aRuntimePath) {
     return NAIVEFOX_STATUS_INVALID_ARGUMENT;
+  }
+
+  mozilla::Maybe<mozilla::naivefox::TransportMode> transportOverride;
+  if (aTransport) {
+    transportOverride =
+        mozilla::naivefox::ParseTransportMode(nsDependentCString(aTransport));
+    if (!transportOverride) {
+      return NAIVEFOX_STATUS_INVALID_ARGUMENT;
+    }
   }
 
   RefPtr<mozilla::naivefox::LocalProxyServerControl> control;
@@ -280,8 +292,8 @@ extern "C" NAIVEFOX_EXPORT int NaiveFoxRunEmbedded(const char* aConfigJson,
 
   mozilla::naivefox::Config config;
   nsAutoCString error;
-  nsresult rv = mozilla::naivefox::ParseConfig(nsDependentCString(aConfigJson),
-                                               config, error);
+  nsresult rv = mozilla::naivefox::ParseConfig(
+      nsDependentCString(aConfigJson), config, error, transportOverride);
   if (NS_SUCCEEDED(rv)) {
     rv = mozilla::naivefox::GeckoRuntime::ValidateEmbeddedLocations(
         nsDependentCString(aProfilePath), nsDependentCString(aRuntimePath));
@@ -377,6 +389,17 @@ extern "C" NAIVEFOX_EXPORT int NaiveFoxMain(int aArgc, char* aArgv[]) {
     }
 
     const auto runtimeProtocol = RuntimeProtocol(config);
+    RefPtr<mozilla::naivefox::LocalProxyServerControl> control;
+#if defined(XP_LINUX) && !defined(ANDROID)
+    control = new mozilla::naivefox::LocalProxyServerControl();
+    mozilla::naivefox::CliSignalStop signalStop;
+    rv = signalStop.Start(control);
+    if (NS_FAILED(rv)) {
+      std::fprintf(stderr, "NaiveFox signal monitor failed: 0x%08x\n",
+                   static_cast<unsigned>(rv));
+      return 1;
+    }
+#endif
 
     mozilla::naivefox::GeckoRuntime runtime;
     rv = runtime.Initialize(
@@ -387,7 +410,9 @@ extern "C" NAIVEFOX_EXPORT int NaiveFoxMain(int aArgc, char* aArgv[]) {
     if (NS_SUCCEEDED(rv)) {
       mozilla::naivefox::RuntimeLogEvent(
           "NaiveFox started transport=%s listeners=%u upstreams=%u\n",
-          config.mTransport == mozilla::naivefox::TransportMode::NoConnect
+          config.mTransport == mozilla::naivefox::TransportMode::NoConnectHybrid
+              ? "no-connect-hybrid"
+          : config.mTransport == mozilla::naivefox::TransportMode::NoConnect
               ? "no-connect"
               : "classic",
           static_cast<unsigned>(config.mListeners.Length()),
@@ -401,8 +426,13 @@ extern "C" NAIVEFOX_EXPORT int NaiveFoxMain(int aArgc, char* aArgv[]) {
       }
       auto tunnelConfigs = MakeTunnelConfigs(config);
       rv = mozilla::naivefox::RunLocalProxyServer(
-          config.mListeners, tunnelConfigs, config.mMaxConnections);
+          config.mListeners, tunnelConfigs, config.mMaxConnections, control);
     }
+#if defined(XP_LINUX) && !defined(ANDROID)
+    if (signalStop.Failed()) {
+      rv = NS_ERROR_FAILURE;
+    }
+#endif
     if (NS_FAILED(rv)) {
       std::fprintf(stderr, "NaiveFox failed: 0x%08x\n",
                    static_cast<unsigned>(rv));

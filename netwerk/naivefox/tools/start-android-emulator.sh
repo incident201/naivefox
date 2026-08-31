@@ -76,6 +76,50 @@ adb=${NAIVEFOX_ADB:-$(command -v adb || true)}
   exit 1
 }
 
+wait_for_android_boot() {
+  local owned_pid=${1:-}
+  local deadline=$((SECONDS + boot_timeout))
+  local consecutive_clocks=0
+  while (( SECONDS < deadline )); do
+    if [[ -n $owned_pid ]] && ! kill -0 "$owned_pid" 2>/dev/null; then
+      printf 'Android emulator exited before boot completion\n' >&2
+      return 1
+    fi
+    local boot_completed= legacy_boot_completed= abi=
+    if timeout 5 "$adb" -s "$serial" get-state >/dev/null 2>&1; then
+      boot_completed=$(timeout 5 "$adb" -s "$serial" shell getprop sys.boot_completed 2>/dev/null |
+        tr -d '\r') || boot_completed=
+      legacy_boot_completed=$(timeout 5 "$adb" -s "$serial" shell getprop dev.bootcomplete 2>/dev/null |
+        tr -d '\r') || legacy_boot_completed=
+      abi=$(timeout 5 "$adb" -s "$serial" shell getprop ro.product.cpu.abi 2>/dev/null |
+        tr -d '\r') || abi=
+    fi
+    if [[ $abi == arm64-v8a && ( $boot_completed == 1 || $legacy_boot_completed == 1 ) ]]; then
+      local host_before guest_time host_after
+      host_before=$(date +%s)
+      guest_time=$(timeout 5 "$adb" -s "$serial" shell date +%s 2>/dev/null |
+        tr -d '\r') || guest_time=
+      host_after=$(date +%s)
+      if [[ $guest_time =~ ^[1-9][0-9]{0,11}$ ]] &&
+         (( host_after >= host_before && guest_time >= host_before - 1 &&
+            guest_time <= host_after + 1 )); then
+        consecutive_clocks=$((consecutive_clocks + 1))
+        if (( consecutive_clocks >= 2 )); then
+          return 0
+        fi
+      else
+        consecutive_clocks=0
+      fi
+    else
+      consecutive_clocks=0
+    fi
+    sleep 1
+  done
+  printf 'Android boot and wall-clock readiness did not complete within %ss\n' \
+    "$boot_timeout" >&2
+  return 1
+}
+
 managed_root=${XDG_DATA_HOME:-$HOME/.local/share}/naivefox
 sdk_root=${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}
 if [[ -z $sdk_root && $(uname -s) == Linux &&
@@ -92,8 +136,11 @@ fi
 if timeout 5 "$adb" -s "$serial" get-state >/dev/null 2>&1 &&
    [[ $(timeout 5 "$adb" -s "$serial" shell getprop ro.product.cpu.abi 2>/dev/null |
        tr -d '\r') == arm64-v8a ]]; then
-  printf 'Android ARM64 emulator already online: %s\n' "$serial"
-  exit 0
+  if wait_for_android_boot; then
+    printf 'Android ARM64 emulator already online with a ready clock: %s\n' "$serial"
+    exit 0
+  fi
+  exit 1
 fi
 
 if [[ -z $emulator ]]; then
@@ -154,33 +201,11 @@ nohup "${emulator_environment[@]}" "$emulator" \
   >"$log_file" 2>&1 &
 emulator_pid=$!
 
-deadline=$((SECONDS + boot_timeout))
-while (( SECONDS < deadline )); do
-  if ! kill -0 "$emulator_pid" 2>/dev/null; then
-    printf 'Android emulator exited before boot: %s\n' "$log_file" >&2
-    tail -40 "$log_file" >&2 || true
-    exit 1
-  fi
-  boot_completed=
-  legacy_boot_completed=
-  if timeout 5 "$adb" -s "$serial" get-state >/dev/null 2>&1; then
-    boot_completed=$(timeout 5 "$adb" -s "$serial" shell getprop sys.boot_completed 2>/dev/null |
-      tr -d '\r') || boot_completed=
-    legacy_boot_completed=$(timeout 5 "$adb" -s "$serial" shell getprop dev.bootcomplete 2>/dev/null |
-      tr -d '\r') || legacy_boot_completed=
-  fi
-  if timeout 5 "$adb" -s "$serial" get-state >/dev/null 2>&1 &&
-     [[ $(timeout 5 "$adb" -s "$serial" shell getprop ro.product.cpu.abi 2>/dev/null |
-       tr -d '\r') == arm64-v8a ]] &&
-     [[ $boot_completed == 1 || $legacy_boot_completed == 1 ]]; then
-    printf 'Android ARM64 emulator ready: %s\n' "$serial"
-    exit 0
-  fi
-  sleep 1
-done
+if wait_for_android_boot "$emulator_pid"; then
+  printf 'Android ARM64 emulator boot and clock ready: %s\n' "$serial"
+  exit 0
+fi
 
-printf 'Android emulator did not boot within %ss: %s\n' \
-  "$boot_timeout" "$log_file" >&2
 kill -TERM "$emulator_pid" 2>/dev/null || true
 tail -40 "$log_file" >&2 || true
 exit 1

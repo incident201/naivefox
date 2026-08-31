@@ -1,6 +1,7 @@
 import importlib.util
 import json
 from pathlib import Path
+import shlex
 import subprocess
 import tempfile
 from types import SimpleNamespace
@@ -159,6 +160,64 @@ class AndroidFixtureTests(unittest.TestCase):
             self.assertLess(events.index("capture-startup"), events.index("stop"))
             self.assertLess(events.index("capture-startup"), events.index("remote-cleanup"))
             self.assertFalse(fixture.ports)
+
+    def test_embedded_selector_preserves_null_empty_and_frozen_device_config(self):
+        with tempfile.TemporaryDirectory() as directory:
+            work = Path(directory)
+            fixture = self.fixture(work)
+            launches = []
+
+            class ReadyProcess:
+                def __init__(self, argv, directory, name, env):
+                    launches.append(shlex.split(argv[-1].split("exec ", 1)[1]))
+                    self.process = SimpleNamespace(poll=lambda: 0)
+                    self.log_path = directory / "client.log"
+                    self.log_path.write_text("")
+
+                def stop(self):
+                    pass
+
+            ports = {"socks": 41000, "http": 41001}
+            config_path = work / "shared.json"
+            with mock.patch.object(android.suite, "Process", ReadyProcess), \
+                 mock.patch.object(android.suite, "wait_until"), \
+                 mock.patch.object(fixture, "call") as call:
+                original = None
+                for override in (None, "", "classic", "no-connect", "no-connect-hybrid"):
+                    args = SimpleNamespace(listener_ports=ports, client_config_path=config_path,
+                                           preserve_client_config=True, transport_override=override,
+                                           rejected_transports=("", "unknown"))
+                    process, _ = fixture.start(args, work, {"listen": []}, {}, dict(ports))
+                    process.stop()
+                    if original is None:
+                        original = config_path.read_bytes()
+                    self.assertEqual(config_path.read_bytes(), original)
+                    argv = launches[-1]
+                    if override is None:
+                        self.assertNotIn("--transport", argv)
+                    else:
+                        self.assertEqual(argv[argv.index("--transport") + 1], override)
+                    self.assertEqual(argv[-4:], ["--reject-first", "", "--reject-first", "unknown"])
+                pushes = [item.args for item in call.call_args_list if item.args[0] == "push"]
+                self.assertEqual(len(pushes), 1)
+                self.assertEqual(pushes[0][1], str(config_path))
+
+    def test_frozen_config_drift_is_rejected_before_launch(self):
+        with tempfile.TemporaryDirectory() as directory:
+            work = Path(directory)
+            fixture = self.fixture(work)
+            path = work / "shared.json"
+            original = b'{"listen": [], "transport": "no-connect"}\n'
+            path.write_bytes(original)
+            args = SimpleNamespace(client_config_path=path, preserve_client_config=True,
+                                   listener_ports={"socks": 41000, "http": 41001})
+            with mock.patch.object(fixture, "call"), \
+                 mock.patch.object(android.suite, "Process") as process:
+                with self.assertRaisesRegex(RuntimeError, "shared configuration"):
+                    fixture.start(args, work, {"listen": [], "transport": "classic"}, {},
+                                  dict(args.listener_ports))
+            process.assert_not_called()
+            self.assertEqual(path.read_bytes(), original)
 
 
 if __name__ == "__main__":

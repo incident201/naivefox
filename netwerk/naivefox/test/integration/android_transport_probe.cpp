@@ -202,6 +202,10 @@ bool Parse(int aCount, char** aArguments, Options& aOptions) {
     if (!aOptions.socks || aOptions.length <= 32 || aOptions.length > 128) {
       return false;
     }
+  } else if (aOptions.operation == Operation::Idle) {
+    if (aOptions.length > 30000) {
+      return false;
+    }
   } else if (aOptions.operation != Operation::Download &&
              aOptions.operation != Operation::Upload && aOptions.length != 0) {
     return false;
@@ -557,7 +561,7 @@ bool Upload(int aSocket, const Options& aOptions) {
          received == aOptions.uploadAck && EndOfStream(aSocket);
 }
 
-bool Idle(int aSocket) {
+bool Idle(int aSocket, uint32_t aMilliseconds) {
   const uint8_t kind = 'E';
   if (!WriteAll(aSocket, &kind, 1)) {
     return false;
@@ -565,7 +569,7 @@ bool Idle(int aSocket) {
   std::array<uint8_t, 4096> received{};
   for (unsigned round = 0; round < 2; ++round) {
     if (round) {
-      usleep(2000000);
+      usleep(aMilliseconds * 1000);
     }
     if (!SendPattern(aSocket, received.size()) ||
         !ReadAll(aSocket, received.data(), received.size())) {
@@ -657,7 +661,7 @@ int main(int argc, char** argv) {
         success = Upload(local.Get(), options);
         break;
       case Operation::Idle:
-        success = Idle(local.Get());
+        success = Idle(local.Get(), options.length ? options.length : 2000);
         break;
       case Operation::Reset:
         success = Reset(local.Get());

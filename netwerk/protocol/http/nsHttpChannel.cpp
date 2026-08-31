@@ -2554,6 +2554,11 @@ nsresult nsHttpChannel::InitTransaction() {
 
 #ifdef MOZ_NAIVEFOX
   if (nsHttpTransaction* transaction = mTransaction->AsHttpTransaction()) {
+    if (mUpgradeProtocol.EqualsLiteral("websocket") && mConnectionInfo &&
+        !mConnectionInfo->GetRoutedHost().IsEmpty() &&
+        mLoadInfo->TriggeringPrincipal()->IsSystemPrincipal()) {
+      transaction->RetainNaiveFoxRoutedHost();
+    }
     transaction->SetWaitForH3HandshakeConfirmation(
         mProxyPreambleWaitForHandshakeConfirmation);
     transaction->SetH3HandshakeDwellMs(mProxyPreambleHandshakeDwellMs);
@@ -8840,6 +8845,15 @@ nsresult nsHttpChannel::BeginConnect() {
     if (mProxyInfo) {
       return false;
     }
+
+#ifdef MOZ_NAIVEFOX
+    // An explicit native WSS address mapping is not an Alt-Svc alternative.
+    if (mUpgradeProtocol.EqualsLiteral("websocket") && mConnectionInfo &&
+        !mConnectionInfo->GetRoutedHost().IsEmpty() &&
+        mLoadInfo->TriggeringPrincipal()->IsSystemPrincipal()) {
+      return false;
+    }
+#endif
 
     // WebSocket and WebTransport upgrades share the same rollout pref.
     if ((mUpgradeProtocolCallback || mWebTransportSessionEventListener) &&

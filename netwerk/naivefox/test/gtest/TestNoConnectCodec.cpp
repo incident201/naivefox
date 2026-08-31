@@ -101,7 +101,7 @@ TEST_F(NaiveFoxNoConnectCodec, EmptyMaximumAndFrameCountBoundaries) {
 
 TEST_F(NaiveFoxNoConnectCodec, AllKindsAndPadding) {
   std::vector<Frame> frames;
-  for (uint8_t kind = 1; kind <= 7; ++kind) {
+  for (uint8_t kind = 1; kind <= 8; ++kind) {
     frames.push_back({static_cast<Kind>(kind), 0, 0, {}});
   }
   std::vector<uint8_t> encoded;
@@ -109,13 +109,24 @@ TEST_F(NaiveFoxNoConnectCodec, AllKindsAndPadding) {
   std::vector<Frame> decoded;
   ASSERT_TRUE(Decode(11, 512, encoded, decoded));
   ExpectFrames(decoded, frames);
-  std::fill(encoded.begin() + kCellHeader + 7 * kFrameHeader, encoded.end(),
+  std::fill(encoded.begin() + kCellHeader + 8 * kFrameHeader, encoded.end(),
             0xff);
   ASSERT_TRUE(Decode(11, 512, encoded, decoded));
   ExpectFrames(decoded, frames);
-  for (uint8_t kind : {uint8_t{0}, uint8_t{8}, uint8_t{255}}) {
+  for (uint8_t kind : {uint8_t{0}, uint8_t{9}, uint8_t{255}}) {
     EXPECT_FALSE(Encode(0, 32, {{static_cast<Kind>(kind), 1, 0, {}}}, encoded));
   }
+}
+
+TEST_F(NaiveFoxNoConnectCodec, WebSocketAckIsNotAStreamMessage) {
+  std::vector<uint8_t> cell;
+  ASSERT_TRUE(Encode(20, 512, {{Kind::Ack, 0, 23, {}}}, cell));
+  std::vector<Frame> frames;
+  ASSERT_TRUE(Decode(20, 512, cell, frames));
+  ASSERT_EQ(frames.size(), 1U);
+  EXPECT_EQ(frames[0].sequence, 23U);
+  StreamState state(1);
+  EXPECT_FALSE(state.Receive(frames[0]));
 }
 
 TEST_F(NaiveFoxNoConnectCodec, EmptyAndPartFilledProfileCapacities) {
@@ -167,8 +178,8 @@ TEST_F(NaiveFoxNoConnectCodec, CorruptHeadersNeverPublishPartialFrames) {
   const std::vector<Frame> sentinel{{Kind::Reset, 99, 0, {}}};
   const std::vector<std::pair<size_t, uint8_t>> mutations{
       {0, 0},  {7, 8},  {8, 1},  {11, 15},  {11, 52}, {12, 17},
-      {13, 0}, {13, 3}, {14, 1}, {15, 1},   {16, 0},  {16, 8},
-      {17, 1}, {18, 1}, {19, 1}, {28, 255}, {31, 4},  {35, 8},
+      {13, 0}, {13, 3}, {14, 1}, {15, 1},   {16, 0},  {16, 9},
+      {17, 1}, {18, 1}, {19, 1}, {28, 255}, {31, 4},  {35, 9},
       {36, 1}, {37, 1}, {38, 1}, {47, 255}, {50, 1}};
   for (const auto& [offset, value] : mutations) {
     auto bad = encoded;

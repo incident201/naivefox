@@ -6,6 +6,12 @@ an application protocol carried by ordinary HTTPS GET/POST requests. The same
 lean NaiveFox executable supports both; `https://` and `quic://` independently
 select strict H2 and H3.
 
+`no-connect-hybrid` is a separate experimental opt-in. Its finite startup uses
+the selected H2 or H3 route, then a native Firefox WebSocket over TLS/TCP takes
+over the same NFC1 session. This is explicitly a mixed protocol policy for an
+H3 startup, not WebSocket over QUIC or an implicit fallback. The original
+`no-connect` mode retains its strict H2/H3 finite-exchange behavior.
+
 The server implementation is maintained in the separate
 [naivefox-transport repository](https://github.com/incident201/naivefox-transport).
 Its registered Caddy module is `http.handlers.naivefox_transport`.
@@ -26,6 +32,12 @@ back with `./naivefox --transport=classic /absolute/path/to/config.json`.
 The option may precede or follow the path; omission of the path reads
 `./config.json`. JSON `"transport":"no-connect"` selects the same mode.
 Credentials never select a transport implicitly.
+
+Embedded hosts pass the same names as the fourth `NaiveFoxRunEmbedded`
+argument. `NULL` preserves JSON/default selection; an explicit name overrides
+it without changing the private JSON bytes. Empty or unknown names fail before
+Gecko initialization. See [the embedded API](README.md#android-embedded-runtime)
+for the required caller rebuild and the one-runtime-per-process contract.
 
 Both modes authenticate using the same percent-decoded username and password
 from `proxy`. No-connect carries their Basic authentication value inside a
@@ -112,6 +124,60 @@ or indistinguishability guarantee.
 Session resumption, transparent reconnect/replay and automatic credential rotation
 are outside the current contract. Normal application retry after a reported
 connection failure remains the local client's responsibility.
+
+## Experimental hybrid lifecycle
+
+Select JSON `"transport":"no-connect-hybrid"` or
+`--transport no-connect-hybrid`. The matching server must advertise
+`X-App-Realtime: websocket-v1`; older servers fail before authentication or
+target opening. The existing proxy credentials and shared destination policy
+remain authoritative. No additional secret, target allowlist, or origin HTTP
+Authorization header is introduced.
+
+The milestone is successful root completion, completion of all six assets,
+then completion and validation of all 20 startup POST/GET pairs. There is no
+transition timer or packet-count predicate. Proxy data may occupy the existing
+startup cells. Only after that complete graph does the client open
+`/api/realtime` with subprotocol `nfc1.hybrid.v1`. HTTP carrier exchanges cannot
+resume after the switch, and a failed WebSocket terminates its logical streams
+without reconnect or replay. Additional local activity reuses the open socket.
+
+The WebSocket uses Firefox's existing native implementation, including TLS,
+handshake validation, masking, fragmentation, control frames and shutdown. The
+current Firefox source does not support WebSocket over HTTP/3. The hybrid
+therefore explicitly opens an HTTP/1.1 WSS connection to the same authority
+after either H2 or H3 startup. The server must permit TCP/TLS on that endpoint;
+a UDP-only server cannot serve this mode. Capture metrics must include both
+the startup connection and WSS, including the second TLS handshake.
+
+NFC1 cell and stream sequences continue across the transition. Each direction
+uses only 512-byte control/idle, 64-KiB active, and 256-KiB bulk messages. Useful
+frames displace cryptographic filler. An active message uses 64 KiB, or
+256 KiB when at least 128 KiB is queued. A 2-ms application scheduling turn
+coalesces partial payloads and new OPENs. A full 256-KiB queue or pure stream
+control proceeds on the next event turn without that delay; newly ready
+capacity can replace a pending partial-payload timer. The startup transition
+does not depend on these timers.
+Idle application heartbeats occur every 25
+seconds. Client queueing is limited to one unacknowledged native WebSocket
+message, in addition to the existing per-stream buffers and 512-KiB credits.
+Native receive dispatch is bounded by 32 callbacks and 2 MiB total payload;
+the peer-driven PONG queue is capped at 32. Overflow fails the carrier.
+Unsolicited WebSocket compression is rejected before data processing starts.
+A missing server message for 75 seconds closes the carrier. Hybrid local
+upload buffering is bounded at 256 KiB per stream so bulk messages can fill
+without growing the 512-KiB credit window.
+
+The WS-only NFC1 `ACK` frame has kind 8, stream zero, empty payload and a
+sequence equal to the last fully processed uplink cell. It is cumulative and
+confirms local FIN retirement; socket-write acknowledgement alone does not.
+Future, decreasing, malformed or HTTP-carried ACKs fail closed. Delivery-based
+per-stream CREDIT remains unchanged, and empty heartbeats do not cause ACK
+loops. A carrier still serves at most 32 concurrent logical streams.
+
+The ordinary anonymous server SPA can exercise the same realtime lifecycle
+without proxy credentials, but cannot open targets or send logical-stream
+frames. This is a browser control, not an authentication bypass.
 
 ## Verification and evidence
 

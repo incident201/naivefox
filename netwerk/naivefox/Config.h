@@ -17,7 +17,7 @@
 namespace mozilla::naivefox {
 
 enum class ListenerType : uint8_t { Socks5, HttpConnect };
-enum class TransportMode : uint8_t { Classic, NoConnect };
+enum class TransportMode : uint8_t { Classic, NoConnect, NoConnectHybrid };
 
 struct ListenerConfig final {
   ListenerType mType = ListenerType::Socks5;
@@ -255,6 +255,7 @@ class ProfileDirectory final {
   bool mTemporary = false;
 };
 
+Maybe<TransportMode> ParseTransportMode(const nsACString& aValue);
 nsresult ParseConfig(
     const nsACString& aJson, Config& aConfig, nsACString& aError,
     const Maybe<TransportMode>& aTransportOverride = Nothing());

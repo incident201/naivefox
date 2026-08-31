@@ -177,7 +177,7 @@ def main():
         check("help documents transport", ["--help"], base, "--transport classic|no-connect", 0)
 
         shared = {**base, "proxy": "https://switch-user:switch-password@proxy.invalid"}
-        for json_mode in (None, "classic", "no-connect"):
+        for json_mode in (None, "classic", "no-connect", "no-connect-hybrid"):
             config = dict(shared)
             if json_mode:
                 config["transport"] = json_mode
@@ -191,12 +191,20 @@ def main():
                 check(f"no-connect precedence {json_mode} {arguments}", arguments, config, ready)
         native = {**shared, "transport": "no-connect"}
         check("JSON no-connect uses proxy credentials", ["selected.json"], native, ready)
+        hybrid = {**shared, "transport": "no-connect-hybrid"}
+        check("JSON hybrid uses proxy credentials", ["selected.json"], hybrid, ready)
+        for arguments in (["--transport", "no-connect-hybrid"],
+                          ["selected.json", "--transport=no-connect-hybrid"],
+                          ["--transport=no-connect-hybrid", "selected.json"]):
+            check("hybrid CLI precedence", arguments, native, ready)
+        check("hybrid overridden by classic", ["--transport=classic"], hybrid, ready)
+        check("hybrid overridden by finite HTTP", ["--transport=no-connect"], hybrid, ready)
         check("same credentials classic override", ["--transport=classic", "selected.json"], native, ready)
         check("default classic shared credentials", [], shared, ready)
         check("explicit classic shared credentials", [], {**shared, "transport": "classic"}, ready)
         for proxy in ("https://proxy.invalid", "https://user:@proxy.invalid",
                       "https://:password@proxy.invalid", "https://:@proxy.invalid"):
-            for mode in ("classic", "no-connect"):
+            for mode in ("classic", "no-connect", "no-connect-hybrid"):
                 check(f"empty credential parsing {mode}", [f"--transport={mode}"],
                       {**base, "proxy": proxy}, ready)
         classic_options = {
@@ -206,6 +214,7 @@ def main():
             "diagnostic-first-socks-tunnel-urgent-start": True,
         }
         check("no-connect ignores valid classic options", ["--transport=no-connect"], classic_options, ready)
+        check("hybrid ignores valid classic options", ["--transport=no-connect-hybrid"], classic_options, ready)
         check("classic keeps classic options", ["--transport=classic"], classic_options, ready)
         check("inactive preamble still has strict syntax", ["--transport=no-connect"],
               {**shared, "preamble": True}, "preamble")
@@ -214,7 +223,7 @@ def main():
         check("override does not hide invalid JSON transport", ["--transport=classic"],
               {**base, "transport": "invalid"}, "transport must be classic or no-connect")
         for value in (secret, None, False, 42, {}):
-            for mode in ("classic", "no-connect"):
+            for mode in ("classic", "no-connect", "no-connect-hybrid"):
                 check(f"removed key migration {mode}", [f"--transport={mode}"],
                       {**shared, "no-connect-key": value}, "no-connect-key is no longer supported")
         for field in ("username", "password", "no-connect-user", "no-connect-password"):

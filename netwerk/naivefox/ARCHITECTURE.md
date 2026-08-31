@@ -146,7 +146,8 @@ H3 raw tunnels preserve byte-stream behavior without copying H2 internals:
 
 ## Transport and protocol selection
 
-`transport` chooses `classic` or `no-connect`; omission selects `classic`.
+`transport` chooses `classic`, `no-connect`, or experimental
+`no-connect-hybrid`; omission selects `classic`.
 The `proxy` URI independently selects strict H2 or H3. Both transports use its
 same parsed username and password. Classic uses Necko proxy authentication;
 no-connect carries their Basic value in a TLS-protected application AUTH frame.
@@ -165,6 +166,17 @@ most 32 streams; new carriers provide further concurrent capacity without a
 client-wide 32-stream limit. Stream byte offsets wrap modulo 2^32 while exact
 offset checks and bounded credit remain mandatory, so the byte counter does
 not cap stream size. See [NO-CONNECT.md](NO-CONNECT.md) for the maintained boundary and limits.
+
+`no-connect-hybrid` retains that same native startup, then transfers the
+existing session to the real Necko WebSocket implementation. All six assets
+and 20 startup API pairs must complete first. NFC1 sequences, per-stream
+credits and half-close remain continuous; a WS-only cumulative application
+ACK confirms uplink processing. The main-thread carrier bounds native WS
+queueing to one shaped message. Firefox owns WS framing and NSS owns TLS;
+DOM execution, the browser worker and the loopback bridge remain absent.
+This explicit mode uses H1 WSS/TCP after H2 or H3 startup because the retained
+Firefox implementation does not support WS over H3. It never resumes HTTP
+carriers or replays streams after a WS failure.
 
 The following fallback rules describe `classic`; the opt-in application
 transport has no automatic downgrade to `classic`:
@@ -256,7 +268,23 @@ creates an Android application profile. Both frontends pass the chosen profile
 to the same Gecko initialization path and use the same JSON parser, listeners,
 sessions, transports, and shutdown machinery.
 
+The fourth `NaiveFoxRunEmbedded` argument selects a transport without editing
+the JSON. A null pointer preserves JSON selection and the `classic` default;
+an explicit valid name overrides JSON before classic preamble defaults are
+applied. JSON, CLI and embedded selectors share one strict name parser.
+Invalid embedded selectors fail before reserving the one-shot runtime, so a
+subsequent valid call remains possible. Switching after a successful run still
+requires a fresh process; this argument does not introduce live reconfiguration.
+
 ## Validation boundaries
+
+Lean validation uses the actual linker response and active compiler dependency
+files, including relative paths from unified translation units and archive
+members. The WebSocket implementation closure is restricted to
+`BaseWebSocketChannel.cpp` and `WebSocketChannel.cpp`; browser actors, DOM
+bindings and additional generated IPC actors are rejected. Existing interface
+headers and the small Necko value helpers do not authorize linking JavaScript
+execution, full DOM, layout, graphics, ICU4C or a browser process stack.
 
 The reproducible loopback fixture proves strict transport selection, scoped
 trust, authentication failure, header negotiation, payload integrity,

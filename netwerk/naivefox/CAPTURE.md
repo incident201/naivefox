@@ -4410,13 +4410,298 @@ and the newly staged H2 config/listener gate against stock Caddy all pass.
 The latter tests SOCKS, authenticated SOCKS and HTTP CONNECT inside a fresh
 private WSL namespace. No full Firefox rebuild or default promotion occurred.
 
+## Native HTTP-startup to shaped WebSocket experiment
+
+This opt-in `no-connect-hybrid` experiment preserves the native no-connect
+root, stylesheet, script, four images and 20 complete ordered NFC1 GET/POST
+pairs, then opens one native Necko WebSocket per carrier. Startup ends at
+successful application completion, never at a packet index or elapsed-time
+threshold. Existing classic and finite no-connect remain separate controls.
+
+The causal preflight searched current documentation, all-ref commit messages,
+`git log -S`/`-G` history for WebSocket, HTTPUpgrade, hybrid, finite responses,
+and pipeline, and retained application-carrier metadata. The earlier
+application worker used WebSocket only as **loopback IPC**, never as its outer
+carrier. The closed ordinary-method carrier (`99e5c3ce5e6d`), asymmetric root
+GET plus CONNECT (`feacbbf6cce6`), corrected finite response variants
+(`dbf22ddf2906`), byte-budgeted responses (`7be2c317e82f`), and startup credit
+activation (`c2c29bdded77`) did not switch a completed fixed application graph
+to a persistent, capacity-shaped NFC1 WebSocket. The new causal premise is
+removal of repeated HTTP completion/headers in the sustained phase while
+preserving that native application's complete startup. It is not another
+response-size, arbitrary-delay, or local acknowledgement experiment.
+
+The historical `continuous-bulk-pipeline` worker matrix is retained under
+`/home/zubastik/naivefox-app-carrier-20260830.U0xyrg/matrix.json`; its source
+and interpretation remain on `experiment/application-carrier-20260830` in
+`APPLICATION-CARRIER-STATUS.md`. Those full-browser-worker results are not a
+native no-connect baseline. All native comparisons below require fresh controls.
+
+The implementation currently uses **H1 WSS over TCP** for realtime, including
+after H3 startup. It is not WebSocket over H3. The passive observer unit is
+therefore all TCP and QUIC packets to the same origin port, sorted by capture
+time. Both physical connections, both handshakes, their teardown outside the
+measurement window, ACKs, filler, and protocol overhead must be accounted for
+where present. Counting only the startup QUIC flow would omit the candidate's
+sustained carrier and is invalid. The strict H3 claim applies to startup;
+server/runtime evidence must separately prove the intentional H1 WS route.
+
+The reference has an explicit artifact-to-runtime proof. Official Taskcluster
+task `L5Q0X7WRRqCc5qenw0iRZQ` carries both the Git route below and Mercurial
+route `c64776bf9a03d7baae8c7aaca9e133ce1437f5ed`; its task environment,
+`target.json` and runtime `application.ini` agree on that Mercurial stamp.
+`verify-hybrid-reference.py` verifies the official SHA-512 archive checksum
+and every regular runtime member against the archive (47 files), then emits
+a proof. The matrix rechecks those runtime hashes and the current Git base
+before entering measurements. A same-day version string or caller-supplied
+revision by itself is not proof. Verification downloads only small public
+metadata; the existing archive and Firefox installation are reused.
+
+The superseded idle-reference diagnostic used seed `2026083105`, ten
+randomized blocks per protocol, and the same official Firefox base
+`0b76543aaeeeb2a5748ce2675ee36e7c94cb1125`. Every block contains Firefox A/B,
+classic SOCKS/HTTP, finite no-connect SOCKS/HTTP, and hybrid SOCKS/HTTP: 160
+cold captures across H2 and H3. A one-block smoke is plumbing admission only.
+All captures use the isolated unshaped namespace, MTU 1500, disabled offloads,
+fresh profiles and a fixed two seconds after navigation dispatch. Browser
+startup and process shutdown remain outside capture. Native arms share the
+canonical inner HTTPS/H2 browser page at base 262144. Firefox controls load
+the module's real SPA with `#realtime`, finish the same 20 API pairs and open
+an anonymous empty-capacity WS; the fragment is never sent on the wire and
+anonymous visitors cannot create target streams. This changes the reference
+application compared with the old static-site dashboard, so numerical scores
+must not be spliced into that dashboard.
+
+The fixed views are p1--16, p17--32, p1--32, 250 ms and Whole. The existing
+Firefox-A/B calibration, bootstrap and admission logic are reused; arm labels
+and server counters are never features. The new observer schema
+`native-hybrid-origin-v1-strict-packet-windows` uses strictly chronological
+packet indices and matching window aggregates for early views. TLS-record
+ordinals and unbounded handshake/QUIC-phase summaries are excluded from early
+views, including when their traffic belongs to the startup connection. All
+such passive features, including each later TCP connection's TLS fingerprint,
+remain in Whole. This experiment's wrapper does not change the legacy analyzer
+or retrospectively reinterpret its published numbers. Regression tests fix
+the first 33 packets while varying future WS connections, fingerprints,
+startup-flow TLS records and later QUIC phases: the early views must remain
+identical while Whole changes. The same two-second window includes the WS
+transition even when the inner page finishes during startup. Capture readiness
+and final drain each require a fresh auxiliary loopback UDP nonce to appear
+in that capture file. The auxiliary port is excluded from all origin events,
+wire accounting and packet indices. The cold trace is cut to exact navigation
+dispatch and dispatch-plus-two-second epoch bounds with `editcap`, while the
+original trace is retained; waiting for capture drain cannot expand Whole. A missing native
+`startup=20` WS-ready marker or server startup-completion evidence rejects the
+sample. Dropped captures, missing captured transport origins, protocol
+fallback, mutated network state, incomplete assets/API graph and failed
+inner-H2/payload checks also reject the complete attempt rather than invite
+selective resampling.
+
+Each native sample additionally performs separate warm-stage captures on the
+still-running carrier: 8-MiB download, 1-MiB upload, 4-KiB small request, and
+four concurrent 512-KiB downloads through that row's local listener. Each
+capture includes a 200-ms settling interval after payload validation for
+credits, FINs and underfilled capacity; the actual capture-stop request and
+completion offsets from curl process return are recorded, because validation
+adds some time after useful completion. Transfer time excludes this tail. Every download checks exact
+size and SHA-256 against an unproxied copy from the same fixture fetched before
+any capture; uploads check the origin's size and SHA-256 acknowledgement. This stage measures sustained
+cost separately from cold page loading; it does not claim long-idle behavior.
+Rate loss is `100 * (1 - baseline_time / candidate_time)` for identical useful
+work; traffic excess is `100 * (candidate_IP_wire / baseline_IP_wire - 1)`.
+The report provides both contemporaneous classic and native no-connect
+denominators. Time growth is a different percentage and is reported separately.
+Stage overhead uses its own capture and useful-work denominator. The optional
+aggregate is the sum of those disjoint stage windows, not an assertion about
+all bytes in the gaps or an entire arbitrarily long session.
+
+Use only the warm product objdir and existing official browser; no browser
+build, generated-source export, default promotion or fixture-size search is
+part of this experiment. All new state belongs below that objdir's `hybrid-ws`
+subtree. The runner's dumpcap writes to an already-open pipe, keeping captures
+there without an unrelated temporary directory. Captures, profiles, payloads
+and logs remain private until the observer audit is complete; never commit or
+upload them. Only numeric features, sanitized results, provenance and the
+matrix are shareable. `--discard-private-on-success` is an explicit cleanup
+option for subsequent fully audited runs. Failed attempts retain diagnostics.
+Ten blocks remain screening evidence below the 30-block inference floor,
+not proof of indistinguishability or an Internet throughput prediction.
+
+```sh
+ROOT=/home/zubastik/naivefox-refresh-20260830.fJHfmY/full-linux
+python3 netwerk/naivefox/test/integration/verify-hybrid-reference.py \
+  --task L5Q0X7WRRqCc5qenw0iRZQ \
+  --git-base 0b76543aaeeeb2a5748ce2675ee36e7c94cb1125 \
+  --archive /home/zubastik/naivefox-refresh-20260830.fJHfmY/reference/target.tar.xz \
+  --firefox /home/zubastik/naivefox-refresh-20260830.fJHfmY/reference/firefox/firefox \
+  --output "$ROOT/hybrid-ws/reference-verification/proof.json"
+NAIVEFOX_CAPTURE_ISOLATED_NETWORK=1 unshare --net -- \
+  netwerk/naivefox/test/integration/run-camouflage-isolated-network.sh \
+  "$ROOT/camouflage-venv/bin/python" \
+  netwerk/naivefox/test/integration/run-hybrid-matrix.py \
+  --objdir "$ROOT" --root "$ROOT/hybrid-ws/matrix-2026083105" \
+  --runtime "$ROOT/dist/bin/naivefox" \
+  --caddy "$ROOT/hybrid-ws/server/bin/caddy" \
+  --firefox /home/zubastik/naivefox-refresh-20260830.fJHfmY/reference/firefox/firefox \
+  --firefox-base 0b76543aaeeeb2a5748ce2675ee36e7c94cb1125 \
+  --reference-proof "$ROOT/hybrid-ws/reference-verification/proof.json" \
+  --geckodriver /root/.cache/selenium/geckodriver/linux64/0.37.1/geckodriver \
+  --protocol both --blocks 10 --seed 2026083105
+```
+
+The first full-workload plumbing attempt (`matrix-smoke-1`, seed
+`2026083102`) stopped at the H2 classic SOCKS 4-KiB warm stage. Curl and payload
+integrity passed but its capture contained zero packets; `File:` alone was
+not sufficient capture readiness/drain evidence. The earlier Firefox control
+and hybrid HTTP sample passed, but this incomplete block is not comparative
+evidence. The nonce admission above replaces that insufficient boundary.
+A separate isolated 400-byte UDP regression proves that readiness and drain
+markers are present in the actual capture while exactly one 428-byte origin
+IP packet enters the observer; no marker contributes to its wire totals.
+
+### Full-capacity WebSocket dispatch refinement
+
+`matrix-smoke-2` (seed `2026083103`) admitted all 16 participants, including
+all warm stages, with the corrected capture boundary. It is retained as the
+pre-refinement plumbing result, not a final matrix or paired inference. The
+warm download result exposed a remaining native implementation limit: both
+sides waited two milliseconds even when an entire application cell was
+already available; client delivery credits also used that wait. Uploads and
+downloads did not have the same direction of improvement, so a general speed
+claim was not justified.
+
+The new per-idea history preflight compared all-ref message/pickaxe history,
+the timed raw-server coalescing rejection, finite read-through/budgeted
+responses, application download-lease coalescing (`02f96ed1e0b4`, server
+`c211251`), bounded credit-state hints (`43f7020043a3`), and progress-qualified
+handoff (`dbe4909bb426`, server `114930d`). Those experiments changed response
+boundaries, lease/state selection or local worker acknowledgement. They did
+not remove an unconditional delay from an already-full outer WebSocket cell;
+that delay was introduced with the new hybrid implementation. This refinement
+does not add raw-read batching, optimistic delivery credit or a larger window.
+
+Preregister immediate event-target dispatch for a fully available 256-KiB
+cell and for pure delivery CREDIT/FIN/RESET work without OPEN or payload.
+A newly satisfied immediate condition also promotes an already-pending
+partial-cell timer. Server full-capacity data likewise skips the coalescing
+wait. Partial data and OPEN retain the existing two-millisecond aggregation;
+64/256-KiB data and 512-byte control capacities, cryptographic filler, stream
+credit bounds, the complete HTTP startup and the single-WS lifecycle stay
+unchanged. This tests avoidable scheduling delay, not a response-size sweep.
+
+After functional/race admission and a new complete plumbing block, the final
+ten-block H2/H3 and listener matrix must use one newly frozen client/server
+pair and fresh contemporary classic/no-connect controls. Never splice the
+pre-refinement smoke rows into that matrix or label them final results.
+
+### Superseded idle-reference diagnostic
+
+The earlier idle-reference experiment is invalid as a matched-workload
+comparison: it used an idle browser WS against active proxy clients, cropped
+Whole at two seconds, and predated the listener and routing corrections.
+Its report and diagnostic dataset remain in
+[Git history](https://github.com/incident201/naivefox/tree/6cbb73c8c6136eaee86906d268b3f4afeb16bc61/netwerk/naivefox/test/integration/evidence).
+They are excluded from the active matrix below and must not be pooled with it.
+
+### Replacement measurement with the same active application
+
+The replacement is specified in
+[the matched application benchmark](test/integration/hybrid_app/BENCHMARK.md)
+and collected by `run-matched-app-matrix.py`. The same Firefox application
+runs directly for both controls and through the selected local proxy for
+each candidate. Every participant must load the same resources, complete the
+same semantic API bootstrap, and execute all eleven verified jobs on one
+application WebSocket. An idle reference cannot pass admission.
+
+Only the selected local listener is enabled. Kernel socket ownership proves
+the application route before active work. Capture starts before browser and
+native startup; a separate direct health endpoint cannot warm the measured
+origin. Whole includes the complete bounded application session and graceful
+producer shutdown, with observed TCP termination and drained shaping queues.
+Complete-session IP bytes and application I/O durations have separate, explicit
+denominators. No old diagnostic samples are eligible for this measurement.
+
+### Matched active application: audited hybrid matrix
+
+A fresh primary run admitted all 160 participants in ten randomized paired blocks per protocol. Firefox A/B and every native arm executed the same application, all eleven verified jobs and one normal application WebSocket close. The outer link used 40 ms RTT and 20 Mbit/s independently in each direction; Whole includes complete startup, activity, idle and teardown.
+
+| Startup / listener | p1–16 distance | p17–32 distance | Whole distance |
+| --- | ---: | ---: | ---: |
+| H2 / socks | 0.11284 | 0.33369 | 0.33158 |
+| H2 / http | 0.11770 | 0.33991 | 0.33489 |
+| H3 / socks | 0.06230 | 0.22239 | 0.24709 |
+| H3 / http | 0.04631 | 0.20506 | 0.24576 |
+
+The distance is a bounded feature diagnostic, not a detection probability. The following costs use direct Firefox running the same active application as the baseline. Download and upload are the 8-MiB and 1-MiB stages; traffic covers the entire completed session.
+
+| Startup / listener | Download rate loss vs Firefox | Upload rate loss vs Firefox | Extra session IP traffic vs Firefox |
+| --- | ---: | ---: | ---: |
+| H2 / socks | +48.19% | +25.19% | +200.72% |
+| H2 / http | +47.25% | +25.09% | +200.01% |
+| H3 / socks | +48.25% | +25.28% | +199.67% |
+| H3 / http | +48.64% | +24.79% | +203.53% |
+
+The next costs compare hybrid with the unchanged native no-connect arm. Positive rate loss or latency increase is worse; negative values are improvements. Traffic is the complete-session outer IP total, with no arbitrary per-stage tail allocation.
+
+| Startup / listener | Download rate loss | Upload rate loss | Small echo latency increase | Extra session traffic |
+| --- | ---: | ---: | ---: | ---: |
+| H2 / socks | -41.29% | -239.71% | -52.65% | +102.43% |
+| H2 / http | -43.42% | -241.67% | -52.59% | +103.85% |
+| H3 / socks | -43.33% | -243.68% | -52.75% | +102.30% |
+| H3 / http | -42.64% | -246.14% | -52.29% | +104.32% |
+
+The [machine-readable matrix](test/integration/evidence/hybrid-ws-matrix.json) includes all six native-arm residual means/intervals/counts in all five views, all four hybrid rows, Firefox/classic/no-connect speed and complete-session traffic comparisons, and browser-clock startup/application-completion costs. It also records immutable artifact identities and the independent raw-capture, workload, routing and numerical audit.
+
+Ten blocks remain descriptive screening below the thirty-block inference floor. These results neither establish absolute indistinguishability nor promote a default transport; prior idle-reference and failed-pilot datasets are not included.
+
+The measured Caddy is identified by its exact binary hash; this report does not assert an immutable module source-to-binary attestation. It contains no Windows live-runtime or Android device measurements.
+
+The point estimates show a lower Whole distance than both native controls in
+all four rows, but no uniform improvement in the early packet windows. For
+example, H2 SOCKS p17--32 is worse than finite no-connect, while H3 SOCKS is
+worse in both early views. Cross-protocol distance values use different
+feature families/scales and are not an absolute H2-versus-H3 camouflage rank.
+
+On this workload, hybrid downloads about 41--43% faster than finite no-connect
+and uploads at about 3.40--3.46 times its rate, while spending about twice its
+complete-session IP bytes. Against direct Firefox it loses about 47--49% of
+download rate and 25% of upload rate, with about three times the IP bytes.
+Application completion is about 20.7--21.0 seconds, compared with 11.8--12.0
+for Firefox and 29.3--29.5 for finite no-connect. The application WS opens at
+about 6.4 seconds in hybrid; this is the target application's milestone, not
+the native carrier WS opening time. Small echoes take about 208 ms and wake
+echoes about 334 ms; Firefox takes about 86--87 ms for each. Classic remains
+the default and hybrid remains experimental.
+
+The network ending is observed, not inferred to be graceful FIN everywhere:
+the accepted captures contain 184 TCP resets and one completed FIN exchange.
+All application WebSockets closed normally and all owned processes exited;
+both types of TCP terminal traffic remain in Whole.
+
+Validation also passed 152 native tests, six Linux signal-shutdown cases
+covering twelve unfinished local requests, seven shim checks, staged-manifest
+and loader-path checks, and incremental Linux/Windows/Android product builds.
+No Windows live or Android device measurement was performed. The final broad
+staged fixture verifier was not rerun: its cache needed a separately pinned
+Caddy build, while the measured binary reports a local module replacement.
+The cache marker was not changed to pretend that attestation existed. All
+participants used the same hash-pinned Caddy binary, and the measured client
+package stayed unchanged.
+
+The feature extractor retains the broad `browser_page` scenario tag. The
+application manifest and complete per-participant admission records identify
+this active workload; no earlier idle-page dataset was pooled into it.
+
+
 ## Sensitive data handling
 
 Raw packet captures, NSS key logs, copied profiles, screenshots, bodies, and
 process logs are sensitive. Runners create them with private permissions below
-the ignored object-directory fixture state. On success, they retain only safe
-aggregates and delete private inputs. On failure, they print the private path
-for local diagnosis; those files must never be committed or shared blindly.
+the ignored object-directory fixture state. Individual runners document whether
+they delete private inputs after producing safe aggregates. The matched active
+application runner retains its private inputs for independent capture audits.
+On failure, runners print the private path for local diagnosis; those files
+must never be committed or shared blindly.
 
 Safe summaries may contain protocol identifiers, setting values, frame types,
 stream identifiers, packet counts/length aggregates, hashes of build artifacts,
