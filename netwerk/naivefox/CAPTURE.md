@@ -4688,6 +4688,78 @@ producer shutdown, with observed TCP termination and drained shaping queues.
 Complete-session IP bytes and application I/O durations have separate, explicit
 denominators. No old diagnostic samples are eligible for this measurement.
 
+### Matched active application: audited hybrid matrix
+
+A fresh primary run admitted all 160 participants in ten randomized paired blocks per protocol. Firefox A/B and every native arm executed the same application, all eleven verified jobs and one normal application WebSocket close. The outer link used 40 ms RTT and 20 Mbit/s independently in each direction; Whole includes complete startup, activity, idle and teardown.
+
+| Startup / listener | p1–16 distance | p17–32 distance | Whole distance |
+| --- | ---: | ---: | ---: |
+| H2 / socks | 0.11284 | 0.33369 | 0.33158 |
+| H2 / http | 0.11770 | 0.33991 | 0.33489 |
+| H3 / socks | 0.06230 | 0.22239 | 0.24709 |
+| H3 / http | 0.04631 | 0.20506 | 0.24576 |
+
+The distance is a bounded feature diagnostic, not a detection probability. The following costs use direct Firefox running the same active application as the baseline. Download and upload are the 8-MiB and 1-MiB stages; traffic covers the entire completed session.
+
+| Startup / listener | Download rate loss vs Firefox | Upload rate loss vs Firefox | Extra session IP traffic vs Firefox |
+| --- | ---: | ---: | ---: |
+| H2 / socks | +48.19% | +25.19% | +200.72% |
+| H2 / http | +47.25% | +25.09% | +200.01% |
+| H3 / socks | +48.25% | +25.28% | +199.67% |
+| H3 / http | +48.64% | +24.79% | +203.53% |
+
+The next costs compare hybrid with the unchanged native no-connect arm. Positive rate loss or latency increase is worse; negative values are improvements. Traffic is the complete-session outer IP total, with no arbitrary per-stage tail allocation.
+
+| Startup / listener | Download rate loss | Upload rate loss | Small echo latency increase | Extra session traffic |
+| --- | ---: | ---: | ---: | ---: |
+| H2 / socks | -41.29% | -239.71% | -52.65% | +102.43% |
+| H2 / http | -43.42% | -241.67% | -52.59% | +103.85% |
+| H3 / socks | -43.33% | -243.68% | -52.75% | +102.30% |
+| H3 / http | -42.64% | -246.14% | -52.29% | +104.32% |
+
+The [machine-readable matrix](test/integration/evidence/hybrid-ws-matrix.json) includes all six native-arm residual means/intervals/counts in all five views, all four hybrid rows, Firefox/classic/no-connect speed and complete-session traffic comparisons, and browser-clock startup/application-completion costs. It also records immutable artifact identities and the independent raw-capture, workload, routing and numerical audit.
+
+Ten blocks remain descriptive screening below the thirty-block inference floor. These results neither establish absolute indistinguishability nor promote a default transport; prior idle-reference and failed-pilot datasets are not included.
+
+The measured Caddy is identified by its exact binary hash; this report does not assert an immutable module source-to-binary attestation. It contains no Windows live-runtime or Android device measurements.
+
+The point estimates show a lower Whole distance than both native controls in
+all four rows, but no uniform improvement in the early packet windows. For
+example, H2 SOCKS p17--32 is worse than finite no-connect, while H3 SOCKS is
+worse in both early views. Cross-protocol distance values use different
+feature families/scales and are not an absolute H2-versus-H3 camouflage rank.
+
+On this workload, hybrid downloads about 41--43% faster than finite no-connect
+and uploads at about 3.40--3.46 times its rate, while spending about twice its
+complete-session IP bytes. Against direct Firefox it loses about 47--49% of
+download rate and 25% of upload rate, with about three times the IP bytes.
+Application completion is about 20.7--21.0 seconds, compared with 11.8--12.0
+for Firefox and 29.3--29.5 for finite no-connect. The application WS opens at
+about 6.4 seconds in hybrid; this is the target application's milestone, not
+the native carrier WS opening time. Small echoes take about 208 ms and wake
+echoes about 334 ms; Firefox takes about 86--87 ms for each. Classic remains
+the default and hybrid remains experimental.
+
+The network ending is observed, not inferred to be graceful FIN everywhere:
+the accepted captures contain 184 TCP resets and one completed FIN exchange.
+All application WebSockets closed normally and all owned processes exited;
+both types of TCP terminal traffic remain in Whole.
+
+Validation also passed 152 native tests, six Linux signal-shutdown cases
+covering twelve unfinished local requests, seven shim checks, staged-manifest
+and loader-path checks, and incremental Linux/Windows/Android product builds.
+No Windows live or Android device measurement was performed. The final broad
+staged fixture verifier was not rerun: its cache needed a separately pinned
+Caddy build, while the measured binary reports a local module replacement.
+The cache marker was not changed to pretend that attestation existed. All
+participants used the same hash-pinned Caddy binary, and the measured client
+package stayed unchanged.
+
+The feature extractor retains the broad `browser_page` scenario tag. The
+application manifest and complete per-participant admission records identify
+this active workload; no earlier idle-page dataset was pooled into it.
+
+
 ## Sensitive data handling
 
 Raw packet captures, NSS key logs, copied profiles, screenshots, bodies, and
