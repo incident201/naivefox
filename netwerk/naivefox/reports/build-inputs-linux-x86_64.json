@@ -27593,7 +27593,7 @@
   ],
   "firefox_base_commit": "0b76543aaeeeb2a5748ce2675ee36e7c94cb1125",
   "generated_makefile_count": 380,
-  "generated_makefiles_sha256": "2398a3f68978be6d2717341abf12204e656644130973d2c9cada26283c1ef5d3",
+  "generated_makefiles_sha256": "30e1f77228e3a6a9c6c1cd17991ad5abfab3a1612b4cf2538019cbafbec82f3a",
   "install_manifest_count": 7,
   "install_manifest_names": [
     "_test_files",
@@ -27608,15 +27608,15 @@
   "install_manifests_sha256": "2dee283ca8dbc977af138d40e9fe250536c3bd0abf901312127e64b146af7c83",
   "mozconfig": "netwerk/naivefox/mozconfig-minimal",
   "mozconfig_sha256": "03e7581d0f3023568f6b1dac19d87add5cfab400af3d909894bd6c49b2f4cf6b",
-  "naivefox_reference_commit": "6ac96eaebed77579c1a09dd6f6ee9da6452dc3ea",
+  "naivefox_reference_commit": "018b3e5eb8794eef3532e68d41776c10cf176d21",
   "objdir_evidence_sha256": {
-    "backend.RecursiveMakeBackend.in": "b7fe58b6bb0589442c0216e99b5eb0b6a8f1cb90bde689593b6d969d8b739826",
-    "config_status_deps.in": "7cef5541b9777f56fb719d6f80a142d0faa808f52d3aa44eb957f8c632b985e6"
+    "backend.RecursiveMakeBackend.in": "b54286987c54c430096b53d8f91ba9679a0e124b5d6f73e8104a6540303a3a48",
+    "config_status_deps.in": "9fe4f66767347bb3510234c3707002fcc3d11b41172e2acfb70d59199966b709"
   },
   "provenance_sha256": "642a32e90aaf870224f1831b2e932e08fb3153ed75765607f2112852f668e3fb",
   "provenance_version": 2,
   "report_version": 1,
-  "source_commit": "6ac96eaebed77579c1a09dd6f6ee9da6452dc3ea",
+  "source_commit": "018b3e5eb8794eef3532e68d41776c10cf176d21",
   "source_tree_kind": "repository",
   "source_worktree_clean": true,
   "source_worktree_status": [],

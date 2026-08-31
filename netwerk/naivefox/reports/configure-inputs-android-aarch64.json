@@ -9823,7 +9823,7 @@
   "firefox_base_commit": "0b76543aaeeeb2a5748ce2675ee36e7c94cb1125",
   "mozconfig": "netwerk/naivefox/mozconfig-android-aarch64",
   "mozconfig_sha256": "69d4665c2b95be12ac6ba7e976069ff72d28e984a4ede2df50a4729a18052c31",
-  "naivefox_reference_commit": "6ac96eaebed77579c1a09dd6f6ee9da6452dc3ea",
+  "naivefox_reference_commit": "018b3e5eb8794eef3532e68d41776c10cf176d21",
   "observed_directories": [
     "browser",
     "build",
@@ -21352,11 +21352,11 @@
   "provenance_version": 2,
   "python_version": "3.12.3",
   "report_version": 2,
-  "source_commit": "6ac96eaebed77579c1a09dd6f6ee9da6452dc3ea",
+  "source_commit": "018b3e5eb8794eef3532e68d41776c10cf176d21",
   "source_worktree_clean": true,
   "strace_version": "strace -- version 6.8",
   "target": "android-aarch64",
   "target_triple": "aarch64-unknown-linux-android",
-  "trace_sha256": "8322e43899ca7aca274e747b2608b488b46159e390331414bf993350e63f8f11",
-  "trace_size_bytes": 29464388
+  "trace_sha256": "0800ff7de306b9e91cd04ee4e0d003f78e4de57aa609fc52bd79f7fecb14ee26",
+  "trace_size_bytes": 29613493
 }
