@@ -28,6 +28,7 @@ class AndroidFixture:
         self.adb = [str(args.adb)] + (["-s", args.serial] if args.serial else [])
         self.remote = f"/data/local/tmp/naivefox-no-connect-{secrets.token_hex(8)}"
         self.ports = set()
+        self.shared_configs = {}
         self.processes = []
         self.runtime = self.remote + "/runtime"
         self.call("shell", "mkdir", "-p", self.runtime)
@@ -48,6 +49,8 @@ class AndroidFixture:
 
     def probe(self, ports, listener, target_port, operation, length=0, slow=False, host="localhost"):
         ack = (struct.pack("!Q", length) + suite.payload_digest(length)).hex() if operation == "upload" else "-"
+        if operation == "auth-partition":
+            ack = str(ports["http"])
         command = [self.remote + "/probe", listener, str(ports[listener]), host,
                    str(target_port), operation, str(length), ack]
         if slow:
@@ -59,13 +62,17 @@ class AndroidFixture:
         suite.require(result.returncode == 0, f"Android {listener} {operation} failed ({result.returncode}); {log_path}")
 
     def install_probes(self):
-        suite.download = lambda ports, listener, target_port, length=1024*1024, slow=False: self.probe(
-            ports, listener, target_port, "download", length, slow)
-        suite.upload = lambda ports, listener, target_port, length=1024*1024: self.probe(
-            ports, listener, target_port, "upload", length)
+        suite.download = lambda ports, listener, target_port, length=1024*1024, slow=False, host="localhost": self.probe(
+            ports, listener, target_port, "download", length, slow, host)
+        suite.upload = lambda ports, listener, target_port, length=1024*1024, host="localhost": self.probe(
+            ports, listener, target_port, "upload", length, host=host)
         suite.echo_wake = lambda ports, listener, target_port: self.probe(
             ports, listener, target_port, "idle")
         suite.cancel_stream = lambda ports, target_port: self.probe(ports, "socks", target_port, "reset")
+        suite.concurrent_open_streams = lambda ports, target_port, count=40: self.probe(
+            ports, "socks", target_port, "concurrent", count)
+        suite.auth_partition_streams = lambda ports, target_port: self.probe(
+            ports, "socks", target_port, "auth-partition")
         def reject(ports, listener, target_port, host="localhost", rejected=False):
             suite.require(rejected, "positive Android workloads must run in the native probe")
             self.probe(ports, listener, target_port, "reject", host=host)
@@ -80,26 +87,53 @@ class AndroidFixture:
         self.call("shell", "mkdir", "-p", remote + "/profile")
         self.call("shell", "chmod", "700", remote, remote + "/profile")
         config = dict(config)
+        fixed_ports = getattr(args, "listener_ports", None)
         for listener in ports:
-            while ports[listener] in self.ports:
-                ports[listener] = suite.free_port()
+            if fixed_ports is not None:
+                suite.require(ports[listener] not in self.ports,
+                              "shared Android listener is still owned by an active runtime")
+            else:
+                while ports[listener] in self.ports:
+                    ports[listener] = suite.free_port()
             self.ports.add(ports[listener])
         config["listen"] = [f"{listener}://127.0.0.1:{port}" for listener, port in ports.items()]
         config["host-resolver-rules"] = f"MAP localhost {self.args.host_alias}"
-        suite.private_json(directory / "config.json", config)
-        self.call("push", str(directory / "config.json"), remote + "/config.json")
-        self.call("shell", "chmod", "600", remote + "/config.json")
+        config_path = Path(getattr(args, "client_config_path", directory / "config.json"))
+        shared = getattr(args, "client_config_path", None) is not None
+        if shared:
+            label = str(config_path)
+            if label not in self.shared_configs:
+                self.shared_configs[label] = self.remote + "/shared-config-" + secrets.token_hex(6) + ".json"
+            remote_config = self.shared_configs[label]
+        else:
+            remote_config = remote + "/config.json"
+        suite.private_json(config_path, config)
+        self.call("push", str(config_path), remote_config)
+        self.call("shell", "chmod", "600", remote_config)
         environment = [f"LD_LIBRARY_PATH={self.runtime}"]
         if env.get("SSL_CERT_FILE"):
             self.call("push", env["SSL_CERT_FILE"], remote + "/ca.crt")
             environment.append(f"SSL_CERT_FILE={remote}/ca.crt")
         argv = ["env", *environment, self.remote + "/harness", self.runtime + "/libxul.so",
-                remote + "/config.json", remote + "/profile", self.runtime,
+                remote_config, remote + "/profile", self.runtime,
                 remote + "/stop", remote + "/ready", remote + "/result"]
         command = "cd " + shlex.quote(remote) + " && echo $$ > pid && exec " + shlex.join(argv)
         fixture = self
 
         class AndroidProcess(suite.Process):
+            released_ports = False
+
+            def release_ports(self):
+                if not self.released_ports:
+                    self.released_ports = True
+                    for port in ports.values():
+                        fixture.ports.discard(port)
+
+            def executed_config(self):
+                result = subprocess.run(fixture.adb + ["shell", "cat", remote_config],
+                                        text=True, capture_output=True, check=True)
+                return json.loads(result.stdout)
+
             def stop(self):
                 if self.process.poll() is None:
                     fixture.call("shell", "touch", remote + "/stop")
@@ -112,6 +146,7 @@ class AndroidFixture:
                         suite.require(pid.isdecimal(), "invalid owned Android harness PID")
                         fixture.call("shell", "kill", pid)
                 super().stop()
+                self.release_ports()
 
             def exited_cleanly(self):
                 try:
@@ -122,6 +157,7 @@ class AndroidFixture:
                 result = subprocess.run(fixture.adb + ["shell", "cat", remote + "/result"],
                                         text=True, capture_output=True, check=True)
                 suite.require("status=0" in result.stdout, "Android embedded result failed")
+                self.release_ports()
 
         process = AndroidProcess(self.adb + ["shell", command], directory, "client", dict(os.environ))
         self.processes.append(process)

@@ -15,7 +15,10 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <memory>
 #include <string>
+#include <utility>
+#include <vector>
 
 namespace {
 
@@ -23,11 +26,14 @@ constexpr uint32_t kMaxBody = 8 * 1024 * 1024;
 constexpr size_t kMaxHeader = 16 * 1024;
 
 enum class Reply { Accepted, Rejected, Invalid };
-enum class Operation { Download, Upload, Idle, Reset, Reject };
+enum class Operation {
+  Download, Upload, Idle, Reset, Reject, Concurrent, AuthPartition
+};
 
 struct Options {
   bool socks = false;
   uint16_t localPort = 0;
+  uint16_t alternatePort = 0;
   std::string targetHost;
   uint16_t targetPort = 0;
   Operation operation = Operation::Download;
@@ -66,8 +72,8 @@ int Fail(const char* aMessage) {
 int Usage() {
   std::fputs(
       "Usage: android_transport_probe socks|http LOCALPORT TARGETHOST "
-      "TARGETPORT download|upload|idle|reset|reject LENGTH "
-      "[ACK_HEX|-] [slow]\n",
+      "TARGETPORT download|upload|idle|reset|reject|concurrent|auth-partition "
+      "LENGTH [ACK_HEX|HTTPPORT|-] [slow]\n",
       stderr);
   return 2;
 }
@@ -144,11 +150,19 @@ bool Parse(int aCount, char** aArguments, Options& aOptions) {
     aOptions.operation = Operation::Reset;
   } else if (std::strcmp(operation, "reject") == 0) {
     aOptions.operation = Operation::Reject;
+  } else if (std::strcmp(operation, "concurrent") == 0) {
+    aOptions.operation = Operation::Concurrent;
+  } else if (std::strcmp(operation, "auth-partition") == 0) {
+    aOptions.operation = Operation::AuthPartition;
   } else {
     return false;
   }
-  if (aOptions.operation != Operation::Download &&
-      aOptions.operation != Operation::Upload && aOptions.length != 0) {
+  if (aOptions.operation == Operation::Concurrent) {
+    if (!aOptions.socks || aOptions.length <= 32 || aOptions.length > 128) {
+      return false;
+    }
+  } else if (aOptions.operation != Operation::Download &&
+             aOptions.operation != Operation::Upload && aOptions.length != 0) {
     return false;
   }
 
@@ -163,7 +177,15 @@ bool Parse(int aCount, char** aArguments, Options& aOptions) {
     }
     aOptions.slow = true;
   }
-  if (aOptions.operation == Operation::Upload) {
+  if (aOptions.operation == Operation::AuthPartition) {
+    uint32_t alternatePort = 0;
+    if (!aOptions.socks || aOptions.slow ||
+        !Number(acknowledgement, 65535, alternatePort) || !alternatePort ||
+        alternatePort == aOptions.localPort) {
+      return false;
+    }
+    aOptions.alternatePort = static_cast<uint16_t>(alternatePort);
+  } else if (aOptions.operation == Operation::Upload) {
     if (std::strlen(acknowledgement) != 80) {
       return false;
     }
@@ -335,6 +357,97 @@ Reply HttpConnect(int aSocket, const Options& aOptions) {
   return Reply::Invalid;
 }
 
+bool Concurrent(const Options& aOptions) {
+  std::vector<std::unique_ptr<Socket>> sockets;
+  sockets.reserve(aOptions.length);
+  for (uint32_t index = 0; index < aOptions.length; ++index) {
+    auto local = std::make_unique<Socket>();
+    if (!ConnectLocal(local->Get(), aOptions) ||
+        SocksConnect(local->Get(), aOptions) != Reply::Accepted) {
+      return false;
+    }
+    sockets.push_back(std::move(local));
+  }
+
+  std::array<uint8_t, 69> request{};
+  request[0] = 'E';
+  for (size_t i = 5; i < request.size(); ++i) {
+    request[i] = static_cast<uint8_t>(i);
+  }
+  for (uint32_t index = 0; index < aOptions.length; ++index) {
+    request[1] = static_cast<uint8_t>(index >> 24);
+    request[2] = static_cast<uint8_t>(index >> 16);
+    request[3] = static_cast<uint8_t>(index >> 8);
+    request[4] = static_cast<uint8_t>(index);
+    if (!WriteAll(sockets[index]->Get(), request.data(), request.size())) {
+      return false;
+    }
+  }
+  for (uint32_t index = 0; index < aOptions.length; ++index) {
+    std::array<uint8_t, 68> response{};
+    if (!ReadAll(sockets[index]->Get(), response.data(), response.size())) {
+      return false;
+    }
+    const uint32_t received = (uint32_t(response[0]) << 24) |
+                              (uint32_t(response[1]) << 16) |
+                              (uint32_t(response[2]) << 8) | response[3];
+    if (received != index) {
+      return false;
+    }
+    for (size_t i = 4; i < response.size(); ++i) {
+      if (response[i] != static_cast<uint8_t>(i + 1)) {
+        return false;
+      }
+    }
+    if (shutdown(sockets[index]->Get(), SHUT_WR) != 0) {
+      return false;
+    }
+  }
+  for (const auto& local : sockets) {
+    if (!EndOfStream(local->Get())) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool AuthPartition(const Options& aOptions) {
+  Socket first;
+  const uint8_t echo = 'E';
+  const std::array<uint8_t, 16> payload{
+      0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+  auto exchange = [&](int aSocket) {
+    std::array<uint8_t, 16> received{};
+    return WriteAll(aSocket, payload.data(), payload.size()) &&
+           ReadAll(aSocket, received.data(), received.size()) &&
+           received == payload;
+  };
+  if (!ConnectLocal(first.Get(), aOptions) ||
+      SocksConnect(first.Get(), aOptions) != Reply::Accepted ||
+      !WriteAll(first.Get(), &echo, 1) || !exchange(first.Get())) {
+    return false;
+  }
+
+  Options rejectedOptions = aOptions;
+  rejectedOptions.localPort = aOptions.alternatePort;
+  rejectedOptions.socks = false;
+  Socket rejected;
+  if (!ConnectLocal(rejected.Get(), rejectedOptions) ||
+      HttpConnect(rejected.Get(), rejectedOptions) != Reply::Rejected ||
+      !exchange(first.Get())) {
+    return false;
+  }
+
+  Socket second;
+  if (!ConnectLocal(second.Get(), aOptions) ||
+      SocksConnect(second.Get(), aOptions) != Reply::Accepted ||
+      !WriteAll(second.Get(), &echo, 1) || !exchange(second.Get())) {
+    return false;
+  }
+  return shutdown(second.Get(), SHUT_WR) == 0 && EndOfStream(second.Get()) &&
+         shutdown(first.Get(), SHUT_WR) == 0 && EndOfStream(first.Get());
+}
+
 bool SendRequest(int aSocket, uint8_t aKind, uint32_t aLength) {
   const uint8_t request[]{aKind, static_cast<uint8_t>(aLength >> 24),
                           static_cast<uint8_t>(aLength >> 16),
@@ -451,6 +564,22 @@ int main(int argc, char** argv) {
     return Fail("timeout setup failed");
   }
   alarm(60);
+  if (options.operation == Operation::Concurrent) {
+    if (!Concurrent(options)) {
+      return Fail("concurrent OPEN barrier or stream lifecycle failed");
+    }
+    alarm(0);
+    std::puts("PASS: simultaneous logical streams");
+    return 0;
+  }
+  if (options.operation == Operation::AuthPartition) {
+    if (!AuthPartition(options)) {
+      return Fail("carrier credential partition or stream lifecycle failed");
+    }
+    alarm(0);
+    std::puts("PASS: authenticated carrier credential partition");
+    return 0;
+  }
   Socket local;
   if (!ConnectLocal(local.Get(), options)) {
     return Fail("local proxy connection failed");
@@ -480,6 +609,8 @@ int main(int argc, char** argv) {
         success = Reset(local.Get());
         break;
       case Operation::Reject:
+      case Operation::Concurrent:
+      case Operation::AuthPartition:
         break;
     }
     if (!success) {

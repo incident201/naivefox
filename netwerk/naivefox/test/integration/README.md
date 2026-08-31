@@ -1,7 +1,8 @@
 # Local integration fixture
 
 The fixture provides reproducible H2 and H3 testing without a real proxy
-account. It builds pinned Caddy plus `forwardproxy@naive`, creates an isolated
+account. It builds pinned Caddy with the unchanged `klzgrad/forwardproxy@naive`
+module and `naivefox_transport`, creates an isolated
 per-run PKI and trusted/untrusted NSS profiles, starts deterministic HTTP/HTTPS
 targets, and binds all fixture services to dynamically selected loopback ports.
 
@@ -23,9 +24,10 @@ python3 netwerk/naivefox/test/integration/run-no-connect-tests.py \
 
 Both transports use the same Caddy process for each protocol. The fixture checks
 strict H2 and UDP-only H3, both local listeners, 1-MiB uploads/downloads,
-backpressure, half-close, four parallel streams, idle wake, abrupt local
-cancellation, bounded graceful shutdown, rejected application keys, exact target
-allowlists and untrusted certificates. It records zero outer
+backpressure, half-close, parallel streams, idle wake, abrupt local
+cancellation, bounded graceful shutdown, shared username/password authentication,
+multiple destination hosts and ports without an allowlist, optional forward-proxy
+access policy, and untrusted certificates. It records zero outer
 CONNECT during the no-connect phase and then exercises classic CONNECT on that
 same endpoint. By default, classic uses an explicit disabled preamble so this
 gate measures transport interoperability. Repeat with `--classic-preamble default`
@@ -34,6 +36,16 @@ on that same combined endpoint. `--parallel-batches 32` repeats the four-stream
 mixed upload/download batch to cover H3 buffered-FIN and callback scheduling;
 run that regression with both preamble policies. Each transfer checks exact
 length, SHA-256 and half-close, and still respects bounded client shutdown.
+
+The no-connect concurrency gate holds 40 logical streams open at one barrier,
+then checks a distinct echo on every stream. This requires multiple carriers
+without exceeding the 32-stream resource bound inside any one carrier. The
+shared-config gate restarts the client with one configuration file through
+`classic → no-connect → classic → no-connect`; only `transport` may change.
+Linux, native Windows, and Android adapters run these same gates. The separate
+`run-transport-cli-tests.py` repeats the switch using `--transport` while checking
+that the JSON file remains byte-identical, including URI credentials and valid
+classic-only settings.
 
 Use `--protocol h2` or `--protocol h3` for a focused iteration. `--runtime`
 selects an already-built Linux executable; omission uses `dist/bin/naivefox`
@@ -50,7 +62,7 @@ python3 netwerk/naivefox/test/integration/run-no-connect-adversarial-tests.py \
   --caddy /absolute/path/to/combined-caddy
 ```
 
-It rejects mismatched profiles, appended/oversized cells, wrong capacities,
+It rejects mismatched profiles or authentication schemes, appended/oversized cells, wrong capacities,
 truncated filler, invalid sequence/reserved fields, redirects, HTTP authentication
 prompts and cross-protocol fallback. The corrupt responses come from isolated
 Caddy test routes; production server code is not modified. `--case` narrows a
@@ -108,6 +120,8 @@ Generated minimal-source exports intentionally omit those unit-test dependencies
 their HTTP integration runners remain available. The standalone codec runner
 reuses a warm product NSS/NSPR build and can enable ASan/UBSan with
 `NAIVEFOX_CODEC_SANITIZERS=1`.
+The codec regressions cross the 4-GiB byte-offset boundary with bounded reusable
+buffers, preserving sequence validation, flow control, and FIN after wrap.
 
 ## Complete local gate
 

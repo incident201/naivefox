@@ -901,6 +901,10 @@ void NoConnectCarrier::Tick() {
   // release every target connection without waiting for session expiry.
   if (mStreams.empty() && mResets.empty() && mRequests.empty() && !mBusy &&
       !mIdle && !mWaking) {
+    if (!CanAttach()) {
+      Fail(NS_OK);
+      return;
+    }
     for (const auto& carrier : sCarriers) {
       if (carrier.get() != this && carrier->Matches(mConfig)) {
         Fail(NS_OK);

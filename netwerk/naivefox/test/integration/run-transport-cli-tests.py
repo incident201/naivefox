@@ -55,10 +55,12 @@ def live_checks(binary, caddy, work_dir, protocols):
                 fixture.private_json(config_path, config)
                 original = config_path.read_bytes()
                 classic_count = 0
-                for name, options in (
-                    ("default-classic", []),
-                    ("no-connect", ["--transport", "no-connect"]),
-                    ("override-classic", ["--transport=classic"]),
+                for name, transport, options in (
+                    ("default-classic", "classic", []),
+                    ("no-connect", "no-connect", ["--transport", "no-connect"]),
+                    ("override-classic", "classic", ["--transport=classic"]),
+                    ("no-connect-again", "no-connect", ["--transport=no-connect"]),
+                    ("classic-again", "classic", ["--transport", "classic"]),
                 ):
                     before = fixture.access_requests(directory)
                     temporary = directory / name
@@ -89,7 +91,7 @@ def live_checks(binary, caddy, work_dir, protocols):
                     output = client.log_path.read_text(errors="replace")
                     fixture.require(not any(value in output for value in (user, password, quote(user, safe=""), quote(password, safe=""))),
                                     "transport override leaked authentication")
-                    if name != "no-connect":
+                    if transport != "no-connect":
                         classic_count += 2
                         fixture.wait_until(
                             lambda: sum(request.get("method") == "CONNECT" for request in

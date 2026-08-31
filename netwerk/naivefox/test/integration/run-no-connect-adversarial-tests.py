@@ -5,7 +5,6 @@ import importlib.util
 import json
 import os
 from pathlib import Path
-import secrets
 import struct
 import tempfile
 
@@ -16,7 +15,7 @@ spec = importlib.util.spec_from_file_location(
 fixture = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(fixture)
 
-CASES = ("profile", "append", "capacity", "truncated", "sequence", "reserved", "redirect", "auth-prompt", "protocol")
+CASES = ("profile", "auth-mode-missing", "auth-mode-legacy", "append", "capacity", "truncated", "sequence", "reserved", "redirect", "auth-prompt", "protocol")
 
 
 def mutation(case):
@@ -52,7 +51,17 @@ def mutation(case):
             },
             "body": body.decode("ascii"),
         }
-        if case == "redirect":
+        if case in ("auth-mode-missing", "auth-mode-legacy"):
+            path = "/"
+            response = {"handler": "static_response", "status_code": 200,
+                        "headers": {"Content-Type": ["text/html"],
+                                    "Content-Length": ["4096"],
+                                    "X-App-Profile": ["continuous-bulk-pipeline"],
+                                    "Set-Cookie": ["app_session=" + "0" * 64 + "; Path=/; Secure; HttpOnly"]},
+                        "body": "x" * 4096}
+            if case == "auth-mode-legacy":
+                response["headers"]["X-App-Auth"] = ["key"]
+        elif case == "redirect":
             path = "/"
             response = {"handler": "static_response", "status_code": 302,
                         "headers": {"Location": ["/redirected"]}}
@@ -71,13 +80,13 @@ def run_case(args, base, protocol, case):
     target = fixture.TargetServer()
     processes = []
     try:
-        key, user, password = secrets.token_hex(32), secrets.token_hex(8), secrets.token_hex(24)
+        user, password = fixture.fixture_credentials()
         args.server_mutator = mutation(case)
-        caddy, port = fixture.start_caddy(args, run, protocol, target.server_address[1], key, user, password)
+        caddy, port = fixture.start_caddy(args, run, protocol, target.server_address[1], user, password)
         processes.append(caddy)
         client_protocol = ("h3" if protocol == "h2" else "h2") if case == "protocol" else protocol
         client, ports = fixture.start_client(args, run, "client", client_protocol, port,
-                                            "no-connect", key, user, password, 1)
+                                            "no-connect", user, password, 1)
         processes.append(client)
         fixture.open_tunnel(ports, "socks", target.server_address[1], rejected=True)
         client.exited_cleanly()
@@ -88,7 +97,7 @@ def run_case(args, base, protocol, case):
         if case == "redirect":
             fixture.require(not any(item.get("uri") == "/redirected" for item in requests),
                             "native client followed an origin redirect")
-        if case in ("profile", "redirect", "auth-prompt", "protocol"):
+        if case in ("profile", "auth-mode-missing", "auth-mode-legacy", "redirect", "auth-prompt", "protocol"):
             fixture.require(stats["opens"] == 0, "bootstrap rejection still opened a target")
             fixture.require(not any(name.startswith("POST ") for name in stats["requests"]),
                             "bootstrap rejection still sent application authentication")
