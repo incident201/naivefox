@@ -352,6 +352,44 @@ jobs:
           ./netwerk/naivefox/tools/build-product.sh "${{ matrix.platform }}" \
             --objdir "${objdir}"
 
+      - name: Verify desktop transport parsing and runtime startup
+        if: matrix.platform != 'android'
+        shell: python
+        env:
+          BUILD_PLATFORM: ${{ matrix.platform }}
+        run: |
+          import os
+          from pathlib import Path
+          import subprocess
+          import sys
+          import tempfile
+
+          platform = os.environ["BUILD_PLATFORM"]
+          if (os.name == "nt") != (platform == "windows"):
+              raise SystemExit("desktop verification requires native platform Python")
+          temporary = Path(os.environ["RUNNER_TEMP"])
+          package = temporary / f"obj-naivefox-{platform}" / "package"
+          package /= f"naivefox-{platform}-x86_64"
+          binary = package / ("naivefox.exe" if platform == "windows" else "runtime/naivefox")
+          launcher = package / ("naivefox.exe" if platform == "windows" else "naivefox")
+          work = temporary / f"naivefox-runtime-checks-{platform}"
+          work.mkdir(exist_ok=True)
+          environment = {key: value for key, value in os.environ.items() if key not in {
+              "LD_LIBRARY_PATH", "LD_PRELOAD", "SSLKEYLOGFILE", "SSL_CERT_FILE",
+              "NAIVEFOX_PROFILE", "NAIVEFOX_PROXY_USER", "NAIVEFOX_PROXY_PASS",
+              "MOZ_RUN_GTEST", "MOZ_LOG", "MOZ_LOG_FILE",
+          }}
+          environment.update(MOZ_CRASHREPORTER_DISABLE="1", TMPDIR=str(work),
+                             TEMP=str(work), TMP=str(work))
+          subprocess.run([
+              sys.executable, "netwerk/naivefox/test/integration/run-transport-cli-tests.py",
+              "--binary", str(binary), "--work-dir", str(work),
+          ], env=environment, check=True, timeout=180)
+          with tempfile.TemporaryDirectory(prefix="profile-", dir=work) as profile:
+              subprocess.run([
+                  str(launcher), "--profile", profile, "--runtime-smoke",
+              ], env=environment, check=True, timeout=30)
+
       - name: Verify Android embedded package
         if: matrix.platform == 'android'
         shell: bash
