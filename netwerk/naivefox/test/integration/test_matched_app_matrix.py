@@ -70,6 +70,27 @@ def successful_records():
 
 
 class MatchedApplicationTests(unittest.TestCase):
+    def test_navigation_waits_for_load_and_does_not_retry_script_failures(self):
+        driver = mock.Mock()
+        driver.capabilities = {"pageLoadStrategy": "normal"}
+        driver.execute_script.return_value = True
+        M.warm_browser_navigation(driver, 443, 120)
+        self.assertEqual([call[0] for call in driver.method_calls],
+                         ["set_page_load_timeout", "get", "execute_script", "get", "execute_script", "set_page_load_timeout"])
+        self.assertEqual(driver.set_page_load_timeout.call_args_list, [mock.call(30), mock.call(120)])
+        self.assertEqual(driver.get.call_args_list, [mock.call("https://127.0.0.1:443/health"), mock.call("about:blank")])
+        driver.reset_mock()
+        driver.execute_script.side_effect = RuntimeError("sandbox evaluation failed")
+        with self.assertRaisesRegex(RuntimeError, "sandbox evaluation failed"):
+            M.warm_browser_navigation(driver, 443, 120)
+        driver.get.assert_called_once()
+        driver.execute_script.assert_called_once()
+        driver.reset_mock()
+        driver.capabilities["pageLoadStrategy"] = "none"
+        with self.assertRaisesRegex(RuntimeError, "completed navigation"):
+            M.warm_browser_navigation(driver, 443, 120)
+        driver.get.assert_not_called()
+
     def test_complete_active_application_is_required(self):
         browser, backend, manifest, assets = successful_records()
         result = M.validate_application(browser, backend, manifest, assets)

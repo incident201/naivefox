@@ -46,6 +46,18 @@ CONTROL_COUNTS = {"binary_messages_sent": 21, "binary_messages_received": 165,
                   "control_messages_sent": 190, "control_messages_received": 43}
 
 
+def warm_browser_navigation(driver, health_port, application_timeout):
+    require(driver.capabilities.get("pageLoadStrategy") == "normal", "WebDriver must wait for completed navigation")
+    driver.set_page_load_timeout(30)
+    driver.get(f"https://127.0.0.1:{health_port}/health")
+    require(driver.execute_script("return location.pathname === '/health' && document.readyState === 'complete'"),
+            "common Firefox warmup did not complete")
+    driver.get("about:blank")
+    require(driver.execute_script("return document.documentURI === 'about:blank' && document.readyState === 'complete'"),
+            "Firefox blank readiness failed")
+    driver.set_page_load_timeout(application_timeout)
+
+
 def expected_assets(directory):
     result = {}
     for path, file, size in (("/assets/site.css", "site.css", 12288),
@@ -713,7 +725,7 @@ class Campaign:
         options.binary_location = str(self.args.firefox)
         options.profile = str(profile)
         options.accept_insecure_certs = False
-        options.page_load_strategy = "none"
+        options.page_load_strategy = "normal"
         options.add_argument("-headless")
         options.add_argument("--width=1280")
         options.add_argument("--height=720")
@@ -724,10 +736,7 @@ class Campaign:
         remember_tree(driver.capabilities["moz:processID"], owned)
         remember_tree(driver.service.process.pid, owned)
         self.active_browsers.append((driver, owned))
-        driver.get(f"https://127.0.0.1:{self.health_port}/health")
-        legacy.wait_for(lambda: driver.execute_script("return location.pathname === '/health' && document.readyState === 'complete'"), "common Firefox warmup did not complete")
-        driver.get("about:blank")
-        legacy.wait_for(lambda: driver.execute_script("return document.documentURI === 'about:blank'"), "Firefox blank readiness failed")
+        warm_browser_navigation(driver, self.health_port, self.args.timeout)
         return driver, owned
 
     def stop_browser(self, driver, known):

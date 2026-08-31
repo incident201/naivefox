@@ -179,3 +179,17 @@ close. It was nevertheless rejected because the then-current native CLI
 terminated on SIGINT rather than performing graceful runtime shutdown. The
 failed pilot is retained; it supplies no comparative score or performance
 result. The lifecycle gate is not relaxed to accept signal termination.
+
+The first primary attempt stopped after 44 admitted H2 participants when
+Marionette failed sandbox evaluation during the next browser's common health
+navigation. That participant had no measured-origin requests, no carrier
+opens and no application bootstrap or WS traffic. The entire incomplete
+attempt is retained and is not pooled into the replacement campaign.
+The controller had selected WebDriver `pageLoadStrategy=none`, which waits
+for navigation to start, then evaluated readiness in a changing document.
+It now requires the standard `normal` strategy and completed loads before
+JavaScript postconditions. Health/about:blank navigation retains a 30-second
+bound; actual application navigation uses the existing application timeout.
+No script exception is caught or retried, no application error is masked,
+and the in-page graph, useful payloads, native binaries and link are unchanged.
+The replacement campaign is declared in advance with seed `2026083121`.
