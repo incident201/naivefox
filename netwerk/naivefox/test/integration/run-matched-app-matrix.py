@@ -179,10 +179,15 @@ class OwnedProcess:
         self.log = (directory / f"{name}.log").open("wb")
         self.process = subprocess.Popen(list(map(str, command)), cwd=directory, env=env, stdout=self.log, stderr=self.log)
         self.name = name
+        self.directory = directory
         self.forced = False
+        self.stop_signal = None
+        self.graceful_requested = False
 
     def stop(self, graceful=True, signal_number=signal.SIGTERM):
+        self.graceful_requested = self.graceful_requested or graceful
         if self.process.poll() is None:
+            self.stop_signal = signal_number
             self.process.send_signal(signal_number)
             try:
                 self.process.wait(timeout=25)
@@ -191,6 +196,9 @@ class OwnedProcess:
                 self.process.kill()
                 self.process.wait(timeout=5)
         self.log.close()
+        write_json(self.directory / f"{self.name}-process-exit.json", {
+            "returncode": self.process.returncode, "requested_signal": signal.Signals(self.stop_signal).name if self.stop_signal is not None else None,
+            "harness_forced_kill": self.forced, "graceful_required": self.graceful_requested})
         if graceful:
             require(not self.forced and self.process.returncode == 0, f"{self.name} did not stop gracefully")
 
@@ -802,8 +810,9 @@ class Campaign:
             write_json(directory / "browser-result.json", app_result)
             open_epoch = (app_result["time_origin_ms"] + app_result["websocket"]["open_ms"]) / 1000
             active_epoch = (app_result["time_origin_ms"] + app_result["stages"][0]["io_start_ms"]) / 1000
-            require(routing is not None and open_epoch - 0.01 <= routing_epoch < active_epoch, "application routing was not verified during its initial WS idle period")
-            result["routing"] = {**routing, "verified_before_active_work": True}
+            require(routing is not None and routing_epoch < active_epoch, "accepted application WebSocket routing was not verified before active work")
+            result["routing"] = {**routing, "verified_before_active_work": True,
+                                 "observation_relative_to_browser_open_ms": 1000 * (routing_epoch - open_epoch)}
             app_done_ms = 1000 * (time.monotonic() - navigation_clock)
             browser_shutdown = self.stop_browser(driver, browser_owned)
             driver = None

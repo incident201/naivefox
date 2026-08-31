@@ -27,10 +27,12 @@ The application then opens exactly one WebSocket with subprotocol
 subprotocol to the ordinary application backend. Native carrier subprotocol
 `nfc1.hybrid.v1` continues to reach the real transport module.
 
-During the initial application-WS idle period, an independent kernel socket
-ownership check verifies routing: native inner-origin clients belong to the
+After the backend accepts the application WS and before active work starts,
+an independent kernel socket ownership check verifies routing: native inner-origin clients belong to the
 Caddy proxy process, while Firefox owns the selected local-listener sockets.
-Direct reference origin clients belong to Firefox. Successful jobs alone
+Direct reference origin clients belong to Firefox. The snapshot may precede
+the browser's open callback by the link propagation delay; that offset is
+recorded rather than mistaken for a routing failure. Successful jobs alone
 cannot conceal an active WS that bypassed the proxy.
 
 The same manifest drives every participant:
@@ -159,3 +161,21 @@ inference floor. All failures are retained, no participant is selectively
 resampled, and no idle-reference or pre-fix dataset is spliced into the result.
 All generated state belongs beneath the existing warm objdir's
 `hybrid-ws/matched-app` subtree. The Firefox browser is reused, never rebuilt.
+
+## Initial implementation checks
+
+The independent link check observed roughly 41 ms TCP/UDP RTT and less than
+0.11 ms on the unshaped control port. Simultaneous UDP traffic measured
+19.778/19.775 IP Mbit/s in the two independent directions. A shorter cold TCP
+duplex check measured 12.22/18.10 Mbit/s despite overlapping transfers; TCP
+congestion/ACK behavior is not a minimum application-goodput admission rule.
+The configured qdisc rates and independently measured link capacity must not
+be confused with throughput achieved by the application or proxy.
+
+The first real Firefox correctness participant completed and verified the
+entire shared application, its six decoded resources, all 40 semantic API
+responses, all eleven jobs, exact useful bytes and a clean application WS
+close. It was nevertheless rejected because the then-current native CLI
+terminated on SIGINT rather than performing graceful runtime shutdown. The
+failed pilot is retained; it supplies no comparative score or performance
+result. The lifecycle gate is not relaxed to accept signal termination.
