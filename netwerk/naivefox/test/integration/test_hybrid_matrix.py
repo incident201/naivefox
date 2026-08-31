@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 
 import importlib.util
+import os
+import socket
+import tempfile
+import time
 from pathlib import Path
 import sys
 from types import SimpleNamespace
@@ -107,6 +111,31 @@ class HybridMatrixTests(unittest.TestCase):
             self.assertTrue(names)
             self.assertEqual({name: first[name] for name in names}, {name: second[name] for name in names})
         self.assertNotEqual(first, second)
+
+    @unittest.skipUnless(os.environ.get("NAIVEFOX_CAPTURE_ISOLATED_NETWORK_ENTERED") == "1"
+                         and os.environ.get("NAIVEFOX_CAPTURE_PACKET_TEST_ROOT"), "requires isolated capture fixture")
+    def test_actual_capture_canary_never_enters_origin_features(self):
+        root = Path(os.environ["NAIVEFOX_CAPTURE_PACKET_TEST_ROOT"])
+        with tempfile.TemporaryDirectory(prefix="canary-", dir=root) as name, socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as receiver:
+            receiver.bind(("127.0.0.1", 0))
+            port = receiver.getsockname()[1]
+            capture = MATRIX.Capture(Path(name), "test", port)
+            try:
+                before = time.time()
+                receiver.sendto(b"x" * 400, receiver.getsockname())
+                receiver.recv(1000)
+                after = time.time()
+            finally:
+                capture.stop()
+            markers = MATRIX.features.tshark_rows(str(capture.pcap), [], f"udp.port=={capture.marker_port}", ["frame.number"])
+            events, _, _, _ = MATRIX.outer_events(capture.pcap, port)
+            self.assertGreaterEqual(len(markers), 2)
+            self.assertEqual(len(events), 1)
+            self.assertEqual(MATRIX.wire_summary(events)["wire_bytes"], 428)
+            sliced = Path(name) / "window.pcapng"
+            MATRIX.subprocess.run(["editcap", "-A", f"{before:.9f}", "-B", f"{after:.9f}", str(capture.pcap), str(sliced)], check=True, capture_output=True)
+            self.assertEqual(len(MATRIX.outer_events(sliced, port)[0]), 1)
+            self.assertEqual(MATRIX.features.tshark_rows(str(sliced), [], f"udp.port=={capture.marker_port}", ["frame.number"]), [])
 
     def test_speed_loss_is_not_time_growth(self):
         values = MATRIX.penalties(10, 20, 100, 125)

@@ -11,6 +11,7 @@ from pathlib import Path
 import secrets
 import shutil
 import signal
+import socket
 import statistics
 import subprocess
 import sys
@@ -193,24 +194,53 @@ class Capture:
     def __init__(self, directory, name, port):
         self.pcap = directory / (name + ".pcapng")
         self.log_path = directory / (name + "-dumpcap.log")
+        self.marker = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.marker.bind(("127.0.0.1", 0))
+        while self.marker.getsockname()[1] == port:
+            self.marker.close()
+            self.marker = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            self.marker.bind(("127.0.0.1", 0))
+        self.marker_port = self.marker.getsockname()[1]
         self.output = self.pcap.open("wb")
         self.log = self.log_path.open("wb")
         self.process = subprocess.Popen([
-            "dumpcap", "-q", "-B", "32", "-i", "any", "-f", f"port {port}",
+            "dumpcap", "-q", "-B", "32", "-i", "any", "-f", f"port {port} or udp port {self.marker_port}",
             "-a", "duration:120", "-w", "-",
         ], stdout=self.output, stderr=self.log)
         try:
             wait_for(lambda: self.process.poll() is not None or "File:" in self.log_path.read_text(), "capture did not start")
             require(self.process.poll() is None, "capture exited during startup")
+            self.observe_nonce()
         except Exception:
             if self.process.poll() is None:
                 self.process.terminate()
                 self.process.wait(timeout=10)
             self.output.close()
             self.log.close()
+            self.marker.close()
             raise
 
+    def observe_nonce(self):
+        nonce = secrets.token_bytes(16)
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            require(self.process.poll() is None, "capture exited before nonce observation")
+            self.marker.sendto(nonce, self.marker.getsockname())
+            result = subprocess.run(["tshark", "-n", "-r", str(self.pcap), "-Y",
+                f"udp.dstport=={self.marker_port} && udp.payload=={nonce.hex(':')}",
+                "-T", "fields", "-e", "frame.number"], text=True, capture_output=True, timeout=3)
+            if result.stdout.strip():
+                return
+        raise RuntimeError("capture did not observe its own readiness/drain nonce")
+
     def stop(self):
+        if self.output.closed:
+            return
+        failure = None
+        try:
+            self.observe_nonce()
+        except Exception as error:
+            failure = error
         self.stop_request_monotonic = time.monotonic()
         if self.process.poll() is None:
             self.process.send_signal(signal.SIGINT)
@@ -218,7 +248,10 @@ class Capture:
         self.stop_complete_monotonic = time.monotonic()
         self.output.close()
         self.log.close()
+        self.marker.close()
         validate_dumpcap_log(self.log_path.read_text())
+        if failure:
+            raise failure
 
 
 class Campaign:
@@ -440,6 +473,7 @@ class Campaign:
             completion = secrets.token_hex(16)
             url = f"https://localhost:{self.port}/#realtime" if reference else f"https://localhost:{self.target_port}/camouflage/index.html?scenario=browser_page&asset_base=262144&completion={completion}"
             started = time.monotonic()
+            started_epoch = time.time()
             driver.get(url)
             done = False
             while time.monotonic() - started < self.args.capture_seconds:
@@ -462,7 +496,12 @@ class Campaign:
             capture.stop()
             capture = None
             require(done, "workload did not complete within the predeclared capture window")
-            document, wire = passive_document(directory / "cold.pcapng", self.port, self.protocol, row, name)
+            write_json(directory / "capture-boundary.json", {"start_epoch": started_epoch,
+                "end_epoch": started_epoch + self.args.capture_seconds})
+            sliced = directory / "cold-window.pcapng"
+            subprocess.run(["editcap", "-A", f"{started_epoch:.9f}", "-B", f"{started_epoch + self.args.capture_seconds:.9f}",
+                            str(directory / "cold.pcapng"), str(sliced)], check=True, capture_output=True)
+            document, wire = passive_document(sliced, self.port, self.protocol, row, name)
             result["cold"] = {"completion_ms": result.pop("completion_ms"), **wire}
             if not reference and self.args.warm_bytes:
                 result["warm"] = self.warm(directory, ports, kind)
@@ -637,7 +676,9 @@ def main():
         "source_revision": subprocess.check_output(["git", "-C", str(INTEGRATION), "rev-parse", "HEAD"], text=True).strip(),
         "observer_unit": "all TCP and QUIC traffic to origin port, chronologically merged; no loopback proxy/target traffic",
         "observer_schema": "native-hybrid-origin-v1-strict-packet-windows",
-        "capture_window_seconds": args.capture_seconds, "seed": args.seed, "blocks_per_protocol": args.blocks,
+        "capture_window_seconds": args.capture_seconds, "capture_readiness": "own auxiliary UDP nonce observed in actual pcap before work and before stop; auxiliary port never enters origin features",
+        "cold_window_enforcement": "epoch-bounded editcap slice from navigation dispatch; original capture retained",
+        "seed": args.seed, "blocks_per_protocol": args.blocks,
         "warm_download_bytes": args.warm_bytes, "plumbing_arm": args.plumbing_arm, "reference_lifecycle": "same-origin SPA bootstrap20 then H1 WSS; empty application capacity",
         "network": "isolated loopback MTU1500 offloads disabled; unshaped", "screening_only": True,
         "private_inputs_retained_for_audit": not args.discard_private_on_success,

@@ -4485,7 +4485,12 @@ or retrospectively reinterpret its published numbers. Regression tests fix
 the first 33 packets while varying future WS connections, fingerprints,
 startup-flow TLS records and later QUIC phases: the early views must remain
 identical while Whole changes. The same two-second window includes the WS
-transition even when the inner page finishes during startup. A missing native
+transition even when the inner page finishes during startup. Capture readiness
+and final drain each require a fresh auxiliary loopback UDP nonce to appear
+in that capture file. The auxiliary port is excluded from all origin events,
+wire accounting and packet indices. The cold trace is cut to exact navigation
+dispatch and dispatch-plus-two-second epoch bounds with `editcap`, while the
+original trace is retained; waiting for capture drain cannot expand Whole. A missing native
 `startup=20` WS-ready marker or server startup-completion evidence rejects the
 sample. Dropped captures, missing captured transport origins, protocol
 fallback, mutated network state, incomplete assets/API graph and failed
@@ -4543,6 +4548,16 @@ NAIVEFOX_CAPTURE_ISOLATED_NETWORK=1 unshare --net -- \
   --geckodriver /root/.cache/selenium/geckodriver/linux64/0.37.1/geckodriver \
   --protocol both --blocks 10 --seed 2026083101
 ```
+
+The first full-workload plumbing attempt (`matrix-smoke-1`, seed
+`2026083102`) stopped at the H2 classic SOCKS 4-KiB warm stage. Curl and payload
+integrity passed but its capture contained zero packets; `File:` alone was
+not sufficient capture readiness/drain evidence. The earlier Firefox control
+and hybrid HTTP sample passed, but this incomplete block is not comparative
+evidence. The nonce admission above replaces that insufficient boundary.
+A separate isolated 400-byte UDP regression proves that readiness and drain
+markers are present in the actual capture while exactly one 428-byte origin
+IP packet enters the observer; no marker contributes to its wire totals.
 
 ## Sensitive data handling
 
