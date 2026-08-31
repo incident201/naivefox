@@ -198,6 +198,59 @@ def get_dynamic_dependencies(binary_path):
     return sorted(set(deps))
 
 
+def get_configured_toolchain_versions(objdir):
+    path = Path(objdir) / "config.status.json"
+    try:
+        substs = json.loads(path.read_text(encoding="utf-8"))["substs"]
+        compiler = substs["CC"]
+        compiler_type = substs["CC_TYPE"]
+        configured_version = substs["CC_VERSION"]
+        linker = substs.get("LINKER")
+        if not linker:
+            candidates = [
+                flag.removeprefix("-Wl,--real-linker,")
+                for flag in substs.get("RELRHACK_LDFLAGS", [])
+                if flag.startswith("-Wl,--real-linker,")
+            ]
+            if len(candidates) != 1:
+                raise ValueError("configured real linker is missing or ambiguous")
+            linker = candidates[0]
+        if not isinstance(compiler, list) or not compiler or not all(
+            isinstance(argument, str) for argument in compiler
+        ):
+            raise ValueError("configured CC is not a command array")
+        for tool in (compiler[0], linker):
+            if (
+                not isinstance(tool, str)
+                or not os.path.isabs(tool)
+                or not os.access(tool, os.X_OK)
+            ):
+                raise ValueError("configured tool is not an absolute executable path")
+        compiler_output = subprocess.check_output(
+            [*compiler, "--version"], stderr=subprocess.PIPE, text=True
+        ).splitlines()[0]
+        version = re.search(r"\bversion (\d+(?:\.\d+)+)", compiler_output)
+        if not version or version.group(1) != configured_version:
+            raise ValueError("compiler version differs from config.status.json")
+        linker_version = subprocess.check_output(
+            [linker, "--version"], stderr=subprocess.PIPE, text=True
+        ).splitlines()[0].strip()
+        if not linker_version:
+            raise ValueError("configured linker reported an empty version")
+        return {
+            "compiler_version": f"{compiler_type} {configured_version}",
+            "linker_version": linker_version,
+            "sccache_state": "configured" if substs.get("CCACHE") else "disabled",
+        }
+    except (
+        OSError, ValueError, KeyError, TypeError, IndexError,
+        subprocess.CalledProcessError,
+    ) as error:
+        raise AuditConsistencyError(
+            f"Cannot attest configured compiler/linker: {path}: {error}"
+        ) from error
+
+
 def get_reachable_rust_closure(topsrcdir, target_triple, objdir=None):
     """
     Run cargo metadata from the actual NaiveFox Rust root. The outer
@@ -427,7 +480,11 @@ def get_source_and_build_inputs(
 
     top_prefix = os.path.normpath(str(topsrcdir)).replace("\\", "/") + "/"
     active_objects = {os.path.normpath(str(path)) for path in active_object_paths}
-    archive_members = set(archive_member_names)
+    archive_members = {name for name in archive_member_names if os.path.basename(name) == name}
+    archive_objects = {
+        os.path.normpath(os.path.join(objdir, name.removeprefix("objdir/")))
+        for name in archive_member_names if name.startswith("objdir/")
+    }
 
     for root, dirs, files in os.walk(str(objdir_path)):
         if ".deps" in root:
@@ -444,6 +501,7 @@ def get_source_and_build_inputs(
                     )
                     if (
                         object_path not in active_objects
+                        and object_path not in archive_objects
                         and os.path.basename(object_path) not in archive_members
                     ):
                         continue
@@ -454,6 +512,8 @@ def get_source_and_build_inputs(
                             for token in content.replace("\\\n", " ").split():
                                 if token.endswith(":") or token.startswith("-"):
                                     continue
+                                if not os.path.isabs(token):
+                                    token = os.path.join(os.path.dirname(root), token)
                                 token_norm = os.path.normpath(token).replace("\\", "/")
                                 if not token_norm.startswith(top_prefix):
                                     continue
@@ -718,15 +778,7 @@ def analyze_target(
     mozconfig_full = os.path.join(topsrcdir, mozconfig_relpath)
     mozconfig_hash = sha256_file(mozconfig_full)
 
-    compiler_ver = "Clang 18.1.8"
-    linker_ver = "LLD 18.1.8"
-    try:
-        c_out = subprocess.check_output(
-            ["clang", "--version"], stderr=subprocess.DEVNULL, text=True
-        )
-        compiler_ver = c_out.splitlines()[0]
-    except Exception:
-        pass
+    toolchain = get_configured_toolchain_versions(objdir)
 
     report = {
         "report_provenance": {
@@ -747,10 +799,8 @@ def analyze_target(
             "target_triple": target_triple,
             "mozconfig_path": mozconfig_relpath,
             "mozconfig_sha256": mozconfig_hash,
-            "analyzer_version": "2.7.0-three-target-active-cargo-tree",
-            "compiler_version": compiler_ver,
-            "linker_version": linker_ver,
-            "sccache_state": "supported",
+            "analyzer_version": "2.7.1-three-target-active-relative-deps",
+            **toolchain,
             "staged_runtime_manifest_count": len(staged_manifest_files),
         },
         "summary": {

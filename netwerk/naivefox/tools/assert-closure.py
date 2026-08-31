@@ -159,6 +159,93 @@ def _forbidden_platform_crate_tokens(platform):
     return tokens
 
 
+def _check_native_websocket_inputs(report, violations):
+    source_root = "netwerk/protocol/websocket/"
+    object_root = "objdir/" + source_root
+    allowed_sources = {
+        source_root + "BaseWebSocketChannel.cpp",
+        source_root + "WebSocketChannel.cpp",
+    }
+    allowed_objects = {"BaseWebSocketChannel", "WebSocketChannel"}
+    build = report.get("build_inputs", {})
+    sources = set(report.get("cxx_translation_units", []))
+    sources.update(build.get("cxx_translation_units", []))
+    websocket_sources = {path for path in sources if path.startswith(source_root)}
+    if websocket_sources != allowed_sources:
+        violations.append(
+            "Native WebSocket source closure must contain exactly "
+            f"BaseWebSocketChannel.cpp and WebSocketChannel.cpp: {sorted(websocket_sources)}"
+        )
+
+    websocket_objects = set()
+    for entry in report.get("direct_objects", []):
+        path = entry.get("path", "")
+        name = Path(path).stem
+        if (
+            name.startswith(("WebSocket", "PWebSocket", "PTransportProvider"))
+            or name == "IPCTransportProvider"
+        ) and name not in allowed_objects:
+            violations.append(
+                f"WebSocket browser/IPC implementation in link closure: {path}"
+            )
+        if path.startswith("objdir/ipc/ipdl/") and path not in {
+            "objdir/ipc/ipdl/IPCMessageTypeName.o",
+            "objdir/ipc/ipdl/IPCMessageTypeName.obj",
+        }:
+            violations.append(f"Generated IPC actor object in link closure: {path}")
+        if path.startswith(object_root):
+            websocket_objects.add(name)
+            if name not in allowed_objects or Path(path).suffix not in {".o", ".obj"}:
+                violations.append(f"Unexpected native WebSocket link object: {path}")
+    if websocket_objects != allowed_objects:
+        violations.append(
+            "Native WebSocket direct objects must contain exactly "
+            f"BaseWebSocketChannel and WebSocketChannel: {sorted(websocket_objects)}"
+        )
+
+    for archive in report.get("static_libraries", []):
+        for member in archive.get("members", []):
+            name = Path(member).stem
+            if (
+                name.startswith(("WebSocket", "BaseWebSocket", "PWebSocket", "PTransportProvider"))
+                or name == "IPCTransportProvider"
+                or "netwerk_protocol_websocket" in name
+                or "Unified_cpp_ipc_ipdl" in name
+            ):
+                violations.append(
+                    "WebSocket browser/IPC implementation in static archive: "
+                    f"{archive.get('path')}: {member}"
+                )
+
+    for field in ("ipdl_inputs", "webidl_binding_inputs"):
+        inputs = set(report.get(field, [])) | set(build.get(field, []))
+        for path in inputs:
+            if path.startswith(source_root) or Path(path).stem.startswith(
+                ("WebSocket", "PWebSocket", "PTransportProvider")
+            ):
+                violations.append(f"WebSocket browser/IPC input in {field}: {path}")
+
+
+def _check_compiled_source_boundaries(report, violations):
+    sources = set(report.get("cxx_translation_units", []))
+    sources.update(report.get("build_inputs", {}).get("cxx_translation_units", []))
+    allowed_value_helpers = {
+        "dom/security/ReferrerInfo.cpp",
+        "dom/security/SecFetch.cpp",
+        "js/xpconnect/loader/AutoMemMap.cpp",
+        "js/xpconnect/src/XPCString.cpp",
+    }
+    forbidden_roots = (
+        "dom/", "js/", "layout/", "gfx/", "intl/icu/", "config/external/icu/",
+        "mobile/", "browser/", "docshell/",
+    )
+    for path in sources:
+        if path.startswith(forbidden_roots) and path not in allowed_value_helpers:
+            violations.append(
+                f"Browser/JS/graphics implementation in source closure: {path}"
+            )
+
+
 def assert_closure(report_path, topsrcdir):
     if not os.path.exists(report_path):
         print(f"FAIL: Closure report not found: {report_path}", file=sys.stderr)
@@ -222,6 +309,8 @@ def assert_closure(report_path, topsrcdir):
         violations.append("Rust closure root is not gkrust-naivefox")
 
     _check_source_lists(report, topsrcdir, violations)
+    _check_native_websocket_inputs(report, violations)
+    _check_compiled_source_boundaries(report, violations)
 
     # 1. Assert NO absolute developer paths in raw JSON
     for bad_pattern in [
