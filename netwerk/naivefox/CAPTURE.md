@@ -4497,8 +4497,8 @@ still-running carrier: 8-MiB download, 1-MiB upload, 4-KiB small request, and
 four concurrent 512-KiB downloads through that row's local listener. Each
 capture includes a 200-ms settling interval after payload validation for
 credits, FINs and underfilled capacity; the actual capture-stop request and
-completion offsets from useful completion are recorded, because validation
-adds some time. Transfer time excludes this tail. Every download checks exact
+completion offsets from curl process return are recorded, because validation
+adds some time after useful completion. Transfer time excludes this tail. Every download checks exact
 size and SHA-256 against an unproxied copy from the same fixture fetched before
 any capture; uploads check the origin's size and SHA-256 acknowledgement. This stage measures sustained
 cost separately from cold page loading; it does not claim long-idle behavior.

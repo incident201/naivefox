@@ -199,8 +199,16 @@ class Capture:
             "dumpcap", "-q", "-B", "32", "-i", "any", "-f", f"port {port}",
             "-a", "duration:120", "-w", "-",
         ], stdout=self.output, stderr=self.log)
-        wait_for(lambda: self.process.poll() is not None or "File:" in self.log_path.read_text(), "capture did not start")
-        require(self.process.poll() is None, "capture exited during startup")
+        try:
+            wait_for(lambda: self.process.poll() is not None or "File:" in self.log_path.read_text(), "capture did not start")
+            require(self.process.poll() is None, "capture exited during startup")
+        except Exception:
+            if self.process.poll() is None:
+                self.process.terminate()
+                self.process.wait(timeout=10)
+            self.output.close()
+            self.log.close()
+            raise
 
     def stop(self):
         self.stop_request_monotonic = time.monotonic()
@@ -363,13 +371,14 @@ class Campaign:
         command.append(f"https://localhost:{self.target_port}" + path)
         started = time.monotonic()
         result = subprocess.run(command, text=True, capture_output=True, timeout=65)
+        returned = time.monotonic()
         require(result.returncode == 0, "warm transfer failed: " + name)
         if upload:
             reply = json.loads(output.read_text())
             require(reply.get("bytes") == size and reply.get("sha256") == hashlib.sha256(payload).hexdigest(), "warm upload integrity failure")
         else:
             require(output.stat().st_size == size and digest(output) == self.expected_downloads[size], "warm download integrity failure")
-        return {"useful_bytes": size, "completion_ms": 1000 * float(result.stdout), "started": started}
+        return {"useful_bytes": size, "completion_ms": 1000 * float(result.stdout), "started": started, "returned": returned}
 
     def warm(self, directory, ports, kind):
         rows = []
@@ -382,20 +391,21 @@ class Campaign:
                         jobs = [pool.submit(self.transfer, directory, ports, kind, f"parallel-{index}", size) for index in range(4)]
                         values = [job.result() for job in jobs]
                     origin = min(value["started"] for value in values)
-                    completed = max(value["started"] + value["completion_ms"] / 1000 for value in values)
+                    completed = max(value["returned"] for value in values)
                     value = {"useful_bytes": sum(item["useful_bytes"] for item in values),
                              "completion_ms": max((item["started"] - origin) * 1000 + item["completion_ms"] for item in values)}
                 else:
                     value = self.transfer(directory, ports, kind, name, size, upload)
-                    completed = value.pop("started") + value["completion_ms"] / 1000
+                    completed = value.pop("returned")
+                    value.pop("started")
                 time.sleep(0.2)
             finally:
                 capture.stop()
             events, _, _, _ = outer_events(capture.pcap, self.port)
             require(events and all(event["wire_size"] <= 1500 for event in events), "warm packet admission failure")
             rows.append({"stage": name, "settle_after_validation_ms": 200,
-                         "post_completion_stop_request_ms": 1000 * (capture.stop_request_monotonic - completed),
-                         "post_completion_stop_complete_ms": 1000 * (capture.stop_complete_monotonic - completed),
+                         "post_curl_return_stop_request_ms": 1000 * (capture.stop_request_monotonic - completed),
+                         "post_curl_return_stop_complete_ms": 1000 * (capture.stop_complete_monotonic - completed),
                          **value, **wire_summary(events)})
         totals = {key: sum(row[key] for row in rows) for key in ("wire_bytes", "packets", "client_wire_bytes", "server_wire_bytes")}
         return {"stages": rows, "observer_windows": "sum of disjoint per-stage captures; each stops at least 200ms after validation, actual tails recorded", **totals}
