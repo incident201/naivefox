@@ -143,7 +143,11 @@ SHA-256 `83a27f7936a8e89fa9e5e220a2cd2622db05f343065d66a92c4397f94df247a0`.
 The SDK needs `platforms`, `platform-tools` and `system-images` directories;
 its runtime needs Linux `libpulse0` and `libgl1` even with `-no-audio` and
 `-no-window`. The launcher adds `-qemu -machine virt` and waits for Android's
-boot-completed property (up to 360 seconds), not merely a stopped animation.
+boot-completed property (up to 900 seconds), not merely a stopped animation.
+It also requires two consecutive guest wall-clock samples within the host
+sampling interval, allowing one second for rounding, before fresh fixture
+certificates are issued. This rejects the minutes of clock lag seen during
+software-emulator startup without setting the clock or weakening TLS checks.
 Headless Linux launches disable Vulkan and WSLg display discovery and select
 software rendering, so the test does not depend on Windows GPU drivers.
 When running as another user (for example root inside the namespace), set

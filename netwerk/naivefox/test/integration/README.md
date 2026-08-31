@@ -123,6 +123,45 @@ reuses a warm product NSS/NSPR build and can enable ASan/UBSan with
 The codec regressions cross the 4-GiB byte-offset boundary with bounded reusable
 buffers, preserving sequence validation, flow control, and FIN after wrap.
 
+## Basic transport checks on all platforms
+
+The Linux, native Windows, and Android adapters share a bounded `--smoke`
+gate. Select `--transport no-connect-hybrid` to check the retained experimental
+transport without running the full concurrency matrix:
+
+```bash
+python3 netwerk/naivefox/test/integration/run-no-connect-tests.py \
+  --objdir /absolute/path/to/linux-objdir --caddy /absolute/path/to/combined-caddy \
+  --transport no-connect-hybrid --smoke
+
+python3 netwerk/naivefox/test/integration/run-no-connect-windows-tests.py \
+  --objdir /absolute/path/to/windows-objdir --runtime /absolute/path/to/naivefox.exe \
+  --caddy /absolute/path/to/combined-caddy --windows-python /mnt/c/path/to/python.exe \
+  --transport no-connect-hybrid --smoke
+
+python3 netwerk/naivefox/test/integration/run-no-connect-android.py \
+  --objdir /absolute/path/to/android-objdir --package /absolute/path/to/android-package \
+  --caddy /absolute/path/to/combined-caddy --ndk /absolute/path/to/android-ndk-r29 \
+  --serial emulator-5554 --transport no-connect-hybrid --smoke
+```
+
+Each command checks H2 and H3 by default. Both local frontends transfer a
+64-KiB download and upload with byte integrity and half-close checks, then
+echo data across a 50-ms pause. Hybrid must complete all 20 startup exchanges
+and establish exactly one WebSocket before the remaining transfers; useful
+traffic must pass in both directions without any outer CONNECT. The client
+must exit naturally after its six streams drain. Two further transfers omit
+the JSON `transport` field and must use default classic CONNECT.
+
+Request-level checks require the selected H2/H3 protocol for startup/API and
+classic CONNECT; only the hybrid `/api/realtime` request may use HTTP/1.1.
+The Windows H3 hybrid fixture therefore relays both UDP and TCP, while finite
+`no-connect` H3 remains UDP-only. Relay readiness and shutdown are bounded.
+All adapters accept `--work-dir` below their object directory. These are basic
+functional checks, not throughput, long-idle heartbeat, or concurrency evidence.
+Android's separate embedded argument matrix also checks explicit C-ABI
+selection, JSON precedence, unchanged configuration bytes, and invalid names.
+
 ## Hybrid WebSocket failure checks
 
 Run all eleven malformed-handshake, message and ACK cases through both startup
@@ -264,6 +303,32 @@ CONNECT streams. The concurrency checks require one pooled outer TCP connection
 for H2 or one NaiveFox-owned UDP socket for H3.
 
 ## Staged runtime
+
+The main Android embedded runner also exercises the fourth
+`NaiveFoxRunEmbedded` transport argument. It holds configuration bytes and
+listener ports fixed across fresh processes, tests null/default and JSON
+selection, then explicit `classic`, `no-connect`, and experimental
+`no-connect-hybrid` overrides. Both local frontends perform verified transfers
+and idle echoes; request observations prove the selected carrier. Rejected
+empty/unknown selectors precede a valid call in the same process to ensure
+they do not consume the one-shot runtime.
+
+The focused device gate can be run separately with an already-online ARM64
+API-26+ device and the combined pinned Caddy:
+
+```bash
+python3 netwerk/naivefox/test/integration/run-android-transport-tests.py \
+  --objdir /absolute/path/to/obj-naivefox-android-aarch64 \
+  --package /absolute/path/to/staged-android-package \
+  --caddy /absolute/path/to/pinned-caddy \
+  --ndk /absolute/path/to/android-ndk-r29 \
+  --work-dir /absolute/path/to/one-test-artifact-directory
+```
+
+Use `--adb` and `--serial` when needed. The main runner's `--check-only`
+compiles the four-argument native harness but does not replace this device
+test. Host callers must be rebuilt against the updated public C header; this
+test selects a mode at startup, not by reinitializing Gecko in one process.
 
 After staging the Linux product, the verifier runs the package from outside the
 source and object directories:

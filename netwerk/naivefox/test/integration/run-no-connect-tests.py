@@ -302,6 +302,9 @@ def start_client(args, run, name, protocol, proxy_port, transport, user, passwor
     else:
         config = copy.deepcopy(baseline)
         config["transport"] = transport
+    if getattr(args, "omit_transport", False):
+        require(transport == "classic", "only the default classic fixture may omit transport")
+        config.pop("transport", None)
     mapped_credentials = getattr(args, "proxy_credentials_by_listener", None)
     if mapped_credentials is not None:
         require(len(mapped_credentials) == len(config["listen"]), "fixture proxy mapping differs from listeners")
@@ -656,6 +659,102 @@ def access_requests(run):
     return [json.loads(line).get("request", {}) for line in path.read_text().splitlines() if line.strip()]
 
 
+def check_smoke_requests(requests, protocol, hybrid, classic=False):
+    expected_protocol = "HTTP/3.0" if protocol == "h3" else "HTTP/2.0"
+    connects = [item for item in requests if item.get("method") == "CONNECT"]
+    require(requests and (len(connects) == 2 if classic else not connects),
+            "smoke request methods did not match the selected transport")
+    websocket = []
+    for item in requests:
+        realtime = item.get("uri", "").split("?", 1)[0] == "/api/realtime"
+        if realtime:
+            websocket.append(item)
+        expected = "HTTP/1.1" if hybrid and not classic and realtime else expected_protocol
+        require(item.get("proto") == expected,
+                "smoke startup, WebSocket or classic CONNECT used the wrong protocol")
+        if not classic:
+            require(not any(name.lower() in {"authorization", "proxy-authorization"}
+                            for name in item.get("headers", {})),
+                    "application smoke exposed Basic credentials in origin headers")
+    require(len(websocket) == (1 if hybrid and not classic else 0),
+            "smoke selected the wrong WebSocket lifecycle")
+
+
+def run_smoke_protocol(args, base, protocol):
+    transport = getattr(args, "transport", "no-connect")
+    hybrid = transport == "no-connect-hybrid"
+    run = base / protocol
+    run.mkdir(mode=0o700)
+    issue_certificates(run)
+    target = TargetServer()
+    user, password = fixture_credentials()
+    processes = []
+    try:
+        caddy, proxy_port = start_caddy(args, run, protocol, target.server_address[1], user, password)
+        processes.append(caddy)
+        candidate, ports = start_client(args, run, "candidate", protocol, proxy_port,
+                                        transport, user, password, 6)
+        processes.append(candidate)
+        download(ports, "socks", target.server_address[1], 65536)
+        if hybrid:
+            wait_until(lambda: "No-connect hybrid websocket ready startup=20" in
+                       candidate.log_path.read_text(errors="replace"),
+                       "hybrid smoke never completed the WebSocket startup milestone", candidate, timeout=60)
+        upload(ports, "socks", target.server_address[1], 65536)
+        download(ports, "http", target.server_address[1], 65536)
+        upload(ports, "http", target.server_address[1], 65536)
+        for listener in ("socks", "http"):
+            echo_wake(ports, listener, target.server_address[1], idle_seconds=0.05)
+        candidate.exited_cleanly()
+        requests = access_requests(run)
+        check_smoke_requests(requests, protocol, hybrid)
+
+        default_args = copy.copy(args)
+        default_args.omit_transport = True
+        default_args.classic_preamble = "default"
+        classic, classic_ports = start_client(default_args, run, "default-classic", protocol,
+                                               proxy_port, "classic", user, password, 2)
+        processes.append(classic)
+        default_config = json.loads((run / "default-classic/config.json").read_text())
+        require("transport" not in default_config, "classic control did not use the absent transport default")
+        if hasattr(classic, "executed_config"):
+            require(classic.executed_config() == default_config, "device executed a different default config")
+        for listener in ("socks", "http"):
+            download(classic_ports, listener, target.server_address[1], 65536)
+        classic.exited_cleanly()
+        check_smoke_requests(access_requests(run)[len(requests):], protocol, hybrid, classic=True)
+        caddy.stop()
+        stats = json.loads((run / "server-stats.json").read_text())
+        require(stats.get("connect") == 2 and stats.get("opens") == 6,
+                "smoke transport/default selections did not open exactly the expected streams")
+        require(not target.failures and target.accepted_connections == 8,
+                "smoke target detected failed, truncated or extra streams")
+        if hybrid:
+            require(stats.get("ws_opened", 0) == 1 and stats.get("ws_messages_in", 0) >= 1 and
+                    stats.get("ws_messages_out", 0) >= 1,
+                    "hybrid smoke did not exchange bidirectional WebSocket cells")
+        else:
+            require(stats.get("ws_opened", 0) == 0, "finite HTTP smoke unexpectedly opened WebSocket")
+        expected_protocol = "HTTP/3.0" if protocol == "h3" else "HTTP/2.0"
+        expected_protocols = {expected_protocol, "HTTP/1.1"} if hybrid else {expected_protocol}
+        require(set(stats["protocols"]) == expected_protocols,
+                "smoke negotiated an unexpected outer protocol")
+        summary = {"protocol": protocol, "transport": transport, "status": "PASS", "smoke": True,
+                   "frontends": ["socks", "http"], "candidate_streams": 6, "default_classic_connects": 2,
+                   "download_bytes": 131072, "upload_bytes": 131072,
+                   "idle_echo_bytes_per_direction": 16384, "idle_seconds": 0.05,
+                   "startup_milestone": 20 if hybrid else None,
+                   "ws_opened": stats.get("ws_opened", 0), "no_connect_outer_connects": 0,
+                   "graceful_exit": True, "default_transport_unchanged": True}
+        private_json(run / "result.json", summary)
+        print(f"PASS {protocol} {transport} smoke: both listeners, bytes, half-close, idle, startup, default classic, shutdown", flush=True)
+        return summary
+    finally:
+        for process in reversed(processes):
+            process.stop()
+        target.close()
+
+
 def run_protocol(args, base, protocol):
     transport = getattr(args, "transport", "no-connect")
     hybrid = transport == "no-connect-hybrid"
@@ -777,6 +876,7 @@ def main():
     parser.add_argument("--runtime", type=Path)
     parser.add_argument("--protocol", choices=("h2", "h3", "both"), default="both")
     parser.add_argument("--transport", choices=("no-connect", "no-connect-hybrid"), default="no-connect")
+    parser.add_argument("--smoke", action="store_true", help="bounded basic byte/lifecycle gate without the full concurrency matrix")
     parser.add_argument("--work-dir", type=Path, help="private artifact parent below objdir")
     parser.add_argument("--idle-seconds", type=int, choices=range(2, 31), default=2, metavar="2..30")
     parser.add_argument("--classic-preamble", choices=("off", "default"), default="off")
@@ -794,7 +894,8 @@ def main():
         modules = subprocess.check_output([str(args.caddy), "list-modules"], text=True)
         for module in ("http.handlers.forward_proxy", "http.handlers.naivefox_transport"):
             require(module in modules.splitlines(), "combined Caddy module is missing")
-        results = [run_protocol(args, run, protocol) for protocol in
+        protocol_runner = run_smoke_protocol if args.smoke else run_protocol
+        results = [protocol_runner(args, run, protocol) for protocol in
                    (("h2", "h3") if args.protocol == "both" else (args.protocol,))]
         private_json(run / "result.json", {"status": "PASS", "targets": results})
         print(f"Private fixture and sanitized result: {run}")

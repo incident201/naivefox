@@ -67,8 +67,8 @@ class AndroidFixture:
             ports, listener, target_port, "download", length, slow, host)
         suite.upload = lambda ports, listener, target_port, length=1024*1024, host="localhost": self.probe(
             ports, listener, target_port, "upload", length, host=host)
-        suite.echo_wake = lambda ports, listener, target_port: self.probe(
-            ports, listener, target_port, "idle")
+        suite.echo_wake = lambda ports, listener, target_port, idle_seconds=2: self.probe(
+            ports, listener, target_port, "idle", int(idle_seconds * 1000))
         suite.cancel_stream = lambda ports, target_port: self.probe(ports, "socks", target_port, "reset")
         suite.concurrent_open_streams = lambda ports, target_port, count=40: self.probe(
             ports, "socks", target_port, "concurrent", count)
@@ -289,6 +289,9 @@ def main():
     parser.add_argument("--serial")
     parser.add_argument("--host-alias", default="10.0.2.2")
     parser.add_argument("--protocol", choices=("h2", "h3", "both"), default="both")
+    parser.add_argument("--transport", choices=("no-connect", "no-connect-hybrid"), default="no-connect")
+    parser.add_argument("--smoke", action="store_true")
+    parser.add_argument("--work-dir", type=Path, help="private artifact parent below objdir")
     parser.add_argument("--parallel-batches", type=int, choices=range(1, 129), default=1)
     parser.add_argument("--classic-preamble", choices=("off", "default"), default="default")
     args = parser.parse_args()
@@ -297,8 +300,9 @@ def main():
     adb = [str(args.adb)] + (["-s", args.serial] if args.serial else [])
     abi = subprocess.check_output(adb + ["shell", "getprop", "ro.product.cpu.abi"], text=True).strip()
     suite.require(abi == "arm64-v8a", "selected Android device must be ARM64")
-    root = args.objdir / "naivefox-fixture"
-    root.mkdir(exist_ok=True)
+    root = (args.work_dir or args.objdir / "naivefox-fixture").resolve()
+    suite.require(root.is_relative_to(args.objdir), "work directory must stay below objdir")
+    root.mkdir(parents=True, exist_ok=True)
     previous_umask = os.umask(0o077)
     work = Path(tempfile.mkdtemp(prefix="no-connect-android-", dir=root))
     fixture = None
@@ -309,20 +313,23 @@ def main():
                                  runtime=args.package / "lib/arm64-v8a/libxul.so",
                                  client_factory=fixture.start,
                                  parallel_batches=args.parallel_batches,
-                                 classic_preamble=args.classic_preamble)
+                                 classic_preamble=args.classic_preamble,
+                                 transport=args.transport)
         protocols = ("h2", "h3") if args.protocol == "both" else (args.protocol,)
-        results = [suite.run_protocol(inputs, work, protocol) for protocol in protocols]
+        protocol_runner = suite.run_smoke_protocol if args.smoke else suite.run_protocol
+        results = [protocol_runner(inputs, work, protocol) for protocol in protocols]
         fixture.close()
         fixture = None
         baseline_env = dict(os.environ, NAIVEFOX_OBJDIR=str(args.package.parents[1]),
                             NAIVEFOX_ADB=str(args.adb), TMPDIR=str(work))
         if args.serial:
             baseline_env["NAIVEFOX_ANDROID_SERIAL"] = args.serial
-        with (work / "embedded-lifecycle.log").open("wb") as log:
-            subprocess.run([str(HERE / "run-android-embedded-tests.sh"),
-                            "--package", str(args.package), "--direct-host", "--protocol",
-                            "all" if args.protocol == "both" else args.protocol],
-                           env=baseline_env, stdout=log, stderr=log, timeout=900, check=True)
+        if not args.smoke:
+            with (work / "embedded-lifecycle.log").open("wb") as log:
+                subprocess.run([str(HERE / "run-android-embedded-tests.sh"),
+                                "--package", str(args.package), "--direct-host", "--protocol",
+                                "all" if args.protocol == "both" else args.protocol],
+                               env=baseline_env, stdout=log, stderr=log, timeout=900, check=True)
         suite.private_json(work / "result.json", {"platform": "android-arm64", "status": "PASS", "targets": results})
         print(f"PASS Android ARM64 dual-transport matrix: {work}", flush=True)
         return 0

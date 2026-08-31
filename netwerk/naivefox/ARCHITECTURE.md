@@ -278,6 +278,14 @@ requires a fresh process; this argument does not introduce live reconfiguration.
 
 ## Validation boundaries
 
+Lean validation uses the actual linker response and active compiler dependency
+files, including relative paths from unified translation units and archive
+members. The WebSocket implementation closure is restricted to
+`BaseWebSocketChannel.cpp` and `WebSocketChannel.cpp`; browser actors, DOM
+bindings and additional generated IPC actors are rejected. Existing interface
+headers and the small Necko value helpers do not authorize linking JavaScript
+execution, full DOM, layout, graphics, ICU4C or a browser process stack.
+
 The reproducible loopback fixture proves strict transport selection, scoped
 trust, authentication failure, header negotiation, payload integrity,
 backpressure, half-close, concurrency, connection reuse, and shutdown. A real
