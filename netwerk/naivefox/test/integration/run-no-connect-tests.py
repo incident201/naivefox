@@ -322,9 +322,9 @@ def start_client(args, run, name, protocol, proxy_port, transport, user, passwor
     return process, {"socks": socks_port, "http": http_port}
 
 
-def open_tunnel(ports, listener, target_port, host="localhost", rejected=False, allow_early_eof=False):
-    sock = socket.create_connection(("127.0.0.1", ports[listener]), timeout=20)
-    sock.settimeout(40)
+def open_tunnel(ports, listener, target_port, host="localhost", rejected=False, allow_early_eof=False, timeout=40):
+    sock = socket.create_connection(("127.0.0.1", ports[listener]), timeout=min(20, timeout))
+    sock.settimeout(timeout)
     try:
         if listener == "socks":
             sock.sendall(b"\x05\x01\x00")

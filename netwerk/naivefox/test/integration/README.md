@@ -155,6 +155,22 @@ padding, robustness, Auto, and H3 capture. Config/runtime behavior is added by
 Run the smallest relevant script while developing, then finish with the
 applicable aggregate:
 
+`run-classic-h3-tls-tests.py --objdir OBJ --runtime CLIENT --caddy CADDY`
+checks terminal certificate failures before a classic H3 CONNECT is established.
+Both local frontends must return an explicit failure within five seconds with
+the default and disabled preambles, without opening a target connection. A TCP
+canary on the proxy's UDP port rejects any hidden H2 fallback. A local timeout
+or silent EOF is not a successful authentication/TLS rejection.
+
+`run-listener-address-tests.py --objdir OBJ --runtime CLIENT --caddy CADDY
+--address ASSIGNED_IPV4` verifies Linux listeners through an actual non-loopback
+interface. It covers both transports over H2/H3, explicit IPv4 and `0.0.0.0`,
+SOCKS5/HTTP CONNECT, transfer integrity, and FIN. The supplied address must belong
+to a local interface; listening on an unassigned address remains an OS error.
+Only these client listeners leave loopback; the isolated Caddy and target remain
+restricted to their private test destination. Normal runtime configuration uses
+`listen`, for example `socks://0.0.0.0:1080` or `http://192.168.1.10:1081`.
+
 | Behavior | Commands |
 |---|---|
 | Fixture module, auth, ACL, TLS, profiles | `run-control-tests.sh` |

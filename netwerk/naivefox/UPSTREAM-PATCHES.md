@@ -417,6 +417,36 @@ all three product targets select matching allocation/deallocation functions;
 the staged `--runtime-smoke` nested-array probe and live Windows H3 pass; and
 the static shim check guards the crate linkage and feature propagation.
 
+## NF-UPSTREAM-019: reject queued H3 proxy tunnels after certificate failure
+
+Files:
+
+```text
+netwerk/protocol/http/HttpConnectionUDP.cpp
+netwerk/naivefox/test/integration/run-classic-h3-tls-tests.py
+```
+
+Before the outer H3 proxy handshake completes, pending CONNECT transactions
+belong to the UDP connection's queues, not the H3 session's stream maps. A
+terminal certificate failure could leave the session waiting for QUIC draining
+after its timer was cancelled, without delivering the error to those pending
+transactions. Project-level listeners cannot repair an error that never reaches
+their channel callbacks.
+
+Under `MOZ_NAIVEFOX`, a security failure on an unconnected outer H3 proxy session
+therefore requests clean terminal shutdown. Existing connection cleanup closes
+the queued transactions with the original error. Both pending queues are moved
+out before invoking callbacks so reentrant cleanup cannot invalidate iteration
+or erase newly queued work. Unflagged Firefox behavior, established tunnels,
+buffered FIN handling, and normal GOAWAY/draining are unchanged.
+
+Review obligations: preserve the outer-proxy, pre-handshake, security-error
+scope; notify both local frontends promptly; close without target traffic or
+TCP/H2 fallback; and retain successful H2/H3 transfers and concurrent FIN tests.
+The focused TLS gate checks disabled and implicit classic preambles, explicit
+local failure within its bound, clean client exit, zero target connections, and
+a TCP canary on the H3 endpoint that detects forbidden fallback attempts.
+
 ## Adding or removing an entry
 
 Use the next stable identifier and record:
