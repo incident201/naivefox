@@ -142,7 +142,7 @@ def passive_document(pcap, port, protocol, row, sample):
     features.validate_features(values)
     return {
         "schema_version": features.SCHEMA_VERSION, "protocol": protocol,
-        "scenario": "browser_page", "label": row["label"], "naivefox_arm": row["naivefox_arm"],
+        "scenario": row["scenario"], "label": row["label"], "naivefox_arm": row["naivefox_arm"],
         "session_id": sample, "experiment_block": row["experiment_block"], "features": values,
     }, wire_summary(events)
 

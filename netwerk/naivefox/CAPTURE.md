@@ -4627,6 +4627,37 @@ durations are no more than 10% worse, and small/wake latency is no more than
 15% worse. Early views are regression diagnostics because startup is unchanged.
 Every short row is descriptive and ineligible for later pooling.
 
+The codec/race suite, H2/H3 transport correctness, and one active-application
+loopback block passed. Loopback reduced complete IP bytes by 27.59--28.50% and
+post-startup WS filler by 56.26--58.44%, which admitted one controlled H2
+block to test whether the mechanism survived real link serialization.
+
+It did not. The six-session H2 block used the same Firefox A/B application and
+same binary/server for generic and asymmetric arms. All participants completed
+the exact workload. An independent TShark recount matched every reported
+outer-flow packet count and `ip.len` total exactly. Both listeners still failed
+the preregistered traffic, filler, and bulk-speed gates:
+
+| Listener | Complete IP vs generic | WS filler vs generic | Download rate loss | Upload rate loss | Parallel rate loss | Small latency | Wake latency |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| SOCKS | +19.85% | +31.97% | +46.30% | +13.79% | +28.72% | -17.00% | -44.81% |
+| HTTP | +9.39% | +14.87% | +40.97% | +0.90% | +15.62% | -16.75% | -43.84% |
+
+Negative latency is faster. The candidate improved small and wake latency, but
+its literal bulk state emitted a 256-KiB response after fragmented 16-KiB
+credit returns. In the SOCKS row it sent 116 such cells for the same useful
+download for which generic sent 40; downstream filler rose by more than the
+uplink asymmetry saved. HTTP transactions had previously accumulated credit
+before granting a bulk response. Removing their barrier without adding a
+productive-capacity guard destroyed that batching effect.
+
+This one block is mechanism screening, not residual inference. Early/Whole
+distances remain descriptive. Because both H2 listener rows failed the explicit
+gate, the H3 performance screen and heavy matrix were not run. The experimental
+selector remains non-default for reproducibility. A future reopening would need
+one new causal constraint: grant 256 KiB only when enough useful downstream data
+is currently sendable, or deliberately coalesce fragmented credits first.
+
 ### Superseded idle-reference diagnostic
 
 The earlier idle-reference experiment is invalid as a matched-workload
@@ -4721,9 +4752,11 @@ The cache marker was not changed to pretend that attestation existed. All
 participants used the same hash-pinned Caddy binary, and the measured client
 package stayed unchanged.
 
-The feature extractor retains the broad `browser_page` scenario tag. The
-application manifest and complete per-participant admission records identify
-this active workload; no earlier idle-page dataset was pooled into it.
+The archived primary feature documents retain the broad `browser_page`
+scenario tag. The application manifest and complete per-participant admission
+records identify that active workload; no earlier idle-page dataset was pooled
+into it. The extractor now preserves the schedule's scenario label, so matched
+application campaigns emit `matched_application` in future feature documents.
 
 
 ## Sensitive data handling

@@ -36,7 +36,7 @@ class HybridMatrixTests(unittest.TestCase):
                 {"time": .2, "frame": 2, "flow": "0", "wire_size": 1200, "direction": -1}]
         self.assertEqual(MATRIX.wire_summary(MATRIX.merge_outer_events([], quic))["outer_flows"], 1)
 
-    def test_passive_observer_does_not_drop_late_websocket_traffic(self):
+    def test_passive_observer_preserves_scenario_and_late_websocket_traffic(self):
         def event(time, frame, flow, size, direction, syn=False, packet_types=()):
             return {"time": time, "frame": frame, "flow": flow, "wire_size": size,
                     "transport_size": size - 40, "direction": direction, "syn": syn, "ack": False,
@@ -45,7 +45,8 @@ class HybridMatrixTests(unittest.TestCase):
         tcp = [event(.3, 3, "0", 60, 1, True), event(.4, 4, "0", 1500, -1)]
         quic = [event(.1, 1, "0", 1280, 1, packet_types=("0",)), event(.2, 2, "0", 1200, -1)]
         merged = MATRIX.merge_outer_events(tcp, quic)
-        row = {"label": "naivefox", "naivefox_arm": "native-no-connect-hybrid-socks", "experiment_block": "block-0"}
+        row = {"scenario": "matched_application", "label": "naivefox",
+               "naivefox_arm": "native-no-connect-hybrid-socks", "experiment_block": "block-0"}
         with mock.patch.object(MATRIX, "outer_events", return_value=(merged, tcp, quic, [])), \
              mock.patch.object(MATRIX.features, "extract_handshake"), \
              mock.patch.object(MATRIX.features, "extract_transport_parameters"), \
@@ -56,6 +57,7 @@ class HybridMatrixTests(unittest.TestCase):
         self.assertEqual(document["features"]["whole_packet_count"], 4)
         self.assertEqual(document["features"]["whole_server_wire_bytes"], 2700)
         self.assertEqual(document["features"]["lifecycle_connection_count"], 2)
+        self.assertEqual(document["scenario"], "matched_application")
 
     def test_late_websocket_cannot_change_early_views(self):
         analysis = MATRIX.module("hybrid_invariance_analysis", "analyze-camouflage-arms.py")
@@ -83,7 +85,8 @@ class HybridMatrixTests(unittest.TestCase):
                     stable = family == protocol and flow_filter == start_filter
                     output.update({"tls_client_hello_count": 1 if stable else variation,
                                    "tls_cipher_stable" if stable else f"tls_cipher_late_{variation}": 1})
-                row = {"label": "naivefox", "naivefox_arm": "native-no-connect-hybrid-socks", "experiment_block": "block"}
+                row = {"scenario": "browser_page", "label": "naivefox",
+                       "naivefox_arm": "native-no-connect-hybrid-socks", "experiment_block": "block"}
                 with mock.patch.object(MATRIX, "outer_events", return_value=(MATRIX.merge_outer_events(tcp, quic), tcp, quic, records)),                      mock.patch.object(MATRIX.features, "extract_handshake", side_effect=handshake),                      mock.patch.object(MATRIX.features, "extract_transport_parameters"):
                     document, _ = MATRIX.passive_document(Path("unused"), 443, protocol, row, "sample")
                 documents.append(document["features"])
