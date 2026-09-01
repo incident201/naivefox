@@ -75,13 +75,19 @@ forward-proxy authority for authentication and destination access, while
 preserving valid TLS certificates and the `continuous-bulk-pipeline` profile.
 
 Current server releases also require an absolute `application_root` pointing
-to a complete validated copy of the released application template. Caddy loads,
-renders and pads it once during provisioning; there is no application embedded
-in the plugin and no per-request disk read. Native clients consume the fixed
-paths and sizes without executing or rendering the SPA. Operators may customize
-the documented HTML/CSS/JS/SVG sources, but an arbitrary static website or a
-Caddy binary with only forwardproxy cannot serve no-connect. Match the module,
-template contract, authentication contract and profile during upgrades.
+to a complete seven-file application. Caddy reads and validates it twice during
+provisioning, requires identical stable snapshots, pads it once, and then serves
+only memory. There is no embedded application, external manifest generator or
+per-request disk read. Restarting/reloading the service after replacing the
+directory is sufficient.
+
+Native clients consume the fixed paths and sizes without executing the SPA.
+Production `app.js` is ordinary operator content served verbatim before padding;
+it has no NFC1 runtime, injected profile, carrier endpoint names or required
+markers. The historical browser carrier remains only under the server
+repository's `lab/` fixtures. An arbitrary static website still must satisfy
+the documented seven-resource path/size contract. Match the module, template,
+authentication contract and profile during upgrades.
 
 ## Exact port boundary
 
