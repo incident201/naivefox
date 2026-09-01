@@ -68,14 +68,20 @@ Build Caddy with both modules using the server repository's
 [build and configuration instructions](https://github.com/incident201/naivefox-transport#readme)
 and [combined Caddyfile example](https://github.com/incident201/naivefox-transport/blob/main/examples/Caddyfile).
 Configure `forward_proxy` authentication and its normal `hosts`, `ports` and
-`acl` policy once. The transport module uses that same forward-proxy authority
-for authentication and destination access, while preserving valid TLS
-certificates and the `continuous-bulk-pipeline` profile. An arbitrary static
-website or a Caddy binary with only forwardproxy cannot serve no-connect.
+`acl` policy once. Keep the hostless `:443` site address alongside the named
+proxy hostname: classic CONNECT carries the destination authority and otherwise
+misses a hostname-only Caddy route. The transport module uses the same
+forward-proxy authority for authentication and destination access, while
+preserving valid TLS certificates and the `continuous-bulk-pipeline` profile.
 
-The module owns the server SPA/assets and protocol endpoints. Native clients
-consume that HTTP contract without executing or rendering the SPA. Match the
-module and client authentication contract and profile during upgrades.
+Current server releases also require an absolute `application_root` pointing
+to a complete validated copy of the released application template. Caddy loads,
+renders and pads it once during provisioning; there is no application embedded
+in the plugin and no per-request disk read. Native clients consume the fixed
+paths and sizes without executing or rendering the SPA. Operators may customize
+the documented HTML/CSS/JS/SVG sources, but an arbitrary static website or a
+Caddy binary with only forwardproxy cannot serve no-connect. Match the module,
+template contract, authentication contract and profile during upgrades.
 
 ## Exact port boundary
 
