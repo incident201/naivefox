@@ -30,10 +30,11 @@ bool ValidKind(Kind aKind) { return aKind >= Kind::Open && aKind <= Kind::Ack; }
 
 }  // namespace
 
-bool Encode(uint32_t aSequence, size_t aCapacity,
-            const std::vector<Frame>& aFrames, std::vector<uint8_t>& aOutput) {
+static bool EncodeImpl(uint32_t aSequence, size_t aCapacity, PressureHint aHint,
+                       const std::vector<Frame>& aFrames,
+                       std::vector<uint8_t>& aOutput) {
   if (aCapacity < kCellHeader || aCapacity > kMaxCell ||
-      aFrames.size() > kMaxFrames) {
+      aFrames.size() > kMaxFrames || aHint > PressureHint::Bulk) {
     return false;
   }
   size_t used = kCellHeader;
@@ -60,6 +61,7 @@ bool Encode(uint32_t aSequence, size_t aCapacity,
   WriteUint32(output.data() + 8, static_cast<uint32_t>(used));
   output[12] = static_cast<uint8_t>(aFrames.size() >> 8);
   output[13] = static_cast<uint8_t>(aFrames.size());
+  output[14] = static_cast<uint8_t>(aHint);
   size_t pos = kCellHeader;
   for (const Frame& frame : aFrames) {
     output[pos] = static_cast<uint8_t>(frame.kind);
@@ -77,15 +79,29 @@ bool Encode(uint32_t aSequence, size_t aCapacity,
   return true;
 }
 
-bool Decode(uint32_t aExpectedSequence, size_t aExpectedCapacity,
-            const std::vector<uint8_t>& aInput, std::vector<Frame>& aFrames) {
+bool Encode(uint32_t aSequence, size_t aCapacity,
+            const std::vector<Frame>& aFrames, std::vector<uint8_t>& aOutput) {
+  return EncodeImpl(aSequence, aCapacity, PressureHint::Idle, aFrames, aOutput);
+}
+
+bool EncodeRealtime(uint32_t aSequence, size_t aCapacity, PressureHint aHint,
+                    const std::vector<Frame>& aFrames,
+                    std::vector<uint8_t>& aOutput) {
+  return EncodeImpl(aSequence, aCapacity, aHint, aFrames, aOutput);
+}
+
+static bool DecodeImpl(uint32_t aExpectedSequence, size_t aExpectedCapacity,
+                       const std::vector<uint8_t>& aInput, bool aRealtime,
+                       PressureHint& aHint, std::vector<Frame>& aFrames) {
   if (aExpectedCapacity < kCellHeader || aExpectedCapacity > kMaxCell ||
       aInput.size() != aExpectedCapacity ||
       std::memcmp(aInput.data(), "NFC1", 4) != 0 ||
-      ReadUint32(aInput.data() + 4) != aExpectedSequence || aInput[14] != 0 ||
-      aInput[15] != 0) {
+      ReadUint32(aInput.data() + 4) != aExpectedSequence || aInput[15] != 0 ||
+      (!aRealtime && aInput[14] != 0) ||
+      aInput[14] > static_cast<uint8_t>(PressureHint::Bulk)) {
     return false;
   }
+  const PressureHint hint = static_cast<PressureHint>(aInput[14]);
   const size_t used = ReadUint32(aInput.data() + 8);
   const size_t count = (size_t(aInput[12]) << 8) | aInput[13];
   if (used < kCellHeader || used > aInput.size() || count > kMaxFrames ||
@@ -123,8 +139,23 @@ bool Decode(uint32_t aExpectedSequence, size_t aExpectedCapacity,
                                            header + kFrameHeader + length)});
     pos += kFrameHeader + length;
   }
+  aHint = hint;
   aFrames = std::move(frames);
   return true;
+}
+
+bool Decode(uint32_t aExpectedSequence, size_t aExpectedCapacity,
+            const std::vector<uint8_t>& aInput, std::vector<Frame>& aFrames) {
+  PressureHint hint = PressureHint::Idle;
+  return DecodeImpl(aExpectedSequence, aExpectedCapacity, aInput, false, hint,
+                    aFrames);
+}
+
+bool DecodeRealtime(uint32_t aExpectedSequence, size_t aExpectedCapacity,
+                    const std::vector<uint8_t>& aInput, PressureHint& aHint,
+                    std::vector<Frame>& aFrames) {
+  return DecodeImpl(aExpectedSequence, aExpectedCapacity, aInput, true, aHint,
+                    aFrames);
 }
 
 bool StreamState::Fail() {

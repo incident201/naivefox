@@ -24,10 +24,10 @@ spec.loader.exec_module(fixture)
 CASES = (
     "missing-subprotocol", "wrong-subprotocol", "unsolicited-compression",
     "text", "oversize", "capacity", "sequence", "future-ack", "decreasing-ack",
-    "ack-stream", "ack-body",
+    "ack-stream", "ack-body", "hint",
 )
 HANDSHAKE_CASES = frozenset(CASES[:3])
-ACK_CASES = frozenset(CASES[7:])
+ACK_CASES = frozenset(CASES[7:11])
 
 
 def frame(opcode, body):
@@ -40,11 +40,13 @@ def frame(opcode, body):
     return head + b"\x7f" + struct.pack("!Q", length) + body
 
 
-def cell(sequence=20, capacity=512, ack=None, stream=0, body=b""):
+def cell(sequence=20, capacity=512, ack=None, stream=0, body=b"", hint=0):
     frames = b"" if ack is None else struct.pack("!B3xIII", 8, stream, ack, len(body)) + body
     used = 16 + len(frames)
     fixture.require(used <= capacity, "invalid adversarial fixture capacity")
-    return b"NFC1" + struct.pack("!IIHH", sequence, used, int(ack is not None), 0) + frames + bytes(capacity - used)
+    return (b"NFC1" + struct.pack("!IIHBB", sequence, used,
+                                  int(ack is not None), hint, 0) +
+            frames + bytes(capacity - used))
 
 
 def read_client_frame(sock):
@@ -61,7 +63,7 @@ def read_client_frame(sock):
     return first & 15, bool(first & 0x80), bytes(value ^ mask[index % 4] for index, value in enumerate(body))
 
 
-def receive_client_cell(sock):
+def receive_client_cell(sock, transport):
     body = bytearray()
     started = False
     while True:
@@ -72,7 +74,12 @@ def receive_client_cell(sock):
         fixture.require(len(body) <= 262144, "client fragmented message exceeded fixture bound")
         if final:
             break
-    fixture.require(len(body) in (512, 65536, 262144) and body[:4] == b"NFC1",
+    capacities = ((512, 4096, 16384, 131072)
+                  if transport == "no-connect-hybrid-asymmetric"
+                  else (512, 65536, 262144))
+    fixture.require(len(body) in capacities and body[:4] == b"NFC1" and
+                    body[14] <= (2 if transport == "no-connect-hybrid-asymmetric" else 0) and
+                    body[15] == 0,
                     "client did not send a shaped NFC1 message")
     return struct.unpack_from("!I", body, 4)[0]
 
@@ -95,7 +102,7 @@ class MaliciousWebSocket(socketserver.BaseRequestHandler):
                     key, value = line.split(":", 1)
                     headers[key.lower()] = value.strip()
             fixture.require(headers.get("upgrade", "").lower() == "websocket" and
-                            headers.get("sec-websocket-protocol") == "nfc1.hybrid.v1" and
+                            headers.get("sec-websocket-protocol") == server.protocol and
                             headers.get("sec-websocket-version") == "13", "missing genuine WebSocket handshake")
             fixture.require("authorization" not in headers and "proxy-authorization" not in headers,
                             "proxy credentials leaked into WebSocket headers")
@@ -108,14 +115,14 @@ class MaliciousWebSocket(socketserver.BaseRequestHandler):
                      "Sec-WebSocket-Accept: " + accept]
             if server.case != "missing-subprotocol":
                 reply.append("Sec-WebSocket-Protocol: " +
-                             ("wrong.protocol" if server.case == "wrong-subprotocol" else "nfc1.hybrid.v1"))
+                             ("wrong.protocol" if server.case == "wrong-subprotocol" else server.protocol))
             if server.case == "unsolicited-compression":
                 reply.append("Sec-WebSocket-Extensions: permessage-deflate")
             fixture.require(server.allow_response.wait(10), "local stream did not reach the attack gate")
             self.request.sendall(("\r\n".join(reply) + "\r\n\r\n").encode("ascii"))
             server.upgraded.set()
             if server.case not in HANDSHAKE_CASES:
-                upstream = receive_client_cell(self.request) if server.case in ACK_CASES else 20
+                upstream = receive_client_cell(self.request, server.transport) if server.case in ACK_CASES else 20
                 body = cell()
                 opcode = 2
                 if server.case == "text":
@@ -136,6 +143,8 @@ class MaliciousWebSocket(socketserver.BaseRequestHandler):
                     body = cell(ack=upstream, stream=1)
                 elif server.case == "ack-body":
                     body = cell(ack=upstream, body=b"x")
+                elif server.case == "hint":
+                    body = cell(hint=3)
                 server.attack_at = time.monotonic()
                 self.request.sendall(frame(opcode, body))
                 server.binary_sent += int(opcode == 2)
@@ -158,9 +167,12 @@ class MaliciousServer(socketserver.ThreadingTCPServer):
     daemon_threads = True
     block_on_close = False
 
-    def __init__(self, case):
+    def __init__(self, case, transport):
         super().__init__(("127.0.0.1", 0), MaliciousWebSocket)
         self.case = case
+        self.transport = transport
+        self.protocol = ("nfc1.hybrid.a1" if transport == "no-connect-hybrid-asymmetric"
+                         else "nfc1.hybrid.v1")
         self.connections = 0
         self.binary_sent = 0
         self.attack_at = None
@@ -194,7 +206,7 @@ def run_case(args, base, protocol, case, listener):
     run.mkdir(mode=0o700)
     fixture.issue_certificates(run)
     target = fixture.TargetServer()
-    malicious = MaliciousServer(case)
+    malicious = MaliciousServer(case, args.transport)
     processes = []
     try:
         user, password = fixture.fixture_credentials()
@@ -202,7 +214,7 @@ def run_case(args, base, protocol, case, listener):
         caddy, port = fixture.start_caddy(args, run, protocol, target.server_address[1], user, password)
         processes.append(caddy)
         client, ports = fixture.start_client(args, run, "client", protocol, port,
-                                            "no-connect-hybrid", user, password, 1)
+                                            args.transport, user, password, 1)
         processes.append(client)
         with fixture.open_tunnel(ports, listener, target.server_address[1]) as local:
             local.sendall(b"E")
@@ -260,11 +272,13 @@ def main():
     parser.add_argument("--protocol", choices=("h2", "h3", "both"), default="both")
     parser.add_argument("--listener", choices=("socks", "http", "both"), default="socks")
     parser.add_argument("--case", choices=CASES, action="append")
+    parser.add_argument("--transport", choices=("no-connect-hybrid",
+                                                  "no-connect-hybrid-asymmetric"),
+                        default="no-connect-hybrid")
     args = parser.parse_args()
     args.objdir = args.objdir.resolve(strict=True)
     args.caddy = args.caddy.resolve(strict=True)
     args.runtime = (args.runtime or args.objdir / "dist/bin/naivefox").resolve(strict=True)
-    args.transport = "no-connect-hybrid"
     root = (args.work_dir or args.objdir / "naivefox-fixture").resolve()
     fixture.require(root.is_relative_to(args.objdir), "work directory must stay below objdir")
     root.mkdir(parents=True, exist_ok=True)

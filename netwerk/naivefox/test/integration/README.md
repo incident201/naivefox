@@ -161,6 +161,11 @@ All adapters accept `--work-dir` below their object directory. These are basic
 functional checks, not throughput, long-idle heartbeat, or concurrency evidence.
 Android's separate embedded argument matrix also checks explicit C-ABI
 selection, JSON precedence, unchanged configuration bytes, and invalid names.
+The directional experiment uses the same adapters with
+`--transport no-connect-hybrid-asymmetric`. Its server counters must contain
+only 4/16/128-KiB uplink and 8/64/256-KiB downlink activity capacities, plus
+512-byte idle cells, and must identify the equal-length `nfc1.hybrid.a1`
+subprotocol. Generic hybrid remains a separate control in the same binaries.
 
 ## Hybrid WebSocket failure checks
 
@@ -222,6 +227,12 @@ For comparative measurements, use
 resources, API requests, active WebSocket jobs and idle periods as the proxied
 application. The earlier idle-WebSocket capture is a superseded diagnostic,
 not a valid baseline for active Whole, throughput or traffic comparisons.
+Pass `--asymmetric-screen` only with `--purpose pilot` and at most two blocks.
+The screen contains Firefox A/B plus generic and asymmetric hybrid through both
+listeners. It cannot trigger or stand in for a full matrix. Potential requires
+at least 15% less complete-session IP traffic and 30% less post-startup WS
+filler than generic, no more than 10% download/upload/parallel duration growth,
+and no more than 15% small/wake latency growth.
 
 The Linux configuration-file CLI handles SIGINT and SIGTERM through the
 existing local-server stop control. It closes listeners and active requests,

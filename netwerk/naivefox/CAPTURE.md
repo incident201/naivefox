@@ -4594,6 +4594,39 @@ ten-block H2/H3 and listener matrix must use one newly frozen client/server
 pair and fresh contemporary classic/no-connect controls. Never splice the
 pre-refinement smoke rows into that matrix or label them final results.
 
+### Directional shaped WebSocket screen
+
+The remaining causal question is whether WS can remove HTTP transaction
+barriers without discarding the selected finite transport's directional
+capacity model. All-ref client history and complete server history contain no
+outer WS experiment with the four finite pairs. The finite state lineage is
+`d444393a61e`, `02f96ed1e0b4`, `539824bba529`, and `0c20c8df6d88`; native
+generic WS is `a5907bf584d1` with the full-capacity refinement at
+`84f0bd95a9cb`. Those earlier changes altered finite leases, bulk pipelining,
+or generic WS dispatch, but never combined directional capacities with the
+outer WS.
+
+The new `no-connect-hybrid-asymmetric` selector and generic hybrid live in the
+same client and Caddy binaries. Equal-length subprotocol tokens keep handshake
+length fixed. A WS-only residual pressure hint replaces `X-App-State` after
+startup; it cannot create a message by itself. The candidate uses 16/256 KiB
+for download, 128/8 KiB for upload, 4/8 KiB for interactive, 128/64 KiB for
+mixed, and 512 bytes for idle. Generic retains 512/64/256 KiB. This matters
+because generic already uses 512-byte pure control cells: blindly replacing
+them with 16/8 KiB can increase reverse filler, so capacity/filler counters are
+an admission requirement rather than an assumed win.
+
+Do not start a heavy matrix immediately. First require codec/state/race tests,
+live H2/H3 correctness, then one same-application loopback block. If mechanism
+counters are correct, run one controlled H2 block containing Firefox A/B plus
+generic/asymmetric over both listeners. H3 receives the same one-block screen
+only if H2 shows material potential. A full campaign is admitted only when
+every screened listener shows at least 15% less complete-session IP traffic
+and 30% less post-startup WS filler than generic, download/upload/parallel
+durations are no more than 10% worse, and small/wake latency is no more than
+15% worse. Early views are regression diagnostics because startup is unchanged.
+Every short row is descriptive and ineligible for later pooling.
+
 ### Superseded idle-reference diagnostic
 
 The earlier idle-reference experiment is invalid as a matched-workload

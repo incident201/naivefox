@@ -147,7 +147,8 @@ H3 raw tunnels preserve byte-stream behavior without copying H2 internals:
 ## Transport and protocol selection
 
 `transport` chooses `classic`, `no-connect`, or experimental
-`no-connect-hybrid`; omission selects `classic`.
+`no-connect-hybrid`, or the separate `no-connect-hybrid-asymmetric` screen;
+omission selects `classic`.
 The `proxy` URI independently selects strict H2 or H3. Both transports use its
 same parsed username and password. Classic uses Necko proxy authentication;
 no-connect carries their Basic value in a TLS-protected application AUTH frame.

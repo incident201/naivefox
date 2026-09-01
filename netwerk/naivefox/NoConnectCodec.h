@@ -29,6 +29,77 @@ enum class Kind : uint8_t {
   Ack,
 };
 
+enum class PressureHint : uint8_t { Idle = 0, Interactive, Bulk };
+
+enum class RealtimeActivity : uint8_t {
+  Idle = 0,
+  Interactive,
+  Download,
+  Upload,
+  Mixed,
+};
+
+inline constexpr PressureHint RealtimePressure(size_t aBytes, bool aControl) {
+  return aBytes >= 32768 ? PressureHint::Bulk
+                         : (aBytes || aControl ? PressureHint::Interactive
+                                               : PressureHint::Idle);
+}
+
+inline constexpr RealtimeActivity SelectRealtimeActivity(PressureHint aLocal,
+                                                         PressureHint aPeer) {
+  if (aLocal == PressureHint::Bulk && aPeer == PressureHint::Bulk) {
+    return RealtimeActivity::Mixed;
+  }
+  if (aLocal == PressureHint::Bulk) {
+    return RealtimeActivity::Upload;
+  }
+  if (aPeer == PressureHint::Bulk) {
+    return RealtimeActivity::Download;
+  }
+  return aLocal == PressureHint::Interactive ||
+                 aPeer == PressureHint::Interactive
+             ? RealtimeActivity::Interactive
+             : RealtimeActivity::Idle;
+}
+
+inline constexpr size_t RealtimeUpCapacity(RealtimeActivity aActivity) {
+  switch (aActivity) {
+    case RealtimeActivity::Download:
+      return 16 * 1024;
+    case RealtimeActivity::Upload:
+    case RealtimeActivity::Mixed:
+      return 128 * 1024;
+    case RealtimeActivity::Interactive:
+      return 4 * 1024;
+    default:
+      return 512;
+  }
+}
+
+inline constexpr size_t RealtimeDownCapacity(RealtimeActivity aActivity) {
+  switch (aActivity) {
+    case RealtimeActivity::Download:
+      return 256 * 1024;
+    case RealtimeActivity::Mixed:
+      return 64 * 1024;
+    case RealtimeActivity::Upload:
+    case RealtimeActivity::Interactive:
+      return 8 * 1024;
+    default:
+      return 512;
+  }
+}
+
+inline constexpr bool ValidRealtimeUpCapacity(size_t aCapacity) {
+  return aCapacity == 512 || aCapacity == 4 * 1024 || aCapacity == 16 * 1024 ||
+         aCapacity == 128 * 1024;
+}
+
+inline constexpr bool ValidRealtimeDownCapacity(size_t aCapacity) {
+  return aCapacity == 512 || aCapacity == 8 * 1024 || aCapacity == 64 * 1024 ||
+         aCapacity == 256 * 1024;
+}
+
 struct Frame {
   Kind kind = Kind::Data;
   uint32_t stream = 0;
@@ -42,8 +113,14 @@ struct Frame {
 // HTTP body or WebSocket message, including filler, with its granted capacity.
 bool Encode(uint32_t aSequence, size_t aCapacity,
             const std::vector<Frame>& aFrames, std::vector<uint8_t>& aOutput);
+bool EncodeRealtime(uint32_t aSequence, size_t aCapacity, PressureHint aHint,
+                    const std::vector<Frame>& aFrames,
+                    std::vector<uint8_t>& aOutput);
 bool Decode(uint32_t aExpectedSequence, size_t aExpectedCapacity,
             const std::vector<uint8_t>& aInput, std::vector<Frame>& aFrames);
+bool DecodeRealtime(uint32_t aExpectedSequence, size_t aExpectedCapacity,
+                    const std::vector<uint8_t>& aInput, PressureHint& aHint,
+                    std::vector<Frame>& aFrames);
 
 // Client-side state for the selected 512-KiB profile. The owner serializes
 // access and reserves queue space before creating a frame. Credit is returned

@@ -219,7 +219,9 @@ class NativeClient:
 
 
 def relay_protocols(protocol, transport):
-    return ("h3", "h2") if protocol == "h3" and transport == "no-connect-hybrid" else (protocol,)
+    return (("h3", "h2") if protocol == "h3" and
+            transport in ("no-connect-hybrid", "no-connect-hybrid-asymmetric")
+            else (protocol,))
 
 
 def wait_for_relay(bridge, timeout=10):
@@ -377,7 +379,9 @@ def main():
     parser.add_argument("--caddy", required=True, type=Path)
     parser.add_argument("--windows-python", required=True, type=Path)
     parser.add_argument("--protocol", choices=("h2", "h3", "both"), default="both")
-    parser.add_argument("--transport", choices=("no-connect", "no-connect-hybrid"), default="no-connect")
+    parser.add_argument("--transport", choices=("no-connect", "no-connect-hybrid",
+                                                  "no-connect-hybrid-asymmetric"),
+                        default="no-connect")
     parser.add_argument("--smoke", action="store_true")
     parser.add_argument("--work-dir", type=Path, help="private artifact parent below objdir")
     parser.add_argument("--classic-preamble", choices=("off", "default"), default="off")

@@ -31,7 +31,8 @@ reads `./config.json`; one positional argument selects another config:
 ./naivefox --transport=classic /absolute/path/to/config.json
 ```
 
-`--transport classic|no-connect|no-connect-hybrid` overrides the JSON `transport` field. It may
+`--transport classic|no-connect|no-connect-hybrid|no-connect-hybrid-asymmetric`
+overrides the JSON `transport` field. It may
 precede or follow the optional config path; without a path, it uses
 `./config.json`. The `--transport=value` form is also accepted. Both transports
 use the same percent-decoded username and password from the private `proxy`
@@ -90,6 +91,8 @@ The supported config is a strict NaiveProxy-compatible subset:
   requires a matching server and TCP access even when startup uses `quic://`;
   this explicit mode does not promise WebSocket over H3. See
   [the hybrid lifecycle](NO-CONNECT.md#experimental-hybrid-lifecycle).
+  `"no-connect-hybrid-asymmetric"` is a separate screening selector that keeps
+  generic hybrid in the same binary as its contemporary control.
 - `listen` is one URI or a non-empty array. `socks://` serves SOCKS5 CONNECT;
   without userinfo it uses the normal no-auth method. SOCKS credentials are
   optional, percent-decoded, and checked with RFC 1929 username/password
@@ -466,8 +469,9 @@ NaiveFoxRequestStop();
 name. `writable_profile_dir` must be an existing writable directory, and
 `runtime_lib_dir` is the absolute `lib/arm64-v8a` directory containing
 `libxul.so`. The fourth argument is `NULL` to honor the JSON transport (or
-default to `classic`), or exactly `"classic"`, `"no-connect"`, or
-`"no-connect-hybrid"` to override it. Empty and unknown values return
+default to `classic`), or exactly `"classic"`, `"no-connect"`,
+`"no-connect-hybrid"`, or `"no-connect-hybrid-asymmetric"` to override it.
+Empty and unknown values return
 `NAIVEFOX_STATUS_INVALID_ARGUMENT` before reserving or initializing Gecko.
 The override is applied before implicit preamble defaults; all JSON fields
 still undergo strict validation. Configuration bytes and credentials are not

@@ -38,9 +38,12 @@ NoConnectWebSocket::~NoConnectWebSocket() = default;
 
 nsresult NoConnectWebSocket::Start(const TunnelConfig& aConfig,
                                    const nsACString& aCookie,
-                                   const nsACString& aPath) {
+                                   const nsACString& aPath,
+                                   const nsACString& aProtocol) {
   MOZ_ASSERT(NS_IsMainThread());
-  if (mChannel || mClosing || aCookie.IsEmpty()) {
+  if (mChannel || mClosing || aCookie.IsEmpty() ||
+      !(aProtocol.EqualsLiteral("nfc1.hybrid.v1") ||
+        aProtocol.EqualsLiteral("nfc1.hybrid.a1"))) {
     return NS_ERROR_INVALID_ARG;
   }
   nsCOMPtr<nsIChannel> templateChannel;
@@ -96,8 +99,9 @@ nsresult NoConnectWebSocket::Start(const TunnelConfig& aConfig,
   MOZ_TRY(NS_MutateURI(uri).SetScheme("wss"_ns).Finalize(websocketUri));
   RefPtr<net::WebSocketChannel> websocket = new net::WebSocketSSLChannel();
   MOZ_TRY(websocket->InitNativeChannel(channel));
-  MOZ_TRY(websocket->SetProtocol("nfc1.hybrid.v1"_ns));
+  MOZ_TRY(websocket->SetProtocol(aProtocol));
   MOZ_TRY(websocket->SetPingInterval(0));
+  mProtocol = aProtocol;
   MOZ_TRY(websocket->AsyncOpenNative(websocketUri, origin, OriginAttributes(),
                                      0, this, nullptr));
   mChannel = std::move(websocket);
@@ -145,8 +149,7 @@ NS_IMETHODIMP NoConnectWebSocket::OnStart(nsISupports*) {
   if (NS_SUCCEEDED(rv)) {
     rv = mChannel->GetExtensions(extensions);
   }
-  if (NS_FAILED(rv) || !protocol.EqualsLiteral("nfc1.hybrid.v1") ||
-      !extensions.IsEmpty()) {
+  if (NS_FAILED(rv) || !protocol.Equals(mProtocol) || !extensions.IsEmpty()) {
     Close(NS_ERROR_ILLEGAL_VALUE);
     return NS_OK;
   }

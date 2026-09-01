@@ -130,6 +130,8 @@ TEST(NaiveFoxConfig, TransportSelectorUsesStrictSharedNames)
             Some(TransportMode::NoConnect));
   EXPECT_EQ(ParseTransportMode("no-connect-hybrid"_ns),
             Some(TransportMode::NoConnectHybrid));
+  EXPECT_EQ(ParseTransportMode("no-connect-hybrid-asymmetric"_ns),
+            Some(TransportMode::NoConnectHybridAsymmetric));
   for (const char* value :
        {"", "Classic", " no-connect", "no-connect ", "auto", "hybrid"}) {
     EXPECT_FALSE(ParseTransportMode(nsDependentCString(value)));
@@ -211,6 +213,20 @@ TEST(NaiveFoxConfig, HybridTransportIsExplicitAndDisablesClassicOptions)
   EXPECT_EQ(config.mTransport, TransportMode::Classic);
   EXPECT_EQ(config.mExtraHeaders.Length(), 1U);
   EXPECT_TRUE(config.mOuterSessionGate);
+}
+
+TEST(NaiveFoxConfig, AsymmetricHybridIsSeparateFromGenericHybrid)
+{
+  Config config;
+  nsAutoCString error;
+  const nsLiteralCString json =
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://user:pass@proxy.example","transport":"no-connect-hybrid-asymmetric"})"_ns;
+  ASSERT_EQ(ParseConfig(json, config, error), NS_OK) << error.get();
+  EXPECT_EQ(config.mTransport, TransportMode::NoConnectHybridAsymmetric);
+  ASSERT_EQ(
+      ParseConfig(json, config, error, Some(TransportMode::NoConnectHybrid)),
+      NS_OK);
+  EXPECT_EQ(config.mTransport, TransportMode::NoConnectHybrid);
 }
 
 TEST(NaiveFoxConfig, TransportOverridePrecedesDefaults)

@@ -17,7 +17,12 @@
 namespace mozilla::naivefox {
 
 enum class ListenerType : uint8_t { Socks5, HttpConnect };
-enum class TransportMode : uint8_t { Classic, NoConnect, NoConnectHybrid };
+enum class TransportMode : uint8_t {
+  Classic,
+  NoConnect,
+  NoConnectHybrid,
+  NoConnectHybridAsymmetric,
+};
 
 struct ListenerConfig final {
   ListenerType mType = ListenerType::Socks5;

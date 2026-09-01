@@ -121,6 +121,8 @@ after H2/H3 startup the hybrid opens a separate H1 WSS/TCP connection. Its H3
 option therefore needs both UDP and TCP access and is explicitly different
 from strict UDP-only `no-connect`. No transparent fallback or reconnect is
 provided. The startup and WS connections must both be counted in measurements.
+The asymmetric hybrid selector additionally requires the matching pressure-hint
+subprotocol. It is screening-only and does not establish a production benefit.
 
 The earlier experimental residual and throughput measurements used a full
 Firefox SPA worker. They cannot be attributed to the lean native client, which

@@ -289,7 +289,9 @@ def main():
     parser.add_argument("--serial")
     parser.add_argument("--host-alias", default="10.0.2.2")
     parser.add_argument("--protocol", choices=("h2", "h3", "both"), default="both")
-    parser.add_argument("--transport", choices=("no-connect", "no-connect-hybrid"), default="no-connect")
+    parser.add_argument("--transport", choices=("no-connect", "no-connect-hybrid",
+                                                  "no-connect-hybrid-asymmetric"),
+                        default="no-connect")
     parser.add_argument("--smoke", action="store_true")
     parser.add_argument("--work-dir", type=Path, help="private artifact parent below objdir")
     parser.add_argument("--parallel-batches", type=int, choices=range(1, 129), default=1)

@@ -7,6 +7,7 @@ from pathlib import Path
 import sys
 import unittest
 from unittest import mock
+from types import SimpleNamespace
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -70,6 +71,41 @@ def successful_records():
 
 
 class MatchedApplicationTests(unittest.TestCase):
+    def test_asymmetric_screen_uses_post_startup_filler_and_preregistered_gate(self):
+        def sample(arm, wire, filler, factor):
+            return {"naivefox_arm": arm, "whole": {"wire_bytes": wire},
+                    "carrier_shape": {"ws_upload_filler": filler // 2,
+                                      "ws_download_filler": filler - filler // 2},
+                    "application": {"stages": [
+                        {"stage": "download", "io_ms": 100 * factor},
+                        {"stage": "upload", "io_ms": 100 * factor},
+                        {"stage": "parallel", "io_ms": 100 * factor},
+                        {"stage": "small", "job_io_ms": [10 * factor]},
+                        {"stage": "wake", "job_io_ms": [10 * factor]},
+                    ]}}
+        samples = [sample("reference", 70, 0, 1), sample("reference", 70, 0, 1)]
+        arms = {}
+        for kind in ("socks", "http"):
+            generic = f"native-no-connect-hybrid-{kind}"
+            asymmetric = f"native-no-connect-hybrid-asymmetric-{kind}"
+            samples.extend((sample(generic, 100, 100, 1),
+                            sample(asymmetric, 80, 60, 1.05)))
+            arms[generic] = {"mean_distance": 0.3}
+            arms[asymmetric] = {"mean_distance": 0.2}
+        report = {"protocols": {"h2": {"views": {
+            view: {"arms": arms} for view in M.VIEWS}}}}
+        campaign = SimpleNamespace(protocol="h2", samples=samples,
+                                   args=SimpleNamespace(blocks=1, link="rtt40-20mbps"))
+        rows = M.summarize_asymmetric(campaign, report)
+        self.assertEqual(len(rows), 2)
+        self.assertTrue(all(row["potential_gate"]["pass"] for row in rows))
+        for row in rows:
+            self.assertAlmostEqual(row["complete_ip_reduction_percent"], 20)
+            self.assertAlmostEqual(row["transport_filler_reduction_percent"], 40)
+        campaign.args.link = "loopback"
+        self.assertFalse(any(row["potential_gate"]["pass"]
+                             for row in M.summarize_asymmetric(campaign, report)))
+
     def test_navigation_waits_for_load_and_does_not_retry_script_failures(self):
         driver = mock.Mock()
         driver.capabilities = {"pageLoadStrategy": "normal"}

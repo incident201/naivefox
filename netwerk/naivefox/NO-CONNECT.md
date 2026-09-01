@@ -11,6 +11,8 @@ the selected H2 or H3 route, then a native Firefox WebSocket over TLS/TCP takes
 over the same NFC1 session. This is explicitly a mixed protocol policy for an
 H3 startup, not WebSocket over QUIC or an implicit fallback. The original
 `no-connect` mode retains its strict H2/H3 finite-exchange behavior.
+`no-connect-hybrid-asymmetric` retains generic hybrid as a contemporary control
+and changes only post-startup WS capacity selection.
 
 The server implementation is maintained in the separate
 [naivefox-transport repository](https://github.com/incident201/naivefox-transport).
@@ -178,6 +180,30 @@ loops. A carrier still serves at most 32 concurrent logical streams.
 The ordinary anonymous server SPA can exercise the same realtime lifecycle
 without proxy credentials, but cannot open targets or send logical-stream
 frames. This is a browser control, not an authentication bypass.
+
+### Asymmetric shaped WebSocket screen
+
+Select `no-connect-hybrid-asymmetric` explicitly. It uses the equal-length
+subprotocol `nfc1.hybrid.a1`; generic hybrid continues to use
+`nfc1.hybrid.v1` in the same client and server binaries. Startup, NFC1 stream
+state, credits, ACK, one-message writer bound, heartbeat and failure behavior
+remain common. A WS-only residual pressure hint occupies reserved NFC1 header
+byte 14; HTTP and generic WS decoding remain strict and unchanged.
+
+| Activity | Client to server | Server to client |
+| --- | ---: | ---: |
+| Download | 16 KiB | 256 KiB |
+| Upload | 128 KiB | 8 KiB |
+| Interactive | 4 KiB | 8 KiB |
+| Mixed | 128 KiB | 64 KiB |
+| Idle heartbeat | 512 B | 512 B |
+
+The hint describes residual sendable pressure after the current cell. It never
+causes a message on its own. Partial payload and OPEN keep the 2-ms coalescing
+turn; data already filling its selected directional capacity and pure control
+dispatch immediately. The experiment first runs unit/live correctness and a
+short same-application generic/asymmetric screen. A full matrix is admitted
+only by the preregistered traffic, filler, throughput and latency gate.
 
 ## Verification and evidence
 

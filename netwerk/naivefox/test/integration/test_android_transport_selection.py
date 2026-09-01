@@ -16,7 +16,8 @@ class AndroidTransportSelectionTests(unittest.TestCase):
     def test_matrix_covers_default_json_and_explicit_overrides(self):
         cases = selection.selection_cases()
         self.assertEqual({case[2] for case in cases},
-                         {None, "classic", "no-connect", "no-connect-hybrid"})
+                         {None, "classic", "no-connect", "no-connect-hybrid",
+                          "no-connect-hybrid-asymmetric"})
         self.assertIn(("default-classic", None, None, "classic"), cases)
         self.assertIn(("json-no-connect", "no-connect", None, "no-connect"), cases)
         self.assertIn(("override-json-classic", "no-connect", "classic", "classic"), cases)
@@ -42,11 +43,13 @@ class AndroidTransportSelectionTests(unittest.TestCase):
         for protocol, wire in (("h2", "HTTP/2.0"), ("h3", "HTTP/3.0")):
             startup = self.request(proto=wire)
             websocket = self.request("GET", "/api/realtime", "HTTP/1.1")
-            selection.check_requests([startup, websocket], "no-connect-hybrid", protocol)
-            for invalid in ([startup], [websocket],
-                            [startup, {**websocket, "proto": wire}]):
-                with self.assertRaises(RuntimeError):
-                    selection.check_requests(invalid, "no-connect-hybrid", protocol)
+            for transport in ("no-connect-hybrid",
+                              "no-connect-hybrid-asymmetric"):
+                selection.check_requests([startup, websocket], transport, protocol)
+                for invalid in ([startup], [websocket],
+                                [startup, {**websocket, "proto": wire}]):
+                    with self.assertRaises(RuntimeError):
+                        selection.check_requests(invalid, transport, protocol)
 
 
 if __name__ == "__main__":

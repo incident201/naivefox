@@ -251,7 +251,8 @@ def start_caddy(args, run, protocol, target_port, user, password):
     mutator = getattr(args, "server_mutator", None)
     if mutator is not None:
         mutator(server)
-    hybrid = getattr(args, "transport", "no-connect") == "no-connect-hybrid"
+    hybrid = getattr(args, "transport", "no-connect") in (
+        "no-connect-hybrid", "no-connect-hybrid-asymmetric")
     if hybrid:
         server["protocols"] = ["h1", protocol]
     private_json(run / "caddy.json", config)
@@ -680,9 +681,34 @@ def check_smoke_requests(requests, protocol, hybrid, classic=False):
             "smoke selected the wrong WebSocket lifecycle")
 
 
+def check_ws_capacity_policy(stats, transport, complete=False):
+    capacities = stats.get("ws_cell_capacities", {})
+    incoming = {int(key.split()[1]) for key in capacities if key.startswith("in ")}
+    outgoing = {int(key.split()[1]) for key in capacities if key.startswith("out ")}
+    if transport == "no-connect-hybrid-asymmetric":
+        require(incoming and incoming <= {512, 4096, 16384, 131072},
+                "asymmetric hybrid used an invalid client-to-server capacity")
+        require(outgoing and outgoing <= {512, 8192, 65536, 262144},
+                "asymmetric hybrid used an invalid server-to-client capacity")
+        require((incoming - {512}) and (outgoing - {512}),
+                "asymmetric hybrid never used directional activity capacity")
+        if complete:
+            require({4096, 16384, 131072} <= incoming and
+                    {8192, 65536, 262144} <= outgoing,
+                    "complete asymmetric gate did not exercise every directional state")
+            activities = stats.get("ws_activities", {})
+            require(all(activities.get(f"out {state}", 0) > 0
+                        for state in ("interactive", "download", "upload", "mixed")),
+                    "complete asymmetric gate missed a server activity state")
+    else:
+        require(incoming and outgoing and incoming <= {512, 65536, 262144} and
+                outgoing <= {512, 65536, 262144},
+                "generic hybrid capacity policy changed")
+
+
 def run_smoke_protocol(args, base, protocol):
     transport = getattr(args, "transport", "no-connect")
-    hybrid = transport == "no-connect-hybrid"
+    hybrid = transport in ("no-connect-hybrid", "no-connect-hybrid-asymmetric")
     run = base / protocol
     run.mkdir(mode=0o700)
     issue_certificates(run)
@@ -733,6 +759,11 @@ def run_smoke_protocol(args, base, protocol):
             require(stats.get("ws_opened", 0) == 1 and stats.get("ws_messages_in", 0) >= 1 and
                     stats.get("ws_messages_out", 0) >= 1,
                     "hybrid smoke did not exchange bidirectional WebSocket cells")
+            expected_subprotocol = ("nfc1.hybrid.a1" if transport == "no-connect-hybrid-asymmetric"
+                                    else "nfc1.hybrid.v1")
+            require(stats.get("ws_subprotocols") == {expected_subprotocol: 1},
+                    "hybrid smoke selected the wrong shaping subprotocol")
+            check_ws_capacity_policy(stats, transport)
         else:
             require(stats.get("ws_opened", 0) == 0, "finite HTTP smoke unexpectedly opened WebSocket")
         expected_protocol = "HTTP/3.0" if protocol == "h3" else "HTTP/2.0"
@@ -757,7 +788,7 @@ def run_smoke_protocol(args, base, protocol):
 
 def run_protocol(args, base, protocol):
     transport = getattr(args, "transport", "no-connect")
-    hybrid = transport == "no-connect-hybrid"
+    hybrid = transport in ("no-connect-hybrid", "no-connect-hybrid-asymmetric")
     run = base / protocol
     run.mkdir(mode=0o700)
     issue_certificates(run)
@@ -822,6 +853,11 @@ def run_protocol(args, base, protocol):
             require(stats.get("ws_opened", 0) >= 1, "hybrid never established WebSocket")
             require(stats.get("ws_messages_in", 0) >= 1 and stats.get("ws_messages_out", 0) >= 1,
                     "hybrid did not exchange bidirectional WebSocket cells")
+            expected_subprotocol = ("nfc1.hybrid.a1" if transport == "no-connect-hybrid-asymmetric"
+                                    else "nfc1.hybrid.v1")
+            require(set(stats.get("ws_subprotocols", {})) == {expected_subprotocol},
+                    "hybrid selected the wrong shaping subprotocol")
+            check_ws_capacity_policy(stats, transport, complete=True)
             if getattr(args, "idle_seconds", 2) >= 27:
                 require(stats.get("idle_heartbeats", 0) >= 1,
                         "hybrid long idle did not exercise application heartbeat")
@@ -875,7 +911,9 @@ def main():
     parser.add_argument("--caddy", type=Path, required=True)
     parser.add_argument("--runtime", type=Path)
     parser.add_argument("--protocol", choices=("h2", "h3", "both"), default="both")
-    parser.add_argument("--transport", choices=("no-connect", "no-connect-hybrid"), default="no-connect")
+    parser.add_argument("--transport", choices=("no-connect", "no-connect-hybrid",
+                                                  "no-connect-hybrid-asymmetric"),
+                        default="no-connect")
     parser.add_argument("--smoke", action="store_true", help="bounded basic byte/lifecycle gate without the full concurrency matrix")
     parser.add_argument("--work-dir", type=Path, help="private artifact parent below objdir")
     parser.add_argument("--idle-seconds", type=int, choices=range(2, 31), default=2, metavar="2..30")
