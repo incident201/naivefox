@@ -1,0 +1,210 @@
+{
+  "schema": "naivefox-fingerprint-observation-v1",
+  "observed_on": "2026-09-05",
+  "verdict": "PASS: observed client JA3 and nDPI JA4 agree across browser and proxy roles",
+  "scope": {
+    "platform": "Linux x86_64, Ubuntu24Dev WSL",
+    "transport": "H2/TLS over IPv4 TCP",
+    "window_seconds": 8,
+    "profile": "fresh",
+    "browser_sites": 4,
+    "caddy_browser_sessions": 2,
+    "proxy_sessions_per_role": 1,
+    "roles": [
+      "Firefox browser",
+      "Firefox HTTPS CONNECT",
+      "NaiveFox classic",
+      "NaiveFox no-connect"
+    ],
+    "excluded": [
+      "H3",
+      "session resumption",
+      "other browser versions",
+      "other operating systems",
+      "hybrid"
+    ]
+  },
+  "tools": {
+    "nfstream": "6.6.0",
+    "tshark": "TShark (Wireshark) 4.2.2 (Git v4.2.2 packaged as 4.2.2-1.1build3)."
+  },
+  "reference": {
+    "ja3": "9d42e90b0225e779f03141ddcd699df2",
+    "ndpi_ja4": "t13d1517h2_8daaf6152771_3cbfd9057e0d"
+  },
+  "inputs": {
+    "naivefox_release": "naivefox-20260831-b5a081b778d2",
+    "naivefox_archive_sha256": "44114f592cdb02f5d0e4b0a5703d1b273a5c9828d325936fb16f65e1e66d4abe",
+    "naivefox_manifest_sha256": "8b69ef3770c0308823d1ea14401ce02797ffbcb0c413130a15c88b48ab0996ee",
+    "firefox_version": "157.0a1",
+    "firefox_build_id": "20260829211045",
+    "firefox_archive_sha256": "10d6cf659b8c175ee523f5d1cf784b14fb09c3f2a615ad989e5fa23589cc9de5",
+    "caddy_sha256": "ea11d2fe58bd8c1862d31aadc993c2b239a1c5eb4bc070cc8934e6baa66d42b2",
+    "caddy_build_id": "caddy=v2.11.2 xcaddy=v0.4.6 module=github.com/caddyserver/forwardproxy@v0.0.0-20250118002110-d62c80d3dd2c=github.com/klzgrad/forwardproxy@d62c80d3dd2c706b6b87579844d2397bddd18317 transport=github.com/incident201/naivefox-transport@a9fdf3a7c532c6be798ad5c25a10bf4ecdd0aefb go=go1.25.12"
+  },
+  "interpretation": "No difference observed in these client fingerprint projections; not equality of all ClientHello fields or behavior",
+  "ndpi_label_caveat": "TLS.Wikipedia is an origin-specific sublabel and is not evidence of a browser/proxy difference",
+  "behavioral_score": null,
+  "observations": [
+    {
+      "sample_id": "control-curl",
+      "role": "curl-caddy",
+      "ja3": [
+        "0149f47eabf9a20d0893e2a44e5a6323"
+      ],
+      "ndpi_client_fingerprint": [
+        "t13d3112h2_e8f1e7e78f70_b26ce05bbdd6"
+      ],
+      "ndpi_labels": [
+        "TLS"
+      ],
+      "client_sni_present": true,
+      "pcap_sha256": "7de327a90325427f22d40c123a85c2d86a2ee0c8af2fe9a869e1236cf678747c",
+      "feature_artifact_sha256": "eb710429a4bd8bb0151057933ce17c6d0a122bcabedd3e59d5fa48896825196b"
+    },
+    {
+      "sample_id": "final-firefox-caddy",
+      "role": "firefox-caddy",
+      "ja3": [
+        "9d42e90b0225e779f03141ddcd699df2"
+      ],
+      "ndpi_client_fingerprint": [
+        "t13d1517h2_8daaf6152771_3cbfd9057e0d"
+      ],
+      "ndpi_labels": [
+        "TLS"
+      ],
+      "client_sni_present": true,
+      "pcap_sha256": "a8ab5b91df9a99daafd27dd9fa758e7eca9dd22b0e6f44ed0841d98824d8f88e",
+      "feature_artifact_sha256": "b1f527621581b5186cfbdb5e6476e5b413fa75ac48d86b848182138d2bab35ec"
+    },
+    {
+      "sample_id": "first-classic",
+      "role": "classic",
+      "ja3": [
+        "9d42e90b0225e779f03141ddcd699df2"
+      ],
+      "ndpi_client_fingerprint": [
+        "t13d1517h2_8daaf6152771_3cbfd9057e0d"
+      ],
+      "ndpi_labels": [
+        "TLS"
+      ],
+      "client_sni_present": true,
+      "pcap_sha256": "513d970d3059f0330f49553cac065d2618c436091dd20b6abf31a98163674248",
+      "feature_artifact_sha256": "6701bd38d917dc9b4fcdf60f720ebe6f1a3d9af2f58df6a4faaedc413305391c"
+    },
+    {
+      "sample_id": "first-firefox-connect",
+      "role": "firefox-connect",
+      "ja3": [
+        "9d42e90b0225e779f03141ddcd699df2"
+      ],
+      "ndpi_client_fingerprint": [
+        "t13d1517h2_8daaf6152771_3cbfd9057e0d"
+      ],
+      "ndpi_labels": [
+        "TLS"
+      ],
+      "client_sni_present": true,
+      "pcap_sha256": "432007dfc7843b616ee97b81b3c1914a16e2177724a219dcc4e6f2483472e36f",
+      "feature_artifact_sha256": "a1182106d8ab563d11139a1d4d51cb7089bd1e2e540e36ea12bd1f44a97cb2c9"
+    },
+    {
+      "sample_id": "first-no-connect",
+      "role": "no-connect",
+      "ja3": [
+        "9d42e90b0225e779f03141ddcd699df2"
+      ],
+      "ndpi_client_fingerprint": [
+        "t13d1517h2_8daaf6152771_3cbfd9057e0d"
+      ],
+      "ndpi_labels": [
+        "TLS"
+      ],
+      "client_sni_present": true,
+      "pcap_sha256": "7d9b011278e3837a5b38b7d9ee7c7820778935ff7f01faf7f0d8a878a75e5cf0",
+      "feature_artifact_sha256": "aa8fd950889a5706b249d43bfd654440436782bdd3fcdddfa47681d24c9184aa"
+    },
+    {
+      "sample_id": "routed-firefox-caddy",
+      "role": "firefox-caddy",
+      "ja3": [
+        "9d42e90b0225e779f03141ddcd699df2"
+      ],
+      "ndpi_client_fingerprint": [
+        "t13d1517h2_8daaf6152771_3cbfd9057e0d"
+      ],
+      "ndpi_labels": [
+        "TLS"
+      ],
+      "client_sni_present": true,
+      "pcap_sha256": "7c592d11e64dba3e066f17bad81478431ba51cf2af365dec5fa4b3f4c4e5e411",
+      "feature_artifact_sha256": "907fe53f4a0c45f955de09b1f7fb2a354e593264551c4aaebd894b2741d871b8"
+    },
+    {
+      "sample_id": "web-example",
+      "role": "firefox-web",
+      "ja3": [
+        "9d42e90b0225e779f03141ddcd699df2"
+      ],
+      "ndpi_client_fingerprint": [
+        "t13d1517h2_8daaf6152771_3cbfd9057e0d"
+      ],
+      "ndpi_labels": [
+        "TLS"
+      ],
+      "client_sni_present": true,
+      "pcap_sha256": "5b205a7b607124bee9419b87f9fa8c836cd31b95e1d510631a49d6266d60f921",
+      "feature_artifact_sha256": "c7655ae43bd267434981873de5c3025f661bb1df60a0e86acde75059b7f464d3"
+    },
+    {
+      "sample_id": "web-kernel",
+      "role": "firefox-web",
+      "ja3": [
+        "9d42e90b0225e779f03141ddcd699df2"
+      ],
+      "ndpi_client_fingerprint": [
+        "t13d1517h2_8daaf6152771_3cbfd9057e0d"
+      ],
+      "ndpi_labels": [
+        "TLS"
+      ],
+      "client_sni_present": true,
+      "pcap_sha256": "c911beb06a1c9d0c2bf687984e9cf371f2aade0f92b62ade24385526035b30d6",
+      "feature_artifact_sha256": "5d64e5f3bb14b834765c1cc73028755cb127f6176a3da9150a911e2721b05aa9"
+    },
+    {
+      "sample_id": "web-python",
+      "role": "firefox-web",
+      "ja3": [
+        "9d42e90b0225e779f03141ddcd699df2"
+      ],
+      "ndpi_client_fingerprint": [
+        "t13d1517h2_8daaf6152771_3cbfd9057e0d"
+      ],
+      "ndpi_labels": [
+        "TLS"
+      ],
+      "client_sni_present": true,
+      "pcap_sha256": "85231bf0c4e878a596688c570e4e5352634636f816cca815ce33fa13c856384d",
+      "feature_artifact_sha256": "40a16506bbbaae73ff964be57e4587ca8247e21720ee2df68c088492d8629171"
+    },
+    {
+      "sample_id": "web-wikipedia",
+      "role": "firefox-web",
+      "ja3": [
+        "9d42e90b0225e779f03141ddcd699df2"
+      ],
+      "ndpi_client_fingerprint": [
+        "t13d1517h2_8daaf6152771_3cbfd9057e0d"
+      ],
+      "ndpi_labels": [
+        "TLS.Wikipedia"
+      ],
+      "client_sni_present": true,
+      "pcap_sha256": "9da0725bc57d664d9c6dd0f993c7db9d225ac4b00a867a245d5fcae2c7eaf124",
+      "feature_artifact_sha256": "2a78b4f0f4771bdedebe301e5005dc53a5ea7ad33aad2a280616315f9686d006"
+    }
+  ]
+}

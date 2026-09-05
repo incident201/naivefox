@@ -1,0 +1,246 @@
+{
+  "schema": "naivefox-repetition-counterexample-v1",
+  "observed_on": "2026-09-05",
+  "inputs_ref": "observation-h2.json#/inputs",
+  "scope": {
+    "platform": "Linux x86_64, Ubuntu24Dev WSL",
+    "protocol": "H2/TLS over IPv4 TCP",
+    "window_seconds": 8,
+    "profiles": "fresh",
+    "server": "private loopback Caddy application; TLS verified with isolated CA",
+    "browser_activity": "ordinary sequential fetch uploads, not the no-connect browser carrier or WebSockets"
+  },
+  "workload": {
+    "chunks": 24,
+    "fixed_chunk_bytes": 4096,
+    "varied_chunk_bytes": "1024 + ((part * 2053 + 997) mod 7168), part=0..23",
+    "pause_after_each_ack_ms": 20,
+    "verification": "every block acknowledged by byte count and SHA-256, verified by browser and server"
+  },
+  "rule": {
+    "representation": "client-to-server TLS type-23 record lengths, including encrypted handshake records",
+    "pairing": "adjacent within each connection's client subsequence; overlapping occurrences counted; no joins across connections",
+    "minimum_pair_sum_bytes": 1024,
+    "session_statistic": "maximum count of any eligible pair, accumulated across connections",
+    "alarm_threshold": 10,
+    "hardcoded_pair": null
+  },
+  "verdict": "REJECT this generic repetition alarm: both ordinary Firefox upload controls trigger it",
+  "interpretation": "Simple record-size repetition is compatible with legitimate Firefox activity. This does not establish equality of the exact sequences, their frequency in everyday browsing, or indistinguishability of a whole transport.",
+  "similarity_score": null,
+  "fingerprints_match_reference": true,
+  "observations": [
+    {
+      "sample": "upload-firefox-fixed",
+      "role": "firefox-caddy",
+      "pattern": "fixed",
+      "chunks": 24,
+      "bytes_uploaded": 98304,
+      "packets_dropped": 0,
+      "maximum_pair_count": 14,
+      "alarm": true,
+      "most_common_pairs": [
+        [
+          [
+            79,
+            1470
+          ],
+          14
+        ],
+        [
+          [
+            1470,
+            2678
+          ],
+          14
+        ],
+        [
+          [
+            2678,
+            79
+          ],
+          13
+        ]
+      ],
+      "pcap_sha256": "902d25d0b06278dfb8dfea8f9d10bfa742c0f8c750e0895b39cd2356a7b0a824",
+      "features_sha256": "5cfed7ba0cea7d4894c0b9b7d86e191ab6e94c73cfda801cd15043db84e10c03"
+    },
+    {
+      "sample": "upload-firefox-varied",
+      "role": "firefox-caddy",
+      "pattern": "varied",
+      "chunks": 24,
+      "bytes_uploaded": 106204,
+      "packets_dropped": 0,
+      "maximum_pair_count": 12,
+      "alarm": true,
+      "most_common_pairs": [
+        [
+          [
+            84,
+            1470
+          ],
+          12
+        ],
+        [
+          [
+            84,
+            1471
+          ],
+          9
+        ],
+        [
+          [
+            160,
+            1471
+          ],
+          1
+        ]
+      ],
+      "pcap_sha256": "18727f8202f214e931dc2be4828e7bf70531011a5eacc93a4c4aeb917f90158e",
+      "features_sha256": "9727bafc4d1641bfe863f461f97de89b34a387cb1bab24b536dfd2f0929842fa"
+    },
+    {
+      "sample": "upload-firefox-connect-fixed",
+      "role": "firefox-connect",
+      "pattern": "fixed",
+      "chunks": 24,
+      "bytes_uploaded": 98304,
+      "packets_dropped": 0,
+      "maximum_pair_count": 23,
+      "alarm": true,
+      "most_common_pairs": [
+        [
+          [
+            4162,
+            109
+          ],
+          23
+        ],
+        [
+          [
+            109,
+            4162
+          ],
+          23
+        ],
+        [
+          [
+            224,
+            1844
+          ],
+          1
+        ]
+      ],
+      "pcap_sha256": "33456305f7ef0452c45a7253d6e0870725eb1c3fe09d97a31a3d729948a3abc2",
+      "features_sha256": "b45035b03549d3cb8e9b62d23b013af11dca8f3edc973d5de104466c0f1811d7"
+    },
+    {
+      "sample": "upload-classic-fixed",
+      "role": "classic",
+      "pattern": "fixed",
+      "chunks": 24,
+      "bytes_uploaded": 98304,
+      "packets_dropped": 0,
+      "maximum_pair_count": 7,
+      "alarm": false,
+      "most_common_pairs": [
+        [
+          [
+            1670,
+            2623
+          ],
+          7
+        ],
+        [
+          [
+            4267,
+            4267
+          ],
+          5
+        ],
+        [
+          [
+            1671,
+            2622
+          ],
+          4
+        ]
+      ],
+      "pcap_sha256": "2ee433ace9afb2d9362dc822b1dc88973e62248faa3393c23567b233a5f6ae24",
+      "features_sha256": "9cb125486a9740c85e23876ddfe519615ee0e4cc8f087afa3092b750bcec23d1"
+    },
+    {
+      "sample": "upload-no-connect-fixed",
+      "role": "no-connect",
+      "pattern": "fixed",
+      "chunks": 24,
+      "bytes_uploaded": 98304,
+      "packets_dropped": 0,
+      "maximum_pair_count": 244,
+      "alarm": true,
+      "most_common_pairs": [
+        [
+          [
+            1637,
+            2511
+          ],
+          244
+        ],
+        [
+          [
+            67,
+            1637
+          ],
+          243
+        ],
+        [
+          [
+            2511,
+            73
+          ],
+          192
+        ]
+      ],
+      "pcap_sha256": "09fe7c011c0a5d67e112e036c210caa4f162b4f0327cce6156af8bb7a2b3cbda",
+      "features_sha256": "6ccd1450f5c628e6bf6f7d8af248f4714ae3bbb9101ec2bb0febf9512b7162b1"
+    },
+    {
+      "sample": "upload-no-connect-varied",
+      "role": "no-connect",
+      "pattern": "varied",
+      "chunks": 24,
+      "bytes_uploaded": 106204,
+      "packets_dropped": 0,
+      "maximum_pair_count": 227,
+      "alarm": true,
+      "most_common_pairs": [
+        [
+          [
+            1637,
+            2511
+          ],
+          227
+        ],
+        [
+          [
+            67,
+            1637
+          ],
+          226
+        ],
+        [
+          [
+            2511,
+            73
+          ],
+          176
+        ]
+      ],
+      "pcap_sha256": "f262cfe70dde1dbdd5dd0547c86562c56f55c6702fe3a437ddc70bdbb90efd4c",
+      "features_sha256": "62be934b43b6e1e25136b7841f5bf33a726ac6764e6b0c843327cb50279b4c6f"
+    }
+  ],
+  "source_report_sha256": "2673b028b1b63662ca73d5cee009411782dce2661cd43a13133cfab1aae07eab",
+  "preregistered_plan_sha256": "06cab78ba6199157ae843c31a3af87a578704eff9f93891933fb4ec1cdbfba67"
+}

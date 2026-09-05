@@ -1,0 +1,57 @@
+{
+  "schema": "naivefox-scoped-classifier-outcome-v1",
+  "observed_on": "2026-09-05",
+  "inputs_ref": "observation-h2.json#/inputs",
+  "question_measured": "distinguishing labeled proxy/browser examples in a specified corpus, not whether traffic could legitimately originate from an arbitrary Firefox activity",
+  "scope": {
+    "protocol": "TLS/TCP endpoint sessions; H2 proxy",
+    "window_seconds": 8,
+    "profiles": "fresh",
+    "development_sessions": 33,
+    "calibration_sessions": 24,
+    "heldout_cases_per_role": 8,
+    "heldout_roles": [
+      "firefox",
+      "firefox-connect",
+      "classic",
+      "no-connect"
+    ],
+    "workload_mix": "four public origins and four private transfer/interactive recipes"
+  },
+  "observer": {
+    "model": "extra-trees-depth3",
+    "threshold": 0.3870285422568522,
+    "model_sha256": "9967701bf469315d0b4fd06e9bc52e6841fe2892641d7d81061628d9204fb73d",
+    "feature_code_sha256": "93fd7b25a2ef16749e604c1ba2404139b5060f68aab58d6863d1c8d4390a45a6",
+    "frozen_before_heldout_capture": true
+  },
+  "heldout_counts": {
+    "classic": {
+      "flagged": 8,
+      "sessions": 8
+    },
+    "firefox": {
+      "flagged": 1,
+      "sessions": 8
+    },
+    "firefox-connect": {
+      "flagged": 8,
+      "sessions": 8
+    },
+    "no-connect": {
+      "flagged": 8,
+      "sessions": 8
+    }
+  },
+  "ordinary_firefox_caddy_guard": {
+    "detected": 0,
+    "sessions": 3
+  },
+  "claimed_false_alarm_budget": 0.01,
+  "verdict": "FAILED stated false-alarm operating point; not an accepted browser-compatibility score",
+  "interpretation": "Scoped separability exists, but a learned classifier's errors and corpus dependence do not establish that a pattern is impossible for ordinary Firefox. Passing this Caddy control alone is insufficient.",
+  "general_browser_similarity_score": null,
+  "subsequent_alternative_audit": "not accepted as a validated general score",
+  "source_result_sha256": "11883930d916027a38b952fef1c9f195c468a305e41c26bb0364fe4160b85eed",
+  "frozen_manifest_sha256": "b69bdcdb8aeb3495258a6401eb9634d38ac4947cd757f4872ad8e5e010c66b12"
+}

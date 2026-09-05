@@ -5,6 +5,11 @@ NSS/PSM, and Neqo wire machinery without accidental project-specific markers.
 It is diagnostic: a browser GET and padded proxy CONNECT are different
 workloads, so packet timing and volume are not fingerprint-equality targets.
 
+For the separately preserved client-fingerprint agreement, legitimate browser
+repetition counterexamples, and limits of browser-likeness scoring, see
+[Firefox traffic compatibility findings](test/fingerprint/README.md). These
+observations are not a general indistinguishability score or a release gate.
+
 ## Size-independent mechanism rule
 
 Fixture asset sizes are diagnostic inputs, not camouflage parameters. A
