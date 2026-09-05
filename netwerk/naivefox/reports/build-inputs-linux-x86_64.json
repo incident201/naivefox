@@ -10563,7 +10563,7 @@
     "directory_contracts": 36,
     "files": 17046
   },
-  "depfile_count": 1107,
+  "depfile_count": 1103,
   "directory_contracts": [
     "config/tests/ref-simple",
     "config/tests/src-simple/l10n",
@@ -27653,7 +27653,7 @@
   ],
   "firefox_base_commit": "0b76543aaeeeb2a5748ce2675ee36e7c94cb1125",
   "generated_makefile_count": 382,
-  "generated_makefiles_sha256": "83a536c54a968f87d2dc861cac8a674a9dc0086e2218f54827aa53e74ca566b8",
+  "generated_makefiles_sha256": "d04b71851885aff29bce07a619b3eb86d2edf3da22e29580d7832fbac37975b2",
   "install_manifest_count": 7,
   "install_manifest_names": [
     "_test_files",
@@ -27668,15 +27668,15 @@
   "install_manifests_sha256": "db68e2a92dd5976c0d8ea2505eeb9ff538f9883b36084e8a37ab29814db7657f",
   "mozconfig": "netwerk/naivefox/mozconfig-minimal",
   "mozconfig_sha256": "03e7581d0f3023568f6b1dac19d87add5cfab400af3d909894bd6c49b2f4cf6b",
-  "naivefox_reference_commit": "cb2ea3c5cc11cfb6f0d2c6a1680fc60e51f3451c",
+  "naivefox_reference_commit": "bc4ed7c04eb5f66df9380a1acf8fc5e01faafbb1",
   "objdir_evidence_sha256": {
-    "backend.RecursiveMakeBackend.in": "88d5f581a804cc03d38ab6322fcc24ba132a95395c8def213827126f8db27cb7",
-    "config_status_deps.in": "7768a3d2ca8bb5fc771f47f4ec7b1610821fdf67696e31754f2749fa7e870c2b"
+    "backend.RecursiveMakeBackend.in": "de11470527413612d29e33464e663e385564009ba0c467cccf79ea1f26ee7f24",
+    "config_status_deps.in": "f46005ac5cfb5e7650555d109e5e68e14036d127531a95dcf2c1d49d1ba31cd2"
   },
   "provenance_sha256": "642a32e90aaf870224f1831b2e932e08fb3153ed75765607f2112852f668e3fb",
   "provenance_version": 2,
   "report_version": 1,
-  "source_commit": "cb2ea3c5cc11cfb6f0d2c6a1680fc60e51f3451c",
+  "source_commit": "bc4ed7c04eb5f66df9380a1acf8fc5e01faafbb1",
   "source_tree_kind": "repository",
   "source_worktree_clean": true,
   "source_worktree_status": [],
