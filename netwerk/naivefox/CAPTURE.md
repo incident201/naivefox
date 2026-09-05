@@ -4663,6 +4663,47 @@ selector remains non-default for reproducibility. A future reopening would need
 one new causal constraint: grant 256 KiB only when enough useful downstream data
 is currently sendable, or deliberately coalesce fragmented credits first.
 
+### Ready-capacity follow-up: classic cost comparison
+
+The productive-grant condition left open by the negative directional screen is
+now measured: each sender grants capacity from locally sendable data within
+stream credit, with 512-byte pure control messages. A peer hint cannot enlarge
+the grant. The history preflight distinguishes this from finite lease/credit
+handoff experiments and the earlier removal of delays on full WS cells.
+
+A separate implementation fix removes an entirely discarded asymmetric
+encoding pass; it does not reuse filler or change the transmitted randomness.
+The native adapter also excludes PING/PONG write completions from the NFC1
+writer budget, with a legal-control regression reproduced on the original
+binary and verified after the fix.
+
+The fresh comparison uses classic as the sole cost baseline, finite no-connect
+and the optimized asymmetric hybrid, through both listeners. Firefox A/B run
+the same active application as calibration controls. Two randomized blocks per
+H2/H3 produce 32 completed sessions on a 40-ms RTT, independent 20-Mbit/s link.
+All outer IP bytes, endpoint jobs, routing, teardown and capture-distance means
+and medians were independently recounted. The complete results and exact
+artifact hashes are retained in
+[the classic-baseline screen](test/integration/evidence/transport-cost-classic-baseline.json).
+
+| Startup | Mode | Download Mbit/s | Upload Mbit/s | Echo ms | Wake ms | Whole IP MiB | Extra vs classic |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| H2 | classic | 18.36 | 14.49 | 88.0 | 89.2 | 12.01 | +0.0% |
+| H2 | no-connect | 6.61 | 3.14 | 440.1 | 349.5 | 18.00 | +49.8% |
+| H2 | new asymmetric hybrid | 15.79 | 11.21 | 103.4 | 106.0 | 16.44 | +36.9% |
+| H3 | classic | 18.75 | 13.51 | 87.8 | 90.2 | 12.04 | +0.0% |
+| H3 | no-connect | 6.63 | 3.16 | 441.1 | 364.5 | 17.67 | +46.8% |
+| H3 | new asymmetric hybrid | 15.73 | 12.07 | 102.4 | 106.8 | 16.34 | +35.7% |
+
+The table averages the two local frontends; the JSON preserves each separately
+and contains p1-16, p17-32, 250-ms and Whole capture distances plus differences
+from classic. Capture distance is still calibrated to Firefox A/B, not to a
+zero-valued classic reference. The new mode has the lowest Whole distance in
+all four conditions, without a uniform early-window win. H2 and H3 scores use
+different feature families. These two-block results remain descriptive and do
+not promote a default or establish indistinguishability. Earlier cohorts are
+kept separate rather than pooled into this comparison.
+
 ### Superseded idle-reference diagnostic
 
 The earlier idle-reference experiment is invalid as a matched-workload

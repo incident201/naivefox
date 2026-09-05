@@ -175,7 +175,9 @@ does not depend on these timers.
 Idle application heartbeats occur every 25
 seconds. Client queueing is limited to one unacknowledged native WebSocket
 message, in addition to the existing per-stream buffers and 512-KiB credits.
-Native receive dispatch is bounded by 32 callbacks and 2 MiB total payload;
+Native PING/PONG write completions do not consume the NFC1 writer budget.
+Application sends are at least 512 bytes, while native control payloads are
+bounded at 125 bytes. Native receive dispatch is bounded by 32 callbacks and 2 MiB total payload;
 the peer-driven PONG queue is capped at 32. Overflow fails the carrier.
 Unsolicited WebSocket compression is rejected before data processing starts.
 A missing server message for 75 seconds closes the carrier. Hybrid local
@@ -202,20 +204,26 @@ state, credits, ACK, one-message writer bound, heartbeat and failure behavior
 remain common. A WS-only residual pressure hint occupies reserved NFC1 header
 byte 14; HTTP and generic WS decoding remain strict and unchanged.
 
-| Activity | Client to server | Server to client |
-| --- | ---: | ---: |
-| Download | 16 KiB | 256 KiB |
-| Upload | 128 KiB | 8 KiB |
-| Interactive | 4 KiB | 8 KiB |
-| Mixed | 128 KiB | 64 KiB |
-| Idle heartbeat | 512 B | 512 B |
+The current screen grants capacity from the sender's actual sendable payload,
+after applying stream credit. A peer hint alone cannot enlarge an allocation.
+The original activity-only allocation remains a closed negative result in
+[the experiment history](CAPTURE.md#directional-shaped-websocket-screen).
 
-The hint describes residual sendable pressure after the current cell. It never
-causes a message on its own. Partial payload and OPEN keep the 2-ms coalescing
-turn; data already filling its selected directional capacity and pure control
-dispatch immediately. The experiment first runs unit/live correctness and a
-short same-application generic/asymmetric screen. A full matrix is admitted
-only by the preregistered traffic, filler, throughput and latency gate.
+| Direction | No payload | Small payload | Medium grant | Large grant |
+| --- | ---: | ---: | ---: | ---: |
+| Client to server | 512 B; OPEN uses 4 KiB | 4 KiB | 16 KiB at 8 KiB ready | 128 KiB at 64 KiB ready |
+| Server to client | 512 B | 8 KiB | 64 KiB at 32 KiB ready | 256 KiB at 128 KiB ready |
+
+The legal capacity sets, subprotocol and hint encoding are unchanged. Partial
+payload and OPEN keep the 2-ms coalescing turn; data already filling its selected
+capacity and pure control dispatch immediately. Capacity is rechecked after
+coalescing. Data can span cells, and control frames still share their bounded
+budget. The server performs exactly one cryptographic encoding per message.
+
+This avoids granting a mostly empty bulk cell after a fragmented credit return,
+without delaying credits or enlarging the 512-KiB window. Functional and short
+controlled-link screens are required; the experimental selector remains
+non-default and does not promise browser-equivalent traffic.
 
 ## Verification and evidence
 

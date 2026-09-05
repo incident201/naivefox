@@ -1,0 +1,1273 @@
+{
+  "baseline_for_cost": "classic",
+  "blocks_per_protocol": 2,
+  "capture": [
+    {
+      "blocks": 2,
+      "delta_distance_vs_classic": {
+        "250ms": 0.0,
+        "p1-16": 0.0,
+        "p17-32": 0.0,
+        "whole": 0.0
+      },
+      "listener": "socks",
+      "mean_distance_to_firefox_ab": {
+        "250ms": 0.5349329773831595,
+        "p1-16": 0.15438788815566162,
+        "p17-32": 0.5165915897545021,
+        "whole": 0.41629690813824627
+      },
+      "protocol": "h2",
+      "transport": "classic"
+    },
+    {
+      "blocks": 2,
+      "delta_distance_vs_classic": {
+        "250ms": -0.03731819233518685,
+        "p1-16": -0.02486668964877939,
+        "p17-32": -0.06748593708453021,
+        "whole": -0.022018965977157023
+      },
+      "listener": "socks",
+      "mean_distance_to_firefox_ab": {
+        "250ms": 0.49761478504797263,
+        "p1-16": 0.12952119850688223,
+        "p17-32": 0.44910565266997193,
+        "whole": 0.39427794216108925
+      },
+      "protocol": "h2",
+      "transport": "no-connect"
+    },
+    {
+      "blocks": 2,
+      "delta_distance_vs_classic": {
+        "250ms": -0.01503565744431512,
+        "p1-16": 0.007231679719197637,
+        "p17-32": -0.10084567426206542,
+        "whole": -0.06024546253472152
+      },
+      "listener": "socks",
+      "mean_distance_to_firefox_ab": {
+        "250ms": 0.5198973199388444,
+        "p1-16": 0.16161956787485926,
+        "p17-32": 0.4157459154924367,
+        "whole": 0.35605144560352475
+      },
+      "protocol": "h2",
+      "transport": "no-connect-hybrid-asymmetric"
+    },
+    {
+      "blocks": 2,
+      "delta_distance_vs_classic": {
+        "250ms": 0.0,
+        "p1-16": 0.0,
+        "p17-32": 0.0,
+        "whole": 0.0
+      },
+      "listener": "http",
+      "mean_distance_to_firefox_ab": {
+        "250ms": 0.5452765546600284,
+        "p1-16": 0.1684958586574088,
+        "p17-32": 0.5582224550794472,
+        "whole": 0.4204236050566966
+      },
+      "protocol": "h2",
+      "transport": "classic"
+    },
+    {
+      "blocks": 2,
+      "delta_distance_vs_classic": {
+        "250ms": -0.01413690946082169,
+        "p1-16": 0.032715260996616424,
+        "p17-32": -0.029827280730187478,
+        "whole": -0.00020227787085891347
+      },
+      "listener": "http",
+      "mean_distance_to_firefox_ab": {
+        "250ms": 0.5311396451992068,
+        "p1-16": 0.20121111965402522,
+        "p17-32": 0.5283951743492598,
+        "whole": 0.4202213271858377
+      },
+      "protocol": "h2",
+      "transport": "no-connect"
+    },
+    {
+      "blocks": 2,
+      "delta_distance_vs_classic": {
+        "250ms": -0.05998150131655422,
+        "p1-16": -0.013457225993201927,
+        "p17-32": -0.04913264678530549,
+        "whole": -0.06780919971217325
+      },
+      "listener": "http",
+      "mean_distance_to_firefox_ab": {
+        "250ms": 0.4852950533434742,
+        "p1-16": 0.15503863266420687,
+        "p17-32": 0.5090898082941417,
+        "whole": 0.3526144053445234
+      },
+      "protocol": "h2",
+      "transport": "no-connect-hybrid-asymmetric"
+    },
+    {
+      "blocks": 2,
+      "delta_distance_vs_classic": {
+        "250ms": 0.0,
+        "p1-16": 0.0,
+        "p17-32": 0.0,
+        "whole": 0.0
+      },
+      "listener": "socks",
+      "mean_distance_to_firefox_ab": {
+        "250ms": 0.44081786392621786,
+        "p1-16": 0.1418625173525831,
+        "p17-32": 0.19014425002562158,
+        "whole": 0.3641178050780218
+      },
+      "protocol": "h3",
+      "transport": "classic"
+    },
+    {
+      "blocks": 2,
+      "delta_distance_vs_classic": {
+        "250ms": -0.06408663684543847,
+        "p1-16": -0.013898700736767189,
+        "p17-32": 0.03897566476193004,
+        "whole": 0.0028029064433645057
+      },
+      "listener": "socks",
+      "mean_distance_to_firefox_ab": {
+        "250ms": 0.3767312270807794,
+        "p1-16": 0.1279638166158159,
+        "p17-32": 0.22911991478755162,
+        "whole": 0.3669207115213863
+      },
+      "protocol": "h3",
+      "transport": "no-connect"
+    },
+    {
+      "blocks": 2,
+      "delta_distance_vs_classic": {
+        "250ms": -0.1715209141538082,
+        "p1-16": -0.05580324066089702,
+        "p17-32": 0.011101212272596306,
+        "whole": -0.09144788132743326
+      },
+      "listener": "socks",
+      "mean_distance_to_firefox_ab": {
+        "250ms": 0.26929694977240964,
+        "p1-16": 0.08605927669168607,
+        "p17-32": 0.20124546229821788,
+        "whole": 0.2726699237505885
+      },
+      "protocol": "h3",
+      "transport": "no-connect-hybrid-asymmetric"
+    },
+    {
+      "blocks": 2,
+      "delta_distance_vs_classic": {
+        "250ms": 0.0,
+        "p1-16": 0.0,
+        "p17-32": 0.0,
+        "whole": 0.0
+      },
+      "listener": "http",
+      "mean_distance_to_firefox_ab": {
+        "250ms": 0.4087494779815437,
+        "p1-16": 0.21541560270671378,
+        "p17-32": 0.2958987915315019,
+        "whole": 0.3726164018148494
+      },
+      "protocol": "h3",
+      "transport": "classic"
+    },
+    {
+      "blocks": 2,
+      "delta_distance_vs_classic": {
+        "250ms": -0.05955951180214203,
+        "p1-16": -0.05296680126616396,
+        "p17-32": -0.08053877230747339,
+        "whole": -0.007487420949769674
+      },
+      "listener": "http",
+      "mean_distance_to_firefox_ab": {
+        "250ms": 0.3491899661794017,
+        "p1-16": 0.16244880144054982,
+        "p17-32": 0.2153600192240285,
+        "whole": 0.3651289808650797
+      },
+      "protocol": "h3",
+      "transport": "no-connect"
+    },
+    {
+      "blocks": 2,
+      "delta_distance_vs_classic": {
+        "250ms": -0.027984230394074716,
+        "p1-16": -0.0876475394508586,
+        "p17-32": -0.08489573443437526,
+        "whole": -0.10166766710109715
+      },
+      "listener": "http",
+      "mean_distance_to_firefox_ab": {
+        "250ms": 0.380765247587469,
+        "p1-16": 0.12776806325585519,
+        "p17-32": 0.21100305709712663,
+        "whole": 0.27094873471375225
+      },
+      "protocol": "h3",
+      "transport": "no-connect-hybrid-asymmetric"
+    }
+  ],
+  "checks": {
+    "capture_window_unit_tests": {
+      "passed": 8,
+      "skipped": 1
+    },
+    "classic_comparison_audit": {
+      "audit_sha256": "8d60d24fd40a4e224f367491c0230f1df0922a98c32a7c567775427a2bdbec29",
+      "matrix_sha256": "7b091f0bcfd75bf1ba2e754413276d792daa85660f153438088d32d2a84b0b6d",
+      "protocols": {
+        "h2": {
+          "all_active_jobs_and_routes": true,
+          "all_backend_useful_bytes_and_message_graphs_verified": true,
+          "all_performance_and_traffic_ratios_recomputed": true,
+          "all_sample_wire_totals_recomputed_from_raw_capture": true,
+          "audited_input_bundle_sha256": "d9f9b9039600e52a7740d790843ab267991d48e8c964dcb236e55bf710f81b0c",
+          "audited_input_files": 83,
+          "capture_windows": {
+            "initial_packets_16": {
+              "all_six_arms_recomputed": true,
+              "features": 139
+            },
+            "initial_packets_32": {
+              "all_six_arms_recomputed": true,
+              "features": 219
+            },
+            "initial_time_250ms": {
+              "all_six_arms_recomputed": true,
+              "features": 59
+            },
+            "packets_17_32": {
+              "all_six_arms_recomputed": true,
+              "features": 80
+            },
+            "whole": {
+              "all_six_arms_recomputed": true,
+              "features": 2372
+            }
+          },
+          "participants": 16,
+          "raw_receive_ip_bytes": 244900690,
+          "raw_receive_packets": 260562,
+          "residual_audited": true
+        },
+        "h3": {
+          "all_active_jobs_and_routes": true,
+          "all_backend_useful_bytes_and_message_graphs_verified": true,
+          "all_performance_and_traffic_ratios_recomputed": true,
+          "all_sample_wire_totals_recomputed_from_raw_capture": true,
+          "audited_input_bundle_sha256": "d7049837ae14f29885c33c5909246af14f472bbfaaceb5952da69b1e6feacf82",
+          "audited_input_files": 83,
+          "capture_windows": {
+            "initial_packets_16": {
+              "all_six_arms_recomputed": true,
+              "features": 138
+            },
+            "initial_packets_32": {
+              "all_six_arms_recomputed": true,
+              "features": 219
+            },
+            "initial_time_250ms": {
+              "all_six_arms_recomputed": true,
+              "features": 60
+            },
+            "packets_17_32": {
+              "all_six_arms_recomputed": true,
+              "features": 80
+            },
+            "whole": {
+              "all_six_arms_recomputed": true,
+              "features": 2275
+            }
+          },
+          "participants": 16,
+          "raw_receive_ip_bytes": 243272251,
+          "raw_receive_packets": 241993,
+          "residual_audited": true
+        }
+      },
+      "scope": "classic-baseline cost, workload, route, raw IP and capture-distance audit",
+      "status": "PASS"
+    },
+    "codec_asan_ubsan": {
+      "passed": 19
+    },
+    "legal_ping_pong_regressions": {
+      "passed": 8,
+      "payload_lengths": [
+        4,
+        125
+      ],
+      "post_control_data_and_half_close": true
+    },
+    "linux_product_build": "PASS",
+    "malformed_http_envelope_cases": {
+      "passed": 22
+    },
+    "malformed_websocket_cases": {
+      "hybrid_modes": 2,
+      "listeners": [
+        "socks",
+        "http"
+      ],
+      "passed": 96,
+      "protocols": [
+        "h2",
+        "h3"
+      ]
+    },
+    "matched_harness_unit_tests": {
+      "passed": 16
+    },
+    "native_full_functional": {
+      "no-connect": "PASS H2/H3",
+      "no-connect-hybrid": "PASS H2/H3",
+      "no-connect-hybrid-asymmetric": "PASS H2/H3",
+      "parallel_batches": 4,
+      "simultaneous_logical_streams": 40
+    },
+    "native_microbenchmark_raw_capture_audit": {
+      "passed": 33
+    },
+    "runtime_manifest": "PASS",
+    "server_race_tests": {
+      "packages_passed": 4
+    },
+    "shim_checks": {
+      "passed": 7
+    }
+  },
+  "cost_aggregation": "mean complete IP bytes; mean stage I/O time then fixed useful bytes/time; mean single-echo latency; four samples per protocol/transport, two per listener",
+  "cost_averaged_over_listeners": [
+    {
+      "complete_app_ms": 12048.75,
+      "extra_ip_percent_vs_classic": 0.0,
+      "native_sessions": 4,
+      "protocol": "h2",
+      "stages": {
+        "download": {
+          "goodput_mbit_s": 18.362094260893358,
+          "io_ms": 3654.75
+        },
+        "parallel": {
+          "goodput_mbit_s": 18.103281359589964,
+          "io_ms": 926.75
+        },
+        "small": {
+          "io_ms": 88.0
+        },
+        "upload": {
+          "goodput_mbit_s": 14.494355075593953,
+          "io_ms": 578.75
+        },
+        "wake": {
+          "io_ms": 89.25
+        }
+      },
+      "startup_to_app_ws_ms": 2383.75,
+      "transport": "classic",
+      "whole_ip_bytes": 12596860.5
+    },
+    {
+      "complete_app_ms": 29629.0,
+      "extra_ip_percent_vs_classic": 49.83101543436159,
+      "native_sessions": 4,
+      "protocol": "h2",
+      "stages": {
+        "download": {
+          "goodput_mbit_s": 6.605690774417403,
+          "io_ms": 10159.25
+        },
+        "parallel": {
+          "goodput_mbit_s": 11.505034116235214,
+          "io_ms": 1458.25
+        },
+        "small": {
+          "io_ms": 440.0625
+        },
+        "upload": {
+          "goodput_mbit_s": 3.1441559220389803,
+          "io_ms": 2668.0
+        },
+        "wake": {
+          "io_ms": 349.5
+        }
+      },
+      "startup_to_app_ws_ms": 8835.25,
+      "transport": "no-connect",
+      "whole_ip_bytes": 18874004.0
+    },
+    {
+      "complete_app_ms": 15224.75,
+      "extra_ip_percent_vs_classic": 36.88331310805577,
+      "native_sessions": 4,
+      "protocol": "h2",
+      "stages": {
+        "download": {
+          "goodput_mbit_s": 15.78939215340274,
+          "io_ms": 4250.25
+        },
+        "parallel": {
+          "goodput_mbit_s": 15.697979883040936,
+          "io_ms": 1068.75
+        },
+        "small": {
+          "io_ms": 103.4375
+        },
+        "upload": {
+          "goodput_mbit_s": 11.214716577540106,
+          "io_ms": 748.0
+        },
+        "wake": {
+          "io_ms": 106.0
+        }
+      },
+      "startup_to_app_ws_ms": 4447.75,
+      "transport": "no-connect-hybrid-asymmetric",
+      "whole_ip_bytes": 17243000.0
+    },
+    {
+      "complete_app_ms": 11973.75,
+      "extra_ip_percent_vs_classic": 0.0,
+      "native_sessions": 4,
+      "protocol": "h3",
+      "stages": {
+        "download": {
+          "goodput_mbit_s": 18.750730371612182,
+          "io_ms": 3579.0
+        },
+        "parallel": {
+          "goodput_mbit_s": 18.093519547047723,
+          "io_ms": 927.25
+        },
+        "small": {
+          "io_ms": 87.8125
+        },
+        "upload": {
+          "goodput_mbit_s": 13.508225442834139,
+          "io_ms": 621.0
+        },
+        "wake": {
+          "io_ms": 90.25
+        }
+      },
+      "startup_to_app_ws_ms": 2342.25,
+      "transport": "classic",
+      "whole_ip_bytes": 12623597.75
+    },
+    {
+      "complete_app_ms": 29498.5,
+      "extra_ip_percent_vs_classic": 46.79843945439406,
+      "native_sessions": 4,
+      "protocol": "h3",
+      "stages": {
+        "download": {
+          "goodput_mbit_s": 6.626236232134482,
+          "io_ms": 10127.75
+        },
+        "parallel": {
+          "goodput_mbit_s": 11.907179559971611,
+          "io_ms": 1409.0
+        },
+        "small": {
+          "io_ms": 441.0625
+        },
+        "upload": {
+          "goodput_mbit_s": 3.155688140694066,
+          "io_ms": 2658.25
+        },
+        "wake": {
+          "io_ms": 364.5
+        }
+      },
+      "startup_to_app_ws_ms": 8957.75,
+      "transport": "no-connect",
+      "whole_ip_bytes": 18531244.5
+    },
+    {
+      "complete_app_ms": 15071.75,
+      "extra_ip_percent_vs_classic": 35.729798186891685,
+      "native_sessions": 4,
+      "protocol": "h3",
+      "stages": {
+        "download": {
+          "goodput_mbit_s": 15.73294197632165,
+          "io_ms": 4265.5
+        },
+        "parallel": {
+          "goodput_mbit_s": 15.974497500595096,
+          "io_ms": 1050.25
+        },
+        "small": {
+          "io_ms": 102.375
+        },
+        "upload": {
+          "goodput_mbit_s": 12.074282835552356,
+          "io_ms": 694.75
+        },
+        "wake": {
+          "io_ms": 106.75
+        }
+      },
+      "startup_to_app_ws_ms": 4423.75,
+      "transport": "no-connect-hybrid-asymmetric",
+      "whole_ip_bytes": 17133983.75
+    }
+  ],
+  "cost_by_listener": [
+    {
+      "baseline": "classic",
+      "baseline_whole_ip_bytes": 12596792.0,
+      "blocks": 2,
+      "complete_app_ms": {
+        "baseline": 12035.0,
+        "candidate": 12035.0,
+        "time_increase_percent": 0.0
+      },
+      "extra_complete_session_traffic_percent": 0.0,
+      "extra_ip_bytes": 0.0,
+      "listener": "socks",
+      "stages": {
+        "download": {
+          "baseline_io_ms": 3655.0,
+          "baseline_mbit_s": 18.36083830369357,
+          "candidate_io_ms": 3655.0,
+          "candidate_mbit_s": 18.36083830369357,
+          "goodput_change_percent": 0.0,
+          "time_increase_percent": 0.0
+        },
+        "parallel": {
+          "baseline_io_ms": 927.0,
+          "baseline_mbit_s": 18.098399137001078,
+          "candidate_io_ms": 927.0,
+          "candidate_mbit_s": 18.098399137001078,
+          "goodput_change_percent": 0.0,
+          "time_increase_percent": 0.0
+        },
+        "small": {
+          "baseline_io_ms": 87.875,
+          "candidate_io_ms": 87.875,
+          "time_increase_percent": 0.0
+        },
+        "upload": {
+          "baseline_io_ms": 578.0,
+          "baseline_mbit_s": 14.513162629757787,
+          "candidate_io_ms": 578.0,
+          "candidate_mbit_s": 14.513162629757787,
+          "goodput_change_percent": 0.0,
+          "time_increase_percent": 0.0
+        },
+        "wake": {
+          "baseline_io_ms": 89.0,
+          "candidate_io_ms": 89.0,
+          "time_increase_percent": 0.0
+        }
+      },
+      "startup_protocol": "h2",
+      "startup_to_app_ws_ms": {
+        "baseline": 2371.0,
+        "candidate": 2371.0,
+        "time_increase_percent": 0.0
+      },
+      "transport": "classic",
+      "whole_ip_bytes": 12596792.0
+    },
+    {
+      "baseline": "classic",
+      "baseline_whole_ip_bytes": 12596792.0,
+      "blocks": 2,
+      "complete_app_ms": {
+        "baseline": 12035.0,
+        "candidate": 29598.5,
+        "time_increase_percent": 145.9368508516826
+      },
+      "extra_complete_session_traffic_percent": 50.89002819130457,
+      "extra_ip_bytes": 6410511.0,
+      "listener": "socks",
+      "stages": {
+        "download": {
+          "baseline_io_ms": 3655.0,
+          "baseline_mbit_s": 18.36083830369357,
+          "candidate_io_ms": 10126.5,
+          "candidate_mbit_s": 6.627054164815089,
+          "goodput_change_percent": -63.906581740976655,
+          "time_increase_percent": 177.05882352941177
+        },
+        "parallel": {
+          "baseline_io_ms": 927.0,
+          "baseline_mbit_s": 18.098399137001078,
+          "candidate_io_ms": 1438.5,
+          "candidate_mbit_s": 11.662993395898505,
+          "goodput_change_percent": -35.557872784150156,
+          "time_increase_percent": 55.17799352750809
+        },
+        "small": {
+          "baseline_io_ms": 87.875,
+          "candidate_io_ms": 439.375,
+          "time_increase_percent": 400.0
+        },
+        "upload": {
+          "baseline_io_ms": 578.0,
+          "baseline_mbit_s": 14.513162629757787,
+          "candidate_io_ms": 2694.0,
+          "candidate_mbit_s": 3.1138114328136597,
+          "goodput_change_percent": -78.5449146250928,
+          "time_increase_percent": 366.08996539792383
+        },
+        "wake": {
+          "baseline_io_ms": 89.0,
+          "candidate_io_ms": 350.0,
+          "time_increase_percent": 293.2584269662921
+        }
+      },
+      "startup_protocol": "h2",
+      "startup_to_app_ws_ms": {
+        "baseline": 2371.0,
+        "candidate": 8831.0,
+        "time_increase_percent": 272.4588781105019
+      },
+      "transport": "no-connect",
+      "whole_ip_bytes": 19007303.0
+    },
+    {
+      "baseline": "classic",
+      "baseline_whole_ip_bytes": 12596792.0,
+      "blocks": 2,
+      "complete_app_ms": {
+        "baseline": 12035.0,
+        "candidate": 15169.5,
+        "time_increase_percent": 26.044869131699212
+      },
+      "extra_complete_session_traffic_percent": 38.230840836301816,
+      "extra_ip_bytes": 4815859.5,
+      "listener": "socks",
+      "stages": {
+        "download": {
+          "baseline_io_ms": 3655.0,
+          "baseline_mbit_s": 18.36083830369357,
+          "candidate_io_ms": 4292.5,
+          "candidate_mbit_s": 15.633981129877693,
+          "goodput_change_percent": -14.851485148514854,
+          "time_increase_percent": 17.44186046511629
+        },
+        "parallel": {
+          "baseline_io_ms": 927.0,
+          "baseline_mbit_s": 18.098399137001078,
+          "candidate_io_ms": 1073.0,
+          "candidate_mbit_s": 15.635802423112768,
+          "goodput_change_percent": -13.606710158434298,
+          "time_increase_percent": 15.749730312837107
+        },
+        "small": {
+          "baseline_io_ms": 87.875,
+          "candidate_io_ms": 103.25,
+          "time_increase_percent": 17.496443812233274
+        },
+        "upload": {
+          "baseline_io_ms": 578.0,
+          "baseline_mbit_s": 14.513162629757787,
+          "candidate_io_ms": 768.5,
+          "candidate_mbit_s": 10.915560182173065,
+          "goodput_change_percent": -24.788549121665582,
+          "time_increase_percent": 32.95847750865053
+        },
+        "wake": {
+          "baseline_io_ms": 89.0,
+          "candidate_io_ms": 107.0,
+          "time_increase_percent": 20.2247191011236
+        }
+      },
+      "startup_protocol": "h2",
+      "startup_to_app_ws_ms": {
+        "baseline": 2371.0,
+        "candidate": 4443.5,
+        "time_increase_percent": 87.4103753690426
+      },
+      "transport": "no-connect-hybrid-asymmetric",
+      "whole_ip_bytes": 17412651.5
+    },
+    {
+      "baseline": "classic",
+      "baseline_whole_ip_bytes": 12596929.0,
+      "blocks": 2,
+      "complete_app_ms": {
+        "baseline": 12062.5,
+        "candidate": 12062.5,
+        "time_increase_percent": 0.0
+      },
+      "extra_complete_session_traffic_percent": 0.0,
+      "extra_ip_bytes": 0.0,
+      "listener": "http",
+      "stages": {
+        "download": {
+          "baseline_io_ms": 3654.5,
+          "baseline_mbit_s": 18.363350389930222,
+          "candidate_io_ms": 3654.5,
+          "candidate_mbit_s": 18.363350389930222,
+          "goodput_change_percent": 0.0,
+          "time_increase_percent": 0.0
+        },
+        "parallel": {
+          "baseline_io_ms": 926.5,
+          "baseline_mbit_s": 18.108166216945495,
+          "candidate_io_ms": 926.5,
+          "candidate_mbit_s": 18.108166216945495,
+          "goodput_change_percent": 0.0,
+          "time_increase_percent": 0.0
+        },
+        "small": {
+          "baseline_io_ms": 88.125,
+          "candidate_io_ms": 88.125,
+          "time_increase_percent": 0.0
+        },
+        "upload": {
+          "baseline_io_ms": 579.5,
+          "baseline_mbit_s": 14.475596203623814,
+          "candidate_io_ms": 579.5,
+          "candidate_mbit_s": 14.475596203623814,
+          "goodput_change_percent": 0.0,
+          "time_increase_percent": 0.0
+        },
+        "wake": {
+          "baseline_io_ms": 89.5,
+          "candidate_io_ms": 89.5,
+          "time_increase_percent": 0.0
+        }
+      },
+      "startup_protocol": "h2",
+      "startup_to_app_ws_ms": {
+        "baseline": 2396.5,
+        "candidate": 2396.5,
+        "time_increase_percent": 0.0
+      },
+      "transport": "classic",
+      "whole_ip_bytes": 12596929.0
+    },
+    {
+      "baseline": "classic",
+      "baseline_whole_ip_bytes": 12596929.0,
+      "blocks": 2,
+      "complete_app_ms": {
+        "baseline": 12062.5,
+        "candidate": 29659.5,
+        "time_increase_percent": 145.88186528497408
+      },
+      "extra_complete_session_traffic_percent": 48.7720141948883,
+      "extra_ip_bytes": 6143776.0,
+      "listener": "http",
+      "stages": {
+        "download": {
+          "baseline_io_ms": 3654.5,
+          "baseline_mbit_s": 18.363350389930222,
+          "candidate_io_ms": 10192.0,
+          "candidate_mbit_s": 6.584464678178964,
+          "goodput_change_percent": -64.14344583987442,
+          "time_increase_percent": 178.88904090846898
+        },
+        "parallel": {
+          "baseline_io_ms": 926.5,
+          "baseline_mbit_s": 18.108166216945495,
+          "candidate_io_ms": 1478.0,
+          "candidate_mbit_s": 11.351296346414074,
+          "goodput_change_percent": -37.31393775372125,
+          "time_increase_percent": 59.52509444144631
+        },
+        "small": {
+          "baseline_io_ms": 88.125,
+          "candidate_io_ms": 440.75,
+          "time_increase_percent": 400.14184397163126
+        },
+        "upload": {
+          "baseline_io_ms": 579.5,
+          "baseline_mbit_s": 14.475596203623814,
+          "candidate_io_ms": 2642.0,
+          "candidate_mbit_s": 3.17509765329296,
+          "goodput_change_percent": -78.0658591975776,
+          "time_increase_percent": 355.9102674719586
+        },
+        "wake": {
+          "baseline_io_ms": 89.5,
+          "candidate_io_ms": 349.0,
+          "time_increase_percent": 289.9441340782123
+        }
+      },
+      "startup_protocol": "h2",
+      "startup_to_app_ws_ms": {
+        "baseline": 2396.5,
+        "candidate": 8839.5,
+        "time_increase_percent": 268.8504068433132
+      },
+      "transport": "no-connect",
+      "whole_ip_bytes": 18740705.0
+    },
+    {
+      "baseline": "classic",
+      "baseline_whole_ip_bytes": 12596929.0,
+      "blocks": 2,
+      "complete_app_ms": {
+        "baseline": 12062.5,
+        "candidate": 15280.0,
+        "time_increase_percent": 26.673575129533678
+      },
+      "extra_complete_session_traffic_percent": 35.53580003507204,
+      "extra_ip_bytes": 4476419.5,
+      "listener": "http",
+      "stages": {
+        "download": {
+          "baseline_io_ms": 3654.5,
+          "baseline_mbit_s": 18.363350389930222,
+          "candidate_io_ms": 4208.0,
+          "candidate_mbit_s": 15.947923954372623,
+          "goodput_change_percent": -13.153517110266154,
+          "time_increase_percent": 15.145710767546849
+        },
+        "parallel": {
+          "baseline_io_ms": 926.5,
+          "baseline_mbit_s": 18.108166216945495,
+          "candidate_io_ms": 1064.5,
+          "candidate_mbit_s": 15.760653828088305,
+          "goodput_change_percent": -12.96383278534523,
+          "time_increase_percent": 14.89476524554776
+        },
+        "small": {
+          "baseline_io_ms": 88.125,
+          "candidate_io_ms": 103.625,
+          "time_increase_percent": 17.588652482269506
+        },
+        "upload": {
+          "baseline_io_ms": 579.5,
+          "baseline_mbit_s": 14.475596203623814,
+          "candidate_io_ms": 727.5,
+          "candidate_mbit_s": 11.530732646048111,
+          "goodput_change_percent": -20.343642611683855,
+          "time_increase_percent": 25.539257981018125
+        },
+        "wake": {
+          "baseline_io_ms": 89.5,
+          "candidate_io_ms": 105.0,
+          "time_increase_percent": 17.31843575418994
+        }
+      },
+      "startup_protocol": "h2",
+      "startup_to_app_ws_ms": {
+        "baseline": 2396.5,
+        "candidate": 4452.0,
+        "time_increase_percent": 85.77091591904862
+      },
+      "transport": "no-connect-hybrid-asymmetric",
+      "whole_ip_bytes": 17073348.5
+    },
+    {
+      "baseline": "classic",
+      "baseline_whole_ip_bytes": 12621970.5,
+      "blocks": 2,
+      "complete_app_ms": {
+        "baseline": 11967.5,
+        "candidate": 11967.5,
+        "time_increase_percent": 0.0
+      },
+      "extra_complete_session_traffic_percent": 0.0,
+      "extra_ip_bytes": 0.0,
+      "listener": "socks",
+      "stages": {
+        "download": {
+          "baseline_io_ms": 3579.5,
+          "baseline_mbit_s": 18.74811118871351,
+          "candidate_io_ms": 3579.5,
+          "candidate_mbit_s": 18.74811118871351,
+          "goodput_change_percent": 0.0,
+          "time_increase_percent": 0.0
+        },
+        "parallel": {
+          "baseline_io_ms": 927.5,
+          "baseline_mbit_s": 18.08864258760108,
+          "candidate_io_ms": 927.5,
+          "candidate_mbit_s": 18.08864258760108,
+          "goodput_change_percent": 0.0,
+          "time_increase_percent": 0.0
+        },
+        "small": {
+          "baseline_io_ms": 87.625,
+          "candidate_io_ms": 87.625,
+          "time_increase_percent": 0.0
+        },
+        "upload": {
+          "baseline_io_ms": 622.0,
+          "baseline_mbit_s": 13.486508038585209,
+          "candidate_io_ms": 622.0,
+          "candidate_mbit_s": 13.486508038585209,
+          "goodput_change_percent": 0.0,
+          "time_increase_percent": 0.0
+        },
+        "wake": {
+          "baseline_io_ms": 89.5,
+          "candidate_io_ms": 89.5,
+          "time_increase_percent": 0.0
+        }
+      },
+      "startup_protocol": "h3",
+      "startup_to_app_ws_ms": {
+        "baseline": 2336.0,
+        "candidate": 2336.0,
+        "time_increase_percent": 0.0
+      },
+      "transport": "classic",
+      "whole_ip_bytes": 12621970.5
+    },
+    {
+      "baseline": "classic",
+      "baseline_whole_ip_bytes": 12621970.5,
+      "blocks": 2,
+      "complete_app_ms": {
+        "baseline": 11967.5,
+        "candidate": 29492.5,
+        "time_increase_percent": 146.43827031543765
+      },
+      "extra_complete_session_traffic_percent": 50.07958147263931,
+      "extra_ip_bytes": 6321030.0,
+      "listener": "socks",
+      "stages": {
+        "download": {
+          "baseline_io_ms": 3579.5,
+          "baseline_mbit_s": 18.74811118871351,
+          "candidate_io_ms": 10080.5,
+          "candidate_mbit_s": 6.657295173850503,
+          "goodput_change_percent": -64.49084866822082,
+          "time_increase_percent": 181.61754434976953
+        },
+        "parallel": {
+          "baseline_io_ms": 927.5,
+          "baseline_mbit_s": 18.08864258760108,
+          "candidate_io_ms": 1432.0,
+          "candidate_mbit_s": 11.715932960893856,
+          "goodput_change_percent": -35.2304469273743,
+          "time_increase_percent": 54.39353099730457
+        },
+        "small": {
+          "baseline_io_ms": 87.625,
+          "candidate_io_ms": 441.25,
+          "time_increase_percent": 403.5663338088445
+        },
+        "upload": {
+          "baseline_io_ms": 622.0,
+          "baseline_mbit_s": 13.486508038585209,
+          "candidate_io_ms": 2680.0,
+          "candidate_mbit_s": 3.1300776119402984,
+          "goodput_change_percent": -76.7910447761194,
+          "time_increase_percent": 330.8681672025723
+        },
+        "wake": {
+          "baseline_io_ms": 89.5,
+          "candidate_io_ms": 353.0,
+          "time_increase_percent": 294.41340782122904
+        }
+      },
+      "startup_protocol": "h3",
+      "startup_to_app_ws_ms": {
+        "baseline": 2336.0,
+        "candidate": 8956.0,
+        "time_increase_percent": 283.3904109589041
+      },
+      "transport": "no-connect",
+      "whole_ip_bytes": 18943000.5
+    },
+    {
+      "baseline": "classic",
+      "baseline_whole_ip_bytes": 12621970.5,
+      "blocks": 2,
+      "complete_app_ms": {
+        "baseline": 11967.5,
+        "candidate": 14986.0,
+        "time_increase_percent": 25.222477543346567
+      },
+      "extra_complete_session_traffic_percent": 34.83579287402074,
+      "extra_ip_bytes": 4396963.5,
+      "listener": "socks",
+      "stages": {
+        "download": {
+          "baseline_io_ms": 3579.5,
+          "baseline_mbit_s": 18.74811118871351,
+          "candidate_io_ms": 4215.5,
+          "candidate_mbit_s": 15.91955023128929,
+          "goodput_change_percent": -15.087178270667778,
+          "time_increase_percent": 17.76784467104344
+        },
+        "parallel": {
+          "baseline_io_ms": 927.5,
+          "baseline_mbit_s": 18.08864258760108,
+          "candidate_io_ms": 1084.5,
+          "candidate_mbit_s": 15.470000922083909,
+          "goodput_change_percent": -14.4767173812817,
+          "time_increase_percent": 16.927223719676544
+        },
+        "small": {
+          "baseline_io_ms": 87.625,
+          "candidate_io_ms": 102.375,
+          "time_increase_percent": 16.833095577746082
+        },
+        "upload": {
+          "baseline_io_ms": 622.0,
+          "baseline_mbit_s": 13.486508038585209,
+          "candidate_io_ms": 668.0,
+          "candidate_mbit_s": 12.557796407185629,
+          "goodput_change_percent": -6.886227544910184,
+          "time_increase_percent": 7.395498392282951
+        },
+        "wake": {
+          "baseline_io_ms": 89.5,
+          "candidate_io_ms": 106.5,
+          "time_increase_percent": 18.99441340782122
+        }
+      },
+      "startup_protocol": "h3",
+      "startup_to_app_ws_ms": {
+        "baseline": 2336.0,
+        "candidate": 4426.5,
+        "time_increase_percent": 89.49058219178083
+      },
+      "transport": "no-connect-hybrid-asymmetric",
+      "whole_ip_bytes": 17018934.0
+    },
+    {
+      "baseline": "classic",
+      "baseline_whole_ip_bytes": 12625225.0,
+      "blocks": 2,
+      "complete_app_ms": {
+        "baseline": 11980.0,
+        "candidate": 11980.0,
+        "time_increase_percent": 0.0
+      },
+      "extra_complete_session_traffic_percent": 0.0,
+      "extra_ip_bytes": 0.0,
+      "listener": "http",
+      "stages": {
+        "download": {
+          "baseline_io_ms": 3578.5,
+          "baseline_mbit_s": 18.753350286432863,
+          "candidate_io_ms": 3578.5,
+          "candidate_mbit_s": 18.753350286432863,
+          "goodput_change_percent": 0.0,
+          "time_increase_percent": 0.0
+        },
+        "parallel": {
+          "baseline_io_ms": 927.0,
+          "baseline_mbit_s": 18.098399137001078,
+          "candidate_io_ms": 927.0,
+          "candidate_mbit_s": 18.098399137001078,
+          "goodput_change_percent": 0.0,
+          "time_increase_percent": 0.0
+        },
+        "small": {
+          "baseline_io_ms": 88.0,
+          "candidate_io_ms": 88.0,
+          "time_increase_percent": 0.0
+        },
+        "upload": {
+          "baseline_io_ms": 620.0,
+          "baseline_mbit_s": 13.530012903225806,
+          "candidate_io_ms": 620.0,
+          "candidate_mbit_s": 13.530012903225806,
+          "goodput_change_percent": 0.0,
+          "time_increase_percent": 0.0
+        },
+        "wake": {
+          "baseline_io_ms": 91.0,
+          "candidate_io_ms": 91.0,
+          "time_increase_percent": 0.0
+        }
+      },
+      "startup_protocol": "h3",
+      "startup_to_app_ws_ms": {
+        "baseline": 2348.5,
+        "candidate": 2348.5,
+        "time_increase_percent": 0.0
+      },
+      "transport": "classic",
+      "whole_ip_bytes": 12625225.0
+    },
+    {
+      "baseline": "classic",
+      "baseline_whole_ip_bytes": 12625225.0,
+      "blocks": 2,
+      "complete_app_ms": {
+        "baseline": 11980.0,
+        "candidate": 29504.5,
+        "time_increase_percent": 146.2813021702838
+      },
+      "extra_complete_session_traffic_percent": 43.51814324101155,
+      "extra_ip_bytes": 5494263.5,
+      "listener": "http",
+      "stages": {
+        "download": {
+          "baseline_io_ms": 3578.5,
+          "baseline_mbit_s": 18.753350286432863,
+          "candidate_io_ms": 10175.0,
+          "candidate_mbit_s": 6.59546574938575,
+          "goodput_change_percent": -64.83046683046683,
+          "time_increase_percent": 184.33701271482462
+        },
+        "parallel": {
+          "baseline_io_ms": 927.0,
+          "baseline_mbit_s": 18.098399137001078,
+          "candidate_io_ms": 1386.0,
+          "candidate_mbit_s": 12.104773448773448,
+          "goodput_change_percent": -33.11688311688312,
+          "time_increase_percent": 49.51456310679612
+        },
+        "small": {
+          "baseline_io_ms": 88.0,
+          "candidate_io_ms": 440.875,
+          "time_increase_percent": 400.9943181818182
+        },
+        "upload": {
+          "baseline_io_ms": 620.0,
+          "baseline_mbit_s": 13.530012903225806,
+          "candidate_io_ms": 2636.5,
+          "candidate_mbit_s": 3.1817212213161388,
+          "goodput_change_percent": -76.48397496681206,
+          "time_increase_percent": 325.2419354838709
+        },
+        "wake": {
+          "baseline_io_ms": 91.0,
+          "candidate_io_ms": 376.0,
+          "time_increase_percent": 313.18681318681325
+        }
+      },
+      "startup_protocol": "h3",
+      "startup_to_app_ws_ms": {
+        "baseline": 2348.5,
+        "candidate": 8959.5,
+        "time_increase_percent": 281.4988290398127
+      },
+      "transport": "no-connect",
+      "whole_ip_bytes": 18119488.5
+    },
+    {
+      "baseline": "classic",
+      "baseline_whole_ip_bytes": 12625225.0,
+      "blocks": 2,
+      "complete_app_ms": {
+        "baseline": 11980.0,
+        "candidate": 15157.5,
+        "time_increase_percent": 26.523372287145254
+      },
+      "extra_complete_session_traffic_percent": 36.623573045232845,
+      "extra_ip_bytes": 4623808.5,
+      "listener": "http",
+      "stages": {
+        "download": {
+          "baseline_io_ms": 3578.5,
+          "baseline_mbit_s": 18.753350286432863,
+          "candidate_io_ms": 4315.5,
+          "candidate_mbit_s": 15.550657861198008,
+          "goodput_change_percent": -17.077974742208323,
+          "time_increase_percent": 20.595221461506206
+        },
+        "parallel": {
+          "baseline_io_ms": 927.0,
+          "baseline_mbit_s": 18.098399137001078,
+          "candidate_io_ms": 1016.0,
+          "candidate_mbit_s": 16.51300787401575,
+          "goodput_change_percent": -8.759842519685035,
+          "time_increase_percent": 9.600862998921244
+        },
+        "small": {
+          "baseline_io_ms": 88.0,
+          "candidate_io_ms": 102.375,
+          "time_increase_percent": 16.33522727272727
+        },
+        "upload": {
+          "baseline_io_ms": 620.0,
+          "baseline_mbit_s": 13.530012903225806,
+          "candidate_io_ms": 721.5,
+          "candidate_mbit_s": 11.626622314622315,
+          "goodput_change_percent": -14.067914067914067,
+          "time_increase_percent": 16.370967741935495
+        },
+        "wake": {
+          "baseline_io_ms": 91.0,
+          "candidate_io_ms": 107.0,
+          "time_increase_percent": 17.582417582417587
+        }
+      },
+      "startup_protocol": "h3",
+      "startup_to_app_ws_ms": {
+        "baseline": 2348.5,
+        "candidate": 4421.0,
+        "time_increase_percent": 88.24781775601447
+      },
+      "transport": "no-connect-hybrid-asymmetric",
+      "whole_ip_bytes": 17249033.5
+    }
+  ],
+  "encoding_microbenchmark": {
+    "256KiB": {
+      "allocations_after": 1,
+      "allocations_before": 2,
+      "baseline_ns": 792117.0,
+      "once_ns": 395585.0,
+      "repetitions": 5,
+      "time_reduction_percent": 50.05977652291265
+    },
+    "64KiB": {
+      "allocations_after": 1,
+      "allocations_before": 2,
+      "baseline_ns": 199999.0,
+      "once_ns": 99065.0,
+      "repetitions": 5,
+      "time_reduction_percent": 50.46725233626168
+    },
+    "8KiB": {
+      "allocations_after": 1,
+      "allocations_before": 2,
+      "baseline_ns": 25698.0,
+      "once_ns": 12801.0,
+      "repetitions": 5,
+      "time_reduction_percent": 50.18678496381042
+    }
+  },
+  "experimental_transport": "no-connect-hybrid-asymmetric",
+  "limits": [
+    "Descriptive two-block Linux/WSL screen, below the 30-block inference floor.",
+    "H3 hybrid uses H3 startup then H1 WSS/TCP; both outer flows are counted.",
+    "Whole is complete application lifecycle plus observed teardown, not a fixed short crop.",
+    "Capture scores are comparable within a protocol; H2 and H3 feature families differ.",
+    "No production-default promotion, cross-platform release gate, or indistinguishability claim.",
+    "Prior generic-baseline and socket-only cohorts are separate and are not pooled here."
+  ],
+  "link": {
+    "each_direction_mbit_s": 20,
+    "mtu": 1500,
+    "qdisc_drops": 0,
+    "rtt_ms": 40
+  },
+  "native_participants": 24,
+  "participants": 32,
+  "provenance": {
+    "client_package_manifest_sha256": "2bdee75364890e6dd33f2dcda8a0ad5a3d8d9912a9e8fb9600f5a40db5107eaa",
+    "client_revision_before_edits": "a0de922b814730cd088b30d9c496a90a5abc49eb",
+    "matrix_sha256": "7b091f0bcfd75bf1ba2e754413276d792daa85660f153438088d32d2a84b0b6d",
+    "provenance_sha256": "934be369df00fe6b0c2de5e37bea7f7267e6ac1d1f630b3c073204ee8bb391dc",
+    "server_build_manifest_sha256": "e70166788aa38979793e479f003cef3e7d788960c9dc65fef457d66d485a2826",
+    "server_sha256": "ca8e009a89d39d714dafef27e9bc64a95004c283f4656302e7c29b7525acd3f8",
+    "working_tree_modified": true
+  },
+  "reference_for_capture_distance": "Firefox A/B",
+  "schema": "naivefox-classic-baseline-cost-and-capture-screen-v1",
+  "useful_websocket_bytes": {
+    "download": 10506240,
+    "upload": 1069056
+  },
+  "workload": "matched active Firefox application, 20 semantic bootstrap pairs, 11 verified jobs, two idle periods and normal application close"
+}

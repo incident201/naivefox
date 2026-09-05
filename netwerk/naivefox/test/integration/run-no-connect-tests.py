@@ -108,10 +108,18 @@ class TargetServer(socketserver.ThreadingTCPServer):
         self.thread.join(timeout=5)
 
 
-def free_port(udp=False):
-    with socket.socket(type=socket.SOCK_DGRAM if udp else socket.SOCK_STREAM) as sock:
-        sock.bind(("127.0.0.1", 0))
-        return sock.getsockname()[1]
+def free_port(udp=False, dual=False):
+    for _ in range(100):
+        with socket.socket(type=socket.SOCK_DGRAM if udp else socket.SOCK_STREAM) as sock:
+            sock.bind(("127.0.0.1", 0))
+            if dual:
+                with socket.socket(type=socket.SOCK_STREAM if udp else socket.SOCK_DGRAM) as other:
+                    try:
+                        other.bind(sock.getsockname())
+                    except OSError:
+                        continue
+            return sock.getsockname()[1]
+    raise RuntimeError("no free dual-protocol fixture port")
 
 
 def private_json(path, value):
@@ -224,8 +232,23 @@ https://:{$NF_PORT} {
 """
 
 
+def prepare_application(run):
+    source = Path(__file__).resolve().parent / "hybrid_app"
+    root = run / "application"
+    assets = root / "assets"
+    assets.mkdir(parents=True, exist_ok=True)
+    (root / "index.html").write_bytes((source / "index.html").read_bytes())
+    for name in ("site.css", "app.js"):
+        (assets / name).write_bytes((source / name).read_bytes())
+    for index in range(1, 5):
+        (assets / f"image-{index}.svg").write_bytes((source / "image.svg").read_bytes())
+    return root.resolve()
+
+
 def start_caddy(args, run, protocol, target_port, user, password):
-    port = free_port(udp=protocol == "h3")
+    hybrid = getattr(args, "transport", "no-connect") in (
+        "no-connect-hybrid", "no-connect-hybrid-asymmetric")
+    port = free_port(udp=protocol == "h3", dual=hybrid and protocol == "h3")
     caddyfile = run / "Caddyfile"
     caddyfile.write_text(caddyfile_text(getattr(args, "forward_proxy_ports", ())))
     env = dict(os.environ, NF_PROTOCOL=protocol, NF_PORT=str(port), NF_CERT=str(run / "server.crt"),
@@ -246,13 +269,12 @@ def start_caddy(args, run, protocol, target_port, user, password):
         item = handlers.pop()
         if item.get("handler") == "naivefox_transport":
             item["stats_path"] = str(run / "server-stats.json")
+            item["application_root"] = str(prepare_application(run))
         for route in item.get("routes", []):
             handlers.extend(route.get("handle", []))
     mutator = getattr(args, "server_mutator", None)
     if mutator is not None:
         mutator(server)
-    hybrid = getattr(args, "transport", "no-connect") in (
-        "no-connect-hybrid", "no-connect-hybrid-asymmetric")
     if hybrid:
         server["protocols"] = ["h1", protocol]
     private_json(run / "caddy.json", config)

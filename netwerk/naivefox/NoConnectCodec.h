@@ -76,6 +76,13 @@ inline constexpr size_t RealtimeUpCapacity(RealtimeActivity aActivity) {
   }
 }
 
+inline constexpr size_t ReadyRealtimeUpCapacity(size_t aBytes, bool aOpening) {
+  return aBytes >= 64 * 1024  ? 128 * 1024
+         : aBytes >= 8 * 1024 ? 16 * 1024
+         : aBytes || aOpening ? 4 * 1024
+                              : 512;
+}
+
 inline constexpr size_t RealtimeDownCapacity(RealtimeActivity aActivity) {
   switch (aActivity) {
     case RealtimeActivity::Download:

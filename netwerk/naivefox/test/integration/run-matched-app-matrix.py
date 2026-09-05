@@ -636,6 +636,7 @@ class Campaign:
             find(server)
             require(module is not None, "real native transport handler is missing")
             module["stats_path"] = str(directory / f"{name}-carrier-stats.json")
+            module["application_root"] = str(native.prepare_application(directory))
             proxy = {"handler": "reverse_proxy", "upstreams": [{"dial": f"127.0.0.1:{self.backend_port}"}]}
             server["routes"] = [
                 {"match": [{"path": ["/health"]}], "handle": [{"handler": "static_response", "status_code": 200, "body": "fixture ready\n"}]},
@@ -1058,6 +1059,48 @@ def summarize_asymmetric(campaign, report):
     return output
 
 
+def summarize_classic_cost(campaign):
+    output = []
+    def stage_time(records, index):
+        values = [record["application"]["stages"][index] for record in records]
+        return statistics.fmean(statistics.fmean(stage["job_io_ms"]) if
+                                stage["stage"] in ("small", "wake") else stage["io_ms"]
+                                for stage in values)
+    for listener in ("socks", "http"):
+        controls = [sample for sample in campaign.samples
+                    if sample["naivefox_arm"] == f"native-classic-{listener}"]
+        require(len(controls) == campaign.args.blocks, "missing classic baseline")
+        baseline_wire = statistics.fmean(item["whole"]["wire_bytes"] for item in controls)
+        for transport in ("classic", "no-connect", "no-connect-hybrid-asymmetric"):
+            candidates = [sample for sample in campaign.samples
+                          if sample["naivefox_arm"] == f"native-{transport}-{listener}"]
+            require(len(candidates) == len(controls), "unpaired transport cost sample")
+            wire = statistics.fmean(item["whole"]["wire_bytes"] for item in candidates)
+            row = {"startup_protocol": campaign.protocol, "listener": listener,
+                   "transport": transport, "baseline": "classic", "blocks": campaign.args.blocks,
+                   "whole_ip_bytes": wire, "baseline_whole_ip_bytes": baseline_wire,
+                   "extra_ip_bytes": wire - baseline_wire,
+                   "extra_complete_session_traffic_percent": 100 * (wire / baseline_wire - 1),
+                   "stages": {}}
+            for metric in ("startup_to_app_ws_ms", "complete_app_ms"):
+                old = statistics.fmean(item["application"][metric] for item in controls)
+                current = statistics.fmean(item["application"][metric] for item in candidates)
+                row[metric] = {"baseline": old, "candidate": current,
+                               "time_increase_percent": 100 * (current / old - 1)}
+            for index, stage in enumerate(candidates[0]["application"]["stages"]):
+                old, current = stage_time(controls, index), stage_time(candidates, index)
+                require(old > 0 and current > 0, "unresolved transport cost timer")
+                value = {"baseline_io_ms": old, "candidate_io_ms": current,
+                         "time_increase_percent": 100 * (current / old - 1)}
+                if stage["stage"] not in ("small", "wake"):
+                    value.update(baseline_mbit_s=stage["useful_bytes"] * 8 / old / 1000,
+                                 candidate_mbit_s=stage["useful_bytes"] * 8 / current / 1000,
+                                 goodput_change_percent=100 * (old / current - 1))
+                row["stages"][stage["stage"]] = value
+            output.append(row)
+    return output
+
+
 def verify_native_runtime(manifest_path, runtime):
     manifest = json.loads(manifest_path.read_text())
     root = manifest_path.parent
@@ -1073,7 +1116,23 @@ def verify_native_runtime(manifest_path, runtime):
             "provenance_note": "Native mapped build is attested by package hashes and build ID, separately from the test harness commit."}, files
 
 
-def verify_caddy_build_id(path):
+def verify_caddy_build_id(path, caddy=None):
+    if path.suffix == ".json":
+        proof = json.loads(path.read_text())
+        require(proof.get("schema") == "naivefox-local-caddy-build-v1" and caddy is not None,
+                "unsupported local Caddy build proof")
+        require(digest(caddy) == proof["binary_sha256"], "local Caddy binary differs")
+        require(proof.get("go_version") == "go1.25.12"
+                and proof.get("source_revision"), "local Caddy provenance is incomplete")
+        for name, expected in proof["source_files_sha256"].items():
+            source = (path.parent / "source" / name).resolve(strict=True)
+            require(source.is_relative_to((path.parent / "source").resolve())
+                    and digest(source) == expected, "local Caddy source snapshot differs")
+        require(proof["source_files_sha256"] and
+                digest(path.parent / "caddy.build-info") == proof["build_info_sha256"],
+                "local Caddy build metadata differs")
+        return proof
+
     values = dict(line.split("=", 1) for line in (HERE / "versions.env").read_text().splitlines()
                   if line and not line.startswith("#"))
     expected = (f"caddy={values['CADDY_VERSION']} xcaddy={values['XCADDY_VERSION']} "
@@ -1099,7 +1158,9 @@ def main():
     parser.add_argument("--blocks", type=int, default=10)
     parser.add_argument("--seed", type=int, required=True)
     parser.add_argument("--timeout", type=int, default=120)
-    parser.add_argument("--asymmetric-screen", action="store_true")
+    screen = parser.add_mutually_exclusive_group()
+    screen.add_argument("--asymmetric-screen", action="store_true")
+    screen.add_argument("--classic-cost-screen", action="store_true")
     args = parser.parse_args()
     require(os.environ.get("NAIVEFOX_CAPTURE_ISOLATED_NETWORK_ENTERED") == "1", "isolated namespace is required")
     require(1 <= args.blocks <= 30 and 30 <= args.timeout <= 150, "campaign bounds are invalid")
@@ -1110,6 +1171,12 @@ def main():
                 "run bounded H2 and H3 asymmetric screens sequentially")
         ARMS = tuple(f"native-{transport}-{kind}"
                      for transport in ("no-connect-hybrid", "no-connect-hybrid-asymmetric")
+                     for kind in ("socks", "http"))
+    if args.classic_cost_screen:
+        require(args.purpose == "pilot" and args.blocks <= 2,
+                "classic cost comparisons use bounded independent screening blocks")
+        ARMS = tuple(f"native-{transport}-{kind}"
+                     for transport in ("classic", "no-connect", "no-connect-hybrid-asymmetric")
                      for kind in ("socks", "http"))
     require(args.purpose != "primary" or (args.link == "rtt40-20mbps" and args.blocks == 10), "primary link or sample contract differs")
     args.objdir = args.objdir.resolve(strict=True)
@@ -1122,11 +1189,11 @@ def main():
     require(base == args.firefox_base and digest(args.asset_dir / "manifest.json") == MANIFEST_SHA, "frozen Firefox base or manifest differs")
     reference_proof = legacy.verify_reference(args.reference_proof, args.firefox, base)
     native_proof, native_files = verify_native_runtime(args.runtime_manifest, args.runtime)
-    caddy_build_id = verify_caddy_build_id(args.caddy_build_id)
+    caddy_build_id = verify_caddy_build_id(args.caddy_build_id, args.caddy)
     source_files = [Path(__file__), *(HERE / name for name in ("run-hybrid-matrix.py", "run-no-connect-tests.py",
         "camouflage_features.py", "analyze-camouflage-arms.py", "analyze-camouflage.py", "camouflage_superblocks.py",
         "camouflage_browser_controller.py", "camouflage_capture_health.py", "monitor-network-mutations.py", "versions.env")),
-        *(args.asset_dir / name for name in ("manifest.json", "app.js", "app.template.js", "render-app.py", "main.go", "go.mod", "go.sum", "site.css", "image.svg"))]
+        *(args.asset_dir / name for name in ("manifest.json", "app.js", "app.template.js", "render-app.py", "main.go", "go.mod", "go.sum", "site.css", "image.svg", "index.html"))]
     named_inputs = {"source/" + str(path.relative_to(HERE)): path for path in source_files}
     named_inputs.update({"native_runtime/" + str(path.relative_to(args.runtime_manifest.parent)): path for path in native_files})
     named_inputs.update({"reference_runtime/" + name: args.firefox.parent / name for name in reference_proof["runtime_files_sha256"]})
@@ -1150,7 +1217,8 @@ def main():
         "caddy_build_id": caddy_build_id,
         "manifest_sha256": MANIFEST_SHA, "seed": args.seed, "blocks_per_protocol": args.blocks,
         "link": args.link, "observer": "receive-side complete origin TCP/QUIC and attributable ICMP; no fixed crop or per-stage wire allocation",
-        "local_listener_topology": "only the selected listener", "screening_only": True}
+        "local_listener_topology": "only the selected listener", "screening_only": True,
+        "comparison_baseline": "classic" if args.classic_cost_screen else None}
     write_json(args.root / "provenance.json", proof)
     matrix = []
     for protocol in (("h2", "h3") if args.protocol == "both" else (args.protocol,)):
@@ -1158,10 +1226,12 @@ def main():
         try:
             campaign.start()
             report = campaign.run()
-            matrix.extend(summarize_asymmetric(campaign, report)
-                          if args.asymmetric_screen else summarize(campaign, report))
+            matrix.extend(summarize_classic_cost(campaign) if args.classic_cost_screen else
+                          summarize_asymmetric(campaign, report) if args.asymmetric_screen else
+                          summarize(campaign, report))
             write_json(args.root / "matrix.json", {"schema": proof["schema"], "purpose": args.purpose,
-                                                   "screening_only": True, "rows": matrix})
+                                                   "screening_only": True, "comparison_baseline": proof["comparison_baseline"],
+                                                   "rows": matrix})
         finally:
             campaign.close()
     print(json.dumps({"result": str(args.root / "matrix.json"), "status": "matched_workload_screening"}), flush=True)

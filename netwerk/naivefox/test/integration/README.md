@@ -189,6 +189,53 @@ compression handshakes must fail without any binary message being sent.
 `--case` and `--listener` narrow an incremental check. Raw fixture files remain
 private below the selected object directory; `result.json` contains safe counts.
 
+## Native control-frame regression
+
+Run legal PING/PONG traffic through both hybrid modes and both H2/H3 startup
+routes with `run-hybrid-control-tests.py`, passing `--objdir`, `--caddy`, and
+`--work-dir` as above. Its default matrix covers both listeners and both hybrid
+selectors. It checks 4-byte and maximum 125-byte control payloads, subsequent
+byte-exact data, application half-close and natural client exit. These native
+control completions must not consume the single NFC1 message's writer budget.
+
+The loopback fixtures materialize the seven-file application below their private
+run directory for current Caddy's required `application_root`. The matched
+application uses the same checked-in root for both origins. H3 hybrid fixture
+ports are checked for availability in both UDP and TCP.
+
+## Native cost screening
+
+`run-no-connect-performance.py` accepts `--objdir`, `--work-dir`, `--runtime`,
+`--caddy`, `--seed`, `--blocks`, `--protocol`, `--listener`, `--transport`, and
+`--link loopback|rtt40-20mbps`. Run it through the existing isolated-network
+wrapper. It measures a cold echo, an 8-MiB download, a 1-MiB upload, four concurrent
+512-KiB downloads, four warm 4-KiB echoes and a wake echo after two seconds.
+Every transfer checks integrity and half-close. Whole-session IP totals use
+receive-side copies after both shaping directions and include carrier startup,
+WebSocket establishment and observed teardown. Private captures and per-sample
+results stay below the specified object directory. These socket jobs are separate
+from the Firefox application and cannot establish browser-equivalent scheduling.
+
+For the matched application, `--caddy-build-id` also accepts an explicit local
+build manifest with schema `naivefox-local-caddy-build-v1`, binary and Go
+build-info hashes, and a hashed source snapshot alongside it. This route records
+a locally modified server honestly; it is not a published immutable-module
+attestation. The pinned text build-ID route remains available.
+
+For a direct classic baseline, pass `--classic-cost-screen --purpose pilot
+--blocks 2 --protocol both` to the matched application runner. Its native arms
+are classic, finite no-connect and the optimized asymmetric hybrid through
+both listeners. Every speed, latency and complete-session traffic ratio is
+relative to contemporary classic; Firefox A/B remain workload and routing
+controls. `audit-classic-cost-screen.py --input CAMPAIGN` requires the
+complete H2/H3 comparison and independently recomputes those quantities.
+
+Run `audit-asymmetric-screen.py --input CAMPAIGN` after a completed one- or
+two-block asymmetric application screen. It independently checks complete paired
+blocks, both endpoints' useful jobs and message counts, routing and shutdown,
+raw receive-side IP totals, cost ratios and admission thresholds. Its PASS covers
+those short-screen costs, not residual inference or a full primary matrix.
+
 ## Complete local gate
 
 The experimental hybrid uses the same native acceptance suite with an

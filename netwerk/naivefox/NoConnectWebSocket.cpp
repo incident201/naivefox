@@ -113,7 +113,7 @@ nsresult NoConnectWebSocket::Send(const nsACString& aMessage) {
   if (!mOpen || mClosing || !mChannel) {
     return NS_ERROR_NOT_CONNECTED;
   }
-  if (aMessage.IsEmpty() || aMessage.Length() > 256 * 1024) {
+  if (aMessage.Length() < 512 || aMessage.Length() > 256 * 1024) {
     return NS_ERROR_ILLEGAL_VALUE;
   }
   return mChannel->SendBinaryMsg(aMessage);
@@ -205,6 +205,11 @@ NS_IMETHODIMP NoConnectWebSocket::OnBinaryMessageAvailable(
 NS_IMETHODIMP NoConnectWebSocket::OnAcknowledge(nsISupports*, uint32_t aSize) {
   MOZ_ASSERT(NS_IsMainThread());
   if (!mOpen || mClosing) {
+    return NS_OK;
+  }
+  // Necko also acknowledges whole PING/PONG payloads (at most 125 bytes).
+  // NFC1 writes are at least 512 bytes and have a separate queue budget.
+  if (aSize <= 125) {
     return NS_OK;
   }
   RefPtr<NoConnectWebSocket> self = this;

@@ -34,7 +34,6 @@ namespace mozilla::naivefox {
 using noconnect::Frame;
 using noconnect::Kind;
 using noconnect::PressureHint;
-using noconnect::RealtimeActivity;
 using Bytes = std::vector<uint8_t>;
 
 namespace {
@@ -339,7 +338,7 @@ class NoConnectCarrier final {
   void WebSocketTick(bool aHeartbeat = false);
   void ScheduleWebSocket(uint32_t aDelay, bool aHeartbeat);
   bool HasPendingOpen() const;
-  uint32_t WebSocketDelay(size_t aBytes, bool aControl) const;
+  uint32_t WebSocketDelay(size_t aBytes) const;
 
   TunnelConfig mConfig;
   nsCString mCookie;
@@ -372,7 +371,6 @@ class NoConnectCarrier final {
   size_t mWebSocketPending = 0;
   uint32_t mWebSocketAck = 0;
   uint32_t mWebSocketScheduledDelay = 0;
-  PressureHint mWebSocketPeerHint = PressureHint::Idle;
   bool mWebSocketReady = false;
   bool mWebSocketHeartbeat = false;
 };
@@ -857,9 +855,6 @@ bool NoConnectCarrier::ReceiveCell(const Bytes& aBody, bool aWebSocket) {
     Fail(NS_ERROR_CORRUPTED_CONTENT);
     return false;
   }
-  if (aWebSocket && IsAsymmetricHybrid(mConfig.mTransport)) {
-    mWebSocketPeerHint = hint;
-  }
   ++mDown;
   for (auto& frame : frames) {
     if (frame.kind == Kind::Ack) {
@@ -1003,7 +998,7 @@ void NoConnectCarrier::Tick() {
       bool control = false;
       const size_t bytes = Pressure(control);
       if (bytes || control) {
-        ScheduleWebSocket(WebSocketDelay(bytes, control), false);
+        ScheduleWebSocket(WebSocketDelay(bytes), false);
       }
     }
     return;
@@ -1232,7 +1227,7 @@ void NoConnectCarrier::StartWebSocket() {
           bool control = false;
           const size_t bytes = self->Pressure(control);
           self->ScheduleWebSocket(
-              bytes || control ? self->WebSocketDelay(bytes, control) : 25000,
+              bytes || control ? self->WebSocketDelay(bytes) : 25000,
               !bytes && !control);
           self->Wake();
         }
@@ -1255,12 +1250,10 @@ bool NoConnectCarrier::HasPendingOpen() const {
   });
 }
 
-uint32_t NoConnectCarrier::WebSocketDelay(size_t aBytes, bool aControl) const {
+uint32_t NoConnectCarrier::WebSocketDelay(size_t aBytes) const {
   size_t capacity = noconnect::kMaxCell;
   if (IsAsymmetricHybrid(mConfig.mTransport)) {
-    const RealtimeActivity activity = noconnect::SelectRealtimeActivity(
-        noconnect::RealtimePressure(aBytes, aControl), mWebSocketPeerHint);
-    capacity = noconnect::RealtimeUpCapacity(activity);
+    capacity = noconnect::ReadyRealtimeUpCapacity(aBytes, HasPendingOpen());
   }
   return aBytes >= capacity || (!aBytes && !HasPendingOpen()) ? 0 : 2;
 }
@@ -1306,10 +1299,7 @@ void NoConnectCarrier::WebSocketTick(bool aHeartbeat) {
   const bool opening = HasPendingOpen();
   size_t capacity = bytes >= 131072 ? 262144 : bytes || opening ? 65536 : 512;
   if (IsAsymmetricHybrid(mConfig.mTransport)) {
-    const RealtimeActivity activity = noconnect::SelectRealtimeActivity(
-        noconnect::RealtimePressure(bytes, control || opening),
-        mWebSocketPeerHint);
-    capacity = noconnect::RealtimeUpCapacity(activity);
+    capacity = noconnect::ReadyRealtimeUpCapacity(bytes, opening);
   }
   Bytes body;
   if (!Upload(capacity, body, IsAsymmetricHybrid(mConfig.mTransport))) {
