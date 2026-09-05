@@ -78,7 +78,7 @@ class NoConnectFixtureTests(unittest.TestCase):
             response = server["routes"][0]["handle"][0]
             self.assertEqual(response["status_code"], 200)
             self.assertEqual(len(response["body"]), 4096)
-            self.assertEqual(response["headers"]["X-App-Profile"], ["continuous-bulk-pipeline"])
+            self.assertEqual(response["headers"]["X-App-Profile"], ["native-stream-v1"])
             self.assertNotEqual(response["headers"].get("X-App-Auth"), ["basic"])
             self.assertIn("Set-Cookie", response["headers"])
 

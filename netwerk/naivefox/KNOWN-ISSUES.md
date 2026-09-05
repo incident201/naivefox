@@ -108,28 +108,22 @@ implicit contract changes.
 
 `no-connect` is opt-in and requires the matching Caddy `naivefox_transport`
 module with shared forward-proxy authentication and access policy and the
-`continuous-bulk-pipeline` profile. It does not interoperate with an ordinary
+`native-stream-v1` profile. It does not interoperate with an ordinary
 forward proxy or an arbitrary static website. A module mismatch or rejected
 credential pair fails the connection; it does not trigger a downgrade to `classic`.
 
 Session resumption and transparent replay after an outer-session failure are
 not supported. Credential provisioning and rotation remain an operator concern.
 
-Experimental `no-connect-hybrid` requires the matching WebSocket-capable
-server. The current Firefox implementation does not provide WS over HTTP/3:
-after H2/H3 startup the hybrid opens a separate H1 WSS/TCP connection. Its H3
-option therefore needs both UDP and TCP access and is explicitly different
-from strict UDP-only `no-connect`. No transparent fallback or reconnect is
-provided. The startup and WS connections must both be counted in measurements.
-The asymmetric hybrid selector additionally requires the matching pressure-hint
-subprotocol. It is screening-only and does not establish a production benefit.
+No-connect requires H1 WSS/TCP after its H2/H3 startup. Its H3 setting is
+therefore not UDP-only. Both physical connections must be counted in traffic
+measurements. Old finite HTTP and hybrid/asymmetric selector names and wire
+profiles are not supported.
 
-The earlier experimental residual and throughput measurements used a full
-Firefox SPA worker. They cannot be attributed to the lean native client, which
-does not execute that page's JavaScript or render its UI. Functional
-interoperability and lean-closure checks do not establish indistinguishability,
-throughput parity, or browser-equivalent request scheduling. Protocol details
-and the exact port boundary are maintained in [NO-CONNECT.md](NO-CONNECT.md).
+Short controlled-link measurements are scoped to their recorded application,
+link, source and runtime. They do not establish absolute indistinguishability
+or performance across arbitrary networks. Historical labels in CAPTURE.md
+describe those earlier artifacts rather than current configuration options.
 
 ## Product scope
 

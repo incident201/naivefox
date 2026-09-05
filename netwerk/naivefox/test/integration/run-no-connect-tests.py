@@ -214,7 +214,7 @@ https://:{$NF_PORT} {
     }
     route {
         naivefox_transport {
-            profile continuous-bulk-pipeline
+            profile native-stream-v1
             forward_proxy {
                 basic_auth "{$NF_PROXY_USER}" "{$NF_PROXY_PASSWORD}"
                 hide_ip
@@ -247,7 +247,7 @@ def prepare_application(run):
 
 def start_caddy(args, run, protocol, target_port, user, password):
     hybrid = getattr(args, "transport", "no-connect") in (
-        "no-connect-hybrid", "no-connect-hybrid-asymmetric")
+        "no-connect", "no-connect")
     port = free_port(udp=protocol == "h3", dual=hybrid and protocol == "h3")
     caddyfile = run / "Caddyfile"
     caddyfile.write_text(caddyfile_text(getattr(args, "forward_proxy_ports", ())))
@@ -703,34 +703,21 @@ def check_smoke_requests(requests, protocol, hybrid, classic=False):
             "smoke selected the wrong WebSocket lifecycle")
 
 
-def check_ws_capacity_policy(stats, transport, complete=False):
+def check_ws_capacity_policy(stats, transport):
+    require(transport == "no-connect", "unexpected application transport")
     capacities = stats.get("ws_cell_capacities", {})
     incoming = {int(key.split()[1]) for key in capacities if key.startswith("in ")}
     outgoing = {int(key.split()[1]) for key in capacities if key.startswith("out ")}
-    if transport == "no-connect-hybrid-asymmetric":
-        require(incoming and incoming <= {512, 4096, 16384, 131072},
-                "asymmetric hybrid used an invalid client-to-server capacity")
-        require(outgoing and outgoing <= {512, 8192, 65536, 262144},
-                "asymmetric hybrid used an invalid server-to-client capacity")
-        require((incoming - {512}) and (outgoing - {512}),
-                "asymmetric hybrid never used directional activity capacity")
-        if complete:
-            require({4096, 16384, 131072} <= incoming and
-                    {8192, 65536, 262144} <= outgoing,
-                    "complete asymmetric gate did not exercise every directional state")
-            activities = stats.get("ws_activities", {})
-            require(all(activities.get(f"out {state}", 0) > 0
-                        for state in ("interactive", "download", "upload", "mixed")),
-                    "complete asymmetric gate missed a server activity state")
-    else:
-        require(incoming and outgoing and incoming <= {512, 65536, 262144} and
-                outgoing <= {512, 65536, 262144},
-                "generic hybrid capacity policy changed")
+    require(incoming and incoming <= {512, 4096, 16384, 131072},
+            "invalid no-connect uplink capacity")
+    require(outgoing and outgoing <= {512, 8192, 65536, 262144},
+            "invalid no-connect downlink capacity")
+    require(incoming - {512} and outgoing - {512}, "no WebSocket data exchanged")
 
 
 def run_smoke_protocol(args, base, protocol):
     transport = getattr(args, "transport", "no-connect")
-    hybrid = transport in ("no-connect-hybrid", "no-connect-hybrid-asymmetric")
+    hybrid = transport in ("no-connect",)
     run = base / protocol
     run.mkdir(mode=0o700)
     issue_certificates(run)
@@ -745,7 +732,7 @@ def run_smoke_protocol(args, base, protocol):
         processes.append(candidate)
         download(ports, "socks", target.server_address[1], 65536)
         if hybrid:
-            wait_until(lambda: "No-connect hybrid websocket ready startup=20" in
+            wait_until(lambda: "No-connect websocket ready startup=20" in
                        candidate.log_path.read_text(errors="replace"),
                        "hybrid smoke never completed the WebSocket startup milestone", candidate, timeout=60)
         upload(ports, "socks", target.server_address[1], 65536)
@@ -781,8 +768,7 @@ def run_smoke_protocol(args, base, protocol):
             require(stats.get("ws_opened", 0) == 1 and stats.get("ws_messages_in", 0) >= 1 and
                     stats.get("ws_messages_out", 0) >= 1,
                     "hybrid smoke did not exchange bidirectional WebSocket cells")
-            expected_subprotocol = ("nfc1.hybrid.a1" if transport == "no-connect-hybrid-asymmetric"
-                                    else "nfc1.hybrid.v1")
+            expected_subprotocol = "nfc1.stream.v1"
             require(stats.get("ws_subprotocols") == {expected_subprotocol: 1},
                     "hybrid smoke selected the wrong shaping subprotocol")
             check_ws_capacity_policy(stats, transport)
@@ -810,7 +796,7 @@ def run_smoke_protocol(args, base, protocol):
 
 def run_protocol(args, base, protocol):
     transport = getattr(args, "transport", "no-connect")
-    hybrid = transport in ("no-connect-hybrid", "no-connect-hybrid-asymmetric")
+    hybrid = transport in ("no-connect",)
     run = base / protocol
     run.mkdir(mode=0o700)
     issue_certificates(run)
@@ -875,17 +861,13 @@ def run_protocol(args, base, protocol):
             require(stats.get("ws_opened", 0) >= 1, "hybrid never established WebSocket")
             require(stats.get("ws_messages_in", 0) >= 1 and stats.get("ws_messages_out", 0) >= 1,
                     "hybrid did not exchange bidirectional WebSocket cells")
-            expected_subprotocol = ("nfc1.hybrid.a1" if transport == "no-connect-hybrid-asymmetric"
-                                    else "nfc1.hybrid.v1")
+            expected_subprotocol = "nfc1.stream.v1"
             require(set(stats.get("ws_subprotocols", {})) == {expected_subprotocol},
                     "hybrid selected the wrong shaping subprotocol")
-            check_ws_capacity_policy(stats, transport, complete=True)
+            check_ws_capacity_policy(stats, transport)
             if getattr(args, "idle_seconds", 2) >= 27:
                 require(stats.get("idle_heartbeats", 0) >= 1,
                         "hybrid long idle did not exercise application heartbeat")
-        else:
-            require(stats["idle_started"] >= 1, "no-connect idle state was not exercised")
-            require(stats["idle_completed"] >= 1, "no-connect idle poll never completed")
         peers = stats.get("peers", [])
         require(sum(peer.get("reset", 0) for peer in peers) >= 1,
                 "abrupt local cancellation did not reset its logical stream")
@@ -906,8 +888,8 @@ def run_protocol(args, base, protocol):
                    "websocket_tcp": hybrid, "ws_opened": stats.get("ws_opened", 0),
                    "no_connect_outer_connects": 0, "classic_connects": stats["connect"],
                    "classic_preamble": getattr(args, "classic_preamble", "off"), "parallel_batches": batches,
-                   "logical_opens": stats["opens"], "idle_started": stats["idle_started"],
-                   "idle_completed": stats["idle_completed"], "concurrent_open_streams": concurrent_connections,
+                   "logical_opens": stats["opens"], "idle_heartbeats": stats.get("idle_heartbeats", 0),
+                   "concurrent_open_streams": concurrent_connections,
                    "carrier_sessions": len(peers), "peak_streams_per_carrier": peaks,
                    "shared_basic_auth": True, "credential_rejection_cases_per_transport": 3,
                    "credential_rejection_frontends": ["socks", "http"],
@@ -933,8 +915,7 @@ def main():
     parser.add_argument("--caddy", type=Path, required=True)
     parser.add_argument("--runtime", type=Path)
     parser.add_argument("--protocol", choices=("h2", "h3", "both"), default="both")
-    parser.add_argument("--transport", choices=("no-connect", "no-connect-hybrid",
-                                                  "no-connect-hybrid-asymmetric"),
+    parser.add_argument("--transport", choices=("no-connect",),
                         default="no-connect")
     parser.add_argument("--smoke", action="store_true", help="bounded basic byte/lifecycle gate without the full concurrency matrix")
     parser.add_argument("--work-dir", type=Path, help="private artifact parent below objdir")

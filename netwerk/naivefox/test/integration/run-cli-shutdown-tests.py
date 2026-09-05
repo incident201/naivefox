@@ -108,11 +108,11 @@ def main():
     objdir = args.objdir.resolve(strict=True)
     runtime = (args.runtime or objdir / "dist/bin/naivefox").resolve(strict=True)
     root = args.work_dir.resolve()
-    require(root.is_relative_to(objdir / "hybrid-ws") and not root.exists(), "new fixture root must be beneath the common objdir hybrid-ws subtree")
+    require(root.is_relative_to(objdir) and not root.exists(), "new fixture root must be beneath the object directory")
     os.umask(0o077)
     root.mkdir(parents=True, mode=0o700)
     results = []
-    for transport in ("classic", "no-connect", "no-connect-hybrid"):
+    for transport in ("classic", "no-connect"):
         for stop_signal in (signal.SIGINT, signal.SIGTERM):
             results.append(run_case(runtime, root, transport, stop_signal))
     summary = {"passed": True, "cases": len(results), "unfinished_frontends_closed": 12, "results": results}

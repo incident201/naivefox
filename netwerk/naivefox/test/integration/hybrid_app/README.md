@@ -46,7 +46,7 @@ Configure these overlays identically on the outer and inner Caddy origins:
 - Send `/api/realtime` to this backend **only** when
   `Sec-WebSocket-Protocol` equals `nfbench.app.v1`.
 
-The native outer `nfc1.hybrid.v1` WebSocket and `/api/sync`, `/api/events/*` and
+The native outer `nfc1.stream.v1` WebSocket and `/api/sync`, `/api/events/*` and
 `/media/chunk/*` remain on the real transport module. They are separate from
 the application workload. No production fault or benchmark hooks are needed.
 

@@ -183,7 +183,7 @@ class AndroidFixtureTests(unittest.TestCase):
                  mock.patch.object(android.suite, "wait_until"), \
                  mock.patch.object(fixture, "call") as call:
                 original = None
-                for override in (None, "", "classic", "no-connect", "no-connect-hybrid"):
+                for override in (None, "", "classic", "no-connect"):
                     args = SimpleNamespace(listener_ports=ports, client_config_path=config_path,
                                            preserve_client_config=True, transport_override=override,
                                            rejected_transports=("", "unknown"))

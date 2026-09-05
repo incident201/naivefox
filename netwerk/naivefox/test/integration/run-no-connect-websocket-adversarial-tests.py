@@ -24,7 +24,7 @@ spec.loader.exec_module(fixture)
 CASES = (
     "missing-subprotocol", "wrong-subprotocol", "unsolicited-compression",
     "text", "oversize", "capacity", "sequence", "future-ack", "decreasing-ack",
-    "ack-stream", "ack-body", "hint",
+    "ack-stream", "ack-body", "reserved",
 )
 HANDSHAKE_CASES = frozenset(CASES[:3])
 ACK_CASES = frozenset(CASES[7:11])
@@ -74,11 +74,9 @@ def receive_client_cell(sock, transport):
         fixture.require(len(body) <= 262144, "client fragmented message exceeded fixture bound")
         if final:
             break
-    capacities = ((512, 4096, 16384, 131072)
-                  if transport == "no-connect-hybrid-asymmetric"
-                  else (512, 65536, 262144))
+    capacities = (512, 4096, 16384, 131072)
     fixture.require(len(body) in capacities and body[:4] == b"NFC1" and
-                    body[14] <= (2 if transport == "no-connect-hybrid-asymmetric" else 0) and
+                    body[14] == 0 and
                     body[15] == 0,
                     "client did not send a shaped NFC1 message")
     return struct.unpack_from("!I", body, 4)[0]
@@ -143,7 +141,7 @@ class MaliciousWebSocket(socketserver.BaseRequestHandler):
                     body = cell(ack=upstream, stream=1)
                 elif server.case == "ack-body":
                     body = cell(ack=upstream, body=b"x")
-                elif server.case == "hint":
+                elif server.case == "reserved":
                     body = cell(hint=3)
                 server.attack_at = time.monotonic()
                 self.request.sendall(frame(opcode, body))
@@ -171,8 +169,7 @@ class MaliciousServer(socketserver.ThreadingTCPServer):
         super().__init__(("127.0.0.1", 0), MaliciousWebSocket)
         self.case = case
         self.transport = transport
-        self.protocol = ("nfc1.hybrid.a1" if transport == "no-connect-hybrid-asymmetric"
-                         else "nfc1.hybrid.v1")
+        self.protocol = "nfc1.stream.v1"
         self.connections = 0
         self.binary_sent = 0
         self.attack_at = None
@@ -272,9 +269,8 @@ def main():
     parser.add_argument("--protocol", choices=("h2", "h3", "both"), default="both")
     parser.add_argument("--listener", choices=("socks", "http", "both"), default="socks")
     parser.add_argument("--case", choices=CASES, action="append")
-    parser.add_argument("--transport", choices=("no-connect-hybrid",
-                                                  "no-connect-hybrid-asymmetric"),
-                        default="no-connect-hybrid")
+    parser.add_argument("--transport", choices=("no-connect",),
+                        default="no-connect")
     args = parser.parse_args()
     args.objdir = args.objdir.resolve(strict=True)
     args.caddy = args.caddy.resolve(strict=True)

@@ -1,3 +1,6 @@
+Current live comparisons use classic and the promoted no-connect. Historical
+matrices retain their source-bound labels in Git.
+
 # Matched active-application benchmark
 
 This benchmark supersedes the invalid idle-reference experiment retained in
@@ -24,7 +27,7 @@ that use them.
 The application then opens exactly one WebSocket with subprotocol
 `nfbench.app.v1` at `/api/realtime`. A test-only Caddy matcher routes that
 subprotocol to the ordinary application backend. Native carrier subprotocol
-`nfc1.hybrid.v1` continues to reach the real transport module.
+`nfc1.stream.v1` continues to reach the real transport module.
 
 After the backend accepts the application WS and before active work starts,
 an independent kernel socket ownership check verifies routing: native inner-origin clients belong to the
@@ -53,8 +56,8 @@ control messages in the client/server directions. Data generation, offsets,
 chunk boundaries, credit rules and expected per-job SHA-256 digests come from
 the same manifest. No candidate trace is replayed into the reference.
 
-Every block contains Firefox A/B plus classic, no-connect and hybrid through
-SOCKS and HTTP CONNECT: eight participants. Native configurations contain only
+Every block contains Firefox A/B plus classic and no-connect through
+SOCKS and HTTP CONNECT: six participants. Native configurations contain only
 the row's selected local listener. All other configuration is common across
 modes, including URI credentials, origin, trust and address mapping.
 
@@ -128,7 +131,7 @@ through complete teardown and be labeled separately from total session cost.
 ## Primary link and sample plan
 
 The primary campaign uses ten randomized paired blocks per H2/H3 startup
-condition: 160 participants total. The outer link has 20 ms one-way delay
+condition: 120 participants total. The outer link has 20 ms one-way delay
 (40 ms RTT) and a separate 20 Mbit/s budget in each direction. Client-to-origin
 and origin-to-client packets enter separate qdisc classes. Associated ICMP
 quotes use the reverse directional class; the fixture validates the supported
@@ -159,7 +162,7 @@ Ten blocks remain descriptive screening evidence below the 30-block paired
 inference floor. All failures are retained, no participant is selectively
 resampled, and no idle-reference or pre-fix dataset is spliced into the result.
 All generated state belongs beneath the existing warm objdir's
-`hybrid-ws/matched-app` subtree. The Firefox browser is reused, never rebuilt.
+`no-connect/matched-app` subtree. The Firefox browser is reused, never rebuilt.
 
 ## Independent audit and publication
 
@@ -171,7 +174,7 @@ is bound to the matrix, audit source and hashes of raw captures and sidecars.
 A new audit replaces any stale PASS with an in-progress marker before checking.
 
 `publish-matched-app-results.py --input CAMPAIGN --output DRAFT_JSON --section
-DRAFT_MARKDOWN` then refuses anything except the complete 160-participant
+DRAFT_MARKDOWN` then refuses anything except the complete 120-participant
 primary and its matching audit. Draft outputs must be beneath the campaign's
 parent directory and outside the campaign itself. Review those safe aggregates
 before copying them into `test/integration/evidence/` and `CAPTURE.md`; never

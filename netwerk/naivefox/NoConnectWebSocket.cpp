@@ -42,8 +42,7 @@ nsresult NoConnectWebSocket::Start(const TunnelConfig& aConfig,
                                    const nsACString& aProtocol) {
   MOZ_ASSERT(NS_IsMainThread());
   if (mChannel || mClosing || aCookie.IsEmpty() ||
-      !(aProtocol.EqualsLiteral("nfc1.hybrid.v1") ||
-        aProtocol.EqualsLiteral("nfc1.hybrid.a1"))) {
+      !aProtocol.EqualsLiteral("nfc1.stream.v1")) {
     return NS_ERROR_INVALID_ARG;
   }
   nsCOMPtr<nsIChannel> templateChannel;

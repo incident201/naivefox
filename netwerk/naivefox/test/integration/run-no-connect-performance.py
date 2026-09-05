@@ -148,14 +148,10 @@ def sample(args, root, row):
             result["cold_echo_ms"] = 1000 * (time.perf_counter() - cold_start)
             sock.shutdown(socket.SHUT_WR)
             require(not sock.recv(1), "cold echo missed EOF")
-        if "hybrid" in row["transport"]:
-            native.wait_until(lambda: "No-connect hybrid websocket ready startup=20" in
+        if row["transport"] == "no-connect":
+            native.wait_until(lambda: "No-connect websocket ready startup=20" in
                               client.log_path.read_text(errors="replace"),
                               "hybrid startup incomplete", client, timeout=60)
-        # All arms finish the fixed startup before warm measurements.
-        else:
-            native.wait_until(lambda: len(native.access_requests(directory)) >= 47,
-                              "finite startup incomplete", client, timeout=60)
         result["carrier_ready_ms"] = 1000 * (time.perf_counter() - cold_start)
         target_port = target.server_address[1]
         result["download"] = transfer(ports, row["listener"], target_port, 8 * 1024 * 1024)
@@ -188,10 +184,10 @@ def sample(args, root, row):
                              if key.startswith("ws_") or key in (
                                  "upload_bytes", "download_bytes", "upload_filler", "download_filler",
                                  "upload_useful", "download_useful", "startup_completed", "opens", "connect")}
-        require(stats["connect"] == 0 and stats["opens"] == 8, "wrong carrier routing/stream count")
+        require((stats["connect"], stats["opens"]) == ((8, 0) if row["transport"] == "classic" else (0, 8)), "wrong carrier routing/stream count")
         require(not target.failures and target.accepted_connections == 8, "target integrity failure")
-        require(stats["startup_completed"] == 1, "fixed startup not completed")
-        require(stats["ws_opened"] == (1 if "hybrid" in row["transport"] else 0),
+        require(stats["startup_completed"] == (0 if row["transport"] == "classic" else 1), "fixed startup not completed")
+        require(stats["ws_opened"] == (1 if row["transport"] == "no-connect" else 0),
                 "wrong realtime transition")
         result["admitted"] = True
         native.private_json(directory / "result.json", result)
@@ -219,8 +215,7 @@ def main():
         parser.add_argument("--" + name, required=True, type=Path)
     parser.add_argument("--protocol", choices=("h2", "h3", "both"), default="both")
     parser.add_argument("--listener", choices=("socks", "http", "both"), default="both")
-    parser.add_argument("--transport", nargs="+", default=["no-connect", "no-connect-hybrid",
-                                                          "no-connect-hybrid-asymmetric"])
+    parser.add_argument("--transport", nargs="+", choices=("classic", "no-connect"), default=["classic", "no-connect"])
     parser.add_argument("--link", choices=("loopback", "rtt40-20mbps"), required=True)
     parser.add_argument("--blocks", type=int, default=3)
     parser.add_argument("--seed", type=int, required=True)

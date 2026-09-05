@@ -145,57 +145,12 @@ TEST_F(NaiveFoxNoConnectCodec, WebSocketAckIsNotAStreamMessage) {
   EXPECT_FALSE(state.Receive(frames[0]));
 }
 
-TEST_F(NaiveFoxNoConnectCodec, RealtimePressureHintsAreWebSocketOnly) {
-  for (PressureHint hint :
-       {PressureHint::Idle, PressureHint::Interactive, PressureHint::Bulk}) {
-    std::vector<uint8_t> body;
-    std::vector<Frame> frames = {
-        {Kind::Credit, 1, 0, {0, 0, 16, 0}},
-    };
-    ASSERT_TRUE(EncodeRealtime(7, 16384, hint, frames, body));
-    PressureHint decodedHint = PressureHint::Idle;
-    std::vector<Frame> decoded;
-    ASSERT_TRUE(DecodeRealtime(7, 16384, body, decodedHint, decoded));
-    EXPECT_EQ(decodedHint, hint);
-    EXPECT_EQ(decoded.size(), 1U);
-    if (hint != PressureHint::Idle) {
-      EXPECT_FALSE(Decode(7, 16384, body, decoded));
-    }
+TEST_F(NaiveFoxNoConnectCodec, DirectionalWebSocketCapacities) {
+  for (size_t capacity : {512U, 4096U, 16384U, 131072U}) {
+    EXPECT_TRUE(ValidRealtimeUpCapacity(capacity));
   }
-  std::vector<uint8_t> body;
-  EXPECT_FALSE(EncodeRealtime(0, 512, static_cast<PressureHint>(3), {}, body));
-  ASSERT_TRUE(EncodeRealtime(0, 512, PressureHint::Idle, {}, body));
-  body[14] = 3;
-  PressureHint hint = PressureHint::Idle;
-  std::vector<Frame> decoded;
-  EXPECT_FALSE(DecodeRealtime(0, 512, body, hint, decoded));
-}
-
-TEST_F(NaiveFoxNoConnectCodec, AsymmetricRealtimeCapacityPolicy) {
-  struct Entry {
-    PressureHint local;
-    PressureHint peer;
-    RealtimeActivity activity;
-    size_t up;
-    size_t down;
-  };
-  for (const Entry& entry : {
-           Entry{PressureHint::Idle, PressureHint::Idle, RealtimeActivity::Idle,
-                 512, 512},
-           Entry{PressureHint::Interactive, PressureHint::Idle,
-                 RealtimeActivity::Interactive, 4096, 8192},
-           Entry{PressureHint::Idle, PressureHint::Bulk,
-                 RealtimeActivity::Download, 16384, 262144},
-           Entry{PressureHint::Bulk, PressureHint::Idle,
-                 RealtimeActivity::Upload, 131072, 8192},
-           Entry{PressureHint::Bulk, PressureHint::Bulk,
-                 RealtimeActivity::Mixed, 131072, 65536},
-       }) {
-    EXPECT_EQ(SelectRealtimeActivity(entry.local, entry.peer), entry.activity);
-    EXPECT_EQ(RealtimeUpCapacity(entry.activity), entry.up);
-    EXPECT_EQ(RealtimeDownCapacity(entry.activity), entry.down);
-    EXPECT_TRUE(ValidRealtimeUpCapacity(entry.up));
-    EXPECT_TRUE(ValidRealtimeDownCapacity(entry.down));
+  for (size_t capacity : {512U, 8192U, 65536U, 262144U}) {
+    EXPECT_TRUE(ValidRealtimeDownCapacity(capacity));
   }
   EXPECT_FALSE(ValidRealtimeUpCapacity(65536));
   EXPECT_FALSE(ValidRealtimeDownCapacity(16384));

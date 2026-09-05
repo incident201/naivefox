@@ -28,6 +28,7 @@ PRODUCT_DOC_SOURCES = {
     "netwerk/naivefox/FRONTING-PAGE.md": "netwerk/naivefox/FRONTING-PAGE.md",
     "netwerk/naivefox/CAPTURE.md": "netwerk/naivefox/CAPTURE.md",
     "netwerk/naivefox/SHIMS.md": "netwerk/naivefox/SHIMS.md",
+    "netwerk/naivefox/test/fingerprint/README.md": "netwerk/naivefox/test/fingerprint/README.md",
     "netwerk/naivefox/test/integration/README.md": (
         "netwerk/naivefox/test/integration/README.md"
     ),

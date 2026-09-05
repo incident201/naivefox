@@ -48,7 +48,7 @@ class AutoLogging final {
 void PrintUsage(const char* aProgram) {
   std::printf(
       "Usage: %s [CONFIG_PATH] [--transport "
-      "classic|no-connect|no-connect-hybrid|no-connect-hybrid-asymmetric]\n"
+      "classic|no-connect]\n"
       "       %s --version\n"
       "       %s --profile PATH --runtime-smoke\n"
       "       %s --profile PATH --activation-process-smoke\n"
@@ -91,10 +91,7 @@ bool ParseConfigArguments(
     const char* value = argument + 12;
     if (std::strcmp(argument, "--transport") == 0) {
       if (++index == aArgc) {
-        aError.AssignLiteral(
-            "--transport requires classic or no-connect or no-connect-hybrid "
-            "or "
-            "no-connect-hybrid-asymmetric");
+        aError.AssignLiteral("--transport requires classic or no-connect");
         return false;
       }
       value = aArgv[index];
@@ -102,9 +99,7 @@ bool ParseConfigArguments(
     aTransport =
         mozilla::naivefox::ParseTransportMode(nsDependentCString(value));
     if (!aTransport) {
-      aError.AssignLiteral(
-          "--transport requires classic or no-connect or no-connect-hybrid or "
-          "no-connect-hybrid-asymmetric");
+      aError.AssignLiteral("--transport requires classic or no-connect");
       return false;
     }
   }
@@ -413,13 +408,7 @@ extern "C" NAIVEFOX_EXPORT int NaiveFoxMain(int aArgc, char* aArgv[]) {
     if (NS_SUCCEEDED(rv)) {
       mozilla::naivefox::RuntimeLogEvent(
           "NaiveFox started transport=%s listeners=%u upstreams=%u\n",
-          config.mTransport ==
-                  mozilla::naivefox::TransportMode::NoConnectHybridAsymmetric
-              ? "no-connect-hybrid-asymmetric"
-          : config.mTransport ==
-                  mozilla::naivefox::TransportMode::NoConnectHybrid
-              ? "no-connect-hybrid"
-          : config.mTransport == mozilla::naivefox::TransportMode::NoConnect
+          config.mTransport == mozilla::naivefox::TransportMode::NoConnect
               ? "no-connect"
               : "classic",
           static_cast<unsigned>(config.mListeners.Length()),

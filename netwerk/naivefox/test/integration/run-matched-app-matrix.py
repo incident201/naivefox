@@ -33,7 +33,7 @@ def load_module(name, filename):
     return result
 
 
-legacy = load_module("matched_app_capture_utilities", "run-hybrid-matrix.py")
+legacy = load_module("matched_app_capture_utilities", "carrier_capture.py")
 features = legacy.features
 native = legacy.native
 ARMS = legacy.ARMS
@@ -857,11 +857,11 @@ class Campaign:
                 require(carrier.get("connect", 0) > 0 and carrier.get("ws_opened", 0) == 0, "classic did not use its native CONNECT path")
             else:
                 require(carrier.get("connect", 0) == 0, "no-connect emitted an outer CONNECT")
-                expected_ws = 1 if transport in ("no-connect-hybrid", "no-connect-hybrid-asymmetric") else 0
+                expected_ws = 1 if transport == "no-connect" else 0
                 require(carrier.get("ws_opened", 0) == expected_ws, "native carrier WebSocket count differs")
                 if expected_ws:
                     require(carrier.get("ws_startup_min_up") == 20 and carrier.get("ws_startup_min_down") == 20, "native WS bypassed startup completion")
-                    expected_subprotocol = "nfc1.hybrid.a1" if transport == "no-connect-hybrid-asymmetric" else "nfc1.hybrid.v1"
+                    expected_subprotocol = "nfc1.stream.v1"
                     require(carrier.get("ws_subprotocols") == {expected_subprotocol: 1},
                             "native carrier selected the wrong WebSocket shaping protocol")
             document, wire = observer_document(directory, self.outer_port, self.protocol, row, name)
@@ -956,12 +956,12 @@ def summarize(campaign, report):
             return statistics.fmean(statistics.fmean(stage["job_io_ms"]) for stage in stages)
         return statistics.fmean(stage["io_ms"] for stage in stages)
     for kind in ("socks", "http"):
-        arm = f"native-no-connect-hybrid-{kind}"
+        arm = f"native-no-connect-{kind}"
         candidates = [sample for sample in campaign.samples if sample["naivefox_arm"] == arm]
         row = {"startup_protocol": campaign.protocol, "listener": kind, "blocks": campaign.args.blocks,
                "residual": {view: report["protocols"][campaign.protocol]["views"][view]["arms"][arm] for view in VIEWS},
                "whole_ip_bytes": average(candidates, "wire_bytes"), "comparisons": {}}
-        for baseline in ("firefox", "classic", "no-connect"):
+        for baseline in ("firefox", "classic"):
             controls = reference if baseline == "firefox" else [sample for sample in campaign.samples if sample["naivefox_arm"] == f"native-{baseline}-{kind}"]
             values = {"baseline_whole_ip_bytes": average(controls, "wire_bytes"),
                       "extra_complete_session_traffic_percent": 100 * (average(candidates, "wire_bytes") / average(controls, "wire_bytes") - 1), "stages": {}}
@@ -986,118 +986,6 @@ def summarize(campaign, report):
                 values["stages"][stage["stage"]] = measurement
             row["comparisons"][baseline] = values
         output.append(row)
-    return output
-
-
-def summarize_asymmetric(campaign, report):
-    output = []
-    references = [sample for sample in campaign.samples if sample["naivefox_arm"] == "reference"]
-    average = lambda records, key: statistics.fmean(record["whole"][key] for record in records)
-
-    def stage_time(records, index):
-        stages = [record["application"]["stages"][index] for record in records]
-        if stages[0]["stage"] in ("small", "wake"):
-            return statistics.fmean(statistics.fmean(stage["job_io_ms"]) for stage in stages)
-        return statistics.fmean(stage["io_ms"] for stage in stages)
-
-    for kind in ("socks", "http"):
-        generic_name = f"native-no-connect-hybrid-{kind}"
-        candidate_name = f"native-no-connect-hybrid-asymmetric-{kind}"
-        generic = [sample for sample in campaign.samples if sample["naivefox_arm"] == generic_name]
-        candidate = [sample for sample in campaign.samples if sample["naivefox_arm"] == candidate_name]
-        require(len(generic) == len(candidate) == campaign.args.blocks,
-                "asymmetric screen lost a paired native arm")
-        generic_wire = average(generic, "wire_bytes")
-        candidate_wire = average(candidate, "wire_bytes")
-        generic_filler = statistics.fmean(item["carrier_shape"]["ws_upload_filler"] +
-                                            item["carrier_shape"]["ws_download_filler"] for item in generic)
-        candidate_filler = statistics.fmean(item["carrier_shape"]["ws_upload_filler"] +
-                                              item["carrier_shape"]["ws_download_filler"] for item in candidate)
-        stages = {}
-        stage_gate = True
-        for index, stage in enumerate(candidate[0]["application"]["stages"]):
-            old_time, new_time = stage_time(generic, index), stage_time(candidate, index)
-            increase = 100 * (new_time / old_time - 1)
-            limit = 15 if stage["stage"] in ("small", "wake") else 10
-            stage_gate &= increase <= limit
-            stages[stage["stage"]] = {
-                "generic_io_ms": old_time,
-                "asymmetric_io_ms": new_time,
-                "time_increase_percent": increase,
-                "gate_limit_percent": limit,
-                "gate_pass": increase <= limit,
-            }
-        traffic_reduction = 100 * (1 - candidate_wire / generic_wire)
-        filler_reduction = 100 * (1 - candidate_filler / generic_filler)
-        row = {
-            "startup_protocol": campaign.protocol,
-            "listener": kind,
-            "blocks": campaign.args.blocks,
-            "generic_complete_ip_bytes": generic_wire,
-            "asymmetric_complete_ip_bytes": candidate_wire,
-            "complete_ip_reduction_percent": traffic_reduction,
-            "generic_transport_filler_bytes": generic_filler,
-            "asymmetric_transport_filler_bytes": candidate_filler,
-            "transport_filler_reduction_percent": filler_reduction,
-            "firefox_complete_ip_bytes": average(references, "wire_bytes"),
-            "stages": stages,
-            "residual": {
-                "generic": {view: report["protocols"][campaign.protocol]["views"][view]["arms"][generic_name]
-                            for view in VIEWS},
-                "asymmetric": {view: report["protocols"][campaign.protocol]["views"][view]["arms"][candidate_name]
-                               for view in VIEWS},
-            },
-        }
-        row["potential_gate"] = {
-            "eligible_controlled_link": campaign.args.link == "rtt40-20mbps",
-            "complete_ip_reduction_at_least_15_percent": traffic_reduction >= 15,
-            "filler_reduction_at_least_30_percent": filler_reduction >= 30,
-            "stage_regressions_within_limits": stage_gate,
-        }
-        row["potential_gate"]["pass"] = all(row["potential_gate"].values())
-        output.append(row)
-    return output
-
-
-def summarize_classic_cost(campaign):
-    output = []
-    def stage_time(records, index):
-        values = [record["application"]["stages"][index] for record in records]
-        return statistics.fmean(statistics.fmean(stage["job_io_ms"]) if
-                                stage["stage"] in ("small", "wake") else stage["io_ms"]
-                                for stage in values)
-    for listener in ("socks", "http"):
-        controls = [sample for sample in campaign.samples
-                    if sample["naivefox_arm"] == f"native-classic-{listener}"]
-        require(len(controls) == campaign.args.blocks, "missing classic baseline")
-        baseline_wire = statistics.fmean(item["whole"]["wire_bytes"] for item in controls)
-        for transport in ("classic", "no-connect", "no-connect-hybrid-asymmetric"):
-            candidates = [sample for sample in campaign.samples
-                          if sample["naivefox_arm"] == f"native-{transport}-{listener}"]
-            require(len(candidates) == len(controls), "unpaired transport cost sample")
-            wire = statistics.fmean(item["whole"]["wire_bytes"] for item in candidates)
-            row = {"startup_protocol": campaign.protocol, "listener": listener,
-                   "transport": transport, "baseline": "classic", "blocks": campaign.args.blocks,
-                   "whole_ip_bytes": wire, "baseline_whole_ip_bytes": baseline_wire,
-                   "extra_ip_bytes": wire - baseline_wire,
-                   "extra_complete_session_traffic_percent": 100 * (wire / baseline_wire - 1),
-                   "stages": {}}
-            for metric in ("startup_to_app_ws_ms", "complete_app_ms"):
-                old = statistics.fmean(item["application"][metric] for item in controls)
-                current = statistics.fmean(item["application"][metric] for item in candidates)
-                row[metric] = {"baseline": old, "candidate": current,
-                               "time_increase_percent": 100 * (current / old - 1)}
-            for index, stage in enumerate(candidates[0]["application"]["stages"]):
-                old, current = stage_time(controls, index), stage_time(candidates, index)
-                require(old > 0 and current > 0, "unresolved transport cost timer")
-                value = {"baseline_io_ms": old, "candidate_io_ms": current,
-                         "time_increase_percent": 100 * (current / old - 1)}
-                if stage["stage"] not in ("small", "wake"):
-                    value.update(baseline_mbit_s=stage["useful_bytes"] * 8 / old / 1000,
-                                 candidate_mbit_s=stage["useful_bytes"] * 8 / current / 1000,
-                                 goodput_change_percent=100 * (old / current - 1))
-                row["stages"][stage["stage"]] = value
-            output.append(row)
     return output
 
 
@@ -1158,30 +1046,13 @@ def main():
     parser.add_argument("--blocks", type=int, default=10)
     parser.add_argument("--seed", type=int, required=True)
     parser.add_argument("--timeout", type=int, default=120)
-    screen = parser.add_mutually_exclusive_group()
-    screen.add_argument("--asymmetric-screen", action="store_true")
-    screen.add_argument("--classic-cost-screen", action="store_true")
     args = parser.parse_args()
     require(os.environ.get("NAIVEFOX_CAPTURE_ISOLATED_NETWORK_ENTERED") == "1", "isolated namespace is required")
     require(1 <= args.blocks <= 30 and 30 <= args.timeout <= 150, "campaign bounds are invalid")
-    if args.asymmetric_screen:
-        require(args.purpose == "pilot" and args.blocks <= 2,
-                "asymmetric screening is deliberately bounded before a heavy campaign")
-        require(args.protocol != "both",
-                "run bounded H2 and H3 asymmetric screens sequentially")
-        ARMS = tuple(f"native-{transport}-{kind}"
-                     for transport in ("no-connect-hybrid", "no-connect-hybrid-asymmetric")
-                     for kind in ("socks", "http"))
-    if args.classic_cost_screen:
-        require(args.purpose == "pilot" and args.blocks <= 2,
-                "classic cost comparisons use bounded independent screening blocks")
-        ARMS = tuple(f"native-{transport}-{kind}"
-                     for transport in ("classic", "no-connect", "no-connect-hybrid-asymmetric")
-                     for kind in ("socks", "http"))
     require(args.purpose != "primary" or (args.link == "rtt40-20mbps" and args.blocks == 10), "primary link or sample contract differs")
     args.objdir = args.objdir.resolve(strict=True)
     args.root = args.root.resolve()
-    require(args.root.is_relative_to(args.objdir / "hybrid-ws/matched-app") and not args.root.exists(), "new campaign root must be beneath the common matched-app subtree")
+    require(args.root.is_relative_to(args.objdir / "no-connect/matched-app") and not args.root.exists(), "new campaign root must be beneath the common matched-app subtree")
     for name in ("caddy", "caddy_build_id", "backend", "firefox", "geckodriver", "reference_proof", "asset_dir", "runtime_manifest"):
         setattr(args, name, getattr(args, name).resolve(strict=True))
     args.runtime = args.runtime.resolve(strict=True)
@@ -1190,7 +1061,7 @@ def main():
     reference_proof = legacy.verify_reference(args.reference_proof, args.firefox, base)
     native_proof, native_files = verify_native_runtime(args.runtime_manifest, args.runtime)
     caddy_build_id = verify_caddy_build_id(args.caddy_build_id, args.caddy)
-    source_files = [Path(__file__), *(HERE / name for name in ("run-hybrid-matrix.py", "run-no-connect-tests.py",
+    source_files = [Path(__file__), *(HERE / name for name in ("carrier_capture.py", "run-no-connect-tests.py",
         "camouflage_features.py", "analyze-camouflage-arms.py", "analyze-camouflage.py", "camouflage_superblocks.py",
         "camouflage_browser_controller.py", "camouflage_capture_health.py", "monitor-network-mutations.py", "versions.env")),
         *(args.asset_dir / name for name in ("manifest.json", "app.js", "app.template.js", "render-app.py", "main.go", "go.mod", "go.sum", "site.css", "image.svg", "index.html"))]
@@ -1218,7 +1089,7 @@ def main():
         "manifest_sha256": MANIFEST_SHA, "seed": args.seed, "blocks_per_protocol": args.blocks,
         "link": args.link, "observer": "receive-side complete origin TCP/QUIC and attributable ICMP; no fixed crop or per-stage wire allocation",
         "local_listener_topology": "only the selected listener", "screening_only": True,
-        "comparison_baseline": "classic" if args.classic_cost_screen else None}
+        "comparison_baseline": "classic"}
     write_json(args.root / "provenance.json", proof)
     matrix = []
     for protocol in (("h2", "h3") if args.protocol == "both" else (args.protocol,)):
@@ -1226,9 +1097,7 @@ def main():
         try:
             campaign.start()
             report = campaign.run()
-            matrix.extend(summarize_classic_cost(campaign) if args.classic_cost_screen else
-                          summarize_asymmetric(campaign, report) if args.asymmetric_screen else
-                          summarize(campaign, report))
+            matrix.extend(summarize(campaign, report))
             write_json(args.root / "matrix.json", {"schema": proof["schema"], "purpose": args.purpose,
                                                    "screening_only": True, "comparison_baseline": proof["comparison_baseline"],
                                                    "rows": matrix})

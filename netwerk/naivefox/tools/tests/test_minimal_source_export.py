@@ -55,6 +55,7 @@ class MinimalSourceExportTest(unittest.TestCase):
             ),
             "netwerk/naivefox/SHIMS.md": "# Shims\n",
             "netwerk/naivefox/test/integration/README.md": "# Integration\n",
+            "netwerk/naivefox/test/fingerprint/README.md": "# Fingerprints\n",
             "netwerk/naivefox/test/integration/hybrid_app/BENCHMARK.md": "# Benchmark\n",
         }
         self.plan = self.make_plan()

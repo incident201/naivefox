@@ -33,24 +33,14 @@ namespace mozilla::naivefox {
 
 using noconnect::Frame;
 using noconnect::Kind;
-using noconnect::PressureHint;
 using Bytes = std::vector<uint8_t>;
 
 namespace {
 
-constexpr size_t kUploadBuffer = 64 * 1024;
+constexpr size_t kInitialBuffer = 64 * 1024;
 constexpr std::array<size_t, 20> kStartupSlots = {
     8192,  8192,  8192,  8192,  32768, 32768, 65536, 65536, 65536, 65536,
     65536, 65536, 65536, 65536, 65536, 65536, 65536, 65536, 8192,  8192};
-
-bool IsHybrid(TransportMode aMode) {
-  return aMode == TransportMode::NoConnectHybrid ||
-         aMode == TransportMode::NoConnectHybridAsymmetric;
-}
-
-bool IsAsymmetricHybrid(TransportMode aMode) {
-  return aMode == TransportMode::NoConnectHybridAsymmetric;
-}
 
 class CarrierRequest final : public nsIStreamListener {
  public:
@@ -60,14 +50,12 @@ class CarrierRequest final : public nsIStreamListener {
 
   using Callback = std::function<void(CarrierRequest*, nsresult)>;
   CarrierRequest(size_t aSize, uint32_t aStatus, bool aCell,
-                 ProxyProtocol aProtocol, Callback&& aDone,
-                 std::function<void()>&& aHeaders)
+                 ProxyProtocol aProtocol, Callback&& aDone)
       : mExpectedSize(aSize),
         mExpectedStatus(aStatus),
         mCell(aCell),
         mProtocol(aProtocol),
-        mDone(std::move(aDone)),
-        mHeaders(std::move(aHeaders)) {}
+        mDone(std::move(aDone)) {}
 
   nsresult Start(const TunnelConfig& aConfig, const nsACString& aPath,
                  const nsACString& aCookie, const Bytes* aUpload) {
@@ -109,14 +97,12 @@ class CarrierRequest final : public nsIStreamListener {
       mTimer->Cancel();
       mTimer = nullptr;
       mChannel = nullptr;
-      mHeaders = nullptr;
       mDone = nullptr;
     }
     return rv;
   }
 
   void Cancel(nsresult aStatus) {
-    mHeaders = nullptr;
     if (mTimer) {
       mTimer->Cancel();
       mTimer = nullptr;
@@ -130,7 +116,6 @@ class CarrierRequest final : public nsIStreamListener {
   nsCString mCookie;
   nsCString mProfile;
   nsCString mAuthScheme;
-  nsCString mState;
   nsCString mRealtime;
 
  private:
@@ -140,7 +125,6 @@ class CarrierRequest final : public nsIStreamListener {
   const bool mCell;
   const ProxyProtocol mProtocol;
   Callback mDone;
-  std::function<void()> mHeaders;
   nsCOMPtr<nsIChannel> mChannel;
   nsCOMPtr<nsITimer> mTimer;
 };
@@ -178,13 +162,10 @@ NS_IMETHODIMP CarrierRequest::OnStartRequest(nsIRequest* aRequest) {
     nsAutoCString expected;
     expected.AppendInt(static_cast<uint32_t>(mExpectedSize));
     MOZ_TRY(http->GetResponseHeader("X-App-Capacity"_ns, capacity));
-    MOZ_TRY(http->GetResponseHeader("X-App-State"_ns, mState));
     nsAutoCString type;
     MOZ_TRY(mChannel->GetContentType(type));
     if (!capacity.Equals(expected) ||
-        !type.EqualsLiteral("application/octet-stream") ||
-        !(mState.EqualsLiteral("idle") || mState.EqualsLiteral("interactive") ||
-          mState.EqualsLiteral("download"))) {
+        !type.EqualsLiteral("application/octet-stream")) {
       return NS_ERROR_CORRUPTED_CONTENT;
     }
   }
@@ -192,10 +173,6 @@ NS_IMETHODIMP CarrierRequest::OnStartRequest(nsIRequest* aRequest) {
   (void)http->GetResponseHeader("X-App-Profile"_ns, mProfile);
   (void)http->GetResponseHeader("X-App-Auth"_ns, mAuthScheme);
   (void)http->GetResponseHeader("X-App-Realtime"_ns, mRealtime);
-  if (mHeaders) {
-    auto headers = std::move(mHeaders);
-    headers();
-  }
   return NS_OK;
 }
 
@@ -227,7 +204,6 @@ NS_IMETHODIMP CarrierRequest::OnStopRequest(nsIRequest*, nsresult aStatus) {
     mTimer = nullptr;
   }
   mChannel = nullptr;
-  mHeaders = nullptr;
   if (NS_SUCCEEDED(aStatus) && mBody.size() != mExpectedSize) {
     aStatus = NS_ERROR_CORRUPTED_CONTENT;
   }
@@ -279,9 +255,7 @@ class NoConnectStream::Impl final {
   bool finConfirmed = false;
   bool done = false;
 
-  size_t UploadLimit() const {
-    return IsHybrid(config.mTransport) ? noconnect::kMaxCell : kUploadBuffer;
-  }
+  size_t UploadLimit() const { return noconnect::kMaxCell; }
 };
 
 class NoConnectCarrier final {
@@ -318,9 +292,8 @@ class NoConnectCarrier final {
   ~NoConnectCarrier() = default;
   using Callback = CarrierRequest::Callback;
   bool Open(const nsACString& aPath, const Bytes* aUpload, size_t aSize,
-            uint32_t aStatus, bool aCell, Callback&& aDone,
-            std::function<void()>&& aHeaders = nullptr);
-  bool Upload(size_t aCapacity, Bytes& aBody, bool aRealtime = false);
+            uint32_t aStatus, bool aCell, Callback&& aDone);
+  bool Upload(size_t aCapacity, Bytes& aBody);
   bool Receive(CarrierRequest* aRequest);
   bool ReceiveCell(const Bytes& aBody, bool aWebSocket);
   void ConfirmUpload(uint32_t aSequence);
@@ -328,10 +301,6 @@ class NoConnectCarrier final {
   void Start();
   void Tick();
   void Startup();
-  void Exchange();
-  void Bulk();
-  void BulkDone(bool aSecond, CarrierRequest* aRequest, nsresult aStatus);
-  void IdleWake();
   void Continue();
   size_t Pressure(bool& aControl) const;
   void StartWebSocket();
@@ -351,20 +320,12 @@ class NoConnectCarrier final {
   size_t mCursor = 0;
   size_t mStartup = 0;
   size_t mAssets = 0;
-  unsigned mLease = 0;
-  nsCString mRemote{"idle"};
-  nsCString mActivity;
   bool mAuthed = false;
   bool mStarted = false;
   bool mBootstrapped = false;
   bool mBusy = false;
   bool mQueued = false;
-  bool mIdle = false;
-  bool mWaking = false;
   bool mClosed = false;
-  bool mFirstApplied = false;
-  RefPtr<CarrierRequest> mBulkFirst;
-  RefPtr<CarrierRequest> mBulkSecond;
   RefPtr<NoConnectWebSocket> mWebSocket;
   nsCOMPtr<nsITimer> mWebSocketTimer;
   nsCOMPtr<nsITimer> mWebSocketDeadline;
@@ -394,7 +355,7 @@ NoConnectStream::~NoConnectStream() = default;
 nsresult NoConnectStream::Start(const nsACString& aAuthority,
                                 Span<const uint8_t> aInitial) {
   if (aAuthority.IsEmpty() || aAuthority.Length() > 512 ||
-      aInitial.Length() > kUploadBuffer ||
+      aInitial.Length() > kInitialBuffer ||
       mImpl->config.mProtocol == ProxyProtocol::Auto) {
     return NS_ERROR_INVALID_ARG;
   }
@@ -573,8 +534,7 @@ NS_IMETHODIMP NoConnectStream::OnOutputStreamReady(nsIAsyncOutputStream*) {
 
 bool NoConnectCarrier::Open(const nsACString& aPath, const Bytes* aUpload,
                             size_t aSize, uint32_t aStatus, bool aCell,
-                            Callback&& aDone,
-                            std::function<void()>&& aHeaders) {
+                            Callback&& aDone) {
   if (mClosed) {
     return false;
   }
@@ -598,8 +558,7 @@ bool NoConnectCarrier::Open(const nsACString& aPath, const Bytes* aUpload,
             done(aRequest, aResult);
           }
         }
-      },
-      std::move(aHeaders));
+      });
   mRequests.push_back(request);
   nsresult rv = request->Start(mConfig, aPath, mCookie, aUpload);
   if (NS_FAILED(rv)) {
@@ -670,8 +629,6 @@ void NoConnectCarrier::Fail(nsresult aStatus) {
     socket->Close(aStatus);
   }
   auto requests = std::move(mRequests);
-  mBulkFirst = nullptr;
-  mBulkSecond = nullptr;
   for (const auto& request : requests) {
     request->Cancel(aStatus);
   }
@@ -694,10 +651,9 @@ void NoConnectCarrier::Start() {
   RefPtr self = this;
   Open("/"_ns, nullptr, 4096, 200, false,
        [self](CarrierRequest* request, nsresult) {
-         if (!request->mProfile.EqualsLiteral("continuous-bulk-pipeline") ||
+         if (!request->mProfile.EqualsLiteral("native-stream-v1") ||
              !request->mAuthScheme.EqualsLiteral("basic") ||
-             (IsHybrid(self->mConfig.mTransport) &&
-              !request->mRealtime.EqualsLiteral("websocket-v1")) ||
+             !request->mRealtime.EqualsLiteral("websocket-v1") ||
              request->mCookie.Length() < 77 ||
              !StringBeginsWith(request->mCookie, "app_session="_ns) ||
              request->mCookie.CharAt(76) != ';') {
@@ -730,7 +686,7 @@ void NoConnectCarrier::Start() {
        });
 }
 
-bool NoConnectCarrier::Upload(size_t aCapacity, Bytes& aBody, bool aRealtime) {
+bool NoConnectCarrier::Upload(size_t aCapacity, Bytes& aBody) {
   if (mUp == UINT32_MAX) {
     Fail(NS_ERROR_FILE_TOO_BIG);
     return false;
@@ -815,17 +771,7 @@ bool NoConnectCarrier::Upload(size_t aCapacity, Bytes& aBody, bool aRealtime) {
       ++misses;
     }
   }
-  bool encoded = false;
-  if (aRealtime) {
-    bool control = false;
-    const size_t bytes = Pressure(control);
-    encoded = noconnect::EncodeRealtime(
-        mUp++, aCapacity, noconnect::RealtimePressure(bytes, control), frames,
-        aBody);
-  } else {
-    encoded = noconnect::Encode(mUp++, aCapacity, frames, aBody);
-  }
-  if (!encoded) {
+  if (!noconnect::Encode(mUp++, aCapacity, frames, aBody)) {
     Fail(NS_ERROR_FAILURE);
     return false;
   }
@@ -836,7 +782,6 @@ bool NoConnectCarrier::Receive(CarrierRequest* aRequest) {
   if (!ReceiveCell(aRequest->mBody, false)) {
     return false;
   }
-  mRemote = aRequest->mState;
   return true;
 }
 
@@ -846,12 +791,7 @@ bool NoConnectCarrier::ReceiveCell(const Bytes& aBody, bool aWebSocket) {
     return false;
   }
   std::vector<Frame> frames;
-  PressureHint hint = PressureHint::Idle;
-  const bool decoded =
-      aWebSocket && IsAsymmetricHybrid(mConfig.mTransport)
-          ? noconnect::DecodeRealtime(mDown, aBody.size(), aBody, hint, frames)
-          : noconnect::Decode(mDown, aBody.size(), aBody, frames);
-  if (!decoded) {
+  if (!noconnect::Decode(mDown, aBody.size(), aBody, frames)) {
     Fail(NS_ERROR_CORRUPTED_CONTENT);
     return false;
   }
@@ -981,7 +921,7 @@ void NoConnectCarrier::Tick() {
   // and RESET uploads before dropping an extra carrier, so the server can
   // release every target connection without waiting for session expiry.
   if (mStreams.empty() && mResets.empty() && mRequests.empty() && !mBusy &&
-      !mIdle && !mWaking && !mWebSocketPending) {
+      !mWebSocketPending) {
     if (!CanAttach()) {
       Fail(NS_OK);
       return;
@@ -1003,11 +943,7 @@ void NoConnectCarrier::Tick() {
     }
     return;
   }
-  if (mIdle) {
-    IdleWake();
-    return;
-  }
-  if (mBusy || !mBootstrapped || mWaking) {
+  if (mBusy || !mBootstrapped) {
     return;
   }
   mBusy = true;
@@ -1015,37 +951,7 @@ void NoConnectCarrier::Tick() {
     Startup();
     return;
   }
-  if (IsHybrid(mConfig.mTransport)) {
-    StartWebSocket();
-    return;
-  }
-  if (mLease) {
-    Exchange();
-    return;
-  }
-  bool control = false;
-  const size_t bytes = Pressure(control);
-  if (bytes >= 32768) {
-    mActivity = mRemote.EqualsLiteral("download") ? "mixed"_ns : "upload"_ns;
-  } else if (mRemote.EqualsLiteral("download")) {
-    Bulk();
-    return;
-  } else if (bytes || control || mRemote.EqualsLiteral("interactive")) {
-    mActivity.AssignLiteral("interactive");
-  } else {
-    mIdle = true;
-    RefPtr self = this;
-    Open("/api/events/idle"_ns, nullptr, 512, 200, true,
-         [self](CarrierRequest* request, nsresult) {
-           self->mIdle = false;
-           if (self->Receive(request)) {
-             self->Continue();
-           }
-         });
-    return;
-  }
-  mLease = 4;
-  Exchange();
+  StartWebSocket();
 }
 
 void NoConnectCarrier::Startup() {
@@ -1075,94 +981,6 @@ void NoConnectCarrier::Startup() {
   });
 }
 
-void NoConnectCarrier::Exchange() {
-  const bool uploading =
-      mActivity.EqualsLiteral("upload") || mActivity.EqualsLiteral("mixed");
-  Bytes body;
-  if (!Upload(uploading ? 131072 : 4096, body)) {
-    return;
-  }
-  RefPtr self = this;
-  Open(uploading ? "/api/upload/chunk"_ns : "/api/sync"_ns, &body, 0, 204,
-       false, [self](CarrierRequest*, nsresult) {
-         nsAutoCString path("/api/data/");
-         path.Append(self->mActivity);
-         const size_t size =
-             self->mActivity.EqualsLiteral("mixed") ? 65536 : 8192;
-         self->Open(path, nullptr, size, 200, true,
-                    [self](CarrierRequest* request, nsresult) {
-                      if (self->Receive(request)) {
-                        --self->mLease;
-                        self->Continue();
-                      }
-                    });
-       });
-}
-
-void NoConnectCarrier::Bulk() {
-  mFirstApplied = false;
-  Bytes body;
-  if (!Upload(16384, body)) {
-    return;
-  }
-  RefPtr self = this;
-  Open(
-      "/api/sync/bulk"_ns, &body, 262144, 200, true,
-      [self](CarrierRequest* request, nsresult rv) {
-        self->BulkDone(false, request, rv);
-      },
-      [self]() {
-        Bytes next;
-        if (self->Upload(16384, next)) {
-          self->Open("/api/sync/bulk"_ns, &next, 262144, 200, true,
-                     [self](CarrierRequest* request, nsresult rv) {
-                       self->BulkDone(true, request, rv);
-                     });
-        }
-      });
-}
-
-void NoConnectCarrier::BulkDone(bool aSecond, CarrierRequest* aRequest,
-                                nsresult) {
-  if (aSecond) {
-    mBulkSecond = aRequest;
-  } else {
-    mBulkFirst = aRequest;
-  }
-  if (mBulkFirst && !mFirstApplied) {
-    mFirstApplied = true;
-    if (!Receive(mBulkFirst)) {
-      return;
-    }
-    mBulkFirst = nullptr;
-  }
-  if (mFirstApplied && mBulkSecond) {
-    if (!Receive(mBulkSecond)) {
-      return;
-    }
-    mBulkSecond = nullptr;
-    Continue();
-  }
-}
-
-void NoConnectCarrier::IdleWake() {
-  bool control = false;
-  const size_t bytes = Pressure(control);
-  if (mWaking || (!bytes && !control)) {
-    return;
-  }
-  Bytes body;
-  if (!Upload(4096, body)) {
-    return;
-  }
-  mWaking = true;
-  RefPtr self = this;
-  Open("/api/sync"_ns, &body, 0, 204, false, [self](CarrierRequest*, nsresult) {
-    self->mWaking = false;
-    self->Wake();
-  });
-}
-
 void NoConnectCarrier::StartWebSocket() {
   MOZ_ASSERT(mBootstrapped && mAssets == 6 &&
              mStartup == kStartupSlots.size() && mRequests.empty());
@@ -1183,7 +1001,7 @@ void NoConnectCarrier::StartWebSocket() {
           return;
         }
         self->mWebSocketDeadline = deadline.unwrap();
-        RuntimeLogEvent("No-connect hybrid websocket ready startup=%zu\n",
+        RuntimeLogEvent("No-connect websocket ready startup=%zu\n",
                         self->mStartup);
         self->Wake();
         self->ScheduleWebSocket(25000, true);
@@ -1193,10 +1011,7 @@ void NoConnectCarrier::StartWebSocket() {
           return;
         }
         const size_t length = aMessage.Length();
-        const bool valid =
-            IsAsymmetricHybrid(self->mConfig.mTransport)
-                ? noconnect::ValidRealtimeDownCapacity(length)
-                : (length == 512 || length == 65536 || length == 262144);
+        const bool valid = noconnect::ValidRealtimeDownCapacity(length);
         if (!valid) {
           self->Fail(NS_ERROR_CORRUPTED_CONTENT);
           return;
@@ -1236,9 +1051,7 @@ void NoConnectCarrier::StartWebSocket() {
         self->Fail(NS_FAILED(aStatus) ? aStatus : NS_ERROR_NET_RESET);
       });
   nsresult rv = mWebSocket->Start(mConfig, mCookie, "/api/realtime"_ns,
-                                  IsAsymmetricHybrid(mConfig.mTransport)
-                                      ? "nfc1.hybrid.a1"_ns
-                                      : "nfc1.hybrid.v1"_ns);
+                                  "nfc1.stream.v1"_ns);
   if (NS_FAILED(rv)) {
     Fail(rv);
   }
@@ -1251,10 +1064,8 @@ bool NoConnectCarrier::HasPendingOpen() const {
 }
 
 uint32_t NoConnectCarrier::WebSocketDelay(size_t aBytes) const {
-  size_t capacity = noconnect::kMaxCell;
-  if (IsAsymmetricHybrid(mConfig.mTransport)) {
-    capacity = noconnect::ReadyRealtimeUpCapacity(aBytes, HasPendingOpen());
-  }
+  const size_t capacity =
+      noconnect::ReadyRealtimeUpCapacity(aBytes, HasPendingOpen());
   return aBytes >= capacity || (!aBytes && !HasPendingOpen()) ? 0 : 2;
 }
 
@@ -1297,12 +1108,9 @@ void NoConnectCarrier::WebSocketTick(bool aHeartbeat) {
     return;
   }
   const bool opening = HasPendingOpen();
-  size_t capacity = bytes >= 131072 ? 262144 : bytes || opening ? 65536 : 512;
-  if (IsAsymmetricHybrid(mConfig.mTransport)) {
-    capacity = noconnect::ReadyRealtimeUpCapacity(bytes, opening);
-  }
+  const size_t capacity = noconnect::ReadyRealtimeUpCapacity(bytes, opening);
   Bytes body;
-  if (!Upload(capacity, body, IsAsymmetricHybrid(mConfig.mTransport))) {
+  if (!Upload(capacity, body)) {
     return;
   }
   mWebSocketPending = body.size();

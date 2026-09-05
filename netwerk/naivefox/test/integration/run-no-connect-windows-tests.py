@@ -220,7 +220,7 @@ class NativeClient:
 
 def relay_protocols(protocol, transport):
     return (("h3", "h2") if protocol == "h3" and
-            transport in ("no-connect-hybrid", "no-connect-hybrid-asymmetric")
+            transport in ("no-connect",)
             else (protocol,))
 
 
@@ -379,8 +379,7 @@ def main():
     parser.add_argument("--caddy", required=True, type=Path)
     parser.add_argument("--windows-python", required=True, type=Path)
     parser.add_argument("--protocol", choices=("h2", "h3", "both"), default="both")
-    parser.add_argument("--transport", choices=("no-connect", "no-connect-hybrid",
-                                                  "no-connect-hybrid-asymmetric"),
+    parser.add_argument("--transport", choices=("no-connect",),
                         default="no-connect")
     parser.add_argument("--smoke", action="store_true")
     parser.add_argument("--work-dir", type=Path, help="private artifact parent below objdir")
@@ -390,6 +389,9 @@ def main():
     args = parser.parse_args()
     for name in ("objdir", "runtime", "caddy", "windows_python"):
         setattr(args, name, getattr(args, name).resolve(strict=True))
+    for path in (args.runtime, args.work_dir or args.objdir):
+        if winpath(path).startswith(chr(92)*2):
+            parser.error("Windows runtime and fixture paths must be on a Windows drive, not a WSL UNC share")
     os.umask(0o077)
     if args.host_pid is None:
         command = ["unshare", "--net", sys.executable, str(Path(__file__).resolve()),

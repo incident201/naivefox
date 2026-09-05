@@ -1,5 +1,14 @@
 # Firefox wire-behavior diagnostics
 
+Current releases expose only `classic` (default) and `no-connect`.
+No-connect is the productive shaped-WebSocket implementation previously
+measured as `no-connect-hybrid-asymmetric`. Historical tables retain their
+original labels: their finite `no-connect` and generic hybrid controls are
+retired implementations, not current selector aliases. The research snapshot
+preceding promotion remains in Git history; current behavior is specified in
+[NO-CONNECT.md](NO-CONNECT.md).
+
+
 Capture comparison checks that NaiveFox continues to use Firefox's Necko,
 NSS/PSM, and Neqo wire machinery without accidental project-specific markers.
 It is diagnostic: a browser GET and padded proxy CONNECT are different

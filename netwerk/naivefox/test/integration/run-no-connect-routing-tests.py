@@ -70,7 +70,7 @@ def run_protocol(args, protocol):
             fixture.download(ports, listener, target.server_address[1], 2 * 1024 * 1024)
             fixture.upload(ports, listener, target.server_address[1], 1024 * 1024)
         fixture.require(
-            "No-connect hybrid websocket ready startup=20" in client.log_path.read_text(),
+            "No-connect websocket ready startup=20" in client.log_path.read_text(),
             "mapped WSS did not reach the application milestone")
         client.exited_cleanly()
         caddy.stop()
@@ -117,12 +117,12 @@ def main():
     args.runtime = (args.runtime or args.objdir / "dist/bin/naivefox").resolve(strict=True)
     args.caddy = args.caddy.resolve(strict=True)
     args.work_dir = args.work_dir.resolve()
-    fixture.require(args.work_dir.is_relative_to(args.objdir / "hybrid-ws") and
+    fixture.require(args.work_dir.is_relative_to(args.objdir) and
                     not args.work_dir.exists(),
-                    "routing artifacts require a new directory below the objdir hybrid-ws subtree")
+                    "routing artifacts require a new directory below the object directory")
     os.umask(0o077)
     args.work_dir.mkdir(parents=True, mode=0o700)
-    args.transport = "no-connect-hybrid"
+    args.transport = "no-connect"
     rows = [run_protocol(args, protocol) for protocol in ("h2", "h3")]
     fixture.private_json(args.work_dir / "results.json", rows)
 

@@ -13,7 +13,7 @@ import struct
 import threading
 
 HERE = Path(__file__).resolve().parent
-spec = importlib.util.spec_from_file_location("control_fixture", HERE / "run-hybrid-adversarial-tests.py")
+spec = importlib.util.spec_from_file_location("control_fixture", HERE / "run-no-connect-websocket-adversarial-tests.py")
 adversarial = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(adversarial)
 fixture = adversarial.fixture
@@ -39,7 +39,7 @@ class ControlPeer(socketserver.BaseRequestHandler):
             fields = dict(line.split(":", 1) for line in header.decode().split("\r\n")[1:] if line)
             key = next(value.strip() for name, value in fields.items() if name.lower() == "sec-websocket-key")
             accept = base64.b64encode(hashlib.sha1((key+"258EAFA5-E914-47DA-95CA-C5AB0DC85B11").encode()).digest()).decode()
-            protocol = "nfc1.hybrid.a1" if server.transport.endswith("asymmetric") else "nfc1.hybrid.v1"
+            protocol = "nfc1.stream.v1"
             self.request.sendall(("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
                 f"Sec-WebSocket-Accept: {accept}\r\nSec-WebSocket-Protocol: {protocol}\r\n\r\n").encode())
             down = 20
@@ -176,7 +176,7 @@ def main():
     parser.add_argument("--runtime", type=Path)
     parser.add_argument("--protocol", choices=("h2", "h3", "both"), default="both")
     parser.add_argument("--listener", choices=("socks", "http", "both"), default="both")
-    parser.add_argument("--transport", choices=("no-connect-hybrid", "no-connect-hybrid-asymmetric", "both"), default="both")
+    parser.add_argument("--transport", choices=("no-connect",), default="no-connect")
     args = parser.parse_args()
     args.runtime = args.runtime or args.objdir / "dist/bin/naivefox"
     fixture.require(args.work_dir.resolve().is_relative_to(args.objdir.resolve()) and not args.work_dir.exists(),
@@ -187,7 +187,7 @@ def main():
     results = []
     for protocol in (("h2", "h3") if args.protocol == "both" else (args.protocol,)):
         for listener in (("socks", "http") if args.listener == "both" else (args.listener,)):
-            for mode in (("no-connect-hybrid", "no-connect-hybrid-asymmetric") if transport == "both" else (transport,)):
+            for mode in (transport,):
                 results.append(run(args, protocol, listener, mode))
     fixture.private_json(args.work_dir / "results.json", results)
 

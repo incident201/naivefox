@@ -20,8 +20,6 @@ enum class ListenerType : uint8_t { Socks5, HttpConnect };
 enum class TransportMode : uint8_t {
   Classic,
   NoConnect,
-  NoConnectHybrid,
-  NoConnectHybridAsymmetric,
 };
 
 struct ListenerConfig final {

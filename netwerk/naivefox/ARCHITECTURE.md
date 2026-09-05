@@ -146,38 +146,26 @@ H3 raw tunnels preserve byte-stream behavior without copying H2 internals:
 
 ## Transport and protocol selection
 
-`transport` chooses `classic`, `no-connect`, or experimental
-`no-connect-hybrid`, or the separate `no-connect-hybrid-asymmetric` screen;
-omission selects `classic`.
-The `proxy` URI independently selects strict H2 or H3. Both transports use its
-same parsed username and password. Classic uses Necko proxy authentication;
-no-connect carries their Basic value in a TLS-protected application AUTH frame.
-The Caddy forward-proxy instance supplies the shared authentication and access
-policy; there is no separate key or target list. The config parser validates
-all fields, then disables valid classic-only preamble, extra-header, gate and
-diagnostic settings for no-connect. Classic padding negotiation never runs in
-no-connect.
+`transport` selects `classic` (default) or `no-connect`. JSON, CLI and
+embedded selection share the same strict parser. The two retired experimental
+selector names are rejected. Classic uses Necko proxy authentication and Naive
+padding; no-connect uses the same credentials in an NFC1 AUTH frame. Both
+share the server forward-proxy authentication and destination policy.
 
-`no-connect` ports only the experimental cell/multiplexer and bounded
-`continuous-bulk-pipeline` lifecycle into native C++. It opens ordinary Necko
-channels, validates response status/capacity/encoding and uses NSS randomness
-for filler. The experiment's Firefox process, DOM, animation, JavaScript
-scheduler and loopback WSS bridge are outside the port. A carrier holds at
-most 32 streams; new carriers provide further concurrent capacity without a
-client-wide 32-stream limit. Stream byte offsets wrap modulo 2^32 while exact
-offset checks and bounded credit remain mandatory, so the byte counter does
-not cap stream size. See [NO-CONNECT.md](NO-CONNECT.md) for the maintained boundary and limits.
+No-connect completes the root, six assets and twenty ordered HTTP pairs,
+then transfers the same session and streams to Firefox's native WebSocket
+implementation. The startup protocol is strict H2 or H3; the persistent
+phase is explicit H1 WSS/TCP in both cases. HTTP active/idle carriers,
+peer-pressure hints and generic WS capacity branches have been removed.
 
-`no-connect-hybrid` retains that same native startup, then transfers the
-existing session to the real Necko WebSocket implementation. All six assets
-and 20 startup API pairs must complete first. NFC1 sequences, per-stream
-credits and half-close remain continuous; a WS-only cumulative application
-ACK confirms uplink processing. The main-thread carrier bounds native WS
-queueing to one shaped message. Firefox owns WS framing and NSS owns TLS;
-DOM execution, the browser worker and the loopback bridge remain absent.
-This explicit mode uses H1 WSS/TCP after H2 or H3 startup because the retained
-Firefox implementation does not support WS over H3. It never resumes HTTP
-carriers or replays streams after a WS failure.
+Capacity follows locally sendable data within the unchanged 512-KiB stream
+credit. Pure control cells use 512 bytes. One WS application message may be
+queued for native writing; native control PING/PONG acknowledgements are
+excluded from that budget. Byte sequences, delivery-based credit, cumulative
+FIN acknowledgement, bounded buffers and half-close remain continuous.
+Additional carriers allow more than 32 total connections. A failed carrier
+cannot replay or resume HTTP work. [NO-CONNECT.md](NO-CONNECT.md) defines the
+wire contract and server profile.
 
 The following fallback rules describe `classic`; the opt-in application
 transport has no automatic downgrade to `classic`:

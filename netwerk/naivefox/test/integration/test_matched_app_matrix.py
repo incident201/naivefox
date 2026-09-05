@@ -72,41 +72,6 @@ def successful_records():
 
 
 class MatchedApplicationTests(unittest.TestCase):
-    def test_asymmetric_screen_uses_post_startup_filler_and_preregistered_gate(self):
-        def sample(arm, wire, filler, factor):
-            return {"naivefox_arm": arm, "whole": {"wire_bytes": wire},
-                    "carrier_shape": {"ws_upload_filler": filler // 2,
-                                      "ws_download_filler": filler - filler // 2},
-                    "application": {"stages": [
-                        {"stage": "download", "io_ms": 100 * factor},
-                        {"stage": "upload", "io_ms": 100 * factor},
-                        {"stage": "parallel", "io_ms": 100 * factor},
-                        {"stage": "small", "job_io_ms": [10 * factor]},
-                        {"stage": "wake", "job_io_ms": [10 * factor]},
-                    ]}}
-        samples = [sample("reference", 70, 0, 1), sample("reference", 70, 0, 1)]
-        arms = {}
-        for kind in ("socks", "http"):
-            generic = f"native-no-connect-hybrid-{kind}"
-            asymmetric = f"native-no-connect-hybrid-asymmetric-{kind}"
-            samples.extend((sample(generic, 100, 100, 1),
-                            sample(asymmetric, 80, 60, 1.05)))
-            arms[generic] = {"mean_distance": 0.3}
-            arms[asymmetric] = {"mean_distance": 0.2}
-        report = {"protocols": {"h2": {"views": {
-            view: {"arms": arms} for view in M.VIEWS}}}}
-        campaign = SimpleNamespace(protocol="h2", samples=samples,
-                                   args=SimpleNamespace(blocks=1, link="rtt40-20mbps"))
-        rows = M.summarize_asymmetric(campaign, report)
-        self.assertEqual(len(rows), 2)
-        self.assertTrue(all(row["potential_gate"]["pass"] for row in rows))
-        for row in rows:
-            self.assertAlmostEqual(row["complete_ip_reduction_percent"], 20)
-            self.assertAlmostEqual(row["transport_filler_reduction_percent"], 40)
-        campaign.args.link = "loopback"
-        self.assertFalse(any(row["potential_gate"]["pass"]
-                             for row in M.summarize_asymmetric(campaign, report)))
-
     def test_navigation_waits_for_load_and_does_not_retry_script_failures(self):
         driver = mock.Mock()
         driver.capabilities = {"pageLoadStrategy": "normal"}
@@ -308,31 +273,6 @@ class LocalCaddyProofTests(unittest.TestCase):
             for index in range(1, 5):
                 self.assertIn(f"/assets/image-{index}.svg", (root / "index.html").read_text())
             self.assertEqual((root / "assets/app.js").read_bytes(), (M.APP / "app.js").read_bytes())
-
-
-class ClassicCostSummaryTests(unittest.TestCase):
-    def test_classic_is_the_only_cost_baseline(self):
-        samples = []
-        for listener in ("socks", "http"):
-            for mode, factor in (("classic", 1), ("no-connect", 2), ("no-connect-hybrid-asymmetric", 1.25)):
-                for _ in range(2):
-                    stages = [{"stage": name, "io_ms": 100*factor, "job_io_ms": [10*factor]*4,
-                               "useful_bytes": 1000000}
-                              for name in ("download", "upload", "parallel", "small", "wake")]
-                    samples.append({"naivefox_arm": f"native-{mode}-{listener}",
-                                    "whole": {"wire_bytes": 1000*factor},
-                                    "application": {"stages": stages, "startup_to_app_ws_ms": 20*factor,
-                                                    "complete_app_ms": 200*factor}})
-        rows = M.summarize_classic_cost(SimpleNamespace(samples=samples, protocol="h2",
-                                                       args=SimpleNamespace(blocks=2)))
-        self.assertEqual(len(rows), 6)
-        for row in rows:
-            factor = {"classic": 1, "no-connect": 2, "no-connect-hybrid-asymmetric": 1.25}[row["transport"]]
-            self.assertEqual(row["baseline"], "classic")
-            self.assertEqual(row["extra_complete_session_traffic_percent"], 100*(factor-1))
-            self.assertEqual(row["stages"]["small"]["candidate_io_ms"], 10*factor)
-            self.assertAlmostEqual(row["stages"]["download"]["goodput_change_percent"], 100*(1/factor-1))
-            self.assertEqual(row["stages"]["download"]["baseline_mbit_s"], 80)
 
 
 if __name__ == "__main__":

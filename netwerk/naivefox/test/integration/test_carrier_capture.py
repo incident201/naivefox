@@ -13,7 +13,7 @@ from unittest import mock
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-SPEC = importlib.util.spec_from_file_location("hybrid_matrix", HERE / "run-hybrid-matrix.py")
+SPEC = importlib.util.spec_from_file_location("hybrid_matrix", HERE / "carrier_capture.py")
 MATRIX = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MATRIX)
 
@@ -46,7 +46,7 @@ class HybridMatrixTests(unittest.TestCase):
         quic = [event(.1, 1, "0", 1280, 1, packet_types=("0",)), event(.2, 2, "0", 1200, -1)]
         merged = MATRIX.merge_outer_events(tcp, quic)
         row = {"scenario": "matched_application", "label": "naivefox",
-               "naivefox_arm": "native-no-connect-hybrid-socks", "experiment_block": "block-0"}
+               "naivefox_arm": "native-no-connect-socks", "experiment_block": "block-0"}
         with mock.patch.object(MATRIX, "outer_events", return_value=(merged, tcp, quic, [])), \
              mock.patch.object(MATRIX.features, "extract_handshake"), \
              mock.patch.object(MATRIX.features, "extract_transport_parameters"), \
@@ -86,7 +86,7 @@ class HybridMatrixTests(unittest.TestCase):
                     output.update({"tls_client_hello_count": 1 if stable else variation,
                                    "tls_cipher_stable" if stable else f"tls_cipher_late_{variation}": 1})
                 row = {"scenario": "browser_page", "label": "naivefox",
-                       "naivefox_arm": "native-no-connect-hybrid-socks", "experiment_block": "block"}
+                       "naivefox_arm": "native-no-connect-socks", "experiment_block": "block"}
                 with mock.patch.object(MATRIX, "outer_events", return_value=(MATRIX.merge_outer_events(tcp, quic), tcp, quic, records)),                      mock.patch.object(MATRIX.features, "extract_handshake", side_effect=handshake),                      mock.patch.object(MATRIX.features, "extract_transport_parameters"):
                     document, _ = MATRIX.passive_document(Path("unused"), 443, protocol, row, "sample")
                 documents.append(document["features"])
