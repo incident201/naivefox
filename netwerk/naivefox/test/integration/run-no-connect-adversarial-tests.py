@@ -20,18 +20,6 @@ CASES = ("profile", "auth-mode-missing", "auth-mode-legacy", "append", "capacity
 
 def mutation(case):
     def apply(server):
-        if case in ("profile", "append"):
-            handlers = [handler for route in server["routes"] for handler in route.get("handle", [])]
-            while handlers:
-                handler = handlers.pop()
-                if handler.get("handler") == "naivefox_transport":
-                    handler["profile" if case == "profile" else "append_mode"] = (
-                        "continuous-v1" if case == "profile" else True
-                    )
-                    return
-                for route in handler.get("routes", []):
-                    handlers.extend(route.get("handle", []))
-            raise RuntimeError("fixture could not locate application handler")
         if case == "protocol":
             return
         header = bytearray(b"NFC1" + struct.pack("!IIHH", 0, 16, 0, 0))
@@ -40,25 +28,30 @@ def mutation(case):
         if case == "reserved":
             header[14] = 1
         body = bytes(header) + bytes((100 if case == "truncated" else 8192) - 16)
+        if case == "append":
+            body += bytes(16)
         path = "/api/events/brief"
         response = {
             "handler": "static_response", "status_code": 200,
             "headers": {
                 "Content-Type": ["application/octet-stream"],
-                "Content-Length": ["8192"],
+                "Content-Length": [str(len(body)) if case == "append" else "8192"],
                 "X-App-Capacity": ["8191" if case == "capacity" else "8192"],
                 "X-App-State": ["idle"], "Cache-Control": ["no-store"],
             },
             "body": body.decode("ascii"),
         }
-        if case in ("auth-mode-missing", "auth-mode-legacy"):
+        if case in ("profile", "auth-mode-missing", "auth-mode-legacy"):
             path = "/"
             response = {"handler": "static_response", "status_code": 200,
                         "headers": {"Content-Type": ["text/html"],
                                     "Content-Length": ["4096"],
-                                    "X-App-Profile": ["continuous-bulk-pipeline"],
+                                    "X-App-Profile": ["incompatible" if case == "profile" else "native-stream-v1"],
+                                    "X-App-Realtime": ["websocket-v1"],
                                     "Set-Cookie": ["app_session=" + "0" * 64 + "; Path=/; Secure; HttpOnly"]},
                         "body": "x" * 4096}
+            if case == "profile":
+                response["headers"]["X-App-Auth"] = ["basic"]
             if case == "auth-mode-legacy":
                 response["headers"]["X-App-Auth"] = ["key"]
         elif case == "redirect":
@@ -102,7 +95,13 @@ def run_case(args, base, protocol, case):
             fixture.require(not any(name.startswith("POST ") for name in stats["requests"]),
                             "bootstrap rejection still sent application authentication")
         if case == "protocol":
-            fixture.require(not stats["requests"], "strict protocol selection emitted an HTTP fallback request")
+            if client_protocol == "h3":
+                fixture.require(not stats["requests"], "H3 attempted an HTTP fallback")
+            else:
+                fixture.require(len(requests) <= 1 and
+                                all(item.get("method") == "GET" and item.get("uri") == "/" and
+                                    item.get("proto") == "HTTP/1.1" for item in requests),
+                                "H2 continued after refusing the root negotiation protocol")
         if case == "auth-prompt":
             fixture.require(sum(item.get("uri") == "/" for item in requests) == 1,
                             "unexpected authentication retry")

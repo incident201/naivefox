@@ -29,6 +29,23 @@ enum class Kind : uint8_t {
   Ack,
 };
 
+inline constexpr size_t ReadyRealtimeUpCapacity(size_t aBytes, bool aOpening) {
+  return aBytes >= 64 * 1024  ? 128 * 1024
+         : aBytes >= 8 * 1024 ? 16 * 1024
+         : aBytes || aOpening ? 4 * 1024
+                              : 512;
+}
+
+inline constexpr bool ValidRealtimeUpCapacity(size_t aCapacity) {
+  return aCapacity == 512 || aCapacity == 4 * 1024 || aCapacity == 16 * 1024 ||
+         aCapacity == 128 * 1024;
+}
+
+inline constexpr bool ValidRealtimeDownCapacity(size_t aCapacity) {
+  return aCapacity == 512 || aCapacity == 8 * 1024 || aCapacity == 64 * 1024 ||
+         aCapacity == 256 * 1024;
+}
+
 struct Frame {
   Kind kind = Kind::Data;
   uint32_t stream = 0;

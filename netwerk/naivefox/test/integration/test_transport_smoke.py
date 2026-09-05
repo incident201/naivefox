@@ -49,12 +49,11 @@ class TransportSmokeTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 suite.check_smoke_requests([request, invalid], "h3", False)
 
-    def test_windows_relays_match_explicit_hybrid_tcp_requirement(self):
-        for transport in ("classic", "no-connect", "no-connect-hybrid"):
+    def test_windows_relays_match_no_connect_tcp_requirement(self):
+        for transport in ("classic", "no-connect"):
             self.assertEqual(windows.relay_protocols("h2", transport), ("h2",))
         self.assertEqual(windows.relay_protocols("h3", "classic"), ("h3",))
-        self.assertEqual(windows.relay_protocols("h3", "no-connect"), ("h3",))
-        self.assertEqual(windows.relay_protocols("h3", "no-connect-hybrid"), ("h3", "h2"))
+        self.assertEqual(windows.relay_protocols("h3", "no-connect"), ("h3", "h2"))
 
     def test_windows_readiness_accepts_complete_marker_and_cleanup_is_idempotent(self):
         process = subprocess.Popen([sys.executable, "-c", "import time; print('ready', flush=True); time.sleep(10)"],

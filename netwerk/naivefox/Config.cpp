@@ -364,8 +364,7 @@ class JsonParser final {
         MOZ_TRY(ParseString(value, "transport must be a string"));
         auto transport = ParseTransportMode(value);
         if (!transport) {
-          return Error(
-              "transport must be classic or no-connect or no-connect-hybrid");
+          return Error("transport must be classic or no-connect");
         }
         parsed.mTransport = *transport;
       } else if (key.EqualsLiteral("no-connect-key")) {
@@ -1761,9 +1760,6 @@ Maybe<TransportMode> ParseTransportMode(const nsACString& aValue) {
   }
   if (aValue.EqualsLiteral("no-connect")) {
     return Some(TransportMode::NoConnect);
-  }
-  if (aValue.EqualsLiteral("no-connect-hybrid")) {
-    return Some(TransportMode::NoConnectHybrid);
   }
   return Nothing();
 }

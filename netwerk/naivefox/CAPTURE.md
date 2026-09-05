@@ -1,9 +1,23 @@
 # Firefox wire-behavior diagnostics
 
+Current releases expose only `classic` (default) and `no-connect`.
+No-connect is the productive shaped-WebSocket implementation previously
+measured as `no-connect-hybrid-asymmetric`. Historical tables retain their
+original labels: their finite `no-connect` and generic hybrid controls are
+retired implementations, not current selector aliases. The research snapshot
+preceding promotion remains in Git history; current behavior is specified in
+[NO-CONNECT.md](NO-CONNECT.md).
+
+
 Capture comparison checks that NaiveFox continues to use Firefox's Necko,
 NSS/PSM, and Neqo wire machinery without accidental project-specific markers.
 It is diagnostic: a browser GET and padded proxy CONNECT are different
 workloads, so packet timing and volume are not fingerprint-equality targets.
+
+For the separately preserved client-fingerprint agreement, legitimate browser
+repetition counterexamples, and limits of browser-likeness scoring, see
+[Firefox traffic compatibility findings](test/fingerprint/README.md). These
+observations are not a general indistinguishability score or a release gate.
 
 ## Size-independent mechanism rule
 
@@ -4594,6 +4608,111 @@ ten-block H2/H3 and listener matrix must use one newly frozen client/server
 pair and fresh contemporary classic/no-connect controls. Never splice the
 pre-refinement smoke rows into that matrix or label them final results.
 
+### Directional shaped WebSocket screen
+
+The remaining causal question is whether WS can remove HTTP transaction
+barriers without discarding the selected finite transport's directional
+capacity model. All-ref client history and complete server history contain no
+outer WS experiment with the four finite pairs. The finite state lineage is
+`d444393a61e`, `02f96ed1e0b4`, `539824bba529`, and `0c20c8df6d88`; native
+generic WS is `a5907bf584d1` with the full-capacity refinement at
+`84f0bd95a9cb`. Those earlier changes altered finite leases, bulk pipelining,
+or generic WS dispatch, but never combined directional capacities with the
+outer WS.
+
+The new `no-connect-hybrid-asymmetric` selector and generic hybrid live in the
+same client and Caddy binaries. Equal-length subprotocol tokens keep handshake
+length fixed. A WS-only residual pressure hint replaces `X-App-State` after
+startup; it cannot create a message by itself. The candidate uses 16/256 KiB
+for download, 128/8 KiB for upload, 4/8 KiB for interactive, 128/64 KiB for
+mixed, and 512 bytes for idle. Generic retains 512/64/256 KiB. This matters
+because generic already uses 512-byte pure control cells: blindly replacing
+them with 16/8 KiB can increase reverse filler, so capacity/filler counters are
+an admission requirement rather than an assumed win.
+
+Do not start a heavy matrix immediately. First require codec/state/race tests,
+live H2/H3 correctness, then one same-application loopback block. If mechanism
+counters are correct, run one controlled H2 block containing Firefox A/B plus
+generic/asymmetric over both listeners. H3 receives the same one-block screen
+only if H2 shows material potential. A full campaign is admitted only when
+every screened listener shows at least 15% less complete-session IP traffic
+and 30% less post-startup WS filler than generic, download/upload/parallel
+durations are no more than 10% worse, and small/wake latency is no more than
+15% worse. Early views are regression diagnostics because startup is unchanged.
+Every short row is descriptive and ineligible for later pooling.
+
+The codec/race suite, H2/H3 transport correctness, and one active-application
+loopback block passed. Loopback reduced complete IP bytes by 27.59--28.50% and
+post-startup WS filler by 56.26--58.44%, which admitted one controlled H2
+block to test whether the mechanism survived real link serialization.
+
+It did not. The six-session H2 block used the same Firefox A/B application and
+same binary/server for generic and asymmetric arms. All participants completed
+the exact workload. An independent TShark recount matched every reported
+outer-flow packet count and `ip.len` total exactly. Both listeners still failed
+the preregistered traffic, filler, and bulk-speed gates:
+
+| Listener | Complete IP vs generic | WS filler vs generic | Download rate loss | Upload rate loss | Parallel rate loss | Small latency | Wake latency |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| SOCKS | +19.85% | +31.97% | +46.30% | +13.79% | +28.72% | -17.00% | -44.81% |
+| HTTP | +9.39% | +14.87% | +40.97% | +0.90% | +15.62% | -16.75% | -43.84% |
+
+Negative latency is faster. The candidate improved small and wake latency, but
+its literal bulk state emitted a 256-KiB response after fragmented 16-KiB
+credit returns. In the SOCKS row it sent 116 such cells for the same useful
+download for which generic sent 40; downstream filler rose by more than the
+uplink asymmetry saved. HTTP transactions had previously accumulated credit
+before granting a bulk response. Removing their barrier without adding a
+productive-capacity guard destroyed that batching effect.
+
+This one block is mechanism screening, not residual inference. Early/Whole
+distances remain descriptive. Because both H2 listener rows failed the explicit
+gate, the H3 performance screen and heavy matrix were not run. The experimental
+selector remains non-default for reproducibility. A future reopening would need
+one new causal constraint: grant 256 KiB only when enough useful downstream data
+is currently sendable, or deliberately coalesce fragmented credits first.
+
+### Ready-capacity follow-up: classic cost comparison
+
+The productive-grant condition left open by the negative directional screen is
+now measured: each sender grants capacity from locally sendable data within
+stream credit, with 512-byte pure control messages. A peer hint cannot enlarge
+the grant. The history preflight distinguishes this from finite lease/credit
+handoff experiments and the earlier removal of delays on full WS cells.
+
+A separate implementation fix removes an entirely discarded asymmetric
+encoding pass; it does not reuse filler or change the transmitted randomness.
+The native adapter also excludes PING/PONG write completions from the NFC1
+writer budget, with a legal-control regression reproduced on the original
+binary and verified after the fix.
+
+The fresh comparison uses classic as the sole cost baseline, finite no-connect
+and the optimized asymmetric hybrid, through both listeners. Firefox A/B run
+the same active application as calibration controls. Two randomized blocks per
+H2/H3 produce 32 completed sessions on a 40-ms RTT, independent 20-Mbit/s link.
+All outer IP bytes, endpoint jobs, routing, teardown and capture-distance means
+and medians were independently recounted. The complete results and exact
+artifact hashes are retained in
+[the classic-baseline screen](test/integration/evidence/transport-cost-classic-baseline.json).
+
+| Startup | Mode | Download Mbit/s | Upload Mbit/s | Echo ms | Wake ms | Whole IP MiB | Extra vs classic |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| H2 | classic | 18.36 | 14.49 | 88.0 | 89.2 | 12.01 | +0.0% |
+| H2 | no-connect | 6.61 | 3.14 | 440.1 | 349.5 | 18.00 | +49.8% |
+| H2 | new asymmetric hybrid | 15.79 | 11.21 | 103.4 | 106.0 | 16.44 | +36.9% |
+| H3 | classic | 18.75 | 13.51 | 87.8 | 90.2 | 12.04 | +0.0% |
+| H3 | no-connect | 6.63 | 3.16 | 441.1 | 364.5 | 17.67 | +46.8% |
+| H3 | new asymmetric hybrid | 15.73 | 12.07 | 102.4 | 106.8 | 16.34 | +35.7% |
+
+The table averages the two local frontends; the JSON preserves each separately
+and contains p1-16, p17-32, 250-ms and Whole capture distances plus differences
+from classic. Capture distance is still calibrated to Firefox A/B, not to a
+zero-valued classic reference. The new mode has the lowest Whole distance in
+all four conditions, without a uniform early-window win. H2 and H3 scores use
+different feature families. These two-block results remain descriptive and do
+not promote a default or establish indistinguishability. Earlier cohorts are
+kept separate rather than pooled into this comparison.
+
 ### Superseded idle-reference diagnostic
 
 The earlier idle-reference experiment is invalid as a matched-workload
@@ -4688,9 +4807,11 @@ The cache marker was not changed to pretend that attestation existed. All
 participants used the same hash-pinned Caddy binary, and the measured client
 package stayed unchanged.
 
-The feature extractor retains the broad `browser_page` scenario tag. The
-application manifest and complete per-participant admission records identify
-this active workload; no earlier idle-page dataset was pooled into it.
+The archived primary feature documents retain the broad `browser_page`
+scenario tag. The application manifest and complete per-participant admission
+records identify that active workload; no earlier idle-page dataset was pooled
+into it. The extractor now preserves the schedule's scenario label, so matched
+application campaigns emit `matched_application` in future feature documents.
 
 
 ## Sensitive data handling

@@ -108,10 +108,18 @@ class TargetServer(socketserver.ThreadingTCPServer):
         self.thread.join(timeout=5)
 
 
-def free_port(udp=False):
-    with socket.socket(type=socket.SOCK_DGRAM if udp else socket.SOCK_STREAM) as sock:
-        sock.bind(("127.0.0.1", 0))
-        return sock.getsockname()[1]
+def free_port(udp=False, dual=False):
+    for _ in range(100):
+        with socket.socket(type=socket.SOCK_DGRAM if udp else socket.SOCK_STREAM) as sock:
+            sock.bind(("127.0.0.1", 0))
+            if dual:
+                with socket.socket(type=socket.SOCK_STREAM if udp else socket.SOCK_DGRAM) as other:
+                    try:
+                        other.bind(sock.getsockname())
+                    except OSError:
+                        continue
+            return sock.getsockname()[1]
+    raise RuntimeError("no free dual-protocol fixture port")
 
 
 def private_json(path, value):
@@ -206,7 +214,7 @@ https://:{$NF_PORT} {
     }
     route {
         naivefox_transport {
-            profile continuous-bulk-pipeline
+            profile native-stream-v1
             forward_proxy {
                 basic_auth "{$NF_PROXY_USER}" "{$NF_PROXY_PASSWORD}"
                 hide_ip
@@ -224,8 +232,23 @@ https://:{$NF_PORT} {
 """
 
 
+def prepare_application(run):
+    source = Path(__file__).resolve().parent / "hybrid_app"
+    root = run / "application"
+    assets = root / "assets"
+    assets.mkdir(parents=True, exist_ok=True)
+    (root / "index.html").write_bytes((source / "index.html").read_bytes())
+    for name in ("site.css", "app.js"):
+        (assets / name).write_bytes((source / name).read_bytes())
+    for index in range(1, 5):
+        (assets / f"image-{index}.svg").write_bytes((source / "image.svg").read_bytes())
+    return root.resolve()
+
+
 def start_caddy(args, run, protocol, target_port, user, password):
-    port = free_port(udp=protocol == "h3")
+    hybrid = getattr(args, "transport", "no-connect") in (
+        "no-connect", "no-connect")
+    port = free_port(udp=protocol == "h3", dual=hybrid and protocol == "h3")
     caddyfile = run / "Caddyfile"
     caddyfile.write_text(caddyfile_text(getattr(args, "forward_proxy_ports", ())))
     env = dict(os.environ, NF_PROTOCOL=protocol, NF_PORT=str(port), NF_CERT=str(run / "server.crt"),
@@ -246,12 +269,12 @@ def start_caddy(args, run, protocol, target_port, user, password):
         item = handlers.pop()
         if item.get("handler") == "naivefox_transport":
             item["stats_path"] = str(run / "server-stats.json")
+            item["application_root"] = str(prepare_application(run))
         for route in item.get("routes", []):
             handlers.extend(route.get("handle", []))
     mutator = getattr(args, "server_mutator", None)
     if mutator is not None:
         mutator(server)
-    hybrid = getattr(args, "transport", "no-connect") == "no-connect-hybrid"
     if hybrid:
         server["protocols"] = ["h1", protocol]
     private_json(run / "caddy.json", config)
@@ -680,9 +703,21 @@ def check_smoke_requests(requests, protocol, hybrid, classic=False):
             "smoke selected the wrong WebSocket lifecycle")
 
 
+def check_ws_capacity_policy(stats, transport):
+    require(transport == "no-connect", "unexpected application transport")
+    capacities = stats.get("ws_cell_capacities", {})
+    incoming = {int(key.split()[1]) for key in capacities if key.startswith("in ")}
+    outgoing = {int(key.split()[1]) for key in capacities if key.startswith("out ")}
+    require(incoming and incoming <= {512, 4096, 16384, 131072},
+            "invalid no-connect uplink capacity")
+    require(outgoing and outgoing <= {512, 8192, 65536, 262144},
+            "invalid no-connect downlink capacity")
+    require(incoming - {512} and outgoing - {512}, "no WebSocket data exchanged")
+
+
 def run_smoke_protocol(args, base, protocol):
     transport = getattr(args, "transport", "no-connect")
-    hybrid = transport == "no-connect-hybrid"
+    hybrid = transport in ("no-connect",)
     run = base / protocol
     run.mkdir(mode=0o700)
     issue_certificates(run)
@@ -697,7 +732,7 @@ def run_smoke_protocol(args, base, protocol):
         processes.append(candidate)
         download(ports, "socks", target.server_address[1], 65536)
         if hybrid:
-            wait_until(lambda: "No-connect hybrid websocket ready startup=20" in
+            wait_until(lambda: "No-connect websocket ready startup=20" in
                        candidate.log_path.read_text(errors="replace"),
                        "hybrid smoke never completed the WebSocket startup milestone", candidate, timeout=60)
         upload(ports, "socks", target.server_address[1], 65536)
@@ -733,6 +768,10 @@ def run_smoke_protocol(args, base, protocol):
             require(stats.get("ws_opened", 0) == 1 and stats.get("ws_messages_in", 0) >= 1 and
                     stats.get("ws_messages_out", 0) >= 1,
                     "hybrid smoke did not exchange bidirectional WebSocket cells")
+            expected_subprotocol = "nfc1.stream.v1"
+            require(stats.get("ws_subprotocols") == {expected_subprotocol: 1},
+                    "hybrid smoke selected the wrong shaping subprotocol")
+            check_ws_capacity_policy(stats, transport)
         else:
             require(stats.get("ws_opened", 0) == 0, "finite HTTP smoke unexpectedly opened WebSocket")
         expected_protocol = "HTTP/3.0" if protocol == "h3" else "HTTP/2.0"
@@ -757,7 +796,7 @@ def run_smoke_protocol(args, base, protocol):
 
 def run_protocol(args, base, protocol):
     transport = getattr(args, "transport", "no-connect")
-    hybrid = transport == "no-connect-hybrid"
+    hybrid = transport in ("no-connect",)
     run = base / protocol
     run.mkdir(mode=0o700)
     issue_certificates(run)
@@ -822,12 +861,13 @@ def run_protocol(args, base, protocol):
             require(stats.get("ws_opened", 0) >= 1, "hybrid never established WebSocket")
             require(stats.get("ws_messages_in", 0) >= 1 and stats.get("ws_messages_out", 0) >= 1,
                     "hybrid did not exchange bidirectional WebSocket cells")
+            expected_subprotocol = "nfc1.stream.v1"
+            require(set(stats.get("ws_subprotocols", {})) == {expected_subprotocol},
+                    "hybrid selected the wrong shaping subprotocol")
+            check_ws_capacity_policy(stats, transport)
             if getattr(args, "idle_seconds", 2) >= 27:
                 require(stats.get("idle_heartbeats", 0) >= 1,
                         "hybrid long idle did not exercise application heartbeat")
-        else:
-            require(stats["idle_started"] >= 1, "no-connect idle state was not exercised")
-            require(stats["idle_completed"] >= 1, "no-connect idle poll never completed")
         peers = stats.get("peers", [])
         require(sum(peer.get("reset", 0) for peer in peers) >= 1,
                 "abrupt local cancellation did not reset its logical stream")
@@ -848,8 +888,8 @@ def run_protocol(args, base, protocol):
                    "websocket_tcp": hybrid, "ws_opened": stats.get("ws_opened", 0),
                    "no_connect_outer_connects": 0, "classic_connects": stats["connect"],
                    "classic_preamble": getattr(args, "classic_preamble", "off"), "parallel_batches": batches,
-                   "logical_opens": stats["opens"], "idle_started": stats["idle_started"],
-                   "idle_completed": stats["idle_completed"], "concurrent_open_streams": concurrent_connections,
+                   "logical_opens": stats["opens"], "idle_heartbeats": stats.get("idle_heartbeats", 0),
+                   "concurrent_open_streams": concurrent_connections,
                    "carrier_sessions": len(peers), "peak_streams_per_carrier": peaks,
                    "shared_basic_auth": True, "credential_rejection_cases_per_transport": 3,
                    "credential_rejection_frontends": ["socks", "http"],
@@ -875,7 +915,8 @@ def main():
     parser.add_argument("--caddy", type=Path, required=True)
     parser.add_argument("--runtime", type=Path)
     parser.add_argument("--protocol", choices=("h2", "h3", "both"), default="both")
-    parser.add_argument("--transport", choices=("no-connect", "no-connect-hybrid"), default="no-connect")
+    parser.add_argument("--transport", choices=("no-connect",),
+                        default="no-connect")
     parser.add_argument("--smoke", action="store_true", help="bounded basic byte/lifecycle gate without the full concurrency matrix")
     parser.add_argument("--work-dir", type=Path, help="private artifact parent below objdir")
     parser.add_argument("--idle-seconds", type=int, choices=range(2, 31), default=2, metavar="2..30")

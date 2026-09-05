@@ -22,11 +22,10 @@ def selection_cases():
     return (
         ("default-classic", None, None, "classic"),
         ("argument-no-connect", None, "no-connect", "no-connect"),
-        ("argument-hybrid", None, "no-connect-hybrid", "no-connect-hybrid"),
         ("argument-classic", None, "classic", "classic"),
         ("json-no-connect", "no-connect", None, "no-connect"),
         ("override-json-classic", "no-connect", "classic", "classic"),
-        ("override-json-hybrid", "no-connect", "no-connect-hybrid", "no-connect-hybrid"),
+        ("override-json-no-connect", "classic", "no-connect", "no-connect"),
     )
 
 
@@ -45,7 +44,7 @@ def check_requests(requests, transport, protocol):
         suite.require(not any(name.lower() in {"authorization", "proxy-authorization", "x-classic-only"}
                               for request in requests for name in request.get("headers", {})),
                       "application transport emitted classic-only headers")
-        suite.require(bool(websocket) == (transport == "no-connect-hybrid"),
+        suite.require(bool(websocket) == (transport == "no-connect"),
                       "embedded argument selected the wrong realtime lifecycle")
     for request in requests:
         expected = "HTTP/1.1" if request in websocket else expected_protocol
@@ -64,7 +63,8 @@ def run_protocol(args, fixture, work, protocol):
     frozen = {}
     ports = {"socks": 1, "http": 2}
     try:
-        server_args = SimpleNamespace(caddy=args.caddy, transport="no-connect-hybrid")
+        server_args = SimpleNamespace(caddy=args.caddy,
+                                      transport="no-connect")
         server, proxy_port = suite.start_caddy(server_args, directory, protocol,
                                               target.server_address[1], user, password)
         for index, (name, json_transport, override, expected) in enumerate(selection_cases()):
@@ -81,8 +81,8 @@ def run_protocol(args, fixture, work, protocol):
             }
             if json_transport is not None:
                 config["transport"] = json_transport
-            config_path = directory / ("json-no-connect.json" if json_transport else "json-default.json")
-            rejected = ("", "unknown", "Classic", "no-connect ") if index == 0 else ()
+            config_path = directory / ("json-" + (json_transport or "default") + ".json")
+            rejected = ("", "unknown", "Classic", "no-connect ", "no-connect-hybrid", "no-connect-hybrid-asymmetric") if index == 0 else ()
             inputs = SimpleNamespace(client_config_path=config_path, preserve_client_config=True,
                                      transport_override=override, rejected_transports=rejected)
             if index:
@@ -97,10 +97,10 @@ def run_protocol(args, fixture, work, protocol):
                 suite.require(actual == frozen[config_path] == client.executed_config_bytes(),
                               "embedded selection did not consume the unchanged shared JSON bytes")
                 fixture.probe(ports, "socks", target.server_address[1], "download", 65536)
-                if expected == "no-connect-hybrid":
-                    suite.wait_until(lambda: "No-connect hybrid websocket ready startup=20" in
+                if expected == "no-connect":
+                    suite.wait_until(lambda: "No-connect websocket ready startup=20" in
                                      client.log_path.read_text(errors="replace"),
-                                     "embedded hybrid never completed its WebSocket milestone", client, timeout=60)
+                                     "embedded no-connect never completed its WebSocket milestone", client, timeout=60)
                 fixture.probe(ports, "socks", target.server_address[1], "upload", 65536)
                 fixture.probe(ports, "http", target.server_address[1], "download", 65536)
                 fixture.probe(ports, "http", target.server_address[1], "upload", 65536)
@@ -133,7 +133,10 @@ def run_protocol(args, fixture, work, protocol):
         stats = json.loads((directory / "server-stats.json").read_text())
         suite.require(stats.get("ws_opened", 0) >= 2 and stats.get("ws_messages_in", 0) >= 2 and
                       stats.get("ws_messages_out", 0) >= 2,
-                      "embedded hybrid selections did not exchange bidirectional WebSocket cells")
+                      "embedded no-connect selections did not exchange bidirectional WebSocket cells")
+        suite.require(stats.get("ws_subprotocols") ==
+                      {"nfc1.stream.v1": 3},
+                      "embedded selectors did not use the current WS protocol")
         suite.require(not target.failures and target.accepted_connections == len(summaries) * 6,
                       "embedded selector workloads did not complete exactly once")
         result = {"protocol": protocol, "status": "PASS", "cases": summaries,

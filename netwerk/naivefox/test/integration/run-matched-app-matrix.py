@@ -33,7 +33,7 @@ def load_module(name, filename):
     return result
 
 
-legacy = load_module("matched_app_capture_utilities", "run-hybrid-matrix.py")
+legacy = load_module("matched_app_capture_utilities", "carrier_capture.py")
 features = legacy.features
 native = legacy.native
 ARMS = legacy.ARMS
@@ -636,6 +636,7 @@ class Campaign:
             find(server)
             require(module is not None, "real native transport handler is missing")
             module["stats_path"] = str(directory / f"{name}-carrier-stats.json")
+            module["application_root"] = str(native.prepare_application(directory))
             proxy = {"handler": "reverse_proxy", "upstreams": [{"dial": f"127.0.0.1:{self.backend_port}"}]}
             server["routes"] = [
                 {"match": [{"path": ["/health"]}], "handle": [{"handler": "static_response", "status_code": 200, "body": "fixture ready\n"}]},
@@ -856,15 +857,24 @@ class Campaign:
                 require(carrier.get("connect", 0) > 0 and carrier.get("ws_opened", 0) == 0, "classic did not use its native CONNECT path")
             else:
                 require(carrier.get("connect", 0) == 0, "no-connect emitted an outer CONNECT")
-                expected_ws = 1 if transport == "no-connect-hybrid" else 0
+                expected_ws = 1 if transport == "no-connect" else 0
                 require(carrier.get("ws_opened", 0) == expected_ws, "native carrier WebSocket count differs")
                 if expected_ws:
                     require(carrier.get("ws_startup_min_up") == 20 and carrier.get("ws_startup_min_down") == 20, "native WS bypassed startup completion")
+                    expected_subprotocol = "nfc1.stream.v1"
+                    require(carrier.get("ws_subprotocols") == {expected_subprotocol: 1},
+                            "native carrier selected the wrong WebSocket shaping protocol")
             document, wire = observer_document(directory, self.outer_port, self.protocol, row, name)
             result.update(application=proof, whole=wire, app_done_ms=app_done_ms,
                           process_teardown={"live_owned_processes": 0, "harness_forced_kills": 0, "producer_count": len(all_owned), **browser_shutdown},
                           capture_drops=0, network_mutations=0, root_sha256=self.root_body_sha,
-                          selected_listener=None if reference else kind, carrier_websockets=carrier.get("ws_opened", 0))
+                          selected_listener=None if reference else kind, carrier_websockets=carrier.get("ws_opened", 0),
+                          carrier_shape={key: carrier.get(key, 0) for key in
+                                         ("upload_bytes", "download_bytes", "upload_filler", "download_filler",
+                                          "upload_useful", "download_useful", "ws_messages_in", "ws_messages_out",
+                                          "ws_upload_bytes", "ws_download_bytes", "ws_upload_filler", "ws_download_filler",
+                                          "ws_upload_useful", "ws_download_useful",
+                                          "ws_cell_capacities", "ws_subprotocols", "ws_activities", "ws_hints")})
             write_json(directory / "timing-origin-private.json", {"navigation_epoch": navigation_epoch,
                 "performance_time_origin_ms": app_result["time_origin_ms"], "first_download_io_ms": app_result["stages"][0]["io_start_ms"]})
             write_json(self.private / "link-final.json", self.link.validate())
@@ -946,12 +956,12 @@ def summarize(campaign, report):
             return statistics.fmean(statistics.fmean(stage["job_io_ms"]) for stage in stages)
         return statistics.fmean(stage["io_ms"] for stage in stages)
     for kind in ("socks", "http"):
-        arm = f"native-no-connect-hybrid-{kind}"
+        arm = f"native-no-connect-{kind}"
         candidates = [sample for sample in campaign.samples if sample["naivefox_arm"] == arm]
         row = {"startup_protocol": campaign.protocol, "listener": kind, "blocks": campaign.args.blocks,
                "residual": {view: report["protocols"][campaign.protocol]["views"][view]["arms"][arm] for view in VIEWS},
                "whole_ip_bytes": average(candidates, "wire_bytes"), "comparisons": {}}
-        for baseline in ("firefox", "classic", "no-connect"):
+        for baseline in ("firefox", "classic"):
             controls = reference if baseline == "firefox" else [sample for sample in campaign.samples if sample["naivefox_arm"] == f"native-{baseline}-{kind}"]
             values = {"baseline_whole_ip_bytes": average(controls, "wire_bytes"),
                       "extra_complete_session_traffic_percent": 100 * (average(candidates, "wire_bytes") / average(controls, "wire_bytes") - 1), "stages": {}}
@@ -994,9 +1004,38 @@ def verify_native_runtime(manifest_path, runtime):
             "provenance_note": "Native mapped build is attested by package hashes and build ID, separately from the test harness commit."}, files
 
 
+def verify_caddy_build_id(path, caddy=None):
+    if path.suffix == ".json":
+        proof = json.loads(path.read_text())
+        require(proof.get("schema") == "naivefox-local-caddy-build-v1" and caddy is not None,
+                "unsupported local Caddy build proof")
+        require(digest(caddy) == proof["binary_sha256"], "local Caddy binary differs")
+        require(proof.get("go_version") == "go1.25.12"
+                and proof.get("source_revision"), "local Caddy provenance is incomplete")
+        for name, expected in proof["source_files_sha256"].items():
+            source = (path.parent / "source" / name).resolve(strict=True)
+            require(source.is_relative_to((path.parent / "source").resolve())
+                    and digest(source) == expected, "local Caddy source snapshot differs")
+        require(proof["source_files_sha256"] and
+                digest(path.parent / "caddy.build-info") == proof["build_info_sha256"],
+                "local Caddy build metadata differs")
+        return proof
+
+    values = dict(line.split("=", 1) for line in (HERE / "versions.env").read_text().splitlines()
+                  if line and not line.startswith("#"))
+    expected = (f"caddy={values['CADDY_VERSION']} xcaddy={values['XCADDY_VERSION']} "
+                f"module={values['FORWARDPROXY_MODULE']}@{values['FORWARDPROXY_VERSION']}="
+                f"{values['FORWARDPROXY_REPLACEMENT']}@{values['FORWARDPROXY_COMMIT']} "
+                f"transport={values['NAIVEFOX_TRANSPORT_MODULE']}@{values['NAIVEFOX_TRANSPORT_COMMIT']} "
+                f"go={values['GO_VERSION']}")
+    require(path.read_text().strip() == expected, "Caddy build ID differs from the pinned server source")
+    return expected
+
+
 def main():
+    global ARMS
     parser = argparse.ArgumentParser(description=__doc__)
-    for argument in ("objdir", "root", "caddy", "backend", "firefox", "geckodriver", "reference-proof", "runtime-manifest"):
+    for argument in ("objdir", "root", "caddy", "caddy-build-id", "backend", "firefox", "geckodriver", "reference-proof", "runtime-manifest"):
         parser.add_argument("--" + argument, type=Path, required=True)
     parser.add_argument("--runtime", type=Path, required=True)
     parser.add_argument("--asset-dir", type=Path, default=APP)
@@ -1013,23 +1052,25 @@ def main():
     require(args.purpose != "primary" or (args.link == "rtt40-20mbps" and args.blocks == 10), "primary link or sample contract differs")
     args.objdir = args.objdir.resolve(strict=True)
     args.root = args.root.resolve()
-    require(args.root.is_relative_to(args.objdir / "hybrid-ws/matched-app") and not args.root.exists(), "new campaign root must be beneath the common matched-app subtree")
-    for name in ("caddy", "backend", "firefox", "geckodriver", "reference_proof", "asset_dir", "runtime_manifest"):
+    require(args.root.is_relative_to(args.objdir / "no-connect/matched-app") and not args.root.exists(), "new campaign root must be beneath the common matched-app subtree")
+    for name in ("caddy", "caddy_build_id", "backend", "firefox", "geckodriver", "reference_proof", "asset_dir", "runtime_manifest"):
         setattr(args, name, getattr(args, name).resolve(strict=True))
     args.runtime = args.runtime.resolve(strict=True)
     base = run_quiet(["git", "-C", HERE, "merge-base", "HEAD", "firefox-upstream"]).stdout.strip()
     require(base == args.firefox_base and digest(args.asset_dir / "manifest.json") == MANIFEST_SHA, "frozen Firefox base or manifest differs")
     reference_proof = legacy.verify_reference(args.reference_proof, args.firefox, base)
     native_proof, native_files = verify_native_runtime(args.runtime_manifest, args.runtime)
-    source_files = [Path(__file__), *(HERE / name for name in ("run-hybrid-matrix.py", "run-no-connect-tests.py",
+    caddy_build_id = verify_caddy_build_id(args.caddy_build_id, args.caddy)
+    source_files = [Path(__file__), *(HERE / name for name in ("carrier_capture.py", "run-no-connect-tests.py",
         "camouflage_features.py", "analyze-camouflage-arms.py", "analyze-camouflage.py", "camouflage_superblocks.py",
-        "camouflage_browser_controller.py", "camouflage_capture_health.py", "monitor-network-mutations.py")),
-        *(args.asset_dir / name for name in ("manifest.json", "app.js", "app.template.js", "render-app.py", "main.go", "go.mod", "go.sum", "site.css", "image.svg"))]
+        "camouflage_browser_controller.py", "camouflage_capture_health.py", "monitor-network-mutations.py", "versions.env")),
+        *(args.asset_dir / name for name in ("manifest.json", "app.js", "app.template.js", "render-app.py", "main.go", "go.mod", "go.sum", "site.css", "image.svg", "index.html"))]
     named_inputs = {"source/" + str(path.relative_to(HERE)): path for path in source_files}
     named_inputs.update({"native_runtime/" + str(path.relative_to(args.runtime_manifest.parent)): path for path in native_files})
     named_inputs.update({"reference_runtime/" + name: args.firefox.parent / name for name in reference_proof["runtime_files_sha256"]})
     named_inputs.update({"native_runtime/manifest.json": args.runtime_manifest, "reference/proof.json": args.reference_proof,
-                         "tools/caddy": args.caddy, "tools/nfbench-app": args.backend})
+                         "tools/caddy": args.caddy, "tools/caddy.build-id": args.caddy_build_id,
+                         "tools/nfbench-app": args.backend})
     args.frozen_files = list(named_inputs.values())
     os.umask(0o077)
     args.root.mkdir(parents=True)
@@ -1044,9 +1085,11 @@ def main():
         "source_revision": run_quiet(["git", "-C", HERE, "rev-parse", "HEAD"]).stdout.strip(),
         "frozen_inputs_sha256": {name: digest(path) for name, path in named_inputs.items()},
         "native_artifact": native_proof, "verified_reference": reference_proof, "manifest": json.loads((args.asset_dir / "manifest.json").read_text()),
+        "caddy_build_id": caddy_build_id,
         "manifest_sha256": MANIFEST_SHA, "seed": args.seed, "blocks_per_protocol": args.blocks,
         "link": args.link, "observer": "receive-side complete origin TCP/QUIC and attributable ICMP; no fixed crop or per-stage wire allocation",
-        "local_listener_topology": "only the selected listener", "screening_only": True}
+        "local_listener_topology": "only the selected listener", "screening_only": True,
+        "comparison_baseline": "classic"}
     write_json(args.root / "provenance.json", proof)
     matrix = []
     for protocol in (("h2", "h3") if args.protocol == "both" else (args.protocol,)):
@@ -1056,7 +1099,8 @@ def main():
             report = campaign.run()
             matrix.extend(summarize(campaign, report))
             write_json(args.root / "matrix.json", {"schema": proof["schema"], "purpose": args.purpose,
-                                                   "screening_only": True, "rows": matrix})
+                                                   "screening_only": True, "comparison_baseline": proof["comparison_baseline"],
+                                                   "rows": matrix})
         finally:
             campaign.close()
     print(json.dumps({"result": str(args.root / "matrix.json"), "status": "matched_workload_screening"}), flush=True)

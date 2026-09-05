@@ -82,8 +82,8 @@ bool Decode(uint32_t aExpectedSequence, size_t aExpectedCapacity,
   if (aExpectedCapacity < kCellHeader || aExpectedCapacity > kMaxCell ||
       aInput.size() != aExpectedCapacity ||
       std::memcmp(aInput.data(), "NFC1", 4) != 0 ||
-      ReadUint32(aInput.data() + 4) != aExpectedSequence || aInput[14] != 0 ||
-      aInput[15] != 0) {
+      ReadUint32(aInput.data() + 4) != aExpectedSequence || aInput[15] != 0 ||
+      aInput[14] != 0) {
     return false;
   }
   const size_t used = ReadUint32(aInput.data() + 8);

@@ -9,7 +9,7 @@
 
 #include "mozilla/RefPtr.h"
 #include "nsIWebSocketListener.h"
-#include "nsStringFwd.h"
+#include "nsString.h"
 
 namespace mozilla::net {
 class WebSocketChannel;
@@ -30,7 +30,7 @@ class NoConnectWebSocket final : public nsIWebSocketListener {
                      std::function<void(nsresult)> aStopped);
 
   nsresult Start(const TunnelConfig& aConfig, const nsACString& aCookie,
-                 const nsACString& aPath);
+                 const nsACString& aPath, const nsACString& aProtocol);
   nsresult Send(const nsACString& aMessage);
   void Close(nsresult aStatus);
 
@@ -42,6 +42,7 @@ class NoConnectWebSocket final : public nsIWebSocketListener {
   std::function<void(uint32_t)> mAcknowledged;
   std::function<void(nsresult)> mStopped;
   nsresult mCloseStatus = NS_OK;
+  nsCString mProtocol;
   bool mOpen = false;
   bool mClosing = false;
 };

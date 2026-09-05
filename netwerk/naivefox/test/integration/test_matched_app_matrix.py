@@ -5,8 +5,10 @@ import importlib.util
 import json
 from pathlib import Path
 import sys
+import tempfile
 import unittest
 from unittest import mock
+from types import SimpleNamespace
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -231,6 +233,46 @@ class MatchedApplicationTests(unittest.TestCase):
         self.assertFalse(M.queues_empty(snapshot))
         snapshot["qdiscs"][0]["backlog"] = snapshot["qdiscs"][0]["qlen"] = 0
         self.assertTrue(M.queues_empty(snapshot))
+
+
+class LocalCaddyProofTests(unittest.TestCase):
+    def test_snapshot_and_binary_are_bound(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "source"
+            source.mkdir()
+            (source / "realtime.go").write_text("package transport")
+            binary = root / "caddy"
+            binary.write_bytes(b"test binary")
+            metadata = root / "caddy.build-info"
+            metadata.write_text("go1.25.12")
+            proof = root / "build-manifest.json"
+            data = {"schema": "naivefox-local-caddy-build-v1", "go_version": "go1.25.12",
+                    "source_revision": "a" * 40, "binary_sha256": M.digest(binary),
+                    "build_info_sha256": M.digest(metadata),
+                    "source_files_sha256": {"realtime.go": M.digest(source / "realtime.go")}}
+            proof.write_text(json.dumps(data))
+            self.assertEqual(M.verify_caddy_build_id(proof, binary), data)
+            binary.write_bytes(b"changed binary")
+            with self.assertRaisesRegex(RuntimeError, "binary differs"):
+                M.verify_caddy_build_id(proof, binary)
+            binary.write_bytes(b"test binary")
+            (source / "realtime.go").write_text("changed source")
+            with self.assertRaisesRegex(RuntimeError, "source snapshot differs"):
+                M.verify_caddy_build_id(proof, binary)
+            data["source_files_sha256"] = {"../caddy.build-info": M.digest(metadata)}
+            proof.write_text(json.dumps(data))
+            with self.assertRaisesRegex(RuntimeError, "source snapshot differs"):
+                M.verify_caddy_build_id(proof, binary)
+
+    def test_external_application_is_complete(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = M.native.prepare_application(Path(temporary))
+            self.assertEqual(len([path for path in root.rglob("*") if path.is_file()]), 7)
+            self.assertLessEqual((root / "index.html").stat().st_size, 4096)
+            for index in range(1, 5):
+                self.assertIn(f"/assets/image-{index}.svg", (root / "index.html").read_text())
+            self.assertEqual((root / "assets/app.js").read_bytes(), (M.APP / "app.js").read_bytes())
 
 
 if __name__ == "__main__":

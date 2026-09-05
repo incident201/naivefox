@@ -38,9 +38,11 @@ NoConnectWebSocket::~NoConnectWebSocket() = default;
 
 nsresult NoConnectWebSocket::Start(const TunnelConfig& aConfig,
                                    const nsACString& aCookie,
-                                   const nsACString& aPath) {
+                                   const nsACString& aPath,
+                                   const nsACString& aProtocol) {
   MOZ_ASSERT(NS_IsMainThread());
-  if (mChannel || mClosing || aCookie.IsEmpty()) {
+  if (mChannel || mClosing || aCookie.IsEmpty() ||
+      !aProtocol.EqualsLiteral("nfc1.stream.v1")) {
     return NS_ERROR_INVALID_ARG;
   }
   nsCOMPtr<nsIChannel> templateChannel;
@@ -96,8 +98,9 @@ nsresult NoConnectWebSocket::Start(const TunnelConfig& aConfig,
   MOZ_TRY(NS_MutateURI(uri).SetScheme("wss"_ns).Finalize(websocketUri));
   RefPtr<net::WebSocketChannel> websocket = new net::WebSocketSSLChannel();
   MOZ_TRY(websocket->InitNativeChannel(channel));
-  MOZ_TRY(websocket->SetProtocol("nfc1.hybrid.v1"_ns));
+  MOZ_TRY(websocket->SetProtocol(aProtocol));
   MOZ_TRY(websocket->SetPingInterval(0));
+  mProtocol = aProtocol;
   MOZ_TRY(websocket->AsyncOpenNative(websocketUri, origin, OriginAttributes(),
                                      0, this, nullptr));
   mChannel = std::move(websocket);
@@ -109,7 +112,7 @@ nsresult NoConnectWebSocket::Send(const nsACString& aMessage) {
   if (!mOpen || mClosing || !mChannel) {
     return NS_ERROR_NOT_CONNECTED;
   }
-  if (aMessage.IsEmpty() || aMessage.Length() > 256 * 1024) {
+  if (aMessage.Length() < 512 || aMessage.Length() > 256 * 1024) {
     return NS_ERROR_ILLEGAL_VALUE;
   }
   return mChannel->SendBinaryMsg(aMessage);
@@ -145,8 +148,7 @@ NS_IMETHODIMP NoConnectWebSocket::OnStart(nsISupports*) {
   if (NS_SUCCEEDED(rv)) {
     rv = mChannel->GetExtensions(extensions);
   }
-  if (NS_FAILED(rv) || !protocol.EqualsLiteral("nfc1.hybrid.v1") ||
-      !extensions.IsEmpty()) {
+  if (NS_FAILED(rv) || !protocol.Equals(mProtocol) || !extensions.IsEmpty()) {
     Close(NS_ERROR_ILLEGAL_VALUE);
     return NS_OK;
   }
@@ -202,6 +204,11 @@ NS_IMETHODIMP NoConnectWebSocket::OnBinaryMessageAvailable(
 NS_IMETHODIMP NoConnectWebSocket::OnAcknowledge(nsISupports*, uint32_t aSize) {
   MOZ_ASSERT(NS_IsMainThread());
   if (!mOpen || mClosing) {
+    return NS_OK;
+  }
+  // Necko also acknowledges whole PING/PONG payloads (at most 125 bytes).
+  // NFC1 writes are at least 512 bytes and have a separate queue budget.
+  if (aSize <= 125) {
     return NS_OK;
   }
   RefPtr<NoConnectWebSocket> self = this;

@@ -18,9 +18,12 @@ SCHEMA = "matched-active-application-v1-complete-session"
 MANIFEST_SHA = "3caeae3d8a8509d1453bcebda06150a63fe39b72c255f8a14ffd838abb1ce525"
 PROTOCOLS = ("h2", "h3")
 LISTENERS = ("socks", "http")
-MODES = ("classic", "no-connect", "no-connect-hybrid")
+MODES = ("classic", "no-connect")
 ARMS = tuple(f"native-{mode}-{listener}" for mode in MODES for listener in LISTENERS)
 GROUPS = (*ARMS, "firefox_a", "firefox_b")
+PRIMARY_BLOCKS = 10
+SAMPLES_PER_PROTOCOL = PRIMARY_BLOCKS * len(GROUPS)
+TOTAL_SAMPLES = SAMPLES_PER_PROTOCOL * len(PROTOCOLS)
 VIEWS = ("initial_packets_16", "packets_17_32", "initial_packets_32", "initial_time_250ms", "whole")
 STAGES = ("download", "upload", "parallel", "small", "wake")
 MESSAGE_COUNTS = {"client_binary": 21, "server_binary": 165, "client_json": 190, "server_json": 43}
@@ -133,7 +136,7 @@ def validate_sample(sample, protocol, index, schedule_row, manifest, uploaded, d
         require(sample.get("selected_listener") is None, "reference used a local proxy listener")
     else:
         require(sample.get("selected_listener") == arm.rsplit("-", 1)[1], "native listener differs from its arm")
-    count(sample.get("carrier_websockets"), "carrier WebSockets", int("no-connect-hybrid" in arm))
+    count(sample.get("carrier_websockets"), "carrier WebSockets", int("no-connect" in arm))
     for key in ("capture_drops", "network_mutations", "pre_navigation_origin_packets", "pre_navigation_origin_requests"):
         count(sample.get(key), key, 0)
     route = sample.get("routing", {})
@@ -180,8 +183,8 @@ def validate_sample(sample, protocol, index, schedule_row, manifest, uploaded, d
             "TCP lifecycle is incomplete")
     if protocol == "h2":
         require(tcp > 0 and flows == tcp, "H2 observer contains an unexpected transport")
-    elif not reference and "no-connect-hybrid" not in arm:
-        require(tcp == 0, "strict classic/no-connect H3 emitted outer TCP")
+    elif not reference and "no-connect" not in arm:
+        require(tcp == 0, "strict classic H3 emitted outer TCP")
     else:
         require(tcp > 0 and flows > tcp, "H3 startup plus application/carrier WSS is missing")
     drain = sample.get("drain", {})
@@ -218,7 +221,7 @@ def verify_audit(audit, inputs, samples, analyses):
     verified = {}
     for protocol in PROTOCOLS:
         part = audit["protocols"][protocol]
-        count(part.get("participants"), "independently audited participants", 80)
+        count(part.get("participants"), "independently audited participants", SAMPLES_PER_PROTOCOL)
         for key in ("all_active_jobs_and_routes", "all_backend_useful_bytes_and_message_graphs_verified", "all_performance_and_traffic_ratios_recomputed", "all_sample_wire_totals_recomputed_from_raw_capture"):
             require(part.get(key) is True, "independent audit did not verify " + key)
         cohort = [sample for sample in samples if sample["protocol"] == protocol]
@@ -233,7 +236,7 @@ def verify_audit(audit, inputs, samples, analyses):
             require(expected_features > 0 and views[view].get("all_six_arms_recomputed") is True
                     and count(views[view].get("features"), "independent feature count") == expected_features,
                     "not all six residual arms were independently recomputed")
-        verified[protocol] = {"participants": 80, "raw_ip_bytes": part["raw_receive_ip_bytes"],
+        verified[protocol] = {"participants": SAMPLES_PER_PROTOCOL, "raw_ip_bytes": part["raw_receive_ip_bytes"],
                               "raw_packets": part["raw_receive_packets"], "all_six_arms_all_five_views_recomputed": True,
                               "audited_input_bundle_sha256": hash_text(part.get("audited_input_bundle_sha256")),
                               "audited_input_files": count(part.get("audited_input_files"), "audited raw/sidecar inputs", 403)}
@@ -313,7 +316,7 @@ def provenance_summary(provenance):
 def ratios(samples, source_matrix, residuals, cold):
     rows = []
     actual_rows = {(row.get("startup_protocol"), row.get("listener")): row for row in source_matrix.get("rows", [])}
-    require(len(source_matrix.get("rows", [])) == 4 and set(actual_rows) == {(p, l) for p in PROTOCOLS for l in LISTENERS}, "matrix does not contain exactly four hybrid rows")
+    require(len(source_matrix.get("rows", [])) == 4 and set(actual_rows) == {(p, l) for p in PROTOCOLS for l in LISTENERS}, "matrix does not contain exactly four no-connect rows")
     def cohort(protocol, arm):
         return [s for s in samples if s["protocol"] == protocol and s["naivefox_arm"] == arm]
     def wire(records):
@@ -325,7 +328,7 @@ def ratios(samples, source_matrix, residuals, cold):
         for listener in LISTENERS:
             original = actual_rows[(protocol, listener)]
             count(original.get("blocks"), "matrix paired blocks", 10)
-            arm = f"native-no-connect-hybrid-{listener}"
+            arm = f"native-no-connect-{listener}"
             candidate = cohort(protocol, arm)
             candidate_wire = wire(candidate)
             equal_number(original.get("whole_ip_bytes"), candidate_wire, "candidate complete-session bytes")
@@ -334,9 +337,9 @@ def ratios(samples, source_matrix, residuals, cold):
                    "residual": {view: residuals[protocol][view][arm] for view in VIEWS}, "comparisons": {}}
             require(set(original.get("comparisons", {})) == {"firefox", "classic", "no-connect"}, "a comparison baseline is missing")
             for view in VIEWS:
-                equal_number(original["residual"][view]["mean_distance"], row["residual"][view]["mean_distance"], "matrix hybrid residual")
-                require(original["residual"][view]["bootstrap_ci95"] == row["residual"][view]["bootstrap_ci95"], "matrix hybrid interval differs")
-            for baseline in ("firefox", "classic", "no-connect"):
+                equal_number(original["residual"][view]["mean_distance"], row["residual"][view]["mean_distance"], "matrix no-connect residual")
+                require(original["residual"][view]["bootstrap_ci95"] == row["residual"][view]["bootstrap_ci95"], "matrix no-connect interval differs")
+            for baseline in ("firefox", "classic"):
                 controls = cohort(protocol, "reference" if baseline == "firefox" else f"native-{baseline}-{listener}")
                 old = original["comparisons"][baseline]
                 baseline_wire = wire(controls)
@@ -405,10 +408,10 @@ def make_report(inputs):
     residuals = {}
     for protocol in PROTOCOLS:
         directory = inputs.root / protocol
-        expected_names = {f"sample-{index:03d}.json" for index in range(80)}
+        expected_names = {f"sample-{index:03d}.json" for index in range(SAMPLES_PER_PROTOCOL)}
         require({path.name for path in directory.glob("sample-*.json")} == expected_names, "missing, extra or resampled public participant identities")
         schedule = inputs.read(protocol + "/schedule.json")
-        require(isinstance(schedule, list) and len(schedule) == 80, "the complete 80-member schedule is required")
+        require(isinstance(schedule, list) and len(schedule) == SAMPLES_PER_PROTOCOL, "the complete primary schedule is required")
         blocks = defaultdict(list)
         for index, declaration in enumerate(schedule):
             sample = inputs.read(f"{protocol}/sample-{index:03d}.json")
@@ -435,9 +438,9 @@ def make_report(inputs):
         residuals[protocol] = {}
         for view in VIEWS:
             arms = part["views"][view].get("arms", {})
-            require(set(arms) == set(ARMS), "residual report omits one of the six native arms")
+            require(set(arms) == set(ARMS), "residual report omits one of the four native arms")
             residuals[protocol][view] = {arm: residual_entry(arms[arm], 10) for arm in ARMS}
-    require(len(samples) == 160 and len(root_hashes) == 1, "complete cohort or common root identity failed")
+    require(len(samples) == TOTAL_SAMPLES and len(root_hashes) == 1, "complete cohort or common root identity failed")
     audit = verify_audit(inputs.read("independent-audit.json"), inputs, samples, analyses)
     rows = ratios(samples, matrix, residuals, cold)
     declared_cohorts = [{"protocol": p, "participant": group, "samples": group_counts[(p, group)]} for p in PROTOCOLS for group in GROUPS]
@@ -454,10 +457,10 @@ def make_report(inputs):
     safe_provenance["report_generator_sha256"] = sha(Path(__file__).read_bytes())
     safe_provenance["public_input_bundle_sha256"] = sha(canonical(inputs.digests))
     return {
-        "schema": "naivefox-hybrid-matched-primary-public-v1", "status": "COMPLETE_AUDITED_SCREENING", "purpose": "primary",
+        "schema": "naivefox-no-connect-matched-primary-public-v1", "status": "COMPLETE_AUDITED_SCREENING", "purpose": "primary",
         "screening_only": True, "provenance": safe_provenance,
-        "design": {"participants": 160, "participants_per_protocol": 80, "blocks_per_protocol": 10,
-                   "participants_per_block": 8, "seed": provenance["seed"], "cohorts": declared_cohorts,
+        "design": {"participants": TOTAL_SAMPLES, "participants_per_protocol": SAMPLES_PER_PROTOCOL, "blocks_per_protocol": PRIMARY_BLOCKS,
+                   "participants_per_block": len(GROUPS), "seed": provenance["seed"], "cohorts": declared_cohorts,
                    "same_firefox_application_for_every_participant": True, "manifest": manifest,
                    "application_useful_bytes": {"client_to_server": uploaded, "server_to_client": downloaded},
                    "declared_application_ws_message_counts": MESSAGE_COUNTS,
@@ -467,18 +470,18 @@ def make_report(inputs):
                    "observer": "All receive-side outer-origin TCP/QUIC and attributable ICMP through application close, producer shutdown, empty shaping queues and observed drain.",
                    "whole_is_complete_session": True, "per_stage_wire_attribution": False,
                    "failed_participant_resampling_within_campaign": False,
-                   "resampling_evidence": "Exactly the 160 scheduled identities, one admitted sidecar each, a matching fail-fast source-frozen collector and independent audit; no pilot or prior failed campaign samples are included."},
-        "admission": {"admitted_participants": 160, "verified_application_jobs": 1760,
-                      "verified_application_asset_responses": 960, "verified_semantic_api_responses": 6400,
-                      "normal_application_websockets": 160, "hybrid_carrier_websockets": 40,
-                      "route_proofs": 160, "cold_origin_empty_before_navigation": 160, "capture_drops": 0, "network_mutations": 0,
+                   "resampling_evidence": "Exactly the 120 scheduled identities, one admitted sidecar each, a matching fail-fast source-frozen collector and independent audit; no pilot or prior failed campaign samples are included."},
+        "admission": {"admitted_participants": len(samples), "verified_application_jobs": len(samples) * len(manifest["jobs"]),
+                      "verified_application_asset_responses": len(samples) * 6, "verified_semantic_api_responses": len(samples) * 40,
+                      "normal_application_websockets": len(samples), "no_connect_carrier_websockets": sum(item["carrier_websockets"] for item in samples),
+                      "route_proofs": len(samples), "cold_origin_empty_before_navigation": len(samples), "capture_drops": 0, "network_mutations": 0,
                       "harness_forced_kills": 0, "surviving_owned_producers": 0,
                       "tcp_flows": sum(sample["whole"]["tcp_flows"] for sample in samples),
                       "tcp_fin_completed": sum(sample["whole"]["tcp_fin_completed"] for sample in samples),
                       "tcp_reset_completed": sum(sample["whole"]["tcp_reset_completed"] for sample in samples),
                       "browser_shutdown_evidence": "Normal application close, successful WebDriver quit/service exit 0, and no surviving tracked PIDs; no stronger claim about undocumented WebDriver internals.",
                       "private_numeric_cold_marker_fallbacks": inputs.private_cold_reads, "outer_flow_ranges": flow_ranges},
-        "independent_audit": audit, "hybrid_rows": rows, "all_native_arm_residuals": residuals,
+        "independent_audit": audit, "no_connect_rows": rows, "all_native_arm_residuals": residuals,
         "interpretation": {"distance": "Bounded passive-feature excess outside matched Firefox A/B control envelope; lower is closer under this declared metric.",
                            "confidence_intervals": "Descriptive conditional bootstrap intervals, not confirmatory acceptance intervals.",
                            "effective_rate_loss_percent": "100 * (1 - baseline_mean_io_ms / candidate_mean_io_ms); negative means higher effective rate.",
@@ -497,13 +500,13 @@ def make_report(inputs):
 
 
 def section(report):
-    lines = ["### Matched active application: audited hybrid matrix", "",
-             "A fresh primary run admitted all 160 participants in ten randomized paired blocks per protocol. "
+    lines = ["### Matched active application: audited classic/no-connect matrix", "",
+             "A fresh primary run admitted all 120 participants in ten randomized paired blocks per protocol. "
              "Firefox A/B and every native arm executed the same application, all eleven verified jobs and one normal application WebSocket close. "
              "The outer link used 40 ms RTT and 20 Mbit/s independently in each direction; Whole includes complete startup, activity, idle and teardown.", "",
              "| Startup / listener | p1–16 distance | p17–32 distance | Whole distance |",
              "| --- | ---: | ---: | ---: |"]
-    for row in report["hybrid_rows"]:
+    for row in report["no_connect_rows"]:
         values = row["residual"]
         lines.append(f"| {row['startup_protocol'].upper()} / {row['listener']} | {values['initial_packets_16']['mean_distance']:.5f} | {values['packets_17_32']['mean_distance']:.5f} | {values['whole']['mean_distance']:.5f} |")
     def percent(value):
@@ -513,19 +516,19 @@ def section(report):
                   "Download and upload are the 8-MiB and 1-MiB stages; traffic covers the entire completed session.", "",
                   "| Startup / listener | Download rate loss vs Firefox | Upload rate loss vs Firefox | Extra session IP traffic vs Firefox |",
                   "| --- | ---: | ---: | ---: |"])
-    for row in report["hybrid_rows"]:
+    for row in report["no_connect_rows"]:
         base = row["comparisons"]["firefox"]
         lines.append(f"| {row['startup_protocol'].upper()} / {row['listener']} | {percent(base['stages']['download']['effective_rate_loss_percent'])} | {percent(base['stages']['upload']['effective_rate_loss_percent'])} | {percent(base['extra_complete_session_traffic_percent'])} |")
-    lines.extend(["", "The next costs compare hybrid with the unchanged native no-connect arm. "
+    lines.extend(["", "The next costs compare no-connect with classic. "
                   "Positive rate loss or latency increase is worse; negative values are improvements. "
                   "Traffic is the complete-session outer IP total, with no arbitrary per-stage tail allocation.", "",
                   "| Startup / listener | Download rate loss | Upload rate loss | Small echo latency increase | Extra session traffic |",
                   "| --- | ---: | ---: | ---: | ---: |"])
-    for row in report["hybrid_rows"]:
-        base = row["comparisons"]["no-connect"]
+    for row in report["no_connect_rows"]:
+        base = row["comparisons"]["classic"]
         lines.append(f"| {row['startup_protocol'].upper()} / {row['listener']} | {percent(base['stages']['download']['effective_rate_loss_percent'])} | {percent(base['stages']['upload']['effective_rate_loss_percent'])} | {percent(base['stages']['small']['time_increase_percent'])} | {percent(base['extra_complete_session_traffic_percent'])} |")
-    lines.extend(["", "The [machine-readable matrix](test/integration/evidence/hybrid-ws-matrix.json) includes all six native-arm residual means/intervals/counts in all five views, "
-                  "all four hybrid rows, Firefox/classic/no-connect speed and complete-session traffic comparisons, and browser-clock startup/application-completion costs. "
+    lines.extend(["", "The [machine-readable matrix](test/integration/evidence/no-connect-matrix.json) includes all four native-arm residual means/intervals/counts in all five views, "
+                  "all four no-connect rows, Firefox/classic baseline speed and complete-session traffic comparisons, and browser-clock startup/application-completion costs. "
                   "It also records immutable artifact identities and the independent raw-capture, workload, routing and numerical audit.", "",
                   "Ten blocks remain descriptive screening below the thirty-block inference floor. "
                   "These results neither establish absolute indistinguishability nor promote a default transport; prior idle-reference and failed-pilot datasets are not included.", ""])
@@ -571,7 +574,7 @@ def main():
             require(not args.output.resolve().is_relative_to(inputs.root) and not args.section.resolve().is_relative_to(inputs.root), "do not modify frozen campaign inputs")
             atomic_output(args.output, data, args.replace, inputs.root.parent)
             atomic_output(args.section, markdown, args.replace, inputs.root.parent)
-        print("PASS: complete primary 160-participant audit and sanitized report validation")
+        print("PASS: complete primary 120-participant audit and sanitized report validation")
         return 0
     except (Rejected, OSError, ValueError, KeyError, TypeError) as error:
         message = str(error) if isinstance(error, Rejected) else type(error).__name__

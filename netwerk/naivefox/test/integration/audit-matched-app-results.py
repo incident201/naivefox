@@ -70,7 +70,7 @@ def audit_distances(folder, protocol):
         if count in names and indicator not in names:
             names.append(indicator)
     report = read(folder / "analysis.json")["protocols"][protocol]
-    check(all(len(block) == 8 and "firefox_a" in block and "firefox_b" in block for block in blocks.values()), "incomplete paired blocks")
+    check(all(len(block) == 6 and "firefox_a" in block and "firefox_b" in block for block in blocks.values()), "incomplete paired blocks")
     arms = sorted(set(next(iter(blocks.values()))) - {"firefox_a", "firefox_b"})
     result = {}
     for view, reported in report["views"].items():
@@ -96,7 +96,7 @@ def audit_distances(folder, protocol):
         for arm in arms:
             close(statistics.fmean(arm_values[arm]), reported["arms"][arm]["mean_distance"], "residual distance mean")
             close(statistics.median(arm_values[arm]), reported["arms"][arm]["median_block_distance"], "residual distance median")
-        result[view] = {"features": len(features), "all_six_arms_recomputed": True}
+        result[view] = {"features": len(features), "all_four_arms_recomputed": True}
     return result
 
 
@@ -179,7 +179,7 @@ def audit_protocol(root, protocol, rows, manifest):
         return mean(mean(item["application"]["stages"][index]["job_io_ms"]) if index >= 3
                     else item["application"]["stages"][index]["io_ms"] for item in items)
     for row in rows:
-        candidates = [item for item in samples if item["naivefox_arm"] == "native-no-connect-hybrid-" + row["listener"]]
+        candidates = [item for item in samples if item["naivefox_arm"] == "native-no-connect-" + row["listener"]]
         close(row["whole_ip_bytes"], mean(item["whole"]["wire_bytes"] for item in candidates), "candidate mean bytes")
         for baseline, comparison in row["comparisons"].items():
             arm = "reference" if baseline == "firefox" else "native-" + baseline + "-" + row["listener"]

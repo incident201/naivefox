@@ -9,256 +9,97 @@ targets, and binds all fixture services to dynamically selected loopback ports.
 Generated binaries, credentials, private keys, profiles, bodies, logs, and
 captures live under `<objdir>/naivefox-fixture/`; none belongs in Git.
 
-## Native classic/no-connect interoperability
+## Classic and no-connect acceptance
 
-The optional application transport has a separate fixture using the combined
-Caddy module build. It creates private loopback PKI and configuration below
-one existing product object directory, runs the rebuilt native executable, and
-never starts a Firefox browser or rebuilds Caddy implicitly:
+Only classic (default) and no-connect are supported. No-connect completes fixed
+HTTP startup and uses a shaped native WebSocket. H2/H3 selects startup; its
+persistent phase requires H1 TCP in either case. Retired selectors are errors.
 
-```bash
-python3 netwerk/naivefox/test/integration/run-no-connect-tests.py \
-  --objdir /absolute/path/to/warm-obj-naivefox-linux \
-  --caddy /absolute/path/to/combined-caddy
-```
-
-Both transports use the same Caddy process for each protocol. The fixture checks
-strict H2 and UDP-only H3, both local listeners, 1-MiB uploads/downloads,
-backpressure, half-close, parallel streams, idle wake, abrupt local
-cancellation, bounded graceful shutdown, shared username/password authentication,
-multiple destination hosts and ports without an allowlist, optional forward-proxy
-access policy, and untrusted certificates. It records zero outer
-CONNECT during the no-connect phase and then exercises classic CONNECT on that
-same endpoint. By default, classic uses an explicit disabled preamble so this
-gate measures transport interoperability. Repeat with `--classic-preamble default`
-to verify the normal implicit H2/H3 preambles against the module's gallery page
-on that same combined endpoint. `--parallel-batches 32` repeats the four-stream
-mixed upload/download batch to cover H3 buffered-FIN and callback scheduling;
-run that regression with both preamble policies. Each transfer checks exact
-length, SHA-256 and half-close, and still respects bounded client shutdown.
-
-The no-connect concurrency gate holds 40 logical streams open at one barrier,
-then checks a distinct echo on every stream. This requires multiple carriers
-without exceeding the 32-stream resource bound inside any one carrier. The
-shared-config gate restarts the client with one configuration file through
-`classic → no-connect → classic → no-connect`; only `transport` may change.
-Linux, native Windows, and Android adapters run these same gates. The separate
-`run-transport-cli-tests.py` repeats the switch using `--transport` while checking
-that the JSON file remains byte-identical, including URI credentials and valid
-classic-only settings.
-
-Use `--protocol h2` or `--protocol h3` for a focused iteration. `--runtime`
-selects an already-built Linux executable; omission uses `dist/bin/naivefox`
-inside `--objdir`. Per-run configs, certificates and logs remain private;
-`result.json` contains only sanitized gate results. Retained failed runs are
-not passing evidence. Server build instructions and the maintained protocol
-boundary are linked from [NO-CONNECT.md](../../NO-CONNECT.md).
-
-Run the separate fail-closed HTTP-envelope gate with the same arguments:
+The combined Caddy binary must match `versions.env`. The fixture materializes
+the seven-file application under private `application_root`. Trust remains
+inside isolated profiles; certificate checks are never disabled.
 
 ```bash
-python3 netwerk/naivefox/test/integration/run-no-connect-adversarial-tests.py \
-  --objdir /absolute/path/to/warm-obj-naivefox-linux \
-  --caddy /absolute/path/to/combined-caddy
+python3 netwerk/naivefox/test/integration/run-no-connect-tests.py   --objdir /absolute/linux-objdir --caddy /absolute/combined-caddy   --work-dir /absolute/linux-objdir/no-connect
 ```
 
-It rejects mismatched profiles or authentication schemes, appended/oversized cells, wrong capacities,
-truncated filler, invalid sequence/reserved fields, redirects, HTTP authentication
-prompts and cross-protocol fallback. The corrupt responses come from isolated
-Caddy test routes; production server code is not modified. `--case` narrows a
-run to one or more named cases, and `--protocol` selects H2 or H3. Each refusal
-must reach a local connection failure without an outer CONNECT, redirect follow,
-authentication retry or target open after rejected bootstrap.
+The full gate covers both listeners and protocols, byte-exact transfers, slow
+consumers, mixed parallel batches, 40 simultaneous streams across bounded
+carriers, half-close, idle, cancellation, shutdown, shared authentication/policy,
+scoped TLS trust and classic/no-connect switching. `--parallel-batches 32`
+expands churn; `--classic-preamble default` checks normal classic preambles.
+`--smoke` runs a smaller transfer set plus default-classic checks.
 
-The Windows adapter runs the base transport interoperability matrix with the
-actual staged Windows executable and Windows local clients:
+The native Windows runner uses the same workloads. Put its runtime and private
+fixture root on a Windows drive. Gecko rejects WSL UNC profile/config/runtime
+paths; the test must not disable that policy. Compilation may remain on Linux.
 
 ```bash
-python3 netwerk/naivefox/test/integration/run-no-connect-windows-tests.py \
-  --objdir /absolute/path/to/warm-obj-naivefox-windows \
-  --runtime /absolute/path/to/staged/naivefox.exe \
-  --caddy /absolute/path/to/combined-linux-caddy \
-  --windows-python '/mnt/c/absolute/path/to/python.exe'
+python3 netwerk/naivefox/test/integration/run-no-connect-windows-tests.py   --objdir /mnt/c/path/to/private-native-test-root   --runtime /mnt/c/path/to/package/naivefox.exe   --caddy /absolute/linux/combined-caddy   --windows-python /mnt/c/path/to/python.exe
 ```
 
-Run the adapter as root in WSL. It creates its own isolated network namespace,
-uses a loopback relay for the private Caddy/target fixture, and owns the Windows
-client process through a kill-on-close Job Object. All fixture state remains
-below the supplied object directory; no existing network-namespace wrapper is
-needed. `--protocol h2` or `--protocol h3` narrows an iteration. The adapter also
-accepts `--classic-preamble default --parallel-batches 32` for the repeated H3
-buffered-FIN regression against the normal fronting-page policy.
-
-The Android adapter runs the same matrix against an existing ARM64 API-26+
-device/emulator, followed by the embedded lifecycle and stop tests:
+Run the Windows adapter as root in WSL. It owns its network namespace, loopback
+relays and Windows Job Object. H3 no-connect relays UDP and TCP; classic remains
+strict H3. Only task-started processes are stopped.
 
 ```bash
-python3 netwerk/naivefox/test/integration/run-no-connect-android.py \
-  --objdir /absolute/path/to/fixture-objdir \
-  --package /absolute/path/to/staged-android-package \
-  --caddy /absolute/path/to/combined-linux-caddy \
-  --ndk /absolute/path/to/android-ndk-r29 \
-  --serial emulator-5554 --parallel-batches 4
+python3 netwerk/naivefox/test/integration/run-no-connect-android.py   --objdir /absolute/android-fixture-objdir   --package /absolute/naivefox-android-aarch64 --ndk /absolute/android-ndk-r29   --caddy /absolute/combined-caddy --serial emulator-5554
 ```
 
-Its small NDK socket probe runs inside Android against the actual loopback
-listeners. It validates half-close directly: ADB forwarding closes both
-directions and is unsuitable for this particular assertion. The upstream uses
-the emulator's host alias (`10.0.2.2` by default, configurable with `--host-alias`)
-while the logical TLS hostname and certificate checks remain intact. Temporary
-runtime, profile and probe files are isolated and removed from the device.
-The older embedded runner's `--direct-host` option likewise avoids ADB reverse
-for H2; it still requires the fixture's explicit host-alias certificate SAN.
-Keep a task-owned emulator alive across gates. The managed software ARM64
-emulator allows up to 900 seconds for normal boot; it never substitutes a fake
-boot-complete property. An isolated ADB server can be selected with
-`ADB_SERVER_SOCKET` and the matching `ANDROID_ADB_SERVER_PORT`.
+Android needs an online ARM64 API-26+ device/emulator. A guest-native probe
+checks half-close; ADB forwarding cannot substitute for it. `--host-alias`
+overrides `10.0.2.2`. Keep the owned emulator alive across gates. Software
+ARM64 boot and clock readiness may take 900 seconds; never fake readiness.
+The runner also tests embedded default/JSON/argument selection, retired-name
+rejection, unchanged config bytes and cross-thread shutdown. A static
+`--check-only` package check is not device acceptance.
 
-The standalone `run-no-connect-codec-tests.sh <linux-objdir> [output-directory]`
-runner requires the full-source checkout and its bundled GoogleTest sources.
-Generated minimal-source exports intentionally omit those unit-test dependencies;
-their HTTP integration runners remain available. The standalone codec runner
-reuses a warm product NSS/NSPR build and can enable ASan/UBSan with
-`NAIVEFOX_CODEC_SANITIZERS=1`.
-The codec regressions cross the 4-GiB byte-offset boundary with bounded reusable
-buffers, preserving sequence validation, flow control, and FIN after wrap.
+## Protocol and lifecycle regressions
 
-## Basic transport checks on all platforms
+Run these with the normal `--objdir`, `--caddy` and `--work-dir` arguments:
 
-The Linux, native Windows, and Android adapters share a bounded `--smoke`
-gate. Select `--transport no-connect-hybrid` to check the retained experimental
-transport without running the full concurrency matrix:
+- `run-no-connect-websocket-adversarial-tests.py --protocol both --listener both`:
+  malformed handshake, compression, message type/capacity, sequence, reserved
+  bits and ACK rejection, without replay, HTTP resumption or CONNECT fallback.
+- `run-no-connect-control-tests.py`: legal 4/125-byte PING/PONG, subsequent
+  data, half-close and clean exit. Control completions cannot spend NFC1 credit.
+- `run-no-connect-adversarial-tests.py`: HTTP startup envelopes, profile/auth
+  mismatch, capacities, redirects, truncation and protocol fallback.
+- `run-no-connect-routing-tests.py`: host mapping and TLS identity.
+- `run-cli-shutdown-tests.py`: both signals with unfinished requests.
+
+`run-no-connect-codec-tests.sh OBJDIR OUTPUT` reuses warm NSS/NSPR and full-source
+GoogleTest. `NAIVEFOX_CODEC_SANITIZERS=1` enables ASan/UBSan. It covers framing,
+reserved fields, delivery credit, 4-GiB offset wrap and capacity thresholds.
+Live tests require valid size sets and actual data; scheduler timing need not
+exercise every size in each run.
+
+## Capture and cost
+
+`run-matched-app-matrix.py` uses classic and no-connect through both listeners,
+plus Firefox A/B running the identical active application. The current primary
+has six participants per block, ten blocks per H2/H3: 120 sessions. Asset/source
+hashes, complete useful jobs, routing, strict packet windows, receive-side IP
+accounting and teardown remain mandatory. Reuse the reference verified by
+`verify-capture-reference.py`; do not build a browser for normal product gates.
+
+`audit-matched-app-results.py` recounts raw traffic, jobs and residual means/
+medians. `publish-matched-app-results.py` admits only a complete audited primary.
+Historical eight-participant matrices retain their original labels in Git.
+`run-no-connect-performance.py` is the separate classic/no-connect socket
+microbenchmark; it does not establish browser-equivalent scheduling.
+
+## Complete classic regression gate
 
 ```bash
-python3 netwerk/naivefox/test/integration/run-no-connect-tests.py \
-  --objdir /absolute/path/to/linux-objdir --caddy /absolute/path/to/combined-caddy \
-  --transport no-connect-hybrid --smoke
-
-python3 netwerk/naivefox/test/integration/run-no-connect-windows-tests.py \
-  --objdir /absolute/path/to/windows-objdir --runtime /absolute/path/to/naivefox.exe \
-  --caddy /absolute/path/to/combined-caddy --windows-python /mnt/c/path/to/python.exe \
-  --transport no-connect-hybrid --smoke
-
-python3 netwerk/naivefox/test/integration/run-no-connect-android.py \
-  --objdir /absolute/path/to/android-objdir --package /absolute/path/to/android-package \
-  --caddy /absolute/path/to/combined-caddy --ndk /absolute/path/to/android-ndk-r29 \
-  --serial emulator-5554 --transport no-connect-hybrid --smoke
+netwerk/naivefox/test/integration/run-full-suite.sh
 ```
 
-Each command checks H2 and H3 by default. Both local frontends transfer a
-64-KiB download and upload with byte integrity and half-close checks, then
-echo data across a 50-ms pause. Hybrid must complete all 20 startup exchanges
-and establish exactly one WebSocket before the remaining transfers; useful
-traffic must pass in both directions without any outer CONNECT. The client
-must exit naturally after its six streams drain. Two further transfers omit
-the JSON `transport` field and must use default classic CONNECT.
-
-Request-level checks require the selected H2/H3 protocol for startup/API and
-classic CONNECT; only the hybrid `/api/realtime` request may use HTTP/1.1.
-The Windows H3 hybrid fixture therefore relays both UDP and TCP, while finite
-`no-connect` H3 remains UDP-only. Relay readiness and shutdown are bounded.
-All adapters accept `--work-dir` below their object directory. These are basic
-functional checks, not throughput, long-idle heartbeat, or concurrency evidence.
-Android's separate embedded argument matrix also checks explicit C-ABI
-selection, JSON precedence, unchanged configuration bytes, and invalid names.
-
-## Hybrid WebSocket failure checks
-
-Run all eleven malformed-handshake, message and ACK cases through both startup
-protocols and both local listeners:
-
-```bash
-python3 netwerk/naivefox/test/integration/run-hybrid-adversarial-tests.py \
-  --objdir /absolute/path/to/warm-obj-naivefox-linux \
-  --caddy /absolute/path/to/combined-caddy \
-  --protocol both --listener both \
-  --work-dir /absolute/path/to/warm-obj-naivefox-linux/hybrid-ws/adversarial
-```
-
-The real module serves the complete startup. Only `/api/realtime` is routed to
-a bounded loopback test responder behind the same trusted Caddy TLS endpoint;
-there are no production fault hooks or disabled certificate checks. Each case
-requires prompt terminal failure, one target connection and no reconnect,
-HTTP-carrier resumption or CONNECT fallback. Bad subprotocol and unsolicited
-compression handshakes must fail without any binary message being sent.
-`--case` and `--listener` narrow an incremental check. Raw fixture files remain
-private below the selected object directory; `result.json` contains safe counts.
-
-## Complete local gate
-
-The experimental hybrid uses the same native acceptance suite with an
-explicitly mixed server protocol policy:
-
-```bash
-python3 netwerk/naivefox/test/integration/run-no-connect-tests.py \
-  --objdir /absolute/path/to/warm-obj-naivefox-linux \
-  --caddy /absolute/path/to/combined-caddy \
-  --transport no-connect-hybrid \
-  --work-dir /absolute/path/to/warm-obj-naivefox-linux/hybrid-ws/functional
-```
-
-Check explicit host mappings with a nonresolving logical hostname, a
-certificate that names only that hostname, and byte-exact transfers through
-both local listeners:
-
-```bash
-python3 netwerk/naivefox/test/integration/run-hybrid-routing-tests.py \
-  --objdir /absolute/path/to/warm-obj-naivefox-linux \
-  --caddy /absolute/path/to/combined-caddy \
-  --work-dir /absolute/path/to/warm-obj-naivefox-linux/hybrid-ws/routing
-```
-
-The startup remains strict H2 or H3. The fixture additionally enables H1 on
-TCP for Firefox's WebSocket handshake; `quic://` in this explicit mode is not
-a claim of UDP-only traffic. Server counters must prove a completed startup
-graph, successful WSS and bidirectional NFC1 cells, alongside the existing
-integrity, half-close, concurrency, policy, cancellation and shutdown checks.
-Run the original no-connect suite separately to retain its strict UDP-only
-H3 regression.
-
-For comparative measurements, use
-[the matched active application benchmark](hybrid_app/BENCHMARK.md) and
-`run-matched-app-matrix.py`. Its direct Firefox controls execute the same
-resources, API requests, active WebSocket jobs and idle periods as the proxied
-application. The earlier idle-WebSocket capture is a superseded diagnostic,
-not a valid baseline for active Whole, throughput or traffic comparisons.
-
-The Linux configuration-file CLI handles SIGINT and SIGTERM through the
-existing local-server stop control. It closes listeners and active requests,
-then leaves the event loop and shuts down the runtime. The embedded API and
-other platforms retain their existing shutdown interfaces. Exercise both
-signals in all three transports, with unfinished requests on both frontends:
-
-```bash
-python3 netwerk/naivefox/test/integration/run-cli-shutdown-tests.py \
-  --objdir /absolute/path/to/warm-obj-naivefox-linux \
-  --work-dir /absolute/path/to/warm-obj-naivefox-linux/hybrid-ws/cli-shutdown
-```
-
-From the repository root, run:
-
-```bash
-./netwerk/naivefox/test/integration/run-full-suite.sh
-```
-
-The command runs H2, H3, Auto, config/listener, failure-path, padding,
-integrity, backpressure, lifecycle, quick capture, and the structural passive
-camouflage gate sequentially with the same NaiveFox binary. Strict H3 uses a
-UDP-only Caddy proxy port with no TCP listener, and therefore cannot pass by
-falling back to H2. The two-sample camouflage gate validates collection,
-analysis, and sanitization; it never makes a statistical camouflage claim.
-
-Protocol-only aggregate suites are:
-
-```bash
-./netwerk/naivefox/test/integration/run-local-suite.sh
-./netwerk/naivefox/test/integration/run-h3-suite.sh
-```
-
-The H2 aggregate includes control, scoped trust, raw CONNECT, SOCKS, padding,
-robustness, and H2 capture. The H3 aggregate includes raw CONNECT, SOCKS,
-padding, robustness, Auto, and H3 capture. Config/runtime behavior is added by
-`run-full-suite.sh`.
+This covers H2, H3, Auto, config/listener, failures, padding, integrity,
+backpressure, lifecycle, quick capture and structural camouflage checks.
+Classic H3 uses a UDP-only endpoint. The small capture gate validates the
+measurement machinery, not statistical indistinguishability. Protocol-focused
+iterations use `run-local-suite.sh` or `run-h3-suite.sh`.
 
 ## Focused gates
 
@@ -307,8 +148,7 @@ for H2 or one NaiveFox-owned UDP socket for H3.
 The main Android embedded runner also exercises the fourth
 `NaiveFoxRunEmbedded` transport argument. It holds configuration bytes and
 listener ports fixed across fresh processes, tests null/default and JSON
-selection, then explicit `classic`, `no-connect`, and experimental
-`no-connect-hybrid` overrides. Both local frontends perform verified transfers
+selection, then explicit `classic` and `no-connect` overrides. Both local frontends perform verified transfers
 and idle echoes; request observations prove the selected carrier. Rejected
 empty/unknown selectors precede a valid call in the same process to ensure
 they do not consume the one-shot runtime.

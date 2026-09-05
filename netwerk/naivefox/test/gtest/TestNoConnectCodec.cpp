@@ -118,6 +118,22 @@ TEST_F(NaiveFoxNoConnectCodec, AllKindsAndPadding) {
   }
 }
 
+TEST_F(NaiveFoxNoConnectCodec, ReadyWebSocketCapacityBoundsFiller) {
+  EXPECT_EQ(ReadyRealtimeUpCapacity(0, false), 512U);
+  EXPECT_EQ(ReadyRealtimeUpCapacity(0, true), 4096U);
+  EXPECT_EQ(ReadyRealtimeUpCapacity(1, false), 4096U);
+  EXPECT_EQ(ReadyRealtimeUpCapacity(8191, false), 4096U);
+  EXPECT_EQ(ReadyRealtimeUpCapacity(8192, false), 16384U);
+  EXPECT_EQ(ReadyRealtimeUpCapacity(65535, false), 16384U);
+  EXPECT_EQ(ReadyRealtimeUpCapacity(65536, false), 131072U);
+  EXPECT_EQ(ReadyRealtimeUpCapacity(kReceiveWindow, false), 131072U);
+  for (size_t bytes = 2048; bytes <= kReceiveWindow; ++bytes) {
+    const size_t capacity = ReadyRealtimeUpCapacity(bytes, false);
+    ASSERT_TRUE(ValidRealtimeUpCapacity(capacity));
+    ASSERT_LE(capacity, 2 * bytes);
+  }
+}
+
 TEST_F(NaiveFoxNoConnectCodec, WebSocketAckIsNotAStreamMessage) {
   std::vector<uint8_t> cell;
   ASSERT_TRUE(Encode(20, 512, {{Kind::Ack, 0, 23, {}}}, cell));
@@ -127,6 +143,17 @@ TEST_F(NaiveFoxNoConnectCodec, WebSocketAckIsNotAStreamMessage) {
   EXPECT_EQ(frames[0].sequence, 23U);
   StreamState state(1);
   EXPECT_FALSE(state.Receive(frames[0]));
+}
+
+TEST_F(NaiveFoxNoConnectCodec, DirectionalWebSocketCapacities) {
+  for (size_t capacity : {512U, 4096U, 16384U, 131072U}) {
+    EXPECT_TRUE(ValidRealtimeUpCapacity(capacity));
+  }
+  for (size_t capacity : {512U, 8192U, 65536U, 262144U}) {
+    EXPECT_TRUE(ValidRealtimeDownCapacity(capacity));
+  }
+  EXPECT_FALSE(ValidRealtimeUpCapacity(65536));
+  EXPECT_FALSE(ValidRealtimeDownCapacity(16384));
 }
 
 TEST_F(NaiveFoxNoConnectCodec, EmptyAndPartFilledProfileCapacities) {

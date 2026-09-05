@@ -6,7 +6,8 @@ control; NSS/PSM supplies TLS and certificate validation; Neqo supplies QUIC.
 NaiveFox adds local proxy listeners, transport selection, CONNECT orchestration,
 Naive padding, bounded stream pumping, configuration, and packaging. The default
 transport is `classic`; `no-connect` opts into the separate Caddy transport
-module through ordinary HTTP request bodies, using the same lean executable.
+module through fixed HTTP startup and shaped native WebSocket messages,
+using the same lean executable.
 
 ```text
 application -> SOCKS5 or HTTP CONNECT -> NaiveFox
@@ -31,7 +32,8 @@ reads `./config.json`; one positional argument selects another config:
 ./naivefox --transport=classic /absolute/path/to/config.json
 ```
 
-`--transport classic|no-connect|no-connect-hybrid` overrides the JSON `transport` field. It may
+`--transport classic|no-connect`
+overrides the JSON `transport` field. It may
 precede or follow the optional config path; without a path, it uses
 `./config.json`. The `--transport=value` form is also accepted. Both transports
 use the same percent-decoded username and password from the private `proxy`
@@ -85,11 +87,12 @@ The supported config is a strict NaiveProxy-compatible subset:
   classic preamble or send extra CONNECT headers; valid classic-only settings
   are parsed but remain inactive in this mode. Local SOCKS authentication
   remains available.
-  Experimental `"no-connect-hybrid"` completes the same H2/H3 startup graph,
-  then uses one shaped native HTTP/1.1 WebSocket over TLS/TCP per carrier. It
-  requires a matching server and TCP access even when startup uses `quic://`;
-  this explicit mode does not promise WebSocket over H3. See
-  [the hybrid lifecycle](netwerk/naivefox/NO-CONNECT.md#experimental-hybrid-lifecycle).
+  No-connect completes a fixed H2/H3 startup, then uses shaped native H1
+  WebSocket over TLS/TCP. Its H3 route therefore requires TCP as well as UDP.
+  The matching server uses the `native-stream-v1` profile and
+  `nfc1.stream.v1` subprotocol. The old finite carrier and hybrid/asymmetric
+  selector names have been retired; upgrade client and server together.
+  See [the no-connect contract](netwerk/naivefox/NO-CONNECT.md).
 - `listen` is one URI or a non-empty array. `socks://` serves SOCKS5 CONNECT;
   without userinfo it uses the normal no-auth method. SOCKS credentials are
   optional, percent-decoded, and checked with RFC 1929 username/password
@@ -466,12 +469,12 @@ NaiveFoxRequestStop();
 name. `writable_profile_dir` must be an existing writable directory, and
 `runtime_lib_dir` is the absolute `lib/arm64-v8a` directory containing
 `libxul.so`. The fourth argument is `NULL` to honor the JSON transport (or
-default to `classic`), or exactly `"classic"`, `"no-connect"`, or
-`"no-connect-hybrid"` to override it. Empty and unknown values return
+default to `classic`), or exactly `"classic"` or `"no-connect"` to override it.
+Empty and unknown values return
 `NAIVEFOX_STATUS_INVALID_ARGUMENT` before reserving or initializing Gecko.
 The override is applied before implicit preamble defaults; all JSON fields
 still undergo strict validation. Configuration bytes and credentials are not
-modified, and hybrid remains an experimental opt-in.
+modified. Classic remains the default.
 
 This four-argument signature replaces the earlier three-argument C ABI.
 Recompile downstream callers and update dynamic-loader function pointer types
