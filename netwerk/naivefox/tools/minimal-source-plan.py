@@ -543,6 +543,11 @@ def main() -> int:
         else:
             add(path, "product:source-and-tests")
 
+    add(
+        "netwerk/test/unit/test_http3_network_change.js",
+        "product:regression-test-dependency",
+    )
+
     for value in sorted(path for path in tracked if path.startswith("python/mozboot/")):
         add(value, "explicit:mach-bootstrap")
 
