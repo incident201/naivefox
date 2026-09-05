@@ -27716,7 +27716,7 @@
   "install_manifests_sha256": "9173dfefbae7fdb51a679d67a77c187486ed009143105e5ff54a099884aec7f5",
   "mozconfig": "netwerk/naivefox/mozconfig-android-aarch64",
   "mozconfig_sha256": "69d4665c2b95be12ac6ba7e976069ff72d28e984a4ede2df50a4729a18052c31",
-  "naivefox_reference_commit": "bc4ed7c04eb5f66df9380a1acf8fc5e01faafbb1",
+  "naivefox_reference_commit": "5270077117f60cc75cac394f28634893851bc6ef",
   "objdir_evidence_sha256": {
     "backend.RecursiveMakeBackend.in": "200e72f147763606c354cc0860fa5df1ed31b315badd38202ac0764782dbea12",
     "config_status_deps.in": "810f4d940d4a85f215146ff564e7fbf34675f460c0175b4f5a5e3a0bc6a61ecd"
@@ -27724,7 +27724,7 @@
   "provenance_sha256": "642a32e90aaf870224f1831b2e932e08fb3153ed75765607f2112852f668e3fb",
   "provenance_version": 2,
   "report_version": 1,
-  "source_commit": "bc4ed7c04eb5f66df9380a1acf8fc5e01faafbb1",
+  "source_commit": "5270077117f60cc75cac394f28634893851bc6ef",
   "source_tree_kind": "repository",
   "source_worktree_clean": true,
   "source_worktree_status": [],
