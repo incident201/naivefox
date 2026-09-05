@@ -510,7 +510,15 @@ jobs:
           {
             echo "NaiveFox product build from \`${SOURCE_SHA}\`."
             echo
-            echo "This release is intentionally created as a draft."
+            echo "Classic remains the default Naive-compatible CONNECT transport."
+            echo
+            echo "No-connect now uses the productive shaped native WebSocket after its fixed HTTP startup. Only classic and no-connect are supported."
+            echo
+            echo "Upgrade the client and naivefox-transport server together. The server wire profile is native-stream-v1 and its WebSocket subprotocol is nfc1.stream.v1. Old finite HTTP and hybrid/asymmetric selectors are retired."
+            echo
+            echo "No-connect with quic:// requires UDP for startup and TCP for the subsequent WebSocket phase."
+            echo
+            echo "Packages are first staged as a draft for checksum and platform verification."
             echo
             echo "SHA-256 checksums:"
             for checksum in assets/*.sha256; do
