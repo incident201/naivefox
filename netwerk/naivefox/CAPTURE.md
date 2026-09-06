@@ -9,6 +9,13 @@ preceding promotion remains in Git history; current behavior is specified in
 [NO-CONNECT.md](NO-CONNECT.md).
 
 
+The native-stream-v2 site bootstrap now derives public resources from the
+operator's index.html and serves their actual sizes without enabling client
+caching. The historical matrices below measured the prior fixed seven-file
+startup. They do not establish capture-distance equivalence for the new graph
+or arbitrary site sizes. Functional site gates and body-byte accounting must
+not be reported as new p1-16/p17-32/Whole results.
+
 Capture comparison checks that NaiveFox continues to use Firefox's Necko,
 NSS/PSM, and Neqo wire machinery without accidental project-specific markers.
 It is diagnostic: a browser GET and padded proxy CONNECT are different
@@ -4829,3 +4836,23 @@ stream identifiers, packet counts/length aggregates, hashes of build artifacts,
 and header names. They must not contain credentials, `Proxy-Authorization`,
 header values, TLS secrets, DATA payload, target bodies, or private profile
 material.
+
+
+## HTML-derived no-connect site bootstrap preflight
+
+The implementation followed searches of current documentation, all-ref messages
+and relevant pickaxe history in both repositories. Server external-site changes
+66720bb, fc5e512 and 891d020 retained the old fixed wire graph; fc5e512 removed
+the operator manifest and injected browser runtime. Those removed requirements
+remain absent. Native client f46cdb61cfb4 and a5907bf584d1 established the fixed
+startup and its later WSS transition. Earlier classic parser/count/cache screens
+do not measure this no-connect contract. The discarded browser-diversity
+campaign f6c2affc4fbd is not revived.
+
+The distinct mechanism derives all supported first-level resources from actual
+HTML, streams unpadded public bodies, checks snapshot identity, and preserves
+the twenty pairs, WSS and cache inhibition. Site size/count are advisory operator
+choices. Existing residual matrices remain source-bound historical evidence;
+no new behavioral-equivalence score follows from implementation or functional
+acceptance. Future comparisons must measure this graph with explicit site
+inputs and account for all cold-carrier traffic.

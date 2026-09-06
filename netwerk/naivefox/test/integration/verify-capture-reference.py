@@ -15,14 +15,50 @@ def digest(source, algorithm="sha256"):
     return hashlib.file_digest(source, algorithm).hexdigest()
 
 
+def verify_runtime_proof(proof_path, firefox, git_base):
+    """Recheck an official-artifact proof against every retained runtime file."""
+    proof = json.loads(Path(proof_path).read_text())
+    if proof.get("schema_version") != 1 or proof.get("git_base") != git_base:
+        raise ValueError("reference proof has a different source identity")
+    hashes = proof.get("runtime_files_sha256", {})
+    required = {"firefox", "firefox-bin", "libxul.so", "libnss3.so", "libssl3.so", "application.ini"}
+    if not isinstance(hashes, dict) or not required.issubset(hashes):
+        raise ValueError("reference proof lacks essential runtime files")
+    runtime = Path(firefox).resolve(strict=True).parent
+    for name, expected in hashes.items():
+        relative = PurePosixPath(name)
+        if relative.is_absolute() or ".." in relative.parts or not relative.parts:
+            raise ValueError("reference proof path escaped runtime")
+        actual = (runtime / Path(*relative.parts)).resolve(strict=True)
+        if not actual.is_relative_to(runtime) or not re.fullmatch(r"[0-9a-f]{64}", expected):
+            raise ValueError("invalid reference runtime entry")
+        with actual.open("rb") as source:
+            if digest(source) != expected:
+                raise ValueError("reference runtime differs from verified artifact")
+    application = configparser.ConfigParser()
+    application.read(runtime / "application.ini")
+    if application["App"]["SourceStamp"] != proof.get("hg_revision") or application["App"]["BuildID"] != proof.get("build_id"):
+        raise ValueError("reference application identity differs")
+    return len(hashes)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--task", required=True)
+    parser.add_argument("--task")
     parser.add_argument("--git-base", required=True)
-    parser.add_argument("--archive", type=Path, required=True)
+    parser.add_argument("--archive", type=Path)
     parser.add_argument("--firefox", type=Path, required=True)
-    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--output", type=Path)
+    parser.add_argument("--verify-proof", type=Path)
     args = parser.parse_args()
+    if args.verify_proof:
+        if args.task or args.archive or args.output:
+            parser.error("proof verification does not accept collection arguments")
+        count = verify_runtime_proof(args.verify_proof, args.firefox, args.git_base)
+        print(json.dumps({"verified_runtime_files": count, "git_base": args.git_base}))
+        return
+    if not args.task or not args.archive or not args.output:
+        parser.error("collection requires --task, --archive and --output")
     if not re.fullmatch(r"[A-Za-z0-9_-]{22}", args.task) or not re.fullmatch(r"[0-9a-f]{40}", args.git_base):
         parser.error("invalid immutable task or Git revision")
     task_url = f"https://firefox-ci-tc.services.mozilla.com/api/queue/v1/task/{args.task}"

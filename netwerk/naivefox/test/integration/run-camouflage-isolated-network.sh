@@ -9,6 +9,15 @@ if [[ $# -lt 1 || ${NAIVEFOX_CAPTURE_ISOLATED_NETWORK:-0} != 1 ||
   exit 2
 fi
 
+# An environment marker is not proof of isolation. Refuse the host namespace
+# and any non-fresh namespace before mutating interfaces, MTU or routes.
+if [[ $(readlink /proc/self/ns/net) == $(readlink /proc/1/ns/net) ||
+      $(ip -o link show | wc -l) -ne 1 ]] ||
+   ! ip -o link show | rg -q '^[0-9]+: lo:'; then
+  printf 'isolated camouflage requires a fresh network namespace\n' >&2
+  exit 2
+fi
+
 ip link set lo up
 # The default Linux loopback MTU is 65536.  Even with segmentation offloads
 # disabled, that permits host-local TCP segments far larger than an ordinary

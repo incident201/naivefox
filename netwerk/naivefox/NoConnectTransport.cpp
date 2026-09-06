@@ -14,6 +14,7 @@
 
 #include "NeckoTunnel.h"
 #include "NoConnectCodec.h"
+#include "NoConnectSite.h"
 #include "NoConnectWebSocket.h"
 #include "RuntimeLogging.h"
 #include "TunnelSession.h"
@@ -42,6 +43,8 @@ constexpr std::array<size_t, 20> kStartupSlots = {
     8192,  8192,  8192,  8192,  32768, 32768, 65536, 65536, 65536, 65536,
     65536, 65536, 65536, 65536, 65536, 65536, 65536, 65536, 8192,  8192};
 
+enum class CarrierBody { Fixed, Document, Style, Script, Image };
+
 class CarrierRequest final : public nsIStreamListener {
  public:
   NS_DECL_THREADSAFE_ISUPPORTS
@@ -50,18 +53,42 @@ class CarrierRequest final : public nsIStreamListener {
 
   using Callback = std::function<void(CarrierRequest*, nsresult)>;
   CarrierRequest(size_t aSize, uint32_t aStatus, bool aCell,
-                 ProxyProtocol aProtocol, Callback&& aDone)
+                 ProxyProtocol aProtocol, Callback&& aDone,
+                 CarrierBody aBodyKind, const nsACString& aSiteIdentity)
       : mExpectedSize(aSize),
         mExpectedStatus(aStatus),
         mCell(aCell),
         mProtocol(aProtocol),
-        mDone(std::move(aDone)) {}
+        mDone(std::move(aDone)),
+        mBodyKind(aBodyKind),
+        mExpectedSite(aSiteIdentity) {
+    if (aBodyKind == CarrierBody::Document) {
+      mSite = MakeUnique<NoConnectSite>();
+    }
+  }
 
   nsresult Start(const TunnelConfig& aConfig, const nsACString& aPath,
                  const nsACString& aCookie, const Bytes* aUpload) {
+    nsContentPolicyType policy = nsIContentPolicy::TYPE_OTHER;
+    switch (mBodyKind) {
+      case CarrierBody::Document:
+        policy = nsIContentPolicy::TYPE_DOCUMENT;
+        break;
+      case CarrierBody::Style:
+        policy = nsIContentPolicy::TYPE_STYLESHEET;
+        break;
+      case CarrierBody::Script:
+        policy = nsIContentPolicy::TYPE_SCRIPT;
+        break;
+      case CarrierBody::Image:
+        policy = nsIContentPolicy::TYPE_IMAGE;
+        break;
+      case CarrierBody::Fixed:
+        break;
+    }
     MOZ_TRY(CreateNoConnectChannel(aConfig.mProxyUrl, aPath, mProtocol,
                                    aConfig.mHostResolverRule,
-                                   getter_AddRefs(mChannel)));
+                                   getter_AddRefs(mChannel), policy));
     nsCOMPtr<nsIHttpChannel> http = do_QueryInterface(mChannel);
     if (!http) {
       return NS_ERROR_FAILURE;
@@ -117,6 +144,8 @@ class CarrierRequest final : public nsIStreamListener {
   nsCString mProfile;
   nsCString mAuthScheme;
   nsCString mRealtime;
+  nsCString mSiteIdentity;
+  UniquePtr<NoConnectSite> mSite;
 
  private:
   ~CarrierRequest() = default;
@@ -127,6 +156,10 @@ class CarrierRequest final : public nsIStreamListener {
   Callback mDone;
   nsCOMPtr<nsIChannel> mChannel;
   nsCOMPtr<nsITimer> mTimer;
+  const CarrierBody mBodyKind;
+  const nsCString mExpectedSite;
+  uint64_t mPublicLength = 0;
+  uint64_t mPublicReceived = 0;
 };
 
 NS_IMPL_ISUPPORTS(CarrierRequest, nsIStreamListener, nsIRequestObserver)
@@ -153,8 +186,42 @@ NS_IMETHODIMP CarrierRequest::OnStartRequest(nsIRequest* aRequest) {
   if (mExpectedStatus == 200) {
     int64_t length = -1;
     MOZ_TRY(mChannel->GetContentLength(&length));
-    if (length != static_cast<int64_t>(mExpectedSize)) {
-      return NS_ERROR_CORRUPTED_CONTENT;
+    if (mBodyKind == CarrierBody::Fixed) {
+      if (length != static_cast<int64_t>(mExpectedSize)) {
+        return NS_ERROR_CORRUPTED_CONTENT;
+      }
+    } else {
+      if (length < 0 || (mBodyKind == CarrierBody::Document && !length)) {
+        return NS_ERROR_CORRUPTED_CONTENT;
+      }
+      mPublicLength = static_cast<uint64_t>(length);
+      MOZ_TRY(http->GetResponseHeader("X-App-Site"_ns, mSiteIdentity));
+      if (mSiteIdentity.Length() != 64) {
+        return NS_ERROR_CORRUPTED_CONTENT;
+      }
+      for (size_t i = 0; i < mSiteIdentity.Length(); ++i) {
+        const char c = mSiteIdentity[i];
+        if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))) {
+          return NS_ERROR_CORRUPTED_CONTENT;
+        }
+      }
+      if (!mExpectedSite.IsEmpty() && !mExpectedSite.Equals(mSiteIdentity)) {
+        return NS_ERROR_CORRUPTED_CONTENT;
+      }
+      nsAutoCString type;
+      MOZ_TRY(mChannel->GetContentType(type));
+      const bool valid =
+          (mBodyKind == CarrierBody::Document &&
+           type.EqualsLiteral("text/html")) ||
+          (mBodyKind == CarrierBody::Style && type.EqualsLiteral("text/css")) ||
+          (mBodyKind == CarrierBody::Script &&
+           (type.EqualsLiteral("text/javascript") ||
+            type.EqualsLiteral("application/javascript"))) ||
+          (mBodyKind == CarrierBody::Image &&
+           StringBeginsWith(type, "image/"_ns));
+      if (!valid) {
+        return NS_ERROR_CORRUPTED_CONTENT;
+      }
     }
   }
   if (mCell) {
@@ -179,6 +246,26 @@ NS_IMETHODIMP CarrierRequest::OnStartRequest(nsIRequest* aRequest) {
 NS_IMETHODIMP CarrierRequest::OnDataAvailable(nsIRequest*,
                                               nsIInputStream* aInput, uint64_t,
                                               uint32_t aCount) {
+  if (mBodyKind != CarrierBody::Fixed) {
+    if (aCount > mPublicLength - mPublicReceived) {
+      return NS_ERROR_CORRUPTED_CONTENT;
+    }
+    std::array<uint8_t, 16384> buffer;
+    while (aCount) {
+      uint32_t read = 0;
+      MOZ_TRY(aInput->Read(reinterpret_cast<char*>(buffer.data()),
+                           std::min(aCount, uint32_t(buffer.size())), &read));
+      if (!read) {
+        return NS_ERROR_UNEXPECTED;
+      }
+      if (mSite) {
+        MOZ_TRY(mSite->Feed(Span<const uint8_t>(buffer.data(), read)));
+      }
+      mPublicReceived += read;
+      aCount -= read;
+    }
+    return NS_OK;
+  }
   if (aCount > mExpectedSize - mBody.size()) {
     return NS_ERROR_FILE_TOO_BIG;
   }
@@ -204,8 +291,16 @@ NS_IMETHODIMP CarrierRequest::OnStopRequest(nsIRequest*, nsresult aStatus) {
     mTimer = nullptr;
   }
   mChannel = nullptr;
-  if (NS_SUCCEEDED(aStatus) && mBody.size() != mExpectedSize) {
-    aStatus = NS_ERROR_CORRUPTED_CONTENT;
+  if (NS_SUCCEEDED(aStatus)) {
+    if (mBodyKind == CarrierBody::Fixed) {
+      if (mBody.size() != mExpectedSize) {
+        aStatus = NS_ERROR_CORRUPTED_CONTENT;
+      }
+    } else if (mPublicReceived != mPublicLength) {
+      aStatus = NS_ERROR_CORRUPTED_CONTENT;
+    } else if (mSite) {
+      aStatus = mSite->Feed(Span<const uint8_t>(), true);
+    }
   }
   if (mDone) {
     auto done = std::move(mDone);
@@ -292,13 +387,15 @@ class NoConnectCarrier final {
   ~NoConnectCarrier() = default;
   using Callback = CarrierRequest::Callback;
   bool Open(const nsACString& aPath, const Bytes* aUpload, size_t aSize,
-            uint32_t aStatus, bool aCell, Callback&& aDone);
+            uint32_t aStatus, bool aCell, Callback&& aDone,
+            CarrierBody aBodyKind = CarrierBody::Fixed);
   bool Upload(size_t aCapacity, Bytes& aBody);
   bool Receive(CarrierRequest* aRequest);
   bool ReceiveCell(const Bytes& aBody, bool aWebSocket);
   void ConfirmUpload(uint32_t aSequence);
   void RetireStreams();
   void Start();
+  void LoadAssets();
   void Tick();
   void Startup();
   void Continue();
@@ -311,6 +408,9 @@ class NoConnectCarrier final {
 
   TunnelConfig mConfig;
   nsCString mCookie;
+  nsCString mSiteIdentity;
+  nsTArray<SiteResource> mResources;
+  size_t mNextAsset = 0;
   std::vector<RefPtr<NoConnectStream>> mStreams;
   std::vector<RefPtr<CarrierRequest>> mRequests;
   std::vector<Frame> mResets;
@@ -534,7 +634,7 @@ NS_IMETHODIMP NoConnectStream::OnOutputStreamReady(nsIAsyncOutputStream*) {
 
 bool NoConnectCarrier::Open(const nsACString& aPath, const Bytes* aUpload,
                             size_t aSize, uint32_t aStatus, bool aCell,
-                            Callback&& aDone) {
+                            Callback&& aDone, CarrierBody aBodyKind) {
   if (mClosed) {
     return false;
   }
@@ -558,7 +658,8 @@ bool NoConnectCarrier::Open(const nsACString& aPath, const Bytes* aUpload,
             done(aRequest, aResult);
           }
         }
-      });
+      },
+      aBodyKind, mSiteIdentity);
   mRequests.push_back(request);
   nsresult rv = request->Start(mConfig, aPath, mCookie, aUpload);
   if (NS_FAILED(rv)) {
@@ -649,41 +750,60 @@ void NoConnectCarrier::Start() {
   mStarted = true;
   mBusy = true;
   RefPtr self = this;
-  Open("/"_ns, nullptr, 4096, 200, false,
-       [self](CarrierRequest* request, nsresult) {
-         if (!request->mProfile.EqualsLiteral("native-stream-v1") ||
-             !request->mAuthScheme.EqualsLiteral("basic") ||
-             !request->mRealtime.EqualsLiteral("websocket-v1") ||
-             request->mCookie.Length() < 77 ||
-             !StringBeginsWith(request->mCookie, "app_session="_ns) ||
-             request->mCookie.CharAt(76) != ';') {
-           self->Fail(NS_ERROR_CORRUPTED_CONTENT);
-           return;
-         }
-         for (size_t i = 12; i < 76; ++i) {
-           const char c = request->mCookie.CharAt(i);
-           if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))) {
-             self->Fail(NS_ERROR_CORRUPTED_CONTENT);
-             return;
-           }
-         }
-         self->mCookie.Assign(Substring(request->mCookie, 0, 76));
-         const char* paths[] = {"/assets/site.css",    "/assets/app.js",
-                                "/assets/image-1.svg", "/assets/image-2.svg",
-                                "/assets/image-3.svg", "/assets/image-4.svg"};
-         for (size_t i = 0; i < 6 && !self->mClosed; ++i) {
-           self->Open(nsDependentCString(paths[i]), nullptr,
-                      i == 0   ? 12288
-                      : i == 1 ? 24576
-                               : 8192,
-                      200, false, [self](CarrierRequest*, nsresult) {
-                        if (++self->mAssets == 6) {
-                          self->mBootstrapped = true;
-                          self->Continue();
-                        }
-                      });
-         }
-       });
+  Open(
+      "/"_ns, nullptr, 0, 200, false,
+      [self](CarrierRequest* request, nsresult) {
+        if (!request->mProfile.EqualsLiteral("native-stream-v2") ||
+            !request->mAuthScheme.EqualsLiteral("basic") ||
+            !request->mRealtime.EqualsLiteral("websocket-v1") ||
+            request->mCookie.Length() < 77 ||
+            !StringBeginsWith(request->mCookie, "app_session="_ns) ||
+            request->mCookie.CharAt(76) != ';') {
+          self->Fail(NS_ERROR_CORRUPTED_CONTENT);
+          return;
+        }
+        for (size_t i = 12; i < 76; ++i) {
+          const char c = request->mCookie.CharAt(i);
+          if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))) {
+            self->Fail(NS_ERROR_CORRUPTED_CONTENT);
+            return;
+          }
+        }
+        self->mCookie.Assign(Substring(request->mCookie, 0, 76));
+        self->mSiteIdentity = request->mSiteIdentity;
+        self->mResources = request->mSite->TakeResources();
+        self->LoadAssets();
+      },
+      CarrierBody::Document);
+}
+
+void NoConnectCarrier::LoadAssets() {
+  if (mClosed) {
+    return;
+  }
+  if (mAssets == mResources.Length()) {
+    mBootstrapped = true;
+    Continue();
+    return;
+  }
+  RefPtr self = this;
+  while (!mClosed && mNextAsset < mResources.Length() && mRequests.size() < 6) {
+    const auto& resource = mResources[mNextAsset++];
+    CarrierBody kind = CarrierBody::Image;
+    if (resource.mKind == SiteResourceKind::Style) {
+      kind = CarrierBody::Style;
+    }
+    if (resource.mKind == SiteResourceKind::Script) {
+      kind = CarrierBody::Script;
+    }
+    Open(
+        resource.mPath, nullptr, 0, 200, false,
+        [self](CarrierRequest*, nsresult) {
+          ++self->mAssets;
+          self->LoadAssets();
+        },
+        kind);
+  }
 }
 
 bool NoConnectCarrier::Upload(size_t aCapacity, Bytes& aBody) {
@@ -982,7 +1102,7 @@ void NoConnectCarrier::Startup() {
 }
 
 void NoConnectCarrier::StartWebSocket() {
-  MOZ_ASSERT(mBootstrapped && mAssets == 6 &&
+  MOZ_ASSERT(mBootstrapped && mAssets == mResources.Length() &&
              mStartup == kStartupSlots.size() && mRequests.empty());
   mWebSocketAck = mUp - 1;
   RefPtr self = this;

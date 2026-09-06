@@ -60,6 +60,7 @@ def run_case(args, root, preamble):
     directory.mkdir(mode=0o700)
     fixture.issue_certificates(directory)
     args.classic_preamble = preamble
+    args.transport = "classic"  # Keep the canary port free of no-connect H1 WSS.
     target = fixture.TargetServer()
     processes = []
     canary = None

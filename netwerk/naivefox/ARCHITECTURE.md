@@ -152,11 +152,21 @@ selector names are rejected. Classic uses Necko proxy authentication and Naive
 padding; no-connect uses the same credentials in an NFC1 AUTH frame. Both
 share the server forward-proxy authentication and destination policy.
 
-No-connect completes the root, six assets and twenty ordered HTTP pairs,
+No-connect completes the root, all HTML-selected resources and twenty ordered HTTP pairs,
 then transfers the same session and streams to Firefox's native WebSocket
 implementation. The startup protocol is strict H2 or H3; the persistent
 phase is explicit H1 WSS/TCP in both cases. HTTP active/idle carriers,
 peer-pressure hints and generic WS capacity branches have been removed.
+
+Public no-connect resource discovery uses an opt-in observer on the existing
+DOM-free Gecko HTML scanner. The classic descriptor path is unchanged. The
+observer interprets only supported initial-HTML declarations; it never executes
+script or recursively follows CSS/image/JS dependencies. Public response bodies
+use a fixed-size streaming sink distinct from bounded NFC1 cell buffering.
+All selected resources complete before carrier startup, with six GETs active
+at most. Site size/count are operator choices; caching remains inhibited.
+The server supplies an immutable unpadded snapshot and a consistent site ID.
+Document/inventory metadata and server snapshot memory scale with site input.
 
 Capacity follows locally sendable data within the unchanged 512-KiB stream
 credit. Pure control cells use 512 bytes. One WS application message may be

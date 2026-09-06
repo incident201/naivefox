@@ -5,6 +5,7 @@
 #ifndef netwerk_naivefox_NeckoTunnel_h
 #define netwerk_naivefox_NeckoTunnel_h
 
+#include "nsIContentPolicy.h"
 #include <functional>
 
 #include "Config.h"
@@ -36,7 +37,8 @@ struct NativeStylePreloadProcessDescriptor;
 nsresult CreateNoConnectChannel(
     const nsACString& aProxyUrl, const nsACString& aPath,
     ProxyProtocol aProtocol, const Maybe<HostResolverRule>& aHostResolverRule,
-    nsIChannel** aChannel);
+    nsIChannel** aChannel,
+    nsContentPolicyType aContentPolicyType = nsIContentPolicy::TYPE_OTHER);
 
 // Internal Naive proxy authentication helper. This is not part of the
 // embedded C ABI.

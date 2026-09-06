@@ -533,8 +533,8 @@ nsresult MakeBasicAuthorization(const nsACString& aUser,
   return Base64EncodeAppend(userPass, aAuthorization);
 }
 
-bool IsValidPreamblePath(const nsACString& aPath) {
-  if (aPath.IsEmpty() || aPath.Length() > 2048 || aPath.First() != '/' ||
+bool IsValidPreamblePath(const nsACString& aPath, bool aLimitLength = true) {
+  if (aPath.IsEmpty() || (aLimitLength && aPath.Length() > 2048) || aPath.First() != '/' ||
       (aPath.Length() >= 2 && aPath.CharAt(1) == '/')) {
     return false;
   }
@@ -4303,9 +4303,10 @@ nsresult BuildProxyAuthorization(const nsACString& aUser,
 nsresult CreateNoConnectChannel(
     const nsACString& aProxyUrl, const nsACString& aPath,
     ProxyProtocol aProtocol, const Maybe<HostResolverRule>& aHostResolverRule,
-    nsIChannel** aChannel) {
+    nsIChannel** aChannel, nsContentPolicyType aContentPolicyType) {
   MOZ_ASSERT(NS_IsMainThread());
-  if (!IsValidPreamblePath(aPath)) {
+  // The classic configurable preamble limit is not a site resource limit.
+  if (!IsValidPreamblePath(aPath, false)) {
     return NS_ERROR_INVALID_ARG;
   }
   ExplicitProxyRoute route;
@@ -4324,7 +4325,7 @@ nsresult CreateNoConnectChannel(
       nsILoadInfo::SEC_ALLOW_CROSS_ORIGIN_SEC_CONTEXT_IS_NULL |
           nsILoadInfo::SEC_DONT_FOLLOW_REDIRECTS |
           nsILoadInfo::SEC_COOKIES_OMIT,
-      nsIContentPolicy::TYPE_OTHER));
+      aContentPolicyType));
   nsCOMPtr<nsIProxiedProtocolHandler> handler =
       do_GetService(NS_NETWORK_PROTOCOL_CONTRACTID_PREFIX "https");
   if (!handler) {

@@ -1,8 +1,8 @@
 # Native no-connect transport
 
 NaiveFox has two transports: `classic` (default) and `no-connect`.
-Classic remains ordinary Naive-compatible CONNECT. No-connect uses a fixed
-ordinary HTTP startup followed by a persistent shaped native WebSocket.
+Classic remains ordinary Naive-compatible CONNECT. No-connect uses an HTML-derived public bootstrap and ordered
+HTTP startup followed by a persistent shaped native WebSocket.
 
 ## Configuration
 
@@ -35,29 +35,54 @@ opening. A mismatched protocol never becomes an accepted carrier.
 
 Use the matching
 [naivefox-transport module](https://github.com/incident201/naivefox-transport).
-The supported wire profile is `native-stream-v1`, advertised with
+The supported wire profile is `native-stream-v2`, advertised with
 `X-App-Profile`, `X-App-Auth: basic` and `X-App-Realtime: websocket-v1`.
-Omit the Caddy `profile` option or set it to `native-stream-v1`.
+Omit the Caddy `profile` option or set it to `native-stream-v2`.
 
 Configure the nested `forward_proxy` credentials and access policy once for
 both transports. Keep the hostless `:443` site address alongside the named
 proxy hostname so classic destination-authority CONNECT requests reach it.
 
-An absolute `application_root` must name a complete seven-file application:
-`index.html`, `assets/site.css`, `assets/app.js` and
-`assets/image-{1,2,3,4}.svg`. The served capacities are 4096, 12288, 24576
-and 8192 bytes per image. The server validates two stable source snapshots,
-pads them once, then serves memory. The application remains ordinary external
-operator content; the client does not execute JavaScript. No browser worker,
-local WSS bridge, DOM or additional network stack is part of the product.
+An absolute `application_root` contains the complete public site. The server
+derives its startup inventory from the actual UTF-8 `index.html`, validates
+stable file reads and serves an immutable memory snapshot at actual sizes.
+There are no compulsory asset names, image counts, manifest files or padding.
+
+The client loads every distinct supported directly declared stylesheet,
+classic deferred script, eager image, image preload and favicon. Compatible
+duplicate URLs are loaded once within that carrier. Navigation links,
+CSS dependencies, JavaScript requests and dynamically inserted content are not
+followed. A root-only page is valid. Unsupported automatic network declarations
+fail explicitly; this is a defined first-level contract, not a full browser.
+
+See the server's [site requirements](https://github.com/incident201/naivefox-transport/blob/main/docs/SITE.md)
+for supported markup, URL/MIME rules, update behavior and size recommendations.
+There is no fixed total byte budget or resource-count maximum. Large directly
+declared files increase startup cost on every new carrier and server snapshot
+memory. Keep the initial page lightweight; the old 72-KiB bootstrap is a
+reference point, not a required size.
+
+Client caching remains disabled. Public bodies are streamed through fixed-size
+I/O buffers, with at most six resource GETs active at once. Parser/URL metadata
+still scales with document structure and resource count. Ordinary deadlines,
+backpressure, checked lengths and allocation-failure handling remain necessary.
+The client validates complete responses, MIME families and matching X-App-Site
+identities. A mixed snapshot fails without an automatic reload/retry loop.
+
+The client uses Gecko's DOM-free HTML tokenizer/tree builder. No JavaScript
+execution, full DOM, style processing, image decoder, browser worker, local WSS
+bridge or additional network stack is introduced. Upgrade server and client
+together for native-stream-v2; v1 peers fail before AUTH/target opening.
 
 ## Lifecycle and bounds
 
-The client completes the root, all six assets, and twenty ordered startup
+The client completes the root, all selected resources, and twenty ordered startup
 POST/GET pairs before opening `/api/realtime` with `nfc1.stream.v1`.
 Startup uploads are 4096 bytes. Responses use four 8192-byte slots, two
 32768-byte slots, twelve 65536-byte slots, and two final 8192-byte slots.
-Proxy frames may displace filler during startup.
+Proxy frames may displace filler during startup. The twenty pairs contribute
+960 KiB of body capacity per new carrier in addition to the site resources.
+The public site script is not required to implement this carrier protocol.
 
 The transition depends on complete, validated HTTP responses. It does not
 depend on a timer, packet number or transferred-byte threshold. Active HTTP

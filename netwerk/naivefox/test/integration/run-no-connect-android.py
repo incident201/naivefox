@@ -284,6 +284,7 @@ def main():
     parser.add_argument("--objdir", type=Path, required=True)
     parser.add_argument("--package", type=Path, required=True)
     parser.add_argument("--caddy", type=Path, required=True)
+    parser.add_argument("--application-root", type=Path, help="Public site fixture override (server-side path)")
     parser.add_argument("--ndk", type=Path, required=True)
     parser.add_argument("--adb", type=Path, default=Path("/usr/bin/adb"))
     parser.add_argument("--serial")

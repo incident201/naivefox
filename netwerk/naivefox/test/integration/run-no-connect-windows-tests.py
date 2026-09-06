@@ -376,6 +376,7 @@ def main():
         description="Run the shared dual-transport fixture against native Windows NaiveFox from WSL.")
     parser.add_argument("--objdir", required=True, type=Path)
     parser.add_argument("--runtime", required=True, type=Path)
+    parser.add_argument("--application-root", type=Path, help="Public site fixture override (server-side path)")
     parser.add_argument("--caddy", required=True, type=Path)
     parser.add_argument("--windows-python", required=True, type=Path)
     parser.add_argument("--protocol", choices=("h2", "h3", "both"), default="both")

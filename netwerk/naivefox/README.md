@@ -6,7 +6,7 @@ control; NSS/PSM supplies TLS and certificate validation; Neqo supplies QUIC.
 NaiveFox adds local proxy listeners, transport selection, CONNECT orchestration,
 Naive padding, bounded stream pumping, configuration, and packaging. The default
 transport is `classic`; `no-connect` opts into the separate Caddy transport
-module through fixed HTTP startup and shaped native WebSocket messages,
+module through HTML-derived public resources and ordered HTTP startup and shaped native WebSocket messages,
 using the same lean executable.
 
 ```text
@@ -52,6 +52,11 @@ application protocol without changing its credentials:
 Transport selection occurs before implicit preamble defaults. Valid classic
 preamble, extra-header, gate and diagnostic settings remain inactive in
 no-connect mode, so the same file switches back to classic unchanged.
+The no-connect client and server must both support native-stream-v2. The site
+inventory is derived from index.html and streamed without fixed-size padding
+or a mandatory byte budget. Client caching stays disabled; see
+[NO-CONNECT.md](NO-CONNECT.md) for the first-level scope and site requirements.
+
 Malformed settings still fail validation. Diagnostic CLI modes cannot be
 combined with this config-mode override. Remove the obsolete `no-connect-key`
 field from older configs; authentication now comes only from the proxy URI.
@@ -89,7 +94,7 @@ The supported config is a strict NaiveProxy-compatible subset:
   remains available.
   No-connect completes a fixed H2/H3 startup, then uses shaped native H1
   WebSocket over TLS/TCP. Its H3 route therefore requires TCP as well as UDP.
-  The matching server uses the `native-stream-v1` profile and
+  The matching server uses the `native-stream-v2` profile and
   `nfc1.stream.v1` subprotocol. The old finite carrier and hybrid/asymmetric
   selector names have been retired; upgrade client and server together.
   See [the no-connect contract](NO-CONNECT.md).

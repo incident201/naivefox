@@ -14,6 +14,16 @@
 #include "nsStringFwd.h"
 #include "nsTArray.h"
 
+class nsAtom;
+class nsHtml5HtmlAttributes;
+// Optional project-only observer. The parser owns neither the observer nor a DOM.
+class nsHtml5ElementObserver {
+ public:
+  virtual nsresult OnElement(int32_t aNamespace, nsAtom* aName,
+                            nsHtml5HtmlAttributes* aAttributes) = 0;
+ protected:
+  virtual ~nsHtml5ElementObserver() = default;
+};
 class nsHtml5Tokenizer;
 class nsHtml5TreeBuilder;
 class nsISerialEventTarget;
@@ -26,7 +36,8 @@ class nsISerialEventTarget;
 class nsHtml5SpeculativeScanner final {
  public:
   explicit nsHtml5SpeculativeScanner(
-      nsISerialEventTarget* aParserEventTarget = nullptr);
+      nsISerialEventTarget* aParserEventTarget = nullptr,
+      nsHtml5ElementObserver* aObserver = nullptr);
   ~nsHtml5SpeculativeScanner();
 
   nsresult Feed(const nsAString& aChunk);

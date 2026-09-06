@@ -214,7 +214,7 @@ https://:{$NF_PORT} {
     }
     route {
         naivefox_transport {
-            profile native-stream-v1
+            profile native-stream-v2
             forward_proxy {
                 basic_auth "{$NF_PROXY_USER}" "{$NF_PROXY_PASSWORD}"
                 hide_ip
@@ -269,7 +269,7 @@ def start_caddy(args, run, protocol, target_port, user, password):
         item = handlers.pop()
         if item.get("handler") == "naivefox_transport":
             item["stats_path"] = str(run / "server-stats.json")
-            item["application_root"] = str(prepare_application(run))
+            item["application_root"] = str(getattr(args, "application_root", None) or prepare_application(run))
         for route in item.get("routes", []):
             handlers.extend(route.get("handle", []))
     mutator = getattr(args, "server_mutator", None)
@@ -914,6 +914,7 @@ def main():
     parser.add_argument("--objdir", type=Path, required=True)
     parser.add_argument("--caddy", type=Path, required=True)
     parser.add_argument("--runtime", type=Path)
+    parser.add_argument("--application-root", type=Path, help="Public site fixture override (server-side path)")
     parser.add_argument("--protocol", choices=("h2", "h3", "both"), default="both")
     parser.add_argument("--transport", choices=("no-connect",),
                         default="no-connect")

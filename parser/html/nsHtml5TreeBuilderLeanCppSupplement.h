@@ -5,6 +5,7 @@
 #include "ErrorList.h"
 #include "nsHtml5AttributeName.h"
 #include "nsHtml5HtmlAttributes.h"
+#include "nsHtml5SpeculativeScanner.h"
 #include <cstring>
 
 nsHtml5TreeBuilder::nsHtml5TreeBuilder(nsAHtml5SpeculativeLoadStage* aStage)
@@ -62,6 +63,17 @@ nsIContentHandle* nsHtml5TreeBuilder::createElement(
     nsIContentHandle*, nsHtml5ContentCreatorFunction) {
   MOZ_ASSERT(aAttributes);
   MOZ_ASSERT(aName);
+
+  if (mElementObserver) {
+    // An opt-in client observer uses generated HTML context without changing
+    // the classic speculative-load path. Never execute scripts or expose
+    // inert template descendants as network resources.
+    mCurrentHtmlScriptCannotDocumentWriteOrBlock = true;
+    if (templateModePtr < 0 && NS_SUCCEEDED(mBroken)) {
+      mBroken = mElementObserver->OnElement(aNamespace, aName, aAttributes);
+    }
+    return AllocateContentHandle();
+  }
 
   // This is the network-relevant DOM-free subset of the upstream speculative
   // load wall. The generated tree builder still determines whether the token

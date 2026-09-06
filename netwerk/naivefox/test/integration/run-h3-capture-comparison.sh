@@ -469,12 +469,26 @@ for required in "$REFERENCE_BIN" "$REFERENCE_LIBDIR/libssl3.so" \
   }
 done
 if [[ -n "$REFERENCE_OBJDIR" ]]; then
-  if ! rg -q -- '-DNSS_ALLOW_SSLKEYLOGFILE' \
-    "$REFERENCE_OBJDIR/security/nss/lib/ssl/ssl_ssl/backend.mk"; then
-    printf 'this NSS build does not enable SSLKEYLOGFILE\n' >&2
+  if [[ -f "$REFERENCE_OBJDIR/security/nss/lib/ssl/ssl_ssl/backend.mk" ]]; then
+    if ! rg -q -- '-DNSS_ALLOW_SSLKEYLOGFILE' \
+      "$REFERENCE_OBJDIR/security/nss/lib/ssl/ssl_ssl/backend.mk"; then
+      printf 'this NSS build does not enable SSLKEYLOGFILE\n' >&2
+      exit 1
+    fi
+  elif [[ -n ${NAIVEFOX_CAPTURE_REFERENCE_PROOF:-} ]]; then
+    # Official binary artifacts have no local NSS backend.mk. Recheck the
+    # artifact-bound runtime instead; the capture below still requires actual
+    # key logging and successful decrypted protocol admission.
+    reference_base=$(git -C "$SOURCE_ROOT" merge-base HEAD firefox-upstream)
+    python3 "$INTEGRATION_DIR/verify-capture-reference.py" \
+      --verify-proof "$NAIVEFOX_CAPTURE_REFERENCE_PROOF" \
+      --git-base "$reference_base" --firefox "$REFERENCE_BIN"
+  else
+    printf 'same-base reference requires an NSS build record or verified artifact proof\n' >&2
     exit 1
   fi
 fi
+
 
 "$INTEGRATION_DIR/start.sh" --mode h3
 run_dir=$(<"$ACTIVE_RUN_FILE")
