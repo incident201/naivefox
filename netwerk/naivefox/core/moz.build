@@ -19,6 +19,7 @@ SOURCES += [
     "../NativeStylePreloadProcessBridge.cpp",
     "../NeckoTunnel.cpp",
     "../NoConnectCodec.cpp",
+    "../NoConnectSite.cpp",
     "../NoConnectTransport.cpp",
     "../NoConnectWebSocket.cpp",
     "../OuterSessionGate.cpp",
@@ -102,3 +103,5 @@ if CONFIG["ENABLE_TESTS"]:
     LOCAL_INCLUDES += ["/testing/gtest/mozilla"]
 
 FINAL_LIBRARY = "xul"
+
+LOCAL_INCLUDES += ["/dom/base"]

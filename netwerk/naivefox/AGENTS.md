@@ -72,8 +72,10 @@ last framed record. Production padding must not use a deterministic RNG.
 That padding contract applies to `classic`, the default transport. The opt-in
 `no-connect` carrier uses bounded NFC1 application cells over Necko's ordinary
 GET/POST startup followed by native WebSocket channels and requires the separately maintained Caddy module. Preserve
-the native-stream-v1 profile, complete twenty-pair startup, ordered OPENs and cell sequences, credit only after
-local delivery, HTTP completion checks, and per-stream half-close. Do not import
+the native-stream-v2 profile, complete HTML-selected resource bootstrap and twenty-pair startup, ordered OPENs and cell sequences, credit only after
+local delivery, HTTP completion checks, unchanged cache inhibition, streaming public-body consumption,
+site snapshot identity checks, and per-stream half-close. Site byte size and resource count
+are operator choices; do not reintroduce the retired fixed seven-file capacities. Do not import
 the experimental browser worker, DOM, JavaScript engine, or WSS bridge into the
 lean runtime. Transport selection in JSON and the desktop CLI must agree.
 Only classic (default) and no-connect are supported. No-connect H3 means strict H3 startup followed by explicit H1 WSS/TCP; classic H3 remains QUIC-only. Both transports use only the existing proxy URI credentials and the server's

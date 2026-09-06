@@ -89,6 +89,7 @@ class nsHtml5StateSnapshot;
 class nsHtml5Portability;
 #ifdef MOZ_NAIVEFOX
 class nsAHtml5SpeculativeLoadStage;
+class nsHtml5ElementObserver;
 class nsHtml5Highlighter;
 #endif
 

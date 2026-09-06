@@ -13,6 +13,7 @@ UNIFIED_SOURCES += [
     "TestNativeStylePreloadProcessLifecycle.cpp",
     "TestNetworkStartupState.cpp",
     "TestNoConnectCodec.cpp",
+    "TestNoConnectSite.cpp",
     "TestNoConnectWebSocket.cpp",
     "TestOuterSessionGate.cpp",
     "TestPaddingNegotiation.cpp",
@@ -31,3 +32,5 @@ LOCAL_INCLUDES += [
 ]
 
 FINAL_LIBRARY = "xul" if CONFIG["MOZ_NAIVEFOX"] else "xul-gtest"
+
+LOCAL_INCLUDES += ["/dom/base"]

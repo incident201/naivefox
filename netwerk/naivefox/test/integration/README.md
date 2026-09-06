@@ -11,12 +11,12 @@ captures live under `<objdir>/naivefox-fixture/`; none belongs in Git.
 
 ## Classic and no-connect acceptance
 
-Only classic (default) and no-connect are supported. No-connect completes fixed
+Only classic (default) and no-connect are supported. No-connect completes HTML-derived public resources and ordered
 HTTP startup and uses a shaped native WebSocket. H2/H3 selects startup; its
 persistent phase requires H1 TCP in either case. Retired selectors are errors.
 
 The combined Caddy binary must match `versions.env`. The fixture materializes
-the seven-file application under private `application_root`. Trust remains
+an HTML-derived application under private `application_root`. Trust remains
 inside isolated profiles; certificate checks are never disabled.
 
 ```bash
@@ -53,6 +53,13 @@ ARM64 boot and clock readiness may take 900 seconds; never fake readiness.
 The runner also tests embedded default/JSON/argument selection, retired-name
 rejection, unchanged config bytes and cross-thread shutdown. A static
 `--check-only` package check is not device acceptance.
+
+The platform runners accept `--application-root` for a private server-side
+site override. Use `run-no-connect-site-tests.py --objdir OBJ --caddy CADDY`
+for root-only pages, more than sixteen resources, large streamed bodies,
+deduplication, actual response lengths and two uncached cold starts over H2/H3.
+Its optional `--astral-site` uses the privately supplied reference directory;
+that site is not bundled into the product. No secondary CSS/JS loads are allowed.
 
 ## Protocol and lifecycle regressions
 
@@ -1303,3 +1310,11 @@ NSS profile contents before product traffic is accepted.
 
 Every runner installs cleanup traps. Successful runs delete sensitive state;
 failed runs print its private ignored path for diagnosis.
+
+
+For an existing official same-base Firefox binary without a local NSS build
+directory, generate an artifact/runtime proof with verify-capture-reference.py
+and set NAIVEFOX_CAPTURE_REFERENCE_PROOF. The internal capture comparison
+rechecks all runtime hashes and source identity; live TLS key logging and
+decrypted request admission remain required. A proof never enables logging
+in a binary that does not actually support it.

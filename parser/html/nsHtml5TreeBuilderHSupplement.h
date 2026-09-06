@@ -14,6 +14,7 @@ bool mViewSource;
 nsTArray<nsHtml5SpeculativeLoad> mSpeculativeLoadQueue;
 nsAHtml5SpeculativeLoadStage* mSpeculativeLoadStage;
 nsTArray<mozilla::UniquePtr<uint8_t>> mHandles;
+nsHtml5ElementObserver* mElementObserver = nullptr;
 nsresult mBroken;
 #else
 nsHtml5OplessBuilder* mBuilder;
@@ -143,6 +144,9 @@ void MarkAsBrokenFromPortability(nsresult aRv);
 public:
 #ifdef MOZ_NAIVEFOX
 explicit nsHtml5TreeBuilder(nsAHtml5SpeculativeLoadStage* aStage);
+void SetElementObserver(nsHtml5ElementObserver* aObserver) {
+  mElementObserver = aObserver;
+}
 #else
 explicit nsHtml5TreeBuilder(nsHtml5OplessBuilder* aBuilder);
 

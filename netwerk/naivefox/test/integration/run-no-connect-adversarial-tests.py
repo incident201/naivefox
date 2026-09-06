@@ -15,7 +15,7 @@ spec = importlib.util.spec_from_file_location(
 fixture = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(fixture)
 
-CASES = ("profile", "auth-mode-missing", "auth-mode-legacy", "append", "capacity", "truncated", "sequence", "reserved", "redirect", "auth-prompt", "protocol")
+CASES = ("profile", "old-profile", "site-id-missing", "site-id-malformed", "site-id-mismatch", "auth-mode-missing", "auth-mode-legacy", "append", "capacity", "truncated", "sequence", "reserved", "redirect", "auth-prompt", "protocol")
 
 
 def mutation(case):
@@ -41,19 +41,30 @@ def mutation(case):
             },
             "body": body.decode("ascii"),
         }
-        if case in ("profile", "auth-mode-missing", "auth-mode-legacy"):
+        if case in ("profile", "old-profile", "site-id-missing", "site-id-malformed", "auth-mode-missing", "auth-mode-legacy"):
             path = "/"
             response = {"handler": "static_response", "status_code": 200,
                         "headers": {"Content-Type": ["text/html"],
                                     "Content-Length": ["4096"],
-                                    "X-App-Profile": ["incompatible" if case == "profile" else "native-stream-v1"],
+                                    "X-App-Profile": ["incompatible" if case == "profile" else ("native-stream-v1" if case == "old-profile" else "native-stream-v2")],
+                                    "X-App-Site": ["0" * 64],
                                     "X-App-Realtime": ["websocket-v1"],
                                     "Set-Cookie": ["app_session=" + "0" * 64 + "; Path=/; Secure; HttpOnly"]},
                         "body": "x" * 4096}
-            if case == "profile":
+            if case in ("profile", "old-profile", "site-id-missing", "site-id-malformed"):
                 response["headers"]["X-App-Auth"] = ["basic"]
             if case == "auth-mode-legacy":
                 response["headers"]["X-App-Auth"] = ["key"]
+            if case == "site-id-missing":
+                del response["headers"]["X-App-Site"]
+            if case == "site-id-malformed":
+                response["headers"]["X-App-Site"] = ["not-a-snapshot"]
+        elif case == "site-id-mismatch":
+            path = "/assets/site.css"
+            response = {"handler": "static_response", "status_code": 200,
+                        "headers": {"Content-Type": ["text/css"], "Content-Length": ["7"],
+                                    "X-App-Site": ["0" * 64]},
+                        "body": "body {}"}
         elif case == "redirect":
             path = "/"
             response = {"handler": "static_response", "status_code": 302,
@@ -90,7 +101,7 @@ def run_case(args, base, protocol, case):
         if case == "redirect":
             fixture.require(not any(item.get("uri") == "/redirected" for item in requests),
                             "native client followed an origin redirect")
-        if case in ("profile", "auth-mode-missing", "auth-mode-legacy", "redirect", "auth-prompt", "protocol"):
+        if case in ("profile", "old-profile", "site-id-missing", "site-id-malformed", "site-id-mismatch", "auth-mode-missing", "auth-mode-legacy", "redirect", "auth-prompt", "protocol"):
             fixture.require(stats["opens"] == 0, "bootstrap rejection still opened a target")
             fixture.require(not any(name.startswith("POST ") for name in stats["requests"]),
                             "bootstrap rejection still sent application authentication")

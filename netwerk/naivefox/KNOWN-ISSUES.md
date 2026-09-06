@@ -108,9 +108,16 @@ implicit contract changes.
 
 `no-connect` is opt-in and requires the matching Caddy `naivefox_transport`
 module with shared forward-proxy authentication and access policy and the
-`native-stream-v1` profile. It does not interoperate with an ordinary
+`native-stream-v2` profile. It does not interoperate with an ordinary
 forward proxy or an arbitrary static website. A module mismatch or rejected
 credential pair fails the connection; it does not trigger a downgrade to `classic`.
+
+The new profile requires a coordinated client/server upgrade from v1. The
+HTML-derived resource set represents only supported directly declared resources;
+CSS imports/backgrounds, script execution and secondary loads are not emulated.
+There is no fixed site-size budget. Large entry pages increase startup traffic,
+latency and server snapshot memory, and may exhaust ordinary resource/deadline
+limits. Client resource caching remains disabled. See [NO-CONNECT.md](NO-CONNECT.md).
 
 Session resumption and transparent replay after an outer-session failure are
 not supported. Credential provisioning and rotation remain an operator concern.

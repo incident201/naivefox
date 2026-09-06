@@ -35,7 +35,7 @@ void EnsureHtml5Statics() {
 }  // namespace
 
 nsHtml5SpeculativeScanner::nsHtml5SpeculativeScanner(
-    nsISerialEventTarget* aParserEventTarget) {
+    nsISerialEventTarget* aParserEventTarget, nsHtml5ElementObserver* aObserver) {
   EnsureHtml5Statics();
 #ifdef DEBUG
   // nsHtml5StreamParser is constructed on main, then explicitly permits atom
@@ -48,6 +48,7 @@ nsHtml5SpeculativeScanner::nsHtml5SpeculativeScanner(
   (void)aParserEventTarget;
 #endif
   mTreeBuilder = mozilla::MakeUnique<nsHtml5TreeBuilder>(&mStage);
+  mTreeBuilder->SetElementObserver(aObserver);
   mTokenizer = mozilla::MakeUnique<nsHtml5Tokenizer>(mTreeBuilder.get(), false);
   mTokenizer->setInterner(&mAtomTable);
   mTreeBuilder->setScriptingEnabled(true);

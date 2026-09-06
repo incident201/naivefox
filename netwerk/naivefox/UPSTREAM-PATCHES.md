@@ -325,6 +325,8 @@ parser/html/nsHtml5SpeculativeLoad.cpp
 parser/html/nsHtml5SpeculativeScanner.h
 parser/html/nsHtml5SpeculativeScanner.cpp
 parser/html/nsHtml5TreeBuilderLeanCppSupplement.h
+parser/html/nsHtml5TreeBuilderHSupplement.h
+parser/html/nsHtml5TreeBuilder.h
 netwerk/protocol/http/nsHttpHandler.h
 ```
 
@@ -346,6 +348,14 @@ NaiveFox-only; scanner tests prove source order and attributes; and decrypted
 H2 admission proves one physical TLS connection with a native root request,
 CONNECT, then the exact style/script/image resource set and normal stream
 completion.
+
+The no-connect v2 consumer opts into an element observer before tokenization.
+Generated HTML context excludes inert template/noscript contents; the observer
+receives element names and attributes without constructing a DOM. Existing
+classic speculative descriptors still use the default null-observer path.
+No script, layout, image-decoding or new parser implementation is linked.
+NoConnectSite tests cover streaming UTF-8, declarations, duplicates, inert
+content and invalid graphs; existing scanner tests guard the default path.
 
 ## NF-UPSTREAM-015: bounded post-confirmation H3 preamble dwell
 
