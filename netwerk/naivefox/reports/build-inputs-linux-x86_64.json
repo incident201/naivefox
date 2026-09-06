@@ -7367,10 +7367,10 @@
     "objdir:backend.RecursiveMakeBackend.in": 450,
     "objdir:component-manifest": 16,
     "objdir:config_status_deps.in": 122,
-    "objdir:generated-action-depfile": 5284,
-    "objdir:generated-action-relative-depfile": 1453,
-    "objdir:generated-make-fragment-source": 887,
-    "objdir:generated-make-prerequisite": 870,
+    "objdir:generated-action-depfile": 5299,
+    "objdir:generated-action-relative-depfile": 1454,
+    "objdir:generated-make-fragment-source": 888,
+    "objdir:generated-make-prerequisite": 871,
     "objdir:install-manifest-pattern": 511,
     "objdir:install-manifest-source": 1753,
     "python:build-site-manifest": 1,
@@ -10561,9 +10561,9 @@
   "collector_sha256": "abdd3662bad26b9e356882f47a48861d2d7dec8623761b31584312be10b494c5",
   "counts": {
     "directory_contracts": 36,
-    "files": 17046
+    "files": 17049
   },
-  "depfile_count": 1103,
+  "depfile_count": 1105,
   "directory_contracts": [
     "config/tests/ref-simple",
     "config/tests/src-simple/l10n",
@@ -14081,6 +14081,8 @@
     "netwerk/naivefox/NeckoTunnel.h",
     "netwerk/naivefox/NoConnectCodec.cpp",
     "netwerk/naivefox/NoConnectCodec.h",
+    "netwerk/naivefox/NoConnectSite.cpp",
+    "netwerk/naivefox/NoConnectSite.h",
     "netwerk/naivefox/NoConnectTransport.cpp",
     "netwerk/naivefox/NoConnectTransport.h",
     "netwerk/naivefox/NoConnectWebSocket.cpp",
@@ -14145,6 +14147,7 @@
     "netwerk/naivefox/test/gtest/TestNativeStylePreloadProcessLifecycle.cpp",
     "netwerk/naivefox/test/gtest/TestNetworkStartupState.cpp",
     "netwerk/naivefox/test/gtest/TestNoConnectCodec.cpp",
+    "netwerk/naivefox/test/gtest/TestNoConnectSite.cpp",
     "netwerk/naivefox/test/gtest/TestNoConnectWebSocket.cpp",
     "netwerk/naivefox/test/gtest/TestOuterSessionGate.cpp",
     "netwerk/naivefox/test/gtest/TestPaddingNegotiation.cpp",
@@ -27653,7 +27656,7 @@
   ],
   "firefox_base_commit": "0b76543aaeeeb2a5748ce2675ee36e7c94cb1125",
   "generated_makefile_count": 382,
-  "generated_makefiles_sha256": "d04b71851885aff29bce07a619b3eb86d2edf3da22e29580d7832fbac37975b2",
+  "generated_makefiles_sha256": "1e36f7525d7a51221424cccb36f539a19fcdfbaa312cc41a8ee6c61eb88f83f5",
   "install_manifest_count": 7,
   "install_manifest_names": [
     "_test_files",
@@ -27668,15 +27671,15 @@
   "install_manifests_sha256": "db68e2a92dd5976c0d8ea2505eeb9ff538f9883b36084e8a37ab29814db7657f",
   "mozconfig": "netwerk/naivefox/mozconfig-minimal",
   "mozconfig_sha256": "03e7581d0f3023568f6b1dac19d87add5cfab400af3d909894bd6c49b2f4cf6b",
-  "naivefox_reference_commit": "5270077117f60cc75cac394f28634893851bc6ef",
+  "naivefox_reference_commit": "cf6cd77e3064671c5b6dd9f4c7717c5118f47fda",
   "objdir_evidence_sha256": {
-    "backend.RecursiveMakeBackend.in": "de11470527413612d29e33464e663e385564009ba0c467cccf79ea1f26ee7f24",
-    "config_status_deps.in": "f46005ac5cfb5e7650555d109e5e68e14036d127531a95dcf2c1d49d1ba31cd2"
+    "backend.RecursiveMakeBackend.in": "afb13f1eb778309f365e24b9ee3576b1d335d54dd1fca9a8c4f1a6b9166c2366",
+    "config_status_deps.in": "54ff095a8c0269df8fc873a52719a32dca6e5e54847c85fd10ecb998414650c0"
   },
   "provenance_sha256": "642a32e90aaf870224f1831b2e932e08fb3153ed75765607f2112852f668e3fb",
   "provenance_version": 2,
   "report_version": 1,
-  "source_commit": "5270077117f60cc75cac394f28634893851bc6ef",
+  "source_commit": "cf6cd77e3064671c5b6dd9f4c7717c5118f47fda",
   "source_tree_kind": "repository",
   "source_worktree_clean": true,
   "source_worktree_status": [],

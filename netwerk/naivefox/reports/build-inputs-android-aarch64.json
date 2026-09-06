@@ -7394,10 +7394,10 @@
     "objdir:backend.RecursiveMakeBackend.in": 538,
     "objdir:component-manifest": 16,
     "objdir:config_status_deps.in": 245,
-    "objdir:generated-action-depfile": 5271,
+    "objdir:generated-action-depfile": 5286,
     "objdir:generated-action-relative-depfile": 1433,
-    "objdir:generated-make-fragment-source": 877,
-    "objdir:generated-make-prerequisite": 860,
+    "objdir:generated-make-fragment-source": 878,
+    "objdir:generated-make-prerequisite": 861,
     "objdir:install-manifest-pattern": 511,
     "objdir:install-manifest-source": 1752,
     "python:build-site-manifest": 1,
@@ -10588,9 +10588,9 @@
   "collector_sha256": "abdd3662bad26b9e356882f47a48861d2d7dec8623761b31584312be10b494c5",
   "counts": {
     "directory_contracts": 36,
-    "files": 17067
+    "files": 17069
   },
-  "depfile_count": 1069,
+  "depfile_count": 1070,
   "directory_contracts": [
     "config/tests/ref-simple",
     "config/tests/src-simple/l10n",
@@ -14095,6 +14095,8 @@
     "netwerk/naivefox/NeckoTunnel.h",
     "netwerk/naivefox/NoConnectCodec.cpp",
     "netwerk/naivefox/NoConnectCodec.h",
+    "netwerk/naivefox/NoConnectSite.cpp",
+    "netwerk/naivefox/NoConnectSite.h",
     "netwerk/naivefox/NoConnectTransport.cpp",
     "netwerk/naivefox/NoConnectTransport.h",
     "netwerk/naivefox/NoConnectWebSocket.cpp",
@@ -27701,7 +27703,7 @@
   ],
   "firefox_base_commit": "0b76543aaeeeb2a5748ce2675ee36e7c94cb1125",
   "generated_makefile_count": 376,
-  "generated_makefiles_sha256": "3c8da82a0883cf63add18bd756f54d177889233b6397c79cc52739fa6e198f95",
+  "generated_makefiles_sha256": "46ac244489f7fd23c35210723bfa66fa095259c042bd7e1ed1c780ed0b30374b",
   "install_manifest_count": 7,
   "install_manifest_names": [
     "_test_files",
@@ -27716,15 +27718,15 @@
   "install_manifests_sha256": "9173dfefbae7fdb51a679d67a77c187486ed009143105e5ff54a099884aec7f5",
   "mozconfig": "netwerk/naivefox/mozconfig-android-aarch64",
   "mozconfig_sha256": "69d4665c2b95be12ac6ba7e976069ff72d28e984a4ede2df50a4729a18052c31",
-  "naivefox_reference_commit": "5270077117f60cc75cac394f28634893851bc6ef",
+  "naivefox_reference_commit": "cf6cd77e3064671c5b6dd9f4c7717c5118f47fda",
   "objdir_evidence_sha256": {
-    "backend.RecursiveMakeBackend.in": "200e72f147763606c354cc0860fa5df1ed31b315badd38202ac0764782dbea12",
-    "config_status_deps.in": "810f4d940d4a85f215146ff564e7fbf34675f460c0175b4f5a5e3a0bc6a61ecd"
+    "backend.RecursiveMakeBackend.in": "2371bdd7a0e59f8c0e3f5cf54d95892e6c6c0128537a1989766ef290f3fa57bd",
+    "config_status_deps.in": "7b6546601b5d3857081d38ccf0979f3870435ab0d8b19dfa3f9140e874315726"
   },
   "provenance_sha256": "642a32e90aaf870224f1831b2e932e08fb3153ed75765607f2112852f668e3fb",
   "provenance_version": 2,
   "report_version": 1,
-  "source_commit": "5270077117f60cc75cac394f28634893851bc6ef",
+  "source_commit": "cf6cd77e3064671c5b6dd9f4c7717c5118f47fda",
   "source_tree_kind": "repository",
   "source_worktree_clean": true,
   "source_worktree_status": [],
