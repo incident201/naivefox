@@ -14,6 +14,7 @@
 
 #include "NeckoTunnel.h"
 #include "NoConnectCodec.h"
+#include "NoConnectHash.h"
 #include "NoConnectSite.h"
 #include "NoConnectWebSocket.h"
 #include "RuntimeLogging.h"
@@ -54,14 +55,13 @@ class CarrierRequest final : public nsIStreamListener {
   using Callback = std::function<void(CarrierRequest*, nsresult)>;
   CarrierRequest(size_t aSize, uint32_t aStatus, bool aCell,
                  ProxyProtocol aProtocol, Callback&& aDone,
-                 CarrierBody aBodyKind, const nsACString& aSiteIdentity)
+                 CarrierBody aBodyKind)
       : mExpectedSize(aSize),
         mExpectedStatus(aStatus),
         mCell(aCell),
         mProtocol(aProtocol),
         mDone(std::move(aDone)),
-        mBodyKind(aBodyKind),
-        mExpectedSite(aSiteIdentity) {
+        mBodyKind(aBodyKind) {
     if (aBodyKind == CarrierBody::Document) {
       mSite = MakeUnique<NoConnectSite>();
     }
@@ -141,10 +141,8 @@ class CarrierRequest final : public nsIStreamListener {
 
   Bytes mBody;
   nsCString mCookie;
-  nsCString mProfile;
-  nsCString mAuthScheme;
-  nsCString mRealtime;
-  nsCString mSiteIdentity;
+  nsCString mMime;
+  nsCString mDigest;
   UniquePtr<NoConnectSite> mSite;
 
  private:
@@ -157,7 +155,7 @@ class CarrierRequest final : public nsIStreamListener {
   nsCOMPtr<nsIChannel> mChannel;
   nsCOMPtr<nsITimer> mTimer;
   const CarrierBody mBodyKind;
-  const nsCString mExpectedSite;
+  NoConnectHash mHash;
   uint64_t mPublicLength = 0;
   uint64_t mPublicReceived = 0;
 };
@@ -195,21 +193,9 @@ NS_IMETHODIMP CarrierRequest::OnStartRequest(nsIRequest* aRequest) {
         return NS_ERROR_CORRUPTED_CONTENT;
       }
       mPublicLength = static_cast<uint64_t>(length);
-      MOZ_TRY(http->GetResponseHeader("X-App-Site"_ns, mSiteIdentity));
-      if (mSiteIdentity.Length() != 64) {
-        return NS_ERROR_CORRUPTED_CONTENT;
-      }
-      for (size_t i = 0; i < mSiteIdentity.Length(); ++i) {
-        const char c = mSiteIdentity[i];
-        if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))) {
-          return NS_ERROR_CORRUPTED_CONTENT;
-        }
-      }
-      if (!mExpectedSite.IsEmpty() && !mExpectedSite.Equals(mSiteIdentity)) {
-        return NS_ERROR_CORRUPTED_CONTENT;
-      }
       nsAutoCString type;
       MOZ_TRY(mChannel->GetContentType(type));
+      mMime = type;
       const bool valid =
           (mBodyKind == CarrierBody::Document &&
            type.EqualsLiteral("text/html")) ||
@@ -225,21 +211,13 @@ NS_IMETHODIMP CarrierRequest::OnStartRequest(nsIRequest* aRequest) {
     }
   }
   if (mCell) {
-    nsAutoCString capacity;
-    nsAutoCString expected;
-    expected.AppendInt(static_cast<uint32_t>(mExpectedSize));
-    MOZ_TRY(http->GetResponseHeader("X-App-Capacity"_ns, capacity));
     nsAutoCString type;
     MOZ_TRY(mChannel->GetContentType(type));
-    if (!capacity.Equals(expected) ||
-        !type.EqualsLiteral("application/octet-stream")) {
+    if (!type.EqualsLiteral("application/octet-stream")) {
       return NS_ERROR_CORRUPTED_CONTENT;
     }
   }
   (void)http->GetResponseHeader("Set-Cookie"_ns, mCookie);
-  (void)http->GetResponseHeader("X-App-Profile"_ns, mProfile);
-  (void)http->GetResponseHeader("X-App-Auth"_ns, mAuthScheme);
-  (void)http->GetResponseHeader("X-App-Realtime"_ns, mRealtime);
   return NS_OK;
 }
 
@@ -260,6 +238,9 @@ NS_IMETHODIMP CarrierRequest::OnDataAvailable(nsIRequest*,
       }
       if (mSite) {
         MOZ_TRY(mSite->Feed(Span<const uint8_t>(buffer.data(), read)));
+      }
+      if (!mHash.Update(Span<const uint8_t>(buffer.data(), read))) {
+        return NS_ERROR_OUT_OF_MEMORY;
       }
       mPublicReceived += read;
       aCount -= read;
@@ -301,6 +282,10 @@ NS_IMETHODIMP CarrierRequest::OnStopRequest(nsIRequest*, nsresult aStatus) {
     } else if (mSite) {
       aStatus = mSite->Feed(Span<const uint8_t>(), true);
     }
+  }
+  if (NS_SUCCEEDED(aStatus) && mBodyKind != CarrierBody::Fixed &&
+      !mHash.Finish(mDigest)) {
+    aStatus = NS_ERROR_FAILURE;
   }
   if (mDone) {
     auto done = std::move(mDone);
@@ -409,6 +394,8 @@ class NoConnectCarrier final {
   TunnelConfig mConfig;
   nsCString mCookie;
   nsCString mSiteIdentity;
+  nsCString mRootDigest;
+  bool mContractReady = false;
   nsTArray<SiteResource> mResources;
   size_t mNextAsset = 0;
   std::vector<RefPtr<NoConnectStream>> mStreams;
@@ -659,7 +646,7 @@ bool NoConnectCarrier::Open(const nsACString& aPath, const Bytes* aUpload,
           }
         }
       },
-      aBodyKind, mSiteIdentity);
+      aBodyKind);
   mRequests.push_back(request);
   nsresult rv = request->Start(mConfig, aPath, mCookie, aUpload);
   if (NS_FAILED(rv)) {
@@ -753,24 +740,21 @@ void NoConnectCarrier::Start() {
   Open(
       "/"_ns, nullptr, 0, 200, false,
       [self](CarrierRequest* request, nsresult) {
-        if (!request->mProfile.EqualsLiteral("native-stream-v2") ||
-            !request->mAuthScheme.EqualsLiteral("basic") ||
-            !request->mRealtime.EqualsLiteral("websocket-v1") ||
-            request->mCookie.Length() < 77 ||
-            !StringBeginsWith(request->mCookie, "app_session="_ns) ||
-            request->mCookie.CharAt(76) != ';') {
+        if (request->mCookie.Length() < 73 ||
+            !StringBeginsWith(request->mCookie, "session="_ns) ||
+            request->mCookie.CharAt(72) != ';') {
           self->Fail(NS_ERROR_CORRUPTED_CONTENT);
           return;
         }
-        for (size_t i = 12; i < 76; ++i) {
+        for (size_t i = 8; i < 72; ++i) {
           const char c = request->mCookie.CharAt(i);
           if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))) {
             self->Fail(NS_ERROR_CORRUPTED_CONTENT);
             return;
           }
         }
-        self->mCookie.Assign(Substring(request->mCookie, 0, 76));
-        self->mSiteIdentity = request->mSiteIdentity;
+        self->mCookie.Assign(Substring(request->mCookie, 0, 72));
+        self->mRootDigest = request->mDigest;
         self->mResources = request->mSite->TakeResources();
         self->LoadAssets();
       },
@@ -782,13 +766,30 @@ void NoConnectCarrier::LoadAssets() {
     return;
   }
   if (mAssets == mResources.Length()) {
+    NoConnectHash snapshot;
+    bool valid =
+        snapshot.Field("naivefox-site-v2"_ns) && snapshot.Field(mRootDigest);
+    for (const auto& resource : mResources) {
+      const nsCString kind(resource.mKind == SiteResourceKind::Style ? "style"
+                           : resource.mKind == SiteResourceKind::Script
+                               ? "script"
+                               : "image");
+      valid = valid && snapshot.Field(resource.mPath) && snapshot.Field(kind) &&
+              snapshot.Field(resource.mMime) &&
+              snapshot.Field(resource.mDigest);
+    }
+    if (!valid || !snapshot.Finish(mSiteIdentity, true)) {
+      Fail(NS_ERROR_FAILURE);
+      return;
+    }
     mBootstrapped = true;
     Continue();
     return;
   }
   RefPtr self = this;
   while (!mClosed && mNextAsset < mResources.Length() && mRequests.size() < 6) {
-    const auto& resource = mResources[mNextAsset++];
+    const size_t index = mNextAsset++;
+    const auto& resource = mResources[index];
     CarrierBody kind = CarrierBody::Image;
     if (resource.mKind == SiteResourceKind::Style) {
       kind = CarrierBody::Style;
@@ -798,7 +799,9 @@ void NoConnectCarrier::LoadAssets() {
     }
     Open(
         resource.mPath, nullptr, 0, 200, false,
-        [self](CarrierRequest*, nsresult) {
+        [self, index](CarrierRequest* request, nsresult) {
+          self->mResources[index].mMime = request->mMime;
+          self->mResources[index].mDigest = request->mDigest;
           ++self->mAssets;
           self->LoadAssets();
         },
@@ -833,6 +836,15 @@ bool NoConnectCarrier::Upload(size_t aCapacity, Bytes& aBody) {
     budget -= auth.Size();
     frames.push_back(std::move(auth));
     mAuthed = true;
+    if (!noconnect::Encode(mUp++, aCapacity, frames, aBody)) {
+      Fail(NS_ERROR_FAILURE);
+      return false;
+    }
+    return true;
+  }
+  if (!mContractReady) {
+    Fail(NS_ERROR_CORRUPTED_CONTENT);
+    return false;
   }
   while (!mResets.empty() && budget >= noconnect::kFrameHeader) {
     budget -= mResets.back().Size();
@@ -915,6 +927,22 @@ bool NoConnectCarrier::ReceiveCell(const Bytes& aBody, bool aWebSocket) {
     Fail(NS_ERROR_CORRUPTED_CONTENT);
     return false;
   }
+  if (!mContractReady) {
+    nsAutoCString expected("native-stream-v2\n");
+    expected.Append(mSiteIdentity);
+    if (aWebSocket || mDown || frames.size() != 1 ||
+        frames[0].kind != Kind::Hello || frames[0].stream ||
+        frames[0].sequence || frames[0].body.size() != expected.Length() ||
+        !std::equal(
+            frames[0].body.begin(), frames[0].body.end(),
+            reinterpret_cast<const uint8_t*>(expected.BeginReading()))) {
+      Fail(NS_ERROR_CORRUPTED_CONTENT);
+      return false;
+    }
+    mContractReady = true;
+    ++mDown;
+    return true;
+  }
   ++mDown;
   for (auto& frame : frames) {
     if (frame.kind == Kind::Ack) {
@@ -928,7 +956,8 @@ bool NoConnectCarrier::ReceiveCell(const Bytes& aBody, bool aWebSocket) {
       continue;
     }
     if (!frame.stream || frame.stream > mHighestStream ||
-        frame.kind == Kind::Open || frame.kind == Kind::Auth) {
+        frame.kind == Kind::Open || frame.kind == Kind::Auth ||
+        frame.kind == Kind::Hello) {
       Fail(NS_ERROR_CORRUPTED_CONTENT);
       return false;
     }

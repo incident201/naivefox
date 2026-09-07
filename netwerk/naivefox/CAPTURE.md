@@ -4856,3 +4856,18 @@ choices. Existing residual matrices remain source-bound historical evidence;
 no new behavioral-equivalence score follows from implementation or functional
 acceptance. Future comparisons must measure this graph with explicit site
 inputs and account for all cold-carrier traffic.
+
+## Authenticated carrier admission preflight
+
+Current docs, all-ref history and X-App-Profile pickaxe history were checked in
+both repositories. Server 78f9cff introduced the public profile handshake;
+194d816 and 82a1803 established shared authentication, while client f46cdb61cfb4
+introduced native NFC1. These mechanisms advertised compatibility before AUTH
+and allowed anonymous empty carrier exchanges.
+
+The distinct change removes public X-App metadata, derives snapshot identity
+from streamed body digests and confirms the fixed contract inside the first
+authenticated response before OPEN. Anonymous API/WS work uses normal site
+fallback. This is an active-probing surface change, not a residual experiment
+or a new claim about passive traffic equivalence. Existing capture results
+remain tied to their original sources and wire headers.

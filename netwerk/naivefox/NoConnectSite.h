@@ -20,6 +20,8 @@ enum class SiteResourceKind : uint8_t { Style, Script, Image };
 struct SiteResource {
   nsCString mPath;
   SiteResourceKind mKind;
+  nsCString mMime;
+  nsCString mDigest;
 };
 
 // Uses Gecko's generated HTML tokenizer/tree builder, with no DOM, scripting,

@@ -70,8 +70,10 @@ Run these with the normal `--objdir`, `--caddy` and `--work-dir` arguments:
   bits and ACK rejection, without replay, HTTP resumption or CONNECT fallback.
 - `run-no-connect-control-tests.py`: legal 4/125-byte PING/PONG, subsequent
   data, half-close and clean exit. Control completions cannot spend NFC1 credit.
-- `run-no-connect-adversarial-tests.py`: HTTP startup envelopes, profile/auth
-  mismatch, capacities, redirects, truncation and protocol fallback.
+- `run-no-connect-adversarial-tests.py`: HELLO version/snapshot,
+  missing/duplicate/malformed confirmation, mixed public bodies, cookie validation,
+  HTTP capacities, redirects, truncation and protocol fallback. No OPEN is allowed
+  before confirmation; public bootstrap failures send no AUTH.
 - `run-no-connect-routing-tests.py`: host mapping and TLS identity.
 - `run-cli-shutdown-tests.py`: both signals with unfinished requests.
 

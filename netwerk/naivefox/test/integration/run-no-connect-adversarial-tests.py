@@ -2,6 +2,7 @@
 
 import argparse
 import importlib.util
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -15,55 +16,84 @@ spec = importlib.util.spec_from_file_location(
 fixture = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(fixture)
 
-CASES = ("profile", "old-profile", "site-id-missing", "site-id-malformed", "site-id-mismatch", "auth-mode-missing", "auth-mode-legacy", "append", "capacity", "truncated", "sequence", "reserved", "redirect", "auth-prompt", "protocol")
+CASES = ("hello-missing", "hello-profile", "hello-site", "hello-stream",
+         "hello-sequence", "hello-duplicate", "site-body-mismatch", "cookie-missing",
+         "cookie-malformed", "append", "capacity", "truncated", "sequence",
+         "reserved", "redirect", "auth-prompt", "protocol")
+
+
+def fixture_identity(root):
+    digest = hashlib.sha256()
+    def field(value):
+        digest.update(struct.pack("!Q", len(value)))
+        digest.update(value)
+    field(b"naivefox-site-v2")
+    field(hashlib.sha256((root / "index.html").read_bytes()).digest())
+    resources = [("/assets/site.css", "style", "text/css"),
+                 ("/assets/app.js", "script", "text/javascript")]
+    resources += [(f"/assets/image-{i}.svg", "image", "image/svg+xml") for i in range(1, 5)]
+    for path, kind, mime in resources:
+        for value in (path, kind, mime):
+            field(value.encode())
+        field(hashlib.sha256((root / path[1:]).read_bytes()).digest())
+    return digest.hexdigest()
 
 
 def mutation(case):
     def apply(server):
         if case == "protocol":
             return
-        header = bytearray(b"NFC1" + struct.pack("!IIHH", 0, 16, 0, 0))
-        if case == "sequence":
-            header[7] = 1
+        handlers = [item for route in server["routes"] for item in route.get("handle", [])]
+        root = None
+        while handlers:
+            item = handlers.pop()
+            if item.get("handler") == "naivefox_transport":
+                root = Path(item["application_root"])
+            for route in item.get("routes", []):
+                handlers.extend(route.get("handle", []))
+        if root is None:
+            raise RuntimeError("fixture application root is missing")
+        profile = "incompatible" if case == "hello-profile" else "native-stream-v2"
+        identity = "0" * 64 if case == "hello-site" else fixture_identity(root)
+        payload = (profile + "\n" + identity).encode()
+        frame = struct.pack("!B3xIII", 9, int(case == "hello-stream"),
+                            int(case == "hello-sequence"), len(payload)) + payload
+        count = 1
+        if case == "hello-missing":
+            frame, count = b"", 0
+        elif case == "hello-duplicate":
+            frame, count = frame * 2, 2
+        header = bytearray(b"NFC1" + struct.pack("!IIHH", int(case == "sequence"),
+                                               16 + len(frame), count, 0))
         if case == "reserved":
             header[14] = 1
-        body = bytes(header) + bytes((100 if case == "truncated" else 8192) - 16)
-        if case == "append":
+        capacity = 8191 if case == "capacity" else 8192
+        body = bytes(header) + frame + bytes(capacity - 16 - len(frame))
+        if case == "truncated":
+            body = body[:100]
+        elif case == "append":
             body += bytes(16)
         path = "/api/events/brief"
         response = {
             "handler": "static_response", "status_code": 200,
-            "headers": {
-                "Content-Type": ["application/octet-stream"],
-                "Content-Length": [str(len(body)) if case == "append" else "8192"],
-                "X-App-Capacity": ["8191" if case == "capacity" else "8192"],
-                "X-App-State": ["idle"], "Cache-Control": ["no-store"],
-            },
-            "body": body.decode("ascii"),
+            "headers": {"Content-Type": ["application/octet-stream"],
+                        "Content-Length": ["8192" if case == "truncated" else str(len(body))],
+                        "Cache-Control": ["no-store"]},
+            "body": body.decode("ascii") if case != "hello-duplicate" else "",
         }
-        if case in ("profile", "old-profile", "site-id-missing", "site-id-malformed", "auth-mode-missing", "auth-mode-legacy"):
+        if case in ("cookie-missing", "cookie-malformed"):
             path = "/"
+            html = (root / "index.html").read_text()
             response = {"handler": "static_response", "status_code": 200,
                         "headers": {"Content-Type": ["text/html"],
-                                    "Content-Length": ["4096"],
-                                    "X-App-Profile": ["incompatible" if case == "profile" else ("native-stream-v1" if case == "old-profile" else "native-stream-v2")],
-                                    "X-App-Site": ["0" * 64],
-                                    "X-App-Realtime": ["websocket-v1"],
-                                    "Set-Cookie": ["app_session=" + "0" * 64 + "; Path=/; Secure; HttpOnly"]},
-                        "body": "x" * 4096}
-            if case in ("profile", "old-profile", "site-id-missing", "site-id-malformed"):
-                response["headers"]["X-App-Auth"] = ["basic"]
-            if case == "auth-mode-legacy":
-                response["headers"]["X-App-Auth"] = ["key"]
-            if case == "site-id-missing":
-                del response["headers"]["X-App-Site"]
-            if case == "site-id-malformed":
-                response["headers"]["X-App-Site"] = ["not-a-snapshot"]
-        elif case == "site-id-mismatch":
+                                    "Content-Length": [str(len(html.encode()))]},
+                        "body": html}
+            if case == "cookie-malformed":
+                response["headers"]["Set-Cookie"] = ["session=invalid; Path=/; Secure; HttpOnly"]
+        elif case == "site-body-mismatch":
             path = "/assets/site.css"
             response = {"handler": "static_response", "status_code": 200,
-                        "headers": {"Content-Type": ["text/css"], "Content-Length": ["7"],
-                                    "X-App-Site": ["0" * 64]},
+                        "headers": {"Content-Type": ["text/css"], "Content-Length": ["7"]},
                         "body": "body {}"}
         elif case == "redirect":
             path = "/"
@@ -73,7 +103,14 @@ def mutation(case):
             path = "/"
             response = {"handler": "static_response", "status_code": 401,
                         "headers": {"WWW-Authenticate": ['Basic realm="fixture"']}}
-        server["routes"].insert(0, {"match": [{"path": [path]}], "handle": [response]})
+        handles = [response]
+        if case == "hello-duplicate":
+            directory = root.parent / "adversarial-response"
+            directory.mkdir(exist_ok=True)
+            (directory / "cell.bin").write_bytes(body)
+            handles = [{"handler": "rewrite", "uri": "/cell.bin"},
+                       {"handler": "file_server", "root": str(directory)}]
+        server["routes"].insert(0, {"match": [{"path": [path]}], "handle": handles})
     return apply
 
 
@@ -101,10 +138,12 @@ def run_case(args, base, protocol, case):
         if case == "redirect":
             fixture.require(not any(item.get("uri") == "/redirected" for item in requests),
                             "native client followed an origin redirect")
-        if case in ("profile", "old-profile", "site-id-missing", "site-id-malformed", "site-id-mismatch", "auth-mode-missing", "auth-mode-legacy", "redirect", "auth-prompt", "protocol"):
-            fixture.require(stats["opens"] == 0, "bootstrap rejection still opened a target")
-            fixture.require(not any(name.startswith("POST ") for name in stats["requests"]),
-                            "bootstrap rejection still sent application authentication")
+        fixture.require(stats["opens"] == 0, "unconfirmed contract opened a target")
+        posts = sum(item.get("method") == "POST" for item in requests)
+        if case in ("cookie-missing", "cookie-malformed", "redirect", "auth-prompt", "protocol"):
+            fixture.require(posts == 0, "public bootstrap rejection sent authentication")
+        else:
+            fixture.require(posts == 1, "contract rejection did not stop after AUTH")
         if case == "protocol":
             if client_protocol == "h3":
                 fixture.require(not stats["requests"], "H3 attempted an HTTP fallback")

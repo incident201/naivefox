@@ -101,7 +101,7 @@ TEST_F(NaiveFoxNoConnectCodec, EmptyMaximumAndFrameCountBoundaries) {
 
 TEST_F(NaiveFoxNoConnectCodec, AllKindsAndPadding) {
   std::vector<Frame> frames;
-  for (uint8_t kind = 1; kind <= 8; ++kind) {
+  for (uint8_t kind = 1; kind <= 9; ++kind) {
     frames.push_back({static_cast<Kind>(kind), 0, 0, {}});
   }
   std::vector<uint8_t> encoded;
@@ -109,11 +109,11 @@ TEST_F(NaiveFoxNoConnectCodec, AllKindsAndPadding) {
   std::vector<Frame> decoded;
   ASSERT_TRUE(Decode(11, 512, encoded, decoded));
   ExpectFrames(decoded, frames);
-  std::fill(encoded.begin() + kCellHeader + 8 * kFrameHeader, encoded.end(),
+  std::fill(encoded.begin() + kCellHeader + 9 * kFrameHeader, encoded.end(),
             0xff);
   ASSERT_TRUE(Decode(11, 512, encoded, decoded));
   ExpectFrames(decoded, frames);
-  for (uint8_t kind : {uint8_t{0}, uint8_t{9}, uint8_t{255}}) {
+  for (uint8_t kind : {uint8_t{0}, uint8_t{10}, uint8_t{255}}) {
     EXPECT_FALSE(Encode(0, 32, {{static_cast<Kind>(kind), 1, 0, {}}}, encoded));
   }
 }
@@ -205,8 +205,8 @@ TEST_F(NaiveFoxNoConnectCodec, CorruptHeadersNeverPublishPartialFrames) {
   const std::vector<Frame> sentinel{{Kind::Reset, 99, 0, {}}};
   const std::vector<std::pair<size_t, uint8_t>> mutations{
       {0, 0},  {7, 8},  {8, 1},  {11, 15},  {11, 52}, {12, 17},
-      {13, 0}, {13, 3}, {14, 1}, {15, 1},   {16, 0},  {16, 9},
-      {17, 1}, {18, 1}, {19, 1}, {28, 255}, {31, 4},  {35, 9},
+      {13, 0}, {13, 3}, {14, 1}, {15, 1},   {16, 0},  {16, 10},
+      {17, 1}, {18, 1}, {19, 1}, {28, 255}, {31, 4},  {35, 10},
       {36, 1}, {37, 1}, {38, 1}, {47, 255}, {50, 1}};
   for (const auto& [offset, value] : mutations) {
     auto bad = encoded;
@@ -328,6 +328,7 @@ TEST_F(NaiveFoxNoConnectCodec, StreamControlAndSequenceValidation) {
                                      {Kind::Credit, 1, 0, {0, 0, 0, 1}},
                                      {Kind::Open, 1, 0, {}},
                                      {Kind::Auth, 0, 0, {}},
+                                     {Kind::Hello, 0, 0, {}},
                                      {Kind::Data, 2, 0, {1}}};
   for (const Frame& frame : malformed) {
     StreamState stream(1);

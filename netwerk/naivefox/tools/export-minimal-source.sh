@@ -42,7 +42,7 @@ if ! $plan_only && [[ -e "$output" ]]; then
   exit 2
 fi
 
-plan=$(mktemp /tmp/naivefox-minimal-source-plan.XXXXXX.json)
+plan=$(mktemp "${TMPDIR:-/tmp}/naivefox-minimal-source-plan.XXXXXX.json")
 tmp=
 cleanup() {
   status=$?

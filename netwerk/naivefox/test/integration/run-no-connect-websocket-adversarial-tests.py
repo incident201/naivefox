@@ -104,7 +104,7 @@ class MaliciousWebSocket(socketserver.BaseRequestHandler):
                             headers.get("sec-websocket-version") == "13", "missing genuine WebSocket handshake")
             fixture.require("authorization" not in headers and "proxy-authorization" not in headers,
                             "proxy credentials leaked into WebSocket headers")
-            fixture.require(headers.get("cookie", "").startswith("app_session="), "session cookie missing")
+            fixture.require(headers.get("cookie", "").startswith("session="), "session cookie missing")
             key = headers.get("sec-websocket-key", "")
             fixture.require(len(base64.b64decode(key, validate=True)) == 16, "invalid WebSocket handshake key")
             accept = base64.b64encode(hashlib.sha1(

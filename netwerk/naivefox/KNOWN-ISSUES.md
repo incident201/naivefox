@@ -112,7 +112,9 @@ module with shared forward-proxy authentication and access policy and the
 forward proxy or an arbitrary static website. A module mismatch or rejected
 credential pair fails the connection; it does not trigger a downgrade to `classic`.
 
-The new profile requires a coordinated client/server upgrade from v1. The
+Client and server must be upgraded together whenever the current contract changes;
+older implementations are not supported. Public metadata removal and authenticated
+carrier admission do not establish passive traffic indistinguishability. The
 HTML-derived resource set represents only supported directly declared resources;
 CSS imports/backgrounds, script execution and secondary loads are not emulated.
 There is no fixed site-size budget. Large entry pages increase startup traffic,
