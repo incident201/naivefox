@@ -7693,7 +7693,7 @@
     "objdir:backend.RecursiveMakeBackend.in": 444,
     "objdir:component-manifest": 16,
     "objdir:config_status_deps.in": 126,
-    "objdir:generated-action-depfile": 5491,
+    "objdir:generated-action-depfile": 5492,
     "objdir:generated-action-relative-depfile": 1427,
     "objdir:generated-make-fragment-source": 911,
     "objdir:generated-make-prerequisite": 894,
@@ -10887,7 +10887,7 @@
   "collector_sha256": "abdd3662bad26b9e356882f47a48861d2d7dec8623761b31584312be10b494c5",
   "counts": {
     "directory_contracts": 35,
-    "files": 17370
+    "files": 17371
   },
   "depfile_count": 1118,
   "directory_contracts": [
@@ -14380,6 +14380,7 @@
     "netwerk/naivefox/NeckoTunnel.h",
     "netwerk/naivefox/NoConnectCodec.cpp",
     "netwerk/naivefox/NoConnectCodec.h",
+    "netwerk/naivefox/NoConnectHash.h",
     "netwerk/naivefox/NoConnectSite.cpp",
     "netwerk/naivefox/NoConnectSite.h",
     "netwerk/naivefox/NoConnectTransport.cpp",
@@ -28302,7 +28303,7 @@
   ],
   "firefox_base_commit": "0b76543aaeeeb2a5748ce2675ee36e7c94cb1125",
   "generated_makefile_count": 368,
-  "generated_makefiles_sha256": "234f9bdd98f5f071496a0aed54c58f850424299d56565fe8699aba9344a22c0f",
+  "generated_makefiles_sha256": "5fddf8cf08d2aab2eaecbe556f7ed14944484de0cc6f9652882fc8aaedec19d1",
   "install_manifest_count": 7,
   "install_manifest_names": [
     "_test_files",
@@ -28317,15 +28318,15 @@
   "install_manifests_sha256": "4a9f055a20a3ff10d6651ff7ba28f96a81a8356ca62ceb885e42f2320fbadee0",
   "mozconfig": "netwerk/naivefox/mozconfig-windows-x86_64",
   "mozconfig_sha256": "594d077dd74eb589b3904dbc005781f3f0ec6e058a4cd7aac5fcc954c8a6fb5b",
-  "naivefox_reference_commit": "cf6cd77e3064671c5b6dd9f4c7717c5118f47fda",
+  "naivefox_reference_commit": "a11e646ff88168a4e2d0dbbdebee133276978f25",
   "objdir_evidence_sha256": {
-    "backend.RecursiveMakeBackend.in": "f4d2548c0a8a5a38b1e2bf7beabb74c205fca64c11670446f7b9760f886401d8",
-    "config_status_deps.in": "24f6a782d6a5736fae7ee4329d0b05d03b8d546390acf05eceef6de79a763462"
+    "backend.RecursiveMakeBackend.in": "5a3aed7ddcabfeed36efeed8af6d89b10256d7d35a8b95f4c819911de391b3dc",
+    "config_status_deps.in": "e71173d4dae8c85aed65f8cd95a6bcc9ab92383672409e5074175bd0a81c1d15"
   },
   "provenance_sha256": "642a32e90aaf870224f1831b2e932e08fb3153ed75765607f2112852f668e3fb",
   "provenance_version": 2,
   "report_version": 1,
-  "source_commit": "cf6cd77e3064671c5b6dd9f4c7717c5118f47fda",
+  "source_commit": "a11e646ff88168a4e2d0dbbdebee133276978f25",
   "source_tree_kind": "repository",
   "source_worktree_clean": true,
   "source_worktree_status": [],
