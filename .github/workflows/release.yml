@@ -512,9 +512,9 @@ jobs:
             echo
             echo "Classic remains the default Naive-compatible CONNECT transport."
             echo
-            echo "No-connect now derives its public startup resources from index.html and streams their actual sizes before the unchanged twenty HTTP pairs and shaped native WebSocket. Only classic and no-connect are supported."
+            echo "No-connect public responses no longer advertise X-App-* metadata. The first startup pair authenticates and privately confirms the fixed contract and streamed site digest before any target OPEN. Anonymous API/WebSocket requests use normal site fallback."
             echo
-            echo "Upgrade the client and naivefox-transport server together. The server wire profile is native-stream-v2 and its WebSocket subprotocol is nfc1.stream.v1. Old finite HTTP and hybrid/asymmetric selectors are retired."
+            echo "Upgrade the client and naivefox-transport server together. Only the latest native-stream-v2 implementation is supported, with no compatibility for earlier releases. Twenty startup pairs and the shaped WebSocket remain. Classic and no-connect remain available."
             echo
             echo "No-connect with quic:// requires UDP for startup and TCP for the subsequent WebSocket phase."
             echo
