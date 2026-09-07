@@ -52,7 +52,9 @@ application protocol without changing its credentials:
 Transport selection occurs before implicit preamble defaults. Valid classic
 preamble, extra-header, gate and diagnostic settings remain inactive in
 no-connect mode, so the same file switches back to classic unchanged.
-The no-connect client and server must both support native-stream-v2. The site
+The no-connect client and server must both implement the current native-stream-v2.
+Public site responses do not advertise the transport. Authentication and private
+snapshot confirmation complete before any destination is opened. The site
 inventory is derived from index.html and streamed without fixed-size padding
 or a mandatory byte budget. Client caching stays disabled; see
 [NO-CONNECT.md](netwerk/naivefox/NO-CONNECT.md) for the first-level scope and site requirements.

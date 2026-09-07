@@ -165,7 +165,12 @@ script or recursively follows CSS/image/JS dependencies. Public response bodies
 use a fixed-size streaming sink distinct from bounded NFC1 cell buffering.
 All selected resources complete before carrier startup, with six GETs active
 at most. Site size/count are operator choices; caching remains inhibited.
-The server supplies an immutable unpadded snapshot and a consistent site ID.
+The server supplies an immutable unpadded snapshot without public transport
+headers. NSS hashes streamed public bodies; the first authenticated NFC1
+response confirms the fixed current contract and ordered snapshot digest.
+The first upload contains only AUTH; OPEN waits for complete HELLO validation.
+Anonymous carrier and WebSocket requests use normal site fallback. The public
+session cookie is ordinary HTTP state, not authentication.
 Document/inventory metadata and server snapshot memory scale with site input.
 
 Capacity follows locally sendable data within the unchanged 512-KiB stream

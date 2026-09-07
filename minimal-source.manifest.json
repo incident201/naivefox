@@ -1,10 +1,10 @@
 {
   "counts": {
     "executable_files": 181,
-    "files": 22106
+    "files": 22090
   },
-  "evidence_commit": "5cb61a1122ef5cc28cbb744807d5217d2f121dd2",
-  "evidence_source_commit": "cf6cd77e3064671c5b6dd9f4c7717c5118f47fda",
+  "evidence_commit": "d66b8a081dd9377a8b7e6c0339ad3632414891a9",
+  "evidence_source_commit": "c35d6f969ad29c1c1e87c41c1bfc510dd76dab05",
   "files": [
     {
       "mode": "0644",
@@ -49,7 +49,7 @@
     {
       "mode": "0644",
       "path": "README.md",
-      "sha256": "068c106f37c20f5456b1a293610dab2a85e84f99231e5d1bd129da95e1695fba"
+      "sha256": "91689598a9cc0f388f701cc19dfa1c9d92e94ce5ee6a0c24c1daa3827535821f"
     },
     {
       "mode": "0644",
@@ -19034,7 +19034,7 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/ARCHITECTURE.md",
-      "sha256": "40c922b69a88f7623b4f930af853db31b8b8c528fcbe44399e4b219bc4e95ac8"
+      "sha256": "783983ebdd9f3997a81612f960f759a42a314a45997817b375c040a4ba627ed9"
     },
     {
       "mode": "0644",
@@ -19049,7 +19049,7 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/CAPTURE.md",
-      "sha256": "e56075b39248972dae72021f6d192896ffef3b2b390ac2b25a45738e1f2ac77b"
+      "sha256": "6043ee336af4a339b9070742143a0417417afa8f5319f7be6b485a61980418e1"
     },
     {
       "mode": "0644",
@@ -19129,7 +19129,7 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/KNOWN-ISSUES.md",
-      "sha256": "2a51e39062775b4b298c2dd9769948af1d59fb51bddfe84d175b4a5b4ef7989c"
+      "sha256": "2170ec0ac2ffdc63269b55e757e56e2abbee52489037c1c07bb07fe801e40ce8"
     },
     {
       "mode": "0644",
@@ -19149,7 +19149,7 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/NO-CONNECT.md",
-      "sha256": "29b310826ca0cae7ae36af23877388ad983f877fdbe38d79c4411d200eb7e8d3"
+      "sha256": "8f6e65d68947f2e43db6ab98d6870b0c58eecb40edd1291975dc6d94317daca1"
     },
     {
       "mode": "0644",
@@ -19239,12 +19239,17 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/NoConnectCodec.cpp",
-      "sha256": "6124ee844a32589244eb27e2edf5e7e4b8286bf8dffdc9827656675395015152"
+      "sha256": "e4d4d430843060b6a3e47b9c9a669a7b8f0117494d01e4cfb09ccfe0f0ccb3db"
     },
     {
       "mode": "0644",
       "path": "netwerk/naivefox/NoConnectCodec.h",
-      "sha256": "b359c1792cde453b5fe0cf499f358d27defb7c2eee9f218dd3b1d819e5bf5e44"
+      "sha256": "6a4045b22faf748edb18d07b841d2f981811f6313a4d7537d0dab41e61a8c6e6"
+    },
+    {
+      "mode": "0644",
+      "path": "netwerk/naivefox/NoConnectHash.h",
+      "sha256": "3bf38544b3541902a4e8a059d31458a79d1fbb7b4116c29774b85200028e0906"
     },
     {
       "mode": "0644",
@@ -19254,12 +19259,12 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/NoConnectSite.h",
-      "sha256": "318fb6c33c9ebd1c68bf1cf2a79a2d3994064cd74a72d0cf36d57f8c3bc9eaeb"
+      "sha256": "909e07d0a2370cfca0c7eb4f80f9ee6bde65bd9bbd2280d3d8396720a02af917"
     },
     {
       "mode": "0644",
       "path": "netwerk/naivefox/NoConnectTransport.cpp",
-      "sha256": "831ec8a7d92f89d31b1102d20b9a84e47b038452fb26733eee80e9a987b0d2db"
+      "sha256": "b2eb2640dc33b206c250c9cba688e89150ab2ae8da4c5843f79c95ce134331d7"
     },
     {
       "mode": "0644",
@@ -19309,7 +19314,7 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/README.md",
-      "sha256": "e5c8e409d205292cc3971dd7d41f4cb64b082f31c9b6ab8a1726b92c1f722ea5"
+      "sha256": "f81ac06ce89d74ae820f5d19b860229276a14380492eb6e36210504264c37bca"
     },
     {
       "mode": "0644",
@@ -19614,7 +19619,7 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/test/gtest/TestNoConnectCodec.cpp",
-      "sha256": "edb7e8ab9a072d63534ece8f496c60a3e13475ac7af7273451990fd62ef7a15d"
+      "sha256": "9124a8344437121831c8e6623b63fe376c0c8b95260d210c525e72b83baffdd8"
     },
     {
       "mode": "0644",
@@ -19669,7 +19674,7 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/test/integration/README.md",
-      "sha256": "ffc67ed7f7a10da26d8152520b01054e000d9eb3c988bab52f8d6079b43e3fc7"
+      "sha256": "7559045829ba8fbfb3b1b482a5d473e5a213f03e6a2ebae98fdc86b2d0e72486"
     },
     {
       "mode": "0644",
@@ -20034,7 +20039,7 @@
     {
       "mode": "0755",
       "path": "netwerk/naivefox/test/integration/run-no-connect-adversarial-tests.py",
-      "sha256": "29102ca0544b22ee9b772bcec632e6b386c27beff9a01982c964bf7bb0dce512"
+      "sha256": "673436a03c1e833b14b0da1869bf63409a9b89861434a61494fa6787cea5670c"
     },
     {
       "mode": "0644",
@@ -20064,17 +20069,17 @@
     {
       "mode": "0755",
       "path": "netwerk/naivefox/test/integration/run-no-connect-site-tests.py",
-      "sha256": "a011243b09871bb77b7b0b095dda7b5adba3fbc136c69242dc6f4ce3629d0e43"
+      "sha256": "503bcc40144e714f8f3d9e848c2fe5e35e0696100d91c38d6efa2447cd3ea2dd"
     },
     {
       "mode": "0755",
       "path": "netwerk/naivefox/test/integration/run-no-connect-tests.py",
-      "sha256": "ffcc846ccf7aa86bea0bdd856c30a412f6a2984d30892f1614de524d29126ac1"
+      "sha256": "10ef303cc0fd7cf6d210fab186c1af139128d93cba78f6ce6b8f6322e67e42cb"
     },
     {
       "mode": "0755",
       "path": "netwerk/naivefox/test/integration/run-no-connect-websocket-adversarial-tests.py",
-      "sha256": "5bf361b8fbe457dea094da01a2618c1a10138355388001447fe002dd5639a869"
+      "sha256": "04993f83d7380ca6f86866718cff36a890ae93dd2874d2ef5a0103af813695c2"
     },
     {
       "mode": "0755",
@@ -20244,7 +20249,7 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/test/integration/test_no_connect_runtime_fixture.py",
-      "sha256": "67e60eacfa7793d8a7934e10f94e75eac16cfaab11c082ae38a268b15c0fa7a9"
+      "sha256": "6d2917cf1faca00fa102217bee25cf5ad557589b6d0774a6d6ae60fbab343b77"
     },
     {
       "mode": "0755",
@@ -20274,7 +20279,7 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/test/integration/versions.env",
-      "sha256": "c7cb91c348b323b5c07ef004c834ac12a885e3a8a7a4a00766e7e492541d0e0c"
+      "sha256": "e4d9e42e871cd52166475bdc958f90f2d7ee086c1b7c0d80b743a0c0c5f3d738"
     },
     {
       "mode": "0755",
@@ -30708,26 +30713,6 @@
     },
     {
       "mode": "0644",
-      "path": "testing/gtest/mozilla/GTestRunner.cpp",
-      "sha256": "96890cfd12d3bdc30e95f382d75403164fd5d4b1e69e6ff93742051204fbeb08"
-    },
-    {
-      "mode": "0644",
-      "path": "testing/gtest/mozilla/GTestRunner.h",
-      "sha256": "9cf036f8748cabd47569301c5b95f5597b74b751f4dd2846da8678ff56b31a04"
-    },
-    {
-      "mode": "0644",
-      "path": "testing/gtest/mozilla/MozAssertions.cpp",
-      "sha256": "c506cb17041830689d93bfb8286caa553446f584c0a882ae12b4c3a3ebcb7ea1"
-    },
-    {
-      "mode": "0644",
-      "path": "testing/gtest/mozilla/MozAssertions.h",
-      "sha256": "cb3ad1dc991f77695b8ac3c9e5195b306362822b37d831089b8c8c81511c844a"
-    },
-    {
-      "mode": "0644",
       "path": "testing/gtest/remotegtests.py",
       "sha256": "eb782d07ec5f5ddc4becec259842f76bb58b297ebd6f7cc511d6557842111b92"
     },
@@ -34045,61 +34030,6 @@
       "mode": "0644",
       "path": "third_party/function2/include/function2/function2.hpp",
       "sha256": "10fb399117ffbce3092a8fd9171b59ac19f5e5b1ceb3db060fc03f822e645e79"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/googletest/googletest/src/gtest-all.cc",
-      "sha256": "972d3016860f9aa6452e078cf77406290fb7003b66fd6c0744a030bd1c323606"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/googletest/googletest/src/gtest-assertion-result.cc",
-      "sha256": "dbd2235676dcc0ef6409108a4041e05442fc6895735a5561d71151e6a14296bb"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/googletest/googletest/src/gtest-death-test.cc",
-      "sha256": "2881240c49961c095505f3c044483a79ef1c32e413e19630af7508d67994f619"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/googletest/googletest/src/gtest-filepath.cc",
-      "sha256": "b3d0011edbb81f782b88aac6ea20d04b24050e5738b3b2240a22033f675cb71f"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/googletest/googletest/src/gtest-internal-inl.h",
-      "sha256": "a5fb0dbf86304cbcce6252a136d7e722e07518940ce1ed134ce93e7eea4f0fcc"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/googletest/googletest/src/gtest-matchers.cc",
-      "sha256": "e4ce9edf33493625353cc147a14caac14fdba7390d76166d101fa2fe9d16bbda"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/googletest/googletest/src/gtest-port.cc",
-      "sha256": "39470003392fcf089340a31f92e61efa46328052cb16559e5ddada64e94886bc"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/googletest/googletest/src/gtest-printers.cc",
-      "sha256": "efcf234bdeb688d09500dbbdede962b9ff1de5d5f842b5d5e5a4a58a0b4b99a4"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/googletest/googletest/src/gtest-test-part.cc",
-      "sha256": "9acddbbe251f0516a92da1f55d8edd06c66c8fdeca382460d57340ad594f76f2"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/googletest/googletest/src/gtest-typed-test.cc",
-      "sha256": "b92e70b2d7ee3b86328162cbda269a28de4ce67f0e8d9beec5ec2c73a93ba006"
-    },
-    {
-      "mode": "0644",
-      "path": "third_party/googletest/googletest/src/gtest.cc",
-      "sha256": "c88905c471c58ca3e58978477d96d8849d97a58e8afcd190011a7a76cd2a8b75"
     },
     {
       "mode": "0644",
@@ -105778,11 +105708,6 @@
     },
     {
       "mode": "0644",
-      "path": "toolkit/library/gtest/libxul_missing_buildid/xul_missing_buildid.c",
-      "sha256": "ff4a46a230d018aaa810e09e3cbb100745f2f3f459bf174a42e0394d95eb6531"
-    },
-    {
-      "mode": "0644",
       "path": "toolkit/library/libxul-naivefox.symbols",
       "sha256": "fe989a874a71f52a9f9d0eedc047991a7c6a7e7568076c371d28b772d7f9cc8a"
     },
@@ -109968,11 +109893,6 @@
     },
     {
       "mode": "0644",
-      "path": "xpcom/tests/TestHarness.h",
-      "sha256": "a4fe56070e0cb0b0b5f986e40317c919688229b969207b5464851c1e2347ef44"
-    },
-    {
-      "mode": "0644",
       "path": "xpcom/threads/AbstractThread.cpp",
       "sha256": "7f274a63bb83f7768f154d9d85d2a1077a628f65812d56a12c6077ed69278acd"
     },
@@ -110538,8 +110458,8 @@
     }
   ],
   "firefox_base_commit": "0b76543aaeeeb2a5748ce2675ee36e7c94cb1125",
-  "manifest_sha256": "c07d70c4cf263e1ef6cbe738479093061b11c686dd8236497f3957b66f04efca",
+  "manifest_sha256": "a67460a772d2bf241bbf3741c931a008c72f9e10fb2e8e21774cb8b42fd3c3b3",
   "manifest_version": 2,
-  "minimal_export_commit": "5cb61a1122ef5cc28cbb744807d5217d2f121dd2",
-  "naivefox_reference_commit": "cf6cd77e3064671c5b6dd9f4c7717c5118f47fda"
+  "minimal_export_commit": "d66b8a081dd9377a8b7e6c0339ad3632414891a9",
+  "naivefox_reference_commit": "c35d6f969ad29c1c1e87c41c1bfc510dd76dab05"
 }

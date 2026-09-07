@@ -71,16 +71,24 @@ class NoConnectFixtureTests(unittest.TestCase):
             with self.subTest(invalid=invalid), self.assertRaises(RuntimeError):
                 fixture.caddyfile_text(invalid)
 
-    def test_auth_mode_faults_keep_valid_root_profile_and_capacity(self):
-        for case in ("auth-mode-missing", "auth-mode-legacy"):
-            server = {"routes": []}
-            adversarial.mutation(case)(server)
-            response = server["routes"][0]["handle"][0]
-            self.assertEqual(response["status_code"], 200)
-            self.assertEqual(len(response["body"]), 4096)
-            self.assertEqual(response["headers"]["X-App-Profile"], ["native-stream-v2"])
-            self.assertNotEqual(response["headers"].get("X-App-Auth"), ["basic"])
-            self.assertIn("Set-Cookie", response["headers"])
+    def test_confirmation_faults_preserve_public_site_and_fixed_capacity(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = fixture.prepare_application(Path(directory))
+            for case in ("hello-missing", "hello-profile", "hello-site", "hello-duplicate"):
+                server = {"routes": [{"handle": [{"handler": "naivefox_transport",
+                                                  "application_root": str(root)}]}]}
+                adversarial.mutation(case)(server)
+                route = server["routes"][0]
+                self.assertEqual(route["match"][0]["path"], ["/api/events/brief"])
+                if case == "hello-duplicate":
+                    response = route["handle"][-1]
+                    self.assertEqual(response["handler"], "file_server")
+                    self.assertEqual((Path(response["root"]) / "cell.bin").stat().st_size, 8192)
+                    continue
+                response = route["handle"][0]
+                self.assertEqual(response["status_code"], 200)
+                self.assertEqual(len(response["body"]), 8192)
+                self.assertFalse(any(name.startswith("X-App-") for name in response["headers"]))
 
     def test_concurrent_gate_holds_all_forty_streams_before_any_data(self):
         lock = threading.Lock()

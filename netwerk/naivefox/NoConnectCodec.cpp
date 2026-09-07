@@ -26,7 +26,9 @@ void WriteUint32(uint8_t* aBytes, uint32_t aValue) {
   aBytes[3] = static_cast<uint8_t>(aValue);
 }
 
-bool ValidKind(Kind aKind) { return aKind >= Kind::Open && aKind <= Kind::Ack; }
+bool ValidKind(Kind aKind) {
+  return aKind >= Kind::Open && aKind <= Kind::Hello;
+}
 
 }  // namespace
 

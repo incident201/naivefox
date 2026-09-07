@@ -91,6 +91,9 @@ def run_case(args, base, protocol, case, supplied=None):
                         "unexpected secondary load, navigation or CONNECT")
         for record in records:
             path = record["request"]["uri"]
+            fixture.require(not any(name.lower().startswith("x-app-")
+                                    for name in record.get("resp_headers", {})),
+                            "public transport metadata leaked")
             if path in {"/", *expected}:
                 source = inputs.application_root / ("index.html" if path == "/" else urlsplit(path).path[1:])
                 fixture.require(record["status"] == 200 and record["size"] == source.stat().st_size,

@@ -35,9 +35,15 @@ opening. A mismatched protocol never becomes an accepted carrier.
 
 Use the matching
 [naivefox-transport module](https://github.com/incident201/naivefox-transport).
-The supported wire profile is `native-stream-v2`, advertised with
-`X-App-Profile`, `X-App-Auth: basic` and `X-App-Realtime: websocket-v1`.
+The only supported wire contract is the current `native-stream-v2`.
+Upgrade client and server together; earlier implementations are not supported.
 Omit the Caddy `profile` option or set it to `native-stream-v2`.
+
+Public GET/HEAD responses have no `X-App-*` headers. Root GET sets an ordinary
+Secure/HttpOnly `session` cookie bound to the client IP. Public resources do not
+advertise transport capabilities or snapshot metadata. Anonymous carrier and
+WebSocket requests use normal site fallback, including empty NFC1 cells,
+malformed uploads and invalid credentials.
 
 Configure the nested `forward_proxy` credentials and access policy once for
 both transports. Keep the hostless `:443` site address alongside the named
@@ -66,13 +72,19 @@ Client caching remains disabled. Public bodies are streamed through fixed-size
 I/O buffers, with at most six resource GETs active at once. Parser/URL metadata
 still scales with document structure and resource count. Ordinary deadlines,
 backpressure, checked lengths and allocation-failure handling remain necessary.
-The client validates complete responses, MIME families and matching X-App-Site
-identities. A mixed snapshot fails without an automatic reload/retry loop.
+The client validates complete responses and MIME families while hashing each
+public body with NSS SHA-256. It computes an ordered snapshot digest from the
+document digest, resource URLs, kinds, MIME types and body digests. The first
+POST carries AUTH alone. The first authenticated GET contains exactly one HELLO
+confirming `native-stream-v2` and the server snapshot digest. Both are checked
+before OPEN. A mixed snapshot fails without reload/retry. Bodies remain streamed
+through bounded buffers, retaining one digest and MIME value per resource.
 
 The client uses Gecko's DOM-free HTML tokenizer/tree builder. No JavaScript
 execution, full DOM, style processing, image decoder, browser worker, local WSS
 bridge or additional network stack is introduced. Upgrade server and client
-together for native-stream-v2; v1 peers fail before AUTH/target opening.
+together whenever the contract changes. TLS certificate and hostname validation
+remain mandatory before credentials are sent.
 
 ## Lifecycle and bounds
 
@@ -80,7 +92,8 @@ The client completes the root, all selected resources, and twenty ordered startu
 POST/GET pairs before opening `/api/realtime` with `nfc1.stream.v1`.
 Startup uploads are 4096 bytes. Responses use four 8192-byte slots, two
 32768-byte slots, twelve 65536-byte slots, and two final 8192-byte slots.
-Proxy frames may displace filler during startup. The twenty pairs contribute
+The first pair authenticates and confirms the contract. Proxy frames may
+displace filler from the second pair onward. The twenty pairs contribute
 960 KiB of body capacity per new carrier in addition to the site resources.
 The public site script is not required to implement this carrier protocol.
 

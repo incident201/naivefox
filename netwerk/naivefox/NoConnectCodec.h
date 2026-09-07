@@ -27,6 +27,7 @@ enum class Kind : uint8_t {
   Auth,
   Opened,
   Ack,
+  Hello,
 };
 
 inline constexpr size_t ReadyRealtimeUpCapacity(size_t aBytes, bool aOpening) {
