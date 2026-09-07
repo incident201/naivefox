@@ -822,6 +822,18 @@ def run_protocol(args, base, protocol):
             args, run, "classic", protocol, proxy_port, "classic", user, password,
             ordinary_connections + variety_connections + policy_refusals)
         processes.append(classic)
+        exercise(classic_ports, target_port, f"{protocol} classic", batches)
+        target_variety(classic_ports, target_port, second_target.server_address[1])
+        for listener in ("socks", "http"):
+            reject_policy(classic_ports, listener, denied_target.server_address[1], host="127.0.0.2")
+        classic.exited_cleanly()
+        reject_credentials(args, run, protocol, proxy_port, "classic", user, password,
+                           target_port, processes)
+        # Closed native sessions expire; collect their final counters before
+        # running any slower, unrelated workload on the same server.
+        native_request_start = len(access_requests(run))
+        reject_credentials(args, run, protocol, proxy_port, transport, user, password,
+                           target_port, processes)
         exercise(candidate_ports, target_port, f"{protocol} {transport}", batches,
                  getattr(args, "idle_seconds", 2))
         target_variety(candidate_ports, target_port, second_target.server_address[1])
@@ -831,21 +843,12 @@ def run_protocol(args, base, protocol):
         for listener in ("socks", "http"):
             reject_policy(candidate_ports, listener, denied_target.server_address[1], host="127.0.0.2")
         candidate.exited_cleanly()
-        reject_credentials(args, run, protocol, proxy_port, transport, user, password,
-                           target_port, processes)
-        requests = access_requests(run)
+        requests = access_requests(run)[native_request_start:]
         require(not any(item.get("method") == "CONNECT" for item in requests),
                 "no-connect emitted an outer CONNECT")
         require(not any(name.lower() in {"authorization", "proxy-authorization"}
                         for item in requests for name in item.get("headers", {})),
                 "no-connect exposed Basic credentials in origin HTTP headers")
-        exercise(classic_ports, target_port, f"{protocol} classic", batches)
-        target_variety(classic_ports, target_port, second_target.server_address[1])
-        for listener in ("socks", "http"):
-            reject_policy(classic_ports, listener, denied_target.server_address[1], host="127.0.0.2")
-        classic.exited_cleanly()
-        reject_credentials(args, run, protocol, proxy_port, "classic", user, password,
-                           target_port, processes)
         require(denied_target.accepted_connections == 0,
                 "forward-proxy ACL dialed a denied loopback address")
         caddy.stop()
