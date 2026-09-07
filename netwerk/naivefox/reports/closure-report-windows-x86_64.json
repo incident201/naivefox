@@ -1,10 +1,10 @@
 {
   "report_provenance": {
     "provenance_version": 2,
-    "source_commit_sha": "a11e646ff88168a4e2d0dbbdebee133276978f25",
+    "source_commit_sha": "c35d6f969ad29c1c1e87c41c1bfc510dd76dab05",
     "source_worktree_clean": true,
     "firefox_base_sha": "0b76543aaeeeb2a5748ce2675ee36e7c94cb1125",
-    "naivefox_reference_sha": "a11e646ff88168a4e2d0dbbdebee133276978f25",
+    "naivefox_reference_sha": "c35d6f969ad29c1c1e87c41c1bfc510dd76dab05",
     "analyzer_sha256": "8375712b7523f4da690b5424d983f9cc080e51ac88505c4709736187578d889a",
     "provenance_sha256": "642a32e90aaf870224f1831b2e932e08fb3153ed75765607f2112852f668e3fb",
     "evidence_collector_sha256": "9008a1958274d02004fafbe29866ce8f8f168755b52c5042e6f73b988ad40f3b",
@@ -7098,7 +7098,7 @@
       {
         "path": "application.ini",
         "size_bytes": 354,
-        "sha256": "30a0b7fd85d38244f835690a4edae4912d6bc1262d91c908b3f429ee9d8ad595"
+        "sha256": "2d719943edd29da38ab3843a604a5847f3203aa7cb0606e0a57f3a15b88b6281"
       },
       {
         "path": "chrome.manifest",
@@ -7148,7 +7148,7 @@
       {
         "path": "xul.dll",
         "size_bytes": 13908480,
-        "sha256": "d9123fc6ad49ddb028351fecc8dd561afbee896009fe40665962c3feaddd07b5"
+        "sha256": "2f20679e2da64b82c2a25452f1da4b8a31cf1b426f959607a7925c07a0d25340"
       },
       {
         "path": "localization/en-US/netwerk/necko.ftl",

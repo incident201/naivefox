@@ -1,10 +1,10 @@
 {
   "report_provenance": {
     "provenance_version": 2,
-    "source_commit_sha": "a11e646ff88168a4e2d0dbbdebee133276978f25",
+    "source_commit_sha": "c35d6f969ad29c1c1e87c41c1bfc510dd76dab05",
     "source_worktree_clean": true,
     "firefox_base_sha": "0b76543aaeeeb2a5748ce2675ee36e7c94cb1125",
-    "naivefox_reference_sha": "a11e646ff88168a4e2d0dbbdebee133276978f25",
+    "naivefox_reference_sha": "c35d6f969ad29c1c1e87c41c1bfc510dd76dab05",
     "analyzer_sha256": "8375712b7523f4da690b5424d983f9cc080e51ac88505c4709736187578d889a",
     "provenance_sha256": "642a32e90aaf870224f1831b2e932e08fb3153ed75765607f2112852f668e3fb",
     "evidence_collector_sha256": "9008a1958274d02004fafbe29866ce8f8f168755b52c5042e6f73b988ad40f3b",
@@ -7011,12 +7011,12 @@
       {
         "path": "runtime-manifest.json",
         "size_bytes": 3082,
-        "sha256": "f125c4717d977f149ddc67c228f5367817efb259dfc44c10fbfc1e4a84a89646"
+        "sha256": "ccc4d0fa8eae7c0e9bde4074f32e3339472b406be039a666f2e15c204dd69b02"
       },
       {
         "path": "runtime/application.ini",
         "size_bytes": 354,
-        "sha256": "95171fc8940e8c7141789ce0841d370c4477be32e5fcb2fd35247c8baace3389"
+        "sha256": "d0612c3dbbacecc263f27cc2eddb21118b64cc66395647a90b532eccf9b0b9f3"
       },
       {
         "path": "runtime/chrome.manifest",
@@ -7086,7 +7086,7 @@
       {
         "path": "runtime/libxul.so",
         "size_bytes": 31116464,
-        "sha256": "20d26e5aa75b7ea4bcf01fbcbc06db81a5f760185b92be73ea9223a7bb87ed66"
+        "sha256": "d8aaee2cfede6e519672fa4b74edd399c8010541d2fbc19078ec838f12b866f2"
       },
       {
         "path": "runtime/naivefox",

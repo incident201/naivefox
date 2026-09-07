@@ -1,10 +1,10 @@
 {
   "report_provenance": {
     "provenance_version": 2,
-    "source_commit_sha": "a11e646ff88168a4e2d0dbbdebee133276978f25",
+    "source_commit_sha": "c35d6f969ad29c1c1e87c41c1bfc510dd76dab05",
     "source_worktree_clean": true,
     "firefox_base_sha": "0b76543aaeeeb2a5748ce2675ee36e7c94cb1125",
-    "naivefox_reference_sha": "a11e646ff88168a4e2d0dbbdebee133276978f25",
+    "naivefox_reference_sha": "c35d6f969ad29c1c1e87c41c1bfc510dd76dab05",
     "analyzer_sha256": "8375712b7523f4da690b5424d983f9cc080e51ac88505c4709736187578d889a",
     "provenance_sha256": "642a32e90aaf870224f1831b2e932e08fb3153ed75765607f2112852f668e3fb",
     "evidence_collector_sha256": "9008a1958274d02004fafbe29866ce8f8f168755b52c5042e6f73b988ad40f3b",
@@ -7048,7 +7048,7 @@
       {
         "path": "manifest.json",
         "size_bytes": 1846,
-        "sha256": "659e98f10f7a73885092d4318c6f099e8ed873e6c1a5dbfea3fd9f6227568843"
+        "sha256": "f8a7938ab47d744299ce3db8aea46bd90f1480ce89e6897030227491ec696793"
       },
       {
         "path": "include/NaiveFoxAPI.h",
@@ -7078,7 +7078,7 @@
       {
         "path": "lib/arm64-v8a/libxul.so",
         "size_bytes": 31633144,
-        "sha256": "871165f0a9f7f21d37d8e6182fb0c28060cc7fb6e9047d475951fbb3771d9833"
+        "sha256": "af29df0c3f56313404e37ff7f72ca306944bf3a64aa3c86fabfb1ba1e8cabd7a"
       },
       {
         "path": "lib/arm64-v8a/omni.ja",
