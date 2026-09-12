@@ -183,16 +183,6 @@ nsHttpTransaction::~nsHttpTransaction() {
   ReleaseBlockingTransaction();
 }
 
-#ifdef MOZ_NAIVEFOX
-void nsHttpTransaction::SetH3CarrierDispatchGate(
-    H3CarrierDispatchGate* aGate) {
-  mH3CarrierDispatchGate = aGate;
-}
-
-H3CarrierDispatchGate* nsHttpTransaction::CarrierDispatchGate() const {
-  return mH3CarrierDispatchGate;
-}
-#endif
 
 nsresult nsHttpTransaction::Init(
     uint32_t caps, nsHttpConnectionInfo* cinfo, nsHttpRequestHead* requestHead,

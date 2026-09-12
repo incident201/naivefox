@@ -7,7 +7,6 @@
 
 #include "HTTPSRecordResolver.h"
 #include "HttpLog.h"
-#include "NaiveFoxLifecycleLog.h"
 #include "nsHttpConnectionMgr.h"
 #include "nsHttpHandler.h"
 #include "nsICachingChannel.h"
@@ -76,21 +75,7 @@ nsresult SpeculativeTransaction::ReadSegments(nsAHttpSegmentReader* aReader,
                                               uint32_t* aCountRead) {
   MOZ_ASSERT(OnSocketThread(), "not on socket thread");
   mTriedToWrite = true;
-  nsresult rv = NullHttpTransaction::ReadSegments(aReader, aCount, aCountRead);
-#ifdef MOZ_NAIVEFOX
-  if (mH3CarrierDispatchGate) {
-    mH3CarrierDispatchGate->MarkCarrierReadComplete(rv);
-    if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
-      NAIVEFOX_LIFECYCLE_LOG(
-          ("h3.carrier_dispatch action=carrier-read-complete gate=%p "
-           "carrier=%p request_bytes=%u result=%s rv=%08x",
-           mH3CarrierDispatchGate.get(), this, *aCountRead,
-           rv == NS_BASE_STREAM_CLOSED ? "base-stream-closed" : "unexpected",
-           static_cast<uint32_t>(rv)));
-    }
-  }
-#endif
-  return rv;
+  return NullHttpTransaction::ReadSegments(aReader, aCount, aCountRead);
 }
 
 void SpeculativeTransaction::Close(nsresult aReason) {

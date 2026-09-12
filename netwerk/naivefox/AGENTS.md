@@ -1,143 +1,108 @@
 # NaiveFox contributor instructions
 
-Read the repository-root `AGENTS.md` first. These rules apply to
-`netwerk/naivefox/` and to the few downstream Firefox files listed in
-[`UPSTREAM-PATCHES.md`](UPSTREAM-PATCHES.md).
-
-Before changing NaiveFox, read:
-
-- [`README.md`](README.md) for product behavior;
-- [`ARCHITECTURE.md`](ARCHITECTURE.md) for ownership and threading constraints;
-- [`UPSTREAM.md`](UPSTREAM.md) for branch and refresh rules;
-- [`KNOWN-ISSUES.md`](KNOWN-ISSUES.md) for active limitations;
-- [`test/integration/README.md`](test/integration/README.md) when changing runtime behavior.
-- [`NO-CONNECT.md`](NO-CONNECT.md) when changing transport selection or the
-  native application carrier.
+Read the repository-root AGENTS.md first, then README.md, ARCHITECTURE.md,
+UPSTREAM.md, KNOWN-ISSUES.md and TRANSPORT.md. For runtime work also read
+test/integration/README.md.
 
 ## Repository discipline
 
-- All NaiveFox networking, product, build-graph, packaging, shim, and export
-  work belongs on `naivefox-full-source`.
-- `firefox-upstream` is a fast-forward-only mirror of Mozilla Firefox.
-- `naivefox-minimal-source` is generated; never edit its product tree or merge
-  it back. Its `.github/workflows/` control-plane overlay is intentionally
-  maintained directly so release automation can evolve independently.
-- Preserve unrelated work in a dirty tree. Do not rewrite public history or push
-  without authorization.
-- Keep project code under `netwerk/naivefox/`. Modify an existing Firefox file
-  only when project-only code cannot use an existing API.
-- Every downstream Firefox change must be narrow, regression-tested, and added
-  to `UPSTREAM-PATCHES.md` with a stable `NF-UPSTREAM-XXX` identifier.
+- Product, networking, packaging, build graph, shims and export changes belong
+  on naivefox-full-source.
+- firefox-upstream is a fast-forward-only Mozilla mirror.
+- naivefox-minimal-source is generated. Do not edit its product tree or merge it
+  back. Its workflow control-plane overlay may be maintained independently.
+- Preserve unrelated changes. Do not push or rewrite public history without
+  authorization.
+- Keep project code under netwerk/naivefox. Existing Firefox files may change
+  only when a project-only implementation cannot use the available APIs.
+- Inventory every downstream Firefox change in UPSTREAM-PATCHES.md with a
+  stable NF-UPSTREAM identifier and focused regression coverage.
+- Credentials, payloads, TLS secrets, generated profiles/captures, Caddy state
+  and reports stay outside Git and ordinary output.
 
-## Architecture invariants
+## Architecture
 
-- Necko owns HTTP/2, HTTP/3, CONNECT, pooling, and flow control.
-- NSS/PSM owns TLS and certificate validation; Neqo owns QUIC.
-- Do not add another HTTP, TLS, or QUIC stack or manually generate protocol
-  frames to imitate Firefox.
-- A raw CONNECT must not emit a synthetic `ALPN`, `Upgrade`, or `Connection`
-  marker. The Naive `padding` header is the intentional compatibility signal.
-- SOCKS domain targets remain hostnames in classic CONNECT authority or
-  no-connect OPEN frames; do not resolve them locally.
-- Strict H2 and H3 must fail closed. Auto may retry H2 only after an H3
-  establishment failure before CONNECT response or tunnel creation.
-- The current product intentionally runs networking in one process. Do not
-  enable the socket process without IPC-capable tunnel-stream takeover.
-- Cross-thread-owned objects require thread-safe refcounting. Keep state
-  mutation on its owning event target even when lifetime is thread-safe.
-- Preserve bounded buffering, partial-I/O handling, async backpressure,
-  half-close behavior, and shutdown propagation. Never assume socket reads map
-  to H2/H3 frames or Naive records.
-- Keep credentials, authorization headers, payloads, TLS secrets, profiles,
-  captures, generated Caddy state, and logs out of Git and ordinary output.
+There is one current NaiveFox transport, with coordinated client/server updates.
+Classic NaiveProxy, transport selectors, legacy profiles, alternate versions,
+migration fallbacks and experimental production modes are out of scope.
+CONNECT absence is not an architectural requirement.
 
-## Configuration and protocol scope
+Necko owns HTTP, native WebSocket and pooling. NSS/PSM owns TLS and certificate
+checks. Neqo owns QUIC. Do not add another HTTP/TLS/QUIC stack, generate fake
+Firefox wire frames, or import browser execution, DOM loaders or JavaScript.
 
-The supported local frontends are SOCKS5 CONNECT and HTTP CONNECT. SOCKS BIND,
-UDP ASSOCIATE, ordinary forward HTTP, CONNECT-UDP, MASQUE, WebTransport, TUN,
-and GUI work are outside the current product.
+Strict H2 uses native HTTP startup and WSS/TCP. Strict H3 keeps all startup and
+sustained carrier traffic on HTTP/3; TCP fallback is forbidden. The current H3
+adapter uses a persistent downstream GET and at most eight finite upload POSTs.
+Keep application sequencing, bounded reorder retention and delivery credit
+consistent between client and server.
 
-Config parsing is strict. Preserve the documented string/array listener and
-proxy mapping, percent-decoded upstream credentials, numeric IPv4/IPv6 binds,
-and `https://` = H2 / `quic://` = H3 selection. SOCKS listeners may require
-RFC 1929 username/password authentication when credentials are configured;
-HTTP CONNECT listeners do not accept listener credentials. Wildcard or LAN
-binding must remain an explicit operator choice.
+SOCKS domain destinations remain hostnames in OPEN and are resolved remotely.
+Preserve bounded buffering, partial I/O, async backpressure, independent
+half-close, reset and shutdown. Do not equate socket reads with HTTP messages or
+application frames. Cross-thread ownership requires thread-safe refcounting;
+state mutation stays on its owning event target.
 
-Naive payload compatibility is legacy Variant 1: eight framed records per
-direction followed by raw bytes. The streaming decoder must accept every
-header/payload/padding split, coalesced records, and raw bytes following the
-last framed record. Production padding must not use a deterministic RNG.
+The product intentionally runs networking in one process. Enabling additional
+processes needs a supported lifecycle design, not just preference changes.
 
-That padding contract applies to `classic`, the default transport. The opt-in
-`no-connect` carrier uses bounded NFC1 application cells over Necko's ordinary
-GET/POST startup followed by native WebSocket channels and requires the separately maintained Caddy module. Preserve
-the native-stream-v2 profile, complete HTML-selected resource bootstrap and twenty-pair startup, ordered OPENs and cell sequences, credit only after
-local delivery, HTTP completion checks, unchanged cache inhibition, streaming public-body consumption,
-site snapshot identity checks, and per-stream half-close. Site byte size and resource count
-are operator choices; do not reintroduce the retired fixed seven-file capacities. Do not import
-the experimental browser worker, DOM, JavaScript engine, or WSS bridge into the
-lean runtime. Transport selection in JSON and the desktop CLI must agree.
-Only classic (default) and no-connect are supported. No-connect H3 means strict H3 startup followed by explicit H1 WSS/TCP; classic H3 remains QUIC-only. Both transports use only the existing proxy URI credentials and the server's
-shared forward-proxy authentication/access policy; never add a separate
-no-connect key or target allowlist. Valid classic-only options are inactive
-under no-connect, but malformed fields remain errors. Stream byte offsets
-wrap modulo 2^32 without a 4-GiB transfer cap. Keep per-carrier stream and
-per-stream credit bounds without imposing a client-wide 32-stream limit.
+## Product behavior
 
-## Build and test policy
+The local frontends are SOCKS5 CONNECT and HTTP CONNECT. Configuration is strict:
+preserve string/array listener and upstream mapping, URI credential decoding,
+numeric IPv4/IPv6 binds, SOCKS username/password auth and explicit LAN binding.
+No Auto protocol or classic configuration is supported.
 
-Use Mozilla's `mach`, managed toolchains, source style, and ownership types.
-Do not introduce CMake or a replacement build system. Use `searchfox-cli` for
-upstream symbol research and narrow local `rg` searches for project code.
+Keep the complete public HTML-selected resource bootstrap, snapshot identity,
+twenty ordered startup pairs, cache inhibition and streamed public-body
+consumption. Site size and resource count are operator choices. Keep one current
+cell contract, 32 streams per carrier, additional carriers as needed and bounded
+per-stream credit. Offsets wrap modulo 2^32 without a 4-GiB transfer cap.
+Return CREDIT only after local delivery.
 
-Before implementing or running a new residual experiment, search the current
-documentation, retained artifact metadata, and the complete Git history for
-both the exact proposal and causally equivalent mechanisms. Record the overlap
-in the experiment notes. Do not repeat a closed experiment under a new name;
-proceed only when the new proposal has a distinct, previously unmeasured causal
-premise.
+The Caddy module owns its authentication and destination policy. It does not
+load or delegate to a classic forward-proxy implementation.
 
-The normal two-stage cycle never builds the Firefox browser:
+## Build and testing
 
-1. `upstream/main -> firefox-upstream -> naivefox-full-source`: source,
-   inventory, and conflict review, followed by the minimized product build.
-2. `naivefox-full-source -> naivefox-minimal-source`: export, isolated build,
-   and acceptance checks.
+Use mach and managed toolchains, not a replacement build system. Use
+searchfox-cli for upstream symbol research and narrow local searches for
+downstream changes.
 
-An ordinary Firefox build is allowed only for an explicitly requested,
-same-base capture comparison. See [`CAPTURE.md`](CAPTURE.md).
+Before proposing or running a residual experiment, search current documentation,
+retained artifact metadata and complete Git history for the exact proposal and
+causally equivalent mechanisms. Record overlap and the distinct causal premise;
+do not repeat a closed experiment under a new name.
 
-For changes on `naivefox-full-source`, use the product configuration and a full graph build
-when build files or closure may have changed:
+Reuse incremental object directories. Put temporary packages, profiles, test
+outputs, captures and minimal exports under a dedicated artifact catalog.
+When build files or dependencies change, run the full product graph through
+tools/build-product.sh with an absolute objdir. Do not build the Firefox browser
+unless explicitly requested for a same-base reference comparison.
 
-```bash
-netwerk/naivefox/tools/build-product.sh linux \
-  --objdir /absolute/path/to/obj-naivefox-linux
-```
+The source cycle is upstream/main -> firefox-upstream -> naivefox-full-source,
+followed by minimized product build and review. The export cycle is
+naivefox-full-source -> generated naivefox-minimal-source, with isolated build
+and lean closure validation. Run applicable focused gtests/integration tests.
+Downstream networking hooks need focused lifecycle regressions.
 
-For focused C++ iteration, use the narrowest valid target, then finish with the
-applicable full product gate. Run project gtests and the integration suites
-described in [`test/integration/README.md`](test/integration/README.md). Changes
-to downstream Necko/Neqo hooks also require their focused xpcshell regressions.
-Do not run formatters over unrelated Firefox files.
+Complete runtime tests on Linux, Windows and Android and the five-window
+comparisons before exporting minimal source. A successful cross-build is not a
+runtime test. Minimal-source export is the final step after those checks.
 
-Generated fixture state belongs below the object directory. The fixture must
-remain loopback-only, use pinned Caddy and `forwardproxy@naive` inputs, install
-trust only into isolated NSS profiles, never call `caddy trust`, never disable
-certificate checks, and stop only processes that it started.
+Correctness, native H3 proof and short performance screens precede long capture
+campaigns. Keep the established p1-16, p17-32, p1-32, 250ms and Whole analysis
+method and health gates. Minor drift is acceptable; material degradation is not.
+An old binary retained as comparison evidence is not a legacy product mode.
+
+Fixtures use pinned Caddy/module inputs, isolated loopback network namespaces and
+NSS profiles. Never run caddy trust or disable certificate validation. Stop only
+processes created by the fixture.
 
 ## Documentation
 
-Keep active documentation short and durable:
-
-- behavior and operator examples in `README.md`;
-- design invariants in `ARCHITECTURE.md`;
-- branch/process rules in `UPSTREAM.md`;
-- downstream Firefox inventory in `UPSTREAM-PATCHES.md`;
-- unresolved limitations only in `KNOWN-ISSUES.md`.
-
-Do not copy mutable commit SHAs, dated status reports, command transcripts, or
-one-off test results into multiple Markdown files. Release provenance belongs
-in generated machine-readable evidence, `UPSTREAM-BASE`, commits, and annotated
-tags. Historical reports remain available in Git history.
+Keep active docs short and durable. Behavior goes in README.md, design in
+ARCHITECTURE.md, process in UPSTREAM.md, downstream inventory in
+UPSTREAM-PATCHES.md and unresolved limitations in KNOWN-ISSUES.md.
+Do not duplicate dated reports, command transcripts or mutable commit SHAs.
+Keep release provenance in generated evidence, UPSTREAM-BASE, commits and tags.

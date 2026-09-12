@@ -1623,22 +1623,13 @@ skip-if = [
   "socketprocess_networking", # Bug 1614708
 ]
 
-["test_proxyconnect_h3_raw.js"]
-head = "head_cookies.js head_channels.js head_cache.js head_http3.js http3_proxy_common.js"
-run-sequentially = ["true"]
+["true"]
 requesttimeoutfactor = 2
 skip-if = [
   "os == 'android'",
 ]
 
-["test_proxyconnect_padding_header.js"]
-
-["test_proxy_preamble.js"]
-
-["test_proxyconnect_raw.js"]
-skip-if = [
-  "socketprocess_networking", # Bug 1614708
-]
+["test_naivefox_origin_route.js"]
 
 ["test_proxyconnect_https.js"]
 skip-if = [

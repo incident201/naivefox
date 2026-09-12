@@ -41,11 +41,10 @@ closure evidence.
 
 ## 2. Build and test the minimal graph
 
-Both `classic` and `no-connect` belong to the same minimized product graph.
-The native application-cell codec and ordinary Necko HTTP channels do not
-require a browser worker, WebSocket bridge, DOM, graphics or SpiderMonkey.
-The exact experimental port boundary is maintained in
-[NO-CONNECT.md](NO-CONNECT.md).
+The sole NaiveFox transport belongs to the minimized product graph. Its native
+cell codec, Necko HTTP/3 and WebSocket channels require no browser worker,
+DOM, graphics or SpiderMonkey. The current contract is in
+[TRANSPORT.md](TRANSPORT.md).
 
 For iteration, reuse an existing object directory whose `.mozconfig.json`
 selects this source checkout and `--enable-project=netwerk/naivefox`. Keep new
@@ -98,7 +97,7 @@ checkout before exporting; the product build wrapper rejects `--bootstrap` in
 an export with an actionable error.
 
 On Windows, verify the staged directory, including the deterministic
-TunnelSession stop-lifecycle churn:
+transport stop-lifecycle churn:
 
 ```powershell
 py -3 netwerk/naivefox/tools/verify-staged-windows-smoke.py `
@@ -122,50 +121,35 @@ NAIVEFOX_OBJDIR=/absolute/path/to/obj-naivefox-android-aarch64 \
 ./netwerk/naivefox/tools/verify-staged-android-runtime.sh \
   /absolute/path/to/obj-naivefox-android-aarch64/package/naivefox-android-aarch64
 
-./netwerk/naivefox/test/integration/run-android-embedded-tests.sh \
+./netwerk/naivefox/tools/start-android-emulator.sh
+
+python3 netwerk/naivefox/test/integration/run-android-runtime-tests.py \
+  --objdir /absolute/path/to/obj-naivefox-android-aarch64 \
   --package /absolute/path/to/obj-naivefox-android-aarch64/package/naivefox-android-aarch64 \
-  --check-only
+  --caddy /absolute/path/to/matching-caddy \
+  --ndk /absolute/path/to/android-ndk \
+  --adb /absolute/path/to/platform-tools/adb \
+  --serial emulator-5554 \
+  --work-dir /absolute/path/to/obj-naivefox-android-aarch64/native-tests
 ```
 
-The WSL gate uses a Linux ARM64 emulator, not a Windows-host emulator. Keep the
-managed SDK and AVD under `${XDG_DATA_HOME:-$HOME/.local/share}/naivefox/` in
-`android-sdk` and `android-avd`, respectively. The launcher discovers these
-directories and the `naivefox-arm64-api27-raw` AVD automatically; explicit SDK,
-AVD and emulator environment overrides remain supported. Append
-`--start-emulator` to the online runner (without `--check-only`). Launch the
-runner inside the isolated WSL network namespace so adb, QEMU and Caddy share
-the same loopback network. No KVM is required for ARM64 software emulation.
+The WSL gate executes the ARM64 runtime on a Linux emulator. The managed SDK
+and AVD live under $XDG_DATA_HOME/naivefox (or $HOME/.local/share/naivefox).
+The launcher selects the existing naivefox-arm64-api27-raw AVD, supplies the
+QEMU virt machine override and checks both boot completion and the guest clock.
+No KVM is required for ARM64 software emulation.
 
-The maintained emulator is the official Linux x86-64 build `34.1.20`, build ID
-`11610631`, with the Android API-27 default ARM64 system image. The archive
-`https://dl.google.com/android/repository/emulator-linux_x64-11610631.zip` has
-SHA-256 `83a27f7936a8e89fa9e5e220a2cd2622db05f343065d66a92c4397f94df247a0`.
-The SDK needs `platforms`, `platform-tools` and `system-images` directories;
-its runtime needs Linux `libpulse0` and `libgl1` even with `-no-audio` and
-`-no-window`. The launcher adds `-qemu -machine virt` and waits for Android's
-boot-completed property (up to 900 seconds), not merely a stopped animation.
-It also requires two consecutive guest wall-clock samples within the host
-sampling interval, allowing one second for rounding, before fresh fixture
-certificates are issued. This rejects the minutes of clock lag seen during
-software-emulator startup without setting the clock or weakening TLS checks.
-Headless Linux launches disable Vulkan and WSLg display discovery and select
-software rendering, so the test does not depend on Windows GPU drivers.
-When running as another user (for example root inside the namespace), set
-`XDG_DATA_HOME` to the SDK owner's data directory or pass explicit SDK/AVD paths.
-Do not remove a previous emulator/image until a relocated, Windows-independent
-H2/H3 runtime gate has passed. Keep the managed emulator when cleaning objdirs.
+Start the emulator in WSL before the runner. The runner owns its isolated
+server fixture and relays native device traffic to it. Static package verification
+does not execute Gecko; the online runner builds the native harness and probe,
+then checks the H2/H3 workload and lifecycle on the device.
+Keep the managed SDK and AVD when cleaning temporary object directories.
 
-The final command compiles and inspects the native harness but does not start
-Gecko on Android. Device acceptance requires the runner without `--check-only`
-on an online ARM64 API-26+ device or emulator. Lack of `adb` or KVM is not a
-pass and must be recorded as an unrun device gate, not replaced with
-`--allow-skip-device`.
-
-Run the integration suites appropriate to the change as described in
-`test/integration/README.md`. H2, H3, Auto, config, padding, parser robustness,
-and staged-runtime checks are release gates when their code paths change.
-Transport integration additionally requires both `classic` and `no-connect`
-against one Caddy with both modules, using H2/H3 and both local listeners.
+Run the integration suites in test/integration/README.md. Linux, Windows and
+Android must execute the staged runtime with strict H2 and H3, both local
+listeners, backpressure, half-close, cancellation and rejection checks.
+Complete p1-16, p17-32, p1-32, 250ms and Whole comparisons before export.
+A cross-build or package inspection does not replace runtime acceptance.
 Inspect the actual linker inputs and dynamic dependencies after rebuilding:
 no `js_static`, JavaScript execution, full DOM, layout, GFX or ICU4C may enter
 the closure. A mozconfig label or a small executable launcher alone is not
@@ -242,14 +226,14 @@ Export from clean `E` into a new directory:
 
 ```bash
 test -z "$(git status --porcelain)"
-plan_a=$(mktemp /tmp/naivefox-plan-a.XXXXXX)
-plan_b=$(mktemp /tmp/naivefox-plan-b.XXXXXX)
+plan_a=$(mktemp "$TMPDIR/naivefox-plan-a.XXXXXX")
+plan_b=$(mktemp "$TMPDIR/naivefox-plan-b.XXXXXX")
 ./netwerk/naivefox/tools/export-minimal-source.sh --plan-only >"$plan_a"
 ./netwerk/naivefox/tools/export-minimal-source.sh --plan-only >"$plan_b"
 cmp "$plan_a" "$plan_b"
 rm -f "$plan_a" "$plan_b"
 
-export_root=$(mktemp -d /tmp/naivefox-export.XXXXXX)
+export_root=$(mktemp -d "$TMPDIR/naivefox-export.XXXXXX")
 ./netwerk/naivefox/tools/export-minimal-source.sh \
   "$export_root/minimal-source"
 python3 netwerk/naivefox/tools/validate-minimal-source.py \
@@ -281,10 +265,8 @@ NAIVEFOX_OBJDIR=/absolute/path/to/export-obj-android-aarch64 \
 ./netwerk/naivefox/tools/verify-staged-android-runtime.sh \
   /absolute/path/to/export-obj-android-aarch64/package/naivefox-android-aarch64
 
-NAIVEFOX_OBJDIR=/absolute/path/to/export-obj-android-aarch64 \
-./netwerk/naivefox/test/integration/run-android-embedded-tests.sh \
-  --package /absolute/path/to/export-obj-android-aarch64/package/naivefox-android-aarch64 \
-  --check-only
+# Run the same current online Android gate shown above against this package.
+# Its harness and probe sources must come from this verification copy.
 ```
 
 For the independence gate, run those commands in a disposable namespace, VM,

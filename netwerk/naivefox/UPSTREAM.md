@@ -47,12 +47,16 @@ Feature branches start from `naivefox-full-source`. There is no separate
 unminimized NaiveFox branch. Protect all long-lived branches from force-push
 and deletion where repository settings permit it.
 
-The optional server module is maintained independently in
-[`incident201/naivefox-transport`](https://github.com/incident201/naivefox-transport).
-It is a server dependency for `no-connect`, not a client build dependency or
-part of the generated minimal-source tree. Both native client transports are
-maintained on `naivefox-full-source`. The application-carrier experiment branch
-retains research history; its full-browser worker is not a product build input.
+The required server module is maintained independently in
+[incident201/naivefox-transport](https://github.com/incident201/naivefox-transport).
+It is a server dependency, not a client build dependency or part of the
+generated minimal-source tree. The single NaiveFox transport and its strict
+H2/H3 adapters are maintained on naivefox-full-source. Client and server are
+updated together; old transports and wire versions are not supported.
+
+Complete native runtime tests on Linux, Windows and Android and the
+five-window comparisons before minimal-source export. Export is the final
+step; cross-compilation alone does not satisfy platform runtime acceptance.
 
 ## Ordinary refresh workflow
 

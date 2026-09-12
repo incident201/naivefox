@@ -53,7 +53,6 @@ namespace net {
 class nsChannelClassifier;
 class HttpChannelSecurityWarningReporter;
 #ifdef MOZ_NAIVEFOX
-class H3CarrierDispatchGate;
 #endif
 
 using DNSPromise = MozPromise<nsCOMPtr<nsIDNSRecord>, nsresult, false>;
@@ -82,8 +81,6 @@ class nsHttpChannel final : public HttpBaseChannel,
                             public nsIRequestTailUnblockCallback,
                             public nsIEarlyHintObserver {
  public:
-  NS_IMETHOD GetProxyPreambleColdWinnerHandoffSucceeded(
-      bool* aValue) override;
   NS_DECL_ISUPPORTS_INHERITED
   NS_DECL_NSIREQUESTOBSERVER
   NS_DECL_NSISTREAMLISTENER
@@ -641,7 +638,7 @@ class nsHttpChannel final : public HttpBaseChannel,
   RefPtr<HttpTransactionShell> mTransaction;
   RefPtr<HttpTransactionShell> mTransactionSticky;
 #ifdef MOZ_NAIVEFOX
-  RefPtr<H3CarrierDispatchGate> mProxyPreambleCarrierDispatchGate;
+
 #endif
 
   uint64_t mLogicalOffset{0};

@@ -103,7 +103,6 @@ class HttpConnectionUDP final : public HttpConnectionBase,
                               bool aIsExtendedCONNECT = false) override;
 
   void OnConnected();
-  void OnHandshakeConfirmed();
 
   void SetDontExclude() override;
 
@@ -162,7 +161,6 @@ class HttpConnectionUDP final : public HttpConnectionBase,
 #ifdef MOZ_NAIVEFOX
   // A cold experimental preamble may remain in the ordinary outer transaction
   // queue until Neqo reports transport handshake confirmation.
-  bool mHandshakeConfirmed = false;
 #endif
   nsTArray<RefPtr<nsHttpTransaction>> mQueuedConnectUdpTransaction;
   bool mAlreadyWildcard = false;

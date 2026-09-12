@@ -139,7 +139,7 @@ void HttpConnectionBase::ChangeState(HttpConnectionState newState) {
 nsresult HttpConnectionBase::CheckTunnelIsNeeded(
     nsAHttpTransaction* aTransaction) {
   if (mState == HttpConnectionState::UNINITIALIZED &&
-      (aTransaction->Caps() & NS_HTTP_PROXY_PREAMBLE) &&
+      (aTransaction->Caps() & NS_HTTP_NAIVEFOX_ORIGIN_ROUTE) &&
       aTransaction->ConnectionInfo()->UsingHttpsProxy()) {
     ChangeState(HttpConnectionState::REQUEST);
     return NS_OK;

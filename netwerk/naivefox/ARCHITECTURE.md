@@ -1,301 +1,82 @@
 # NaiveFox architecture
 
-NaiveFox is a thin product layer around Firefox networking. Its central design
-constraint is that the wire stack remains Firefox's stack:
+## One transport and native networking
 
-```text
-local client
-  -> SOCKS5 or HTTP CONNECT parser
-  -> TunnelSession
-  -> Necko proxied channel
-  -> NSS/PSM TLS + HTTP/2, or NSS/PSM + Neqo QUIC/HTTP/3
-  -> classic CONNECT to forwardproxy@naive
-  -> bounded DuplexPump + Naive Variant 1 codec
-  -> local client
-```
+NaiveFox has one current application transport and supports coordinated
+client/server updates only. It does not negotiate legacy profiles or implement
+classic NaiveProxy. The name of the transport is NaiveFox. Absence of CONNECT is
+not an invariant; protocol choices are judged by correctness, performance,
+maintainability and observable behavior.
 
-The diagram above is the default `classic` path. The optional `no-connect`
-path replaces CONNECT and the Naive codec with ordinary origin GET/POST
-channels, bounded application cells, logical streams and the matching Caddy
-`naivefox_transport` module. Both paths use the same local listener parsers,
-headless Gecko runtime and Necko/NSS/Neqo stack.
+The client uses Firefox Necko for HTTP, native WebSocket and connection pooling,
+NSS/PSM for TLS and certificate verification, and Neqo for QUIC. Do not add a
+second HTTP/TLS/QUIC stack or synthetic Firefox protocol frames. Networking stays
+in the single lean process without browser execution, DOM loaders or JavaScript.
 
-NaiveFox does not construct TLS handshakes, H2/H3 frames, HPACK/QPACK, stream
-IDs, connection pools, or transport flow control. Application cell framing is
-above HTTP; it is not H2/H3 or TLS framing.
+Config parses the strict product configuration. SocksServer owns listeners
+and local protocol negotiation. TransportStream owns byte delivery, offsets,
+credit and half-close. TransportCarrier owns startup, routing and multiplexing.
+OriginChannel selects explicit strict native H2/H3 routes. TransportWebSocket
+adapts the native WebSocket channel. TransportCodec owns the shared wire
+contract, bounded upload ring and H3 cell-stream decoder. TransportSite parses
+the public HTML resource graph without executing the site.
 
-## Components and ownership
+## Startup and sustained data
 
-`GeckoRuntime` initializes the headless XPCOM/Necko/PSM environment, profile,
-preferences, and event loop. The small desktop executable and the Android
-embedded runner are frontends over the same initializer and proxy core. The
-Gecko-facing implementation remains inside `libxul` behind a controlled C ABI.
+The client consumes the complete public document and selected resources, checks
+MIME types and completion, and verifies their shared snapshot identity in HELLO.
+Twenty serial POST/GET pairs bootstrap the application carrier and already carry
+useful stream data. Keep the existing startup capacities and ordering unless
+a separately validated change justifies altering them.
 
-`Config` parses the strict JSON subset and produces one or more listener/proxy
-pairs. `SocksServer` owns the local server sockets. Each accepted connection is
-handled by either the bounded SOCKS5 state machine or the bounded HTTP CONNECT
-parser; both pass the destination and any already-read payload to the selected
-transport backend.
+Strict H2 moves to native WSS/TCP. Strict H3 remains HTTP/3: one persistent GET
+response carries downstream cells and at most eight finite POSTs carry upstream
+cells. Every H3 byte continues through Neqo; no WSS or TCP fallback is allowed.
 
-`TunnelSession` owns the H2/H3/Auto attempt lifecycle, CONNECT metadata,
-padding negotiation, and transition to one established tunnel. Attempt
-callbacks carry an immutable generation so cancelled or superseded Auto
-callbacks cannot publish stale streams.
+Finite POSTs use Necko's existing upload API. A live infinite upload would
+otherwise be normalized into a complete storage stream before AsyncOpen and
+would require additional length, restart and early-response lifecycle changes.
+WebTransport adds another session/settings integration without a present need
+for unreliable datagrams. The selected design keeps the native HTTP path small.
 
-`NeckoTunnel` creates the explicit proxy route and connect-only channel. Necko
-owns route selection, authentication, connection reuse, and CONNECT transport.
-The upgrade listener receives asynchronous input/output streams only after a
-successful raw CONNECT.
+H3 POSTs may reach the server out of order. The server bounds both active request
+bodies and its reorder map, applies sequences in order, and returns success only
+after application. It never acknowledges a gap to free more pipeline slots.
+Cancellation, gaps exceeding the deadline, malformed cells and transport failure
+end the carrier. There is no application replay or version fallback.
 
-`NaivePadding` and `PaddingNegotiation` implement the compatibility layer. The
-codec is independent of Necko and local sockets. `DuplexPump` connects the
-local byte stream to the tunnel streams with fixed-size buffers and async
-backpressure.
+The shared H3 GET is framed with a four-byte network-order cell length. Its
+decoder accepts arbitrary buffer boundaries and coalesced cells, rejects invalid
+capacities before allocation, and holds at most one bounded cell. The request
+timeout becomes an activity deadline once streaming starts.
 
-## Threading and lifetime
+## Ownership and flow control
 
-Firefox's main and socket event targets both participate in tunnel setup and
-shutdown. A `RefPtr` captured by a runnable may be retained and released on a
-different thread from the original owner. Any object that crosses these event
-targets, including `TunnelSession` and shared server state, therefore requires
-thread-safe refcounting.
+Carrier state lives on the main event target. Local listener callbacks execute
+on the socket target; dispatch carries ownership explicitly. Cross-thread-owned
+objects use thread-safe refcounting. Lifetime safety does not permit concurrent
+state mutation.
 
-Atomic lifetime does not make object state generally thread-safe. State changes
-remain confined to the documented owning event target or are dispatched there.
-Queued callbacks must hold strong references, stale Auto generations must be
-ignored, and teardown must be idempotent. A successful last reference release
-must occur only after queued work has finished.
+Each carrier admits at most 32 logical streams; the client may create more
+carriers. Stream receive credit is 512 KiB on H2 and 1 MiB on H3, returned only after local delivery.
+Upload buffering uses a bounded ring; frame boundaries are independent of ring
+wrap. Server read queues and HTTP request concurrency are bounded. Partial writes
+and WOULD_BLOCK must preserve every unsent byte.
 
-The embedded entrypoint is deliberately blocking. A host calls
-`NaiveFoxRunEmbedded()` on one worker thread, which becomes the Gecko main/event
-thread for that runtime, and may call `NaiveFoxRequestStop()` from another
-thread. The stop request is atomically published and dispatched to the owning
-event targets: listener sockets stop accepting, active connections and tunnel
-requests are cancelled, the event loop drains and exits, and XPCOM shuts down
-before the blocking call returns. Dispatch failure must complete the associated
-connection bookkeeping rather than leave shutdown waiting indefinitely.
+FIN closes one direction after buffered data is delivered; the opposite
+direction remains usable. RESET terminates the stream. Stream offsets wrap
+modulo 2^32. Cell sequence exhaustion ends the carrier instead of wrapping.
+Remote domain targets remain hostnames in OPEN and are resolved by the server.
 
-## Raw CONNECT contract
+## Acceptance
 
-Firefox's upgrade callback is the existing way to receive tunnel streams, but a
-normal non-empty upgrade token is reflected into wire headers. NaiveFox uses
-this connect-only sequence:
+Correctness and short mechanism checks precede long performance campaigns.
+Verify native H3 UDP traffic with no TCP tail, sustained data, cancellation,
+half-close, slow consumers, reordered POSTs and bounded memory. Compare speed,
+latency and the established p1-16, p17-32, p1-32, 250 ms and Whole views using the
+same reference, grouping and health checks. Only minor metric drift is acceptable;
+a material regression requires investigation and a design change.
 
-```text
-setConnectOnly(false)
-HTTPUpgrade("", listener)
-AsyncOpen(listener)
-```
-
-The downstream raw-CONNECT hook permits an empty protocol only on a
-connect-only channel. It keeps the stream callback without emitting synthetic
-`ALPN`, `Upgrade`, or `Connection` headers. The only intentional Naive marker is
-the validated `padding` header inserted into the generated proxy CONNECT head.
-CONNECT status and response headers are read through normal proxied-channel
-metadata.
-
-## H2 transport
-
-H2 mode creates an HTTPS proxy route, disallows H3, and verifies negotiated
-outer `h2`. Firefox's normal connection manager creates the TLS/TCP connection
-and `Http2StreamTunnel`; NaiveFox receives only its byte streams.
-
-The downstream H2 tunnel fixes preserve byte-stream semantics for raw CONNECT:
-
-- consumed bytes advance normal H2 flow-control accounting;
-- successful output close sends `END_STREAM` without closing input;
-- buffered response bytes are delivered before graceful EOF;
-- ordinary HTTP transactions keep their existing behavior.
-
-## H3 transport
-
-H3 mode uses Firefox's H3-proxy route:
-
-```text
-MASQUE-type proxy info
-  -> HttpConnectionUDP
-  -> Http3Session / Neqo / NSS
-  -> regular CONNECT Http3StreamTunnel
-  -> Http3TransportLayer byte streams
-```
-
-The route type selects an H3 proxy connection, but the request itself is
-classic CONNECT. It does not use the MASQUE URI template, CONNECT-UDP,
-WebTransport, or datagrams.
-
-A strict proxy flag disables the normal H3 backup timer, MASQUE-to-HTTPS
-restart conversion, and Happy Eyeballs TCP route for that transaction. The
-channel's protocol metadata must report H3; integration tests additionally use
-an H3-only UDP listener with no TCP listener at the proxy port.
-
-A separate route flag suppresses only the automatic PMTUD force normally
-derived from outer-H3-proxy identity. `Http3Session` retains that identity for
-TLS host selection and proxy session behavior, while passing a distinct PMTUD
-input to Neqo. The global `network.http.http3.pmtud` preference remains
-authoritative and can explicitly restore PMTUD on the same binary.
-
-H3 raw tunnels preserve byte-stream behavior without copying H2 internals:
-
-- async callbacks are published before a notification that may re-enter;
-- successful connect-only output close uses Neqo's send-side FIN and keeps the
-  receive side alive;
-- the slow-consumer buffer is capped at 256 KiB and resumes reads after drain;
-- received FIN and `STOP_SENDING` do not discard already-buffered response data;
-- ordinary H3 requests, WebTransport, and CONNECT-UDP retain their normal
-  lifecycle.
-
-## Transport and protocol selection
-
-`transport` selects `classic` (default) or `no-connect`. JSON, CLI and
-embedded selection share the same strict parser. The two retired experimental
-selector names are rejected. Classic uses Necko proxy authentication and Naive
-padding; no-connect uses the same credentials in an NFC1 AUTH frame. Both
-share the server forward-proxy authentication and destination policy.
-
-No-connect completes the root, all HTML-selected resources and twenty ordered HTTP pairs,
-then transfers the same session and streams to Firefox's native WebSocket
-implementation. The startup protocol is strict H2 or H3; the persistent
-phase is explicit H1 WSS/TCP in both cases. HTTP active/idle carriers,
-peer-pressure hints and generic WS capacity branches have been removed.
-
-Public no-connect resource discovery uses an opt-in observer on the existing
-DOM-free Gecko HTML scanner. The classic descriptor path is unchanged. The
-observer interprets only supported initial-HTML declarations; it never executes
-script or recursively follows CSS/image/JS dependencies. Public response bodies
-use a fixed-size streaming sink distinct from bounded NFC1 cell buffering.
-All selected resources complete before carrier startup, with six GETs active
-at most. Site size/count are operator choices; caching remains inhibited.
-The server supplies an immutable unpadded snapshot without public transport
-headers. NSS hashes streamed public bodies; the first authenticated NFC1
-response confirms the fixed current contract and ordered snapshot digest.
-The first upload contains only AUTH; OPEN waits for complete HELLO validation.
-Anonymous carrier and WebSocket requests use normal site fallback. The public
-session cookie is ordinary HTTP state, not authentication.
-Document/inventory metadata and server snapshot memory scale with site input.
-
-Capacity follows locally sendable data within the unchanged 512-KiB stream
-credit. Pure control cells use 512 bytes. One WS application message may be
-queued for native writing; native control PING/PONG acknowledgements are
-excluded from that budget. Byte sequences, delivery-based credit, cumulative
-FIN acknowledgement, bounded buffers and half-close remain continuous.
-Additional carriers allow more than 32 total connections. A failed carrier
-cannot replay or resume HTTP work. [NO-CONNECT.md](NO-CONNECT.md) defines the
-wire contract and server profile.
-
-The following fallback rules describe `classic`; the opt-in application
-transport has no automatic downgrade to `classic`:
-
-- H2: one strict HTTPS/H2 attempt; any other outer protocol is failure.
-- H3: one strict QUIC/H3 attempt; no TCP/H2 traffic is permitted as fallback.
-- Auto: one strict H3 attempt, then at most one new H2 attempt when H3 fails
-  before CONNECT response or tunnel streams are observed.
-
-Authentication failure, ACL/target rejection, any CONNECT response, and failure
-after tunnel establishment are terminal in Auto. A bounded establishment timer
-may classify a no-response/no-transport H3 attempt as eligible for retry.
-Every attempt has its own padding value and generation; the local success reply
-is withheld until the final attempt has valid protocol, CONNECT status, channel
-completion, and streams.
-
-## Padding and pumping
-
-The proxy CONNECT carries a randomized Naive `padding` request header. Payload
-padding activates only when the successful response also contains `padding`.
-Legacy Variant 1 frames the first eight records in each direction:
-
-```text
-u16 big-endian payload length | u8 padding length | payload | zero padding
-```
-
-Payload chunks larger than 65535 bytes are split. Decoder state is independent
-of transport read boundaries and handles split headers, split payload/padding,
-coalesced records, and raw bytes following the final framed record.
-
-The pump tolerates partial reads/writes and `WOULD_BLOCK`, uses asynchronous
-callbacks, bounds memory, propagates EOF/errors, and avoids recursive busy
-loops. Its buffers do not correspond to H2 DATA frames, H3 frames, QUIC
-packets, or Naive records.
-
-## Process and profile model
-
-The current product deliberately disables Firefox's separate socket process.
-Raw upgrade-connect stream takeover is not IPC-capable, while both H2 and H3
-operate through the parent-process Necko stack. Enabling the socket process
-requires a designed IPC stream handoff and lifecycle regressions; it must not be
-turned on as a preference-only experiment.
-
-One process may host several local listeners. They share the Gecko runtime,
-Necko connection manager, TLS/QUIC stack, padding code, and tunnel backend.
-Firefox, not NaiveFox, owns outer connection reuse.
-
-There are two runtime-location frontends:
-
-```text
-desktop CLI -> discover executable/runtime location -> common Gecko initializer
-embedded API -> caller-supplied runtime directory  -> common Gecko initializer
-```
-
-Desktop discovery continues to use the executable path (`/proc/self/exe` on
-Unix and the module filename on Windows). Embedded Android must not use
-`/proc/self/exe`, because it names the host application rather than the
-NaiveFox runtime. Its caller supplies the absolute library directory, and the
-embedded frontend sets `MOZ_ANDROID_LIBDIR` before any `BinaryPath`, Gecko, or
-XPCOM work. No `JNIEnv`, Android `Context`, Java type, or GeckoView lifecycle is
-part of the common initializer.
-
-Android application sandboxes may deny the route-netlink monitor used by
-Gecko's native network-link service. After that monitor reaches a terminal
-failure, the embedded runtime follows the service's existing conservative
-unknown-network policy and continues through the ordered main-thread and
-socket-thread startup barriers. Linux still requires successful initial
-netlink convergence, and a pending state, timeout, missing service, or failed
-queue barrier remains fatal on every platform.
-
-The instance contract is one NaiveFox runtime per process. Multiple listeners
-belong to that one runtime; concurrent starts are rejected. After a successful
-Gecko/XPCOM initialization and shutdown, another embedded start in the same
-process is not supported because Gecko's process lifecycle is one-shot.
-
-Gecko requires a writable profile. Config mode uses a unique private temporary
-profile unless the operator explicitly supplies `NAIVEFOX_PROFILE`; the profile
-choice never weakens NSS certificate or hostname verification. `SSL_CERT_FILE`
-adds process-lifetime trust anchors through the NSS temporary certificate
-context and never imports certificate or trust records into the profile. When
-that explicit CA is not a built-in Firefox root, the common initializer also
-temporarily disables Firefox's third-party-root H3 guard and restores the
-original preference during shutdown. The environment option is applied by the
-common desktop and embedded initializer.
-
-The embedded frontend instead requires the host to provide an existing,
-writable profile directory. It neither discovers desktop state directories nor
-creates an Android application profile. Both frontends pass the chosen profile
-to the same Gecko initialization path and use the same JSON parser, listeners,
-sessions, transports, and shutdown machinery.
-
-The fourth `NaiveFoxRunEmbedded` argument selects a transport without editing
-the JSON. A null pointer preserves JSON selection and the `classic` default;
-an explicit valid name overrides JSON before classic preamble defaults are
-applied. JSON, CLI and embedded selectors share one strict name parser.
-Invalid embedded selectors fail before reserving the one-shot runtime, so a
-subsequent valid call remains possible. Switching after a successful run still
-requires a fresh process; this argument does not introduce live reconfiguration.
-
-## Validation boundaries
-
-Lean validation uses the actual linker response and active compiler dependency
-files, including relative paths from unified translation units and archive
-members. The WebSocket implementation closure is restricted to
-`BaseWebSocketChannel.cpp` and `WebSocketChannel.cpp`; browser actors, DOM
-bindings and additional generated IPC actors are rejected. Existing interface
-headers and the small Necko value helpers do not authorize linking JavaScript
-execution, full DOM, layout, graphics, ICU4C or a browser process stack.
-
-The reproducible loopback fixture proves strict transport selection, scoped
-trust, authentication failure, header negotiation, payload integrity,
-backpressure, half-close, concurrency, connection reuse, and shutdown. A real
-Caddy deployment is the second interoperability gate. Same-base Firefox capture
-is an optional diagnostic, not a product build gate; see
-[`CAPTURE.md`](CAPTURE.md).
-
-All modifications outside `netwerk/naivefox/` are maintained in
-`UPSTREAM-PATCHES.md` in the full maintenance checkout.
+Preserve a known baseline outside the source tree. Temporary comparisons with
+that baseline are evidence, not a supported legacy product mode. Keep temporary
+builds, captures and exports together and reuse incremental build outputs.

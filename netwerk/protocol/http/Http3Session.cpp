@@ -682,17 +682,6 @@ nsresult Http3Session::ProcessEvents() {
             ("Http3Session::ProcessEvents %p - StopSeniding with error "
              "0x%" PRIx64,
              this, event.stop_sending.error));
-        if (RefPtr<Http3StreamBase> stream =
-                mStreamIdHash.Get(event.stop_sending.stream_id);
-            stream && stream->GetHttp3StreamTunnel() &&
-            stream->GetHttp3StreamTunnel()->IsConnectOnly()) {
-          // STOP_SENDING only closes our sending direction. In particular,
-          // CONNECT proxies can use H3_REQUEST_CANCELLED after the target has
-          // completed its response. Preserve the receive direction so a slow
-          // tunnel consumer can drain data already buffered before FIN.
-          stream->GetHttp3StreamTunnel()->StopSending();
-          break;
-        }
         if (event.stop_sending.error == HTTP3_APP_ERROR_NO_ERROR) {
           RefPtr<Http3StreamBase> stream =
               mStreamIdHash.Get(event.stop_sending.stream_id);
@@ -805,13 +794,6 @@ nsresult Http3Session::ProcessEvents() {
         // is received call MaybeResumeSend to trigger reads for the
         // zero-rtt-rejected transactions.
         MaybeResumeSend();
-      } break;
-      case Http3Event::Tag::HandshakeConfirmed: {
-        LOG(("Http3Session::ProcessEvents - HandshakeConfirmed"));
-        if (IsClosing()) {
-          break;
-        }
-        mUdpConn->OnHandshakeConfirmed();
       } break;
       case Http3Event::Tag::GoawayReceived:
         LOG(("Http3Session::ProcessEvents - GoawayReceived"));
@@ -1492,7 +1474,7 @@ bool Http3Session::AddStream(nsAHttpTransaction* aHttpTransaction,
   Http3StreamBase* stream = nullptr;
 
   if (trans && mConnInfo->IsHttp3ProxyConnection() && !mIsInTunnel &&
-      !(trans->Caps() & NS_HTTP_PROXY_PREAMBLE)) {
+      !(trans->Caps() & NS_HTTP_NAIVEFOX_ORIGIN_ROUTE)) {
     LOG3(("Http3Session::AddStream new connect-udp stream %p atrans=%p.\n",
           this, aHttpTransaction));
     stream = new Http3ConnectUDPStream(aHttpTransaction, this,
@@ -1512,17 +1494,6 @@ bool Http3Session::AddStream(nsAHttpTransaction* aHttpTransaction,
 
   mStreamTransactionHash.InsertOrUpdate(aHttpTransaction, RefPtr{stream});
 
-#ifdef MOZ_NAIVEFOX
-  if (trans && trans->UseH3CarrierDispatch() &&
-      NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
-    H3CarrierDispatchGate* gate = trans->CarrierDispatchGate();
-    NAIVEFOX_LIFECYCLE_LOG(
-        ("h3.carrier_dispatch action=document-attached gate=%p carrier=%p "
-         "session=%p document=%p via=add-stream carrier_complete=%d",
-         gate, reinterpret_cast<void*>(gate ? gate->CarrierId() : 0), this,
-         trans, gate && gate->IsComplete()));
-  }
-#endif
 
   if (mState == ZERORTT) {
     if (!stream->Do0RTT()) {

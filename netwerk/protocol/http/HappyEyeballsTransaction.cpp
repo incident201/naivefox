@@ -29,7 +29,7 @@ HappyEyeballsTransaction::HappyEyeballsTransaction(
     uint32_t aCaps, uint64_t aBrowserId, StatusForwarder&& aStatusForwarder,
     ClientAuthForwarder&& aClientAuthRequestedForwarder,
     ClientAuthForwarder&& aClientAuthSelectedForwarder,
-    ZeroRttHandle* aZeroRttHandle, bool aAllowZeroRtt)
+    ZeroRttHandle* aZeroRttHandle)
     : SpeculativeTransaction(aConnInfo, aCallbacks, aCaps,
                              /* aCallback */ nullptr,
                              /* reportActivity */ false),
@@ -37,7 +37,6 @@ HappyEyeballsTransaction::HappyEyeballsTransaction(
       mClientAuthRequestedForwarder(std::move(aClientAuthRequestedForwarder)),
       mClientAuthSelectedForwarder(std::move(aClientAuthSelectedForwarder)),
       mZeroRttHandle(aZeroRttHandle),
-      mAllowZeroRtt(aAllowZeroRtt),
       mBrowserId(aBrowserId) {
   LOG1(("HappyEyeballsTransaction ctor %p handle=%p", this,
         mZeroRttHandle.get()));
@@ -82,7 +81,7 @@ void HappyEyeballsTransaction::OnTransportStatus(nsITransport* aTransport,
 }
 
 bool HappyEyeballsTransaction::Do0RTT(bool aCanSendEarlyData) {
-  if (!mAllowZeroRtt || !mZeroRttHandle) {
+  if (!mZeroRttHandle) {
     return false;
   }
 

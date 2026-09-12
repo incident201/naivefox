@@ -45,13 +45,13 @@ PRODUCT_DOCS = {
     "README.md",
     "ARCHITECTURE.md",
     "KNOWN-ISSUES.md",
-    "NO-CONNECT.md",
+    "TRANSPORT.md",
     "FRONTING-PAGE.md",
     "CAPTURE.md",
     "SHIMS.md",
     "test/integration/README.md",
     "test/fingerprint/README.md",
-    "test/integration/hybrid_app/BENCHMARK.md",
+    "test/integration/http_app/README.md",
 }
 FORBIDDEN_BASENAMES = {
     "AGENTS.md",

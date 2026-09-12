@@ -6,21 +6,17 @@ history or generated evidence.
 
 ## Single-process networking
 
-NaiveFox disables Firefox's separate socket process. The current raw
-upgrade-connect callback exposes asynchronous tunnel streams only in the parent
-process; it has no IPC stream-takeover contract. Necko, Neqo, PSM, and NSS still
-own the wire protocols and connection management.
-
-Enabling the socket process requires an IPC-capable design plus cross-process
-lifecycle, half-close, backpressure, and shutdown regressions. Do not enable it
-only by changing preferences.
+NaiveFox intentionally keeps networking in one process. The native application
+carrier has no cross-process ownership/lifecycle design. Necko, Neqo, PSM and
+NSS still own networking and encryption. Do not enable the socket process by
+changing preferences alone.
 
 ## Local listener exposure
 
 HTTP CONNECT listeners do not authenticate local clients. SOCKS5 listeners can
 require RFC 1929 username/password authentication when credentials are present
 in the `listen` URI. Loopback is the safe default, but explicit wildcard and
-LAN addresses are accepted for NaiveProxy-compatible configuration. Operators
+LAN addresses are accepted when explicitly configured. Operators
 exposing such an address must provide host-firewall or trusted-network
 protection.
 
@@ -79,60 +75,26 @@ socket `protect()` callback, DNS routing, per-app routing, or VPN lifecycle.
 Those capabilities require a downstream Android integration and are not
 implicitly supplied by the SOCKS5/HTTP CONNECT listeners.
 
-## Auto mode has no cross-connection memory
+## Carrier boundaries
 
-Developer `auto` mode makes a new strict H3 establishment decision for every
-accepted SOCKS connection. It has no H3 failure cache, backoff, or shared
-network-quality state. The only allowed fallback is one fresh H2 attempt after
-pre-CONNECT H3 establishment failure.
+The matching NaiveFox Caddy module is required. There is no compatibility with
+classic NaiveProxy or an arbitrary static website. Client and server must be
+updated together; version negotiation, session resumption and transparent replay
+after an outer-session failure are not supported.
 
-Normal JSON config deliberately has no Auto scheme: `https://` is strict H2 and
-`quic://` is strict H3.
+The client consumes only supported directly declared HTML resources. It does
+not execute scripts, follow CSS imports or emulate a browser. Large sites add
+startup traffic, latency and server snapshot memory; there is no fixed site-size
+budget. Client resource caching remains disabled.
 
-## Implicit H3 fronting page has an exact resource contract
+H2 uses WSS/TCP after startup. H3 uses HTTP/3 throughout, but its shared downstream
+GET does not give each logical destination an independent QUIC stream. The H2
+adapter keeps 512 KiB of stream credit and H3 keeps 1 MiB. Long credit turnaround can limit
+single-stream throughput; the H3 upload pipeline is also bounded to eight requests.
 
-The promoted implicit H3 preamble on SOCKS5, HTTP CONNECT, or mixed listeners
-expects the configured origin root to
-contain exactly one same-origin stylesheet, one classic deferred script, and
-four images accepted by the lean parser, within the documented aggregate
-budget. Strict H3 fails closed when that contract is not met; it does not
-silently fall back to a document-only request or to H2. Operators using a
-different fronting page must select an explicit compatible `preamble` policy,
-including `document-start-overlap`, or explicitly disable the preamble. The
-canonical tag/attribute constraints, response limits, measured resource sizes,
-and remaining size-validation gap are in
-[`FRONTING-PAGE.md`](FRONTING-PAGE.md); they must be updated whenever this
-implicit contract changes.
-
-## No-connect compatibility and evidence
-
-`no-connect` is opt-in and requires the matching Caddy `naivefox_transport`
-module with shared forward-proxy authentication and access policy and the
-`native-stream-v2` profile. It does not interoperate with an ordinary
-forward proxy or an arbitrary static website. A module mismatch or rejected
-credential pair fails the connection; it does not trigger a downgrade to `classic`.
-
-Client and server must be upgraded together whenever the current contract changes;
-older implementations are not supported. Public metadata removal and authenticated
-carrier admission do not establish passive traffic indistinguishability. The
-HTML-derived resource set represents only supported directly declared resources;
-CSS imports/backgrounds, script execution and secondary loads are not emulated.
-There is no fixed site-size budget. Large entry pages increase startup traffic,
-latency and server snapshot memory, and may exhaust ordinary resource/deadline
-limits. Client resource caching remains disabled. See [NO-CONNECT.md](NO-CONNECT.md).
-
-Session resumption and transparent replay after an outer-session failure are
-not supported. Credential provisioning and rotation remain an operator concern.
-
-No-connect requires H1 WSS/TCP after its H2/H3 startup. Its H3 setting is
-therefore not UDP-only. Both physical connections must be counted in traffic
-measurements. Old finite HTTP and hybrid/asymmetric selector names and wire
-profiles are not supported.
-
-Short controlled-link measurements are scoped to their recorded application,
-link, source and runtime. They do not establish absolute indistinguishability
-or performance across arbitrary networks. Historical labels in CAPTURE.md
-describe those earlier artifacts rather than current configuration options.
+Short controlled-link results apply only to their recorded application, network
+and binaries. They do not establish passive traffic indistinguishability across
+arbitrary networks. See [TRANSPORT.md](TRANSPORT.md).
 
 ## Product scope
 

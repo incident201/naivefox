@@ -9,7 +9,7 @@ if CONFIG["OS_TARGET"] != "Android":
         "NaiveFox.cpp",
     ]
 
-DIRS += ["codec", "core"]
+DIRS += ["core"]
 
 if CONFIG["ENABLE_TESTS"]:
     # NaiveFox suppresses the tree-wide TEST_DIRS traversal and opts into only

@@ -17,11 +17,23 @@ import tempfile
 import time
 import urllib.parse
 
+import importlib.util
+
+_runtime_spec = importlib.util.spec_from_file_location(
+    "naivefox_runtime_smoke",
+    os.path.join(os.path.dirname(__file__), "runtime_smoke.py"),
+)
+_runtime_module = importlib.util.module_from_spec(_runtime_spec)
+_runtime_spec.loader.exec_module(_runtime_module)
+run_runtime_smoke = _runtime_module.run_runtime_smoke
+
 SOCKS_NO_AUTH_GREETING = b"\x05\x01\x00"
 
 
 def validate_necko_localization(package_dir):
-    resource = os.path.join(package_dir, "localization", "en-US", "netwerk", "necko.ftl")
+    resource = os.path.join(
+        package_dir, "localization", "en-US", "netwerk", "necko.ftl"
+    )
     assert os.path.isfile(resource) and os.path.getsize(resource) > 0, (
         "required Necko localization resource is missing or empty: "
         "localization/en-US/netwerk/necko.ftl"
@@ -29,8 +41,18 @@ def validate_necko_localization(package_dir):
 
 
 def fetch_digest(target_url, local_proxy=None):
-    command = ["curl.exe", "--fail", "--silent", "--show-error", "--noproxy", "",
-               "--connect-timeout", "10", "--max-time", "60"]
+    command = [
+        "curl.exe",
+        "--fail",
+        "--silent",
+        "--show-error",
+        "--noproxy",
+        "",
+        "--connect-timeout",
+        "10",
+        "--max-time",
+        "60",
+    ]
     if os.environ.get("SSL_CERT_FILE"):
         command.extend(["--cacert", os.environ["SSL_CERT_FILE"]])
     if local_proxy:
@@ -43,17 +65,21 @@ def fetch_digest(target_url, local_proxy=None):
     except subprocess.TimeoutExpired:
         raise AssertionError("live transfer timed out") from None
     # Avoid echoing potentially private target URLs or upstream diagnostics.
-    assert result.returncode == 0, f"live transfer failed (curl exit {result.returncode})"
+    assert result.returncode == 0, (
+        f"live transfer failed (curl exit {result.returncode})"
+    )
     assert result.stdout, "live transfer returned an empty body"
     return hashlib.sha256(result.stdout).hexdigest()
 
 
 def verify_live_transfers(target_url, local_proxy, expected_digest):
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-        digests = list(executor.map(
-            lambda _: fetch_digest(target_url, local_proxy), range(8)
-        ))
-    assert all(digest == expected_digest for digest in digests), "live transfer body mismatch"
+        digests = list(
+            executor.map(lambda _: fetch_digest(target_url, local_proxy), range(8))
+        )
+    assert all(digest == expected_digest for digest in digests), (
+        "live transfer body mismatch"
+    )
 
 
 def find_free_port():
@@ -151,7 +177,7 @@ def run_file_logging_case(
         stop(proc)
 
     # Reopen the same file to verify append semantics across bounded process
-    # teardowns.  Natural clean exit is covered by runtime-smoke.
+    # teardowns.  Natural clean exit is covered by the bounded configuration run.
     proc = launch()
     try:
         wait_for_log_and_liveness(proc, log_path, minimum_size=first_size)
@@ -347,7 +373,7 @@ def send_socks_probe(port, payload, read_reply=True):
         if read_reply:
             try:
                 reply = sock.recv(32)
-            except (ConnectionResetError, TimeoutError):
+            except (ConnectionResetError, ConnectionAbortedError, TimeoutError):
                 # A terminal parser error may close before the peer can read
                 # the bounded reject; the important invariant is no process
                 # spin/OOM and continued listener availability.
@@ -532,9 +558,7 @@ def main():
 
     # 2. Runtime smoke test
     with tempfile.TemporaryDirectory(prefix="nf_win_smoke_") as temp_prof:
-        out = subprocess.check_output(
-            [exe_path, "--profile", temp_prof, "--runtime-smoke"], text=True, timeout=30
-        )
+        out = run_runtime_smoke(exe_path, temp_prof)
         print(f"[2] Runtime Smoke: {out.strip()}")
         assert "completed successfully" in out, "Smoke test failed"
 
@@ -587,8 +611,14 @@ def main():
                 s.close()
             print("    5 Consecutive SOCKS5 handshakes: PASSED")
             if expected_digest:
-                verify_live_transfers(args.target_url, f"socks5h://127.0.0.1:{socks_port}", expected_digest)
-                print("    SOCKS5 live payload integrity (8 transfers, concurrency 4): PASSED")
+                verify_live_transfers(
+                    args.target_url,
+                    f"socks5h://127.0.0.1:{socks_port}",
+                    expected_digest,
+                )
+                print(
+                    "    SOCKS5 live payload integrity (8 transfers, concurrency 4): PASSED"
+                )
 
         finally:
             proc.terminate()
@@ -631,8 +661,12 @@ def main():
             print(f"    HTTP CONNECT Listener: {'PASSED' if opened else 'FAILED'}")
             assert opened, "HTTP CONNECT listener did not accept connections"
             if expected_digest:
-                verify_live_transfers(args.target_url, f"http://127.0.0.1:{http_port}", expected_digest)
-                print("    HTTP CONNECT live payload integrity (8 transfers, concurrency 4): PASSED")
+                verify_live_transfers(
+                    args.target_url, f"http://127.0.0.1:{http_port}", expected_digest
+                )
+                print(
+                    "    HTTP CONNECT live payload integrity (8 transfers, concurrency 4): PASSED"
+                )
 
         finally:
             proc.terminate()
@@ -650,15 +684,12 @@ def main():
             exe_path, temp_churn, "http", make_http_connect_request()
         )
     print(
-        "[5] Windows TunnelSession stop lifecycle churn + bounded forced "
-        "teardown: PASSED"
+        "[5] Windows transport stop lifecycle churn + bounded forced teardown: PASSED"
     )
 
     # 6. Prove a fresh runtime still starts and exits naturally after churn.
     with tempfile.TemporaryDirectory(prefix="nf_win_post_churn_") as temp_prof:
-        out = subprocess.check_output(
-            [exe_path, "--profile", temp_prof, "--runtime-smoke"], text=True, timeout=30
-        )
+        out = run_runtime_smoke(exe_path, temp_prof)
         assert "completed successfully" in out, "post-churn smoke test failed"
     print("[6] Post-churn runtime smoke clean exit: PASSED")
 

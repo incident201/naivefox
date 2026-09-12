@@ -3152,11 +3152,6 @@ nsresult Http2Session::WriteSegmentsAgain(nsAHttpSegmentWriter* writer,
       mInputFrameDataStream->DisableSpdy();
       // actually allow restart by unsticking
       mInputFrameDataStream->MakeNonSticky();
-    } else if (mDownstreamRstReason == NO_HTTP_ERROR &&
-               mInputFrameDataStream->IsTunnel()) {
-      // A tunnel is an unframed byte stream to its consumer. Deliver all
-      // bytes already buffered before turning a graceful peer reset into EOF.
-      streamCleanupCode = NS_OK;
     } else if (mDownstreamRstReason == CANCEL_ERROR ||
                mDownstreamRstReason == NO_HTTP_ERROR) {
       // The server cancelled or gracefully closed this stream; do not retry.
@@ -3438,9 +3433,7 @@ nsresult Http2Session::ProcessSlowConsumer(Http2StreamBase* slowConsumer,
         " %d\n",
         this, slowConsumer->StreamID(), static_cast<uint32_t>(rv),
         *countWritten));
-  if ((NS_SUCCEEDED(rv) || rv == NS_BASE_STREAM_WOULD_BLOCK) &&
-      !*countWritten &&
-      (slowConsumer->RecvdFin() || slowConsumer->RecvdReset())) {
+  if (NS_SUCCEEDED(rv) && !*countWritten && slowConsumer->RecvdFin()) {
     rv = NS_BASE_STREAM_CLOSED;
   }
 

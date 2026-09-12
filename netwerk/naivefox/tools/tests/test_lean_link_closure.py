@@ -226,7 +226,7 @@ class NativeWebSocketClosureTest(unittest.TestCase):
             "direct_objects": [
                 {"path": "objdir/" + root + "BaseWebSocketChannel.o"},
                 {"path": "objdir/" + root + "WebSocketChannel.o"},
-                {"path": "objdir/netwerk/naivefox/core/NoConnectWebSocket.o"},
+                {"path": "objdir/netwerk/naivefox/core/TransportWebSocket.o"},
                 {"path": "objdir/ipc/ipdl/IPCMessageTypeName.o"},
             ],
             "static_libraries": [],

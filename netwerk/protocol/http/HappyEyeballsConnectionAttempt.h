@@ -73,8 +73,7 @@ class HappyEyeballsConnectionAttempt final : public ConnectionAttempt,
   HappyEyeballsConnectionAttempt(nsHttpConnectionInfo* ci,
                                  nsAHttpTransaction* trans, uint32_t caps,
                                  bool speculative, bool urgentStart,
-                                 bool retryWithoutTRR = false,
-                                 bool singleProxyColdWinnerHandoff = false);
+                                 bool retryWithoutTRR = false);
 
   nsresult Init(ConnectionEntry* ent) override;
   void Abandon() override;
@@ -100,17 +99,6 @@ class HappyEyeballsConnectionAttempt final : public ConnectionAttempt,
   // Test-only accessors.
   bool WasTransactionAdoptedForTesting() const { return mTransactionAdopted; }
   ZeroRttHandle* ZeroRttHandleForTesting() const { return mZeroRttHandle; }
-#ifdef ENABLE_TESTS
-  // Exercise the production winner-dispatch body without performing DNS or
-  // opening a socket.  The caller supplies the already-established winner and
-  // the entry that still owns the exact pending transaction.
-  void ProcessSingleProxyWinnerForTesting(
-      HttpConnectionBase* aConn, ConnectionEntry* aEntry,
-      bool aTransactionAlreadyOnConn = false) {
-    mEntry = aEntry;
-    ProcessUDPConn(aConn, aEntry, aTransactionAlreadyOnConn);
-  }
-#endif
 
   // Real transaction accessor, used by the shared ZeroRttHandle.
   nsHttpTransaction* RealHttpTransaction() const {
@@ -199,18 +187,6 @@ class HappyEyeballsConnectionAttempt final : public ConnectionAttempt,
   void ReleaseRealTransaction(nsresult aCloseReason, ConnectionEntry* aEntry);
 
   nsresult CreateHappyEyeballs(ConnectionEntry* ent);
-
-  // NaiveFox's narrow proxy-aware equivalent of Firefox's cold H3 winner
-  // handoff.  The real document remains in the entry's pending queue while a
-  // single request-less HET establishes exactly one UDP connection.  This
-  // intentionally bypasses the Rust race (and all TCP/fallback/retry paths),
-  // but reuses ConnectionEstablisher's racing carrier and EnterSucceeded's
-  // exact pending-transaction dispatch.
-  void StartSingleProxyColdWinnerHandoff();
-  nsresult StartSingleProxyDnsLookup();
-  nsresult HandleSingleProxyDnsResult(nsIDNSRecord* aRecord, nsresult aStatus);
-  nsresult EstablishSingleProxyUDPConnection(const NetAddr& aAddr);
-  void FailSingleProxyColdWinnerHandoff(nsresult aReason, const char* aStage);
 
   nsresult ProcessConnectionResult(const NetAddr& aAddr, nsresult aStatus,
                                    uint64_t aId);
@@ -407,11 +383,6 @@ class HappyEyeballsConnectionAttempt final : public ConnectionAttempt,
   // (i.e. actually attempts a connection). With mLocalAddrRefused, means "every
   // attempt refused a local peer".
   bool mAllAttemptsRefusedLocal = true;
-
-  bool mSingleProxyColdWinnerHandoff = false;
-  bool mSingleProxyUdpAttemptStarted = false;
-  nsCOMPtr<nsICancelable> mSingleProxyDnsRequest;
-  uint16_t mSingleProxyPort = 0;
 };
 
 }  // namespace net

@@ -253,16 +253,6 @@ nsresult ConnectionEstablisher::ActivateConnectionWithTransaction(
 
   aConn->SetIsRacing(true);
 
-#ifdef MOZ_NAIVEFOX
-  const bool coldWinnerCarrier =
-      mTransaction && mTransaction->IsSingleProxyColdWinnerCarrier();
-  if (coldWinnerCarrier && NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
-    NAIVEFOX_LIFECYCLE_LOG(
-        ("h3.cold_winner_handoff action=connection-racing carrier=%p "
-         "conn=%p racing=1 before-activate=1",
-         mTransaction.get(), aConn.get()));
-  }
-#endif
 
   mHasConnected = true;
   mResultConn = aConn;
@@ -275,32 +265,9 @@ nsresult ConnectionEstablisher::ActivateConnectionWithTransaction(
   mTransaction->SetConnectedCallback(
       [self = RefPtr{this},
        onActivated = std::move(aOnActivated)](nsresult aResult) {
-#ifdef MOZ_NAIVEFOX
-        const bool coldWinnerCarrier =
-            self->mTransaction &&
-            self->mTransaction->IsSingleProxyColdWinnerCarrier();
-        if (coldWinnerCarrier && NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
-          NAIVEFOX_LIFECYCLE_LOG(
-              ("h3.cold_winner_handoff action=activate-callback-post "
-               "carrier=%p rv=%08x",
-               self->mTransaction.get(), static_cast<uint32_t>(aResult)));
-        }
-#endif
         nsresult dispatchRv = DispatchToCurrent(NS_NewRunnableFunction(
             "ConnectionEstablisher::ActivateCallback",
             [self, aResult, onActivated = std::move(onActivated)]() {
-#ifdef MOZ_NAIVEFOX
-              const bool coldWinnerCarrier =
-                  self->mTransaction &&
-                  self->mTransaction->IsSingleProxyColdWinnerCarrier();
-              if (coldWinnerCarrier && NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
-                NAIVEFOX_LIFECYCLE_LOG(
-                    ("h3.cold_winner_handoff action=activate-callback-run "
-                     "carrier=%p rv=%08x",
-                     self->mTransaction.get(),
-                     static_cast<uint32_t>(aResult)));
-              }
-#endif
               if (NS_FAILED(aResult)) {
                 self->Finish(aResult);
                 return;

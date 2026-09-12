@@ -46,7 +46,6 @@ class nsHttpResponseHead;
 class NullHttpTransaction;
 class Http2ConnectTransaction;
 #ifdef MOZ_NAIVEFOX
-class H3CarrierDispatchGate;
 #endif
 
 //-----------------------------------------------------------------------------
@@ -97,30 +96,6 @@ class nsHttpTransaction final : public nsAHttpTransaction,
 
 #ifdef MOZ_NAIVEFOX
   void RetainNaiveFoxRoutedHost() { mDontRetryWithDirectRoute = true; }
-  void SetWaitForH3HandshakeConfirmation(bool aValue) {
-    mWaitForH3HandshakeConfirmation = aValue;
-  }
-  bool WaitForH3HandshakeConfirmation() const {
-    return mWaitForH3HandshakeConfirmation;
-  }
-  void SetH3HandshakeDwellMs(uint32_t aValue) {
-    mH3HandshakeDwellMs = aValue;
-  }
-  uint32_t H3HandshakeDwellMs() const { return mH3HandshakeDwellMs; }
-  void SetUseH3CarrierDispatch(bool aValue) { mUseH3CarrierDispatch = aValue; }
-  bool UseH3CarrierDispatch() const { return mUseH3CarrierDispatch; }
-  void SetUseH3ColdWinnerHandoff(bool aValue) {
-    mUseH3ColdWinnerHandoff = aValue;
-  }
-  bool UseH3ColdWinnerHandoff() const { return mUseH3ColdWinnerHandoff; }
-  void SetH3ColdWinnerHandoffSucceeded(bool aValue) {
-    mH3ColdWinnerHandoffSucceeded = aValue;
-  }
-  bool H3ColdWinnerHandoffSucceeded() const {
-    return mH3ColdWinnerHandoffSucceeded;
-  }
-  void SetH3CarrierDispatchGate(H3CarrierDispatchGate* aGate);
-  H3CarrierDispatchGate* CarrierDispatchGate() const;
 #endif
 
   void SetTRRInfo(nsIRequest::TRRMode aMode,
@@ -544,12 +519,7 @@ class nsHttpTransaction final : public nsAHttpTransaction,
   Atomic<bool, ReleaseAcquire> mClosed{false};
   Atomic<bool, Relaxed> mIsHttp3Used{false};
 #ifdef MOZ_NAIVEFOX
-  Atomic<bool, ReleaseAcquire> mWaitForH3HandshakeConfirmation{false};
-  Atomic<uint32_t, ReleaseAcquire> mH3HandshakeDwellMs{0};
-  Atomic<bool, ReleaseAcquire> mUseH3CarrierDispatch{false};
-  Atomic<bool, ReleaseAcquire> mUseH3ColdWinnerHandoff{false};
-  Atomic<bool, ReleaseAcquire> mH3ColdWinnerHandoffSucceeded{false};
-  RefPtr<H3CarrierDispatchGate> mH3CarrierDispatchGate;
+
 #endif
 
   // True iff WriteSegments was called while this transaction should be

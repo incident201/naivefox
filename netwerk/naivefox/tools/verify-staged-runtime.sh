@@ -3,19 +3,19 @@
 set -euo pipefail
 
 usage() {
-  printf 'Usage: %s [--fetch URL] [STAGED_DIR]\n' "$0"
+  printf 'Usage: %s [--caddy PATH] [STAGED_DIR]\n' "$0"
 }
 
-fetch_url=
+caddy_binary=
 staged_arg=
 while (( $# )); do
   case "$1" in
-    --fetch)
+    --caddy)
       if (( $# < 2 )) || [[ -z $2 ]]; then
         usage >&2
         exit 2
       fi
-      fetch_url=$2
+      caddy_binary=$2
       shift 2
       ;;
     --help)
@@ -117,27 +117,29 @@ assert_clean_tree() {
 assert_clean_tree "$staged_dir"
 "$script_dir/runtime-manifest.py" verify "$staged_dir"
 
-verify_root=$(mktemp -d /tmp/naivefox-runtime-verify.XXXXXX)
-profile_dir=
+verify_work="$objdir/verification"
+if [[ -v NAIVEFOX_VERIFY_WORK_DIR ]]; then
+  verify_work=$NAIVEFOX_VERIFY_WORK_DIR
+fi
+verify_parent=$(realpath -m -- "$verify_work")
+case "$verify_parent" in
+  "$objdir"/*) ;;
+  *) printf 'verification work directory must be below objdir\n' >&2; exit 2 ;;
+esac
+mkdir -p -- "$verify_parent"
+verify_root=$(mktemp -d "$verify_parent/naivefox-runtime-verify.XXXXXX")
 cleanup() {
-  if [[ -n ${verify_root:-} && -d $verify_root ]]; then
+  if [[ -n $verify_root && -d $verify_root ]]; then
     case "$verify_root" in
-      /tmp/naivefox-runtime-verify.*) rm -rf -- "$verify_root" ;;
-      *) printf 'refusing to remove unexpected path: %s\n' "$verify_root" >&2 ;;
-    esac
-  fi
-  if [[ -n ${profile_dir:-} && -d $profile_dir ]]; then
-    case "$profile_dir" in
-      /tmp/naivefox-profile.*) rm -rf -- "$profile_dir" ;;
-      *) printf 'refusing to remove unexpected path: %s\n' "$profile_dir" >&2 ;;
+      "$verify_parent"/naivefox-runtime-verify.*) rm -rf -- "$verify_root" ;;
+      *) printf 'refusing unexpected cleanup path: %s\n' "$verify_root" >&2 ;;
     esac
   fi
 }
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
-profile_dir=$(mktemp -d /tmp/naivefox-profile.XXXXXX)
-chmod 0700 "$verify_root" "$profile_dir"
+chmod 0700 "$verify_root"
 
 package_dir="$verify_root/package"
 mkdir -m 0700 "$package_dir"
@@ -165,50 +167,31 @@ if grep -q 'not found' <<<"$ldd_output"; then
   printf 'staged runtime has unresolved ELF dependencies\n' >&2
   exit 1
 fi
-if grep -Fq "$objdir" <<<"$ldd_output" ||
-   grep -Fq "$source_root" <<<"$ldd_output"; then
+unrelocated_ldd=$(python3 -c 'import sys; print(sys.stdin.read().replace(sys.argv[1] + "/", "relocated/"))' "$package_dir" <<<"$ldd_output")
+if grep -Fq "$objdir" <<<"$unrelocated_ldd" ||
+   grep -Fq "$source_root" <<<"$unrelocated_ldd"; then
   printf '%s\n' "$ldd_output" >&2
   printf 'staged runtime still resolves a dependency from the build tree\n' >&2
   exit 1
 fi
 
 export MOZ_CRASHREPORTER_DISABLE=1
-env -u LD_LIBRARY_PATH -u LD_PRELOAD -u SSLKEYLOGFILE \
-  timeout 30 "$package_dir/naivefox" \
-  --profile "$profile_dir" --runtime-smoke
+export PYTHONDONTWRITEBYTECODE=1
+env -u LD_PRELOAD -u SSLKEYLOGFILE \
+  LD_LIBRARY_PATH="$package_dir/runtime" \
+  python3 "$script_dir/runtime_smoke.py" \
+    --runtime "$package_dir/runtime/naivefox" --work-dir "$verify_root/runtime-check"
+python3 "$source_root/netwerk/naivefox/test/integration/run-transport-cli-tests.py" \
+  --runtime "$package_dir/runtime/naivefox" --work-dir "$verify_root/cli-check"
 
-if [[ -n $fetch_url ]]; then
-  env -u LD_LIBRARY_PATH -u LD_PRELOAD -u SSLKEYLOGFILE \
-    timeout 60 "$package_dir/naivefox" \
-    --profile "$profile_dir" --fetch "$fetch_url"
+if [[ -n $caddy_binary ]]; then
+  NAIVEFOX_CAPTURE_ISOLATED_NETWORK=1 unshare -n -- \
+    bash "$source_root/netwerk/naivefox/test/integration/run-camouflage-isolated-network.sh" \
+    python3 "$source_root/netwerk/naivefox/test/integration/run-transport-tests.py" \
+      --runtime "$package_dir/runtime/naivefox" --caddy "$caddy_binary" \
+      --objdir "$objdir" --output "$verify_parent/staged-transport-$$"
 fi
-
-env -u LD_LIBRARY_PATH -u LD_PRELOAD -u SSLKEYLOGFILE \
-  NAIVEFOX_RUNTIME="$package_dir/naivefox" \
-  "$source_root/netwerk/naivefox/test/integration/run-config-runtime-behavior-tests.sh"
-assert_clean_tree "$package_dir"
-
-for protocol in h2 h3; do
-  config_environment=()
-  if [[ $protocol == h2 ]]; then
-    config_environment=(
-      NAIVEFOX_CONFIG_DEFAULT=1
-      NAIVEFOX_CONFIG_PATH="$package_dir/config.json"
-    )
-  fi
-  env -u LD_LIBRARY_PATH -u LD_PRELOAD -u SSLKEYLOGFILE \
-    "${config_environment[@]}" NAIVEFOX_RUNTIME="$package_dir/naivefox" \
-    NAIVEFOX_EXPECT_RUNTIME_DIR="$package_dir/runtime" \
-    "$source_root/netwerk/naivefox/test/integration/run-config-tests.sh" \
-    "$protocol"
-  assert_clean_tree "$package_dir"
-done
-
-env -u LD_LIBRARY_PATH -u LD_PRELOAD -u SSLKEYLOGFILE \
-  NAIVEFOX_RUNTIME="$package_dir/naivefox" \
-  "$source_root/netwerk/naivefox/test/integration/run-auto-protocol-tests.sh"
 
 assert_clean_tree "$package_dir"
 "$script_dir/runtime-manifest.py" verify "$package_dir"
-printf 'staged NaiveFox runtime verified outside the build tree: %s\n' \
-  "$package_dir"
+printf 'staged NaiveFox runtime verified from an independent package copy: %s\n' "$package_dir"

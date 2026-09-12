@@ -9,7 +9,7 @@
 
 namespace mozilla::naivefox {
 
-enum class ProxyProtocol : uint8_t { H2, H3, Auto };
+enum class ProxyProtocol : uint8_t { H2, H3 };
 
 }  // namespace mozilla::naivefox
 

@@ -48,15 +48,15 @@ class MinimalSourceExportTest(unittest.TestCase):
             "netwerk/naivefox/README.md": nested_readme,
             "netwerk/naivefox/ARCHITECTURE.md": "# Architecture\n",
             "netwerk/naivefox/KNOWN-ISSUES.md": "# Known issues\n",
-            "netwerk/naivefox/NO-CONNECT.md": "# No-connect\n",
+            "netwerk/naivefox/TRANSPORT.md": "# NaiveFox transport\n",
             "netwerk/naivefox/FRONTING-PAGE.md": "# Fronting page\n",
             "netwerk/naivefox/CAPTURE.md": (
-                "# Capture\n[benchmark](test/integration/hybrid_app/BENCHMARK.md)\n"
+                "# Capture\n[benchmark](test/integration/http_app/README.md)\n"
             ),
             "netwerk/naivefox/SHIMS.md": "# Shims\n",
             "netwerk/naivefox/test/integration/README.md": "# Integration\n",
             "netwerk/naivefox/test/fingerprint/README.md": "# Fingerprints\n",
-            "netwerk/naivefox/test/integration/hybrid_app/BENCHMARK.md": "# Benchmark\n",
+            "netwerk/naivefox/test/integration/http_app/README.md": "# Benchmark\n",
         }
         self.plan = self.make_plan()
         self.write_export()
@@ -138,21 +138,23 @@ class MinimalSourceExportTest(unittest.TestCase):
         source = (
             "ARCHITECTURE.md prose\n"
             "[architecture](ARCHITECTURE.md#threading)\n"
-            "[transport](NO-CONNECT.md#configuration)\n"
+            "[transport](TRANSPORT.md#configuration)\n"
             "[fronting](FRONTING-PAGE.md)\n"
             "[external](https://example.invalid/ARCHITECTURE.md)\n"
         )
         rendered = render_root_readme(source)
         self.assertIn("ARCHITECTURE.md prose", rendered)
         self.assertIn("](netwerk/naivefox/ARCHITECTURE.md#threading)", rendered)
-        self.assertIn("](netwerk/naivefox/NO-CONNECT.md#configuration)", rendered)
+        self.assertIn("](netwerk/naivefox/TRANSPORT.md#configuration)", rendered)
         self.assertIn("](netwerk/naivefox/FRONTING-PAGE.md)", rendered)
         self.assertIn("https://example.invalid/ARCHITECTURE.md", rendered)
 
     def test_operator_documents_are_required(self) -> None:
-        for path in ("netwerk/naivefox/NO-CONNECT.md",
-                     "netwerk/naivefox/FRONTING-PAGE.md",
-                     "netwerk/naivefox/test/integration/hybrid_app/BENCHMARK.md"):
+        for path in (
+            "netwerk/naivefox/TRANSPORT.md",
+            "netwerk/naivefox/FRONTING-PAGE.md",
+            "netwerk/naivefox/test/integration/http_app/README.md",
+        ):
             plan = dict(self.plan)
             plan["entries"] = [
                 entry for entry in self.plan["entries"] if entry["path"] != path
@@ -173,9 +175,9 @@ class MinimalSourceExportTest(unittest.TestCase):
                 path = urllib.parse.unquote(parsed.path)
                 if not path.lower().endswith(".md"):
                     continue
-                target = posixpath.normpath(posixpath.join(
-                    posixpath.dirname(destination), path
-                ))
+                target = posixpath.normpath(
+                    posixpath.join(posixpath.dirname(destination), path)
+                )
                 with self.subTest(document=destination, link=link):
                     self.assertIn(target, PRODUCT_DOC_SOURCES)
 

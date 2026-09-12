@@ -46,7 +46,6 @@ class Http2StreamTunnel : public Http2StreamBase, public nsISocketTransport {
     // Do nothing here. We'll never reuse the connection.
   }
   void MakeNonSticky() override {}
-  void CloseOutput();
 
   void SetTransactionId(uintptr_t aId) { mId = aId; };
   uintptr_t GetTransactionId() const { return mId; }
@@ -109,8 +108,6 @@ class InputStreamTunnel : public nsIAsyncInputStream {
   explicit InputStreamTunnel(Http2StreamTunnel* aStream);
 
   nsresult OnSocketReady(nsresult condition);
-  nsresult OnSocketReady(nsresult condition, uint32_t aReadLimit,
-                         uint32_t* aReadCount);
   bool HasCallback() { return !!mCallback; }
 
  private:
@@ -122,9 +119,6 @@ class InputStreamTunnel : public nsIAsyncInputStream {
   WeakPtr<Http2StreamTunnel> mWeakStream;
   nsCOMPtr<nsIInputStreamCallback> mCallback;
   nsresult mCondition{NS_OK};
-  uint32_t mReadLimit{0};
-  uint32_t mReadCount{0};
-  bool mCountReads{false};
 };
 
 class Http2StreamWebSocket : public Http2StreamTunnel {

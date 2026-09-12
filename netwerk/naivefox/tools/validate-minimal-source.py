@@ -59,13 +59,13 @@ PRODUCT_DOCS = {
     pathlib.PurePosixPath("netwerk/naivefox/README.md"),
     pathlib.PurePosixPath("netwerk/naivefox/ARCHITECTURE.md"),
     pathlib.PurePosixPath("netwerk/naivefox/KNOWN-ISSUES.md"),
-    pathlib.PurePosixPath("netwerk/naivefox/NO-CONNECT.md"),
+    pathlib.PurePosixPath("netwerk/naivefox/TRANSPORT.md"),
     pathlib.PurePosixPath("netwerk/naivefox/FRONTING-PAGE.md"),
     pathlib.PurePosixPath("netwerk/naivefox/CAPTURE.md"),
     pathlib.PurePosixPath("netwerk/naivefox/SHIMS.md"),
     pathlib.PurePosixPath("netwerk/naivefox/test/integration/README.md"),
     pathlib.PurePosixPath("netwerk/naivefox/test/fingerprint/README.md"),
-    pathlib.PurePosixPath("netwerk/naivefox/test/integration/hybrid_app/BENCHMARK.md"),
+    pathlib.PurePosixPath("netwerk/naivefox/test/integration/http_app/README.md"),
 }
 CONTROL_PLANE_PREFIX = pathlib.PurePosixPath(".github", "workflows")
 MANIFEST_KEYS = {
@@ -141,8 +141,7 @@ def safe_relative(value: str) -> pathlib.PurePosixPath:
     if path.parts[:2] == CONTROL_PLANE_PREFIX.parts:
         if len(path.parts) != 3 or path.suffix.lower() not in {".yml", ".yaml"}:
             fail(
-                "only workflow files are allowed in the control-plane overlay: "
-                f"{value}"
+                f"only workflow files are allowed in the control-plane overlay: {value}"
             )
         return path
     if path.parts and path.parts[0] == "browser":
