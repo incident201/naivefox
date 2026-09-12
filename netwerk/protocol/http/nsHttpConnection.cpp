@@ -742,7 +742,7 @@ nsresult nsHttpConnection::AddTransaction(nsAHttpTransaction* httpTransaction,
   // Let the transaction know that the tunnel is already established and we
   // don't need to setup the tunnel again.
   if (transCI->UsingConnect() &&
-      !(httpTransaction->Caps() & NS_HTTP_PROXY_PREAMBLE)) {
+      !(httpTransaction->Caps() & NS_HTTP_NAIVEFOX_ORIGIN_ROUTE)) {
     MOZ_ASSERT(mProxyConnectResponseHead);
     httpTransaction->OnProxyConnectComplete(mProxyConnectResponseHead);
   }
@@ -1773,10 +1773,7 @@ nsresult nsHttpConnection::OnSocketWritable() {
       return NS_ERROR_FAILURE;
     }
 
-    // A fresh HTTP/2 proxy connection still needs to restart the transaction
-    // onto a tunnel stream before the connect-only transaction can finish.
-    if (mUsingSpdyVersion == SpdyVersion::NONE &&
-        mState == HttpConnectionState::REQUEST &&
+    if (mState == HttpConnectionState::REQUEST &&
         mTlsHandshaker->EnsureNPNComplete()) {
       // Don't need to check this each write attempt since it is only
       // updated after OnSocketWritable completes.
@@ -2110,10 +2107,6 @@ nsresult nsHttpConnection::MakeConnectString(nsAHttpTransaction* trans,
     rv = request->SetHeader("ALPN"_ns, val);
     MOZ_ASSERT(NS_SUCCEEDED(rv));
   }
-
-  nsresult connectHeaderRv =
-      trans->RequestHead()->CopyProxyConnectHeadersTo(*request);
-  NS_ENSURE_SUCCESS(connectHeaderRv, connectHeaderRv);
 
   result.Truncate();
   request->Flatten(result, false);

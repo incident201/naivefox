@@ -673,6 +673,12 @@ nsSocketOutputStream::CloseWithStatus(nsresult reason) {
 
   // may be called from any thread
 
+#ifdef MOZ_NAIVEFOX
+  if (NS_SUCCEEDED(reason)) {
+    reason = NS_BASE_STREAM_CLOSED;
+  }
+#endif
+
   nsresult rv;
   {
     MutexAutoLock lock(mTransport->mLock);
@@ -1914,6 +1920,17 @@ void nsSocketTransport::OnMsgOutputClosed(nsresult reason) {
 
   MOZ_ASSERT(OnSocketThread(), "not on socket thread");
 
+#ifdef MOZ_NAIVEFOX
+  // Deliver the local frontend's FIN while its receive direction stays open.
+  if (!mOutputClosed && reason == NS_BASE_STREAM_CLOSED &&
+      mState == STATE_TRANSFERRING) {
+    MutexAutoLock lock(mLock);
+    if (mFD.IsInitialized() &&
+        PR_Shutdown(mFD, PR_SHUTDOWN_SEND) != PR_SUCCESS) {
+      reason = NS_ERROR_NET_RESET;
+    }
+  }
+#endif
   mOutputClosed = true;
   // check if event should affect entire transport
   if (NS_FAILED(reason) && (reason != NS_BASE_STREAM_CLOSED)) {

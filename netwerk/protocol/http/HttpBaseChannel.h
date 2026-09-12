@@ -276,19 +276,7 @@ class HttpBaseChannel : public nsHashPropertyBag,
   NS_IMETHOD GetRemotePort(int32_t* port) override;
   NS_IMETHOD GetOnlyConnect(bool* aOnlyConnect) override;
   NS_IMETHOD SetConnectOnly(bool aTlsTunnel) override;
-  NS_IMETHOD SetProxyConnectHeader(const nsACString& aHeader,
-                                   const nsACString& aValue) override;
-  NS_IMETHOD SetProxyPreamble() override;
-  NS_IMETHOD SetProxyPreambleWaitForHandshakeConfirmation() override;
-  NS_IMETHOD SetProxyPreambleHandshakeDwell(uint32_t aMilliseconds) override;
-  NS_IMETHOD SetProxyPreambleUseCarrierDispatch() override;
-  NS_IMETHOD SetProxyPreambleUseNativeCacheOpen() override;
-  NS_IMETHOD SetProxyPreambleUseNativeResourceCacheOpen() override;
-  NS_IMETHOD SetProxyPreambleUseColdWinnerHandoff() override;
-  NS_IMETHOD GetProxyPreambleColdWinnerHandoffSucceeded(bool* aValue) override;
-  NS_IMETHOD GetProxyPreambleNativeCacheReadOnlyMiss(bool* aValue) override;
-  NS_IMETHOD GetProxyPreambleNativeResourceCacheOpenSucceeded(
-      bool* aValue) override;
+  NS_IMETHOD SetNaiveFoxOriginRoute() override;
   NS_IMETHOD GetAllowSpdy(bool* aAllowSpdy) override;
   NS_IMETHOD SetAllowSpdy(bool aAllowSpdy) override;
   NS_IMETHOD GetAllowHttp3(bool* aAllowHttp3) override;
@@ -910,16 +898,16 @@ class HttpBaseChannel : public nsHashPropertyBag,
   Atomic<uint32_t, Relaxed> mLoadFlags{LOAD_NORMAL};
   uint32_t mCaps{0};
 #ifdef MOZ_NAIVEFOX
-  bool mProxyPreambleWaitForHandshakeConfirmation{false};
-  uint32_t mProxyPreambleHandshakeDwellMs{0};
-  bool mProxyPreambleUseCarrierDispatch{false};
-  bool mProxyPreambleUseColdWinnerHandoff{false};
-  bool mProxyPreambleUseNativeCacheOpen{false};
-  bool mProxyPreambleNativeCacheOpenCallActive{false};
-  bool mProxyPreambleNativeCacheReadOnlyMiss{false};
-  bool mProxyPreambleUseNativeResourceCacheOpen{false};
-  bool mProxyPreambleNativeResourceCacheOpenCallActive{false};
-  bool mProxyPreambleNativeResourceCacheNewEntry{false};
+
+
+
+
+
+
+
+
+
+
 #endif
 
   ClassOfService mClassOfService;

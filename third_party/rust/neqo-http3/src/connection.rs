@@ -1833,7 +1833,6 @@ impl Http3Connection {
         let stream = self.recv_streams.remove(&stream_id);
         if let Some(s) = &stream
             && s.stream_type() == Http3StreamType::ExtendedConnect
-            && s.extended_connect_session().is_some()
         {
             self.send_streams.remove(&stream_id)?;
             if let Some(wt) = s.extended_connect_session() {
@@ -1851,11 +1850,6 @@ impl Http3Connection {
         let stream = self.send_streams.remove(&stream_id);
         if let Some(s) = &stream
             && s.stream_type() == Http3StreamType::ExtendedConnect
-            && self
-                .recv_streams
-                .get(&stream_id)
-                .and_then(|recv| recv.extended_connect_session())
-                .is_some()
             && let Some(wt) = self
                 .recv_streams
                 .remove(&stream_id)?

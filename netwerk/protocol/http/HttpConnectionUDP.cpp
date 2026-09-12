@@ -450,7 +450,7 @@ nsresult HttpConnectionUDP::Activate(nsAHttpTransaction* trans, uint32_t caps,
   NS_ENSURE_ARG_POINTER(trans);
 
   if (mState == HttpConnectionState::SETTING_UP_TUNNEL &&
-      (caps & NS_HTTP_PROXY_PREAMBLE) && !mIsInTunnel &&
+      (caps & NS_HTTP_NAIVEFOX_ORIGIN_ROUTE) && !mIsInTunnel &&
       mConnInfo->IsHttp3ProxyConnection()) {
     // A speculative H3 null transaction can set the outer proxy connection's
     // state before the ordinary preamble is activated. The preamble targets
@@ -470,24 +470,6 @@ nsresult HttpConnectionUDP::Activate(nsAHttpTransaction* trans, uint32_t caps,
     return mErrorBeforeConnect;
   }
 
-#ifdef MOZ_NAIVEFOX
-  if (trans->IsNullTransaction() && mConnInfo->IsHttp3ProxyConnection() &&
-      NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
-    NAIVEFOX_LIFECYCLE_LOG(
-        ("h3.carrier_dispatch action=carrier-activated connection=%p "
-         "session=%p carrier=%p connected=%d",
-         this, mHttp3Session.get(), trans, mConnected));
-  }
-  if ((caps & NS_HTTP_PROXY_PREAMBLE) && hTrans &&
-      hTrans->UseH3CarrierDispatch() && NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
-    H3CarrierDispatchGate* gate = hTrans->CarrierDispatchGate();
-    NAIVEFOX_LIFECYCLE_LOG(
-        ("h3.carrier_dispatch action=document-activated gate=%p carrier=%p "
-         "connection=%p session=%p document=%p connected=%d wildcard=%d",
-         gate, reinterpret_cast<void*>(gate ? gate->CarrierId() : 0), this,
-         mHttp3Session.get(), hTrans, mConnected, mAlreadyWildcard));
-  }
-#endif
 
   // When mIsInTunnel is false, this HttpConnectionUDP represents the *outer*
   // connection to the proxy. If a proxy CONNECT is still in progress,
@@ -498,26 +480,12 @@ nsresult HttpConnectionUDP::Activate(nsAHttpTransaction* trans, uint32_t caps,
   // is still connecting. Resetting here could lead to opening another HTTP/3
   // connection.
   if ((IsProxyConnectInProgress() ||
-       ((caps & NS_HTTP_PROXY_PREAMBLE) &&
+       ((caps & NS_HTTP_NAIVEFOX_ORIGIN_ROUTE) &&
         mConnInfo->IsHttp3ProxyConnection() && !mAlreadyWildcard)) &&
       !mIsInTunnel && hTrans) {
-    bool waitForHandshakeConfirmation = false;
-#ifdef MOZ_NAIVEFOX
-    waitForHandshakeConfirmation = (caps & NS_HTTP_PROXY_PREAMBLE) &&
-                                   hTrans->WaitForH3HandshakeConfirmation() &&
-                                   !mAlreadyWildcard && !mHandshakeConfirmed;
-#endif
-    if (!mConnected || waitForHandshakeConfirmation) {
+    if (!mConnected) {
       MOZ_ASSERT(!mQueuedHttpConnectTransaction.Contains(hTrans));
       mQueuedHttpConnectTransaction.AppendElement(hTrans);
-#ifdef MOZ_NAIVEFOX
-      if (waitForHandshakeConfirmation && NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
-        NAIVEFOX_LIFECYCLE_LOG(
-            ("h3.preamble_confirm_gate action=wait session=%p ci=%p "
-             "transport_confirmed=0",
-             mHttp3Session.get(), NaiveFoxConnectionInfoId(mConnInfo)));
-      }
-#endif
       (void)ResumeSend();
     } else {
       // Don't call ResetTransaction() directly here.
@@ -629,67 +597,11 @@ void HttpConnectionUDP::OnConnected() {
   nsTArray<RefPtr<nsHttpTransaction>> queued =
       std::move(mQueuedHttpConnectTransaction);
   for (const auto& trans : queued) {
-#ifdef MOZ_NAIVEFOX
-    if (trans->WaitForH3HandshakeConfirmation() && !mHandshakeConfirmed) {
-      mQueuedHttpConnectTransaction.AppendElement(trans);
-      continue;
-    }
-#endif
     ResetTransaction(trans);
   }
 }
 
-void HttpConnectionUDP::OnHandshakeConfirmed() {
-  LOG(("HttpConnectionUDP::OnHandshakeConfirmed %p", this));
 
-#ifdef MOZ_NAIVEFOX
-  if (mHandshakeConfirmed) {
-    return;
-  }
-  mHandshakeConfirmed = true;
-  if (NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
-    NAIVEFOX_LIFECYCLE_LOG(
-        ("h3.transport_confirmation action=observed session=%p ci=%p "
-         "transport_confirmed=1",
-         mHttp3Session.get(), NaiveFoxConnectionInfoId(mConnInfo)));
-  }
-
-  if (mIsInTunnel || mDontReuse || mQueuedHttpConnectTransaction.IsEmpty()) {
-    return;
-  }
-
-  RefPtr<HttpConnectionUDP> self(this);
-  nsTArray<RefPtr<nsHttpTransaction>> queued =
-      std::move(mQueuedHttpConnectTransaction);
-  for (const auto& trans : queued) {
-    if (trans->WaitForH3HandshakeConfirmation() &&
-        NAIVEFOX_LIFECYCLE_LOG_ENABLED()) {
-      NAIVEFOX_LIFECYCLE_LOG(
-          ("h3.preamble_confirm_gate action=release session=%p ci=%p "
-           "transport_confirmed=1",
-           mHttp3Session.get(), NaiveFoxConnectionInfoId(mConnInfo)));
-    }
-    const uint32_t dwellMs = trans->H3HandshakeDwellMs();
-    if (dwellMs) {
-      RefPtr<HttpConnectionUDP> self = this;
-      RefPtr<nsHttpTransaction> transaction = trans;
-      nsresult rv = NS_DelayedDispatchToCurrentThread(
-          NS_NewRunnableFunction(
-              "HttpConnectionUDP::ReleasePreambleAfterBrowserDwell",
-              [self = std::move(self),
-               transaction = std::move(transaction)]() {
-                self->ResetTransaction(transaction);
-              }),
-          dwellMs);
-      if (NS_FAILED(rv)) {
-        trans->Close(rv);
-      }
-      continue;
-    }
-    ResetTransaction(trans);
-  }
-#endif
-}
 
 already_AddRefed<nsIInputStream> HttpConnectionUDP::CreateProxyConnectStream(
     nsAHttpTransaction* trans) {
@@ -1277,7 +1189,7 @@ void HttpConnectionUDP::CloseTransaction(nsAHttpTransaction* trans,
 #endif
   MOZ_ASSERT(trans == mHttp3Session ||
              (transInQueue && (IsProxyConnectInProgress() ||
-                               (trans->Caps() & NS_HTTP_PROXY_PREAMBLE))));
+                               (trans->Caps() & NS_HTTP_NAIVEFOX_ORIGIN_ROUTE))));
   MOZ_ASSERT(OnSocketThread(), "not on socket thread");
 
   if (NS_SUCCEEDED(reason) || (reason == NS_BASE_STREAM_CLOSED)) {

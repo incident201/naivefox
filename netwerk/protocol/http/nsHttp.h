@@ -135,7 +135,7 @@ inline bool IsHttp3(SupportedAlpnRank aRank) {
 
 // Send this transaction as an ordinary request on the outer HTTPS proxy
 // session instead of creating a CONNECT tunnel.
-#define NS_HTTP_PROXY_PREAMBLE (1 << 14)
+#define NS_HTTP_NAIVEFOX_ORIGIN_ROUTE (1 << 14)
 
 // Only permit CONNECTing to a proxy. A channel with this flag will not send an
 // http request after CONNECT or setup tls. An http upgrade handler MUST be

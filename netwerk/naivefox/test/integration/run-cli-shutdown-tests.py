@@ -41,24 +41,49 @@ def connect_when_ready(port, process):
     raise RuntimeError("CLI listener did not become ready")
 
 
-def run_case(runtime, root, transport, stop_signal):
-    directory = root / (transport + "-" + signal.Signals(stop_signal).name.lower())
+def run_case(runtime, root, stop_signal):
+    directory = root / signal.Signals(stop_signal).name.lower()
     directory.mkdir(mode=0o700)
     ports = reserve_ports()
-    config = {"listen": [f"socks://127.0.0.1:{ports[0]}", f"http://127.0.0.1:{ports[1]}"],
-              "proxy": f"https://fixture:{secrets.token_hex(16)}@127.0.0.1:9",
-              "transport": transport, "max-connections": 0, "log": ""}
+    config = {
+        "listen": [f"socks://127.0.0.1:{ports[0]}", f"http://127.0.0.1:{ports[1]}"],
+        "proxy": f"https://fixture:{secrets.token_hex(16)}@127.0.0.1:9",
+        "max-connections": 0,
+        "log": "",
+    }
     config_path = directory / "config.json"
     config_path.write_text(json.dumps(config) + "\n")
-    env = {key: value for key, value in os.environ.items() if key not in
-           ("NAIVEFOX_PROFILE", "SSLKEYLOGFILE", "SSL_CERT_FILE", "MOZ_LOG", "MOZ_LOG_FILE", "LD_PRELOAD", "MOZ_RUN_GTEST")}
-    env.update(TMPDIR=str(directory), LD_LIBRARY_PATH=str(runtime.parent), MOZ_CRASHREPORTER_DISABLE="1")
-    result = {"transport": transport, "signal": signal.Signals(stop_signal).name, "passed": False}
+    env = {
+        key: value
+        for key, value in os.environ.items()
+        if key
+        not in (
+            "NAIVEFOX_PROFILE",
+            "SSLKEYLOGFILE",
+            "SSL_CERT_FILE",
+            "MOZ_LOG",
+            "MOZ_LOG_FILE",
+            "LD_PRELOAD",
+            "MOZ_RUN_GTEST",
+        )
+    }
+    env.update(
+        TMPDIR=str(directory),
+        LD_LIBRARY_PATH=str(runtime.parent),
+        MOZ_CRASHREPORTER_DISABLE="1",
+    )
+    result = {"signal": signal.Signals(stop_signal).name, "passed": False}
     connections = []
     process = None
     try:
         with (directory / "native.log").open("wb") as log:
-            process = subprocess.Popen([str(runtime), str(config_path)], cwd=directory, env=env, stdout=log, stderr=log)
+            process = subprocess.Popen(
+                [str(runtime), str(config_path)],
+                cwd=directory,
+                env=env,
+                stdout=log,
+                stderr=log,
+            )
             connections = [connect_when_ready(port, process) for port in ports]
             connections[0].sendall(b"\x05")
             connections[1].sendall(b"CONNECT ")
@@ -66,8 +91,14 @@ def run_case(runtime, root, transport, stop_signal):
             started = time.monotonic()
             process.send_signal(stop_signal)
             process.wait(timeout=15)
-            result.update(returncode=process.returncode, stop_ms=1000 * (time.monotonic() - started))
-            require(process.returncode == 0, "CLI signal did not complete through its normal exit path")
+            result.update(
+                returncode=process.returncode,
+                stop_ms=1000 * (time.monotonic() - started),
+            )
+            require(
+                process.returncode == 0,
+                "CLI signal did not complete through its normal exit path",
+            )
             for connection in connections:
                 received = 0
                 while True:
@@ -78,12 +109,23 @@ def run_case(runtime, root, transport, stop_signal):
                     if not data:
                         break
                     received += len(data)
-                    require(received <= 4096, "unexpected data after an incomplete local request")
+                    require(
+                        received <= 4096,
+                        "unexpected data after an incomplete local request",
+                    )
             for port in ports:
                 with socket.socket() as probe:
                     probe.settimeout(1)
-                    require(probe.connect_ex(("127.0.0.1", port)) != 0, "CLI listener survived shutdown")
-            result.update(passed=True, unfinished_frontends_closed=2, listeners_remaining=0, forced_kills=0)
+                    require(
+                        probe.connect_ex(("127.0.0.1", port)) != 0,
+                        "CLI listener survived shutdown",
+                    )
+            result.update(
+                passed=True,
+                unfinished_frontends_closed=2,
+                listeners_remaining=0,
+                forced_kills=0,
+            )
     except Exception as error:
         result["failure"] = str(error)
         raise
@@ -108,16 +150,30 @@ def main():
     objdir = args.objdir.resolve(strict=True)
     runtime = (args.runtime or objdir / "dist/bin/naivefox").resolve(strict=True)
     root = args.work_dir.resolve()
-    require(root.is_relative_to(objdir) and not root.exists(), "new fixture root must be beneath the object directory")
+    require(
+        root.is_relative_to(objdir) and not root.exists(),
+        "new fixture root must be beneath the object directory",
+    )
     os.umask(0o077)
     root.mkdir(parents=True, mode=0o700)
     results = []
-    for transport in ("classic", "no-connect"):
-        for stop_signal in (signal.SIGINT, signal.SIGTERM):
-            results.append(run_case(runtime, root, transport, stop_signal))
-    summary = {"passed": True, "cases": len(results), "unfinished_frontends_closed": 12, "results": results}
+    for stop_signal in (signal.SIGINT, signal.SIGTERM):
+        results.append(run_case(runtime, root, stop_signal))
+    summary = {
+        "passed": True,
+        "cases": len(results),
+        "unfinished_frontends_closed": 2 * len(results),
+        "results": results,
+    }
     (root / "result.json").write_text(json.dumps(summary, indent=2) + "\n")
-    print(json.dumps({"passed": True, "cases": len(results), "unfinished_frontends_closed": 12, "result": str(root / "result.json")}))
+    print(
+        json.dumps({
+            "passed": True,
+            "cases": len(results),
+            "unfinished_frontends_closed": 2 * len(results),
+            "result": str(root / "result.json"),
+        })
+    )
 
 
 if __name__ == "__main__":

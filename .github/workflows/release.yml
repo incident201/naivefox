@@ -383,12 +383,12 @@ jobs:
                              TEMP=str(work), TMP=str(work))
           subprocess.run([
               sys.executable, "netwerk/naivefox/test/integration/run-transport-cli-tests.py",
-              "--binary", str(binary), "--work-dir", str(work),
+              "--runtime", str(binary), "--work-dir", str(work),
           ], env=environment, check=True, timeout=180)
-          with tempfile.TemporaryDirectory(prefix="profile-", dir=work) as profile:
-              subprocess.run([
-                  str(launcher), "--profile", profile, "--runtime-smoke",
-              ], env=environment, check=True, timeout=30)
+          subprocess.run([
+              sys.executable, "netwerk/naivefox/tools/runtime_smoke.py",
+              "--runtime", str(launcher), "--work-dir", str(work / "runtime-smoke"),
+          ], env=environment, check=True, timeout=60)
 
       - name: Verify Android embedded package
         if: matrix.platform == 'android'
@@ -400,9 +400,16 @@ jobs:
           package_dir="${objdir}/package/naivefox-android-aarch64"
           ./netwerk/naivefox/tools/verify-staged-android-runtime.sh \
             "${package_dir}"
-          NAIVEFOX_OBJDIR="${objdir}" \
-            ./netwerk/naivefox/test/integration/run-android-embedded-tests.sh \
-              --package "${package_dir}" --check-only
+          compiler="${NAIVEFOX_ANDROID_NDK:?}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang++"
+          "$compiler" -std=c++17 -O2 -fPIE -pie -static-libstdc++ -pthread \
+            -I"${package_dir}/include" \
+            netwerk/naivefox/test/integration/android_embedded_harness.cpp \
+            -ldl -o "${objdir}/android-harness"
+          "$compiler" -std=c++17 -O2 -fPIE -pie -static-libstdc++ -pthread \
+            netwerk/naivefox/test/integration/android_transport_probe.cpp \
+            -o "${objdir}/android-probe"
+          readelf -h "${objdir}/android-harness" | grep -F AArch64
+          readelf -h "${objdir}/android-probe" | grep -F AArch64
 
       - name: Archive Linux package
         if: matrix.platform == 'linux'
@@ -510,17 +517,15 @@ jobs:
           {
             echo "NaiveFox product build from \`${SOURCE_SHA}\`."
             echo
-            echo "Classic remains the default Naive-compatible CONNECT transport."
+            echo "NaiveFox has one current transport. Upgrade the client and naivefox-transport server together. Classic NaiveProxy, transport selectors and older wire contracts are not supported."
             echo
-            echo "No-connect public responses no longer advertise X-App-* metadata. The first startup pair authenticates and privately confirms the fixed contract and streamed site digest before any target OPEN. Anonymous API/WebSocket requests use normal site fallback."
+            echo "H2 uses native WSS after the public site and twenty startup pairs. H3 remains on Firefox Neqo QUIC/HTTP3 with a persistent GET and bounded POST pipeline; it does not fall back to TCP."
             echo
-            echo "Upgrade the client and naivefox-transport server together. Only the latest native-stream-v2 implementation is supported, with no compatibility for earlier releases. Twenty startup pairs and the shaped WebSocket remain. Classic and no-connect remain available."
+            echo "Delivery credit is 512 KiB for H2 and 1 MiB for H3. H3 cells are capped at 64 KiB. Both half-closes, cancellation, bounded buffering and strict certificate checks are preserved."
             echo
-            echo "No-connect with quic:// requires UDP for startup and TCP for the subsequent WebSocket phase."
+            echo "The public site has no compulsory filenames or size/resource-count budget. The client consumes supported directly declared resources without JavaScript, crawling secondary dependencies or enabling resource caching."
             echo
-            echo "There are no compulsory asset filenames or site-size/resource-count budgets. Client caching remains disabled; at most six public resources are loaded concurrently. CSS/JavaScript secondary dependencies are not crawled."
-            echo
-            echo "Large directly declared resources increase traffic on every new carrier and server snapshot memory. See the site requirements in NO-CONNECT.md and the server documentation."
+            echo "See TRANSPORT.md and the matching server documentation. The source pins server implementation 961a8f8994d95b36cdc96f46f176476a0c4be217."
             echo
             echo "Packages are first staged as a draft for checksum and platform verification."
             echo

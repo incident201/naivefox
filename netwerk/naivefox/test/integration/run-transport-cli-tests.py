@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exercise transport CLI parsing and optional shared-config live switching."""
+"""Check the single product CLI and strict configuration rejection."""
 
 import argparse
 import json
@@ -9,243 +9,74 @@ import subprocess
 import tempfile
 
 
-def live_checks(binary, caddy, work_dir, protocols):
-    import importlib.util
-    import secrets
-    from urllib.parse import quote
-
-    spec = importlib.util.spec_from_file_location(
-        "no_connect_fixture", Path(__file__).with_name("run-no-connect-tests.py"))
-    fixture = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(fixture)
-    previous_umask = os.umask(0o077)
-    run = Path(tempfile.mkdtemp(prefix="transport-cli-live-", dir=work_dir))
-    summaries = []
-    try:
-        for protocol in protocols:
-            directory = run / protocol
-            directory.mkdir(mode=0o700)
-            fixture.issue_certificates(directory)
-            target = fixture.TargetServer()
-            processes = []
-            try:
-                user = "cli-user@" + secrets.token_hex(8)
-                password = "cli:p@ss-" + secrets.token_hex(24)
-                server_args = argparse.Namespace(caddy=caddy)
-                server, proxy_port = fixture.start_caddy(
-                    server_args, directory, protocol, target.server_address[1],
-                    user, password)
-                processes.append(server)
-                ports = {"socks": fixture.free_port(), "http": fixture.free_port()}
-                while ports["http"] == ports["socks"]:
-                    ports["http"] = fixture.free_port()
-                scheme = "quic" if protocol == "h3" else "https"
-                credentials = quote(user, safe="") + ":" + quote(password, safe="")
-                config = {
-                    "listen": [f"socks://127.0.0.1:{ports['socks']}",
-                               f"http://127.0.0.1:{ports['http']}"],
-                    "proxy": f"{scheme}://{credentials}@localhost:{proxy_port}",
-                    "preamble": {"mode": "document-complete", "path": "/"},
-                    "extra-headers": "X-Classic-Only: enabled\r\n",
-                    "outer-session-gate": True,
-                    "host-resolver-rules": "MAP localhost 127.0.0.1",
-                    "max-connections": 2, "log": "",
-                }
-                config_path = directory / "shared-config.json"
-                fixture.private_json(config_path, config)
-                original = config_path.read_bytes()
-                classic_count = 0
-                for name, transport, options in (
-                    ("default-classic", "classic", []),
-                    ("no-connect", "no-connect", ["--transport", "no-connect"]),
-                    ("override-classic", "classic", ["--transport=classic"]),
-                    ("no-connect-again", "no-connect", ["--transport=no-connect"]),
-                    ("classic-again", "classic", ["--transport", "classic"]),
-                ):
-                    before = fixture.access_requests(directory)
-                    temporary = directory / name
-                    temporary.mkdir(mode=0o700)
-                    env = {key: value for key, value in os.environ.items() if key not in {
-                        "NAIVEFOX_PROFILE", "NAIVEFOX_PROXY_USER", "NAIVEFOX_PROXY_PASS",
-                        "SSLKEYLOGFILE", "MOZ_RUN_GTEST", "MOZ_LOG", "MOZ_LOG_FILE",
-                        "LD_PRELOAD", "SSL_CERT_FILE"}}
-                    env.update(LD_LIBRARY_PATH=str(binary.parent), TMPDIR=str(temporary),
-                               SSL_CERT_FILE=str(directory / "ca.crt"),
-                               MOZ_CRASHREPORTER_DISABLE="1")
-                    client = fixture.Process(
-                        [str(binary), str(config_path), *options], directory, name, env)
-                    processes.append(client)
-
-                    def ready():
-                        text = client.log_path.read_text(errors="replace")
-                        return (
-                            f"SOCKS5 listening on 127.0.0.1:{ports['socks']}" in text and
-                            f"HTTP CONNECT listening on 127.0.0.1:{ports['http']}" in text)
-
-                    fixture.wait_until(ready, "shared-config client did not start", client)
-                    for listener in ("socks", "http"):
-                        fixture.download(ports, listener, target.server_address[1], 65536)
-                    client.exited_cleanly()
-                    fixture.require(config_path.read_bytes() == original,
-                                    "transport override changed the shared config")
-                    output = client.log_path.read_text(errors="replace")
-                    fixture.require(not any(value in output for value in (user, password, quote(user, safe=""), quote(password, safe=""))),
-                                    "transport override leaked authentication")
-                    if transport != "no-connect":
-                        classic_count += 2
-                        fixture.wait_until(
-                            lambda: sum(request.get("method") == "CONNECT" for request in
-                                        fixture.access_requests(directory)) == classic_count,
-                            "classic CLI selection did not traverse CONNECT")
-                    else:
-                        requests = fixture.access_requests(directory)[len(before):]
-                        fixture.require(bool(requests), "no-connect CLI sent no HTTP requests")
-                        fixture.require(not any(request.get("method") == "CONNECT"
-                                                for request in requests),
-                                        "no-connect CLI emitted an outer CONNECT")
-                        fixture.require(not any(
-                            key.lower() in {"authorization", "proxy-authorization", "x-classic-only"}
-                            for request in requests for key in request.get("headers", {})),
-                            "no-connect sent classic-only headers instead of application authentication")
-                    print(f"PASS {protocol} shared-config CLI {name}: both listeners", flush=True)
-                server.stop()
-                fixture.require(not target.failures, "shared-config target stream failed")
-                summaries.append({"protocol": protocol, "status": "PASS",
-                                  "unchanged_config": True, "classic_connects": classic_count,
-                                  "no_connect_outer_connects": 0,
-                                  "classic_only_headers_in_no_connect": 0,
-                                  "shared_proxy_credentials": True,
-                                  "separate_transport_key": False})
-            finally:
-                for process in reversed(processes):
-                    process.stop()
-                target.close()
-        fixture.private_json(run / "result.json", {"status": "PASS", "targets": summaries})
-        print(f"Shared-config active CLI checks passed. Private fixture: {run}", flush=True)
-    finally:
-        os.umask(previous_umask)
-
-
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--binary", type=Path, required=True)
+    parser.add_argument("--runtime", type=Path, required=True)
     parser.add_argument("--work-dir", type=Path, required=True)
-    parser.add_argument("--caddy", type=Path,
-                        help="also test one unchanged authenticated config over live H2/H3")
-    parser.add_argument("--protocol", choices=("h2", "h3", "both"), default="both")
     args = parser.parse_args()
-    binary = args.binary.resolve(strict=True)
+    runtime = args.runtime.resolve(strict=True)
     args.work_dir.mkdir(parents=True, exist_ok=True)
-    env = os.environ.copy()
-    for name in ("MOZ_RUN_GTEST", "SSLKEYLOGFILE", "MOZ_LOG", "MOZ_LOG_FILE"):
-        env.pop(name, None)
-    env["LD_LIBRARY_PATH"] = str(binary.parent)
-    checks = 0
-    secret = "0123456789abcdef0123456789abcdef"
-    with tempfile.TemporaryDirectory(prefix="transport-cli-", dir=args.work_dir) as temporary:
-        work = Path(temporary)
-        blocked_log = work / "log-is-a-directory"
-        blocked_log.mkdir()
-        base = {
-            "listen": "socks://127.0.0.1:1080",
-            "proxy": "https://proxy.invalid:443",
-            "log": str(blocked_log),
-        }
-        ready = "NaiveFox config error: cannot open runtime log file"
-        cli_error = "NaiveFox command line error:"
+    with tempfile.TemporaryDirectory(prefix="cli-", dir=args.work_dir) as directory:
+        root = Path(directory)
+        env = dict(
+            os.environ,
+            LD_LIBRARY_PATH=str(runtime.parent),
+            TMPDIR=str(root),
+            XDG_RUNTIME_DIR=str(root),
+        )
+        for key in ("MOZ_LOG", "MOZ_LOG_FILE", "SSLKEYLOGFILE", "NAIVEFOX_PROFILE"):
+            env.pop(key, None)
 
-        def check(name, arguments, config, expected, status=2):
-            nonlocal checks
-            for filename in ("config.json", "selected.json"):
-                path = work / filename
-                path.write_text(json.dumps(config), encoding="utf-8")
-                path.chmod(0o600)
+        def run(arguments, expected):
             result = subprocess.run(
-                [str(binary), *arguments], cwd=work, env=env,
-                text=True, capture_output=True, timeout=10,
+                [str(runtime), *arguments],
+                cwd=root,
+                env=env,
+                text=True,
+                capture_output=True,
+                timeout=5,
             )
-            output = result.stdout + result.stderr
-            if result.returncode != status or expected not in output:
-                raise AssertionError(f"{name}: unexpected status or diagnostic (status {result.returncode})")
-            if any(value in output for value in (secret, "switch-user", "switch-password")) or "SOCKS5 listening" in output or "NaiveFox started" in output:
-                raise AssertionError(f"{name}: leaked credentials or started the runtime")
-            checks += 1
+            if result.returncode != expected:
+                raise RuntimeError("unexpected CLI result for " + repr(arguments))
+            return result.stdout + result.stderr
 
-        check("default classic", [], base, ready)
-        check("positional config", ["selected.json"], base, ready)
-        check("classic option uses default path", ["--transport", "classic"], base, ready)
-        check("help documents transport", ["--help"], base, "--transport classic|no-connect", 0)
-
-        shared = {**base, "proxy": "https://switch-user:switch-password@proxy.invalid"}
-        for json_mode in (None, "classic", "no-connect"):
-            config = dict(shared)
-            if json_mode:
-                config["transport"] = json_mode
-            for arguments in (
-                ["--transport", "no-connect"],
-                ["selected.json", "--transport", "no-connect"],
-                ["--transport", "no-connect", "selected.json"],
-                ["selected.json", "--transport=no-connect"],
-                ["--transport=no-connect", "selected.json"],
-            ):
-                check(f"no-connect precedence {json_mode} {arguments}", arguments, config, ready)
-        native = {**shared, "transport": "no-connect"}
-        check("JSON no-connect uses proxy credentials", ["selected.json"], native, ready)
-        for retired in ("no-connect-hybrid", "no-connect-hybrid-asymmetric"):
-            check("retired JSON transport rejected", [], {**shared, "transport": retired},
-                  "transport must be classic or no-connect")
-            check("retired CLI transport rejected", ["--transport="+retired], shared,
-                  "--transport requires classic or no-connect")
-        check("same credentials classic override", ["--transport=classic", "selected.json"], native, ready)
-        check("default classic shared credentials", [], shared, ready)
-        check("explicit classic shared credentials", [], {**shared, "transport": "classic"}, ready)
-        for proxy in ("https://proxy.invalid", "https://user:@proxy.invalid",
-                      "https://:password@proxy.invalid", "https://:@proxy.invalid"):
-            for mode in ("classic", "no-connect"):
-                check(f"empty credential parsing {mode}", [f"--transport={mode}"],
-                      {**base, "proxy": proxy}, ready)
-        classic_options = {
-            **shared, "preamble": {"mode": "document-complete", "path": "/"},
-            "extra-headers": "X-Classic-Only: enabled\r\n", "outer-session-gate": True,
-            "diagnostic-optimistic-local-reply": True,
-            "diagnostic-first-socks-tunnel-urgent-start": True,
-        }
-        check("no-connect ignores valid classic options", ["--transport=no-connect"], classic_options, ready)
-        check("classic keeps classic options", ["--transport=classic"], classic_options, ready)
-        check("inactive preamble still has strict syntax", ["--transport=no-connect"],
-              {**shared, "preamble": True}, "preamble")
-        check("inactive headers still have strict syntax", ["--transport=no-connect"],
-              {**shared, "extra-headers": "invalid"}, "header")
-        check("override does not hide invalid JSON transport", ["--transport=classic"],
-              {**base, "transport": "invalid"}, "transport must be classic or no-connect")
-        for value in (secret, None, False, 42, {}):
-            for mode in ("classic", "no-connect"):
-                check(f"removed key migration {mode}", [f"--transport={mode}"],
-                      {**shared, "no-connect-key": value}, "no-connect-key is no longer supported")
-        for field in ("username", "password", "no-connect-user", "no-connect-password"):
-            check("no extra authentication fields", ["--transport=no-connect"],
-                  {**shared, field: "unused"}, "unsupported config field")
-
+        help_text = run(["--help"], 0)
+        if "--transport" in help_text or "--runtime-smoke" in help_text:
+            raise RuntimeError("retired CLI remains advertised")
+        if not run(["--version"], 0).strip():
+            raise RuntimeError("version output missing")
         for arguments in (
-            ["--transport"],
-            ["selected.json", "--transport"],
-            ["--transport="],
-            ["--transport", "Classic"],
-            ["--transport=unknown"],
-            ["--transport", "--help"],
-            ["--transport=classic", "--transport=classic"],
-            ["--transport", "classic", "--transport", "no-connect"],
-            ["selected.json", "other.json", "--transport=classic"],
-            ["--transport=classic", ""],
-            ["--transport=classic", "--profile", "profile", "--runtime-smoke"],
-            ["--profile", "profile", "--runtime-smoke", "--transport=no-connect"],
-            ["--transport=no-connect", "--no-connect-key", secret],
+            ["--unknown"],
+            ["--transport", "naivefox"],
+            ["--runtime-smoke"],
+            ["one", "two"],
+            ["--version", "extra"],
         ):
-            check(f"invalid arguments {arguments[0]}", arguments, native, cli_error)
-    print(f"Transport CLI checks passed: {checks}; no runtime or network startup")
-    if args.caddy:
-        protocols = ("h2", "h3") if args.protocol == "both" else (args.protocol,)
-        live_checks(binary, args.caddy.resolve(strict=True), args.work_dir, protocols)
+            run(arguments, 2)
+        valid = {
+            "listen": "socks://127.0.0.1:1080",
+            "proxy": "https://fixture:fixture@localhost:443",
+        }
+        invalid = [
+            "{",
+            "[]",
+            "{}",
+            '{"listen":true,"proxy":"https://localhost"}',
+            '{"listen":"socks://127.0.0.1:1080","listen":"socks://127.0.0.1:1081","proxy":"https://localhost"}',
+            json.dumps({**valid, "proxy": "auto://localhost"}),
+            json.dumps({**valid, "unknown": True}),
+            json.dumps({**valid, "transport": "naivefox"}),
+            json.dumps({**valid, "preamble": {"mode": "off"}}),
+            json.dumps({**valid, "extra-headers": "X-Test: retired"}),
+            json.dumps({**valid, "max-connections": -1}),
+            json.dumps({**valid, "no-post-quantum": "true"}),
+            " " * (1024 * 1024 + 1),
+        ]
+        for value in invalid:
+            (root / "config.json").write_text(value)
+            run([], 2)
+            run([str(root / "config.json")], 2)
+    print("PASS: current CLI, default config path, strict fields and bounds")
 
 
 if __name__ == "__main__":

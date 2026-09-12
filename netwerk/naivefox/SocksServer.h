@@ -8,11 +8,11 @@
 #include <cstdint>
 
 #include "Config.h"
-#include "TunnelSession.h"
 #include "mozilla/Atomics.h"
 #include "mozilla/Mutex.h"
 #include "mozilla/RefPtr.h"
 #include "nsCOMPtr.h"
+#include "nsIEventTarget.h"
 #include "nsISupportsImpl.h"
 #include "nsStringFwd.h"
 #include "nscore.h"
@@ -20,23 +20,6 @@
 class nsIEventTarget;
 
 namespace mozilla::naivefox {
-
-namespace detail {
-
-// Selects one fully parsed SOCKS tunnel across all listeners owned by a
-// RunLocalProxyServer invocation. Disabled probes deliberately do not consume
-// the one-shot claim.
-class FirstSocksTunnelUrgentStartSelector final {
- public:
-  bool Claim(bool aEnabled) {
-    return aEnabled && mClaimed.compareExchange(false, true);
-  }
-
- private:
-  Atomic<bool, Relaxed> mClaimed{false};
-};
-
-}  // namespace detail
 
 class LocalProxyServerControl final {
  public:
@@ -47,8 +30,8 @@ class LocalProxyServerControl final {
 
  private:
   friend nsresult RunLocalProxyServer(const nsTArray<ListenerConfig>&,
-                                      const nsTArray<TunnelConfig>&, uint32_t,
-                                      LocalProxyServerControl*);
+                                      const nsTArray<TransportConfig>&,
+                                      uint32_t, LocalProxyServerControl*);
 
   ~LocalProxyServerControl() = default;
   void SetMainEventTarget(nsIEventTarget* aTarget);
@@ -60,11 +43,11 @@ class LocalProxyServerControl final {
 };
 
 nsresult RunLocalProxyServer(const nsTArray<ListenerConfig>& aListeners,
-                             const TunnelConfig& aTunnelConfig,
+                             const TransportConfig& aTransportConfig,
                              uint32_t aMaxConnections = 0);
 
 nsresult RunLocalProxyServer(const nsTArray<ListenerConfig>& aListeners,
-                             const nsTArray<TunnelConfig>& aTunnelConfigs,
+                             const nsTArray<TransportConfig>& aTransportConfigs,
                              uint32_t aMaxConnections = 0,
                              LocalProxyServerControl* aControl = nullptr);
 

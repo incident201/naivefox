@@ -3,23 +3,16 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 UNIFIED_SOURCES += [
-    "TestAutoFallback.cpp",
+    "TestAllocatorBoundary.cpp",
     "TestCacheCryptoBoundary.cpp",
     "TestConfig.cpp",
-    "TestHeaderPadding.cpp",
     "TestHtml5SpeculativeScanner.cpp",
     "TestHttpConnectParser.cpp",
-    "TestNaivePadding.cpp",
-    "TestNativeStylePreloadProcessLifecycle.cpp",
     "TestNetworkStartupState.cpp",
-    "TestNoConnectCodec.cpp",
-    "TestNoConnectSite.cpp",
-    "TestNoConnectWebSocket.cpp",
-    "TestOuterSessionGate.cpp",
-    "TestPaddingNegotiation.cpp",
-    "TestPreambleRequestSemantics.cpp",
     "TestSocks5Parser.cpp",
-    "TestTunnelSessionLifecycle.cpp",
+    "TestTransportCodec.cpp",
+    "TestTransportSite.cpp",
+    "TestTransportWebSocket.cpp",
 ]
 
 LOCAL_INCLUDES += [
@@ -27,7 +20,6 @@ LOCAL_INCLUDES += [
     "/layout/style",
     "/netwerk/cache2",
     "/netwerk/naivefox",
-    "/netwerk/naivefox/codec",
     "/netwerk/system/netlink",
 ]
 

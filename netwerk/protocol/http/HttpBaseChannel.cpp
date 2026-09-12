@@ -4084,11 +4084,8 @@ HttpBaseChannel::GetRemotePort(int32_t* port) {
 NS_IMETHODIMP
 HttpBaseChannel::HTTPUpgrade(const nsACString& aProtocolName,
                              nsIHttpUpgradeListener* aListener) {
+  NS_ENSURE_ARG(!aProtocolName.IsEmpty());
   NS_ENSURE_ARG_POINTER(aListener);
-
-  if (aProtocolName.IsEmpty() && !(mCaps & NS_HTTP_CONNECT_ONLY)) {
-    return NS_ERROR_INVALID_ARG;
-  }
 
   // The protocol name is emitted verbatim into the Upgrade request header, so
   // reject anything that could inject additional headers or requests (e.g. an
@@ -4114,6 +4111,10 @@ NS_IMETHODIMP
 HttpBaseChannel::SetConnectOnly(bool aTlsTunnel) {
   ENSURE_CALLED_BEFORE_CONNECT();
 
+  if (!mUpgradeProtocolCallback) {
+    return NS_ERROR_FAILURE;
+  }
+
   mCaps |= NS_HTTP_CONNECT_ONLY;
   if (aTlsTunnel) {
     mCaps |= NS_HTTP_TLS_TUNNEL;
@@ -4126,185 +4127,10 @@ HttpBaseChannel::SetConnectOnly(bool aTlsTunnel) {
 }
 
 NS_IMETHODIMP
-HttpBaseChannel::SetProxyConnectHeader(const nsACString& aHeader,
-                                       const nsACString& aValue) {
+HttpBaseChannel::SetNaiveFoxOriginRoute() {
   ENSURE_CALLED_BEFORE_CONNECT();
 
-  const nsCString& flatHeader = PromiseFlatCString(aHeader);
-  const nsCString& flatValue = PromiseFlatCString(aValue);
-  if (!nsHttp::IsValidToken(flatHeader) ||
-      !nsHttp::IsReasonableHeaderValue(flatValue)) {
-    return NS_ERROR_INVALID_ARG;
-  }
-
-  nsHttpAtom atom = nsHttp::ResolveAtom(flatHeader);
-  if (atom == nsHttp::Host || atom == nsHttp::Connection ||
-      atom == nsHttp::Proxy_Connection || atom == nsHttp::Keep_Alive ||
-      atom == nsHttp::Transfer_Encoding || atom == nsHttp::TE ||
-      atom == nsHttp::Trailer || atom == nsHttp::Upgrade ||
-      atom == nsHttp::Content_Length || atom == nsHttp::Proxy_Authorization ||
-      atom == nsHttp::Proxy_Authenticate ||
-      flatHeader.LowerCaseEqualsLiteral("alpn")) {
-    return NS_ERROR_INVALID_ARG;
-  }
-
-  return mRequestHead.SetProxyConnectHeader(flatHeader, flatValue);
-}
-
-NS_IMETHODIMP
-HttpBaseChannel::SetProxyPreamble() {
-  ENSURE_CALLED_BEFORE_CONNECT();
-
-  mCaps |= NS_HTTP_PROXY_PREAMBLE;
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-HttpBaseChannel::SetProxyPreambleWaitForHandshakeConfirmation() {
-  ENSURE_CALLED_BEFORE_CONNECT();
-
-#ifdef MOZ_NAIVEFOX
-  if (!(mCaps & NS_HTTP_PROXY_PREAMBLE) ||
-      mProxyPreambleUseNativeCacheOpen ||
-      mProxyPreambleUseNativeResourceCacheOpen ||
-      mProxyPreambleUseColdWinnerHandoff) {
-    return NS_ERROR_NOT_INITIALIZED;
-  }
-  mProxyPreambleWaitForHandshakeConfirmation = true;
-  return NS_OK;
-#else
-  return NS_ERROR_NOT_IMPLEMENTED;
-#endif
-}
-
-NS_IMETHODIMP
-HttpBaseChannel::SetProxyPreambleHandshakeDwell(uint32_t aMilliseconds) {
-  ENSURE_CALLED_BEFORE_CONNECT();
-
-#ifdef MOZ_NAIVEFOX
-  if (!(mCaps & NS_HTTP_PROXY_PREAMBLE) || aMilliseconds == 0 ||
-      aMilliseconds > 100 || mProxyPreambleUseCarrierDispatch ||
-      mProxyPreambleUseColdWinnerHandoff || mProxyPreambleUseNativeCacheOpen ||
-      mProxyPreambleUseNativeResourceCacheOpen) {
-    return NS_ERROR_INVALID_ARG;
-  }
-  mProxyPreambleWaitForHandshakeConfirmation = true;
-  mProxyPreambleHandshakeDwellMs = aMilliseconds;
-  return NS_OK;
-#else
-  return NS_ERROR_NOT_IMPLEMENTED;
-#endif
-}
-
-NS_IMETHODIMP
-HttpBaseChannel::SetProxyPreambleUseCarrierDispatch() {
-  ENSURE_CALLED_BEFORE_CONNECT();
-
-#ifdef MOZ_NAIVEFOX
-  if (!(mCaps & NS_HTTP_PROXY_PREAMBLE) ||
-      mProxyPreambleWaitForHandshakeConfirmation ||
-      mProxyPreambleUseColdWinnerHandoff ||
-      mProxyPreambleUseNativeCacheOpen ||
-      mProxyPreambleUseNativeResourceCacheOpen) {
-    return NS_ERROR_NOT_INITIALIZED;
-  }
-  mProxyPreambleUseCarrierDispatch = true;
-  return NS_OK;
-#else
-  return NS_ERROR_NOT_IMPLEMENTED;
-#endif
-}
-
-NS_IMETHODIMP
-HttpBaseChannel::SetProxyPreambleUseNativeCacheOpen() {
-  ENSURE_CALLED_BEFORE_CONNECT();
-
-#ifdef MOZ_NAIVEFOX
-  if (!(mCaps & NS_HTTP_PROXY_PREAMBLE) ||
-      mProxyPreambleWaitForHandshakeConfirmation ||
-      mProxyPreambleUseCarrierDispatch ||
-      mProxyPreambleUseColdWinnerHandoff ||
-      mProxyPreambleUseNativeCacheOpen ||
-      mProxyPreambleUseNativeResourceCacheOpen) {
-    return NS_ERROR_NOT_INITIALIZED;
-  }
-  mProxyPreambleUseNativeCacheOpen = true;
-  return NS_OK;
-#else
-  return NS_ERROR_NOT_IMPLEMENTED;
-#endif
-}
-
-NS_IMETHODIMP
-HttpBaseChannel::SetProxyPreambleUseNativeResourceCacheOpen() {
-  ENSURE_CALLED_BEFORE_CONNECT();
-
-#ifdef MOZ_NAIVEFOX
-  if (!(mCaps & NS_HTTP_PROXY_PREAMBLE) ||
-      !mLoadInfo ||
-      mLoadInfo->GetExternalContentPolicyType() ==
-          ExtContentPolicy::TYPE_DOCUMENT ||
-      mProxyPreambleWaitForHandshakeConfirmation ||
-      mProxyPreambleUseCarrierDispatch ||
-      mProxyPreambleUseColdWinnerHandoff ||
-      mProxyPreambleUseNativeCacheOpen ||
-      mProxyPreambleUseNativeResourceCacheOpen) {
-    return NS_ERROR_NOT_INITIALIZED;
-  }
-  mProxyPreambleUseNativeResourceCacheOpen = true;
-  return NS_OK;
-#else
-  return NS_ERROR_NOT_IMPLEMENTED;
-#endif
-}
-
-NS_IMETHODIMP
-HttpBaseChannel::SetProxyPreambleUseColdWinnerHandoff() {
-  ENSURE_CALLED_BEFORE_CONNECT();
-
-#ifdef MOZ_NAIVEFOX
-  if (!(mCaps & NS_HTTP_PROXY_PREAMBLE) ||
-      mProxyPreambleWaitForHandshakeConfirmation ||
-      mProxyPreambleUseCarrierDispatch ||
-      mProxyPreambleUseColdWinnerHandoff ||
-      mProxyPreambleUseNativeCacheOpen ||
-      mProxyPreambleUseNativeResourceCacheOpen) {
-    return NS_ERROR_NOT_INITIALIZED;
-  }
-  mProxyPreambleUseColdWinnerHandoff = true;
-  return NS_OK;
-#else
-  return NS_ERROR_NOT_IMPLEMENTED;
-#endif
-}
-
-NS_IMETHODIMP
-HttpBaseChannel::GetProxyPreambleColdWinnerHandoffSucceeded(bool* aValue) {
-  NS_ENSURE_ARG_POINTER(aValue);
-  *aValue = false;
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-HttpBaseChannel::GetProxyPreambleNativeCacheReadOnlyMiss(bool* aValue) {
-  NS_ENSURE_ARG_POINTER(aValue);
-#ifdef MOZ_NAIVEFOX
-  *aValue = mProxyPreambleNativeCacheReadOnlyMiss;
-#else
-  *aValue = false;
-#endif
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-HttpBaseChannel::GetProxyPreambleNativeResourceCacheOpenSucceeded(
-    bool* aValue) {
-  NS_ENSURE_ARG_POINTER(aValue);
-#ifdef MOZ_NAIVEFOX
-  *aValue = mProxyPreambleNativeResourceCacheNewEntry;
-#else
-  *aValue = false;
-#endif
+  mCaps |= NS_HTTP_NAIVEFOX_ORIGIN_ROUTE;
   return NS_OK;
 }
 

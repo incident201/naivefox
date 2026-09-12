@@ -1,10 +1,10 @@
 {
   "counts": {
-    "executable_files": 181,
-    "files": 22090
+    "executable_files": 128,
+    "files": 21997
   },
-  "evidence_commit": "d66b8a081dd9377a8b7e6c0339ad3632414891a9",
-  "evidence_source_commit": "c35d6f969ad29c1c1e87c41c1bfc510dd76dab05",
+  "evidence_commit": "4f6ef0f64405c516ae0bad3440816d32ad2be47f",
+  "evidence_source_commit": "7fc3220ed237fa73cb9cb1b3f1cc4343c9c6b1ad",
   "files": [
     {
       "mode": "0644",
@@ -49,7 +49,7 @@
     {
       "mode": "0644",
       "path": "README.md",
-      "sha256": "91689598a9cc0f388f701cc19dfa1c9d92e94ce5ee6a0c24c1daa3827535821f"
+      "sha256": "d07dc7ff1ad6bc06580ad75c8833c154c14d7a280d715b21fac590018348fc20"
     },
     {
       "mode": "0644",
@@ -17499,7 +17499,7 @@
     {
       "mode": "0644",
       "path": "netwerk/base/nsSocketTransport2.cpp",
-      "sha256": "b8b587fbf7c8341cf7c420fa896d5ed25e6066a870cd05f7b4a57395aae04203"
+      "sha256": "d1cb4202fb1ee374d9794e6d0dfe93bb4abe4b4cda1105d83e39635c040d19a0"
     },
     {
       "mode": "0644",
@@ -19034,22 +19034,12 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/ARCHITECTURE.md",
-      "sha256": "783983ebdd9f3997a81612f960f759a42a314a45997817b375c040a4ba627ed9"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/AutoFallback.cpp",
-      "sha256": "5a5879bc246eecda642146971338fc3f129ba48761d6c85a5edc1c8e6184a711"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/AutoFallback.h",
-      "sha256": "93185773e5902a13c3317b23cbd42f1bfb364d8a1ee7ff82f201cd09a5648262"
+      "sha256": "abfa8b164b93d601f6718a8ab90548d42749e22f277ce8a328ac645e4700adad"
     },
     {
       "mode": "0644",
       "path": "netwerk/naivefox/CAPTURE.md",
-      "sha256": "6043ee336af4a339b9070742143a0417417afa8f5319f7be6b485a61980418e1"
+      "sha256": "5ab4586de6d018d94c88aab485f11580102a119cc1981e7a1dc96f9c905f7143"
     },
     {
       "mode": "0644",
@@ -19069,17 +19059,17 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/Config.cpp",
-      "sha256": "dc427ad8a49ae51658ae69b0ac81ed8acf30a12b3cd71196c2207764f50b00cf"
+      "sha256": "935e9b8ca7885bd518408ce3f65434ec2688664bff8ef4bd57e8bede98130f24"
     },
     {
       "mode": "0644",
       "path": "netwerk/naivefox/Config.h",
-      "sha256": "780cbb2f130835142690aa7a74f0e654584c852e4d16d9f7003a219504f449b8"
+      "sha256": "ecaa76f2c9961f0a543448903a7ce070dbedd045ffba16212cfd4a798131b85b"
     },
     {
       "mode": "0644",
       "path": "netwerk/naivefox/FRONTING-PAGE.md",
-      "sha256": "6a326f834df581c9b9640770d57b07c45a1570957023192775f2addb9cfbebd6"
+      "sha256": "a4d300f0ea366e2adbdc3331b1da6d85376ff0f8330af2dd4071f8025a3aeab8"
     },
     {
       "mode": "0644",
@@ -19089,32 +19079,12 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/GeckoRuntime.cpp",
-      "sha256": "3c87aebb31242e233bcbb6f71eee8d70febd13d49dd7317a4e7d6fee4f97cd3f"
+      "sha256": "1b2598f21ef0446560fbd6ddcd0ed8ac2debcfa8995cdcf2d67bf2942b73d43e"
     },
     {
       "mode": "0644",
       "path": "netwerk/naivefox/GeckoRuntime.h",
-      "sha256": "1df75308f86864e22d9849b426b0a4a9ba11c49c72ea1643b1b0adcc50a5ddea"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/HeaderPadding.cpp",
-      "sha256": "8c0fcc4c767b90bd175d051aa0c9a80bbc5480eb12aa32af0c19974a095f39c3"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/HeaderPadding.h",
-      "sha256": "a759922c0fcafd9cb6c5fdaacdc6affb970603097c390287e90dcb4c1e4fa957"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/HttpClient.cpp",
-      "sha256": "9d76efd1aabfc43222adc2b8e77eea7746cd9daf50095f85a6be15be0eb43333"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/HttpClient.h",
-      "sha256": "c9c2422d7e93b50b52bd677c90d0c9103c0dba7bef6471b1fad08b87904c2251"
+      "sha256": "549db1df89b2eb0355f925b15302e7576211e572a7914e9c20b1b63d25708780"
     },
     {
       "mode": "0644",
@@ -19129,7 +19099,7 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/KNOWN-ISSUES.md",
-      "sha256": "2170ec0ac2ffdc63269b55e757e56e2abbee52489037c1c07bb07fe801e40ce8"
+      "sha256": "8806b8d8ce7896bc91c1943e29c0e57fb8770992fe2d0c315beaa090c985f9a6"
     },
     {
       "mode": "0644",
@@ -19148,18 +19118,13 @@
     },
     {
       "mode": "0644",
-      "path": "netwerk/naivefox/NO-CONNECT.md",
-      "sha256": "8f6e65d68947f2e43db6ab98d6870b0c58eecb40edd1291975dc6d94317daca1"
-    },
-    {
-      "mode": "0644",
       "path": "netwerk/naivefox/NaiveFox.cpp",
-      "sha256": "d2288de78434ae17a46e0809896298082122026544cf7ba88772f38b15d21405"
+      "sha256": "d860183b76fe47411177e8563997360bc344bd93a4b7ec990365eaa8e7e8a91a"
     },
     {
       "mode": "0644",
       "path": "netwerk/naivefox/NaiveFoxAPI.h",
-      "sha256": "4bde739b8c627b49230dcf327b66d9ea8acc6aad80c572c34b61c2c523e8c745"
+      "sha256": "9c59af7ebd30038f0690062a0ba919a79f771f67d85a5a9bf12853a587bd0f9e"
     },
     {
       "mode": "0644",
@@ -19174,47 +19139,7 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/NaiveFoxRunner.cpp",
-      "sha256": "bf72429e593ee84053c73fe42027157e4653a7a9fd0059fe06b3b23ab930bbf4"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/NativeStylePreloadActivation.cpp",
-      "sha256": "756e3802bbc700ea4dab8e6bc5bdf1570be77eb778d63246fba76015ab3034aa"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/NativeStylePreloadActivation.h",
-      "sha256": "6da0af5af0dfff7d9c822585029e9ae6eebceaec19ba12b9f4d50c3b126a3658"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/NativeStylePreloadChannel.cpp",
-      "sha256": "6ccf1c5a8ae37bb198b383f9243c6c1d8e5b9b4182a212c34d4951b146628fe9"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/NativeStylePreloadChannel.h",
-      "sha256": "e60215489ad9d49e4fa9a5ae56b486a264cb66744db6749edc16b7f8bcf8d867"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/NativeStylePreloadProcessBackground.cpp",
-      "sha256": "775296cb3c87f7094c29919e64fb14dfe5858c201309c2f6995f5bb5d10b1116"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/NativeStylePreloadProcessBackground.h",
-      "sha256": "d928a5e363126543aa46ef5da9fdeb1f2c0432f18237c27ddf156b56e80ccf65"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/NativeStylePreloadProcessBridge.cpp",
-      "sha256": "c540558f027eab35ee9ceb47bf92f9a364efcf4c8cfb9e5fdcd9385a3fb11cf7"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/NativeStylePreloadProcessBridge.h",
-      "sha256": "eee74b4383f313e75fe593a960e0f0f22156f0fbc0cbd9498874e9d57766c31d"
+      "sha256": "65f5885ce0425355b1890fa60c01d22bb7fbaff9a1e4c1a3b861fe76e23fb4be"
     },
     {
       "mode": "0644",
@@ -19228,78 +19153,13 @@
     },
     {
       "mode": "0644",
-      "path": "netwerk/naivefox/NeckoTunnel.cpp",
-      "sha256": "fdc2b4c95c36ee3578e4a92045353528d123116ff294f6094d4c1894a302a701"
+      "path": "netwerk/naivefox/OriginChannel.cpp",
+      "sha256": "76d5ed4779cdecf4a2f759e1f17bdec2ce824a76ffef2970e3e2f7d3f5b18460"
     },
     {
       "mode": "0644",
-      "path": "netwerk/naivefox/NeckoTunnel.h",
-      "sha256": "dbd84121afcbf4fdbfc32d81c7be1a51585dd7c9e69e2c4ab54dde54aa1a5ac8"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/NoConnectCodec.cpp",
-      "sha256": "e4d4d430843060b6a3e47b9c9a669a7b8f0117494d01e4cfb09ccfe0f0ccb3db"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/NoConnectCodec.h",
-      "sha256": "6a4045b22faf748edb18d07b841d2f981811f6313a4d7537d0dab41e61a8c6e6"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/NoConnectHash.h",
-      "sha256": "3bf38544b3541902a4e8a059d31458a79d1fbb7b4116c29774b85200028e0906"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/NoConnectSite.cpp",
-      "sha256": "6fe4f0c646838fe1d16f4273fc8f548055d47a77f22510fcfb5872c2e0f140c6"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/NoConnectSite.h",
-      "sha256": "909e07d0a2370cfca0c7eb4f80f9ee6bde65bd9bbd2280d3d8396720a02af917"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/NoConnectTransport.cpp",
-      "sha256": "b2eb2640dc33b206c250c9cba688e89150ab2ae8da4c5843f79c95ce134331d7"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/NoConnectTransport.h",
-      "sha256": "5ec9152819a3a13e2090ca0342eeeede7cb509f41d9784664ffaa420456d0480"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/NoConnectWebSocket.cpp",
-      "sha256": "70ad6f1836ea1d6f9221277e1be7d314a8507343520ba77ae5aa3c7399c46481"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/NoConnectWebSocket.h",
-      "sha256": "7d3036c12ba37306307f77373ae78ba39b9a1b432cd22e42f452e0f93eb612ae"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/OuterSessionGate.cpp",
-      "sha256": "8f17ba06cd2d430785657e037b035ac68e99d8cf0d563f8b53e332ba294eee42"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/OuterSessionGate.h",
-      "sha256": "6c6bef43e07275ed343cb965ae51186fa04f8fee8745b042b791a5346c104f06"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/PaddingNegotiation.cpp",
-      "sha256": "0b08945d79413f01f0d5878f8ef44008573b685995fab877fc013daccc34c99e"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/PaddingNegotiation.h",
-      "sha256": "5d187eb4ec2ef635e6bc35b35697e056c598776631e4afe9fa12defb5fdb8b28"
+      "path": "netwerk/naivefox/OriginChannel.h",
+      "sha256": "5b347fb45689ea0deb887a0d897f8b3d75dd73f342cc2d0eec63075c5c837287"
     },
     {
       "mode": "0644",
@@ -19309,12 +19169,12 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/ProxyProtocol.h",
-      "sha256": "4dcc08aa29fe74bfde01c8de6a45dc8e4a67736893e7e150145030cda337593c"
+      "sha256": "8698d61c60aeaba38ffaa3b970754b209576bdd8cb46bfffd7bf265bafc409a8"
     },
     {
       "mode": "0644",
       "path": "netwerk/naivefox/README.md",
-      "sha256": "f81ac06ce89d74ae820f5d19b860229276a14380492eb6e36210504264c37bca"
+      "sha256": "5a2474345ae7a2aabf9f590b567be3a487fa4e8e090c016a6ed05f8a960f94a7"
     },
     {
       "mode": "0644",
@@ -19359,12 +19219,12 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/SocksServer.cpp",
-      "sha256": "61edf075e12de5963f2d2301662bcf7b90882e9226384ad6d9067727c65e4826"
+      "sha256": "3ccb0b467c9361a90db94d6fad45aa6a89e9ff3d7b360e3cd1b84af307bc7c4a"
     },
     {
       "mode": "0644",
       "path": "netwerk/naivefox/SocksServer.h",
-      "sha256": "d12a214c57a3f691cfce8f20238087f6cc4640d500f1de7f7b7e6629b42dacc7"
+      "sha256": "21f939517c42ae2f024eed33bfadebadf8fceb903a8f2e0b9bc514106c4149ea"
     },
     {
       "mode": "0644",
@@ -19378,6 +19238,11 @@
     },
     {
       "mode": "0644",
+      "path": "netwerk/naivefox/TRANSPORT.md",
+      "sha256": "1c2b85b2d4e051ef845de438bd711c375c4c6a163cc1d5da4f5600aeb0e252c3"
+    },
+    {
+      "mode": "0644",
       "path": "netwerk/naivefox/TemporaryTrustStore.cpp",
       "sha256": "e532d5cc201b4c5742954c8c2bd01d77214dd8893f786835fd4408036da8d261"
     },
@@ -19388,13 +19253,48 @@
     },
     {
       "mode": "0644",
-      "path": "netwerk/naivefox/TunnelSession.cpp",
-      "sha256": "a8b6947a460e0d1bab29fab3b4d4843ce686e944084a33f23604ae2adff45757"
+      "path": "netwerk/naivefox/Transport.cpp",
+      "sha256": "d2a38d1ff61f1a59067ad6912e202bf5ea195d0fe993be02865303ce4709b6cd"
     },
     {
       "mode": "0644",
-      "path": "netwerk/naivefox/TunnelSession.h",
-      "sha256": "7066bafc0539e165d7b319fc85ad842456d61fbab3aa329988bd68e82c210bf0"
+      "path": "netwerk/naivefox/Transport.h",
+      "sha256": "1d7cbd9f190da7465000937d3e5ad1db65db521d18ebca0242ed4525c9758eb2"
+    },
+    {
+      "mode": "0644",
+      "path": "netwerk/naivefox/TransportCodec.cpp",
+      "sha256": "9b8cf7c71693b124f2edc7f85cd672dd2e2ec10165d9d8f20af19b963319a3f0"
+    },
+    {
+      "mode": "0644",
+      "path": "netwerk/naivefox/TransportCodec.h",
+      "sha256": "cc9cd657fa1a07f015c60bdcb45d27393dc291b0b0d9ed4de723e0d2846a0c78"
+    },
+    {
+      "mode": "0644",
+      "path": "netwerk/naivefox/TransportHash.h",
+      "sha256": "bbc772055198b1e1405f460cbd096c1588c420c52560e0a3006524ba4a8b4a38"
+    },
+    {
+      "mode": "0644",
+      "path": "netwerk/naivefox/TransportSite.cpp",
+      "sha256": "819ef2c311d949eb02723bc97c94274a2f2969ebbdc765464f281191d8345ac4"
+    },
+    {
+      "mode": "0644",
+      "path": "netwerk/naivefox/TransportSite.h",
+      "sha256": "ab11b03858adda767ac1e95735cce288d6c1cc8fa59a417104ce38938052cc2c"
+    },
+    {
+      "mode": "0644",
+      "path": "netwerk/naivefox/TransportWebSocket.cpp",
+      "sha256": "44f9e0df5e61050a897acc00cc2acdfe3ce6bd7c92a3bfe4e0aa7e7bd0a906b2"
+    },
+    {
+      "mode": "0644",
+      "path": "netwerk/naivefox/TransportWebSocket.h",
+      "sha256": "8f57a52c621abcdf6f77934c7c8ecd26181297048f7ea7c518013efbbf97c6f3"
     },
     {
       "mode": "0644",
@@ -19410,21 +19310,6 @@
       "mode": "0644",
       "path": "netwerk/naivefox/app.mozbuild",
       "sha256": "6c17a3c29afd73c504d432aacc694096265e397b2de0aaef9396b22e58145562"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/codec/NaivePadding.cpp",
-      "sha256": "fbb2df90392fb58297703a9c635abffcbf8ea2d758b5a0ac22fff7d1329389cd"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/codec/NaivePadding.h",
-      "sha256": "cfdab3404101d76e8e4c014ae62eddd9484be6f75404ee79bf68964bb0568e32"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/codec/moz.build",
-      "sha256": "292a81d0e545024771ff61e171e03645b8a9337f4eea2b7aece51fa053b4a71e"
     },
     {
       "mode": "0644",
@@ -19459,52 +19344,12 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/core/moz.build",
-      "sha256": "b837499a959f86d461d6efd513b57c6d9dbf0e66a4df6a4a1dd95c29d875e9fe"
+      "sha256": "398c3b0ec3a1c2ec8e8a0c8f725bcb1f2f48bad039316d3c958b73dc710e06ed"
     },
     {
       "mode": "0644",
       "path": "netwerk/naivefox/glean/bindings/MetricTypes.h",
       "sha256": "dd3523159361a3a85a7bd612a83739792c5af622d0d1a3211e0b4f487c872dec"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/idl/NativeStylePreloadActivationTypes.ipdlh",
-      "sha256": "ae3d628edebab5c316cc0118833100d616a572f363af17e2310992acbb5cbc24"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/idl/PNativeStylePreloadActivation.ipdl",
-      "sha256": "2792c3cc88cd0299898ae397234ea8f75a1fbc3ec1754975bdb48f190eab6bce"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/idl/PNativeStylePreloadActivationRequest.ipdl",
-      "sha256": "ee0344eecd0588d2b95a70ee0f96f2732af3d5361e722a6d9d1e27e7da489f94"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/idl/PNativeStylePreloadProcess.ipdl",
-      "sha256": "bc6947f5cfad4b863c29a3e28d23fa66cd0e770b2e9159381b76cb2a590c302d"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/idl/PNativeStylePreloadProcessBackground.ipdl",
-      "sha256": "088d264223b64eec60b6636c7319558e8ff465168e3f8b6d952cf756fe0c53b6"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/idl/PNativeStylePreloadProcessBackgroundRequest.ipdl",
-      "sha256": "38ed5d50b736a61e9cf19144910fd0a8c3849b6fdb38a2a1397d1bb5d2975b59"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/idl/PNativeStylePreloadProcessRoot.ipdl",
-      "sha256": "d8334f00ec0ef53743c50f8c3031a8f9e9c5a47e28e26de391cef829e522c074"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/idl/PNativeStylePreloadProcessStyle.ipdl",
-      "sha256": "3b164641a75a33777cd1ab608a901ff76747cb631cc7a8d903f42d87f04eb79b"
     },
     {
       "mode": "0644",
@@ -19519,12 +19364,12 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/idl/moz.build",
-      "sha256": "00163f877f84dbc777819a39a4522c9dbebc608976c01d32ca7ed38fac06bd72"
+      "sha256": "a2b25eb806d896c7587faa303d9a440e30524b903889bec55ef422469dc83bab"
     },
     {
       "mode": "0644",
       "path": "netwerk/naivefox/moz.build",
-      "sha256": "dada63bb0b1a332f6c2f8f437e6fd0edd9df9b44cf929220d867969a5bf03323"
+      "sha256": "5a8fd90f62962a1291c61c3616f7fc7a50a0e939776bdb52cc88cab6ee89294c"
     },
     {
       "mode": "0644",
@@ -19554,27 +19399,12 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/test/fingerprint/README.md",
-      "sha256": "51a36f100f397198ab00f90498ba987fc60b5257f29af047ed27eb24764d20a0"
+      "sha256": "176942d3a4de1997a557a91dda80ac86eb731c1dcd50479f91448bad39140b9a"
     },
     {
       "mode": "0644",
-      "path": "netwerk/naivefox/test/fingerprint/observation-classifier-screen.json",
-      "sha256": "81d710aa9e3b747921eb0426eeb09e6e1738d6128e35e8a86b16442c91878ac9"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/test/fingerprint/observation-h2.json",
-      "sha256": "b103bd9b335d5374165a96402635a3f5fe68be56a70bdfe2d4f25e02fde4d857"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/test/fingerprint/observation-repetition-h2.json",
-      "sha256": "c6ad4bb2408db465d0450ae5f9dd76496c8bb1089f393dfc49057af696fdaaaa"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/test/gtest/TestAutoFallback.cpp",
-      "sha256": "33fabbdd389472918380189de3c553231442b4a5aafa62477840f41b6261c5af"
+      "path": "netwerk/naivefox/test/gtest/TestAllocatorBoundary.cpp",
+      "sha256": "bdd6335843536745c2b80561dff3692957a74e2fb149a7bda178be74bee55200"
     },
     {
       "mode": "0644",
@@ -19584,12 +19414,7 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/test/gtest/TestConfig.cpp",
-      "sha256": "9fe135bab1f7d81efe21f2cb2a87ed142d65e72a945546d47d25e77ed0eb4c7a"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/test/gtest/TestHeaderPadding.cpp",
-      "sha256": "d3e26083e05dc9328de805829bb6be4f89f3213d9c8c53a9b5c27bec41682077"
+      "sha256": "828b96506de6d72b40fffd722ba243160f45388dd2ae68b3725eeff537ad8c1c"
     },
     {
       "mode": "0644",
@@ -19603,48 +19428,8 @@
     },
     {
       "mode": "0644",
-      "path": "netwerk/naivefox/test/gtest/TestNaivePadding.cpp",
-      "sha256": "e78d9f94cb0d99991f23decfd7ef6f0b75fe45966425f07fd3c2e9f8c7326cb8"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/test/gtest/TestNativeStylePreloadProcessLifecycle.cpp",
-      "sha256": "4e91c14145859d9d9ec56a723cf34e4ddbf1e94e295982b09e8e5e5d48ba5a16"
-    },
-    {
-      "mode": "0644",
       "path": "netwerk/naivefox/test/gtest/TestNetworkStartupState.cpp",
       "sha256": "0b949f8ce7fda61c4365e7a5331c8c61ff358ab6fe282cd77033fd29a44e611c"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/test/gtest/TestNoConnectCodec.cpp",
-      "sha256": "9124a8344437121831c8e6623b63fe376c0c8b95260d210c525e72b83baffdd8"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/test/gtest/TestNoConnectSite.cpp",
-      "sha256": "920ca1e28c132b70c0211bdc43d80f251c5e49534311b78d96f531e03ab91185"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/test/gtest/TestNoConnectWebSocket.cpp",
-      "sha256": "25917fec2111e2151b40f223af6fc0c9f7c30d1a8596cb6e507584246c8e3a6b"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/test/gtest/TestOuterSessionGate.cpp",
-      "sha256": "f5bd04e263d81809aec6652008d70ee5ecda25dd1ca95c06493bad4c2ec1882e"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/test/gtest/TestPaddingNegotiation.cpp",
-      "sha256": "5ecc91e21f9f5bb9032c913c4337812a32c0a2f0dce64f43c8303b297acbfcfa"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/test/gtest/TestPreambleRequestSemantics.cpp",
-      "sha256": "5fe35230572bc9621c3f364397370dfb9c1598af9a0f9503736fd4c2ed12749a"
     },
     {
       "mode": "0644",
@@ -19653,13 +19438,23 @@
     },
     {
       "mode": "0644",
-      "path": "netwerk/naivefox/test/gtest/TestTunnelSessionLifecycle.cpp",
-      "sha256": "87036e19dd3203b74d6d552c8f170d02eae9fb5592fd0c6634a961a1aed06a78"
+      "path": "netwerk/naivefox/test/gtest/TestTransportCodec.cpp",
+      "sha256": "5652ae2214d2157897566dc029e2fa5da259844ea69840f7630be015e56deba8"
+    },
+    {
+      "mode": "0644",
+      "path": "netwerk/naivefox/test/gtest/TestTransportSite.cpp",
+      "sha256": "3f2f0325eabc96603b72928fa542c25cc84fa913c1a59558d6e2699365d4d7e7"
+    },
+    {
+      "mode": "0644",
+      "path": "netwerk/naivefox/test/gtest/TestTransportWebSocket.cpp",
+      "sha256": "45df05483956912fdf821c6f601d42dbe02af48044c3be6a2fa4001886f92018"
     },
     {
       "mode": "0644",
       "path": "netwerk/naivefox/test/gtest/moz.build",
-      "sha256": "2873f21b44060436d9d5272da848c1941820e77d4bc9698b73bc87aea119b44c"
+      "sha256": "f96648c0b302db15fc2cd1033529f6fde096486e2568b409e93c628a2a180640"
     },
     {
       "mode": "0644",
@@ -19674,12 +19469,12 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/test/integration/README.md",
-      "sha256": "7559045829ba8fbfb3b1b482a5d473e5a213f03e6a2ebae98fdc86b2d0e72486"
+      "sha256": "c9a8846a7270c49fca031abe0929f6ce1cd008d6176a943f6e67746c11eb28a2"
     },
     {
       "mode": "0644",
       "path": "netwerk/naivefox/test/integration/analyze-camouflage-arms.py",
-      "sha256": "1e53321bb7573578205ca9c6b833eb297e65aaa39228d692808496c034985aa4"
+      "sha256": "766286d840cf36df7108de247c4cbf6902affe0d77845297446b1df3666c4d99"
     },
     {
       "mode": "0755",
@@ -19687,39 +19482,24 @@
       "sha256": "edfd3c468d7cf4a95201f157423f776aa3f294c342a2249daf98ad7c2991041d"
     },
     {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/analyze-private-h3-lifecycle.py",
-      "sha256": "0e24c0e100255bd7550df704a437ce4a6ae3a81a972471b09ed369fcd2f67b27"
-    },
-    {
       "mode": "0644",
       "path": "netwerk/naivefox/test/integration/android_embedded_harness.cpp",
-      "sha256": "a3501fe318eb408edfbfc15dc5c06e9a2e8c598d20accbc5fc53ad870e7fca57"
+      "sha256": "d6b56acedf564763bd928316d7685ad7a63884970189dbe58c63361f9345a1f6"
     },
     {
       "mode": "0644",
       "path": "netwerk/naivefox/test/integration/android_transport_probe.cpp",
-      "sha256": "9d67fbc6ad07a9c79d585d88c37e1d4766f14ca45910af4ab95e60374f95abe1"
-    },
-    {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/android_udp_echo.py",
-      "sha256": "7c03cc36709c24638c0c486f36fcaf113c05b0189e46b10ef67e445fc8b51e52"
+      "sha256": "66bf8d654234d411d9d695d0e459e9127997cd46e4d5d0afd300cbfee1b553e4"
     },
     {
       "mode": "0644",
       "path": "netwerk/naivefox/test/integration/audit-matched-app-results.py",
-      "sha256": "5ee0311442e26d6c5053be7ab8ccad8aa612ac8ded4e7b778b1620d3bb2b601d"
+      "sha256": "9444fff8326d1152ffc4ac658f6725dd40a862099090243ad354fafff95bfc72"
     },
     {
       "mode": "0755",
       "path": "netwerk/naivefox/test/integration/camouflage_browser_controller.py",
       "sha256": "9be3de1b37bd0542376669a7370000e7242a76ed476660738ee34892ae64dcf0"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/test/integration/camouflage_cache_validation.py",
-      "sha256": "aed058add3545e70dd13d611df0948b2354dddfc7f1d2b99bb28979ecaa5813c"
     },
     {
       "mode": "0755",
@@ -19733,133 +19513,73 @@
     },
     {
       "mode": "0644",
-      "path": "netwerk/naivefox/test/integration/camouflage_inner_h2_validation.py",
-      "sha256": "b52b42b15560cb1d586d5169bcda2959cc7aa3ea1ea69a383d33ac59893c9a80"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/test/integration/camouflage_naivefox_config.py",
-      "sha256": "a56429817766dc0f8f9e007c9f9f173d071fa4089d442ef2f958301307d38812"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/test/integration/camouflage_sample_validation.py",
-      "sha256": "3a38be0d1c580e55087e2303e62eae86eb250bf7ba53b55f4086897a9de44f23"
-    },
-    {
-      "mode": "0644",
       "path": "netwerk/naivefox/test/integration/camouflage_superblocks.py",
-      "sha256": "694a8fc7a976537886032712adf963aaf57eaf6d1b6a1a3ec1ca314bd0ae671b"
+      "sha256": "144337d174be50a504e9826fe720f6f7c7457b1a2f0d3ecd0fa3f9d2dbed2bf1"
     },
     {
       "mode": "0644",
       "path": "netwerk/naivefox/test/integration/carrier_capture.py",
-      "sha256": "b170bbd519ac85a6b76bdcc19f1fe7bf76fc01d8fa510402129832ac9a957a55"
-    },
-    {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/common.sh",
-      "sha256": "a22616bf8c5ab65284219b7cda8489a25c47f10d1a8732f150233fd6dba21762"
+      "sha256": "854170e04b4f1f5181385c78bdc1ee71fa5955a1a8a468ffd0ebd37b6361143d"
     },
     {
       "mode": "0644",
-      "path": "netwerk/naivefox/test/integration/evidence/hybrid-ws-matrix.json",
-      "sha256": "622fe816f5b6d91aca8ae6433eab47115b98d2c237bed9c2917fb87e2af72496"
+      "path": "netwerk/naivefox/test/integration/http_app/README.md",
+      "sha256": "060758cd625663f45d39a8d3529509adb790794d30df59213c2785f32db4dcaf"
     },
     {
       "mode": "0644",
-      "path": "netwerk/naivefox/test/integration/evidence/transport-cost-classic-baseline.json",
-      "sha256": "970fbaee3556aecec5a08996158d91289a3544abcda3a65c6ce3465997df2553"
-    },
-    {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/firefox_repeat_navigation_summary.py",
-      "sha256": "ce95c3edd7568f458123e34e1945ba073ac1b0e5acb1d61beabccf1f945377c6"
-    },
-    {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/h2_connect_priority_summary.py",
-      "sha256": "4f1d99f70a193d723fb1792aced91536fd64888ae09edaf43852e1615dbbdb7b"
+      "path": "netwerk/naivefox/test/integration/http_app/app.js",
+      "sha256": "63e9677d999887447d4c5d534050cacaa420d4328ac5410cbe149882f3005c91"
     },
     {
       "mode": "0644",
-      "path": "netwerk/naivefox/test/integration/h2_decrypted_parity_summary.py",
-      "sha256": "2d3edd276a5d652747f8139887f9194153378d6fa16b7987de309e8cae8cfaaf"
+      "path": "netwerk/naivefox/test/integration/http_app/app.template.js",
+      "sha256": "53c1eb9a48d8f93a764f25f3e36f7a63fd8eca4af26b5a7e8e29beb61aa61e50"
     },
     {
       "mode": "0644",
-      "path": "netwerk/naivefox/test/integration/h2_request_lifecycle_summary.py",
-      "sha256": "13a3c63c047b548612e65c0540bb56da887d13dfee39f22c8efda8e4919ae058"
+      "path": "netwerk/naivefox/test/integration/http_app/go.mod",
+      "sha256": "6bbf43704695ccbab8fa427a2d34e910f5e13ae5830b68b95d0e139eec423242"
     },
     {
       "mode": "0644",
-      "path": "netwerk/naivefox/test/integration/h3_decrypted_arm_summary.py",
-      "sha256": "3754505e2606949b01f4808a7bcb024f2e49de3c85bb161426e9c17d003a0b23"
+      "path": "netwerk/naivefox/test/integration/http_app/go.sum",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     {
       "mode": "0644",
-      "path": "netwerk/naivefox/test/integration/hybrid_app/BENCHMARK.md",
-      "sha256": "1b9c128367d99d1c17810ccc01100f66275551d624cb3fcdeb54e7027c36af2a"
+      "path": "netwerk/naivefox/test/integration/http_app/http.go",
+      "sha256": "1eea959e5345188cd4464280c2cb3476c4786282e895207852a68cfaa781684d"
     },
     {
       "mode": "0644",
-      "path": "netwerk/naivefox/test/integration/hybrid_app/app.js",
-      "sha256": "4bfe590ff1f3c8688a66c85315acf18ec758d26fb782ceca88923e626a165da3"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/test/integration/hybrid_app/app.template.js",
-      "sha256": "8913c56e4f2284fb7bf41e8d1346a4532c0a6ff8f806fac516316b599831f334"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/test/integration/hybrid_app/go.mod",
-      "sha256": "14d3dcdcc8221823338369d9fc52e1743f183aa93443d0b41f8ec78063d40bfb"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/test/integration/hybrid_app/go.sum",
-      "sha256": "1737d5523b7264df09b253e86e29f96af295a7bd18e0aaa4373c6099317e065f"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/test/integration/hybrid_app/image.svg",
+      "path": "netwerk/naivefox/test/integration/http_app/image.svg",
       "sha256": "df8c647263703bd0ab3fd1df6deb02d7442ffb9a43b2916bfb6d47b8716a4efa"
     },
     {
       "mode": "0644",
-      "path": "netwerk/naivefox/test/integration/hybrid_app/index.html",
+      "path": "netwerk/naivefox/test/integration/http_app/index.html",
       "sha256": "4643afafd2bfe6dd257d735b70fccd3b5bec39ad6e1e102ff0dc3381555aa550"
     },
     {
       "mode": "0644",
-      "path": "netwerk/naivefox/test/integration/hybrid_app/main.go",
-      "sha256": "76c6ac197ae6ef78c835394b0cb84e85aa771809ede2de16640ca660d46051be"
+      "path": "netwerk/naivefox/test/integration/http_app/main.go",
+      "sha256": "aec3df85195e43dd2a604e2a2807153aa5731b325a77ef5be1715bea568f23c1"
     },
     {
       "mode": "0644",
-      "path": "netwerk/naivefox/test/integration/hybrid_app/main_test.go",
-      "sha256": "0f2788cf8496bdbfe32da2a840251454a0e94933a9e307d803e9c3ed3790a2fb"
+      "path": "netwerk/naivefox/test/integration/http_app/manifest.json",
+      "sha256": "9ac8cb84ecd08ea1c150c4c9384015e36a0cfbc23d16561a8fbdf4da994fe47b"
     },
     {
       "mode": "0644",
-      "path": "netwerk/naivefox/test/integration/hybrid_app/manifest.json",
-      "sha256": "3caeae3d8a8509d1453bcebda06150a63fe39b72c255f8a14ffd838abb1ce525"
+      "path": "netwerk/naivefox/test/integration/http_app/render-app.py",
+      "sha256": "8f93522cfb446a147d501938b272ad1dd2150567bb8a660ab2eea5216d52c188"
     },
     {
       "mode": "0644",
-      "path": "netwerk/naivefox/test/integration/hybrid_app/render-app.py",
-      "sha256": "23f631769064bf801bb4fdf6bd6d65d808a3e7d52ff6bb21ee95cc612517a521"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/test/integration/hybrid_app/site.css",
+      "path": "netwerk/naivefox/test/integration/http_app/site.css",
       "sha256": "ab7aa7f5a8270bbf452a508366522d47655ce925335fd8d8550761822936e9a9"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/test/integration/hybrid_app/test-app.cjs",
-      "sha256": "ee9541f5f027c51943234237f7322d571e58892f759a2ad7438e48b7834800a4"
     },
     {
       "mode": "0644",
@@ -19867,34 +19587,9 @@
       "sha256": "b3e8aef1a6553ca971ab9adedec4b8c043a1ddb4f56cbe194766c74593832fe0"
     },
     {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/proxied_firefox_controller.py",
-      "sha256": "3b6e0f496f630cc2e94e4b3c0e7a8334a169d7deada45abfcbbe7dd8d0f36302"
-    },
-    {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/publish-matched-app-results.py",
-      "sha256": "47e3b17a0984d380380a0b4d511c3151f59a7a496cf7c67ff438ed39c2882b76"
-    },
-    {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/robustness_client.py",
-      "sha256": "d2dc465387e50954dd38cf16664c35cbfca5c364fbab1f2eb9a0c34455b1cbf9"
-    },
-    {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/run-android-embedded-tests.sh",
-      "sha256": "831d079e092bce382431c40801a5c2783db28f4da771e77860d82e7219899d38"
-    },
-    {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/run-android-transport-tests.py",
-      "sha256": "000165fd72d75cec15eae2658c95a2569f961af897349bf85136bff4ae4d4513"
-    },
-    {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/run-auto-protocol-tests.sh",
-      "sha256": "9a604e0d9ade2ad2ea598ced1067d8e2cb98cdcfd27ef56531e76907b1515084"
+      "mode": "0644",
+      "path": "netwerk/naivefox/test/integration/run-android-runtime-tests.py",
+      "sha256": "ea4b463c211488a01c03045879d73cd56ecb60c5903d2e187e4c6c55bd7851c1"
     },
     {
       "mode": "0755",
@@ -19904,282 +19599,72 @@
     {
       "mode": "0755",
       "path": "netwerk/naivefox/test/integration/run-camouflage-self-tests.sh",
-      "sha256": "9eee783fafc5ec9be43787ed96fa3a246128d6479f4668602f7666889c9327e2"
-    },
-    {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/run-camouflage-suite.sh",
-      "sha256": "38a5e52c4e8ca83fc8aa7b4ec8f84dad5edf3fd4276cdec520571c761fc03260"
-    },
-    {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/run-capture-comparison.sh",
-      "sha256": "0dc392b14912b3da14d7964e90ea877dbe1a9c0a91e444818451acc2350db8fa"
-    },
-    {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/run-classic-h3-tls-tests.py",
-      "sha256": "259f72741a794cdf8805e5a1db1b4a16f8ff7f16e99eafb5ff3986d315919428"
+      "sha256": "f6503c8cfb821197d1635fe1fddedf8e4caa3c7e29e5a00d91a2a6fb8cc46ce0"
     },
     {
       "mode": "0644",
       "path": "netwerk/naivefox/test/integration/run-cli-shutdown-tests.py",
-      "sha256": "b11256f6d4ec7f48ea71e2c0207f9e25cf619b805535d2f65dceac38d38764d5"
-    },
-    {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/run-config-runtime-behavior-tests.sh",
-      "sha256": "7dab4daf7ad5068a5d014481589f6d94ea0df2cdcaaa8f37d148781c4229a46d"
-    },
-    {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/run-config-tests.sh",
-      "sha256": "1ed0b91b92d18bc8520315242c6cef8c660ff59c8e4ff9ba1ca967f95b40ded1"
-    },
-    {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/run-control-tests.sh",
-      "sha256": "abc2d26fcaefe0e4e414ed72b3c9e5a006512551cd7d6f9cd3cecbc9f3f6bf4f"
-    },
-    {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/run-firefox-repeat-navigation-diagnostic.sh",
-      "sha256": "1413eb8227fcbc741bedb17f0c5ac7afce1387a0233db5ededc9cf71e98eff71"
-    },
-    {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/run-full-suite.sh",
-      "sha256": "a72324ddc6269525b50986fe94a00081bc89847a4f2d8cb420e1687a5dab7746"
-    },
-    {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/run-h2-capture-comparison.sh",
-      "sha256": "87a6fc89f754471c9042acf2798ea19e847a76d52c8cfa948f7d7b9c8e67cb25"
-    },
-    {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/run-h2-config-tests.sh",
-      "sha256": "cb842e340ce5e51d814b303b4d02b20a8e68d34658aa2d3e5169a6389f2a7cfe"
-    },
-    {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/run-h2-connect-priority-comparison.sh",
-      "sha256": "5a0abd59edd8bf2f3b71957f55995cf3be284627f515d17a4148a51679e46dcb"
-    },
-    {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/run-h3-capture-comparison.sh",
-      "sha256": "6e1bc1f6e01d4f1121572a14a98db559464378eea2d60983958ad352b806e3b4"
-    },
-    {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/run-h3-config-tests.sh",
-      "sha256": "1cfeb6545c8f1268d09dd6ee979577117b7f37ff2d0ef32d55984df5f1eb7e42"
-    },
-    {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/run-h3-padded-tests.sh",
-      "sha256": "e9831a6cd476a63c5ac0bbaa0bcf581ddf33f2dc6219cf964059d313c0017bc2"
-    },
-    {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/run-h3-pool-race-gate.sh",
-      "sha256": "6b79dab829fc4ed7e0133bd65f207f41f1bb25b5e6a298413d226fbf417a6a43"
-    },
-    {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/run-h3-raw-connect-tests.sh",
-      "sha256": "ae3b741bcbbd63ee24f68bf7df92e2c8de4d3f1347e4b80cf9f14358163e4150"
-    },
-    {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/run-h3-robustness-tests.sh",
-      "sha256": "3a2b73328c5a1a2ea75e230a6966ea477a12b1c70b18d64cb5070583b5c23d38"
-    },
-    {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/run-h3-socks-tests.sh",
-      "sha256": "95f44ec404de5d74c72cc6ddb1447798bd5bb5f72b44c3dbaf6023572fa0f605"
-    },
-    {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/run-h3-suite.sh",
-      "sha256": "bdc07c94f22222332c7e555ece3ff971d824ea7bbbe1312584e08fe227b0ab7b"
-    },
-    {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/run-h3-throughput-benchmark.sh",
-      "sha256": "0fd6ae880ee703423ad01478726b0081010b41c37883ff2da4fa9974dc10be1e"
+      "sha256": "176bbfb41a18186045e002d05acce8c3fcd78d77099554476d49de47110d9111"
     },
     {
       "mode": "0644",
       "path": "netwerk/naivefox/test/integration/run-listener-address-tests.py",
-      "sha256": "726535ae39873a1bd0ba19cc36193a2e5b17e38ddef29dcbe8f4262c33f4c54a"
-    },
-    {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/run-local-suite.sh",
-      "sha256": "9634c49667bf6f19ebe3a96eb07decc6f2fee60206e29f339df378a90e0baca1"
-    },
-    {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/run-malformed-socks-tests.sh",
-      "sha256": "a0d48df67665f85921dcd4f18df35b4ab9afa9133853822a8fee1074a240bd46"
+      "sha256": "421cbf340f4a4b29b76f0ededddc4af60c4ae1f2a16155b8f8e3ead94dfec3da"
     },
     {
       "mode": "0644",
       "path": "netwerk/naivefox/test/integration/run-matched-app-matrix.py",
-      "sha256": "ea9936c851db37594e3dd14f50f674d4f44d8b43b6f07ec071e80394faa83be3"
+      "sha256": "6ad78bee872c825d6ee883717b7d1c779f2169d51675b206c677bccd3f3aecb3"
     },
     {
       "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/run-necko-tests.sh",
-      "sha256": "4826b5736b9f657fc3922690938ee7f3a64ad186a7e748eecdfc51172c8c9e33"
+      "path": "netwerk/naivefox/test/integration/run-routing-tests.py",
+      "sha256": "fd7361684b4ca0a9dd543b64b4b2895e172cc7d8e1ad5b5958155d8824d8ac10"
     },
     {
       "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/run-no-connect-adversarial-tests.py",
-      "sha256": "673436a03c1e833b14b0da1869bf63409a9b89861434a61494fa6787cea5670c"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/test/integration/run-no-connect-android.py",
-      "sha256": "9ada3425fc6c886bec841df749ffe8bf3722334e03b444adb8a724fa9d67b30d"
+      "path": "netwerk/naivefox/test/integration/run-site-tests.py",
+      "sha256": "89adc838cc7e774398a0daf6215b9e85a585c916148fb93ef6200676aa06f0fd"
     },
     {
       "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/run-no-connect-codec-tests.sh",
-      "sha256": "2956197190af4b9415cc59ca38ee8de733b3ad7fcda8694f764c1934974e7d52"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/test/integration/run-no-connect-control-tests.py",
-      "sha256": "04be9debcb1fb660144b21001a64ca52e6297aa10ca87be47b82994312ae624d"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/test/integration/run-no-connect-performance.py",
-      "sha256": "f04482142c67046af2be3f22a67d8f6c6e7ab0a49ce7e3273bdbf2dd30481928"
-    },
-    {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/run-no-connect-routing-tests.py",
-      "sha256": "9df4750494314fb92d18be0110607944ee4a268bab0a6fa30d65ca80a6a2708e"
-    },
-    {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/run-no-connect-site-tests.py",
-      "sha256": "503bcc40144e714f8f3d9e848c2fe5e35e0696100d91c38d6efa2447cd3ea2dd"
-    },
-    {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/run-no-connect-tests.py",
-      "sha256": "10ef303cc0fd7cf6d210fab186c1af139128d93cba78f6ce6b8f6322e67e42cb"
-    },
-    {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/run-no-connect-websocket-adversarial-tests.py",
-      "sha256": "04993f83d7380ca6f86866718cff36a890ae93dd2874d2ef5a0103af813695c2"
-    },
-    {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/run-no-connect-windows-tests.py",
-      "sha256": "1473c35eb2e89767d78ea8c4c8ed53098f0af923b43f12eade78116b01e90901"
-    },
-    {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/run-observer-comparison.sh",
-      "sha256": "42ed8c75d9bb7f6a1a9140f3ae9e1f75f245a1511df420ac33f5c60b1cdb35b6"
-    },
-    {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/run-padded-tests.sh",
-      "sha256": "8a2675ae9f2dbcbe290b43a6b1ef3481cc17d1f04168f385e3c34078a9df80fd"
-    },
-    {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/run-raw-connect-tests.sh",
-      "sha256": "f655a5df097656d2b45bf10b28505e16a8ba18325ac3f5deec846cc8d7ca4e2e"
-    },
-    {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/run-real-server-config-tests.sh",
-      "sha256": "37d1d557ec575632ea96597052864f27d8fbf008e614f8f5e2c502b8cd263873"
-    },
-    {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/run-real-server-h3-soak.sh",
-      "sha256": "ec35d7fa24c22c16dd76124630eccf4bdf1dba5a989a2375863496c19f2b1f0c"
-    },
-    {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/run-real-server-soak.sh",
-      "sha256": "80b5148984140bd252055297a652497e39109e28afba9a1c346c58286be07f49"
-    },
-    {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/run-real-server-tests.sh",
-      "sha256": "5f48850def3db5f7e6b9cb24b14f2a9c5f3d3c7fc01790869166fe848a05740a"
-    },
-    {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/run-reference-server-tests.sh",
-      "sha256": "0bac1f887e2f379da3f8a9bd14e85b7d836b0b9b2398ebf5635ac77bcf0e7d69"
-    },
-    {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/run-robustness-tests.sh",
-      "sha256": "591e03b778b697491edda349cafef217c869ea73cf89d812166bc0b09d91c293"
-    },
-    {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/run-socks-tests.sh",
-      "sha256": "d3ec545a7c081490d1adfe9562df3b46458bf39b7aa9ff7df335f0dddfeb8a7f"
-    },
-    {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/run-ssl-cert-file-tests.sh",
-      "sha256": "fa52634560423a054ab8066bb8f3b5554bcdd5ec1b2cc720d96442fad822058b"
-    },
-    {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/run-throughput-benchmark.sh",
-      "sha256": "8f73233a18253e77f1bda34d79478ca6f6be508c03831eddf232d6d1701f7944"
+      "path": "netwerk/naivefox/test/integration/run-transport-adversarial-tests.py",
+      "sha256": "f72784c39f2e94e75b6e270b9b1c7fe422e601a11afdab0792ad24b13cd11211"
     },
     {
       "mode": "0644",
       "path": "netwerk/naivefox/test/integration/run-transport-cli-tests.py",
-      "sha256": "094e54116fe650258d270943935911ff8aaa0f29e69fe58b20598ee0f95612ea"
+      "sha256": "5d67736c873153f4fd24016ddf0a1b53ae6f7589ebc610205b45b7a6f5470ebc"
     },
     {
       "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/setup.sh",
-      "sha256": "6a1d2928a86ca768fb7c7ae2bc14d8c0b48c1f869ea82df23b5b0e07c8bb2ad0"
+      "path": "netwerk/naivefox/test/integration/run-transport-codec-tests.sh",
+      "sha256": "448f8bed80502ba54ee20f925438e614cb8ced61e75b638e12f803823a80cfa1"
     },
     {
       "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/start.sh",
-      "sha256": "8ef63ba3111fc3be308350b0c61c57d9047bd1915c8a6adc4373d7b28d3340ca"
+      "path": "netwerk/naivefox/test/integration/run-transport-tests.py",
+      "sha256": "cffbf4d7c6326dd1ded1a9101f01bab598af5be96150bdf4ee11ed56cdafbd59"
     },
     {
       "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/stop.sh",
-      "sha256": "f6e5cba22c7b587d129ba5cefaddaf9c50beb6956d64bf5ee7235fba95ae00dd"
-    },
-    {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/target_server.py",
-      "sha256": "d81f044f769f1e7a0c7930336332c2da2555e796964657e5c6ec47cb3bbb29ad"
-    },
-    {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/tcp_accept_probe.py",
-      "sha256": "2aeaee43c2c515c3248d1cf07081ba8c88bd0d4eef1daca92fab5bad297f2586"
+      "path": "netwerk/naivefox/test/integration/run-websocket-adversarial-tests.py",
+      "sha256": "031d6de7e93002d16b2f453c35885b0c9723cb4865ec39426cb1e94a62cea7eb"
     },
     {
       "mode": "0644",
-      "path": "netwerk/naivefox/test/integration/test_android_transport_selection.py",
-      "sha256": "0bdb6efb94353fa5c0f746be7a7a18c286f7df2c8638b29ec1da7d49ae7cb829"
+      "path": "netwerk/naivefox/test/integration/run-websocket-control-tests.py",
+      "sha256": "fb22f3f16874f0d39a4ff7a67eff226b7e74e00395d960d9a57e4bb0e4b72528"
+    },
+    {
+      "mode": "0755",
+      "path": "netwerk/naivefox/test/integration/run-windows-runtime-tests.py",
+      "sha256": "0e0b2d339fd0ce44e7947716c4bad4a76225999b6b753e77a25a6a5a5eb5e476"
+    },
+    {
+      "mode": "0644",
+      "path": "netwerk/naivefox/test/integration/test_android_runtime_fixture.py",
+      "sha256": "a0e0c162f5ea021c0e7e467927e669c62d7af619f4f8ae529b0c63a6ebe6e333"
     },
     {
       "mode": "0755",
@@ -20193,48 +19678,23 @@
     },
     {
       "mode": "0644",
-      "path": "netwerk/naivefox/test/integration/test_camouflage_harness.py",
-      "sha256": "380908eda969fe4e1552f56a4b374f8d076bc11ac86797767897ca3a5291e433"
-    },
-    {
-      "mode": "0644",
       "path": "netwerk/naivefox/test/integration/test_capture_reference_proof.py",
       "sha256": "d01721f2df164cbe12a08390180768299b2da16fdf262f55e58be603dd104386"
     },
     {
       "mode": "0644",
       "path": "netwerk/naivefox/test/integration/test_carrier_capture.py",
-      "sha256": "e9d9dd4a4a79a79389ba7d97375eb1a41b6f8ac03f8ad362e6c9f195a73b9745"
+      "sha256": "8718407ca210e2750dea33c53c5d9f79c37658dfc60f5bf22eefb2f18b854e92"
     },
     {
       "mode": "0644",
-      "path": "netwerk/naivefox/test/integration/test_firefox_repeat_navigation_summary.py",
-      "sha256": "4e51c163f8710769b986cd9a38b0f6e2e5c2bf10a5b62c1e9f15542e40604033"
-    },
-    {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/test_h2_connect_priority_summary.py",
-      "sha256": "3c23ccc3140dd749f66f6df0a159d331b297245f8e51f0d4d8b933599bfaafe1"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/test/integration/test_h2_decrypted_parity_summary.py",
-      "sha256": "b3ac804a167f6e35be6d9c700dfcaa7ef85218ec0eb9c2e82a2b3dee4f66d8d9"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/test/integration/test_h2_request_lifecycle_summary.py",
-      "sha256": "576dae05ab924e4c509aefcd5e4ef660b45e3ed48e920f3f4ea98320f45412d5"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/test/integration/test_h3_decrypted_arm_summary.py",
-      "sha256": "9745e92d25f8a71e4b00faf2219c418a3a9b3339d62d015f130f61ad19765e8b"
+      "path": "netwerk/naivefox/test/integration/test_matched_app_audit.py",
+      "sha256": "9f27eead3fa86611da58546e2e948bcffa79791eb69fbefc139ba247e0573b0b"
     },
     {
       "mode": "0644",
       "path": "netwerk/naivefox/test/integration/test_matched_app_matrix.py",
-      "sha256": "aa4fc992573bc5f3e937a34ae49c06bada9858d567f26489586a3fb696f33a30"
+      "sha256": "fd796a9baaafb776abcdb40dcf5c41e84df05cb8a19abdd4d1406ba5de0e089f"
     },
     {
       "mode": "0644",
@@ -20243,33 +19703,18 @@
     },
     {
       "mode": "0644",
-      "path": "netwerk/naivefox/test/integration/test_no_connect_android_fixture.py",
-      "sha256": "390324256128473b06265ee1b23987ca6f151e1d2901a5546c95932684195560"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/test/integration/test_no_connect_runtime_fixture.py",
-      "sha256": "6d2917cf1faca00fa102217bee25cf5ad557589b6d0774a6d6ae60fbab343b77"
-    },
-    {
-      "mode": "0755",
-      "path": "netwerk/naivefox/test/integration/test_private_h3_lifecycle.py",
-      "sha256": "943d8bba4f5b59de9650838e3d014cb00207bf930919510ddb3ae46cb4a80466"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/test/integration/test_publication_topology.py",
-      "sha256": "d421436440827155a3e2f2062c91216fd6a0969d59e70d57e3ab844d61924838"
-    },
-    {
-      "mode": "0644",
-      "path": "netwerk/naivefox/test/integration/test_transport_smoke.py",
-      "sha256": "93df5241bf96c65bb77f987d13fe654b0f3b0e23c2fa80780d6338eb1865ee63"
+      "path": "netwerk/naivefox/test/integration/test_runtime_fixture.py",
+      "sha256": "446f705a2929ae336fc9e40846dbc1071fd68484fc16311734a9cc59acff39df"
     },
     {
       "mode": "0644",
       "path": "netwerk/naivefox/test/integration/test_verify_staged_windows_smoke.py",
       "sha256": "732762d4db9354c14a1b34455a3c4f0bd613001851cb5cb6f4929ba018bef9dd"
+    },
+    {
+      "mode": "0644",
+      "path": "netwerk/naivefox/test/integration/transport_fixture.py",
+      "sha256": "06d7d40429a607fb1e5bb59d6c2fe27cda5b881a20c436dd7092879380c25739"
     },
     {
       "mode": "0644",
@@ -20279,7 +19724,7 @@
     {
       "mode": "0644",
       "path": "netwerk/naivefox/test/integration/versions.env",
-      "sha256": "e4d9e42e871cd52166475bdc958f90f2d7ee086c1b7c0d80b743a0c0c5f3d738"
+      "sha256": "ac70b36fb436d9ccca380941c3e4c15b488d87187ef7186e9350a5ec22c0e554"
     },
     {
       "mode": "0755",
@@ -20342,6 +19787,11 @@
       "sha256": "e6e641ddb40804f76b16c195727334a0b17244c06a3d5e76932d468f33355e0e"
     },
     {
+      "mode": "0644",
+      "path": "netwerk/naivefox/tools/runtime_smoke.py",
+      "sha256": "3e6eb6ff7904861e908922754c938b5e57bc56a26d4a29f4afcc20b076a14235"
+    },
+    {
       "mode": "0755",
       "path": "netwerk/naivefox/tools/stage-runtime-android-aarch64.sh",
       "sha256": "b452541490d238a7762d36cc4cde2e0e05168c0561571e1071adcc8837a2ca37"
@@ -20369,12 +19819,12 @@
     {
       "mode": "0755",
       "path": "netwerk/naivefox/tools/verify-staged-runtime.sh",
-      "sha256": "852ff28f1c5b009eab8593c79d4d62974687f2c41ede8bd4a3953d387dc778cf"
+      "sha256": "711d9f12c3b9e388a5079b489aaa96bb1a914353108d102c74abfbf05438ad97"
     },
     {
       "mode": "0755",
       "path": "netwerk/naivefox/tools/verify-staged-windows-smoke.py",
-      "sha256": "5711012d45bb26d308d78a94837d74d81590e6920eb384f795c6b1472a3272ff"
+      "sha256": "0f0d8be5175a828ef3eee264a9032206be8f223086ed4b7a1fe7b72214d9e9bc"
     },
     {
       "mode": "0644",
@@ -20554,7 +20004,7 @@
     {
       "mode": "0644",
       "path": "netwerk/protocol/http/ConnectionAttemptPool.cpp",
-      "sha256": "f6eb73957d47f3f85b9d673c5fbf62a3abb5dc72cadcd83984fd9da8e8a7a410"
+      "sha256": "88b17ff6b8c0ccacdccde707b6125d59ba36f06507d2cde2b32f7d98d1e16888"
     },
     {
       "mode": "0644",
@@ -20579,7 +20029,7 @@
     {
       "mode": "0644",
       "path": "netwerk/protocol/http/ConnectionEstablisher.cpp",
-      "sha256": "f2f1dabd922e19466b26c1e804141f5e2c24d78b7032fb2ec59c1abe41a16eed"
+      "sha256": "e6f3815a597b414c7e44b368cb93d16b8e4402d97e3b3d7c51bea8f30be8979b"
     },
     {
       "mode": "0644",
@@ -20644,22 +20094,22 @@
     {
       "mode": "0644",
       "path": "netwerk/protocol/http/HappyEyeballsConnectionAttempt.cpp",
-      "sha256": "05a412c363eccbbbac1583dbb7e25c463f99534dd28732f3d2b5bc99a4c49186"
+      "sha256": "6cbf37eebc79de9c70b1b552c017818ddbb6e21653bf837f03ee4afbacd85ca0"
     },
     {
       "mode": "0644",
       "path": "netwerk/protocol/http/HappyEyeballsConnectionAttempt.h",
-      "sha256": "187123c45392e0c91bcad42b376c6cd915cfd6cd4d7bd77f453cfb22f127f7ec"
+      "sha256": "ea00fb66fb999f06dab37b063b90b38a45fd3782fe5102b7f7b9fcc8c5995ee9"
     },
     {
       "mode": "0644",
       "path": "netwerk/protocol/http/HappyEyeballsTransaction.cpp",
-      "sha256": "7c90efcc04cc1fdaa9f9afd0706a25555abc6eb39a08a35fe032a4721485fe90"
+      "sha256": "0e58a6afa404ef6aeba83a0f254db0999f56a5c35d954faa6f717f07906b5b4b"
     },
     {
       "mode": "0644",
       "path": "netwerk/protocol/http/HappyEyeballsTransaction.h",
-      "sha256": "85dac25dcb7fc50dc6ca89d5b07dfd2f614bfe4847b69a980811d523c50b8cb4"
+      "sha256": "0d974bd048fbff7cf9f0f60945e2a9af41d90a2057781769f6797550d539078c"
     },
     {
       "mode": "0644",
@@ -20684,7 +20134,7 @@
     {
       "mode": "0644",
       "path": "netwerk/protocol/http/Http2Session.cpp",
-      "sha256": "0e2b3a762e594083c4f6c198b0389e1612599544dfcd3bece2d4505b4378ec9f"
+      "sha256": "83ab3f33bedb1250934f6636ad4f70ac132cb7b6479be6861fa3a4a484f455ee"
     },
     {
       "mode": "0644",
@@ -20714,12 +20164,12 @@
     {
       "mode": "0644",
       "path": "netwerk/protocol/http/Http2StreamTunnel.cpp",
-      "sha256": "36b29f6abc2887d038c0e3086853c7d56479e0a86129cab90cbc469ae3f4c4b4"
+      "sha256": "6303f9f5518d78ac02fd203cc57779e8e009d010118a731efc4b853a818fe649"
     },
     {
       "mode": "0644",
       "path": "netwerk/protocol/http/Http2StreamTunnel.h",
-      "sha256": "e62f1043635ce49d678d3481a2e463965443a46a5406896e819f2fa89bf12b0b"
+      "sha256": "43eb4b531c703c808895382b29aaf5f3e0fbd186aea1208f78da1e70e17fc460"
     },
     {
       "mode": "0644",
@@ -20754,7 +20204,7 @@
     {
       "mode": "0644",
       "path": "netwerk/protocol/http/Http3Session.cpp",
-      "sha256": "bdfcc167dc212f4261b457ad37281edfa10f3d0ac04fc3410dbf31c17a2d075a"
+      "sha256": "72f7674cb8845b723273f84cf45b9052d3541281573c7b563e8041e9e40fc86a"
     },
     {
       "mode": "0644",
@@ -20764,7 +20214,7 @@
     {
       "mode": "0644",
       "path": "netwerk/protocol/http/Http3Stream.cpp",
-      "sha256": "19998d10a7bc70b47a8691c3ede5d40cfab95710d03c6a74952792d69f5bb2ec"
+      "sha256": "a2643a08537faf3339133cecf8cb55afd224fcb00c86a52c315685cf4809e22f"
     },
     {
       "mode": "0644",
@@ -20779,12 +20229,12 @@
     {
       "mode": "0644",
       "path": "netwerk/protocol/http/Http3StreamTunnel.cpp",
-      "sha256": "1529aefa0c372edcb2f28cd7ad6bb5a7c5a762c68dcefdcf9a206f47b58dce3e"
+      "sha256": "0d5d5d683aa7513059c4f3fb257ad4a1a81c30d6139de6fc757246dae36b03b2"
     },
     {
       "mode": "0644",
       "path": "netwerk/protocol/http/Http3StreamTunnel.h",
-      "sha256": "b6e186f7e946b133034c6f9f299e90a5f9f736d03374edd9c7a4db58a4578499"
+      "sha256": "7dadafeaa2dcaa87908c52ebcf7a51743702c6cfc08eaa564b135ac2ac9b0a30"
     },
     {
       "mode": "0644",
@@ -20829,12 +20279,12 @@
     {
       "mode": "0644",
       "path": "netwerk/protocol/http/HttpBaseChannel.cpp",
-      "sha256": "38109027157c1a6a17bba771c45e65b4c4cf8f4b92112c0a9c2897e44b45a9c6"
+      "sha256": "6b3f68fe08e789ba42ecc3e80ca43ad6b5dfedc1c47bb5c113667540adb6315e"
     },
     {
       "mode": "0644",
       "path": "netwerk/protocol/http/HttpBaseChannel.h",
-      "sha256": "3c67826975ebe6121470e44fa19bcc2b5b38f834e9c00c99dfab79f49c2f7708"
+      "sha256": "559134670535093eec185386a61ac56ae5365abb28d4968c4f911a4a5d2cac76"
     },
     {
       "mode": "0644",
@@ -20849,7 +20299,7 @@
     {
       "mode": "0644",
       "path": "netwerk/protocol/http/HttpConnectionBase.cpp",
-      "sha256": "545db0d504b638932b2faa76973c763e5d6259e6b2a35489cfc053316c01f5b4"
+      "sha256": "503521e6245260437a139dfacdd279a4c77c3305ddcc0e3fcb9e84d95056a545"
     },
     {
       "mode": "0644",
@@ -20874,12 +20324,12 @@
     {
       "mode": "0644",
       "path": "netwerk/protocol/http/HttpConnectionUDP.cpp",
-      "sha256": "4da87ac7bc1fe108da7fe6f416084d8cca521dc06a8fb172e945950bd77db563"
+      "sha256": "8f7029a8e323a22d907f102b70777eba7e5914e96d3cda52bee4facaa061355d"
     },
     {
       "mode": "0644",
       "path": "netwerk/protocol/http/HttpConnectionUDP.h",
-      "sha256": "fa88271f9f78e2e14171dd4e8f62baf60034a5d7418070ff9eb31fc058d8204a"
+      "sha256": "5c89fdd2454a778f96efe62ed04a8337959cce48995b09cff9276d0fac131d58"
     },
     {
       "mode": "0644",
@@ -21014,7 +20464,7 @@
     {
       "mode": "0644",
       "path": "netwerk/protocol/http/PHttpChannelParams.h",
-      "sha256": "735cf0a2a86fd4c220f547ed5bcf2e2d51c57cf5aeee2cb916078d5705424aef"
+      "sha256": "005f58b2b875989c978c0d98ddaf6bfe75de5e627d61015c1c1262c8bfa425e7"
     },
     {
       "mode": "0644",
@@ -21059,12 +20509,12 @@
     {
       "mode": "0644",
       "path": "netwerk/protocol/http/SpeculativeTransaction.cpp",
-      "sha256": "ee108f8a30dfb76d050188d9bb2ecd01129a25d97dceb5f4cc7471120d838d57"
+      "sha256": "7ce4cb01616fbb4f18bbb0a48d93e24e6b336800e702327777f46b48c244e18b"
     },
     {
       "mode": "0644",
       "path": "netwerk/protocol/http/SpeculativeTransaction.h",
-      "sha256": "1a45fa641db4921069714c8f1dad41f2eee3729604428fb48bf763ab08649c93"
+      "sha256": "68d160a4977de8e1cd7b1e98be69b5eac9dd511804ef674d132e4dce21c94abb"
     },
     {
       "mode": "0644",
@@ -21259,7 +20709,7 @@
     {
       "mode": "0644",
       "path": "netwerk/protocol/http/nsHttp.h",
-      "sha256": "6bc8a6bfaa2795a632ac7976542828dade1cc9c2c5b8bd822a26f6ad4ffbc42e"
+      "sha256": "478fbac4d9e0d307aef7bff4f2f1465602d56ad2418d75137d45473c90c6edd3"
     },
     {
       "mode": "0644",
@@ -21309,12 +20759,12 @@
     {
       "mode": "0644",
       "path": "netwerk/protocol/http/nsHttpChannel.cpp",
-      "sha256": "de5d6e1edf3b55e5b73c6dd62c19bb2ae52c7168f33eeaf464bec38360d05317"
+      "sha256": "c72f8646ad746165c2a8e9d3c88bc70d615c1a314621a33a452b23080a22a431"
     },
     {
       "mode": "0644",
       "path": "netwerk/protocol/http/nsHttpChannel.h",
-      "sha256": "87fd01cb7d09a3b72ff2179346440a51134cad1b20dfbafbfba8fe2dcf79c209"
+      "sha256": "e58d25fd03c31bc859b60f3f8f1791e2ce39d8cef347aebb5e5814d2b0caed1e"
     },
     {
       "mode": "0644",
@@ -21339,12 +20789,12 @@
     {
       "mode": "0644",
       "path": "netwerk/protocol/http/nsHttpConnection.cpp",
-      "sha256": "9d976caaef58be35fb8c457c39f62feb64e6f8798a9a61ba53a9a6eb1cc5c35e"
+      "sha256": "5da0828e08332d0fb578880f3484dedf0e95ac2cc69bc64b400ca2fd8df882e1"
     },
     {
       "mode": "0644",
       "path": "netwerk/protocol/http/nsHttpConnection.h",
-      "sha256": "e6881398eed917df68501853071d838eda33df830e06db6be9b4c9cafe6a6510"
+      "sha256": "8006bfa01f06327739070da30aa0b95fdf8bf33f469ee998122e34b3157f77e4"
     },
     {
       "mode": "0644",
@@ -21359,7 +20809,7 @@
     {
       "mode": "0644",
       "path": "netwerk/protocol/http/nsHttpConnectionMgr.cpp",
-      "sha256": "c05ba3c695482d24785df9cc7f1b6f1c1f3b8b1731beafa84a7670553fb22ae7"
+      "sha256": "0009a88830df4710e1dc377698eac064c7fa7f8cd8da41dc8da70c7bc4549312"
     },
     {
       "mode": "0644",
@@ -21404,12 +20854,12 @@
     {
       "mode": "0644",
       "path": "netwerk/protocol/http/nsHttpRequestHead.cpp",
-      "sha256": "bd75a365a19625aafe61fb897ecab40ef20b5b37e6f3a6c0660b172b604ad013"
+      "sha256": "0095a56bff91f017a0707ccf3f81737b83ff36f347f42573e2d736229a7799cb"
     },
     {
       "mode": "0644",
       "path": "netwerk/protocol/http/nsHttpRequestHead.h",
-      "sha256": "c04198667a4b0e5c12aa3fe4ab2910f2d1c814bdee43a7c6f24464b9f5c5232d"
+      "sha256": "a0439ea8a49b22ed737ecd6768ef9a17cbc33b8dc1ab730a19405dc8a415294c"
     },
     {
       "mode": "0644",
@@ -21424,12 +20874,12 @@
     {
       "mode": "0644",
       "path": "netwerk/protocol/http/nsHttpTransaction.cpp",
-      "sha256": "a5e4032ffb625d6ec31d910ae6eeff66570224cb92de210f7838c898ac59b6a8"
+      "sha256": "ed031f5518c48995057ad3a0e86513ca79e8f1e357ca7d11f3a150d60ac88846"
     },
     {
       "mode": "0644",
       "path": "netwerk/protocol/http/nsHttpTransaction.h",
-      "sha256": "c6374fa8fa8d594bc9782a3a4c895b3d9313e40cf8b3ee792b0616c355d6dabc"
+      "sha256": "60032219c0572fad92f94752a2d621f608a2c4e3522b81a9f0ed7c0161af238e"
     },
     {
       "mode": "0644",
@@ -21509,7 +20959,7 @@
     {
       "mode": "0644",
       "path": "netwerk/protocol/http/nsIHttpChannelInternal.idl",
-      "sha256": "67e175636f70418f7e9f4f6519efaa15123c0c53512c056fd5d2febe5457da71"
+      "sha256": "dec3402cb1fd9fe686a153682733609aaced2ea571120f12656e11d4b81f07c4"
     },
     {
       "mode": "0644",
@@ -21799,7 +21249,7 @@
     {
       "mode": "0644",
       "path": "netwerk/socket/neqo_glue/Cargo.toml",
-      "sha256": "d7f10ce6464a211febca15179bbfab771919d792fc66b3ed902590a74a16a461"
+      "sha256": "29597b34e172828f6faded2cd4b02e8c32b15264a8025529156aabe63b425e2c"
     },
     {
       "mode": "0644",
@@ -21819,7 +21269,7 @@
     {
       "mode": "0644",
       "path": "netwerk/socket/neqo_glue/src/lib.rs",
-      "sha256": "556c7f875ed8b2ec757108e2e318efb01528ba18e30a18f9b3daaa016518d070"
+      "sha256": "5239a0bf18b1e172c474a648665fbb87803b814cc44d6083a6d716e76f7de21c"
     },
     {
       "mode": "0644",
@@ -30713,6 +30163,26 @@
     },
     {
       "mode": "0644",
+      "path": "testing/gtest/mozilla/GTestRunner.cpp",
+      "sha256": "96890cfd12d3bdc30e95f382d75403164fd5d4b1e69e6ff93742051204fbeb08"
+    },
+    {
+      "mode": "0644",
+      "path": "testing/gtest/mozilla/GTestRunner.h",
+      "sha256": "9cf036f8748cabd47569301c5b95f5597b74b751f4dd2846da8678ff56b31a04"
+    },
+    {
+      "mode": "0644",
+      "path": "testing/gtest/mozilla/MozAssertions.cpp",
+      "sha256": "c506cb17041830689d93bfb8286caa553446f584c0a882ae12b4c3a3ebcb7ea1"
+    },
+    {
+      "mode": "0644",
+      "path": "testing/gtest/mozilla/MozAssertions.h",
+      "sha256": "cb3ad1dc991f77695b8ac3c9e5195b306362822b37d831089b8c8c81511c844a"
+    },
+    {
+      "mode": "0644",
       "path": "testing/gtest/remotegtests.py",
       "sha256": "eb782d07ec5f5ddc4becec259842f76bb58b297ebd6f7cc511d6557842111b92"
     },
@@ -34030,6 +33500,61 @@
       "mode": "0644",
       "path": "third_party/function2/include/function2/function2.hpp",
       "sha256": "10fb399117ffbce3092a8fd9171b59ac19f5e5b1ceb3db060fc03f822e645e79"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/googletest/googletest/src/gtest-all.cc",
+      "sha256": "972d3016860f9aa6452e078cf77406290fb7003b66fd6c0744a030bd1c323606"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/googletest/googletest/src/gtest-assertion-result.cc",
+      "sha256": "dbd2235676dcc0ef6409108a4041e05442fc6895735a5561d71151e6a14296bb"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/googletest/googletest/src/gtest-death-test.cc",
+      "sha256": "2881240c49961c095505f3c044483a79ef1c32e413e19630af7508d67994f619"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/googletest/googletest/src/gtest-filepath.cc",
+      "sha256": "b3d0011edbb81f782b88aac6ea20d04b24050e5738b3b2240a22033f675cb71f"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/googletest/googletest/src/gtest-internal-inl.h",
+      "sha256": "a5fb0dbf86304cbcce6252a136d7e722e07518940ce1ed134ce93e7eea4f0fcc"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/googletest/googletest/src/gtest-matchers.cc",
+      "sha256": "e4ce9edf33493625353cc147a14caac14fdba7390d76166d101fa2fe9d16bbda"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/googletest/googletest/src/gtest-port.cc",
+      "sha256": "39470003392fcf089340a31f92e61efa46328052cb16559e5ddada64e94886bc"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/googletest/googletest/src/gtest-printers.cc",
+      "sha256": "efcf234bdeb688d09500dbbdede962b9ff1de5d5f842b5d5e5a4a58a0b4b99a4"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/googletest/googletest/src/gtest-test-part.cc",
+      "sha256": "9acddbbe251f0516a92da1f55d8edd06c66c8fdeca382460d57340ad594f76f2"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/googletest/googletest/src/gtest-typed-test.cc",
+      "sha256": "b92e70b2d7ee3b86328162cbda269a28de4ce67f0e8d9beec5ec2c73a93ba006"
+    },
+    {
+      "mode": "0644",
+      "path": "third_party/googletest/googletest/src/gtest.cc",
+      "sha256": "c88905c471c58ca3e58978477d96d8849d97a58e8afcd190011a7a76cd2a8b75"
     },
     {
       "mode": "0644",
@@ -66349,12 +65874,12 @@
     {
       "mode": "0644",
       "path": "third_party/rust/neqo-http3/.cargo-checksum.json",
-      "sha256": "a321db87abf1c653f2a53f9c2683949fb5cbd25bb5d65b6dc2c9c7158dbe6042"
+      "sha256": "0035267404decec0069a0305f1b21c9cc8ba780deb459dec6ad91e79de5d1a7a"
     },
     {
       "mode": "0644",
       "path": "third_party/rust/neqo-http3/Cargo.toml",
-      "sha256": "1965c801fb8bf318683eca5db3e8fa841c86590fab2a6b511907360c95a35c58"
+      "sha256": "527362a89f23e2c486d0daeaea54a7f199b7048cafad2a2b22dba083cdb0aec2"
     },
     {
       "mode": "0644",
@@ -66379,7 +65904,7 @@
     {
       "mode": "0644",
       "path": "third_party/rust/neqo-http3/src/client_events.rs",
-      "sha256": "b11001b2e9aa3a8b623c2dd068791d9c3d61cad0153bda0a3b180eec0569b62c"
+      "sha256": "3dd9e87377ae02783e787748ecee3270bc82147dd4882c1d9206bdee31563d3f"
     },
     {
       "mode": "0644",
@@ -66394,12 +65919,12 @@
     {
       "mode": "0644",
       "path": "third_party/rust/neqo-http3/src/connection.rs",
-      "sha256": "02e1499ae89d391d5dfb6aa24a9bac2f5920f40e3af627f055df3706aaa69760"
+      "sha256": "e9d97c8e38895eb69d5db474fc3933f636c0f0d67f93ae675a80d7577800b6cb"
     },
     {
       "mode": "0644",
       "path": "third_party/rust/neqo-http3/src/connection_client.rs",
-      "sha256": "23e63bc4696e427c79961868b02d5e3199d00d1eee7643e3d2ea144c90e7ced3"
+      "sha256": "3f9b91e8d40accadfb519278590e74b6eb6c71e360ab694541e3489621822f9c"
     },
     {
       "mode": "0644",
@@ -66619,7 +66144,7 @@
     {
       "mode": "0644",
       "path": "third_party/rust/neqo-http3/tests/classic_connect.rs",
-      "sha256": "ad3feefd5448acefa41653de605698c1852b1d6e0d61ca65f54e88e513291d80"
+      "sha256": "9c9efe4929a236231ef825858c0fb6133bc2f47ed48f424859ade096d511f792"
     },
     {
       "mode": "0644",
@@ -105708,8 +105233,13 @@
     },
     {
       "mode": "0644",
+      "path": "toolkit/library/gtest/libxul_missing_buildid/xul_missing_buildid.c",
+      "sha256": "ff4a46a230d018aaa810e09e3cbb100745f2f3f459bf174a42e0394d95eb6531"
+    },
+    {
+      "mode": "0644",
       "path": "toolkit/library/libxul-naivefox.symbols",
-      "sha256": "fe989a874a71f52a9f9d0eedc047991a7c6a7e7568076c371d28b772d7f9cc8a"
+      "sha256": "80480b7cd6e9b4dc629e258d49a8e0ee684fc0e0f417eae14110514c05134ec6"
     },
     {
       "mode": "0644",
@@ -109893,6 +109423,11 @@
     },
     {
       "mode": "0644",
+      "path": "xpcom/tests/TestHarness.h",
+      "sha256": "a4fe56070e0cb0b0b5f986e40317c919688229b969207b5464851c1e2347ef44"
+    },
+    {
+      "mode": "0644",
       "path": "xpcom/threads/AbstractThread.cpp",
       "sha256": "7f274a63bb83f7768f154d9d85d2a1077a628f65812d56a12c6077ed69278acd"
     },
@@ -110458,8 +109993,8 @@
     }
   ],
   "firefox_base_commit": "0b76543aaeeeb2a5748ce2675ee36e7c94cb1125",
-  "manifest_sha256": "a67460a772d2bf241bbf3741c931a008c72f9e10fb2e8e21774cb8b42fd3c3b3",
+  "manifest_sha256": "ffc317ce70e615bcbe35cbaf5eb6685ade12cb305199af0311b5d343ff86ea86",
   "manifest_version": 2,
-  "minimal_export_commit": "d66b8a081dd9377a8b7e6c0339ad3632414891a9",
-  "naivefox_reference_commit": "c35d6f969ad29c1c1e87c41c1bfc510dd76dab05"
+  "minimal_export_commit": "4f6ef0f64405c516ae0bad3440816d32ad2be47f",
+  "naivefox_reference_commit": "7fc3220ed237fa73cb9cb1b3f1cc4343c9c6b1ad"
 }

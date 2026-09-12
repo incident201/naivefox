@@ -355,12 +355,14 @@ def mechanism_diagnostics(blocks, feature_names, arms):
                 "mean_normalized_excess": statistics.fmean(normalized_excesses),
                 "outside_control_envelope_fraction": outside / len(blocks),
             })
-        summaries.sort(key=lambda item: (
-            -item["mean_normalized_excess"],
-            -item["outside_control_envelope_fraction"],
-            -item["mean_abs_delta_from_firefox_midpoint"],
-            item["feature"],
-        ))
+        summaries.sort(
+            key=lambda item: (
+                -item["mean_normalized_excess"],
+                -item["outside_control_envelope_fraction"],
+                -item["mean_abs_delta_from_firefox_midpoint"],
+                item["feature"],
+            )
+        )
         top_features[arm] = summaries[:MECHANISM_TOP_FEATURES]
 
     sequence = []
@@ -428,13 +430,7 @@ def summarize_view(
     if not feature_names:
         return {"available": False, "reason": "feature view has no columns"}
     selected_arms = SUPERBLOCKS.validate_arm_sequence(
-        arms
-        if arms is not None
-        else (
-            arm
-            for arm in SUPERBLOCKS.SUPPORTED_ARMS
-            if arm in blocks[0]["arms"]
-        )
+        arms if arms is not None else tuple(blocks[0]["arms"])
     )
     arm_pairs = tuple(itertools.combinations(selected_arms, 2))
     distances = block_distances(blocks, feature_names, selected_arms)
@@ -793,9 +789,7 @@ def main():
     if args.permutations < 99:
         raise SystemExit("permutation iterations must be at least 99")
     if args.min_blocks < MIN_PAIRED_BLOCKS:
-        raise SystemExit(
-            f"minimum blocks must be at least {MIN_PAIRED_BLOCKS}"
-        )
+        raise SystemExit(f"minimum blocks must be at least {MIN_PAIRED_BLOCKS}")
     try:
         args.views = parse_views(args.views)
     except ValueError as error:

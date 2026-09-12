@@ -27,7 +27,15 @@ constexpr size_t kMaxHeader = 16 * 1024;
 
 enum class Reply { Accepted, Rejected, Invalid };
 enum class Operation {
-  Download, Upload, Idle, Reset, Reject, Concurrent, AuthPartition, PolicyReject
+  Download,
+  ResponseFirst,
+  Upload,
+  Idle,
+  Reset,
+  Reject,
+  Concurrent,
+  AuthPartition,
+  PolicyReject
 };
 
 struct Options {
@@ -111,7 +119,9 @@ int Usage() {
   std::fputs(
       "Usage: android_transport_probe --allocate-listeners\n"
       "       android_transport_probe socks|http LOCALPORT TARGETHOST "
-      "TARGETPORT download|upload|idle|reset|reject|concurrent|auth-partition|policy-reject "
+      "TARGETPORT "
+      "download|response-first|upload|idle|reset|reject|concurrent|auth-"
+      "partition|policy-reject "
       "LENGTH [ACK_HEX|HTTPPORT|-] [slow]\n",
       stderr);
   return 2;
@@ -181,6 +191,8 @@ bool Parse(int aCount, char** aArguments, Options& aOptions) {
   const char* operation = aArguments[5];
   if (std::strcmp(operation, "download") == 0) {
     aOptions.operation = Operation::Download;
+  } else if (std::strcmp(operation, "response-first") == 0) {
+    aOptions.operation = Operation::ResponseFirst;
   } else if (std::strcmp(operation, "upload") == 0) {
     aOptions.operation = Operation::Upload;
   } else if (std::strcmp(operation, "idle") == 0) {
@@ -207,6 +219,7 @@ bool Parse(int aCount, char** aArguments, Options& aOptions) {
       return false;
     }
   } else if (aOptions.operation != Operation::Download &&
+             aOptions.operation != Operation::ResponseFirst &&
              aOptions.operation != Operation::Upload && aOptions.length != 0) {
     return false;
   }
@@ -459,8 +472,8 @@ bool Concurrent(const Options& aOptions) {
 bool AuthPartition(const Options& aOptions) {
   Socket first;
   const uint8_t echo = 'E';
-  const std::array<uint8_t, 16> payload{
-      0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+  const std::array<uint8_t, 16> payload{0, 1, 2,  3,  4,  5,  6,  7,
+                                        8, 9, 10, 11, 12, 13, 14, 15};
   auto exchange = [&](int aSocket) {
     std::array<uint8_t, 16> received{};
     return WriteAll(aSocket, payload.data(), payload.size()) &&
@@ -517,8 +530,9 @@ bool SendPattern(int aSocket, uint32_t aLength) {
 }
 
 bool Download(int aSocket, const Options& aOptions) {
-  if (!SendRequest(aSocket, 'D', aOptions.length) ||
-      shutdown(aSocket, SHUT_WR) != 0) {
+  const bool responseFirst = aOptions.operation == Operation::ResponseFirst;
+  if (!SendRequest(aSocket, responseFirst ? 'H' : 'D', aOptions.length) ||
+      (!responseFirst && shutdown(aSocket, SHUT_WR) != 0)) {
     return false;
   }
   std::array<uint8_t, 65536> buffer{};
@@ -533,7 +547,9 @@ bool Download(int aSocket, const Options& aOptions) {
       return false;
     }
     if (count == 0) {
-      return total == aOptions.length;
+      return total == aOptions.length &&
+             (!responseFirst || (SendPattern(aSocket, aOptions.length) &&
+                                 shutdown(aSocket, SHUT_WR) == 0));
     }
     if (static_cast<size_t>(count) > aOptions.length - total) {
       return false;
@@ -635,14 +651,8 @@ int main(int argc, char** argv) {
   const Reply reply = options.socks ? SocksConnect(local.Get(), options)
                                     : HttpConnect(local.Get(), options);
   if (options.operation == Operation::PolicyReject) {
-    if (reply == Reply::Accepted) {
-      const timeval timeout{5, 0};
-      if (setsockopt(local.Get(), SOL_SOCKET, SO_RCVTIMEO, &timeout,
-                     sizeof(timeout)) != 0 || !EndOfStream(local.Get())) {
-        return Fail("policy-denied tunnel did not close without target data");
-      }
-    } else if (reply != Reply::Rejected) {
-      return Fail("invalid policy refusal reply");
+    if (reply != Reply::Rejected) {
+      return Fail("local proxy did not reject the policy-denied request");
     }
   } else if (options.operation == Operation::Reject) {
     if (reply != Reply::Rejected) {
@@ -655,6 +665,7 @@ int main(int argc, char** argv) {
     bool success = false;
     switch (options.operation) {
       case Operation::Download:
+      case Operation::ResponseFirst:
         success = Download(local.Get(), options);
         break;
       case Operation::Upload:

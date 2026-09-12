@@ -221,74 +221,10 @@ interface nsIHttpChannelInternal : nsISupports
     [must_use] void setConnectOnly(in boolean tlsTunnel);
 
     /**
-     * Set a header on the proxy CONNECT request. This header is not included
-     * in the origin request. Must be called before the channel is opened.
-     *
-     * Connection-control and proxy-authorization headers are rejected.
-     */
-    [must_use] void setProxyConnectHeader(in ACString aHeader,
-                                          in ACString aValue);
-
-    /**
      * Send this request directly on its outer HTTPS proxy session rather than
      * creating a CONNECT tunnel. Must be called before the channel is opened.
      */
-    [must_use] void setProxyPreamble();
-
-    /**
-     * For the experimental first cold HTTP/3 proxy preamble only, keep the
-     * transaction queued until the QUIC transport handshake is confirmed.
-     * Must be called after setProxyPreamble() and before the channel is opened.
-     */
-    [must_use] void setProxyPreambleWaitForHandshakeConfirmation();
-
-    /**
-     * For a marked HTTP/3 proxy preamble, wait for transport confirmation and
-     * defer request activation by the bounded settling interval.
-     */
-    [must_use] void setProxyPreambleHandshakeDwell(in unsigned long milliseconds);
-
-    /**
-     * For the experimental first cold HTTP/3 proxy preamble only, establish
-     * the session with a request-less carrier, then dispatch this transaction
-     * normally after the connected activation callback.
-     * Must be called after setProxyPreamble() and before the channel is opened.
-     */
-    [must_use] void setProxyPreambleUseCarrierDispatch();
-
-    /**
-     * For the experimental first cold HTTP/3 proxy preamble only, keep the
-     * real document pending while a request-less transaction establishes one
-     * provisional H3 connection, then dispatch that exact document onto the
-     * exact winner before publishing the connection generally.
-     * Must be called after setProxyPreamble() and before the channel is opened.
-     */
-    [must_use] void setProxyPreambleUseColdWinnerHandoff();
-
-    /** True only after exact cold H3 winner dispatch completed. */
-    [must_use] readonly attribute boolean proxyPreambleColdWinnerHandoffSucceeded;
-
-    /**
-     * For the experimental first cold HTTP/3 proxy document, preserve
-     * INHIBIT_CACHING but run the native asynchronous cache2 read-only lookup
-     * before the real network transaction is triggered.
-     * Must be called after setProxyPreamble() and before the channel is opened.
-     */
-    [must_use] void setProxyPreambleUseNativeCacheOpen();
-
-    /** True only after the marked preamble completed its cold read-only miss. */
-    [must_use] readonly attribute boolean proxyPreambleNativeCacheReadOnlyMiss;
-
-    /**
-     * For an experimental HTTP/3 proxy preamble resource, require Firefox's
-     * ordinary asynchronous writable cache2 open before the resource network
-     * transaction is dispatched. This does not run the document classifier.
-     * Must be called after setProxyPreamble() and before the channel is opened.
-     */
-    [must_use] void setProxyPreambleUseNativeResourceCacheOpen();
-
-    /** True only after an asynchronous new writable resource cache entry. */
-    [must_use] readonly attribute boolean proxyPreambleNativeResourceCacheOpenSucceeded;
+    [must_use] void setNaiveFoxOriginRoute();
 
     /**
      * True iff the channel is CONNECT only.

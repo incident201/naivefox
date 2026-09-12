@@ -10,10 +10,9 @@
 #include <utility>
 
 #include "HttpConnectParser.h"
-#include "NoConnectTransport.h"
 #include "RuntimeLogging.h"
 #include "Socks5Parser.h"
-#include "TunnelSession.h"
+#include "Transport.h"
 #include "mozilla/Atomics.h"
 #include "mozilla/RefPtr.h"
 #include "mozilla/ScopeExit.h"
@@ -76,18 +75,17 @@ class SocksConnection final : public nsIInputStreamCallback,
 
   SocksConnection(nsIAsyncInputStream* aLocalIn,
                   nsIAsyncOutputStream* aLocalOut,
-                  const TunnelConfig& aTunnelConfig,
+                  const TransportConfig& aTransportConfig,
                   const nsACString& aListenUser,
                   const nsACString& aListenPassword,
                   nsIEventTarget* aSocketTarget,
-                  std::function<bool()>&& aClaimUrgentStart,
+
                   std::function<void()>&& aOnClose)
       : mLocalIn(aLocalIn),
         mLocalOut(aLocalOut),
-        mTunnelConfig(aTunnelConfig),
+        mTransportConfig(aTransportConfig),
         mSocketTarget(aSocketTarget),
         mParser(aListenUser, aListenPassword),
-        mClaimUrgentStart(std::move(aClaimUrgentStart)),
         mOnClose(std::move(aOnClose)) {}
 
   nsresult Start() { return WaitForInput(); }
@@ -105,21 +103,19 @@ class SocksConnection final : public nsIInputStreamCallback,
   nsresult StartPumpIfReady();
   nsresult BeginTunnel(const nsACString& aAuthority,
                        Span<const uint8_t> aInitialPayload);
-  void TunnelEstablished(const nsACString& aOuterProtocol,
-                         bool aPaddingEnabled);
+  void TunnelEstablished();
   void TunnelFailed(nsresult aStatus);
   void Close(nsresult aStatus);
 
   nsCOMPtr<nsIAsyncInputStream> mLocalIn;
   nsCOMPtr<nsIAsyncOutputStream> mLocalOut;
-  TunnelConfig mTunnelConfig;
+  TransportConfig mTransportConfig;
   nsCOMPtr<nsIEventTarget> mSocketTarget;
   Socks5Parser mParser;
   std::array<uint8_t, kMaxReplyBytes> mReplies{};
   size_t mReplyLength = 0;
   size_t mReplyOffset = 0;
-  RefPtr<TunnelSession> mSession;
-  std::function<bool()> mClaimUrgentStart;
+  RefPtr<TransportStream> mSession;
   std::function<void()> mOnClose;
   bool mOpening = false;
   bool mEstablished = false;
@@ -127,8 +123,6 @@ class SocksConnection final : public nsIInputStreamCallback,
   bool mOutputWaiting = false;
   bool mCloseAfterWrite = false;
   bool mFailureQueued = false;
-  bool mOptimisticReplyQueued = false;
-  bool mOptimisticReplyFlushedBeforeOuter = false;
   bool mInputTerminal = false;
   bool mClosed = false;
 };
@@ -185,13 +179,7 @@ nsresult SocksConnection::FlushReplies() {
   }
   mReplyLength = 0;
   mReplyOffset = 0;
-  if (mOptimisticReplyQueued && !mEstablished &&
-      !mOptimisticReplyFlushedBeforeOuter) {
-    mOptimisticReplyFlushedBeforeOuter = true;
-    RuntimeLogEvent(
-        "Local optimistic reply phase=reply-flushed-before-outer "
-        "listener=socks\n");
-  }
+
   if (mCloseAfterWrite) {
     Close(NS_OK);
     return NS_OK;
@@ -204,55 +192,28 @@ nsresult SocksConnection::StartPumpIfReady() {
     return NS_OK;
   }
   mPumpStarted = true;
-  if (mOptimisticReplyQueued) {
-    RuntimeLogEvent(
-        "Local optimistic reply phase=pump-started listener=socks\n");
-  }
+
   return mSession->StartPump();
 }
 
 nsresult SocksConnection::BeginTunnel(const nsACString& aAuthority,
                                       Span<const uint8_t> aInitialPayload) {
-  // Reaching BeginTunnel means the SOCKS request is fully parsed. Consume the
-  // diagnostic claim before opening the outer channel, including when that
-  // open later fails, so retries cannot change which tunnel was selected.
-  const bool connectUrgentStart = mClaimUrgentStart && mClaimUrgentStart();
   RefPtr self = this;
-  mSession = new TunnelSession(
-      mLocalIn, mLocalOut, mTunnelConfig, connectUrgentStart, mSocketTarget,
-      [self](const nsACString& aOuterProtocol, bool aPaddingEnabled) {
-        self->TunnelEstablished(aOuterProtocol, aPaddingEnabled);
-      },
+  mSession = new TransportStream(
+      mLocalIn, mLocalOut, mTransportConfig, mSocketTarget,
+      [self]() { self->TunnelEstablished(); },
       [self](nsresult aStatus) { self->TunnelFailed(aStatus); },
       [self](nsresult aStatus) { self->Close(aStatus); });
-  if (mTunnelConfig.mDiagnosticOptimisticLocalReply) {
-    mOptimisticReplyQueued = true;
-    RuntimeLogEvent("Local optimistic reply phase=queued listener=socks\n");
-    nsTArray<uint8_t> reply;
-    Socks5Parser::MakeReply(0x00, reply);
-    nsresult rv = QueueReply(Span(reply), false);
-    if (NS_FAILED(rv)) {
-      return rv;
-    }
-  }
+
   return mSession->Start(aAuthority, aInitialPayload);
 }
 
-void SocksConnection::TunnelEstablished(const nsACString& aOuterProtocol,
-                                        bool aPaddingEnabled) {
+void SocksConnection::TunnelEstablished() {
   if (mClosed || mFailureQueued) {
     return;
   }
   mEstablished = true;
-  if (mOptimisticReplyQueued) {
-    RuntimeLogEvent(
-        "Local optimistic reply phase=outer-established listener=socks\n");
-    nsresult rv = StartPumpIfReady();
-    if (NS_FAILED(rv)) {
-      Close(rv);
-    }
-    return;
-  }
+
   nsTArray<uint8_t> reply;
   Socks5Parser::MakeReply(0x00, reply);
   nsresult rv = QueueReply(Span(reply), false);
@@ -265,12 +226,7 @@ void SocksConnection::TunnelFailed(nsresult aStatus) {
   if (mClosed || mFailureQueued) {
     return;
   }
-  if (mOptimisticReplyQueued) {
-    RuntimeLogEvent(
-        "Local optimistic reply phase=outer-failed listener=socks\n");
-    Close(aStatus);
-    return;
-  }
+
   mFailureQueued = true;
   nsTArray<uint8_t> reply;
   Socks5Parser::MakeReply(0x01, reply);
@@ -375,7 +331,7 @@ void SocksConnection::Close(nsresult aStatus) {
     return;
   }
   mClosed = true;
-  RefPtr<TunnelSession> session = std::move(mSession);
+  RefPtr<TransportStream> session = std::move(mSession);
   if (session) {
     session->Cancel(aStatus);
   }
@@ -396,12 +352,12 @@ class HttpConnectConnection final : public nsIInputStreamCallback,
 
   HttpConnectConnection(nsIAsyncInputStream* aLocalIn,
                         nsIAsyncOutputStream* aLocalOut,
-                        const TunnelConfig& aTunnelConfig,
+                        const TransportConfig& aTransportConfig,
                         nsIEventTarget* aSocketTarget,
                         std::function<void()>&& aOnClose)
       : mLocalIn(aLocalIn),
         mLocalOut(aLocalOut),
-        mTunnelConfig(aTunnelConfig),
+        mTransportConfig(aTransportConfig),
         mSocketTarget(aSocketTarget),
         mOnClose(std::move(aOnClose)) {}
 
@@ -418,28 +374,25 @@ class HttpConnectConnection final : public nsIInputStreamCallback,
   nsresult StartPumpIfReady();
   nsresult BeginTunnel(const nsACString& aAuthority,
                        Span<const uint8_t> aInitialPayload);
-  void TunnelEstablished(const nsACString& aOuterProtocol,
-                         bool aPaddingEnabled);
+  void TunnelEstablished();
   void TunnelFailed(nsresult aStatus);
   void Reject(HttpConnectParser::Event aEvent);
   void Close(nsresult aStatus);
 
   nsCOMPtr<nsIAsyncInputStream> mLocalIn;
   nsCOMPtr<nsIAsyncOutputStream> mLocalOut;
-  TunnelConfig mTunnelConfig;
+  TransportConfig mTransportConfig;
   nsCOMPtr<nsIEventTarget> mSocketTarget;
   HttpConnectParser mParser;
   nsCString mResponse;
   size_t mResponseOffset = 0;
-  RefPtr<TunnelSession> mSession;
+  RefPtr<TransportStream> mSession;
   std::function<void()> mOnClose;
   bool mOpening = false;
   bool mEstablished = false;
   bool mPumpStarted = false;
   bool mOutputWaiting = false;
   bool mCloseAfterWrite = false;
-  bool mOptimisticReplyQueued = false;
-  bool mOptimisticReplyFlushedBeforeOuter = false;
   bool mInputTerminal = false;
   bool mClosed = false;
 };
@@ -488,13 +441,7 @@ nsresult HttpConnectConnection::FlushResponse() {
   }
   mResponse.Truncate();
   mResponseOffset = 0;
-  if (mOptimisticReplyQueued && !mEstablished &&
-      !mOptimisticReplyFlushedBeforeOuter) {
-    mOptimisticReplyFlushedBeforeOuter = true;
-    RuntimeLogEvent(
-        "Local optimistic reply phase=reply-flushed-before-outer "
-        "listener=http-connect\n");
-  }
+
   if (mCloseAfterWrite) {
     Close(NS_OK);
     return NS_OK;
@@ -507,52 +454,28 @@ nsresult HttpConnectConnection::StartPumpIfReady() {
     return NS_OK;
   }
   mPumpStarted = true;
-  if (mOptimisticReplyQueued) {
-    RuntimeLogEvent(
-        "Local optimistic reply phase=pump-started listener=http-connect\n");
-  }
+
   return mSession->StartPump();
 }
 
 nsresult HttpConnectConnection::BeginTunnel(
     const nsACString& aAuthority, Span<const uint8_t> aInitialPayload) {
   RefPtr self = this;
-  mSession = new TunnelSession(
-      mLocalIn, mLocalOut, mTunnelConfig, false, mSocketTarget,
-      [self](const nsACString& aOuterProtocol, bool aPaddingEnabled) {
-        self->TunnelEstablished(aOuterProtocol, aPaddingEnabled);
-      },
+  mSession = new TransportStream(
+      mLocalIn, mLocalOut, mTransportConfig, mSocketTarget,
+      [self]() { self->TunnelEstablished(); },
       [self](nsresult aStatus) { self->TunnelFailed(aStatus); },
       [self](nsresult aStatus) { self->Close(aStatus); });
-  if (mTunnelConfig.mDiagnosticOptimisticLocalReply) {
-    mOptimisticReplyQueued = true;
-    RuntimeLogEvent(
-        "Local optimistic reply phase=queued listener=http-connect\n");
-    nsresult rv =
-        QueueResponse("HTTP/1.1 200 Connection Established\r\n\r\n"_ns, false);
-    if (NS_FAILED(rv)) {
-      return rv;
-    }
-  }
+
   return mSession->Start(aAuthority, aInitialPayload);
 }
 
-void HttpConnectConnection::TunnelEstablished(const nsACString& aOuterProtocol,
-                                              bool aPaddingEnabled) {
+void HttpConnectConnection::TunnelEstablished() {
   if (mClosed) {
     return;
   }
   mEstablished = true;
-  if (mOptimisticReplyQueued) {
-    RuntimeLogEvent(
-        "Local optimistic reply phase=outer-established "
-        "listener=http-connect\n");
-    nsresult rv = StartPumpIfReady();
-    if (NS_FAILED(rv)) {
-      Close(rv);
-    }
-    return;
-  }
+
   nsresult rv =
       QueueResponse("HTTP/1.1 200 Connection Established\r\n\r\n"_ns, false);
   if (NS_FAILED(rv)) {
@@ -564,12 +487,7 @@ void HttpConnectConnection::TunnelFailed(nsresult aStatus) {
   if (mClosed) {
     return;
   }
-  if (mOptimisticReplyQueued) {
-    RuntimeLogEvent(
-        "Local optimistic reply phase=outer-failed listener=http-connect\n");
-    Close(aStatus);
-    return;
-  }
+
   nsresult rv = QueueResponse(
       "HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\nContent-Length: "
       "0\r\n\r\n"_ns,
@@ -659,7 +577,7 @@ void HttpConnectConnection::Close(nsresult aStatus) {
     return;
   }
   mClosed = true;
-  RefPtr<TunnelSession> session = std::move(mSession);
+  RefPtr<TransportStream> session = std::move(mSession);
   if (session) {
     session->Cancel(aStatus);
   }
@@ -678,10 +596,6 @@ class ServerState final {
   explicit ServerState(uint32_t aMaxConnections)
       : mMutex("NaiveFox::ServerState::mMutex"),
         mMaxConnections(aMaxConnections) {}
-
-  bool ClaimFirstSocksTunnelUrgentStart(bool aEnabled) {
-    return mFirstSocksTunnelUrgentStart.Claim(aEnabled);
-  }
 
   void AddSocket(nsIServerSocket* aSocket) {
     bool close = false;
@@ -810,7 +724,6 @@ class ServerState final {
   uint32_t mAcceptedConnections MOZ_GUARDED_BY(mMutex) = 0;
   uint64_t mNextConnectionId MOZ_GUARDED_BY(mMutex) = 0;
   bool mStopping MOZ_GUARDED_BY(mMutex) = false;
-  detail::FirstSocksTunnelUrgentStartSelector mFirstSocksTunnelUrgentStart;
 };
 
 class LocalListener final : public nsIServerSocketListener {
@@ -819,10 +732,10 @@ class LocalListener final : public nsIServerSocketListener {
   NS_DECL_NSISERVERSOCKETLISTENER
 
   LocalListener(const ListenerConfig& aListener,
-                const TunnelConfig& aTunnelConfig,
+                const TransportConfig& aTransportConfig,
                 nsIEventTarget* aSocketTarget, ServerState* aState)
       : mListener(aListener),
-        mTunnelConfig(aTunnelConfig),
+        mTransportConfig(aTransportConfig),
         mSocketTarget(aSocketTarget),
         mState(aState) {}
 
@@ -830,7 +743,7 @@ class LocalListener final : public nsIServerSocketListener {
   ~LocalListener() = default;
 
   ListenerConfig mListener;
-  TunnelConfig mTunnelConfig;
+  TransportConfig mTransportConfig;
   nsCOMPtr<nsIEventTarget> mSocketTarget;
   RefPtr<ServerState> mState;
 };
@@ -867,14 +780,9 @@ NS_IMETHODIMP LocalListener::OnSocketAccepted(nsIServerSocket* aServer,
         [state, connectionId]() { state->ConnectionClosed(connectionId); }));
   };
   if (mListener.mType == ListenerType::Socks5) {
-    auto claimUrgentStart =
-        [state,
-         enabled = mTunnelConfig.mDiagnosticFirstSocksTunnelUrgentStart]() {
-          return state->ClaimFirstSocksTunnelUrgentStart(enabled);
-        };
     RefPtr connection = new SocksConnection(
-        localIn, localOut, mTunnelConfig, mListener.mUser, mListener.mPassword,
-        mSocketTarget, std::move(claimUrgentStart), std::move(onClose));
+        localIn, localOut, mTransportConfig, mListener.mUser,
+        mListener.mPassword, mSocketTarget, std::move(onClose));
     nsCOMPtr<nsIEventTarget> socketTarget = mSocketTarget;
     mState->SetCancellation(
         connectionId, [socketTarget, connection = RefPtr{connection}]() {
@@ -891,7 +799,7 @@ NS_IMETHODIMP LocalListener::OnSocketAccepted(nsIServerSocket* aServer,
     }
   } else {
     RefPtr connection = new HttpConnectConnection(
-        localIn, localOut, mTunnelConfig, mSocketTarget, std::move(onClose));
+        localIn, localOut, mTransportConfig, mSocketTarget, std::move(onClose));
     nsCOMPtr<nsIEventTarget> socketTarget = mSocketTarget;
     mState->SetCancellation(
         connectionId, [socketTarget, connection = RefPtr{connection}]() {
@@ -918,12 +826,12 @@ NS_IMETHODIMP LocalListener::OnStopListening(nsIServerSocket* aServer,
 }  // namespace
 
 nsresult RunLocalProxyServer(const nsTArray<ListenerConfig>& aListeners,
-                             const nsTArray<TunnelConfig>& aTunnelConfigs,
+                             const nsTArray<TransportConfig>& aTransportConfigs,
                              uint32_t aMaxConnections,
                              LocalProxyServerControl* aControl) {
-  if (aListeners.IsEmpty() || aTunnelConfigs.IsEmpty() ||
-      (aTunnelConfigs.Length() >= 2 &&
-       aTunnelConfigs.Length() != aListeners.Length())) {
+  if (aListeners.IsEmpty() || aTransportConfigs.IsEmpty() ||
+      (aTransportConfigs.Length() >= 2 &&
+       aTransportConfigs.Length() != aListeners.Length())) {
     return NS_ERROR_INVALID_ARG;
   }
   for (const auto& listener : aListeners) {
@@ -941,7 +849,7 @@ nsresult RunLocalProxyServer(const nsTArray<ListenerConfig>& aListeners,
     aControl->SetMainEventTarget(GetMainThreadSerialEventTarget());
   }
   auto clearControl = MakeScopeExit([aControl]() {
-    ShutdownNoConnectCarriers();
+    ShutdownTransportCarriers();
     if (aControl) {
       aControl->ClearMainEventTarget();
     }
@@ -954,7 +862,7 @@ nsresult RunLocalProxyServer(const nsTArray<ListenerConfig>& aListeners,
   for (size_t index = 0; index < aListeners.Length(); ++index) {
     const auto& config = aListeners[index];
     const auto& tunnelConfig =
-        aTunnelConfigs[aTunnelConfigs.Length() == 1 ? 0 : index];
+        aTransportConfigs[aTransportConfigs.Length() == 1 ? 0 : index];
     nsCOMPtr<nsIServerSocket> server =
         do_CreateInstance("@mozilla.org/network/server-socket;1");
     if (!server) {
@@ -1025,10 +933,10 @@ nsresult RunLocalProxyServer(const nsTArray<ListenerConfig>& aListeners,
 }
 
 nsresult RunLocalProxyServer(const nsTArray<ListenerConfig>& aListeners,
-                             const TunnelConfig& aTunnelConfig,
+                             const TransportConfig& aTransportConfig,
                              uint32_t aMaxConnections) {
-  nsTArray<TunnelConfig> tunnelConfigs;
-  tunnelConfigs.AppendElement(aTunnelConfig);
+  nsTArray<TransportConfig> tunnelConfigs;
+  tunnelConfigs.AppendElement(aTransportConfig);
   return RunLocalProxyServer(aListeners, tunnelConfigs, aMaxConnections);
 }
 
@@ -1041,7 +949,7 @@ nsresult RunSocksServer(uint16_t aListenPort, const nsACString& aProxyUrl,
   listener.mType = ListenerType::Socks5;
   listener.mHost.AssignLiteral("127.0.0.1");
   listener.mPort = aListenPort;
-  TunnelConfig tunnelConfig;
+  TransportConfig tunnelConfig;
   tunnelConfig.mProxyUrl = aProxyUrl;
   tunnelConfig.mProxyUser = aProxyUser;
   tunnelConfig.mProxyPassword = aProxyPassword;
