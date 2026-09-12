@@ -80,6 +80,8 @@ class ControlPeer(socketserver.BaseRequestHandler):
                         output_offset += len(value)
                     elif kind == 3:
                         fixture.require(position == 1+len(b"after-controls") and not value, "FIN differs")
+                        frames.append((2, 1, output_offset, b"tail"))
+                        output_offset += 4
                         frames.append((3, 1, output_offset, b""))
                         received_fin = True
                     else:
@@ -151,7 +153,8 @@ def run(args, protocol, listener, transport):
             local.sendall(b"after-controls")
             fixture.require(fixture.receive(local, len(b"after-controls")) == b"after-controls", "echo failed after controls")
             local.shutdown(socket.SHUT_WR)
-            fixture.require(not local.recv(1), "half-close failed after controls")
+            fixture.require(fixture.receive(local, 4) == b"tail", "final payload differs")
+            fixture.require(not local.recv(1), "half-close failed without a CREDIT acknowledgement")
         client.exited_cleanly()
         fixture.require(peer.finished.wait(8) and not peer.failures, "control peer failed: "+str(peer.failures))
         fixture.require(peer.pongs == 2 and peer.data_verified, "missing legal controls or post-control data")

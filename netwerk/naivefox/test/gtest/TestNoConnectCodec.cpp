@@ -491,5 +491,36 @@ TEST_F(NaiveFoxNoConnectCodec, ReceiveWindowRemainsBoundedAcrossSequenceWrap) {
   EXPECT_TRUE(stream.IsReset());
 }
 
+TEST_F(NaiveFoxNoConnectCodec, UploadRingWrapAndBound) {
+  UploadBuffer buffer;
+  std::vector<uint8_t> first(kMaxCell, 0x51);
+  ASSERT_TRUE(buffer.Append(first.data(), first.size()));
+  EXPECT_FALSE(buffer.Append(first.data(), 1));
+  EXPECT_FALSE(buffer.Consume(kMaxCell + 1));
+  ASSERT_TRUE(buffer.Consume(kMaxCell - 31));
+  std::vector<uint8_t> second(kMaxCell - 31, 0x92);
+  ASSERT_TRUE(buffer.Append(second.data(), second.size()));
+  EXPECT_EQ(buffer.Size(), kMaxCell);
+  std::array<uint8_t, 64> copied;
+  ASSERT_TRUE(buffer.CopyTo(copied.data(), copied.size()));
+  EXPECT_TRUE(std::all_of(copied.begin(), copied.begin() + 31,
+                          [](uint8_t value) { return value == 0x51; }));
+  EXPECT_TRUE(std::all_of(copied.begin() + 31, copied.end(),
+                          [](uint8_t value) { return value == 0x92; }));
+  EXPECT_EQ(buffer.ContiguousSize(), 31U);
+  for (size_t i = 0; i < 31; ++i) {
+    EXPECT_EQ(buffer.Data()[i], 0x51);
+  }
+  ASSERT_TRUE(buffer.Consume(31));
+  EXPECT_EQ(buffer.ContiguousSize(), second.size());
+  EXPECT_TRUE(std::equal(second.begin(), second.end(), buffer.Data()));
+  ASSERT_TRUE(buffer.Consume(second.size()));
+  EXPECT_TRUE(buffer.Empty());
+  ASSERT_TRUE(buffer.Append(first.data(), 17));
+  buffer.Clear();
+  EXPECT_EQ(buffer.Size(), 0U);
+  EXPECT_FALSE(buffer.Append(nullptr, 1));
+}
+
 }  // namespace
 }  // namespace mozilla::naivefox::noconnect

@@ -258,7 +258,7 @@ func loadAssets(directory string) (map[string]*immutableAsset, error) {
 }
 
 func sourceCookieHash(r *http.Request) string {
-	cookie, err := r.Cookie("app_session")
+	cookie, err := r.Cookie("session")
 	if err != nil || cookie.Value == "" {
 		return "none"
 	}

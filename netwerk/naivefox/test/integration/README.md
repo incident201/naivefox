@@ -99,6 +99,22 @@ medians. `publish-matched-app-results.py` admits only a complete audited primary
 Historical eight-participant matrices retain their original labels in Git.
 `run-no-connect-performance.py` is the separate classic/no-connect socket
 microbenchmark; it does not establish browser-equivalent scheduling.
+`run-no-connect-optimization.py` additionally measures configurable link RTT
+and bandwidth, verified transfers larger than a stream window, and short
+requests arriving during bulk transfers. Keep builds and other workloads
+separate from measurements. `--carrier-profile` selects the frozen peer
+contract when comparing original and updated binaries; it does not enable
+product compatibility. Store all generated state below the selected objdir.
+Use the matched application matrix and its independent audit to check
+p1-16, p17-32, p1-32, 250-ms and complete-session Whole before retaining
+performance changes. For before/after optimization checks,
+`run-no-connect-paired-capture.py` runs both native versions through both
+listeners with common Firefox A/B controls in each randomized block. It uses
+the same feature extractor, five views, residual calculation and independent
+raw-capture audit as the ordinary matrix. Distances from separately calibrated
+campaigns must not be subtracted to estimate a patch effect. The matched
+application's canonical padded site is prepared by the matrix itself; the
+generic native fixture continues to use its actual site file sizes.
 
 ## Complete classic regression gate
 

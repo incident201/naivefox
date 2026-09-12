@@ -113,15 +113,26 @@ Message capacity depends only on locally sendable payload within stream credit:
 | Direction | No payload | Small payload | Medium grant | Large grant |
 | --- | ---: | ---: | ---: | ---: |
 | Client to server | 512 B; OPEN uses 4 KiB | 4 KiB | 16 KiB at 8 KiB ready | 128 KiB at 64 KiB ready |
-| Server to client | 512 B | 8 KiB | 64 KiB at 32 KiB ready | 256 KiB at 128 KiB ready |
+| Server to client | 512 B | 8 KiB | 64 KiB when data and framing fill the grant | 256 KiB when data and framing fill the grant |
 
-Partial payload and OPEN retain a 2-ms coalescing turn. A full selected
-capacity or pure control dispatches immediately. Capacity is rechecked after
-coalescing. There are no peer-pressure hints and no delayed credit grants.
-The server encodes each response once.
+Partial payload and OPEN retain a 2-ms coalescing turn. An already-full
+selected capacity or pure control dispatches immediately. During server
+coalescing, data and credit notifications recheck maximum-cell fullness;
+the deadline never restarts. Capacity accounts for DATA/control framing and
+reserves the optional ACK header so returned full-cell credit retains its tier.
+Smaller tiers keep their aggregation deadline.
+
+A credit-limited remainder smaller than an 8-KiB cell's DATA budget does not
+start a standalone DATA cell when more data is queued. It can still accompany
+other sendable data. Short final tails remain sendable when their available
+credit covers the backlog, and controls/FIN do not wait for DATA credit. This avoids repeatedly padding a tiny window
+remainder into a full cell. There are no peer-pressure hints or delayed receive
+credit grants. The server encodes each response once, generating random filler
+only for its unused suffix.
 
 Per-stream receive credit is 512 KiB; local upload buffering is at most
-256 KiB. Credit is returned only after delivery to the local consumer.
+256 KiB, using a ring buffer without moving the remaining upload on each
+DATA frame. Credit is returned only after delivery to the local consumer.
 Stream byte offsets wrap modulo 2^32 without a 4-GiB transfer ceiling.
 Each carrier holds at most 32 simultaneous streams, with additional carriers
 available beyond that limit. One warm carrier is retained per route.

@@ -47,6 +47,25 @@ inline constexpr bool ValidRealtimeDownCapacity(size_t aCapacity) {
          aCapacity == 256 * 1024;
 }
 
+class UploadBuffer final {
+ public:
+  bool Append(const uint8_t* aData, size_t aLength);
+  bool Consume(size_t aLength);
+  bool CopyTo(uint8_t* aData, size_t aLength) const;
+  size_t Size() const { return mLength; }
+  bool Empty() const { return !mLength; }
+  const uint8_t* Data() const {
+    return mBytes.empty() ? nullptr : mBytes.data() + mHead;
+  }
+  size_t ContiguousSize() const;
+  void Clear();
+
+ private:
+  std::vector<uint8_t> mBytes;
+  size_t mHead = 0;
+  size_t mLength = 0;
+};
+
 struct Frame {
   Kind kind = Kind::Data;
   uint32_t stream = 0;

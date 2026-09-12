@@ -268,6 +268,7 @@ def start_caddy(args, run, protocol, target_port, user, password):
     while handlers:
         item = handlers.pop()
         if item.get("handler") == "naivefox_transport":
+            item["profile"] = getattr(args, "carrier_profile", "native-stream-v2")
             item["stats_path"] = str(run / "server-stats.json")
             item["application_root"] = str(getattr(args, "application_root", None) or prepare_application(run))
         for route in item.get("routes", []):

@@ -323,7 +323,7 @@ class NoConnectStream::Impl final {
   UniquePtr<noconnect::StreamState> state;
   nsCOMPtr<nsITimer> deadline;
   nsCString authority;
-  Bytes upload;
+  noconnect::UploadBuffer upload;
   std::deque<Bytes> download;
   size_t downloadOffset = 0;
   std::atomic<bool> cancelled{false};
@@ -458,7 +458,10 @@ nsresult NoConnectStream::Start(const nsACString& aAuthority,
           return;
         }
         state.authority = authority;
-        state.upload = initial;
+        if (!state.upload.Append(initial.data(), initial.size())) {
+          self->Finish(NS_ERROR_OUT_OF_MEMORY, false);
+          return;
+        }
         sCarriers.erase(std::remove_if(sCarriers.begin(), sCarriers.end(),
                                        [](const auto& carrier) {
                                          return carrier->Closed();
@@ -518,7 +521,7 @@ void NoConnectStream::Finish(nsresult aStatus, bool aReset) {
   s.established = nullptr;
   s.failed = nullptr;
   s.closed = nullptr;
-  s.upload.clear();
+  s.upload.Clear();
   s.download.clear();
   if (callback) {
     (void)s.target->Dispatch(NS_NewRunnableFunction(
@@ -530,8 +533,8 @@ void NoConnectStream::Finish(nsresult aStatus, bool aReset) {
 void NoConnectStream::ArmRead() {
   auto& s = *mImpl;
   if (s.done || s.cancelled || !s.pump || s.eof || !s.state ||
-      !s.state->IsOpened() || s.upload.size() >= s.UploadLimit() ||
-      s.upload.size() >= s.state->SendCredit()) {
+      !s.state->IsOpened() || s.upload.Size() >= s.UploadLimit() ||
+      s.upload.Size() >= s.state->SendCredit()) {
     return;
   }
   nsresult rv =
@@ -548,11 +551,11 @@ NS_IMETHODIMP NoConnectStream::OnInputStreamReady(nsIAsyncInputStream*) {
     return NS_OK;
   }
   std::array<uint8_t, 16384> buffer;
-  while (s.upload.size() < s.UploadLimit() &&
-         s.upload.size() < s.state->SendCredit()) {
+  while (s.upload.Size() < s.UploadLimit() &&
+         s.upload.Size() < s.state->SendCredit()) {
     const size_t length =
-        std::min({buffer.size(), s.UploadLimit() - s.upload.size(),
-                  s.state->SendCredit() - s.upload.size()});
+        std::min({buffer.size(), s.UploadLimit() - s.upload.Size(),
+                  s.state->SendCredit() - s.upload.Size()});
     uint32_t read = 0;
     nsresult rv =
         s.input->Read(reinterpret_cast<char*>(buffer.data()), length, &read);
@@ -568,7 +571,10 @@ NS_IMETHODIMP NoConnectStream::OnInputStreamReady(nsIAsyncInputStream*) {
       Finish(rv, true);
       return NS_OK;
     }
-    s.upload.insert(s.upload.end(), buffer.begin(), buffer.begin() + read);
+    if (!s.upload.Append(buffer.data(), read)) {
+      Finish(NS_ERROR_OUT_OF_MEMORY, true);
+      return NS_OK;
+    }
   }
   if (s.carrier) {
     s.carrier->Wake();
@@ -878,19 +884,25 @@ bool NoConnectCarrier::Upload(size_t aCapacity, Bytes& aBody) {
     if (!s.openPending && s.state->PendingCredit() &&
         budget >= noconnect::kFrameHeader + 4) {
       have = s.state->TakeCredit(frame);
-    } else if (!s.openPending && !s.upload.empty() &&
+    } else if (!s.openPending && !s.upload.Empty() &&
                budget > noconnect::kFrameHeader && s.state->SendCredit()) {
-      const size_t length = std::min({s.upload.size(), size_t(16384),
+      const size_t length = std::min({s.upload.Size(), size_t(16384),
                                       size_t(s.state->SendCredit()),
                                       budget - noconnect::kFrameHeader});
-      have = s.state->MakeData(s.upload.data(), length, frame);
+      if (length <= s.upload.ContiguousSize()) {
+        have = s.state->MakeData(s.upload.Data(), length, frame);
+      } else {
+        std::array<uint8_t, 16384> chunk;
+        MOZ_ALWAYS_TRUE(s.upload.CopyTo(chunk.data(), length));
+        have = s.state->MakeData(chunk.data(), length, frame);
+      }
       if (!have) {
         stream->Finish(NS_ERROR_FILE_TOO_BIG, true);
         continue;
       }
-      s.upload.erase(s.upload.begin(), s.upload.begin() + length);
+      MOZ_ALWAYS_TRUE(s.upload.Consume(length));
       stream->ArmRead();
-    } else if (!s.openPending && s.eof && s.upload.empty() &&
+    } else if (!s.openPending && s.eof && s.upload.Empty() &&
                !s.state->SentFin()) {
       have = s.state->MakeFin(frame);
       s.finUpload = mUp;
@@ -1035,9 +1047,9 @@ size_t NoConnectCarrier::Pressure(bool& aControl) const {
   aControl = !mResets.empty();
   for (const auto& stream : mStreams) {
     const auto& s = *stream->mImpl;
-    bytes += std::min(s.upload.size(), size_t(s.state->SendCredit()));
+    bytes += std::min(s.upload.Size(), size_t(s.state->SendCredit()));
     aControl |= s.openPending || s.state->PendingCredit() ||
-                (s.eof && s.upload.empty() && !s.state->SentFin());
+                (s.eof && s.upload.Empty() && !s.state->SentFin());
   }
   return bytes;
 }
@@ -1066,6 +1078,7 @@ void NoConnectCarrier::Continue() {
 }
 
 void NoConnectCarrier::Tick() {
+  RetireStreams();
   // Keep one warm carrier per route after a burst. Finish acknowledging FIN
   // and RESET uploads before dropping an extra carrier, so the server can
   // release every target connection without waiting for session expiry.

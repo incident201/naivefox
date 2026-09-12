@@ -40,7 +40,7 @@ func newAppFixture(t *testing.T) *appFixture {
 	client.Jar, _ = cookiejar.New(nil)
 	client.Timeout = 5 * time.Second
 	origin, _ := url.Parse(server.URL)
-	client.Jar.SetCookies(origin, []*http.Cookie{{Name: "app_session", Value: strings.Repeat("a", 64), Path: "/", Secure: true}})
+	client.Jar.SetCookies(origin, []*http.Cookie{{Name: "session", Value: strings.Repeat("a", 64), Path: "/", Secure: true}})
 	f := &appFixture{t, b, server, client}
 	t.Cleanup(func() { b.Close(); server.Close() })
 	return f
@@ -507,7 +507,7 @@ func TestCoverAssetsCannotSatisfyApplicationAssetGate(t *testing.T) {
 	f := newAppFixture(t)
 	f.fetchAssets()
 	origin, _ := url.Parse(f.server.URL)
-	f.client.Jar.SetCookies(origin, []*http.Cookie{{Name: "app_session", Value: strings.Repeat("b", 64), Path: "/", Secure: true}})
+	f.client.Jar.SetCookies(origin, []*http.Cookie{{Name: "session", Value: strings.Repeat("b", 64), Path: "/", Secure: true}})
 	f.bootstrapAPI()
 	if conn, _, err := f.dial(); err == nil {
 		conn.Close()

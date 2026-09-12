@@ -70,6 +70,21 @@ def expected_assets(directory):
     return result
 
 
+def prepare_matched_application(directory, assets):
+    root = directory / "application"
+    (root / "assets").mkdir(parents=True, exist_ok=True)
+    for target, source, size in (
+        ("index.html", "index.html", 4096),
+        ("assets/site.css", "site.css", 12288),
+        ("assets/app.js", "app.js", 24576),
+        *((f"assets/image-{i}.svg", "image.svg", 8192) for i in range(1, 5)),
+    ):
+        body = (assets / source).read_bytes()
+        require(len(body) <= size, "matched site asset exceeds canonical size")
+        (root / target).write_bytes(body + b" " * (size - len(body)))
+    return root.resolve()
+
+
 def useful_totals(manifest):
     sent = sum(job["bytes"] for job in manifest["jobs"] if job["kind"] in ("upload", "echo"))
     received = sum(job["bytes"] for job in manifest["jobs"] if job["kind"] in ("download", "echo"))
@@ -635,8 +650,9 @@ class Campaign:
                         find(item)
             find(server)
             require(module is not None, "real native transport handler is missing")
+            module["profile"] = self.args.carrier_profile
             module["stats_path"] = str(directory / f"{name}-carrier-stats.json")
-            module["application_root"] = str(native.prepare_application(directory))
+            module["application_root"] = str(prepare_matched_application(directory, self.args.asset_dir))
             proxy = {"handler": "reverse_proxy", "upstreams": [{"dial": f"127.0.0.1:{self.backend_port}"}]}
             server["routes"] = [
                 {"match": [{"path": ["/health"]}], "handle": [{"handler": "static_response", "status_code": 200, "body": "fixture ready\n"}]},
@@ -810,6 +826,8 @@ class Campaign:
                             caddy.process.pid, set(browser_owned))
                         routing_epoch = time.time()
                 if isinstance(value, dict):
+                    if value.get("error"):
+                        write_json(directory / "browser-failure.json", value)
                     require(not value.get("error"), "matched application reported a terminal failure")
                     if value.get("result"):
                         app_result = value["result"]
@@ -860,8 +878,9 @@ class Campaign:
                 expected_ws = 1 if transport == "no-connect" else 0
                 require(carrier.get("ws_opened", 0) == expected_ws, "native carrier WebSocket count differs")
                 if expected_ws:
-                    require(carrier.get("ws_startup_min_up") == 20 and carrier.get("ws_startup_min_down") == 20, "native WS bypassed startup completion")
-                    expected_subprotocol = "nfc1.stream.v1"
+                    startup_pairs = 20 if self.args.carrier_profile == "native-stream-v2" else 1
+                    require(carrier.get("ws_startup_min_up") == startup_pairs and carrier.get("ws_startup_min_down") == startup_pairs, "native WS bypassed startup completion")
+                    expected_subprotocol = "nfc1.stream.v1" if startup_pairs == 20 else "nfc1.stream.v2"
                     require(carrier.get("ws_subprotocols") == {expected_subprotocol: 1},
                             "native carrier selected the wrong WebSocket shaping protocol")
             document, wire = observer_document(directory, self.outer_port, self.protocol, row, name)
@@ -1038,6 +1057,7 @@ def main():
     for argument in ("objdir", "root", "caddy", "caddy-build-id", "backend", "firefox", "geckodriver", "reference-proof", "runtime-manifest"):
         parser.add_argument("--" + argument, type=Path, required=True)
     parser.add_argument("--runtime", type=Path, required=True)
+    parser.add_argument("--carrier-profile", default="native-stream-v2")
     parser.add_argument("--asset-dir", type=Path, default=APP)
     parser.add_argument("--firefox-base", required=True)
     parser.add_argument("--protocol", choices=("h2", "h3", "both"), default="both")
@@ -1089,7 +1109,7 @@ def main():
         "manifest_sha256": MANIFEST_SHA, "seed": args.seed, "blocks_per_protocol": args.blocks,
         "link": args.link, "observer": "receive-side complete origin TCP/QUIC and attributable ICMP; no fixed crop or per-stage wire allocation",
         "local_listener_topology": "only the selected listener", "screening_only": True,
-        "comparison_baseline": "classic"}
+        "comparison_baseline": "classic", "carrier_profile": args.carrier_profile}
     write_json(args.root / "provenance.json", proof)
     matrix = []
     for protocol in (("h2", "h3") if args.protocol == "both" else (args.protocol,)):

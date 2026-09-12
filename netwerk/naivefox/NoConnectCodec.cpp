@@ -32,6 +32,55 @@ bool ValidKind(Kind aKind) {
 
 }  // namespace
 
+bool UploadBuffer::Append(const uint8_t* aData, size_t aLength) {
+  if (aLength > kMaxCell - mLength || (aLength && !aData)) {
+    return false;
+  }
+  if (!aLength) {
+    return true;
+  }
+  if (mBytes.empty()) {
+    mBytes.resize(kMaxCell);
+  }
+  const size_t tail = (mHead + mLength) % kMaxCell;
+  const size_t first = std::min(aLength, kMaxCell - tail);
+  std::memcpy(mBytes.data() + tail, aData, first);
+  std::memcpy(mBytes.data(), aData + first, aLength - first);
+  mLength += aLength;
+  return true;
+}
+
+bool UploadBuffer::Consume(size_t aLength) {
+  if (aLength > mLength) {
+    return false;
+  }
+  mLength -= aLength;
+  mHead = mLength ? (mHead + aLength) % kMaxCell : 0;
+  return true;
+}
+
+size_t UploadBuffer::ContiguousSize() const {
+  return std::min(mLength, kMaxCell - mHead);
+}
+
+void UploadBuffer::Clear() {
+  mBytes.clear();
+  mHead = mLength = 0;
+}
+
+bool UploadBuffer::CopyTo(uint8_t* aData, size_t aLength) const {
+  if (aLength > mLength || (aLength && !aData)) {
+    return false;
+  }
+  if (!aLength) {
+    return true;
+  }
+  const size_t first = std::min(aLength, ContiguousSize());
+  std::memcpy(aData, Data(), first);
+  std::memcpy(aData + first, mBytes.data(), aLength - first);
+  return true;
+}
+
 bool Encode(uint32_t aSequence, size_t aCapacity,
             const std::vector<Frame>& aFrames, std::vector<uint8_t>& aOutput) {
   if (aCapacity < kCellHeader || aCapacity > kMaxCell ||
