@@ -207,7 +207,7 @@ netwerk/protocol/http/nsHttpHandler.h
 Exposes an ordered, move-only descriptor stream from Firefox's generated HTML5
 speculative-load machinery without constructing DOM nodes, executing script,
 decoding images, or enabling layout. The lean consumer retains the upstream
-causes for same-origin stylesheet, classic deferred script, and image preload
+causes for same-origin stylesheet, non-module deferred script, and image preload
 channels, including document URI/referrer context and the current pref-derived
 image `Accept` value. Base, CSP, and meta-referrer descriptors remain ordered
 context operations and fail closed when the lean runtime cannot preserve their

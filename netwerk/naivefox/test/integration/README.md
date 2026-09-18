@@ -1,8 +1,8 @@
 # NaiveFox integration verification
 
 Tests exercise one current NaiveFox transport and coordinated client/server
-builds. There are no classic, Auto, preamble, padding-version or migration
-campaigns. The local frontends are SOCKS5 and HTTP CONNECT; the outer selections
+builds. Test the current transport, without alternate wire versions or
+migration campaigns. The local frontends are SOCKS5 and HTTP CONNECT; the outer selections
 are strict H2 and strict H3.
 
 All generated packages, profiles, certificates, logs and captures belong under a
@@ -13,7 +13,7 @@ traffic and one-off reports must never enter source control.
 ## Correctness before measurement
 
 Build the lean product with tools/build-product.sh. The Caddy binary must contain
-the matching naivefox_transport module, without the classic forwardproxy module.
+the matching naivefox_transport module.
 Use an isolated Linux network namespace for local fixtures. The
 run-camouflage-isolated-network.sh wrapper verifies namespace isolation, sets
 loopback MTU 1500 and disables segmentation offloads before any producer starts.
@@ -108,3 +108,19 @@ behavior. Record native device/host verification separately.
 Export minimal source only with current build/configuration/link evidence.
 The normal product and exported product must remain free of browser execution,
 DOM loaders, JavaScript engine and retired activation-process dependencies.
+
+## CDN fixture: development only
+
+Build test/integration/cdn_proxy/main.go with the pinned Go toolchain and keep
+the binary outside the source tree. run-cdn-tests.py uses it as a separate
+TLS-terminating H2 edge with H1/H2 origin startup and H1 WebSocket. It verifies
+changing trusted proxy IPs, independent and rotated/path-scoped cookies,
+missing Content-Length, split reads, identical startup replay, lifecycle,
+idle heartbeat and fresh sessions after edge restart. Hostile status, encoding,
+MIME, snapshot and body-length cases must fail before opening a target.
+
+The Windows and Android runtime runners accept --cdn-proxy with --protocol h2
+to exercise their normal native workloads through the same replaying edge.
+These local tests do not establish real-CDN compatibility. CDN integration is
+unfinished and currently deferred; complete real-provider acceptance has not
+been performed. Direct H2/H3 remains the supported deployment.

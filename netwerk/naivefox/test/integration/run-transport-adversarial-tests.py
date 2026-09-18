@@ -193,11 +193,11 @@ def run_case(args, base, protocol, case):
         client.exited_cleanly()
         caddy.stop()
         stats = json.loads((run / "server-stats.json").read_text())
+        requests = fixture.access_requests(run)
         fixture.require(
-            stats["connect"] == 0,
+            not any(item["method"] == "CONNECT" for item in requests),
             "adversarial response triggered outer CONNECT fallback",
         )
-        requests = fixture.access_requests(run)
         if case == "redirect":
             fixture.require(
                 not any(item.get("uri") == "/redirected" for item in requests),
@@ -244,7 +244,7 @@ def run_case(args, base, protocol, case):
             broken = [
                 entry
                 for entry in entries
-                if entry.get("request", {}).get("uri") == "/api/events/brief"
+                if entry.get("request", {}).get("uri", "").split("?", 1)[0] == "/api/events/brief"
             ]
             fixture.require(
                 bool(broken)

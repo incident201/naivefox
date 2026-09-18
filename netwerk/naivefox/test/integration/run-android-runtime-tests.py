@@ -473,6 +473,7 @@ def main():
     parser.add_argument("--objdir", type=Path, required=True)
     parser.add_argument("--package", type=Path, required=True)
     parser.add_argument("--caddy", type=Path, required=True)
+    parser.add_argument("--cdn-proxy", type=Path)
     parser.add_argument(
         "--application-root",
         type=Path,
@@ -490,6 +491,10 @@ def main():
         "--parallel-batches", type=int, choices=range(1, 129), default=1
     )
     args = parser.parse_args()
+    if args.cdn_proxy:
+        args.cdn_proxy = args.cdn_proxy.resolve(strict=True)
+        if args.protocol != "h2":
+            parser.error("--cdn-proxy requires --protocol h2")
     for name in ("objdir", "package", "caddy", "ndk", "adb"):
         setattr(args, name, getattr(args, name).resolve(strict=True))
     adb = [str(args.adb)] + (["-s", args.serial] if args.serial else [])
@@ -511,6 +516,7 @@ def main():
         inputs = SimpleNamespace(
             objdir=args.objdir,
             caddy=args.caddy,
+            cdn_proxy=args.cdn_proxy,
             runtime=args.package / "lib/arm64-v8a/libxul.so",
             client_factory=fixture.start,
             parallel_batches=args.parallel_batches,

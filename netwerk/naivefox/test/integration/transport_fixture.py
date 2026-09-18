@@ -53,6 +53,11 @@ class Target(socketserver.BaseRequestHandler):
         try:
             self.request.settimeout(30)
             kind = receive(self.request, 1)
+            if kind == b"R":
+                self.request.sendall(b"ready")
+                while self.request.recv(4096):
+                    pass
+                return
             if kind == b"C":
                 while self.request.recv(4096):
                     pass
@@ -94,7 +99,7 @@ class Target(socketserver.BaseRequestHandler):
             self.request.sendall(struct.pack("!Q", length) + digest.digest())
             self.request.shutdown(socket.SHUT_WR)
         except (OSError, RuntimeError):
-            if kind != b"C":
+            if kind not in {b"C", b"R"}:
                 self.server.failures.append("target stream failed")
 
 
@@ -369,6 +374,14 @@ def start_caddy(args, run, protocol, target_port, user, password):
             )
         for route in item.get("routes", []):
             handlers.extend(route.get("handle", []))
+    cdn_proxy = getattr(args, "cdn_proxy", None)
+    if cdn_proxy:
+        require(protocol == "h2", "CDN fixture supports H2/WSS only")
+        server["trusted_proxies"] = {
+            "source": "static", "ranges": ["127.0.0.2/32", "127.0.0.3/32"]
+        }
+        server["trusted_proxies_strict"] = 1
+        server["client_ip_headers"] = ["CF-Connecting-IP"]
     mutator = getattr(args, "server_mutator", None)
     if mutator is not None:
         mutator(server)
@@ -389,6 +402,31 @@ def start_caddy(args, run, protocol, target_port, user, password):
             not socket_listeners(port, udp=True),
             "strict H2 fixture unexpectedly listens on UDP",
         )
+    if cdn_proxy:
+        edge_port = free_port()
+        edge = Process(
+            [str(cdn_proxy), "--listen", f"127.0.0.1:{edge_port}",
+             "--origin", f"https://127.0.0.1:{port}", "--origin-protocol", "h2",
+             "--mode", "replay", "--cert", str(run / "server.crt"),
+             "--key", str(run / "server.key"), "--ca", str(run / "ca.crt"),
+             "--stats", str(run / "cdn-stats.json")],
+            run, "cdn-edge", env,
+        )
+        original_stop = process.stop
+
+        def stop():
+            try:
+                edge.stop()
+            finally:
+                original_stop()
+
+        process.stop = stop
+        try:
+            wait_until(lambda: socket_listeners(edge_port), "CDN edge did not start", edge)
+        except BaseException:
+            process.stop()
+            raise
+        port = edge_port
     return process, port
 
 
@@ -793,7 +831,7 @@ def verify_idle_h3_transition(run, ports, target_port, server):
     wait_until(
         lambda: (
             sum(
-                request["method"] == "GET" and request["uri"] == "/api/events/brief"
+                request["method"] == "GET" and request["uri"].split("?", 1)[0] == "/api/events/brief"
                 for request in access_requests(run)
             )
             >= 6
@@ -868,7 +906,16 @@ def run_protocol(args, base, protocol):
             "target integrity or stream count failed",
         )
         validate_carrier_stats(stats, protocol)
+        cdn = None
+        if getattr(args, "cdn_proxy", None):
+            cdn = json.loads((run / "cdn-stats.json").read_text())
+            require(cdn.get("websockets", 0) >= 2 and cdn.get("replays", 0) >= 80
+                    and not cdn.get("replay_mismatch")
+                    and not cdn.get("cookie_errors")
+                    and not cdn.get("cookie_path_errors"),
+                    "native CDN fixture mechanisms failed")
         result = {
+            "cdn": cdn,
             "protocol": protocol,
             "passed": True,
             "opens": stats["opens"],

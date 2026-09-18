@@ -18,6 +18,7 @@ SOURCES += [
     "../TemporaryTrustStore.cpp",
     "../Transport.cpp",
     "../TransportCodec.cpp",
+    "../TransportCookies.cpp",
     "../TransportSite.cpp",
     "../TransportWebSocket.cpp",
     "../UnknownProtocolHandler.cpp",

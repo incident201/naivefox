@@ -23,7 +23,7 @@ test/integration/README.md.
 ## Architecture
 
 There is one current NaiveFox transport, with coordinated client/server updates.
-Classic NaiveProxy, transport selectors, legacy profiles, alternate versions,
+Alternate transports, transport selectors, compatibility profiles, wire versions,
 migration fallbacks and experimental production modes are out of scope.
 CONNECT absence is not an architectural requirement.
 
@@ -51,7 +51,7 @@ processes needs a supported lifecycle design, not just preference changes.
 The local frontends are SOCKS5 CONNECT and HTTP CONNECT. Configuration is strict:
 preserve string/array listener and upstream mapping, URI credential decoding,
 numeric IPv4/IPv6 binds, SOCKS username/password auth and explicit LAN binding.
-No Auto protocol or classic configuration is supported.
+No automatic protocol fallback or alternate transport configuration is supported.
 
 Keep the complete public HTML-selected resource bootstrap, snapshot identity,
 twenty ordered startup pairs, cache inhibition and streamed public-body
@@ -61,7 +61,7 @@ per-stream credit. Offsets wrap modulo 2^32 without a 4-GiB transfer cap.
 Return CREDIT only after local delivery.
 
 The Caddy module owns its authentication and destination policy. It does not
-load or delegate to a classic forward-proxy implementation.
+load or delegate transport authentication to another proxy implementation.
 
 ## Build and testing
 

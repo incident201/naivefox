@@ -104,7 +104,7 @@ git merge --ff-only refresh/firefox-<name>
 Resolve minimization conflicts on `naivefox-full-source`, then validate the
 complete minimized product graph. The gate includes Linux x86-64, Windows
 x86-64, and Android ARM64 embedded product builds, focused unit regressions,
-H2/H3/Auto/config/listener behavior, padding and integrity,
+H2/H3/config/listener behavior, framing and integrity,
 concurrency/backpressure/lifecycle, package manifests, staged runtime checks,
 and size/closure assertions. Android remains the NaiveFox project; GeckoView
 and the Firefox Android application graph are not part of this gate. Use all

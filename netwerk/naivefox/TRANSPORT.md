@@ -1,7 +1,7 @@
 # NaiveFox transport
 
 NaiveFox supports one current transport and coordinated client/server updates.
-There is no classic mode, protocol-version negotiation or legacy fallback.
+There are no alternate transport modes, version negotiation or migration fallbacks.
 CONNECT is permitted when justified by the native protocol architecture.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for carrier ownership, H2/H3 selection,
@@ -17,3 +17,26 @@ length prefix delimits downstream cells in the GET response.
 Both carriers use NFOX cells, the naivefox HELLO identity, bounded
 stream credit and the same DATA/CREDIT/FIN/RESET rules. There is one current
 subprotocol identity, not a list of supported versions.
+
+HTTP startup identifies each GET by its canonical path and ?seq=N query.
+The server retains each logical result for bounded idempotent intermediary
+retries, without replaying input to the mux. This does not resume active streams
+after an outer carrier fails; sustained H3 uploads still reject duplicates.
+
+Each carrier has an isolated cookie store: at most 32 cookies and 16 KiB of
+retained name/value/path/domain data, with 4096 bytes per Set-Cookie and 32 KiB
+per response. Cookies are scoped to the configured HTTPS origin and their path,
+respect Secure/expiry and domain validation, and update from individual HTTP
+and WS response headers. They never enter the shared browser cookie service.
+The reserved session cookie retains one validated root-path value per carrier.
+
+Content-Length is optional. Fixed cells must still contain exactly their
+expected bytes. Public resources remain streamed, with MIME, EOF and snapshot
+validation. Carrier/site responses to a configured trusted proxy include no-transform.
+Direct routes retain their ordinary cache headers.
+
+CDN support is work in progress and is not validated for production use.
+Only direct H2 and H3 deployments are currently supported. Local reverse-proxy
+tests cover HTTP compatibility, but complete real-provider CDN acceptance has
+not been performed. CDN integration is deferred. Its intended deployment
+contract is described in the server's docs/CDN.md; it is not a support guarantee.

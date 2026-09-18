@@ -77,10 +77,13 @@ implicitly supplied by the SOCKS5/HTTP CONNECT listeners.
 
 ## Carrier boundaries
 
-The matching NaiveFox Caddy module is required. There is no compatibility with
-classic NaiveProxy or an arbitrary static website. Client and server must be
+The matching NaiveFox Caddy module is required; an arbitrary static website
+cannot serve as the transport endpoint. Client and server must be
 updated together; version negotiation, session resumption and transparent replay
-after an outer-session failure are not supported.
+after an outer-session failure are not supported. Bounded startup HTTP retry
+deduplication does not change that lifecycle boundary. CDN support is unfinished and is not validated for production use. Complete
+real-provider CDN testing has not been performed; direct H2/H3 is the supported
+deployment.
 
 The client consumes only supported directly declared HTML resources. It does
 not execute scripts, follow CSS imports or emulate a browser. Large sites add

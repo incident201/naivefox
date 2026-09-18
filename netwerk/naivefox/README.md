@@ -6,8 +6,8 @@ and Neqo owns QUIC. The runtime runs in one process without a browser, DOM
 execution, JavaScript engine or GUI.
 
 There is one NaiveFox transport. Client and server must be updated together.
-Classic NaiveProxy, old clients/servers, transport selectors, alternate wire
-versions and compatibility profiles are not supported. CONNECT is a protocol
+Only the current matching client/server pair is supported. There are no
+transport selectors, alternate wire versions or compatibility profiles. CONNECT is a protocol
 mechanism, not an architectural prohibition.
 
 ## Configure and run
@@ -40,8 +40,8 @@ The other supported CLI forms are --help and --version.
 - Logging is disabled when log is omitted. An empty string enables console
   logging; a nonempty string names a log file.
 
-Unknown or duplicate fields are errors. There are no transport/profile flags,
-classic padding fields, preamble modes or experimental runtime switches.
+Unknown or duplicate fields are errors. The configuration selects H2 or H3
+for the same transport; it has no alternate transport or wire-version modes.
 
 By default each CLI run creates and removes an isolated temporary NSS profile.
 NAIVEFOX_PROFILE explicitly selects a persistent profile.
@@ -84,6 +84,14 @@ order. The downstream GET uses a four-byte cell-length prefix.
 The H3 downstream stream is shared within a carrier. Logical streams do not
 each obtain an independent QUIC stream. The bounded upload pipeline adds HTTP
 request work; assess throughput and responsiveness with the maintained tests.
+
+## CDN support: work in progress
+
+Direct connections to the matching Caddy server are the supported deployment.
+CDN integration is unfinished and is not validated for production use.
+Local reverse-proxy tests exist, but end-to-end testing with a real CDN has not
+been completed. CDN work is currently deferred; no provider is supported yet.
+See [TRANSPORT.md](TRANSPORT.md) and the server's docs/CDN.md.
 
 ## Build and verification
 

@@ -3,8 +3,8 @@
 ## One transport and native networking
 
 NaiveFox has one current application transport and supports coordinated
-client/server updates only. It does not negotiate legacy profiles or implement
-classic NaiveProxy. The name of the transport is NaiveFox. Absence of CONNECT is
+client/server updates only. It has no alternate transports, compatibility
+profiles or wire-version negotiation. The name of the transport is NaiveFox. Absence of CONNECT is
 not an invariant; protocol choices are judged by correctness, performance,
 maintainability and observable behavior.
 
@@ -16,8 +16,9 @@ in the single lean process without browser execution, DOM loaders or JavaScript.
 Config parses the strict product configuration. SocksServer owns listeners
 and local protocol negotiation. TransportStream owns byte delivery, offsets,
 credit and half-close. TransportCarrier owns startup, routing and multiplexing.
-OriginChannel selects explicit strict native H2/H3 routes. TransportWebSocket
-adapts the native WebSocket channel. TransportCodec owns the shared wire
+OriginChannel selects explicit strict native H2/H3 routes. TransportCookies
+keeps bounded cookies isolated per carrier and configured HTTPS origin.
+TransportWebSocket adapts the native WebSocket channel. TransportCodec owns the shared wire
 contract, bounded upload ring and H3 cell-stream decoder. TransportSite parses
 the public HTML resource graph without executing the site.
 
@@ -43,7 +44,8 @@ H3 POSTs may reach the server out of order. The server bounds both active reques
 bodies and its reorder map, applies sequences in order, and returns success only
 after application. It never acknowledges a gap to free more pipeline slots.
 Cancellation, gaps exceeding the deadline, malformed cells and transport failure
-end the carrier. There is no application replay or version fallback.
+end the carrier. Sustained uploads have no application replay or version
+fallback. Startup HTTP results alone have a bounded idempotency journal for intermediary retries.
 
 The shared H3 GET is framed with a four-byte network-order cell length. Its
 decoder accepts arbitrary buffer boundaries and coalesced cells, rejects invalid
