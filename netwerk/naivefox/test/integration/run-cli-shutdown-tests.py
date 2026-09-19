@@ -47,7 +47,7 @@ def run_case(runtime, root, stop_signal):
     ports = reserve_ports()
     config = {
         "listen": [f"socks://127.0.0.1:{ports[0]}", f"http://127.0.0.1:{ports[1]}"],
-        "proxy": f"https://fixture:{secrets.token_hex(16)}@127.0.0.1:9",
+        "proxy": f"https://fixture~{'0' * 64}:{secrets.token_hex(16)}@127.0.0.1:9",
         "max-connections": 0,
         "log": "",
     }

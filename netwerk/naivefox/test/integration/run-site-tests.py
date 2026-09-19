@@ -131,13 +131,14 @@ def run_case(args, base, protocol, case, supplied=None):
             "/",
             *expected,
             "/api/sync",
-            "/api/events/brief",
-            "/api/events/state",
             "/api/realtime",
             "/api/stream",
             "/api/upload",
         }
-        allowed.update("/media/chunk/" + str(i) for i in range(6, 18))
+        for index in range(20):
+            path = ("/api/events/brief" if index < 4 or index >= 18 else
+                    "/api/events/state" if index < 6 else f"/media/chunk/{index}")
+            allowed.add(f"{path}?seq={index}")
         fixture.require(
             all(
                 item["uri"] in allowed and item["method"] != "CONNECT"
@@ -164,8 +165,10 @@ def run_case(args, base, protocol, case, supplied=None):
                 )
         stats = json.loads((run / "server-stats.json").read_text())
         fixture.require(
-            stats.get("startup_completed") == 2 and stats.get("ws_opened") == 2,
-            "wrong complete HTTP/WS lifecycle",
+            stats.get("startup_completed") == 2
+            and stats.get("h3_opened" if protocol == "h3" else "ws_opened") == 2
+            and stats.get("ws_opened" if protocol == "h3" else "h3_opened") == 0,
+            "wrong complete startup/carrier lifecycle",
         )
         fixture.require(
             not target.failures and target.accepted_connections == 4,
@@ -231,7 +234,7 @@ def main():
     )
     parent.mkdir(parents=True, exist_ok=True)
     os.umask(0o077)
-    run = Path(tempfile.mkdtemp(prefix="site-v2-", dir=parent))
+    run = Path(tempfile.mkdtemp(prefix="site-", dir=parent))
     try:
         results = []
         for protocol in ("h2", "h3") if args.protocol == "both" else (args.protocol,):

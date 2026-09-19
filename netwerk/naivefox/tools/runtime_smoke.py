@@ -23,7 +23,7 @@ def run_runtime_smoke(exe_path, directory):
         json.dump(
             {
                 "listen": f"socks://127.0.0.1:{port}",
-                "proxy": "https://fixture:fixture@127.0.0.1:9",
+                "proxy": "https://fixture~" + "0" * 64 + ":fixture@127.0.0.1:9",
                 "max-connections": 1,
                 "log": "",
             },

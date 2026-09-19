@@ -330,7 +330,7 @@ def run_case(args, base, protocol, case, listener):
         stats = json.loads((run / "server-stats.json").read_text())
         requests = fixture.access_requests(run)
         fixture.require(
-            stats["connect"] == 0
+            not any(item["method"] == "CONNECT" for item in requests)
             and stats["opens"] == 1
             and target.accepted_connections == 1,
             "malformed WebSocket caused fallback or duplicate target opening",

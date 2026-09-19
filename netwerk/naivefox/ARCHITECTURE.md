@@ -2,9 +2,11 @@
 
 ## One transport and native networking
 
-NaiveFox has one current application transport and supports coordinated
-client/server updates only. It does not negotiate legacy profiles or implement
-classic NaiveProxy. The name of the transport is NaiveFox. Absence of CONNECT is
+NaiveFox has one current application protocol and supports coordinated
+client/server updates only. https:// selects the default H2 packet adapter,
+directly or through a compatible CDN. wss:// selects native WebSocket and
+quic:// selects direct H3. There are no compatibility profiles,
+wire-version negotiation or automatic fallbacks. The name of the transport is NaiveFox. Absence of CONNECT is
 not an invariant; protocol choices are judged by correctness, performance,
 maintainability and observable behavior.
 
@@ -16,8 +18,9 @@ in the single lean process without browser execution, DOM loaders or JavaScript.
 Config parses the strict product configuration. SocksServer owns listeners
 and local protocol negotiation. TransportStream owns byte delivery, offsets,
 credit and half-close. TransportCarrier owns startup, routing and multiplexing.
-OriginChannel selects explicit strict native H2/H3 routes. TransportWebSocket
-adapts the native WebSocket channel. TransportCodec owns the shared wire
+OriginChannel selects explicit strict native H2/H3 routes. TransportCookies
+keeps bounded cookies isolated per carrier and configured HTTPS origin.
+TransportWebSocket adapts the native WebSocket channel. TransportCodec owns the shared wire
 contract, bounded upload ring and H3 cell-stream decoder. TransportSite parses
 the public HTML resource graph without executing the site.
 
@@ -25,11 +28,11 @@ the public HTML resource graph without executing the site.
 
 The client consumes the complete public document and selected resources, checks
 MIME types and completion, and verifies their shared snapshot identity in HELLO.
-Twenty serial POST/GET pairs bootstrap the application carrier and already carry
-useful stream data. Keep the existing startup capacities and ordering unless
+Twenty serial POST/GET pairs bootstrap each WSS or QUIC carrier and
+already carry useful stream data. Keep the existing startup capacities and ordering unless
 a separately validated change justifies altering them.
 
-Strict H2 moves to native WSS/TCP. Strict H3 remains HTTP/3: one persistent GET
+The wss:// selection moves from native H2 startup to WSS/TCP. Strict H3 remains HTTP/3: one persistent GET
 response carries downstream cells and at most eight finite POSTs carry upstream
 cells. Every H3 byte continues through Neqo; no WSS or TCP fallback is allowed.
 
@@ -43,12 +46,20 @@ H3 POSTs may reach the server out of order. The server bounds both active reques
 bodies and its reorder map, applies sequences in order, and returns success only
 after application. It never acknowledges a gap to free more pipeline slots.
 Cancellation, gaps exceeding the deadline, malformed cells and transport failure
-end the carrier. There is no application replay or version fallback.
+end the carrier. Sustained uploads have no application replay or version
+fallback. Startup HTTP results alone have a bounded idempotency journal for intermediary retries.
 
 The shared H3 GET is framed with a four-byte network-order cell length. Its
 decoder accepts arbitrary buffer boundaries and coalesced cells, rejects invalid
 capacities before allocation, and holds at most one bounded cell. The request
 timeout becomes an activity deadline once streaming starts.
+
+The default HTTPS packet adapter keeps the same mux behind an inner
+NSS/Go TLS 1.3 stream. Two finite setup POST exchanges complete the inner
+handshake and AUTH/HELLO. It uses a pinned origin identity, finite H2 POSTs, authenticated
+acknowledgements and resumable H2 GET records. HTTP retries occur below TLS and
+retain original ciphertext. CDN source addresses are not session identity.
+See [HTTPS.md](HTTPS.md) for the security contract, bounds and development gates.
 
 ## Ownership and flow control
 
@@ -58,7 +69,8 @@ objects use thread-safe refcounting. Lifetime safety does not permit concurrent
 state mutation.
 
 Each carrier admits at most 32 logical streams; the client may create more
-carriers. Stream receive credit is 512 KiB on H2 and 1 MiB on H3, returned only after local delivery.
+carriers. Stream receive credit is 512 KiB on WSS and 1 MiB on QUIC and HTTPS packet
+delivery, returned only after local delivery.
 Upload buffering uses a bounded ring; frame boundaries are independent of ring
 wrap. Server read queues and HTTP request concurrency are bounded. Partial writes
 and WOULD_BLOCK must preserve every unsent byte.

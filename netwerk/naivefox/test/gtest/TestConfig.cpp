@@ -85,13 +85,13 @@ TEST(NaiveFoxConfig, RejectsOversizedStringInput)
   EXPECT_STREQ(error.get(), "config is too large");
 }
 
-TEST(NaiveFoxConfig, StringListenerAndHttpsDefaults)
+TEST(NaiveFoxConfig, StringListenerAndWssSelection)
 {
   Config config;
   nsAutoCString error;
   ASSERT_EQ(
       ParseConfig(
-          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://user:pass@example.com"})"_ns,
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"wss://user:pass@example.com"})"_ns,
           config, error),
       NS_OK)
       << error.get();
@@ -110,23 +110,102 @@ TEST(NaiveFoxConfig, StringListenerAndHttpsDefaults)
   EXPECT_EQ(config.mMaxConnections, 0U);
 }
 
+TEST(NaiveFoxConfig, HttpsPinLivesInDecodedUsername)
+{
+  Config config;
+  nsAutoCString error;
+  ASSERT_EQ(ParseConfig(
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://user%7Ename~0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF:p%40ss@example.com"})"_ns,
+      config, error), NS_OK) << error.get();
+  const auto& proxy = config.mProxies[0];
+  EXPECT_EQ(proxy.mProtocol, ProxyProtocol::H2);
+  EXPECT_TRUE(proxy.mUrl.EqualsLiteral("https://example.com:443"));
+  EXPECT_TRUE(proxy.mUser.EqualsLiteral("user~name"));
+  EXPECT_TRUE(proxy.mPassword.EqualsLiteral("p@ss"));
+  EXPECT_TRUE(proxy.mServerPin.EqualsLiteral(
+      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"));
+}
+
+TEST(NaiveFoxConfig, HttpsNeverAllowsMissingOrMalformedPin)
+{
+  for (const char* proxy : {
+           "https://example.com", "https://user:pass@example.com",
+           "https://user~1234:pass@example.com",
+           "https://~0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef:pass@example.com",
+           "https://user~0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef:@example.com",
+           "https://user~0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdeg:pass@example.com"}) {
+    nsCString json(R"({"listen":"socks://127.0.0.1:1080","proxy":")");
+    json.Append(proxy);
+    json.AppendLiteral(R"("})");
+    Config config;
+    nsAutoCString error;
+    EXPECT_TRUE(NS_FAILED(ParseConfig(json, config, error)));
+  }
+}
+
+TEST(NaiveFoxConfig, WssIgnoresPinSuffix)
+{
+  Config config;
+  nsAutoCString error;
+  ASSERT_EQ(ParseConfig(
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"wss://user~0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef:p@example.com"})"_ns,
+      config, error), NS_OK);
+  EXPECT_TRUE(config.mProxies[0].mServerPin.IsEmpty());
+  EXPECT_TRUE(config.mProxies[0].mUser.EqualsLiteral("user"));
+}
+
+TEST(NaiveFoxConfig, WssIgnoresPinWithoutValidatingIt)
+{
+  for (const char* suffix : {"", "not-a-pin", "1234"}) {
+    nsCString json(R"({"listen":"socks://127.0.0.1:1080","proxy":"wss://user%7Ename~)");
+    json.Append(suffix);
+    json.AppendLiteral(R"(:pass@example.com"})");
+    Config config;
+    nsAutoCString error;
+    ASSERT_EQ(ParseConfig(json, config, error), NS_OK) << error.get();
+    EXPECT_TRUE(config.mProxies[0].mServerPin.IsEmpty());
+    EXPECT_TRUE(config.mProxies[0].mUser.EqualsLiteral("user~name"));
+  }
+}
+
+TEST(NaiveFoxConfig, QuicUsernameRemainsLiteral)
+{
+  Config config;
+  nsAutoCString error;
+  ASSERT_EQ(ParseConfig(
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"quic://user~pin:pass@example.com"})"_ns,
+      config, error), NS_OK);
+  EXPECT_EQ(config.mProxies[0].mProtocol, ProxyProtocol::H3);
+  EXPECT_TRUE(config.mProxies[0].mUser.EqualsLiteral("user~pin"));
+  EXPECT_TRUE(config.mProxies[0].mServerPin.IsEmpty());
+}
+
+TEST(NaiveFoxConfig, RejectsRemovedCdnScheme)
+{
+  Config config;
+  nsAutoCString error;
+  EXPECT_TRUE(NS_FAILED(ParseConfig(
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"cdn://user~0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef:pass@example.com"})"_ns,
+      config, error)));
+}
+
 TEST(NaiveFoxConfig, MaxConnectionsIsBoundedAndExplicit)
 {
   Config config;
   nsAutoCString error;
   ASSERT_EQ(
       ParseConfig(
-          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","max-connections":1})"_ns,
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"wss://proxy.example","max-connections":1})"_ns,
           config, error),
       NS_OK)
       << error.get();
   EXPECT_EQ(config.mMaxConnections, 1U);
 
   static constexpr const char* kInvalid[] = {
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","max-connections":-1})",
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","max-connections":"1"})",
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","max-connections":4294967296})",
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","max-connections":1,"max-connections":2})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"wss://proxy.example","max-connections":-1})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"wss://proxy.example","max-connections":"1"})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"wss://proxy.example","max-connections":4294967296})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"wss://proxy.example","max-connections":1,"max-connections":2})",
   };
   for (const char* json : kInvalid) {
     Config invalid;
@@ -163,7 +242,7 @@ TEST(NaiveFoxConfig, IPv6AndFileLog)
   nsAutoCString error;
   ASSERT_EQ(
       ParseConfig(
-          R"({"listen":"http://[::1]:8080","proxy":"https://user:pass@[2001:db8::1]:9443","log":"/tmp/naivefox.log"})"_ns,
+          R"({"listen":"http://[::1]:8080","proxy":"wss://user:pass@[2001:db8::1]:9443","log":"/tmp/naivefox.log"})"_ns,
           config, error),
       NS_OK)
       << error.get();
@@ -198,7 +277,7 @@ TEST(NaiveFoxConfig, OptionalUpstreamCredentials)
   nsAutoCString error;
   ASSERT_EQ(
       ParseConfig(
-          R"({"listen":["socks://127.0.0.1:1080","http://127.0.0.1:8080"],"proxy":["https://proxy.example","quic://[2001:db8::1]:8443"]})"_ns,
+          R"({"listen":["socks://127.0.0.1:1080","http://127.0.0.1:8080"],"proxy":["wss://proxy.example","quic://[2001:db8::1]:8443"]})"_ns,
           config, error),
       NS_OK)
       << error.get();
@@ -225,12 +304,12 @@ TEST(NaiveFoxConfig, OneSidedUpstreamCredentials)
     ProxyProtocol mProtocol;
   };
   for (const auto& credentials : {
-           Credentials{"https", "user:password@", "user", "password",
+           Credentials{"wss", "user:password@", "user", "password",
                        ProxyProtocol::H2},
-           Credentials{"https", "user:@", "user", "", ProxyProtocol::H2},
-           Credentials{"https", ":password@", "", "password",
+           Credentials{"wss", "user:@", "user", "", ProxyProtocol::H2},
+           Credentials{"wss", ":password@", "", "password",
                        ProxyProtocol::H2},
-           Credentials{"https", ":@", "", "", ProxyProtocol::H2},
+           Credentials{"wss", ":@", "", "", ProxyProtocol::H2},
            Credentials{"quic", "user:password@", "user", "password",
                        ProxyProtocol::H3},
            Credentials{"quic", "user:@", "user", "", ProxyProtocol::H3},
@@ -261,7 +340,7 @@ TEST(NaiveFoxConfig, PercentEncodedOneSidedUpstreamCredentials)
   nsAutoCString error;
   ASSERT_EQ(
       ParseConfig(
-          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://user%40name:@proxy.example"})"_ns,
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"wss://user%40name:@proxy.example"})"_ns,
           config, error),
       NS_OK)
       << error.get();
@@ -294,7 +373,7 @@ TEST(NaiveFoxConfig, SocksListenerCredentials)
   nsAutoCString error;
   ASSERT_EQ(
       ParseConfig(
-          R"({"listen":"socks://user%40name:p%3A%2Fss@127.0.0.1:1080","proxy":"https://proxy.example"})"_ns,
+          R"({"listen":"socks://user%40name:p%3A%2Fss@127.0.0.1:1080","proxy":"wss://proxy.example"})"_ns,
           config, error),
       NS_OK)
       << error.get();
@@ -318,7 +397,7 @@ TEST(NaiveFoxConfig, HostResolverRule)
                       "proxy.example.com", "backend.example.com"},
        }) {
     nsAutoCString json(
-        R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","host-resolver-rules":")"_ns);
+        R"({"listen":"socks://127.0.0.1:1080","proxy":"wss://proxy.example","host-resolver-rules":")"_ns);
     json.Append(rule);
     json.AppendLiteral("\"}");
     Config config;
@@ -338,7 +417,7 @@ TEST(NaiveFoxConfig, NoPostQuantumBoolean)
            std::pair{"false", false},
        }) {
     nsAutoCString json(
-        R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","no-post-quantum":)"_ns);
+        R"({"listen":"socks://127.0.0.1:1080","proxy":"wss://proxy.example","no-post-quantum":)"_ns);
     json.Append(value);
     json.Append('}');
     Config config;
@@ -351,7 +430,7 @@ TEST(NaiveFoxConfig, NoPostQuantumBoolean)
   nsAutoCString error;
   ASSERT_EQ(
       ParseConfig(
-          R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example"})"_ns,
+          R"({"listen":"socks://127.0.0.1:1080","proxy":"wss://proxy.example"})"_ns,
           config, error),
       NS_OK)
       << error.get();
@@ -364,7 +443,7 @@ TEST(NaiveFoxConfig, NonLoopbackAndWildcardListeners)
   nsAutoCString error;
   ASSERT_EQ(
       ParseConfig(
-          R"({"listen":["socks://0.0.0.0:1080","http://192.168.1.1:8080","http://[::]:8081"],"proxy":"https://user:pass@example.com"})"_ns,
+          R"({"listen":["socks://0.0.0.0:1080","http://192.168.1.1:8080","http://[::]:8081"],"proxy":"wss://user:pass@example.com"})"_ns,
           config, error),
       NS_OK)
       << error.get();
@@ -381,7 +460,7 @@ TEST(NaiveFoxConfig, ProxyArrayMapsOneToOneToListeners)
   nsAutoCString error;
   ASSERT_EQ(
       ParseConfig(
-          R"({"listen":["socks://0.0.0.0:1080","http://0.0.0.0:8080"],"proxy":["https://first:secret@one.example","quic://second:secret@two.example:8443"]})"_ns,
+          R"({"listen":["socks://0.0.0.0:1080","http://0.0.0.0:8080"],"proxy":["wss://first:secret@one.example","quic://second:secret@two.example:8443"]})"_ns,
           config, error),
       NS_OK)
       << error.get();
@@ -399,7 +478,7 @@ TEST(NaiveFoxConfig, SingleProxyArrayIsShared)
   nsAutoCString error;
   ASSERT_EQ(
       ParseConfig(
-          R"({"listen":["socks://127.0.0.1:1080","http://127.0.0.1:8080"],"proxy":["https://user:pass@example.com"]})"_ns,
+          R"({"listen":["socks://127.0.0.1:1080","http://127.0.0.1:8080"],"proxy":["wss://user:pass@example.com"]})"_ns,
           config, error),
       NS_OK)
       << error.get();
@@ -411,21 +490,21 @@ TEST(NaiveFoxConfig, RejectsMalformedAndWrongTypes)
   static constexpr const char* kInvalid[] = {
       R"({)",
       R"({"listen":"socks://127.0.0.1:1080"})",
-      R"({"proxy":"https://u:p@example.com"})",
-      R"({"listen":42,"proxy":"https://u:p@example.com"})",
-      R"({"listen":["socks://127.0.0.1:1080",42],"proxy":"https://u:p@example.com"})",
+      R"({"proxy":"wss://u:p@example.com"})",
+      R"({"listen":42,"proxy":"wss://u:p@example.com"})",
+      R"({"listen":["socks://127.0.0.1:1080",42],"proxy":"wss://u:p@example.com"})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":false})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":[]})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":[42]})",
-      R"({"listen":"socks://127.0.0.1:1080","proxy":["https://u:p@one.example","https://u:p@two.example"]})",
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://u:p@example.com","log":true})",
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://example.com","host-resolver-rules":true})",
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://example.com","extra-headers":[]})",
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://example.com","no-post-quantum":"true"})",
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://example.com","host-resolver-rules":"MAP example.com 127.0.0.1","host-resolver-rules":"MAP example.com ::1"})",
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://example.com","extra-headers":"X-One: 1","extra-headers":"X-Two: 2"})",
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://example.com","no-post-quantum":true,"no-post-quantum":false})",
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://u:p@example.com","extra":"x"})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":["wss://u:p@one.example","wss://u:p@two.example"]})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"wss://u:p@example.com","log":true})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"wss://example.com","host-resolver-rules":true})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"wss://example.com","extra-headers":[]})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"wss://example.com","no-post-quantum":"true"})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"wss://example.com","host-resolver-rules":"MAP example.com 127.0.0.1","host-resolver-rules":"MAP example.com ::1"})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"wss://example.com","extra-headers":"X-One: 1","extra-headers":"X-Two: 2"})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"wss://example.com","no-post-quantum":true,"no-post-quantum":false})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"wss://u:p@example.com","extra":"x"})",
   };
   for (const char* json : kInvalid) {
     Config config;
@@ -439,22 +518,22 @@ TEST(NaiveFoxConfig, RejectsMalformedAndWrongTypes)
 TEST(NaiveFoxConfig, RejectsUnsupportedAndUnsafeUris)
 {
   static constexpr const char* kInvalid[] = {
-      R"({"listen":"ftp://127.0.0.1:1080","proxy":"https://u:p@example.com"})",
-      R"({"listen":"socks://proxy.example:1080","proxy":"https://u:p@example.com"})",
-      R"({"listen":"socks://127.0.0.1","proxy":"https://u:p@example.com"})",
-      R"({"listen":"http://user:pass@127.0.0.1:8080","proxy":"https://example.com"})",
-      R"({"listen":"socks://user@127.0.0.1:1080","proxy":"https://example.com"})",
-      R"({"listen":"socks://:pass@127.0.0.1:1080","proxy":"https://example.com"})",
-      R"({"listen":"socks://user:@127.0.0.1:1080","proxy":"https://example.com"})",
-      R"({"listen":"socks://user:%zz@127.0.0.1:1080","proxy":"https://example.com"})",
+      R"({"listen":"ftp://127.0.0.1:1080","proxy":"wss://u:p@example.com"})",
+      R"({"listen":"socks://proxy.example:1080","proxy":"wss://u:p@example.com"})",
+      R"({"listen":"socks://127.0.0.1","proxy":"wss://u:p@example.com"})",
+      R"({"listen":"http://user:pass@127.0.0.1:8080","proxy":"wss://example.com"})",
+      R"({"listen":"socks://user@127.0.0.1:1080","proxy":"wss://example.com"})",
+      R"({"listen":"socks://:pass@127.0.0.1:1080","proxy":"wss://example.com"})",
+      R"({"listen":"socks://user:@127.0.0.1:1080","proxy":"wss://example.com"})",
+      R"({"listen":"socks://user:%zz@127.0.0.1:1080","proxy":"wss://example.com"})",
       R"({"listen":"socks://127.0.0.1:1080","proxy":"http://u:p@example.com"})",
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://user@example.com"})",
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://@example.com"})",
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://u:p@example.com/path"})",
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://u:%zz@example.com"})",
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://u:p@bad_host"})",
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://u:p@-bad.example"})",
-      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://u:p@one.example,https://u:p@two.example"})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"wss://user@example.com"})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"wss://@example.com"})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"wss://u:p@example.com/path"})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"wss://u:%zz@example.com"})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"wss://u:p@bad_host"})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"wss://u:p@-bad.example"})",
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"wss://u:p@one.example,wss://u:p@two.example"})",
   };
   for (const char* json : kInvalid) {
     Config config;
@@ -471,7 +550,7 @@ TEST(NaiveFoxConfig, RejectsOversizedListenerCredentials)
   for (size_t index = 0; index < 256; ++index) {
     json.Append('p');
   }
-  json.AppendLiteral(R"(@127.0.0.1:1080","proxy":"https://example.com"})");
+  json.AppendLiteral(R"(@127.0.0.1:1080","proxy":"wss://example.com"})");
   Config config;
   nsAutoCString error;
   EXPECT_TRUE(NS_FAILED(ParseConfig(json, config, error)));
@@ -495,7 +574,7 @@ TEST(NaiveFoxConfig, RejectsUnsupportedHostResolverRules)
   };
   for (const char* rule : kInvalidRules) {
     nsAutoCString json(
-        R"({"listen":"socks://127.0.0.1:1080","proxy":"https://proxy.example","host-resolver-rules":")"_ns);
+        R"({"listen":"socks://127.0.0.1:1080","proxy":"wss://proxy.example","host-resolver-rules":")"_ns);
     const nsDependentCString ruleText(rule);
     for (size_t index = 0; index < ruleText.Length(); ++index) {
       const char value = ruleText.CharAt(index);

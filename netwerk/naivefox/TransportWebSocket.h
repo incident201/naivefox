@@ -6,10 +6,14 @@
 #define netwerk_naivefox_TransportWebSocket_h
 
 #include <functional>
+#include <memory>
 
 #include "mozilla/RefPtr.h"
+#include "nsCOMPtr.h"
 #include "nsIWebSocketListener.h"
 #include "nsString.h"
+
+class nsIChannel;
 
 namespace mozilla::net {
 class WebSocketChannel;
@@ -18,6 +22,7 @@ class WebSocketChannel;
 namespace mozilla::naivefox {
 
 struct TransportConfig;
+class TransportCookies;
 
 class TransportWebSocket final : public nsIWebSocketListener {
  public:
@@ -29,7 +34,8 @@ class TransportWebSocket final : public nsIWebSocketListener {
                      std::function<void(uint32_t)> aAcknowledged,
                      std::function<void(nsresult)> aStopped);
 
-  nsresult Start(const TransportConfig& aConfig, const nsACString& aCookie,
+  nsresult Start(const TransportConfig& aConfig,
+                 std::shared_ptr<TransportCookies> aCookies,
                  const nsACString& aPath, const nsACString& aProtocol);
   nsresult Send(const nsACString& aMessage);
   void Close(nsresult aStatus);
@@ -37,6 +43,8 @@ class TransportWebSocket final : public nsIWebSocketListener {
  private:
   ~TransportWebSocket();
   RefPtr<net::WebSocketChannel> mChannel;
+  nsCOMPtr<nsIChannel> mHandshake;
+  std::shared_ptr<TransportCookies> mCookies;
   std::function<void()> mStarted;
   std::function<void(const nsACString&)> mMessage;
   std::function<void(uint32_t)> mAcknowledged;

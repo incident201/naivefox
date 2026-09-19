@@ -141,7 +141,7 @@ def process_stats(proc):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--package-dir", required=True)
-    parser.add_argument("--protocol", choices=("h2", "h3"), default="h3")
+    parser.add_argument("--protocol", choices=("https", "wss", "quic"), default="https")
     parser.add_argument("--duration", type=int, default=600)
     args = parser.parse_args()
     if args.duration < 600 or args.duration > 900:
@@ -150,7 +150,7 @@ def main():
     proxy_url = os.environ.get("NAIVEFOX_SOAK_PROXY_URL", "")
     if not proxy_url or "@" not in proxy_url:
         raise SystemExit("NAIVEFOX_SOAK_PROXY_URL must be supplied in the environment")
-    expected_scheme = "quic://" if args.protocol == "h3" else "https://"
+    expected_scheme = args.protocol + "://"
     if not proxy_url.startswith(expected_scheme):
         raise SystemExit(f"proxy scheme must be {expected_scheme} for --protocol {args.protocol}")
 
@@ -313,14 +313,14 @@ def main():
         contents = client_log.read_text(encoding="utf-8", errors="replace")
         if "Proxy-Authorization" in contents or "dummy_pass" in contents:
             raise RuntimeError("credentials appeared in native soak log")
-        expected_protocol = f"Outer protocol: {args.protocol}"
-        protocol_count = contents.count(expected_protocol)
-        padding_count = contents.count("Padding negotiated: yes")
-        if protocol_count < len(attempts) or padding_count < len(attempts):
-            raise RuntimeError(
-                f"missing protocol/padding records: protocol={protocol_count} "
-                f"padding={padding_count} requests={len(attempts)}"
-            )
+        ready_marker = {
+            "https": "NaiveFox HTTPS packet carrier ready",
+            "wss": "NaiveFox websocket ready",
+            "quic": "NaiveFox HTTP/3 stream ready",
+        }[args.protocol]
+        carrier_count = contents.count(ready_marker)
+        if carrier_count < 1:
+            raise RuntimeError("selected transport did not become ready")
 
         with samples_lock:
             observed = [item[1] for item in samples if item[1] is not None]
@@ -340,8 +340,7 @@ def main():
             "rss_mib_final": rss[-1] / 2**20 if rss else None,
             "threads_max": max(threads) if threads else None,
             "handles_max": max(handles) if handles else None,
-            "outer_protocol_records": protocol_count,
-            "padding_yes_records": padding_count,
+            "carrier_ready_records": carrier_count,
             "credentials_absent": True,
         }
         print(json.dumps(summary, sort_keys=True))

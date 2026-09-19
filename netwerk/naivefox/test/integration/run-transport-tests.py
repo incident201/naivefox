@@ -64,6 +64,9 @@ def run_protocol(args, protocol):
         f.download(ports, "http", target.server_address[1], 65536)
         client.stop()
         f.require(client.exited_cleanly(), "valid client did not stop cleanly")
+        if protocol == "h2":
+            f.verify_ignored_wss_pin(
+                args, run, port, user, password, target.server_address[1])
         for name, trusted, credential in (
             ("invalid-auth", True, password + "wrong"),
             ("untrusted-ca", False, password),
@@ -157,7 +160,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("runtime", "caddy", "objdir", "output"):
         parser.add_argument("--" + name, type=Path, required=True)
-    parser.add_argument("--protocol", choices=("h2", "h3", "both"), default="both")
+    parser.add_argument("--protocol", choices=("packet", "h2", "h3", "all"), default="all")
     args = parser.parse_args()
     f.require(
         os.readlink("/proc/self/ns/net") != os.readlink("/proc/1/ns/net"),
@@ -174,7 +177,7 @@ def main():
     args.output.mkdir(parents=True, mode=0o700)
     os.environ.update(TMPDIR=str(args.output), XDG_RUNTIME_DIR=str(args.output))
     tempfile.tempdir = str(args.output)
-    for protocol in ("h2", "h3") if args.protocol == "both" else (args.protocol,):
+    for protocol in ("packet", "h2", "h3") if args.protocol == "all" else (args.protocol,):
         run_protocol(args, protocol)
 
 

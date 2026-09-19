@@ -55,7 +55,7 @@ def main():
             run(arguments, 2)
         valid = {
             "listen": "socks://127.0.0.1:1080",
-            "proxy": "https://fixture:fixture@localhost:443",
+            "proxy": "https://fixture~" + "0" * 64 + ":fixture@localhost:443",
         }
         invalid = [
             "{",
@@ -64,6 +64,9 @@ def main():
             '{"listen":true,"proxy":"https://localhost"}',
             '{"listen":"socks://127.0.0.1:1080","listen":"socks://127.0.0.1:1081","proxy":"https://localhost"}',
             json.dumps({**valid, "proxy": "auto://localhost"}),
+            json.dumps({**valid, "proxy": valid["proxy"].replace("https://", "cdn://")}),
+            json.dumps({**valid, "proxy": "https://fixture:fixture@localhost:443"}),
+            json.dumps({**valid, "proxy": "https://fixture~bad:fixture@localhost:443"}),
             json.dumps({**valid, "unknown": True}),
             json.dumps({**valid, "transport": "naivefox"}),
             json.dumps({**valid, "preamble": {"mode": "off"}}),

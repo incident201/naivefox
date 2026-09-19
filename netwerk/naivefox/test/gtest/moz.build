@@ -11,6 +11,7 @@ UNIFIED_SOURCES += [
     "TestNetworkStartupState.cpp",
     "TestSocks5Parser.cpp",
     "TestTransportCodec.cpp",
+    "TestTransportCookies.cpp",
     "TestTransportSite.cpp",
     "TestTransportWebSocket.cpp",
 ]

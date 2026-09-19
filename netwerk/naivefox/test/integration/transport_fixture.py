@@ -53,6 +53,11 @@ class Target(socketserver.BaseRequestHandler):
         try:
             self.request.settimeout(30)
             kind = receive(self.request, 1)
+            if kind == b"R":
+                self.request.sendall(b"ready")
+                while self.request.recv(4096):
+                    pass
+                return
             if kind == b"C":
                 while self.request.recv(4096):
                     pass
@@ -94,7 +99,7 @@ class Target(socketserver.BaseRequestHandler):
             self.request.sendall(struct.pack("!Q", length) + digest.digest())
             self.request.shutdown(socket.SHUT_WR)
         except (OSError, RuntimeError):
-            if kind != b"C":
+            if kind not in {b"C", b"R"}:
                 self.server.failures.append("target stream failed")
 
 
@@ -321,13 +326,32 @@ def prepare_application(run):
     return root.resolve()
 
 
+def packet_identity(run):
+    inner = run / "packet-identity"
+    inner.mkdir(mode=0o700)
+    issue_certificates(inner)
+    public = subprocess.check_output(
+        ["openssl", "x509", "-in", str(inner / "server.crt"), "-pubkey", "-noout"],
+        stderr=subprocess.DEVNULL,
+    )
+    der = subprocess.check_output(
+        ["openssl", "pkey", "-pubin", "-outform", "DER"],
+        input=public, stderr=subprocess.DEVNULL,
+    )
+    return inner, hashlib.sha256(der).hexdigest()
+
+
 def start_caddy(args, run, protocol, target_port, user, password):
+    outer_protocol = "h2" if protocol == "packet" else protocol
+    identity = None
+    if protocol == "packet":
+        identity, args.packet_server_pin = packet_identity(run)
     port = free_port(udp=protocol == "h3", dual=True)
     caddyfile = run / "Caddyfile"
     caddyfile.write_text(caddyfile_text(getattr(args, "allowed_ports", ())))
     env = dict(
         os.environ,
-        NF_PROTOCOL=protocol,
+        NF_PROTOCOL=outer_protocol,
         NF_PORT=str(port),
         NF_CERT=str(run / "server.crt"),
         NF_CERT_KEY=str(run / "server.key"),
@@ -358,21 +382,32 @@ def start_caddy(args, run, protocol, target_port, user, password):
     require(
         server["listen"] == [f"127.0.0.1:{port}"], "fixture listener escaped loopback"
     )
-    require(server["protocols"] == [protocol], "fixture protocol is not strict")
+    require(server["protocols"] == [outer_protocol], "fixture protocol is not strict")
     handlers = [item for route in server["routes"] for item in route.get("handle", [])]
     while handlers:
         item = handlers.pop()
         if item.get("handler") == "naivefox_transport":
+            if identity is not None:
+                item["packet_certificate"] = str(identity / "server.crt")
+                item["packet_key"] = str(identity / "server.key")
             item["stats_path"] = str(run / "server-stats.json")
             item["application_root"] = str(
                 getattr(args, "application_root", None) or prepare_application(run)
             )
         for route in item.get("routes", []):
             handlers.extend(route.get("handle", []))
+    cdn_proxy = getattr(args, "cdn_proxy", None)
+    if cdn_proxy:
+        require(outer_protocol == "h2", "CDN fixture requires outer H2")
+        server["trusted_proxies"] = {
+            "source": "static", "ranges": ["127.0.0.2/32", "127.0.0.3/32"]
+        }
+        server["trusted_proxies_strict"] = 1
+        server["client_ip_headers"] = ["CF-Connecting-IP"]
     mutator = getattr(args, "server_mutator", None)
     if mutator is not None:
         mutator(server)
-    server["protocols"] = ["h1", protocol]
+    server["protocols"] = ["h1", outer_protocol]
     private_json(run / "caddy.json", config)
     process = Process(
         [str(args.caddy), "run", "--config", str(run / "caddy.json")], run, "caddy", env
@@ -389,12 +424,37 @@ def start_caddy(args, run, protocol, target_port, user, password):
             not socket_listeners(port, udp=True),
             "strict H2 fixture unexpectedly listens on UDP",
         )
+    if cdn_proxy:
+        edge_port = free_port()
+        edge = Process(
+            [str(cdn_proxy), "--listen", f"127.0.0.1:{edge_port}",
+             "--origin", f"https://127.0.0.1:{port}", "--origin-protocol", getattr(args, "cdn_origin_protocol", "h2"),
+             "--mode", getattr(args, "cdn_mode", "packet-loss" if protocol == "packet" else "replay"), "--cert", str(run / "server.crt"),
+             "--key", str(run / "server.key"), "--ca", str(run / "ca.crt"),
+             "--stats", str(run / "cdn-stats.json")],
+            run, "cdn-edge", env,
+        )
+        original_stop = process.stop
+
+        def stop():
+            try:
+                edge.stop()
+            finally:
+                original_stop()
+
+        process.stop = stop
+        try:
+            wait_until(lambda: socket_listeners(edge_port), "CDN edge did not start", edge)
+        except BaseException:
+            process.stop()
+            raise
+        port = edge_port
     return process, port
 
 
 def proxy_uri(protocol, proxy_port, user, password):
     require((user is None) == (password is None), "partial fixture credentials")
-    scheme = "quic" if protocol == "h3" else "https"
+    scheme = {"h2": "wss", "h3": "quic", "packet": "https"}[protocol]
     credentials = (
         ""
         if user is None
@@ -419,6 +479,8 @@ def client_config(protocol, proxy_port, user, password, ports, connections):
 def start_client(
     args, run, name, protocol, proxy_port, user, password, connections=0, trusted=True
 ):
+    if protocol == "packet" and getattr(args, "packet_server_pin", None):
+        user = user + "~" + args.packet_server_pin
     directory = run / name
     directory.mkdir(mode=0o700)
     selected_ports = getattr(args, "listener_ports", None)
@@ -492,6 +554,19 @@ def start_client(
 
     wait_until(ready, "client listeners did not start", process)
     return process, {"socks": socks_port, "http": http_port}
+
+
+
+def verify_ignored_wss_pin(args, run, port, user, password, target_port):
+    client, ports = start_client(
+        args, run, "ignored-wss-pin", "h2", port,
+        user + "~not-a-pin", password)
+    try:
+        for frontend in ("socks", "http"):
+            download(ports, frontend, target_port, length=65536)
+    finally:
+        client.stop()
+    client.exited_cleanly()
 
 
 def open_tunnel(
@@ -775,6 +850,14 @@ def access_requests(run):
 
 
 def validate_carrier_stats(stats, protocol):
+    if protocol == "packet":
+        peaks = stats["packet_peaks"]
+        require(stats["packet_opened"] >= 2 and stats["ws_opened"] == 0 and
+                stats["h3_opened"] == 0 and len(peaks) == 33 and
+                sum(peaks[1:]) >= 2 and
+                sum(index * count for index, count in enumerate(peaks)) >= 40,
+                "packet concurrency did not use bounded carriers")
+        return
     selected, excluded = (
         ("h3_opened", "ws_opened") if protocol == "h3" else ("ws_opened", "h3_opened")
     )
@@ -793,7 +876,7 @@ def verify_idle_h3_transition(run, ports, target_port, server):
     wait_until(
         lambda: (
             sum(
-                request["method"] == "GET" and request["uri"] == "/api/events/brief"
+                request["method"] == "GET" and request["uri"].split("?", 1)[0] == "/api/events/brief"
                 for request in access_requests(run)
             )
             >= 6
@@ -842,6 +925,9 @@ def run_protocol(args, base, protocol):
         download(ports, "http", target.server_address[1], 65536)
         client.stop()
         client.exited_cleanly()
+        if protocol == "h2":
+            verify_ignored_wss_pin(
+                args, run, port, user, password, target.server_address[1])
         for name, trusted, credential in (
             ("invalid-auth", True, password + "wrong"),
             ("untrusted-ca", False, password),
@@ -860,6 +946,23 @@ def run_protocol(args, base, protocol):
             require(
                 target.accepted_connections == before, "rejected session reached target"
             )
+        if protocol == "packet":
+            before = target.accepted_connections
+            good_pin = args.packet_server_pin
+            args.packet_server_pin = ("1" if good_pin[0] == "0" else "0") + good_pin[1:]
+            try:
+                rejected, rejected_ports = start_client(
+                    args, run, "wrong-pin", protocol, port, user, password)
+                processes.append(rejected)
+                for listener in ("socks", "http"):
+                    open_tunnel(rejected_ports, listener,
+                                target.server_address[1], rejected=True)
+                rejected.stop()
+                rejected.exited_cleanly()
+                require(target.accepted_connections == before,
+                        "wrong packet origin pin reached target")
+            finally:
+                args.packet_server_pin = good_pin
         server.stop()
         server.exited_cleanly()
         stats = json.loads((run / "server-stats.json").read_text())
@@ -868,7 +971,27 @@ def run_protocol(args, base, protocol):
             "target integrity or stream count failed",
         )
         validate_carrier_stats(stats, protocol)
+        cdn = None
+        if getattr(args, "cdn_proxy", None):
+            cdn = json.loads((run / "cdn-stats.json").read_text())
+            if protocol == "packet":
+                require(cdn.get("packet_lost_responses", 0) >= 3 and
+                        cdn.get("packet_cut_downloads", 0) >= 1 and
+                        cdn.get("packet_reset_connections", 0) >= 1 and
+                        cdn.get("packet_reframed_uploads", 0) >= 1 and
+                        cdn.get("packet_reordered", 0) >= 1 and
+                        cdn.get("websockets", 0) == 0 and
+                        not cdn.get("cookie_errors") and
+                        not cdn.get("cookie_path_errors"),
+                        "native packet CDN fault mechanisms failed")
+            else:
+                require(cdn.get("websockets", 0) >= 2 and cdn.get("replays", 0) >= 80
+                    and not cdn.get("replay_mismatch")
+                    and not cdn.get("cookie_errors")
+                    and not cdn.get("cookie_path_errors"),
+                    "native CDN fixture mechanisms failed")
         result = {
+            "cdn": cdn,
             "protocol": protocol,
             "passed": True,
             "opens": stats["opens"],

@@ -6,6 +6,7 @@
 
 #include "Config.h"
 #include "OriginChannel.h"
+#include "TransportCookies.h"
 #include "mozilla/OriginAttributes.h"
 #include "mozilla/Try.h"
 #include "mozilla/net/WebSocketChannel.h"
@@ -37,11 +38,11 @@ TransportWebSocket::TransportWebSocket(
 TransportWebSocket::~TransportWebSocket() = default;
 
 nsresult TransportWebSocket::Start(const TransportConfig& aConfig,
-                                   const nsACString& aCookie,
+                                   std::shared_ptr<TransportCookies> aCookies,
                                    const nsACString& aPath,
                                    const nsACString& aProtocol) {
   MOZ_ASSERT(NS_IsMainThread());
-  if (mChannel || mClosing || aCookie.IsEmpty() ||
+  if (mChannel || mClosing || !aCookies || !aCookies->HasSession() ||
       !aProtocol.EqualsLiteral("naivefox")) {
     return NS_ERROR_INVALID_ARG;
   }
@@ -91,7 +92,11 @@ nsresult TransportWebSocket::Start(const TransportConfig& aConfig,
   connection->SetHttp3Disabled(true);
   connection->SetAnonymous(true);
   internal->SetConnectionInfo(connection);
-  MOZ_TRY(http->SetRequestHeader("Cookie"_ns, aCookie, false));
+  nsAutoCString cookie;
+  MOZ_TRY(aCookies->RequestHeader(uri, cookie));
+  MOZ_TRY(http->SetRequestHeader("Cookie"_ns, cookie, false));
+  mCookies = std::move(aCookies);
+  mHandshake = channel;
   nsAutoCString origin;
   MOZ_TRY(uri->GetPrePath(origin));
   nsCOMPtr<nsIURI> websocketUri;
@@ -152,6 +157,12 @@ NS_IMETHODIMP TransportWebSocket::OnStart(nsISupports*) {
     Close(NS_ERROR_ILLEGAL_VALUE);
     return NS_OK;
   }
+  rv = mCookies->ResponseHeaders(mHandshake);
+  mHandshake = nullptr;
+  if (NS_FAILED(rv)) {
+    Close(rv);
+    return NS_OK;
+  }
   mOpen = true;
   RefPtr<TransportWebSocket> self = this;
   auto callback = mStarted;
@@ -167,6 +178,8 @@ NS_IMETHODIMP TransportWebSocket::OnStop(nsISupports*, nsresult aStatus) {
   mOpen = false;
   mClosing = true;
   mChannel = nullptr;
+  mHandshake = nullptr;
+  mCookies = nullptr;
   auto callback = std::move(mStopped);
   mStarted = nullptr;
   mMessage = nullptr;

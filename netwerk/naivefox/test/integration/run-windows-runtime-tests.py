@@ -446,7 +446,7 @@ def run_inside(args):
             module.require(
                 expected in modules.splitlines(), "combined Caddy module is missing"
             )
-        protocols = ("h2", "h3") if args.protocol == "both" else (args.protocol,)
+        protocols = ("packet", "h2", "h3") if args.protocol == "all" else (args.protocol,)
         protocol_runner = module.run_protocol
         results = [protocol_runner(args, run, protocol) for protocol in protocols]
         module.private_json(
@@ -486,8 +486,9 @@ def main():
         help="Public site fixture override (server-side path)",
     )
     parser.add_argument("--caddy", required=True, type=Path)
+    parser.add_argument("--cdn-proxy", type=Path)
     parser.add_argument("--windows-python", required=True, type=Path)
-    parser.add_argument("--protocol", choices=("h2", "h3", "both"), default="both")
+    parser.add_argument("--protocol", choices=("packet", "h2", "h3", "all"), default="all")
     parser.add_argument(
         "--work-dir", type=Path, help="private artifact parent below objdir"
     )
@@ -500,6 +501,10 @@ def main():
     )
     parser.add_argument("--host-pid", type=int)
     args = parser.parse_args()
+    if args.cdn_proxy:
+        args.cdn_proxy = args.cdn_proxy.resolve(strict=True)
+        if args.protocol not in ("h2", "packet"):
+            parser.error("--cdn-proxy requires --protocol h2 or packet")
     for name in ("objdir", "runtime", "caddy", "windows_python"):
         setattr(args, name, getattr(args, name).resolve(strict=True))
     for path in (args.runtime, args.work_dir or args.objdir):

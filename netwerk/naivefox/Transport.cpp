@@ -9,6 +9,7 @@
 #include <atomic>
 #include <deque>
 #include <limits>
+#include <memory>
 #include <utility>
 #include <vector>
 
@@ -16,7 +17,9 @@
 #include "OriginChannel.h"
 #include "RuntimeLogging.h"
 #include "TransportCodec.h"
+#include "TransportCookies.h"
 #include "TransportHash.h"
+#include "TransportPacket.h"
 #include "TransportSite.h"
 #include "TransportWebSocket.h"
 #include "mozilla/Base64.h"
@@ -68,7 +71,8 @@ class CarrierRequest final : public nsIStreamListener {
   }
 
   nsresult Start(const TransportConfig& aConfig, const nsACString& aPath,
-                 const nsACString& aCookie, const Bytes* aUpload) {
+                 std::shared_ptr<TransportCookies> aCookies,
+                 const Bytes* aUpload) {
     nsContentPolicyType policy = nsIContentPolicy::TYPE_OTHER;
     switch (mBodyKind) {
       case CarrierBody::Document:
@@ -95,8 +99,13 @@ class CarrierRequest final : public nsIStreamListener {
       return NS_ERROR_FAILURE;
     }
     MOZ_TRY(http->SetRequestHeader("Accept-Encoding"_ns, "identity"_ns, false));
-    if (!aCookie.IsEmpty()) {
-      MOZ_TRY(http->SetRequestHeader("Cookie"_ns, aCookie, false));
+    mCookies = std::move(aCookies);
+    nsCOMPtr<nsIURI> uri;
+    MOZ_TRY(mChannel->GetURI(getter_AddRefs(uri)));
+    nsAutoCString cookie;
+    MOZ_TRY(mCookies->RequestHeader(uri, cookie));
+    if (!cookie.IsEmpty()) {
+      MOZ_TRY(http->SetRequestHeader("Cookie"_ns, cookie, false));
     }
     if (aUpload) {
       nsCOMPtr<nsIInputStream> input;
@@ -143,7 +152,6 @@ class CarrierRequest final : public nsIStreamListener {
   std::function<void()> mStarted;
   std::function<bool(const Bytes&)> mCellReceived;
   Bytes mBody;
-  nsCString mCookie;
   nsCString mMime;
   nsCString mDigest;
   UniquePtr<TransportSite> mSite;
@@ -160,8 +168,12 @@ class CarrierRequest final : public nsIStreamListener {
   const CarrierBody mBodyKind;
   wire::CellStreamDecoder mDecoder;
   TransportHash mHash;
-  uint64_t mPublicLength = 0;
+  std::shared_ptr<TransportCookies> mCookies;
+  int64_t mPublicLength = -1;
   uint64_t mPublicReceived = 0;
+  uint32_t mResponseStatus = 0;
+  const char* mResponseProtocol = "unknown";
+  nsCString mTraceID;
 };
 
 NS_IMPL_ISUPPORTS(CarrierRequest, nsIStreamListener, nsIRequestObserver)
@@ -175,6 +187,19 @@ NS_IMETHODIMP CarrierRequest::OnStartRequest(nsIRequest* aRequest) {
   nsAutoCString protocol;
   MOZ_TRY(http->GetResponseStatus(&status));
   MOZ_TRY(http->GetProtocolVersion(protocol));
+  mResponseStatus = status;
+  mResponseProtocol = protocol.EqualsLiteral("h3")   ? "h3"
+                      : protocol.EqualsLiteral("h2") ? "h2"
+                                                     : "other";
+  nsAutoCString trace;
+  if (NS_SUCCEEDED(http->GetResponseHeader("CF-Ray"_ns, trace)) &&
+      trace.Length() <= 64 &&
+      std::all_of(trace.BeginReading(), trace.EndReading(), [](char c) {
+        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+               (c >= '0' && c <= '9') || c == '-';
+      })) {
+    mTraceID = trace;
+  }
   if (status != mExpectedStatus ||
       !(mProtocol == ProxyProtocol::H3 ? protocol.EqualsLiteral("h3")
                                        : protocol.EqualsLiteral("h2"))) {
@@ -185,6 +210,7 @@ NS_IMETHODIMP CarrierRequest::OnStartRequest(nsIRequest* aRequest) {
       !encoding.IsEmpty() && !encoding.EqualsLiteral("identity")) {
     return NS_ERROR_CORRUPTED_CONTENT;
   }
+  MOZ_TRY(mCookies->ResponseHeaders(mChannel));
   if (mBodyKind == CarrierBody::Stream) {
     nsAutoCString type;
     MOZ_TRY(mChannel->GetContentType(type));
@@ -202,14 +228,14 @@ NS_IMETHODIMP CarrierRequest::OnStartRequest(nsIRequest* aRequest) {
     int64_t length = -1;
     MOZ_TRY(mChannel->GetContentLength(&length));
     if (mBodyKind == CarrierBody::Fixed) {
-      if (length != static_cast<int64_t>(mExpectedSize)) {
+      if (length >= 0 && length != static_cast<int64_t>(mExpectedSize)) {
         return NS_ERROR_CORRUPTED_CONTENT;
       }
     } else {
-      if (length < 0 || (mBodyKind == CarrierBody::Document && !length)) {
+      if (mBodyKind == CarrierBody::Document && !length) {
         return NS_ERROR_CORRUPTED_CONTENT;
       }
-      mPublicLength = static_cast<uint64_t>(length);
+      mPublicLength = length;
       nsAutoCString type;
       MOZ_TRY(mChannel->GetContentType(type));
       mMime = type;
@@ -234,7 +260,6 @@ NS_IMETHODIMP CarrierRequest::OnStartRequest(nsIRequest* aRequest) {
       return NS_ERROR_CORRUPTED_CONTENT;
     }
   }
-  (void)http->GetResponseHeader("Set-Cookie"_ns, mCookie);
   return NS_OK;
 }
 
@@ -255,7 +280,9 @@ NS_IMETHODIMP CarrierRequest::OnDataAvailable(nsIRequest*,
     return mTimer ? mTimer->SetDelay(75000) : NS_ERROR_ABORT;
   }
   if (mBodyKind != CarrierBody::Fixed) {
-    if (aCount > mPublicLength - mPublicReceived) {
+    if (aCount > UINT64_MAX - mPublicReceived ||
+        (mPublicLength >= 0 &&
+         aCount > static_cast<uint64_t>(mPublicLength) - mPublicReceived)) {
       return NS_ERROR_CORRUPTED_CONTENT;
     }
     std::array<uint8_t, 16384> buffer;
@@ -313,7 +340,9 @@ NS_IMETHODIMP CarrierRequest::OnStopRequest(nsIRequest*, nsresult aStatus) {
       if (mBody.size() != mExpectedSize) {
         aStatus = NS_ERROR_CORRUPTED_CONTENT;
       }
-    } else if (mPublicReceived != mPublicLength) {
+    } else if ((mPublicLength >= 0 &&
+                mPublicReceived != static_cast<uint64_t>(mPublicLength)) ||
+               (mBodyKind == CarrierBody::Document && !mPublicReceived)) {
       aStatus = NS_ERROR_CORRUPTED_CONTENT;
     } else if (mSite) {
       aStatus = mSite->Feed(Span<const uint8_t>(), true);
@@ -322,6 +351,13 @@ NS_IMETHODIMP CarrierRequest::OnStopRequest(nsIRequest*, nsresult aStatus) {
   if (NS_SUCCEEDED(aStatus) && mBodyKind != CarrierBody::Fixed &&
       !mHash.Finish(mDigest)) {
     aStatus = NS_ERROR_FAILURE;
+  }
+  if (NS_FAILED(aStatus)) {
+    RuntimeLogEvent(
+        "NaiveFox HTTP request failed phase=%u status=0x%08x "
+        "http_status=%u protocol=%s trace=%s\n",
+        static_cast<unsigned>(mBodyKind), static_cast<unsigned>(aStatus),
+        mResponseStatus, mResponseProtocol, mTraceID.get());
   }
   if (mDone) {
     auto done = std::move(mDone);
@@ -388,6 +424,7 @@ class TransportCarrier final {
     if (mClosed || mConfig.mProtocol != aConfig.mProtocol ||
         !mConfig.mProxyUrl.Equals(aConfig.mProxyUrl) ||
         !mConfig.mProxyUser.Equals(aConfig.mProxyUser) ||
+        !mConfig.mServerPin.Equals(aConfig.mServerPin) ||
         !mConfig.mProxyPassword.Equals(aConfig.mProxyPassword) ||
         mConfig.mHostResolverRule.isSome() !=
             aConfig.mHostResolverRule.isSome()) {
@@ -423,7 +460,10 @@ class TransportCarrier final {
   size_t Pressure(bool& aControl) const;
   void StartWebSocket();
   void StartHttp3();
+  void StartPacket();
+  uint32_t HeartbeatDelay() const { return mPacket ? 5000 : 25000; }
   bool UploadBlocked() const {
+    if (mPacket) return mPacket->Blocked();
     if (mConfig.mProtocol != ProxyProtocol::H3) {
       return mPendingMessageBytes != 0;
     }
@@ -445,9 +485,11 @@ class TransportCarrier final {
   void ScheduleSend(uint32_t aDelay, bool aHeartbeat);
   bool HasPendingOpen() const;
   uint32_t CoalescingDelay(size_t aBytes) const;
+  size_t UploadCapacity(size_t aBytes) const;
 
   TransportConfig mConfig;
-  nsCString mCookie;
+  std::shared_ptr<TransportCookies> mCookies =
+      std::make_shared<TransportCookies>();
   nsCString mSiteIdentity;
   nsCString mRootDigest;
   bool mContractReady = false;
@@ -468,6 +510,7 @@ class TransportCarrier final {
   bool mBusy = false;
   bool mQueued = false;
   bool mClosed = false;
+  RefPtr<TransportPacket> mPacket;
   RefPtr<CarrierRequest> mHttp3Stream;
   size_t mHttp3Uploads = 0;
   RefPtr<TransportWebSocket> mWebSocket;
@@ -710,7 +753,7 @@ bool TransportCarrier::Open(const nsACString& aPath, const Bytes* aUpload,
       },
       aBodyKind);
   mRequests.push_back(request);
-  nsresult rv = request->Start(mConfig, aPath, mCookie, aUpload);
+  nsresult rv = request->Start(mConfig, aPath, mCookies, aUpload);
   if (NS_FAILED(rv)) {
     Fail(rv);
     return false;
@@ -727,7 +770,8 @@ void TransportCarrier::Attach(TransportStream* aStream) {
   auto& s = *aStream->mImpl;
   s.carrier = this;
   s.state = MakeUnique<wire::StreamState>(
-      ++mHighestStream, mConfig.mProtocol == ProxyProtocol::H3);
+      ++mHighestStream, mConfig.mProtocol == ProxyProtocol::H3 ||
+                            !mConfig.mServerPin.IsEmpty());
   mStreams.push_back(aStream);
   RefPtr stream = aStream;
   auto timer = NS_NewTimerWithCallback(
@@ -775,6 +819,10 @@ void TransportCarrier::Fail(nsresult aStatus) {
     mReceiveDeadline->Cancel();
     mReceiveDeadline = nullptr;
   }
+  if (mPacket) {
+    RefPtr packet = std::move(mPacket);
+    packet->Close();
+  }
   if (mHttp3Stream) {
     RefPtr stream = std::move(mHttp3Stream);
     stream->Cancel(aStatus);
@@ -792,7 +840,7 @@ void TransportCarrier::Fail(nsresult aStatus) {
     stream->Finish(aStatus, false);
   }
   mStreams.clear();
-  mCookie.Truncate();
+  mCookies->Clear();
   mConfig.mProxyUser.Truncate();
   mConfig.mProxyPassword.Truncate();
   mResets.clear();
@@ -807,20 +855,10 @@ void TransportCarrier::Start() {
   Open(
       "/"_ns, nullptr, 0, 200, false,
       [self](CarrierRequest* request, nsresult) {
-        if (request->mCookie.Length() < 73 ||
-            !StringBeginsWith(request->mCookie, "session="_ns) ||
-            request->mCookie.CharAt(72) != ';') {
+        if (self->mConfig.mServerPin.IsEmpty() && !self->mCookies->HasSession()) {
           self->Fail(NS_ERROR_CORRUPTED_CONTENT);
           return;
         }
-        for (size_t i = 8; i < 72; ++i) {
-          const char c = request->mCookie.CharAt(i);
-          if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))) {
-            self->Fail(NS_ERROR_CORRUPTED_CONTENT);
-            return;
-          }
-        }
-        self->mCookie.Assign(Substring(request->mCookie, 0, 72));
         self->mRootDigest = request->mDigest;
         self->mResources = request->mSite->TakeResources();
         self->LoadAssets();
@@ -1003,6 +1041,10 @@ bool TransportCarrier::ReceiveCell(const Bytes& aBody, bool aRealtime) {
   if (!mContractReady) {
     nsAutoCString expected("naivefox\n");
     expected.Append(mSiteIdentity);
+    if (mPacket) {
+      expected.AppendLiteral("\nhttps\n");
+      expected.Append(mPacket->SessionID());
+    }
     if (aRealtime || mDown || frames.size() != 1 ||
         frames[0].kind != Kind::Hello || frames[0].stream ||
         frames[0].sequence || frames[0].body.size() != expected.Length() ||
@@ -1156,7 +1198,7 @@ void TransportCarrier::Tick() {
       }
     }
   }
-  if (mWebSocket || mHttp3Stream) {
+  if (mWebSocket || mHttp3Stream || mPacket) {
     if (mRealtimeReady) {
       bool control = false;
       const size_t bytes = Pressure(control);
@@ -1170,6 +1212,10 @@ void TransportCarrier::Tick() {
     return;
   }
   mBusy = true;
+  if (!mConfig.mServerPin.IsEmpty()) {
+    StartPacket();
+    return;
+  }
   if (mStartup < kStartupSlots.size()) {
     Startup();
     return;
@@ -1198,6 +1244,8 @@ void TransportCarrier::Startup() {
       path.AssignLiteral("/media/chunk/");
       path.AppendInt(static_cast<uint32_t>(self->mStartup));
     }
+    path.AppendLiteral("?seq=");
+    path.AppendInt(static_cast<uint32_t>(self->mStartup));
     self->Open(path, nullptr, capacity, 200, true,
                [self](CarrierRequest* request, nsresult) {
                  if (self->Receive(request)) {
@@ -1206,6 +1254,35 @@ void TransportCarrier::Startup() {
                  }
                });
   });
+}
+
+void TransportCarrier::StartPacket() {
+  Bytes auth;
+  if (!Upload(4096, auth)) return;
+  RefPtr self = this;
+  mPacket = new TransportPacket(
+      [self]() {
+        if (self->mClosed) return;
+        self->mRealtimeReady = true;
+        self->mBusy = false;
+        self->mAcknowledgedUpload = self->mUp - 1;
+        RuntimeLogEvent("NaiveFox HTTPS packet carrier ready\n");
+        self->Wake();
+        self->ScheduleSend(self->HeartbeatDelay(), true);
+      },
+      [self](const Bytes& body, bool realtime) {
+        if (self->mClosed || !self->ReceiveCell(body, realtime)) return false;
+        self->Wake();
+        return true;
+      },
+      [self]() {
+        if (self->mClosed) return;
+        self->Wake();
+        self->ScheduleSend(self->HeartbeatDelay(), true);
+      },
+      [self](nsresult status) { self->Fail(status); });
+  nsresult rv = mPacket->Start(mConfig, mCookies, auth);
+  if (NS_FAILED(rv)) Fail(rv);
 }
 
 void TransportCarrier::StartHttp3() {
@@ -1228,7 +1305,7 @@ void TransportCarrier::StartHttp3() {
     RuntimeLogEvent("NaiveFox HTTP/3 stream ready startup=%zu\n",
                     self->mStartup);
     self->Wake();
-    self->ScheduleSend(25000, true);
+    self->ScheduleSend(self->HeartbeatDelay(), true);
   };
   mHttp3Stream->mCellReceived = [self](const Bytes& aBody) {
     if (self->mClosed || !self->ReceiveCell(aBody, true)) {
@@ -1238,7 +1315,7 @@ void TransportCarrier::StartHttp3() {
     return true;
   };
   nsresult rv =
-      mHttp3Stream->Start(mConfig, "/api/stream"_ns, mCookie, nullptr);
+      mHttp3Stream->Start(mConfig, "/api/stream"_ns, mCookies, nullptr);
   if (NS_FAILED(rv)) {
     Fail(rv);
   }
@@ -1267,7 +1344,7 @@ void TransportCarrier::StartWebSocket() {
         RuntimeLogEvent("NaiveFox websocket ready startup=%zu\n",
                         self->mStartup);
         self->Wake();
-        self->ScheduleSend(25000, true);
+        self->ScheduleSend(self->HeartbeatDelay(), true);
       },
       [self](const nsACString& aMessage) {
         if (self->mClosed) {
@@ -1305,7 +1382,7 @@ void TransportCarrier::StartWebSocket() {
           bool control = false;
           const size_t bytes = self->Pressure(control);
           self->ScheduleSend(
-              bytes || control ? self->CoalescingDelay(bytes) : 25000,
+              bytes || control ? self->CoalescingDelay(bytes) : self->HeartbeatDelay(),
               !bytes && !control);
           self->Wake();
         }
@@ -1314,7 +1391,7 @@ void TransportCarrier::StartWebSocket() {
         self->Fail(NS_FAILED(aStatus) ? aStatus : NS_ERROR_NET_RESET);
       });
   nsresult rv =
-      mWebSocket->Start(mConfig, mCookie, "/api/realtime"_ns, "naivefox"_ns);
+      mWebSocket->Start(mConfig, mCookies, "/api/realtime"_ns, "naivefox"_ns);
   if (NS_FAILED(rv)) {
     Fail(rv);
   }
@@ -1326,10 +1403,21 @@ bool TransportCarrier::HasPendingOpen() const {
   });
 }
 
+size_t TransportCarrier::UploadCapacity(size_t aBytes) const {
+  size_t capacity = wire::ReadyRealtimeUpCapacity(aBytes, HasPendingOpen());
+  if (mPacket && capacity == 4096 &&
+      aBytes + wire::kCellHeader + wire::kFrameHeader > capacity) {
+    capacity = aBytes + wire::kCellHeader + wire::kFrameHeader <= 8192
+                   ? 8192
+                   : 16384;
+  }
+  return capacity;
+}
+
 uint32_t TransportCarrier::CoalescingDelay(size_t aBytes) const {
-  const size_t capacity =
-      wire::ReadyRealtimeUpCapacity(aBytes, HasPendingOpen());
-  return aBytes >= capacity || (!aBytes && !HasPendingOpen()) ? 0 : 2;
+  const size_t capacity = UploadCapacity(aBytes);
+  const size_t framed = aBytes + (mPacket ? wire::kCellHeader + wire::kFrameHeader : 0);
+  return framed >= capacity || (!aBytes && !HasPendingOpen()) ? 0 : 2;
 }
 
 void TransportCarrier::ScheduleSend(uint32_t aDelay, bool aHeartbeat) {
@@ -1366,13 +1454,21 @@ void TransportCarrier::SendTick(bool aHeartbeat) {
   bool control = false;
   const size_t bytes = Pressure(control);
   if (!bytes && !control && !aHeartbeat) {
-    ScheduleSend(25000, true);
+    ScheduleSend(HeartbeatDelay(), true);
     return;
   }
-  const bool opening = HasPendingOpen();
-  const size_t capacity = wire::ReadyRealtimeUpCapacity(bytes, opening);
+  const size_t capacity = UploadCapacity(bytes);
   Bytes body;
   if (!Upload(capacity, body)) {
+    return;
+  }
+  if (mPacket) {
+    if (!mPacket->Send(body)) {
+      Fail(NS_ERROR_FAILURE);
+      return;
+    }
+    Wake();
+    ScheduleSend(HeartbeatDelay(), true);
     return;
   }
   if (mConfig.mProtocol == ProxyProtocol::H3) {
@@ -1382,12 +1478,12 @@ void TransportCarrier::SendTick(bool aHeartbeat) {
               [self](CarrierRequest*, nsresult) {
                 --self->mHttp3Uploads;
                 self->Wake();
-                self->ScheduleSend(25000, true);
+                self->ScheduleSend(self->HeartbeatDelay(), true);
               })) {
       return;
     }
     Wake();
-    ScheduleSend(25000, true);
+    ScheduleSend(HeartbeatDelay(), true);
     return;
   }
   mPendingMessageBytes = body.size();

@@ -75,6 +75,7 @@ nsTArray<mozilla::naivefox::TransportConfig> MakeTransportConfigs(
     tunnelConfig.mProxyUser = proxy.mUser;
     tunnelConfig.mProxyPassword = proxy.mPassword;
     tunnelConfig.mProtocol = proxy.mProtocol;
+    tunnelConfig.mServerPin = proxy.mServerPin;
     tunnelConfig.mHostResolverRule = aConfig.mHostResolverRule;
   }
   return tunnelConfigs;
@@ -262,7 +263,11 @@ extern "C" NAIVEFOX_EXPORT int NaiveFoxMain(int aArgc, char* aArgv[]) {
       for (size_t index = 0; index < config.mProxies.Length(); ++index) {
         mozilla::naivefox::RuntimeLogEvent(
             "Proxying via %s endpoint=%s upstream=%u\n",
-            ProxyProtocolName(config.mProxies[index].mProtocol),
+            config.mProxies[index].mServerPin.IsEmpty()
+                ? (config.mProxies[index].mProtocol == mozilla::naivefox::ProxyProtocol::H3
+                       ? "QUIC (h3)"
+                       : "WSS (h2 startup)")
+                : "HTTPS packet (h2)",
             config.mProxies[index].mUrl.get(),
             static_cast<unsigned>(index + 1));
       }

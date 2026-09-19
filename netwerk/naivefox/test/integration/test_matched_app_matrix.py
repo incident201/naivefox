@@ -470,5 +470,40 @@ class LocalCaddyProofTests(unittest.TestCase):
             )
 
 
+class SummaryTests(unittest.TestCase):
+    def test_summary_covers_each_delivery_and_listener(self):
+        arms = ("native-http", "native-socks", "packet-http", "packet-socks")
+        sample = {
+            "whole": {"wire_bytes": 100},
+            "application": {"stages": [{"io_ms": 10}]},
+        }
+        campaign = SimpleNamespace(
+            protocol="h2",
+            args=SimpleNamespace(blocks=1),
+            manifest={"stages": [{"name": "upload"}]},
+            samples=[
+                {**sample, "naivefox_arm": arm}
+                for arm in ("reference", *arms)
+            ],
+        )
+        for protocol in ("h2", "h3"):
+            campaign.protocol = protocol
+            report = {"protocols": {protocol: {"views": {
+                view: {"arms": {arm: {} for arm in arms}}
+                for view in M.VIEWS
+            }}}}
+            with mock.patch.object(M, "ARMS", arms):
+                rows = M.summarize(campaign, report)
+            self.assertEqual(len(rows), 4)
+            for row in rows:
+                expected = "https" if row["arm"].startswith("packet-") else (
+                    "wss" if protocol == "h2" else "quic"
+                )
+                self.assertEqual(row["delivery"], expected)
+                self.assertEqual(row["protocol"], protocol)
+                self.assertEqual(row["blocks"], 1)
+                self.assertEqual(row["whole_ip_bytes"], 100)
+
+
 if __name__ == "__main__":
     unittest.main()
