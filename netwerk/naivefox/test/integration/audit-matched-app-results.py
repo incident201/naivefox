@@ -176,6 +176,18 @@ def audit_distances(folder, protocol):
     return result
 
 
+
+def candidate_samples(samples, row):
+    arm = row["arm"]
+    check(
+        arm != "reference" and arm.rsplit("-", 1)[-1] == row["listener"],
+        "matrix arm and listener differ",
+    )
+    candidates = [item for item in samples if item["naivefox_arm"] == arm]
+    check(candidates, "missing matrix arm")
+    return candidates
+
+
 def audit_protocol(root, protocol, rows, manifest):
     folder = root / protocol
     samples = [read(path) for path in sorted(folder.glob("sample-*.json"))]
@@ -399,11 +411,7 @@ def audit_protocol(root, protocol, rows, manifest):
 
     controls = [item for item in samples if item["naivefox_arm"] == "reference"]
     for row in rows:
-        candidates = [
-            item
-            for item in samples
-            if item["naivefox_arm"] == "native-" + row["listener"]
-        ]
+        candidates = candidate_samples(samples, row)
         old_wire, new_wire = (
             mean(item["whole"]["wire_bytes"] for item in cohort)
             for cohort in (controls, candidates)

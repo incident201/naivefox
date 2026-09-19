@@ -66,6 +66,25 @@ class MatchedAppAuditTests(unittest.TestCase):
                 result = audit.audit_distances(root, "h2")
                 self.assertEqual(result["whole"]["all_arms_recomputed"], len(arms))
 
+    def test_packet_summary_uses_packet_samples_with_shared_listener(self):
+        samples = [
+            {"naivefox_arm": "reference", "bytes": 100},
+            {"naivefox_arm": "native-http", "bytes": 200},
+            {"naivefox_arm": "packet-http", "bytes": 300},
+        ]
+        selected = audit.candidate_samples(
+            samples, {"arm": "packet-http", "listener": "http"}
+        )
+        self.assertEqual([sample["bytes"] for sample in selected], [300])
+        with self.assertRaisesRegex(RuntimeError, "missing matrix arm"):
+            audit.candidate_samples(
+                samples, {"arm": "packet-socks", "listener": "socks"}
+            )
+        with self.assertRaisesRegex(RuntimeError, "arm and listener differ"):
+            audit.candidate_samples(
+                samples, {"arm": "packet-http", "listener": "socks"}
+            )
+
     def test_missing_reference_is_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
