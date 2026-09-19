@@ -517,15 +517,15 @@ jobs:
           {
             echo "NaiveFox product build from \`${SOURCE_SHA}\`."
             echo
-            echo "NaiveFox has one current transport. Upgrade the client and naivefox-transport server together. Classic NaiveProxy, transport selectors and older wire contracts are not supported."
+            echo "NaiveFox has one current application protocol. Upgrade the client and naivefox-transport server together; only the current matching pair is supported."
             echo
-            echo "H2 uses native WSS after the public site and twenty startup pairs. H3 remains on Firefox Neqo QUIC/HTTP3 with a persistent GET and bounded POST pipeline; it does not fall back to TCP."
+            echo "HTTPS is the default packet delivery over H2, directly or through a compatible CDN. Its username~PIN suffix is mandatory. WSS explicitly selects WebSocket and strips an optional PIN suffix. QUIC remains on Firefox Neqo HTTP/3 without TCP fallback."
             echo
-            echo "Delivery credit is 512 KiB for H2 and 1 MiB for H3. H3 cells are capped at 64 KiB. Both half-closes, cancellation, bounded buffering and strict certificate checks are preserved."
+            echo "Delivery credit is 512 KiB for WSS and 1 MiB for HTTPS and QUIC. HTTPS uses pinned inner TLS, finite uploads and resumable downloads. Receipted upload blocks remain in the bounded window without redundant body retries."
             echo
             echo "The public site has no compulsory filenames or size/resource-count budget. The client consumes supported directly declared resources without JavaScript, crawling secondary dependencies or enabling resource caching."
             echo
-            echo "See TRANSPORT.md and the matching server documentation. The source pins server implementation 961a8f8994d95b36cdc96f46f176476a0c4be217."
+            echo "See HTTPS.md, TRANSPORT.md and the matching server documentation. Configure packet_tls on the server and keep its inner private key on the origin."
             echo
             echo "Packages are first staged as a draft for checksum and platform verification."
             echo
