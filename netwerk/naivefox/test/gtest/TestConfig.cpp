@@ -110,6 +110,50 @@ TEST(NaiveFoxConfig, StringListenerAndHttpsDefaults)
   EXPECT_EQ(config.mMaxConnections, 0U);
 }
 
+TEST(NaiveFoxConfig, CdnPinLivesInDecodedUsername)
+{
+  Config config;
+  nsAutoCString error;
+  ASSERT_EQ(ParseConfig(
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"cdn://user%7Ename~0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF:p%40ss@example.com"})"_ns,
+      config, error), NS_OK) << error.get();
+  const auto& proxy = config.mProxies[0];
+  EXPECT_EQ(proxy.mProtocol, ProxyProtocol::H2);
+  EXPECT_TRUE(proxy.mUrl.EqualsLiteral("https://example.com:443"));
+  EXPECT_TRUE(proxy.mUser.EqualsLiteral("user~name"));
+  EXPECT_TRUE(proxy.mPassword.EqualsLiteral("p@ss"));
+  EXPECT_TRUE(proxy.mServerPin.EqualsLiteral(
+      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"));
+}
+
+TEST(NaiveFoxConfig, CdnNeverAllowsMissingOrMalformedPin)
+{
+  for (const char* proxy : {
+           "cdn://example.com", "cdn://user:pass@example.com",
+           "cdn://user~1234:pass@example.com",
+           "cdn://~0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef:pass@example.com",
+           "cdn://user~0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef:@example.com",
+           "cdn://user~0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdeg:pass@example.com"}) {
+    nsCString json(R"({"listen":"socks://127.0.0.1:1080","proxy":")");
+    json.Append(proxy);
+    json.AppendLiteral(R"("})");
+    Config config;
+    nsAutoCString error;
+    EXPECT_TRUE(NS_FAILED(ParseConfig(json, config, error)));
+  }
+}
+
+TEST(NaiveFoxConfig, DirectUsernameDoesNotInterpretPinSuffix)
+{
+  Config config;
+  nsAutoCString error;
+  ASSERT_EQ(ParseConfig(
+      R"({"listen":"socks://127.0.0.1:1080","proxy":"https://user~0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef:p@example.com"})"_ns,
+      config, error), NS_OK);
+  EXPECT_TRUE(config.mProxies[0].mServerPin.IsEmpty());
+  EXPECT_EQ(config.mProxies[0].mUser.Length(), 69U);
+}
+
 TEST(NaiveFoxConfig, MaxConnectionsIsBoundedAndExplicit)
 {
   Config config;

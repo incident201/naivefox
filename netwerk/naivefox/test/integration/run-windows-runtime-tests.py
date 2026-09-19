@@ -488,7 +488,7 @@ def main():
     parser.add_argument("--caddy", required=True, type=Path)
     parser.add_argument("--cdn-proxy", type=Path)
     parser.add_argument("--windows-python", required=True, type=Path)
-    parser.add_argument("--protocol", choices=("h2", "h3", "both"), default="both")
+    parser.add_argument("--protocol", choices=("h2", "h3", "cdn", "both"), default="both")
     parser.add_argument(
         "--work-dir", type=Path, help="private artifact parent below objdir"
     )
@@ -503,8 +503,8 @@ def main():
     args = parser.parse_args()
     if args.cdn_proxy:
         args.cdn_proxy = args.cdn_proxy.resolve(strict=True)
-        if args.protocol != "h2":
-            parser.error("--cdn-proxy requires --protocol h2")
+        if args.protocol not in ("h2", "cdn"):
+            parser.error("--cdn-proxy requires --protocol h2 or cdn")
     for name in ("objdir", "runtime", "caddy", "windows_python"):
         setattr(args, name, getattr(args, name).resolve(strict=True))
     for path in (args.runtime, args.work_dir or args.objdir):

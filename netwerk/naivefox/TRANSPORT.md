@@ -1,7 +1,8 @@
 # NaiveFox transport
 
 NaiveFox supports one current transport and coordinated client/server updates.
-There are no alternate transport modes, version negotiation or migration fallbacks.
+Explicit URI schemes select its delivery adapter; there is no version
+negotiation or automatic migration fallback.
 CONNECT is permitted when justified by the native protocol architecture.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for carrier ownership, H2/H3 selection,
@@ -14,7 +15,7 @@ H3 uses the same startup followed by a persistent HTTP/3 GET and at most eight
 concurrent finite POSTs. Its sustained data remains on Neqo QUIC. A four-byte
 length prefix delimits downstream cells in the GET response.
 
-Both carriers use NFOX cells, the naivefox HELLO identity, bounded
+Both direct carriers use NFOX cells, the naivefox HELLO identity, bounded
 stream credit and the same DATA/CREDIT/FIN/RESET rules. There is one current
 subprotocol identity, not a list of supported versions.
 
@@ -35,8 +36,8 @@ expected bytes. Public resources remain streamed, with MIME, EOF and snapshot
 validation. Carrier/site responses to a configured trusted proxy include no-transform.
 Direct routes retain their ordinary cache headers.
 
-CDN support is work in progress and is not validated for production use.
+CDN support is **experimental** and is not validated for production use.
 Only direct H2 and H3 deployments are currently supported. Local reverse-proxy
 tests cover HTTP compatibility, but complete real-provider CDN acceptance has
-not been performed. CDN integration is deferred. Its intended deployment
-contract is described in the server's docs/CDN.md; it is not a support guarantee.
+not been performed. The explicit cdn:// selection enables the experimental packet adapter;
+see [CDN.md](CDN.md). Its intended deployment contract is described in the server's docs/CDN.md; it is not a support guarantee.

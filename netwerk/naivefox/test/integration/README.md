@@ -3,7 +3,7 @@
 Tests exercise one current NaiveFox transport and coordinated client/server
 builds. Test the current transport, without alternate wire versions or
 migration campaigns. The local frontends are SOCKS5 and HTTP CONNECT; the outer selections
-are strict H2 and strict H3.
+are direct strict H2, direct strict H3 and experimental packet delivery over H2.
 
 All generated packages, profiles, certificates, logs and captures belong under a
 dedicated object-directory subtree. Reuse object directories for incremental
@@ -122,5 +122,28 @@ MIME, snapshot and body-length cases must fail before opening a target.
 The Windows and Android runtime runners accept --cdn-proxy with --protocol h2
 to exercise their normal native workloads through the same replaying edge.
 These local tests do not establish real-CDN compatibility. CDN integration is
-unfinished and currently deferred; complete real-provider acceptance has not
+unfinished; complete real-provider acceptance has not
 been performed. Direct H2/H3 remains the supported deployment.
+
+
+## Experimental packet delivery verification
+
+run-packet-tests.py exercises the native cdn:// URI, independently pinned inner
+TLS, both local frontends, streaming integrity, half-close, 40 streams, idle
+heartbeat and rejection of a wrong pin, credentials or edge CA. With
+--cdn-proxy it injects lost finite responses, reordered uploads, arbitrary body
+fragments, download truncation and complete outer TCP connection resets,
+against H1 or H2 origins, including chunked origin request reframing. WebSocket upgrades
+are disabled in this fixture. The native Windows and Android runners accept
+--protocol cdn with the same fault-injecting proxy.
+
+The client and Go TLS implementations are tested against each other; the server
+packet unit suite additionally covers queue bounds, receipt expiry, stale
+generation/cursor rejection, replay ownership, request cancellation, MAC
+binding and old-replay inactivity expiry.
+
+For a short matched H2 screen, --include-cdn adds packet HTTP/SOCKS arms beside
+direct HTTP/SOCKS in each randomized block, sharing the same Firefox A/B
+controls. Window definitions, feature extraction, workload and health gates
+are unchanged. Carrier health checks distinguish the explicitly selected path.
+A short block is diagnostic evidence, not a 30-block acceptance claim.

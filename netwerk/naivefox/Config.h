@@ -20,14 +20,14 @@ struct ListenerConfig final {
   bool mIPv6 = false;
 };
 struct UpstreamProxyConfig final {
-  nsCString mUrl, mUser, mPassword;
+  nsCString mUrl, mUser, mPassword, mServerPin;
   ProxyProtocol mProtocol = ProxyProtocol::H2;
 };
 struct HostResolverRule final {
   nsCString mLogicalHost, mPhysicalHost;
 };
 struct TransportConfig final {
-  nsCString mProxyUrl, mProxyUser, mProxyPassword;
+  nsCString mProxyUrl, mProxyUser, mProxyPassword, mServerPin;
   ProxyProtocol mProtocol = ProxyProtocol::H2;
   Maybe<HostResolverRule> mHostResolverRule;
 };

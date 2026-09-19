@@ -1303,6 +1303,10 @@ class Campaign:
 
     def start(self):
         native.issue_certificates(self.fixture)
+        self.packet_identity = None
+        self.packet_pin = None
+        if getattr(self.args, "include_cdn", False):
+            self.packet_identity, self.packet_pin = native.packet_identity(self.fixture)
         trusted = self.fixture / "trusted"
         trusted.mkdir()
         run_quiet(["certutil", "-N", "-d", "sql:" + str(trusted), "--empty-password"])
@@ -1422,6 +1426,9 @@ class Campaign:
 
             find(server)
             require(module is not None, "real native transport handler is missing")
+            if name == "outer" and self.packet_identity is not None:
+                module["packet_certificate"] = str(self.packet_identity / "server.crt")
+                module["packet_key"] = str(self.packet_identity / "server.key")
             module["stats_path"] = str(directory / f"{name}-carrier-stats.json")
             module["application_root"] = str(
                 prepare_matched_application(directory, self.args.asset_dir)
@@ -1567,12 +1574,14 @@ class Campaign:
             time.sleep(0.01)
         raise RuntimeError("preflight traffic did not drain")
 
-    def client(self, directory, kind):
+    def client(self, directory, kind, packet=False):
         port = native.free_port()
         config = {
             "listen": f"{kind}://127.0.0.1:{port}",
             "proxy": native.proxy_uri(
-                self.protocol, self.outer_port, self.user, self.password
+                "cdn" if packet else self.protocol, self.outer_port,
+                self.user + "~" + self.packet_pin if packet else self.user,
+                self.password,
             ),
             "host-resolver-rules": "MAP localhost 127.0.0.1",
             "max-connections": 0,
@@ -1690,6 +1699,7 @@ class Campaign:
         result = {"sample": name, **row, "admitted": False}
         arm = row["naivefox_arm"]
         reference = arm == "reference"
+        packet = arm.startswith("packet-")
         kind = "http" if arm.endswith("-http") else "socks"
         caddy = backend = client = monitor = driver = capture = None
         browser_owned = {}
@@ -1723,7 +1733,7 @@ class Campaign:
             capture = CompleteCapture(directory, self.outer_port)
             local_port = 0
             if not reference:
-                client, local_port = self.client(directory, kind)
+                client, local_port = self.client(directory, kind, packet=packet)
             driver, browser_owned = self.browser(
                 directory, None if reference else kind, local_port
             )
@@ -1876,13 +1886,26 @@ class Campaign:
             carrier = json.loads((directory / "outer-carrier-stats.json").read_text())
             if reference:
                 require(
-                    carrier.get("opens", 0) == 0
+                    carrier.get("packet_opened", 0) == 0
+                    and carrier.get("opens", 0) == 0
                     and carrier.get("ws_opened", 0) == 0
                     and carrier.get("upload_bytes", 0) == 0
                     and carrier.get("download_bytes", 0) == 0,
                     "reference generated native carrier filler or target traffic",
                 )
+            elif packet:
+                require(
+                    carrier.get("packet_opened") == 1
+                    and carrier.get("packet_uploads", 0) > 0
+                    and carrier.get("packet_downloads", 0) > 0
+                    and carrier.get("ws_opened", 0) == 0
+                    and carrier.get("h3_opened", 0) == 0
+                    and carrier.get("startup_completed", 0) == 0,
+                    "packet delivery path differs",
+                )
             else:
+                require(carrier.get("packet_opened", 0) == 0,
+                        "direct carrier selected packet delivery")
                 expected_ws = 0 if self.protocol == "h3" else 1
                 require(
                     carrier.get("ws_opened", 0) == expected_ws,
@@ -1950,6 +1973,9 @@ class Campaign:
                         "h3_opened",
                         "h3_uploads",
                         "h3_downloads",
+                        "packet_opened",
+                        "packet_uploads",
+                        "packet_downloads",
                     )
                 },
             )
@@ -2078,8 +2104,8 @@ def summarize(campaign, report):
     mean = statistics.fmean
     reference = [row for row in campaign.samples if row["naivefox_arm"] == "reference"]
     rows = []
-    for kind in ("socks", "http"):
-        arm = "native-" + kind
+    for arm in ARMS:
+        kind = "http" if arm.endswith("-http") else "socks"
         candidate = [row for row in campaign.samples if row["naivefox_arm"] == arm]
         reference_bytes = mean(row["whole"]["wire_bytes"] for row in reference)
         candidate_bytes = mean(row["whole"]["wire_bytes"] for row in candidate)
@@ -2103,6 +2129,8 @@ def summarize(campaign, report):
         rows.append({
             "protocol": campaign.protocol,
             "listener": kind,
+            "delivery": "cdn" if arm.startswith("packet-") else "direct",
+            "arm": arm,
             "blocks": campaign.args.blocks,
             "residual": {
                 view: report["protocols"][campaign.protocol]["views"][view]["arms"][arm]
@@ -2213,7 +2241,13 @@ def main():
     parser.add_argument("--blocks", type=int, default=10)
     parser.add_argument("--seed", type=int, required=True)
     parser.add_argument("--timeout", type=int, default=120)
+    parser.add_argument("--include-cdn", action="store_true",
+                        help="Add packet HTTP/SOCKS arms to the same H2 blocks and common Firefox A/B controls")
     args = parser.parse_args()
+    require(not args.include_cdn or args.protocol == "h2",
+            "packet comparison requires an explicit H2 reference")
+    if args.include_cdn:
+        ARMS = (*legacy.ARMS, "packet-socks", "packet-http")
     require(
         os.environ.get("NAIVEFOX_CAPTURE_ISOLATED_NETWORK_ENTERED") == "1",
         "isolated namespace is required",
@@ -2357,6 +2391,7 @@ def main():
         "manifest_sha256": MANIFEST_SHA,
         "seed": args.seed,
         "blocks_per_protocol": args.blocks,
+        "delivery_arms": list(ARMS),
         "link": args.link,
         "observer": "receive-side complete origin TCP/QUIC and attributable ICMP; no fixed crop or per-stage wire allocation",
         "local_listener_topology": "only the selected listener",

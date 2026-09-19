@@ -2,9 +2,10 @@
 
 ## One transport and native networking
 
-NaiveFox has one current application transport and supports coordinated
-client/server updates only. It has no alternate transports, compatibility
-profiles or wire-version negotiation. The name of the transport is NaiveFox. Absence of CONNECT is
+NaiveFox has one current application protocol and supports coordinated
+client/server updates only. Explicit URI schemes select direct H2/WSS, direct
+H3, or the experimental CDN packet adapter. There are no compatibility profiles,
+wire-version negotiation or automatic fallbacks. The name of the transport is NaiveFox. Absence of CONNECT is
 not an invariant; protocol choices are judged by correctness, performance,
 maintainability and observable behavior.
 
@@ -26,8 +27,8 @@ the public HTML resource graph without executing the site.
 
 The client consumes the complete public document and selected resources, checks
 MIME types and completion, and verifies their shared snapshot identity in HELLO.
-Twenty serial POST/GET pairs bootstrap the application carrier and already carry
-useful stream data. Keep the existing startup capacities and ordering unless
+Twenty serial POST/GET pairs bootstrap each direct application carrier and
+already carry useful stream data. Keep the existing startup capacities and ordering unless
 a separately validated change justifies altering them.
 
 Strict H2 moves to native WSS/TCP. Strict H3 remains HTTP/3: one persistent GET
@@ -52,6 +53,13 @@ decoder accepts arbitrary buffer boundaries and coalesced cells, rejects invalid
 capacities before allocation, and holds at most one bounded cell. The request
 timeout becomes an activity deadline once streaming starts.
 
+The experimental CDN packet adapter keeps the same mux behind an inner
+NSS/Go TLS 1.3 stream. Two finite setup POST exchanges complete the inner
+handshake and AUTH/HELLO. It uses a pinned origin identity, finite H2 POSTs, authenticated
+acknowledgements and resumable H2 GET records. HTTP retries occur below TLS and
+retain original ciphertext. CDN source addresses are not session identity.
+See [CDN.md](CDN.md) for the security contract, bounds and development gates.
+
 ## Ownership and flow control
 
 Carrier state lives on the main event target. Local listener callbacks execute
@@ -60,7 +68,8 @@ objects use thread-safe refcounting. Lifetime safety does not permit concurrent
 state mutation.
 
 Each carrier admits at most 32 logical streams; the client may create more
-carriers. Stream receive credit is 512 KiB on H2 and 1 MiB on H3, returned only after local delivery.
+carriers. Stream receive credit is 512 KiB on direct H2 and 1 MiB on H3 and packet
+delivery, returned only after local delivery.
 Upload buffering uses a bounded ring; frame boundaries are independent of ring
 wrap. Server read queues and HTTP request concurrency are bounded. Partial writes
 and WOULD_BLOCK must preserve every unsent byte.

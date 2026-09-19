@@ -35,6 +35,7 @@ type fixture struct {
 	mu             sync.Mutex
 	cookies        map[string]string
 	stats          map[string]int
+	faults         map[string]bool
 }
 
 func (f *fixture) count(key string) { f.mu.Lock(); f.stats[key]++; f.mu.Unlock() }
@@ -49,7 +50,70 @@ func (f *fixture) round(r *http.Request) (*http.Response, error) {
 	}
 	return response, err
 }
+
+func (f *fixture) once(key string) bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.faults == nil {
+		f.faults = make(map[string]bool)
+	}
+	if f.faults[key] || len(f.faults) >= 256 {
+		return false
+	}
+	f.faults[key] = true
+	return true
+}
+func (f *fixture) packetRound(r *http.Request) (*http.Response, error) {
+	if r.Method != http.MethodPost {
+		return f.round(r)
+	}
+	body, err := io.ReadAll(io.LimitReader(r.Body, 65537))
+	r.Body.Close()
+	if err != nil {
+		return nil, err
+	}
+	r.Body = io.NopCloser(bytes.NewReader(body))
+	r.ContentLength = -1
+	r.Header.Del("Content-Length")
+	f.count("packet_reframed_uploads")
+	if strings.Contains(r.URL.Path, "/upload/") {
+		f.count("packet_uploads")
+		if strings.HasSuffix(r.URL.Path, "/2") {
+			time.Sleep(25 * time.Millisecond)
+			f.count("packet_reordered")
+			if f.mode == "packet-tamper" && len(body) > 0 {
+				body[0] ^= 1
+				f.count("packet_tampered")
+			}
+		}
+	}
+	response, err := f.round(r)
+	if err != nil {
+		return nil, err
+	}
+	setup := r.URL.Path == "/api/packet" || strings.HasSuffix(r.URL.Path, "/auth")
+	if f.mode == "packet-loss" && response.StatusCode == 200 &&
+		(setup || strings.HasSuffix(r.URL.Path, "/upload/2")) && f.once("post "+r.URL.Path) {
+		_, err := io.Copy(io.Discard, response.Body)
+		response.Body.Close()
+		if err != nil {
+			return nil, err
+		}
+		f.count("packet_lost_responses")
+		return nil, errors.New("injected lost packet response")
+	}
+	return response, nil
+}
+
+type cutBody struct {
+	io.Reader
+	io.Closer
+}
+
 func (f *fixture) RoundTrip(r *http.Request) (*http.Response, error) {
+	if strings.HasPrefix(f.mode, "packet-") && strings.HasPrefix(r.URL.Path, "/api/packet") {
+		return f.packetRound(r)
+	}
 	startup := r.URL.Path == "/api/sync" || r.URL.Query().Has("seq")
 	if !startup || f.mode != "replay" {
 		return f.round(r)
@@ -147,6 +211,8 @@ func main() {
 			}
 		}
 	}
+	var connMu sync.Mutex
+	conns := map[net.Conn]bool{}
 	proxy := &httputil.ReverseProxy{
 		Rewrite: func(r *httputil.ProxyRequest) {
 			r.SetURL(originURL)
@@ -161,6 +227,28 @@ func main() {
 			http.Error(w, "fixture upstream failure", 502)
 		},
 		ModifyResponse: func(r *http.Response) error {
+			if f.mode == "packet-loss" && strings.HasSuffix(r.Request.URL.Path, "/download") &&
+				r.Request.URL.Query().Get("generation") == "2" && r.StatusCode == 200 &&
+				f.once("connection "+r.Request.URL.Path) {
+				remote := r.Request.RemoteAddr
+				time.AfterFunc(10*time.Millisecond, func() {
+					connMu.Lock()
+					for connection := range conns {
+						if connection.RemoteAddr().String() == remote {
+							connection.Close()
+							f.count("packet_reset_connections")
+							break
+						}
+					}
+					connMu.Unlock()
+				})
+			}
+
+			if f.mode == "packet-loss" && strings.HasSuffix(r.Request.URL.Path, "/download") &&
+				r.StatusCode == 200 && f.once("get "+r.Request.URL.Path) {
+				r.Body = cutBody{io.LimitReader(r.Body, 91), r.Body}
+				f.count("packet_cut_downloads")
+			}
 			if r.Request.URL.Path == "/" && r.StatusCode == 200 {
 				session := ""
 				for _, c := range r.Cookies() {
@@ -243,6 +331,11 @@ func main() {
 	}
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		f.count("edge_" + r.Proto)
+		if strings.HasPrefix(f.mode, "packet-") && r.Header.Get("Upgrade") != "" {
+			f.count("packet_rejected_upgrade")
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
 		if r.URL.Path == "/" {
 			switch f.mode {
 			case "challenge":
@@ -284,8 +377,6 @@ func main() {
 		}
 		proxy.ServeHTTP(w, r)
 	})
-	var connMu sync.Mutex
-	conns := map[net.Conn]bool{}
 	server := &http.Server{Addr: *listen, Handler: handler, ReadHeaderTimeout: 10 * time.Second,
 		ConnState: func(c net.Conn, s http.ConnState) {
 			connMu.Lock()

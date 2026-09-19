@@ -22,9 +22,11 @@ test/integration/README.md.
 
 ## Architecture
 
-There is one current NaiveFox transport, with coordinated client/server updates.
-Alternate transports, transport selectors, compatibility profiles, wire versions,
-migration fallbacks and experimental production modes are out of scope.
+There is one current NaiveFox application protocol, with coordinated client/server
+updates. The supported explicit delivery selections are https:// (direct H2/WSS),
+quic:// (direct H3), and the experimental cdn:// packet carrier over H2.
+Compatibility profiles, wire versions and automatic migration fallbacks are out
+of scope. CDN changes must not alter direct carrier behavior without validation.
 CONNECT absence is not an architectural requirement.
 
 Necko owns HTTP, native WebSocket and pooling. NSS/PSM owns TLS and certificate
@@ -51,10 +53,13 @@ processes needs a supported lifecycle design, not just preference changes.
 The local frontends are SOCKS5 CONNECT and HTTP CONNECT. Configuration is strict:
 preserve string/array listener and upstream mapping, URI credential decoding,
 numeric IPv4/IPv6 binds, SOCKS username/password auth and explicit LAN binding.
-No automatic protocol fallback or alternate transport configuration is supported.
+No automatic protocol fallback is supported. A cdn:// URI must include its
+independently obtained origin SPKI pin as a suffix of the decoded username; never
+send authentication before the inner NSS TLS handshake validates that pin.
 
-Keep the complete public HTML-selected resource bootstrap, snapshot identity,
-twenty ordered startup pairs, cache inhibition and streamed public-body
+Keep the complete public HTML-selected resource bootstrap and authenticated
+snapshot identity. Direct carriers retain twenty ordered startup pairs; packet
+startup uses finite inner-TLS setup exchanges. Preserve cache inhibition and streamed public-body
 consumption. Site size and resource count are operator choices. Keep one current
 cell contract, 32 streams per carrier, additional carriers as needed and bounded
 per-stream credit. Offsets wrap modulo 2^32 without a 4-GiB transfer cap.

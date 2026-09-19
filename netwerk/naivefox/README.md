@@ -6,8 +6,8 @@ and Neqo owns QUIC. The runtime runs in one process without a browser, DOM
 execution, JavaScript engine or GUI.
 
 There is one NaiveFox transport. Client and server must be updated together.
-Only the current matching client/server pair is supported. There are no
-transport selectors, alternate wire versions or compatibility profiles. CONNECT is a protocol
+Only the current matching client/server pair is supported. Explicit URI schemes select delivery; there are no alternate wire versions,
+compatibility profiles or automatic fallbacks. CONNECT is a protocol
 mechanism, not an architectural prohibition.
 
 ## Configure and run
@@ -23,6 +23,9 @@ The other supported CLI forms are --help and --version.
 ~~~
 
 - https:// selects strict H2 startup followed by native WSS over TCP.
+- cdn:// selects the **experimental** H2 packet carrier, with finite POST uploads,
+  resumable streaming GET downloads and inner TLS 1.3 to a pinned origin.
+  See [CDN.md](CDN.md) for the existing-field URI configuration and limits.
 - quic:// selects strict H3 for startup and sustained application data.
   H3 does not switch to WSS or fall back to TCP.
 - listen accepts a string or array of numeric IPv4/IPv6 endpoints.
@@ -41,7 +44,8 @@ The other supported CLI forms are --help and --version.
   logging; a nonempty string names a log file.
 
 Unknown or duplicate fields are errors. The configuration selects H2 or H3
-for the same transport; it has no alternate transport or wire-version modes.
+for the same application protocol and URI-selected delivery adapters; it has no
+old wire-version modes.
 
 By default each CLI run creates and removes an isolated temporary NSS profile.
 NAIVEFOX_PROFILE explicitly selects a persistent profile.
@@ -66,18 +70,21 @@ proxy.example {
 
 The public HTML selects the startup stylesheet, script and image resources.
 The client validates their MIME types, completion and snapshot identity.
-The application carrier then sends twenty bounded POST/GET pairs with useful
-data, followed by the protocol-specific sustained carrier:
+Direct adapters then send twenty bounded POST/GET pairs with useful data.
+The experimental packet adapter instead uses two finite inner-TLS/AUTH setup
+exchanges. Each selection continues with its sustained carrier:
 
-| Outer selection | Sustained carrier |
+| URI selection | Sustained carrier |
 | --- | --- |
-| H2 | Native Necko WebSocket over TLS/TCP |
-| H3 | Persistent HTTP/3 GET and at most eight concurrent finite HTTP/3 POSTs |
+| https:// | Native Necko WebSocket over TLS/TCP |
+| quic:// | Persistent HTTP/3 GET and at most eight concurrent finite HTTP/3 POSTs |
+| cdn:// (experimental) | Resumable H2 GET and finite H2 POSTs, with pinned inner TLS |
 
-Both adapters carry the same current NaiveFox cells, multiplexed streams,
+All adapters carry the same current NaiveFox cells, multiplexed streams,
 delivery credits, offsets and FIN/RESET semantics. A carrier hosts up to 32
 logical streams; additional carriers allow more connections. Each stream has
-512 KiB (H2) or 1 MiB (H3) of receive credit, returned only after local delivery.
+512 KiB (direct H2) or 1 MiB (H3 and packet) of receive credit, returned only
+after local delivery.
 H3 POST completion preserves cell order even when QUIC requests arrive out of
 order. The downstream GET uses a four-byte cell-length prefix.
 
@@ -85,13 +92,13 @@ The H3 downstream stream is shared within a carrier. Logical streams do not
 each obtain an independent QUIC stream. The bounded upload pipeline adds HTTP
 request work; assess throughput and responsiveness with the maintained tests.
 
-## CDN support: work in progress
+## CDN support: experimental
 
 Direct connections to the matching Caddy server are the supported deployment.
-CDN integration is unfinished and is not validated for production use.
-Local reverse-proxy tests exist, but end-to-end testing with a real CDN has not
-been completed. CDN work is currently deferred; no provider is supported yet.
-See [TRANSPORT.md](TRANSPORT.md) and the server's docs/CDN.md.
+The **experimental cdn://** packet adapter is opt-in and is not validated for
+production use. Local reverse-proxy and native-client tests do not establish
+provider compatibility. No real CDN provider has completed end-to-end acceptance.
+See [CDN.md](CDN.md), [TRANSPORT.md](TRANSPORT.md) and the server's docs/CDN.md.
 
 ## Build and verification
 
