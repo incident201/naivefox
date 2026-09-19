@@ -2129,7 +2129,7 @@ def summarize(campaign, report):
         rows.append({
             "protocol": campaign.protocol,
             "listener": kind,
-            "delivery": "https" if arm.startswith("packet-") else ("wss" if self.protocol == "h2" else "quic"),
+            "delivery": "https" if arm.startswith("packet-") else ("wss" if campaign.protocol == "h2" else "quic"),
             "arm": arm,
             "blocks": campaign.args.blocks,
             "residual": {
