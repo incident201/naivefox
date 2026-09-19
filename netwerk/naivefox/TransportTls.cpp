@@ -198,10 +198,11 @@ int32_t TransportTls::Write(const uint8_t* aData, size_t aLength) {
 
 bool TransportTls::Export(std::array<uint8_t, 32>& aSecret) const {
   static constexpr char label[] = "EXPORTER-NaiveFox-packet";
+  static constexpr char context[] = "naivefox/https";
   return mReady && !mFailed &&
          SSL_ExportKeyingMaterial(
              mSocket, label, sizeof(label) - 1, PR_TRUE,
-             reinterpret_cast<const unsigned char*>("naivefox/cdn"), 12,
+             reinterpret_cast<const unsigned char*>(context), sizeof(context) - 1,
              aSecret.data(), aSecret.size()) == SECSuccess;
 }
 

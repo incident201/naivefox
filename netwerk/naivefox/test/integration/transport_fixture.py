@@ -342,9 +342,9 @@ def packet_identity(run):
 
 
 def start_caddy(args, run, protocol, target_port, user, password):
-    outer_protocol = "h2" if protocol == "cdn" else protocol
+    outer_protocol = "h2" if protocol == "packet" else protocol
     identity = None
-    if protocol == "cdn":
+    if protocol == "packet":
         identity, args.packet_server_pin = packet_identity(run)
     port = free_port(udp=protocol == "h3", dual=True)
     caddyfile = run / "Caddyfile"
@@ -429,7 +429,7 @@ def start_caddy(args, run, protocol, target_port, user, password):
         edge = Process(
             [str(cdn_proxy), "--listen", f"127.0.0.1:{edge_port}",
              "--origin", f"https://127.0.0.1:{port}", "--origin-protocol", getattr(args, "cdn_origin_protocol", "h2"),
-             "--mode", getattr(args, "cdn_mode", "packet-loss" if protocol == "cdn" else "replay"), "--cert", str(run / "server.crt"),
+             "--mode", getattr(args, "cdn_mode", "packet-loss" if protocol == "packet" else "replay"), "--cert", str(run / "server.crt"),
              "--key", str(run / "server.key"), "--ca", str(run / "ca.crt"),
              "--stats", str(run / "cdn-stats.json")],
             run, "cdn-edge", env,
@@ -454,7 +454,7 @@ def start_caddy(args, run, protocol, target_port, user, password):
 
 def proxy_uri(protocol, proxy_port, user, password):
     require((user is None) == (password is None), "partial fixture credentials")
-    scheme = {"h2": "https", "h3": "quic", "cdn": "cdn"}[protocol]
+    scheme = {"h2": "wss", "h3": "quic", "packet": "https"}[protocol]
     credentials = (
         ""
         if user is None
@@ -479,7 +479,7 @@ def client_config(protocol, proxy_port, user, password, ports, connections):
 def start_client(
     args, run, name, protocol, proxy_port, user, password, connections=0, trusted=True
 ):
-    if protocol == "cdn" and getattr(args, "packet_server_pin", None):
+    if protocol == "packet" and getattr(args, "packet_server_pin", None):
         user = user + "~" + args.packet_server_pin
     directory = run / name
     directory.mkdir(mode=0o700)
@@ -554,6 +554,19 @@ def start_client(
 
     wait_until(ready, "client listeners did not start", process)
     return process, {"socks": socks_port, "http": http_port}
+
+
+
+def verify_ignored_wss_pin(args, run, port, user, password, target_port):
+    client, ports = start_client(
+        args, run, "ignored-wss-pin", "h2", port,
+        user + "~not-a-pin", password)
+    try:
+        for frontend in ("socks", "http"):
+            download(ports, frontend, target_port, length=65536)
+    finally:
+        client.stop()
+    client.exited_cleanly()
 
 
 def open_tunnel(
@@ -837,7 +850,7 @@ def access_requests(run):
 
 
 def validate_carrier_stats(stats, protocol):
-    if protocol == "cdn":
+    if protocol == "packet":
         peaks = stats["packet_peaks"]
         require(stats["packet_opened"] >= 2 and stats["ws_opened"] == 0 and
                 stats["h3_opened"] == 0 and len(peaks) == 33 and
@@ -912,6 +925,9 @@ def run_protocol(args, base, protocol):
         download(ports, "http", target.server_address[1], 65536)
         client.stop()
         client.exited_cleanly()
+        if protocol == "h2":
+            verify_ignored_wss_pin(
+                args, run, port, user, password, target.server_address[1])
         for name, trusted, credential in (
             ("invalid-auth", True, password + "wrong"),
             ("untrusted-ca", False, password),
@@ -930,7 +946,7 @@ def run_protocol(args, base, protocol):
             require(
                 target.accepted_connections == before, "rejected session reached target"
             )
-        if protocol == "cdn":
+        if protocol == "packet":
             before = target.accepted_connections
             good_pin = args.packet_server_pin
             args.packet_server_pin = ("1" if good_pin[0] == "0" else "0") + good_pin[1:]
@@ -958,7 +974,7 @@ def run_protocol(args, base, protocol):
         cdn = None
         if getattr(args, "cdn_proxy", None):
             cdn = json.loads((run / "cdn-stats.json").read_text())
-            if protocol == "cdn":
+            if protocol == "packet":
                 require(cdn.get("packet_lost_responses", 0) >= 3 and
                         cdn.get("packet_cut_downloads", 0) >= 1 and
                         cdn.get("packet_reset_connections", 0) >= 1 and

@@ -3,8 +3,9 @@
 ## One transport and native networking
 
 NaiveFox has one current application protocol and supports coordinated
-client/server updates only. Explicit URI schemes select direct H2/WSS, direct
-H3, or the experimental CDN packet adapter. There are no compatibility profiles,
+client/server updates only. https:// selects the default H2 packet adapter,
+directly or through a compatible CDN. wss:// selects native WebSocket and
+quic:// selects direct H3. There are no compatibility profiles,
 wire-version negotiation or automatic fallbacks. The name of the transport is NaiveFox. Absence of CONNECT is
 not an invariant; protocol choices are judged by correctness, performance,
 maintainability and observable behavior.
@@ -27,11 +28,11 @@ the public HTML resource graph without executing the site.
 
 The client consumes the complete public document and selected resources, checks
 MIME types and completion, and verifies their shared snapshot identity in HELLO.
-Twenty serial POST/GET pairs bootstrap each direct application carrier and
+Twenty serial POST/GET pairs bootstrap each WSS or QUIC carrier and
 already carry useful stream data. Keep the existing startup capacities and ordering unless
 a separately validated change justifies altering them.
 
-Strict H2 moves to native WSS/TCP. Strict H3 remains HTTP/3: one persistent GET
+The wss:// selection moves from native H2 startup to WSS/TCP. Strict H3 remains HTTP/3: one persistent GET
 response carries downstream cells and at most eight finite POSTs carry upstream
 cells. Every H3 byte continues through Neqo; no WSS or TCP fallback is allowed.
 
@@ -53,12 +54,12 @@ decoder accepts arbitrary buffer boundaries and coalesced cells, rejects invalid
 capacities before allocation, and holds at most one bounded cell. The request
 timeout becomes an activity deadline once streaming starts.
 
-The experimental CDN packet adapter keeps the same mux behind an inner
+The default HTTPS packet adapter keeps the same mux behind an inner
 NSS/Go TLS 1.3 stream. Two finite setup POST exchanges complete the inner
 handshake and AUTH/HELLO. It uses a pinned origin identity, finite H2 POSTs, authenticated
 acknowledgements and resumable H2 GET records. HTTP retries occur below TLS and
 retain original ciphertext. CDN source addresses are not session identity.
-See [CDN.md](CDN.md) for the security contract, bounds and development gates.
+See [HTTPS.md](HTTPS.md) for the security contract, bounds and development gates.
 
 ## Ownership and flow control
 
@@ -68,7 +69,7 @@ objects use thread-safe refcounting. Lifetime safety does not permit concurrent
 state mutation.
 
 Each carrier admits at most 32 logical streams; the client may create more
-carriers. Stream receive credit is 512 KiB on direct H2 and 1 MiB on H3 and packet
+carriers. Stream receive credit is 512 KiB on WSS and 1 MiB on QUIC and HTTPS packet
 delivery, returned only after local delivery.
 Upload buffering uses a bounded ring; frame boundaries are independent of ring
 wrap. Server read queues and HTTP request concurrency are bounded. Partial writes

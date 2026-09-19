@@ -49,11 +49,12 @@ class RuntimeFixtureTests(unittest.TestCase):
             fixture.validate_carrier_stats(invalid, "h2")
 
     def test_current_config_has_one_transport_and_encoded_credentials(self):
-        for protocol in ("h2", "h3"):
+        for protocol, scheme in (("h2", "wss"), ("h3", "quic"), ("packet", "https")):
+            user = "user@example" + ("~" + "a" * 64 if protocol == "packet" else "")
             config = fixture.client_config(
                 protocol,
                 18443,
-                "user@example",
+                user,
                 "p:/a% ss",
                 {"socks": 18080, "http": 18081},
                 2,
@@ -61,9 +62,9 @@ class RuntimeFixtureTests(unittest.TestCase):
             self.assertNotIn("transport", config)
             self.assertNotIn("preamble", config)
             proxy = urlsplit(config["proxy"])
-            self.assertEqual(unquote(proxy.username), "user@example")
+            self.assertEqual(unquote(proxy.username), user)
             self.assertEqual(unquote(proxy.password), "p:/a% ss")
-            self.assertEqual(proxy.scheme, "quic" if protocol == "h3" else "https")
+            self.assertEqual(proxy.scheme, scheme)
 
     def test_caddy_owns_authentication_and_policy(self):
         text = fixture.caddyfile_text()

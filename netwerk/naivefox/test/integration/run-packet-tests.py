@@ -73,9 +73,9 @@ def main():
             args, run, "h2", target.server_address[1], user, password)
         processes.append(server)
         client, ports = f.start_client(
-            args, run, "valid", "cdn", port, user + "~" + pin, password)
+            args, run, "valid", "packet", port, user + "~" + pin, password)
         processes.append(client)
-        f.exercise(ports, target.server_address[1], "cdn")
+        f.exercise(ports, target.server_address[1], "packet")
         for frontend in ("socks", "http"):
             f.response_first_half_close(ports, frontend, target)
         f.concurrent_open_streams(ports, target.server_address[1])
@@ -91,7 +91,7 @@ def main():
         ):
             before = target.accepted_connections
             rejected, rejected_ports = f.start_client(
-                args, run, name, "cdn", port, user + "~" + supplied_pin,
+                args, run, name, "packet", port, user + "~" + supplied_pin,
                 credential, trusted=trusted)
             processes.append(rejected)
             for frontend in ("socks", "http"):

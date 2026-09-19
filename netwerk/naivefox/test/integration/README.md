@@ -3,7 +3,9 @@
 Tests exercise one current NaiveFox transport and coordinated client/server
 builds. Test the current transport, without alternate wire versions or
 migration campaigns. The local frontends are SOCKS5 and HTTP CONNECT; the outer selections
-are direct strict H2, direct strict H3 and experimental packet delivery over H2.
+are default https:// packet delivery over H2, explicit wss:// WebSocket delivery
+and quic:// native HTTP/3. Shared runtime selectors packet, h2 and h3 correspond
+to those three deliveries; all is the default.
 
 All generated packages, profiles, certificates, logs and captures belong under a
 dedicated object-directory subtree. Reuse object directories for incremental
@@ -32,7 +34,7 @@ The runtime gate covers both frontends, slow consumers, byte-exact upload and
 download, request-first and response-first FIN, 40 simultaneously open streams,
 cancellation followed by a fresh transfer, credential denial and untrusted TLS.
 H3 also blocks UDP while TCP remains reachable and requires explicit local
-failure with no target connection and no fallback TCP packets. H2 must emit no
+failure with no target connection and no fallback TCP packets. HTTPS and WSS must emit no
 UDP. Captures and aggregate server counters attest the actual carrier.
 
 Use run-transport-cli-tests.py for the public command line and strict JSON
@@ -50,7 +52,7 @@ Additional focused runners cover hostile startup envelopes
 (run-websocket-adversarial-tests.py, run-websocket-control-tests.py), explicit
 host mapping (run-routing-tests.py), public site graphs (run-site-tests.py) and
 non-loopback listener binding (run-listener-address-tests.py). WebSocket-specific
-tests apply to H2; H3 uses streaming HTTP.
+tests apply to WSS; HTTPS and QUIC use streaming HTTP.
 
 ## Matched application and five windows
 
@@ -109,7 +111,7 @@ Export minimal source only with current build/configuration/link evidence.
 The normal product and exported product must remain free of browser execution,
 DOM loaders, JavaScript engine and retired activation-process dependencies.
 
-## CDN fixture: development only
+## CDN deployment fixture
 
 Build test/integration/cdn_proxy/main.go with the pinned Go toolchain and keep
 the binary outside the source tree. run-cdn-tests.py uses it as a separate
@@ -121,29 +123,35 @@ MIME, snapshot and body-length cases must fail before opening a target.
 
 The Windows and Android runtime runners accept --cdn-proxy with --protocol h2
 to exercise their normal native workloads through the same replaying edge.
-These local tests do not establish real-CDN compatibility. CDN integration is
-unfinished; complete real-provider acceptance has not
-been performed. Direct H2/H3 remains the supported deployment.
+These local tests do not establish real-CDN compatibility. Provider-specific production acceptance remains incomplete. HTTPS packet
+delivery is the default independently of CDN use.
 
 
-## Experimental packet delivery verification
+## Default HTTPS packet delivery verification
 
-run-packet-tests.py exercises the native cdn:// URI, independently pinned inner
+run-packet-tests.py exercises the native https:// URI, independently pinned inner
 TLS, both local frontends, streaming integrity, half-close, 40 streams, idle
 heartbeat and rejection of a wrong pin, credentials or edge CA. With
 --cdn-proxy it injects lost finite responses, reordered uploads, arbitrary body
 fragments, download truncation and complete outer TCP connection resets,
 against H1 or H2 origins, including chunked origin request reframing. WebSocket upgrades
 are disabled in this fixture. The native Windows and Android runners accept
---protocol cdn with the same fault-injecting proxy.
+--protocol packet with the same fault-injecting proxy.
 
 The client and Go TLS implementations are tested against each other; the server
 packet unit suite additionally covers queue bounds, receipt expiry, stale
 generation/cursor rejection, replay ownership, request cancellation, MAC
 binding and old-replay inactivity expiry.
 
-For a short matched H2 screen, --include-cdn adds packet HTTP/SOCKS arms beside
-direct HTTP/SOCKS in each randomized block, sharing the same Firefox A/B
+For a short matched H2 screen, --include-packet adds default HTTPS packet HTTP/SOCKS arms beside
+WSS HTTP/SOCKS in each randomized block, sharing the same Firefox A/B
 controls. Window definitions, feature extraction, workload and health gates
 are unchanged. Carrier health checks distinguish the explicitly selected path.
 A short block is diagnostic evidence, not a 30-block acceptance claim.
+
+
+run-packet-receipt-tests.py holds a large upload block while later blocks reach
+the origin, then loses a head response and one later receipt. Both frontends
+must preserve payload integrity, retry missing receipts, keep the eight-slot
+cumulative window and avoid resending blocks whose storage was already
+confirmed. Run it with --cdn-proxy against both H1 and H2 origins.

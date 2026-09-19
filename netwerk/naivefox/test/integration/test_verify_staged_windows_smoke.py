@@ -152,5 +152,15 @@ class LifecycleChurnHelpersTest(unittest.TestCase):
             )
 
 
+    def test_pin_suffix_does_not_hide_the_authentication_username(self):
+        for scheme in ("https", "wss"):
+            url = f"{scheme}://user%40name~{'a' * 64}:p%40ss@proxy.test:443"
+            tokens = SMOKE.proxy_secret_tokens(url)
+            self.assertIn("user@name", tokens)
+            self.assertIn("p@ss", tokens)
+            with self.assertRaisesRegex(AssertionError, "credential leaked"):
+                SMOKE.assert_no_proxy_secrets("user@name", tokens, "test")
+
+
 if __name__ == "__main__":
     unittest.main()

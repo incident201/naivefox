@@ -1042,7 +1042,7 @@ bool TransportCarrier::ReceiveCell(const Bytes& aBody, bool aRealtime) {
     nsAutoCString expected("naivefox\n");
     expected.Append(mSiteIdentity);
     if (mPacket) {
-      expected.AppendLiteral("\ncdn\n");
+      expected.AppendLiteral("\nhttps\n");
       expected.Append(mPacket->SessionID());
     }
     if (aRealtime || mDown || frames.size() != 1 ||
@@ -1266,7 +1266,7 @@ void TransportCarrier::StartPacket() {
         self->mRealtimeReady = true;
         self->mBusy = false;
         self->mAcknowledgedUpload = self->mUp - 1;
-        RuntimeLogEvent("NaiveFox CDN packet carrier ready\n");
+        RuntimeLogEvent("NaiveFox HTTPS packet carrier ready\n");
         self->Wake();
         self->ScheduleSend(self->HeartbeatDelay(), true);
       },

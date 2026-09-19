@@ -23,8 +23,8 @@ test/integration/README.md.
 ## Architecture
 
 There is one current NaiveFox application protocol, with coordinated client/server
-updates. The supported explicit delivery selections are https:// (direct H2/WSS),
-quic:// (direct H3), and the experimental cdn:// packet carrier over H2.
+updates. https:// is the default packet delivery over H2, directly or through a
+compatible CDN. wss:// explicitly selects WebSocket and quic:// selects direct H3.
 Compatibility profiles, wire versions and automatic migration fallbacks are out
 of scope. CDN changes must not alter direct carrier behavior without validation.
 CONNECT absence is not an architectural requirement.
@@ -33,7 +33,8 @@ Necko owns HTTP, native WebSocket and pooling. NSS/PSM owns TLS and certificate
 checks. Neqo owns QUIC. Do not add another HTTP/TLS/QUIC stack, generate fake
 Firefox wire frames, or import browser execution, DOM loaders or JavaScript.
 
-Strict H2 uses native HTTP startup and WSS/TCP. Strict H3 keeps all startup and
+Default HTTPS uses finite native H2 POSTs and a resumable H2 GET with inner TLS.
+WSS uses native H2 startup and WSS/TCP. Strict H3 keeps all startup and
 sustained carrier traffic on HTTP/3; TCP fallback is forbidden. The current H3
 adapter uses a persistent downstream GET and at most eight finite upload POSTs.
 Keep application sequencing, bounded reorder retention and delivery credit
@@ -53,12 +54,14 @@ processes needs a supported lifecycle design, not just preference changes.
 The local frontends are SOCKS5 CONNECT and HTTP CONNECT. Configuration is strict:
 preserve string/array listener and upstream mapping, URI credential decoding,
 numeric IPv4/IPv6 binds, SOCKS username/password auth and explicit LAN binding.
-No automatic protocol fallback is supported. A cdn:// URI must include its
+No automatic protocol fallback is supported. An https:// URI must include its
 independently obtained origin SPKI pin as a suffix of the decoded username; never
 send authentication before the inner NSS TLS handshake validates that pin.
+For wss://, strip and ignore the final username tilde suffix without PIN
+validation; do not send that suffix as part of AUTH.
 
 Keep the complete public HTML-selected resource bootstrap and authenticated
-snapshot identity. Direct carriers retain twenty ordered startup pairs; packet
+snapshot identity. WSS and QUIC retain twenty ordered startup pairs; HTTPS packet
 startup uses finite inner-TLS setup exchanges. Preserve cache inhibition and streamed public-body
 consumption. Site size and resource count are operator choices. Keep one current
 cell contract, 32 streams per carrier, additional carriers as needed and bounded

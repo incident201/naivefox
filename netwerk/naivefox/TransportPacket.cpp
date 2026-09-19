@@ -234,6 +234,7 @@ class TransportPacket::Impl final {
     RefPtr<PacketRequest> request;
     TimeStamp started, retry;
     uint32_t attempts = 0;
+    bool received = false;
   };
 
   void Fail(nsresult status) {
@@ -515,16 +516,13 @@ class TransportPacket::Impl final {
             p.Fail(NS_ERROR_CORRUPTED_CONTENT);
             return;
           }
+          upload->received = true;
           p.acknowledged = std::max(p.acknowledged, next);
           while (!p.uploads.empty() &&
                  p.uploads.front()->sequence < p.acknowledged) {
             auto retired = p.uploads.front();
             p.uploads.pop_front();
             if (retired->request) retired->request->Cancel();
-          }
-          if (upload->sequence >= p.acknowledged) {
-            upload->retry = RetryAt(upload->attempts++);
-            p.Retry();
           }
           p.PumpUploads();
           if (!p.closed && p.writable) p.writable();
@@ -563,7 +561,7 @@ class TransportPacket::Impl final {
         Fail(NS_ERROR_NET_TIMEOUT);
         return;
       }
-      if (upload->request) continue;
+      if (upload->received || upload->request) continue;
       if (TimeStamp::Now() >= upload->retry)
         StartUpload(upload);
       else

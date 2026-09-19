@@ -50,8 +50,8 @@ and deletion where repository settings permit it.
 The required server module is maintained independently in
 [incident201/naivefox-transport](https://github.com/incident201/naivefox-transport).
 It is a server dependency, not a client build dependency or part of the
-generated minimal-source tree. The single NaiveFox transport and its strict
-H2/H3 adapters are maintained on naivefox-full-source. Client and server are
+generated minimal-source tree. The single NaiveFox protocol and its HTTPS, WSS and QUIC deliveries are
+maintained on naivefox-full-source. Client and server are
 updated together; old transports and wire versions are not supported.
 
 Complete native runtime tests on Linux, Windows and Android and the

@@ -264,8 +264,10 @@ extern "C" NAIVEFOX_EXPORT int NaiveFoxMain(int aArgc, char* aArgv[]) {
         mozilla::naivefox::RuntimeLogEvent(
             "Proxying via %s endpoint=%s upstream=%u\n",
             config.mProxies[index].mServerPin.IsEmpty()
-                ? ProxyProtocolName(config.mProxies[index].mProtocol)
-                : "CDN packet (h2)",
+                ? (config.mProxies[index].mProtocol == mozilla::naivefox::ProxyProtocol::H3
+                       ? "QUIC (h3)"
+                       : "WSS (h2 startup)")
+                : "HTTPS packet (h2)",
             config.mProxies[index].mUrl.get(),
             static_cast<unsigned>(index + 1));
       }

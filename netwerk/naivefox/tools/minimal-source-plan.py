@@ -46,6 +46,8 @@ PRODUCT_DOCS = {
     "ARCHITECTURE.md",
     "KNOWN-ISSUES.md",
     "TRANSPORT.md",
+    "HTTPS.md",
+    "CDN.md",
     "FRONTING-PAGE.md",
     "CAPTURE.md",
     "SHIMS.md",

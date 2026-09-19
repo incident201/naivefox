@@ -1305,7 +1305,7 @@ class Campaign:
         native.issue_certificates(self.fixture)
         self.packet_identity = None
         self.packet_pin = None
-        if getattr(self.args, "include_cdn", False):
+        if getattr(self.args, "include_packet", False):
             self.packet_identity, self.packet_pin = native.packet_identity(self.fixture)
         trusted = self.fixture / "trusted"
         trusted.mkdir()
@@ -1579,7 +1579,7 @@ class Campaign:
         config = {
             "listen": f"{kind}://127.0.0.1:{port}",
             "proxy": native.proxy_uri(
-                "cdn" if packet else self.protocol, self.outer_port,
+                "packet" if packet else self.protocol, self.outer_port,
                 self.user + "~" + self.packet_pin if packet else self.user,
                 self.password,
             ),
@@ -2129,7 +2129,7 @@ def summarize(campaign, report):
         rows.append({
             "protocol": campaign.protocol,
             "listener": kind,
-            "delivery": "cdn" if arm.startswith("packet-") else "direct",
+            "delivery": "https" if arm.startswith("packet-") else ("wss" if self.protocol == "h2" else "quic"),
             "arm": arm,
             "blocks": campaign.args.blocks,
             "residual": {
@@ -2241,12 +2241,12 @@ def main():
     parser.add_argument("--blocks", type=int, default=10)
     parser.add_argument("--seed", type=int, required=True)
     parser.add_argument("--timeout", type=int, default=120)
-    parser.add_argument("--include-cdn", action="store_true",
-                        help="Add packet HTTP/SOCKS arms to the same H2 blocks and common Firefox A/B controls")
+    parser.add_argument("--include-packet", action="store_true",
+                        help="Add default HTTPS packet HTTP/SOCKS arms beside WSS with common H2 Firefox controls")
     args = parser.parse_args()
-    require(not args.include_cdn or args.protocol == "h2",
+    require(not args.include_packet or args.protocol == "h2",
             "packet comparison requires an explicit H2 reference")
-    if args.include_cdn:
+    if args.include_packet:
         ARMS = (*legacy.ARMS, "packet-socks", "packet-http")
     require(
         os.environ.get("NAIVEFOX_CAPTURE_ISOLATED_NETWORK_ENTERED") == "1",

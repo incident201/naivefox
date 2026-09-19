@@ -60,6 +60,8 @@ PRODUCT_DOCS = {
     pathlib.PurePosixPath("netwerk/naivefox/ARCHITECTURE.md"),
     pathlib.PurePosixPath("netwerk/naivefox/KNOWN-ISSUES.md"),
     pathlib.PurePosixPath("netwerk/naivefox/TRANSPORT.md"),
+    pathlib.PurePosixPath("netwerk/naivefox/HTTPS.md"),
+    pathlib.PurePosixPath("netwerk/naivefox/CDN.md"),
     pathlib.PurePosixPath("netwerk/naivefox/FRONTING-PAGE.md"),
     pathlib.PurePosixPath("netwerk/naivefox/CAPTURE.md"),
     pathlib.PurePosixPath("netwerk/naivefox/SHIMS.md"),

@@ -18,16 +18,21 @@ The other supported CLI forms are --help and --version.
 ~~~json
 {
   "listen": "socks://127.0.0.1:1080",
-  "proxy": "quic://username:password@proxy.example:443"
+  "proxy": "https://username~PIN:password@proxy.example:443"
 }
 ~~~
 
-- https:// selects strict H2 startup followed by native WSS over TCP.
-- cdn:// selects the **experimental** H2 packet carrier, with finite POST uploads,
-  resumable streaming GET downloads and inner TLS 1.3 to a pinned origin.
-  See [CDN.md](CDN.md) for the existing-field URI configuration and limits.
+Replace PIN with the independently obtained 64-hex SHA-256 SPKI fingerprint
+of the origin's inner-TLS certificate.
+
+- https:// is the default packet transport: finite H2 POST uploads, resumable
+  streaming GET downloads and inner TLS 1.3 to a pinned origin. It works directly
+  or through a compatible CDN; the PIN is mandatory in both cases.
+- wss:// explicitly selects native WebSocket after H2 startup. An optional
+  username~PIN suffix is stripped and ignored, without PIN validation.
 - quic:// selects strict H3 for startup and sustained application data.
   H3 does not switch to WSS or fall back to TCP.
+- See [HTTPS.md](HTTPS.md) for PIN configuration, security and recovery.
 - listen accepts a string or array of numeric IPv4/IPv6 endpoints.
   Use http://127.0.0.1:8080 for a local HTTP CONNECT listener.
 - proxy accepts a string or array. One upstream is shared; otherwise upstream
@@ -63,6 +68,7 @@ proxy.example {
         naivefox_transport {
             application_root /srv/naivefox-site
             basic_auth username password
+            packet_tls /etc/naivefox/inner.crt /etc/naivefox/inner.key
         }
     }
 }
@@ -70,20 +76,20 @@ proxy.example {
 
 The public HTML selects the startup stylesheet, script and image resources.
 The client validates their MIME types, completion and snapshot identity.
-Direct adapters then send twenty bounded POST/GET pairs with useful data.
-The experimental packet adapter instead uses two finite inner-TLS/AUTH setup
-exchanges. Each selection continues with its sustained carrier:
+The default HTTPS adapter uses two finite inner-TLS/AUTH setup exchanges.
+WSS and QUIC use twenty bounded POST/GET pairs with useful data.
+Each selection continues with its sustained carrier:
 
 | URI selection | Sustained carrier |
 | --- | --- |
-| https:// | Native Necko WebSocket over TLS/TCP |
+| https:// (default) | Resumable H2 GET and finite H2 POSTs, with pinned inner TLS |
+| wss:// | Native Necko WebSocket over TLS/TCP |
 | quic:// | Persistent HTTP/3 GET and at most eight concurrent finite HTTP/3 POSTs |
-| cdn:// (experimental) | Resumable H2 GET and finite H2 POSTs, with pinned inner TLS |
 
 All adapters carry the same current NaiveFox cells, multiplexed streams,
 delivery credits, offsets and FIN/RESET semantics. A carrier hosts up to 32
 logical streams; additional carriers allow more connections. Each stream has
-512 KiB (direct H2) or 1 MiB (H3 and packet) of receive credit, returned only
+512 KiB (WSS) or 1 MiB (HTTPS and QUIC) of receive credit, returned only
 after local delivery.
 H3 POST completion preserves cell order even when QUIC requests arrive out of
 order. The downstream GET uses a four-byte cell-length prefix.
@@ -92,13 +98,15 @@ The H3 downstream stream is shared within a carrier. Logical streams do not
 each obtain an independent QUIC stream. The bounded upload pipeline adds HTTP
 request work; assess throughput and responsiveness with the maintained tests.
 
-## CDN support: experimental
+## Direct and CDN deployment
 
-Direct connections to the matching Caddy server are the supported deployment.
-The **experimental cdn://** packet adapter is opt-in and is not validated for
-production use. Local reverse-proxy and native-client tests do not establish
-provider compatibility. No real CDN provider has completed end-to-end acceptance.
-See [CDN.md](CDN.md), [TRANSPORT.md](TRANSPORT.md) and the server's docs/CDN.md.
+HTTPS packet delivery is the default regardless of whether a CDN is used.
+The inner origin pin and packet_tls are required for this delivery. Generate
+the dedicated identity as described in the server's docs/HTTPS.md.
+
+CDN compatibility is a separate deployment concern. Provider-specific
+production acceptance remains incomplete; short live and local checks are not
+a support guarantee. See [CDN.md](CDN.md) and [TRANSPORT.md](TRANSPORT.md).
 
 ## Build and verification
 

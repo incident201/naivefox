@@ -483,7 +483,7 @@ def main():
     parser.add_argument("--adb", type=Path, default=Path("/usr/bin/adb"))
     parser.add_argument("--serial")
     parser.add_argument("--host-alias", default="10.0.2.2")
-    parser.add_argument("--protocol", choices=("h2", "h3", "cdn", "both"), default="both")
+    parser.add_argument("--protocol", choices=("packet", "h2", "h3", "all"), default="all")
     parser.add_argument(
         "--work-dir", type=Path, help="private artifact parent below objdir"
     )
@@ -493,8 +493,8 @@ def main():
     args = parser.parse_args()
     if args.cdn_proxy:
         args.cdn_proxy = args.cdn_proxy.resolve(strict=True)
-        if args.protocol not in ("h2", "cdn"):
-            parser.error("--cdn-proxy requires --protocol h2 or cdn")
+        if args.protocol not in ("h2", "packet"):
+            parser.error("--cdn-proxy requires --protocol h2 or packet")
     for name in ("objdir", "package", "caddy", "ndk", "adb"):
         setattr(args, name, getattr(args, name).resolve(strict=True))
     adb = [str(args.adb)] + (["-s", args.serial] if args.serial else [])
@@ -521,7 +521,7 @@ def main():
             client_factory=fixture.start,
             parallel_batches=args.parallel_batches,
         )
-        protocols = ("h2", "h3") if args.protocol == "both" else (args.protocol,)
+        protocols = ("packet", "h2", "h3") if args.protocol == "all" else (args.protocol,)
         protocol_runner = suite.run_protocol
         results = [protocol_runner(inputs, work, protocol) for protocol in protocols]
         fixture.close()

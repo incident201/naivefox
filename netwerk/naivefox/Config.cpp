@@ -762,8 +762,9 @@ class JsonParser final {
       return Error("proxy must be an absolute URI");
     }
     const nsDependentCSubstring scheme = Substring(aValue, 0, schemeEnd);
-    const bool packet = scheme.EqualsLiteral("cdn");
-    if (scheme.EqualsLiteral("https") || packet) {
+    const bool packet = scheme.EqualsLiteral("https");
+    const bool websocket = scheme.EqualsLiteral("wss");
+    if (packet || websocket) {
       aProxy.mProtocol = ProxyProtocol::H2;
     } else if (scheme.EqualsLiteral("quic")) {
       aProxy.mProtocol = ProxyProtocol::H3;
@@ -798,19 +799,24 @@ class JsonParser final {
       const int32_t delimiter = aProxy.mUser.RFindChar('~');
       if (delimiter <= 0 || aProxy.mPassword.IsEmpty() ||
           aProxy.mUser.Length() - delimiter - 1 != 64) {
-        return Error("cdn URI requires username~SPKI-SHA256 and password");
+        return Error("https URI requires username~SPKI-SHA256 and password");
       }
       aProxy.mServerPin = Substring(aProxy.mUser, delimiter + 1);
       for (uint32_t i = 0; i < aProxy.mServerPin.Length(); ++i) {
         const char value = aProxy.mServerPin.CharAt(i);
         if (!IsHex(value)) {
-          return Error("cdn SPKI-SHA256 pin must contain 64 hexadecimal digits");
+          return Error("https SPKI-SHA256 pin must contain 64 hexadecimal digits");
         }
         if (value >= 'A' && value <= 'F') {
           aProxy.mServerPin.SetCharAt(value - 'A' + 'a', i);
         }
       }
       aProxy.mUser.Truncate(delimiter);
+    } else if (websocket) {
+      const int32_t delimiter = aProxy.mUser.RFindChar('~');
+      if (delimiter >= 0) {
+        aProxy.mUser.Truncate(delimiter);
+      }
     }
 
     nsAutoCString host;

@@ -111,6 +111,9 @@ def proxy_secret_tokens(proxy_url):
     raw_values = (raw_user, raw_password) if separator else (raw_user,)
     tokens = set(raw_values)
     tokens.update(urllib.parse.unquote(value) for value in raw_values)
+    user = urllib.parse.unquote(raw_user)
+    if parsed.scheme in ("https", "wss") and "~" in user:
+        tokens.add(user.rsplit("~", 1)[0])
     return tuple(sorted(token for token in tokens if token))
 
 
@@ -333,7 +336,7 @@ def run_lifecycle_churn_case(exe_path, temp_root, listener_scheme, payload):
             # NaiveFox requires credentials for HTTPS proxy URIs even when the
             # endpoint is deliberately dead.  The values are local test data
             # and never leave this temporary config.
-            "proxy": f"https://lifecycle:pass@127.0.0.1:{dead_port}",
+            "proxy": f"https://lifecycle~{'0' * 64}:pass@127.0.0.1:{dead_port}",
             "log": "",
         }
         with open(cfg_path, "w", encoding="utf-8") as f:
@@ -564,7 +567,7 @@ def main():
 
     # 3. Dynamic Port SOCKS5 listener test
     socks_port = find_free_port()
-    proxy_endpoint = args.proxy_url or "https://dummy_user:dummy_pass@127.0.0.1:28443"
+    proxy_endpoint = args.proxy_url or ("https://dummy_user~" + "0" * 64 + ":dummy_pass@127.0.0.1:28443")
     proxy_secrets = proxy_secret_tokens(proxy_endpoint)
     expected_digest = fetch_digest(args.target_url) if args.proxy_url else None
 

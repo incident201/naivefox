@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -20,12 +21,20 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
 )
+
+type packetGap struct {
+	sequence uint64
+	until    time.Time
+	receipts map[uint64]bool
+	tailLost bool
+}
 
 type fixture struct {
 	mode           string
@@ -36,6 +45,7 @@ type fixture struct {
 	cookies        map[string]string
 	stats          map[string]int
 	faults         map[string]bool
+	packetGaps     map[string]*packetGap
 }
 
 func (f *fixture) count(key string) { f.mu.Lock(); f.stats[key]++; f.mu.Unlock() }
@@ -63,6 +73,88 @@ func (f *fixture) once(key string) bool {
 	f.faults[key] = true
 	return true
 }
+func (f *fixture) gapUpload(r *http.Request, body []byte) (*http.Response, error) {
+	prefix, suffix, ok := strings.Cut(r.URL.Path, "/upload/")
+	sequence, err := strconv.ParseUint(suffix, 10, 64)
+	if !ok || err != nil {
+		return nil, errors.New("invalid packet upload path")
+	}
+	f.mu.Lock()
+	if f.packetGaps == nil {
+		f.packetGaps = make(map[string]*packetGap)
+	}
+	gap := f.packetGaps[prefix]
+	first := false
+	if gap == nil && len(body) >= 32768 && len(f.packetGaps) < 32 {
+		gap = &packetGap{sequence: sequence, until: time.Now().Add(1200 * time.Millisecond), receipts: make(map[uint64]bool)}
+		f.packetGaps[prefix] = gap
+		first = true
+		f.stats["packet_gap_held"]++
+	}
+	if gap == nil || sequence < gap.sequence {
+		f.mu.Unlock()
+		return f.round(r)
+	}
+	if gap.receipts[sequence] {
+		f.stats["packet_gap_redundant_posts"]++
+		f.stats["packet_gap_redundant_bytes"] += len(body)
+	}
+	if sequence == gap.sequence && !first {
+		f.stats["packet_gap_head_retries"]++
+	}
+	if sequence == gap.sequence+1 && gap.tailLost && !gap.receipts[sequence] {
+		f.stats["packet_gap_lost_tail_retries"]++
+	}
+	if time.Now().Before(gap.until) {
+		distance := int(sequence - gap.sequence)
+		f.stats["packet_gap_furthest"] = max(f.stats["packet_gap_furthest"], distance)
+		if distance >= 8 {
+			f.stats["packet_gap_outside_window"]++
+		}
+	}
+	f.mu.Unlock()
+	if first {
+		timer := time.NewTimer(time.Until(gap.until))
+		defer timer.Stop()
+		select {
+		case <-timer.C:
+		case <-r.Context().Done():
+			return nil, r.Context().Err()
+		}
+	}
+	response, err := f.round(r)
+	if err != nil || response.StatusCode != http.StatusOK {
+		return response, err
+	}
+	reply, err := io.ReadAll(io.LimitReader(response.Body, 49))
+	response.Body.Close()
+	if err != nil || len(reply) != 48 || binary.BigEndian.Uint64(reply[8:16]) != sequence {
+		return nil, errors.New("invalid packet receipt")
+	}
+	response.Body = io.NopCloser(bytes.NewReader(reply))
+	f.mu.Lock()
+	drop := first
+	if first {
+		f.stats["packet_gap_lost_head"]++
+	} else if sequence == gap.sequence+1 && !gap.tailLost {
+		gap.tailLost = true
+		f.stats["packet_gap_lost_tail"]++
+		drop = true
+	} else if sequence > gap.sequence && sequence < gap.sequence+8 &&
+		binary.BigEndian.Uint64(reply[:8]) == gap.sequence {
+		if !gap.receipts[sequence] {
+			f.stats["packet_gap_receipts"]++
+		}
+		gap.receipts[sequence] = true
+	}
+	f.mu.Unlock()
+	if drop {
+		response.Body.Close()
+		return nil, errors.New("injected lost packet receipt")
+	}
+	return response, nil
+}
+
 func (f *fixture) packetRound(r *http.Request) (*http.Response, error) {
 	if r.Method != http.MethodPost {
 		return f.round(r)
@@ -76,6 +168,9 @@ func (f *fixture) packetRound(r *http.Request) (*http.Response, error) {
 	r.ContentLength = -1
 	r.Header.Del("Content-Length")
 	f.count("packet_reframed_uploads")
+	if f.mode == "packet-gap" && strings.Contains(r.URL.Path, "/upload/") {
+		return f.gapUpload(r, body)
+	}
 	if strings.Contains(r.URL.Path, "/upload/") {
 		f.count("packet_uploads")
 		if strings.HasSuffix(r.URL.Path, "/2") {

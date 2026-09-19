@@ -50,6 +50,8 @@ class MinimalSourceExportTest(unittest.TestCase):
             "netwerk/naivefox/KNOWN-ISSUES.md": "# Known issues\n",
             "netwerk/naivefox/TRANSPORT.md": "# NaiveFox transport\n",
             "netwerk/naivefox/FRONTING-PAGE.md": "# Fronting page\n",
+            "netwerk/naivefox/HTTPS.md": "# HTTPS packet delivery\n",
+            "netwerk/naivefox/CDN.md": "# CDN deployment\n",
             "netwerk/naivefox/CAPTURE.md": (
                 "# Capture\n[benchmark](test/integration/http_app/README.md)\n"
             ),
@@ -140,6 +142,8 @@ class MinimalSourceExportTest(unittest.TestCase):
             "[architecture](ARCHITECTURE.md#threading)\n"
             "[transport](TRANSPORT.md#configuration)\n"
             "[fronting](FRONTING-PAGE.md)\n"
+            "[HTTPS](HTTPS.md)\n"
+            "[CDN](CDN.md)\n"
             "[external](https://example.invalid/ARCHITECTURE.md)\n"
         )
         rendered = render_root_readme(source)
@@ -147,6 +151,8 @@ class MinimalSourceExportTest(unittest.TestCase):
         self.assertIn("](netwerk/naivefox/ARCHITECTURE.md#threading)", rendered)
         self.assertIn("](netwerk/naivefox/TRANSPORT.md#configuration)", rendered)
         self.assertIn("](netwerk/naivefox/FRONTING-PAGE.md)", rendered)
+        self.assertIn("](netwerk/naivefox/HTTPS.md)", rendered)
+        self.assertIn("](netwerk/naivefox/CDN.md)", rendered)
         self.assertIn("https://example.invalid/ARCHITECTURE.md", rendered)
 
     def test_operator_documents_are_required(self) -> None:

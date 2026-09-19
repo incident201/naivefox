@@ -80,21 +80,21 @@ implicitly supplied by the SOCKS5/HTTP CONNECT listeners.
 The matching NaiveFox Caddy module is required; an arbitrary static website
 cannot serve as the transport endpoint. Client and server must be
 updated together; version negotiation and transparent recreation of failed
-target connections are not supported. Direct adapters end their streams on
-carrier failure. The experimental cdn:// adapter can resume HTTP delivery within
+target connections are not supported. WSS and QUIC adapters end their streams on
+carrier failure. The default https:// adapter can resume HTTP delivery within
 its retained ciphertext window while keeping the same TLS and mux session. Bounded startup HTTP retry
-deduplication does not change that lifecycle boundary. CDN support is unfinished and is not validated for production use. Complete
-real-provider CDN testing has not been performed; direct H2/H3 is the supported
-deployment.
+deduplication does not change that lifecycle boundary. HTTPS packet delivery
+works directly; production acceptance of specific CDN deployments remains
+incomplete. Short live probes do not establish all provider limits.
 
 The client consumes only supported directly declared HTML resources. It does
 not execute scripts, follow CSS imports or emulate a browser. Large sites add
 startup traffic, latency and server snapshot memory; there is no fixed site-size
 budget. Client resource caching remains disabled.
 
-H2 uses WSS/TCP after startup. H3 uses HTTP/3 throughout, but its shared downstream
-GET does not give each logical destination an independent QUIC stream. The direct H2
-adapter keeps 512 KiB of stream credit; H3 and packet delivery keep 1 MiB. Long credit turnaround can limit
+wss:// uses WSS/TCP after startup. quic:// uses HTTP/3 throughout, but its shared downstream
+GET does not give each logical destination an independent QUIC stream. The WSS
+adapter keeps 512 KiB of stream credit; QUIC and HTTPS packet delivery keep 1 MiB. Long credit turnaround can limit
 single-stream throughput; the H3 upload pipeline is also bounded to eight requests.
 
 Short controlled-link results apply only to their recorded application, network
