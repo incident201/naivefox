@@ -1,10 +1,10 @@
 {
   "report_provenance": {
     "provenance_version": 2,
-    "source_commit_sha": "7fc3220ed237fa73cb9cb1b3f1cc4343c9c6b1ad",
+    "source_commit_sha": "8a3460410c2357c5049ed817b2767c38f0384c46",
     "source_worktree_clean": true,
     "firefox_base_sha": "0b76543aaeeeb2a5748ce2675ee36e7c94cb1125",
-    "naivefox_reference_sha": "7fc3220ed237fa73cb9cb1b3f1cc4343c9c6b1ad",
+    "naivefox_reference_sha": "8a3460410c2357c5049ed817b2767c38f0384c46",
     "analyzer_sha256": "8375712b7523f4da690b5424d983f9cc080e51ac88505c4709736187578d889a",
     "provenance_sha256": "642a32e90aaf870224f1831b2e932e08fb3153ed75765607f2112852f668e3fb",
     "evidence_collector_sha256": "9008a1958274d02004fafbe29866ce8f8f168755b52c5042e6f73b988ad40f3b",
@@ -20,13 +20,13 @@
     "staged_runtime_manifest_count": 8
   },
   "summary": {
-    "cxx_translation_units_count": 696,
-    "direct_link_objects_count": 175,
-    "unstripped_link_objects_bytes": 215908488,
-    "unstripped_link_objects_mb": 205.91,
+    "cxx_translation_units_count": 699,
+    "direct_link_objects_count": 178,
+    "unstripped_link_objects_bytes": 218388440,
+    "unstripped_link_objects_mb": 208.27,
     "static_libraries_count": 2,
     "spidermonkey_static_present": false,
-    "libxul_size_bytes": 237490808,
+    "libxul_size_bytes": 238891336,
     "naivefox_bin_size_bytes": 0,
     "reachable_rust_crates_count": 258,
     "dynamic_dependencies_count": 8,
@@ -34,9 +34,9 @@
   },
   "component_groups": {
     "netwerk": {
-      "files": 72,
-      "bytes": 105846160,
-      "mb": 100.94
+      "files": 75,
+      "bytes": 108326112,
+      "mb": 103.31
     },
     "xpcom": {
       "files": 28,
@@ -415,7 +415,10 @@
     "netwerk/naivefox/TemporaryTrustStore.cpp",
     "netwerk/naivefox/Transport.cpp",
     "netwerk/naivefox/TransportCodec.cpp",
+    "netwerk/naivefox/TransportCookies.cpp",
+    "netwerk/naivefox/TransportPacket.cpp",
     "netwerk/naivefox/TransportSite.cpp",
+    "netwerk/naivefox/TransportTls.cpp",
     "netwerk/naivefox/TransportWebSocket.cpp",
     "netwerk/naivefox/UnknownProtocolHandler.cpp",
     "netwerk/naivefox/core/NaiveFoxComponents.cpp",
@@ -5268,7 +5271,10 @@
       "netwerk/naivefox/TemporaryTrustStore.cpp",
       "netwerk/naivefox/Transport.cpp",
       "netwerk/naivefox/TransportCodec.cpp",
+      "netwerk/naivefox/TransportCookies.cpp",
+      "netwerk/naivefox/TransportPacket.cpp",
       "netwerk/naivefox/TransportSite.cpp",
+      "netwerk/naivefox/TransportTls.cpp",
       "netwerk/naivefox/TransportWebSocket.cpp",
       "netwerk/naivefox/UnknownProtocolHandler.cpp",
       "netwerk/naivefox/core/NaiveFoxComponents.cpp",
@@ -5913,8 +5919,8 @@
     "cargo_root_manifest": "toolkit/library/rust/naivefox/Cargo.toml",
     "cargo_lockfile": "Cargo.lock",
     "cargo_config_template": ".cargo/config.toml.in",
-    "depfiles_scanned": 173,
-    "headers_count": 917,
+    "depfiles_scanned": 176,
+    "headers_count": 920,
     "headers": [
       "caps/SystemPrincipal.h",
       "caps/nsJSPrincipals.h",
@@ -6361,8 +6367,11 @@
       "netwerk/naivefox/TemporaryTrustStore.h",
       "netwerk/naivefox/Transport.h",
       "netwerk/naivefox/TransportCodec.h",
+      "netwerk/naivefox/TransportCookies.h",
       "netwerk/naivefox/TransportHash.h",
+      "netwerk/naivefox/TransportPacket.h",
       "netwerk/naivefox/TransportSite.h",
+      "netwerk/naivefox/TransportTls.h",
       "netwerk/naivefox/TransportWebSocket.h",
       "netwerk/naivefox/UnknownProtocolHandler.h",
       "netwerk/naivefox/core/NaiveFoxComponents.h",
@@ -6990,7 +6999,7 @@
       },
       {
         "name": "libxul.so",
-        "size_bytes": 237490808
+        "size_bytes": 238891336
       },
       {
         "name": "libxul.so-gdb.py",
@@ -7013,7 +7022,7 @@
       {
         "path": "manifest.json",
         "size_bytes": 1846,
-        "sha256": "5249662f7bc60777c642b57fce10856505aca374a271e10669c59140d8f20f69"
+        "sha256": "5b0e69d334058bf32502c547a33c078d385820c6882525b93be879706b219fd3"
       },
       {
         "path": "include/NaiveFoxAPI.h",
@@ -7042,8 +7051,8 @@
       },
       {
         "path": "lib/arm64-v8a/libxul.so",
-        "size_bytes": 30841784,
-        "sha256": "1f746c253d45276dfb36b6c038fc5945e0d5d337d2623bc422939024580a4520"
+        "size_bytes": 30935488,
+        "sha256": "697da227e69284a9c343b92f4c2bc81aebda74b6c67f1bdda03099379074d092"
       },
       {
         "path": "lib/arm64-v8a/omni.ja",
@@ -7339,7 +7348,7 @@
     },
     {
       "path": "objdir/netwerk/naivefox/core/Config.o",
-      "size_bytes": 670600
+      "size_bytes": 682096
     },
     {
       "path": "objdir/netwerk/naivefox/core/GeckoRuntime.o",
@@ -7359,7 +7368,7 @@
     },
     {
       "path": "objdir/netwerk/naivefox/core/NaiveFoxRunner.o",
-      "size_bytes": 359480
+      "size_bytes": 362848
     },
     {
       "path": "objdir/netwerk/naivefox/core/OriginChannel.o",
@@ -7375,7 +7384,7 @@
     },
     {
       "path": "objdir/netwerk/naivefox/core/SocksServer.o",
-      "size_bytes": 1005600
+      "size_bytes": 986440
     },
     {
       "path": "objdir/netwerk/naivefox/core/SpiderMonkeyCompat.o",
@@ -7387,19 +7396,31 @@
     },
     {
       "path": "objdir/netwerk/naivefox/core/Transport.o",
-      "size_bytes": 2077680
+      "size_bytes": 2320304
     },
     {
       "path": "objdir/netwerk/naivefox/core/TransportCodec.o",
       "size_bytes": 215640
     },
     {
+      "path": "objdir/netwerk/naivefox/core/TransportCookies.o",
+      "size_bytes": 483680
+    },
+    {
+      "path": "objdir/netwerk/naivefox/core/TransportPacket.o",
+      "size_bytes": 1398488
+    },
+    {
       "path": "objdir/netwerk/naivefox/core/TransportSite.o",
       "size_bytes": 445944
     },
     {
+      "path": "objdir/netwerk/naivefox/core/TransportTls.o",
+      "size_bytes": 336808
+    },
+    {
       "path": "objdir/netwerk/naivefox/core/TransportWebSocket.o",
-      "size_bytes": 390504
+      "size_bytes": 413152
     },
     {
       "path": "objdir/netwerk/naivefox/core/UnknownProtocolHandler.o",
