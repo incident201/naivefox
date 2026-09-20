@@ -368,6 +368,32 @@ Review obligations: verify byte-exact response EOF before local input FIN,
 request FIN followed by a response, reset, cancellation and both local frontends
 over H2 and H3. A half-close must never discard the opposite direction.
 
+## NF-UPSTREAM-025: atomic HTTP/2 upload frame commitment
+
+Files:
+
+- netwerk/protocol/http/Http2StreamBase.cpp
+- netwerk/protocol/http/Http2Session.h
+- netwerk/naivefox/test/gtest/TestHttp2Upload.cpp
+
+Obtain the session's whole-frame output commitment before coalescing request
+body bytes into the stream's inline frame. Previously a refused commitment
+could still advance the transaction input. If those bytes ended the request,
+the next source read returned EOF and left the unsent DATA frame stranded.
+
+Project-level upload callbacks cannot repair bytes already consumed inside
+Necko. Retrying requests or changing cell sizes only avoids or masks that
+ownership error. The ordering fix keeps successful wire bytes, frame sizes,
+flow-control accounting, queue bounds and retry deadlines unchanged. It applies
+to native HTTP/2; the test-only friend grants access to queue state without
+adding a runtime interface.
+
+Review obligations: repeated WOULD_BLOCK must leave source bytes available;
+after the queue drains, emit one complete DATA frame with END_STREAM and exact
+payload; EOF must not emit a duplicate. Cover both coalesced tails and an
+uncoalesced frame, then exercise native HTTPS uploads under socket backpressure
+and retain WSS/QUIC correctness.
+
 ## Adding or removing an entry
 
 Use the next stable identifier and record:

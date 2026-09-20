@@ -658,6 +658,18 @@ nsresult Http2StreamBase::TransmitFrame(const char* buf, uint32_t* countUsed,
   nsresult rv;
   RefPtr<Http2Session> session = Session();
 
+  // A refused frame must leave its body bytes in the transaction stream.
+  rv = mSegmentReader->CommitToSegmentSize(
+      mTxStreamFrameSize + mTxInlineFrameUsed, forceCommitment);
+
+  if (rv == NS_BASE_STREAM_WOULD_BLOCK) {
+    MOZ_ASSERT(!forceCommitment, "forceCommitment with WOULD_BLOCK");
+    session->TransactionHasDataToWrite(this);
+  }
+  if (NS_FAILED(rv)) {  // this will include WOULD_BLOCK
+    return rv;
+  }
+
   // In the (relatively common) event that we have a small amount of data
   // split between the inlineframe and the streamframe, then move the stream
   // data into the inlineframe via copy in order to coalesce into one write.
@@ -670,17 +682,6 @@ nsresult Http2StreamBase::TransmitFrame(const char* buf, uint32_t* countUsed,
     if (countUsed) *countUsed += mTxStreamFrameSize;
     mTxInlineFrameUsed += mTxStreamFrameSize;
     mTxStreamFrameSize = 0;
-  }
-
-  rv = mSegmentReader->CommitToSegmentSize(
-      mTxStreamFrameSize + mTxInlineFrameUsed, forceCommitment);
-
-  if (rv == NS_BASE_STREAM_WOULD_BLOCK) {
-    MOZ_ASSERT(!forceCommitment, "forceCommitment with WOULD_BLOCK");
-    session->TransactionHasDataToWrite(this);
-  }
-  if (NS_FAILED(rv)) {  // this will include WOULD_BLOCK
-    return rv;
   }
 
   // This function calls mSegmentReader->OnReadSegment to report the actual

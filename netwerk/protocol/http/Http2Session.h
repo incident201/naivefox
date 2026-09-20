@@ -343,6 +343,10 @@ class Http2Session final : public ASpdySession,
   void CleanupStream(Http2StreamBase*, nsresult, errorType);
 
  private:
+#ifdef MOZ_NAIVEFOX
+  friend class NaiveFoxHttp2UploadTestPeer;
+#endif
+
   Http2Session(nsISocketTransport*, enum SpdyVersion version,
                bool attemptingEarlyData);
 
