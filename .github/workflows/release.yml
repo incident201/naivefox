@@ -517,6 +517,8 @@ jobs:
           {
             echo "NaiveFox product build from \`${SOURCE_SHA}\`."
             echo
+            echo "NaiveFox is a research project whose project-specific code and documentation were created entirely with AI."
+            echo
             echo "NaiveFox has one current application protocol. Upgrade the client and naivefox-transport server together; only the current matching pair is supported."
             echo
             echo "HTTPS is the default packet delivery over H2, directly or through a compatible CDN. Its username~PIN suffix is mandatory. WSS explicitly selects WebSocket and strips an optional PIN suffix. QUIC remains on Firefox Neqo HTTP/3 without TCP fallback."
