@@ -1,5 +1,9 @@
 # NaiveFox integration verification
 
+NaiveFox is a research project created entirely with AI. This covers all
+project-specific code and documentation; upstream dependencies retain their
+original authorship and licenses.
+
 Tests exercise one current NaiveFox transport and coordinated client/server
 builds. Test the current transport, without alternate wire versions or
 migration campaigns. The local frontends are SOCKS5 and HTTP CONNECT; the outer selections

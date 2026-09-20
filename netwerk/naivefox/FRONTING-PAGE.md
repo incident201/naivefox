@@ -1,5 +1,9 @@
 # Public application site
 
+NaiveFox is a research project created entirely with AI. This covers all
+project-specific code and documentation; upstream dependencies retain their
+original authorship and licenses.
+
 NaiveFox starts with the configured HTTPS origin's actual HTML document and its
 supported directly declared stylesheet, script and image resources. The client
 uses the Firefox HTML speculative scanner without DOM or JavaScript execution.

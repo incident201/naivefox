@@ -1,5 +1,9 @@
 # Downstream Firefox patch inventory
 
+NaiveFox is a research project created entirely with AI. This covers all
+project-specific code and documentation; upstream dependencies retain their
+original authorship and licenses.
+
 This is the durable inventory of changes to existing Firefox files on the
 `naivefox-full-source` reference branch. It contains stable patch identifiers and semantic
 review obligations, not mutable branch SHAs or dated test results. Git history

@@ -1,5 +1,9 @@
 # CDN deployment
 
+NaiveFox is a research project created entirely with AI. This covers all
+project-specific code and documentation; upstream dependencies retain their
+original authorship and licenses.
+
 CDN is an optional deployment of the default [HTTPS packet transport](HTTPS.md).
 Use https://user~PIN:password@host:443 for both direct and CDN endpoints.
 There is no CDN-specific client scheme or automatic fallback.

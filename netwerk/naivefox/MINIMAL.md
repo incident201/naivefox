@@ -1,5 +1,9 @@
 # Minimal build and source export
 
+NaiveFox is a research project created entirely with AI. This covers all
+project-specific code and documentation; upstream dependencies retain their
+original authorship and licenses.
+
 This guide is the maintainer runbook for the `naivefox-full-source` branch. It deliberately
 contains no release SHA, date, size, or test transcript. Git and the generated
 evidence files are the source of those values.

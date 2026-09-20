@@ -1,5 +1,9 @@
 # Upstream synchronization and product export
 
+NaiveFox is a research project created entirely with AI. This covers all
+project-specific code and documentation; upstream dependencies retain their
+original authorship and licenses.
+
 This document is the normative maintenance workflow. It deliberately contains
 no current commit SHA, dated status, or copied test result. Git ancestry,
 machine-readable evidence, `UPSTREAM-BASE`, and annotated release tags record

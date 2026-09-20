@@ -1,5 +1,9 @@
 # NaiveFox minimization-only Firefox patch inventory
 
+NaiveFox is a research project created entirely with AI. This covers all
+project-specific code and documentation; upstream dependencies retain their
+original authorship and licenses.
+
 This is the refresh checklist for changes carried only by
 `naivefox-full-source`. The shared NaiveFox integration patches are catalogued
 in `UPSTREAM-PATCHES.md`.

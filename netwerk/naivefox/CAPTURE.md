@@ -1,5 +1,9 @@
 # Capture and comparison method
 
+NaiveFox is a research project created entirely with AI. This covers all
+project-specific code and documentation; upstream dependencies retain their
+original authorship and licenses.
+
 The purpose is to compare observable traffic and application performance against
 a real Firefox build from the same upstream base. Protocol implementations stay
 in Firefox Necko/NSS/Neqo. The measurement harness must never construct fake

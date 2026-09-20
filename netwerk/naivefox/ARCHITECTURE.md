@@ -1,5 +1,9 @@
 # NaiveFox architecture
 
+NaiveFox is a research project created entirely with AI. This covers all
+project-specific code and documentation; upstream dependencies retain their
+original authorship and licenses.
+
 ## One transport and native networking
 
 NaiveFox has one current application protocol and supports coordinated

@@ -1,5 +1,9 @@
 # Minimal compatibility shims
 
+NaiveFox is a research project created entirely with AI. This covers all
+project-specific code and documentation; upstream dependencies retain their
+original authorship and licenses.
+
 The `minimal` build keeps Firefox's Necko, NSS, and Neqo transport behavior but
 does not compile the browser UI, content process, full DOM runtime, telemetry,
 or profiler implementation. The shims below satisfy narrowly defined ABI or

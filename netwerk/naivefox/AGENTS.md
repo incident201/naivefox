@@ -1,5 +1,9 @@
 # NaiveFox contributor instructions
 
+NaiveFox is a research project created entirely with AI. This covers all
+project-specific code and documentation; upstream dependencies retain their
+original authorship and licenses.
+
 Read the repository-root AGENTS.md first, then README.md, ARCHITECTURE.md,
 UPSTREAM.md, KNOWN-ISSUES.md and TRANSPORT.md. For runtime work also read
 test/integration/README.md.

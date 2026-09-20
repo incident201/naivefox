@@ -1,5 +1,9 @@
 # Known issues and constraints
 
+NaiveFox is a research project created entirely with AI. This covers all
+project-specific code and documentation; upstream dependencies retain their
+original authorship and licenses.
+
 This file contains unresolved product limitations only. Completed milestones,
 one-off observations, frozen-base test failures, and run results belong in Git
 history or generated evidence.
