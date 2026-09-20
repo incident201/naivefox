@@ -7,6 +7,7 @@ UNIFIED_SOURCES += [
     "TestCacheCryptoBoundary.cpp",
     "TestConfig.cpp",
     "TestHtml5SpeculativeScanner.cpp",
+    "TestHttp2Upload.cpp",
     "TestHttpConnectParser.cpp",
     "TestNetworkStartupState.cpp",
     "TestSocks5Parser.cpp",
@@ -19,8 +20,10 @@ UNIFIED_SOURCES += [
 LOCAL_INCLUDES += [
     "/dom/security",
     "/layout/style",
+    "/netwerk/base",
     "/netwerk/cache2",
     "/netwerk/naivefox",
+    "/netwerk/protocol/http",
     "/netwerk/system/netlink",
 ]
 

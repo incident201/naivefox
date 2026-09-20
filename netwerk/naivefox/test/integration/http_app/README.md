@@ -1,5 +1,9 @@
 # Ordinary HTTP application workload
 
+NaiveFox is a research project created entirely with AI. This covers all
+project-specific code and documentation; upstream dependencies retain their
+original authorship and licenses.
+
 This real browser workload uses standard fetch GET/POST requests, streaming
 download consumption and native HTTP flow control. It has no WebSocket,
 NaiveFox cells, custom protocol padding or simulated Firefox transport.

@@ -1,5 +1,9 @@
 # NaiveFox integration verification
 
+NaiveFox is a research project created entirely with AI. This covers all
+project-specific code and documentation; upstream dependencies retain their
+original authorship and licenses.
+
 Tests exercise one current NaiveFox transport and coordinated client/server
 builds. Test the current transport, without alternate wire versions or
 migration campaigns. The local frontends are SOCKS5 and HTTP CONNECT; the outer selections
@@ -155,3 +159,16 @@ the origin, then loses a head response and one later receipt. Both frontends
 must preserve payload integrity, retry missing receipts, keep the eight-slot
 cumulative window and avoid resending blocks whose storage was already
 confirmed. Run it with --cdn-proxy against both H1 and H2 origins.
+
+
+run-http2-upload-backpressure-tests.py is a short direct HTTPS regression.
+Inside a private network namespace it limits TCP send buffers, shapes only the
+outer carrier, and alternates an 8-MiB download with a 1-MiB upload through both
+frontends. Payloads must remain exact and uploads must finish before the request
+retry deadline. This is a queue-ownership test, not a five-window or peak-speed
+benchmark. Optional --diagnostics retains private native HTTP/2 logs and TLS
+keys below the output directory; never publish those files.
+
+The NaiveFoxHttp2Upload gtest forces repeated frame-commitment refusal at the
+end of an input stream. It checks that blocked writes consume no source bytes,
+then verifies a single complete DATA/END_STREAM frame after the queue drains.

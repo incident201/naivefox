@@ -1,5 +1,9 @@
 # NaiveFox
 
+NaiveFox is a research project created entirely with AI. This covers all
+project-specific code and documentation; upstream dependencies retain their
+original authorship and licenses.
+
 NaiveFox is a lean SOCKS5 and HTTP CONNECT client built on Firefox networking.
 Necko owns HTTP and connection pooling, NSS/PSM owns TLS and certificate checks,
 and Neqo owns QUIC. The runtime runs in one process without a browser, DOM

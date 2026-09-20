@@ -1,5 +1,9 @@
 # Passive traffic verification
 
+NaiveFox is a research project created entirely with AI. This covers all
+project-specific code and documentation; upstream dependencies retain their
+original authorship and licenses.
+
 Use the same-base Firefox reference and matched ordinary HTTP application
 described in [CAPTURE.md](../../CAPTURE.md) and the
 [integration guide](../integration/README.md).
