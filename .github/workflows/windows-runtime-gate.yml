@@ -190,3 +190,17 @@ jobs:
             --objdir $objdir --runtime $runtime --caddy $caddy `
             --windows-python $python --work-dir $work --protocol all
           if ($LASTEXITCODE -ne 0) { throw 'native Windows runtime gate failed' }
+
+      - name: Show failed fixture worker traceback
+        if: failure()
+        shell: pwsh
+        run: |
+          $root = Join-Path $env:RUNNER_TEMP 'obj-naivefox-windows\native-runtime-gate'
+          if (Test-Path $root) {
+            Get-ChildItem $root -Filter 'workload-*.log' -Recurse |
+              Where-Object { $_.Length -gt 0 } |
+              ForEach-Object {
+                Write-Host "Fixture worker: $($_.Name)"
+                Get-Content -LiteralPath $_.FullName -Tail 40
+              }
+          }
