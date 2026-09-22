@@ -230,6 +230,9 @@ def _check_compiled_source_boundaries(report, violations):
     sources = set(report.get("cxx_translation_units", []))
     sources.update(report.get("build_inputs", {}).get("cxx_translation_units", []))
     allowed_value_helpers = {
+        # RemoteType is a process-kind value record; the lean build rejects
+        # site-origin types and does not compile its DOM actor consumers.
+        "dom/ipc/RemoteType.cpp",
         "dom/security/ReferrerInfo.cpp",
         "dom/security/SecFetch.cpp",
         "js/xpconnect/loader/AutoMemMap.cpp",

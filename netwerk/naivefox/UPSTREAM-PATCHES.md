@@ -420,6 +420,8 @@ DOM certificate Promise fail closed in the lean build. The product's in-process
 HTTP connection record and WebTransport statistics record track the upstream
 IPDL field schemas without compiling their actor protocols. Ordinary Firefox
 builds keep the upstream paths and behavior.
+The closure rule admits only `dom/ipc/RemoteType.cpp` as a process-kind value
+helper; other DOM IPC implementations remain forbidden.
 
 Review obligations: compare both value records to their IPDL schemas with
 verify-shims.py, run all three product builds and closure checks, verify staged

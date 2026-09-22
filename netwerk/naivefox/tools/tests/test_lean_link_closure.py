@@ -192,6 +192,7 @@ class CompiledSourceBoundaryTest(unittest.TestCase):
     def test_value_helpers_and_browser_interface_headers_are_allowed(self):
         report = {
             "cxx_translation_units": [
+                "dom/ipc/RemoteType.cpp",
                 "dom/security/ReferrerInfo.cpp", "dom/security/SecFetch.cpp",
                 "js/xpconnect/loader/AutoMemMap.cpp", "js/xpconnect/src/XPCString.cpp",
             ],
@@ -204,6 +205,7 @@ class CompiledSourceBoundaryTest(unittest.TestCase):
     def test_unified_includes_cannot_hide_heavy_implementations(self):
         for path in (
             "dom/base/Document.cpp",
+            "dom/ipc/ContentParent.cpp",
             "js/src/vm/Interpreter.cpp",
             "gfx/thebes/gfxPlatform.cpp",
             "layout/base/PresShell.cpp", "intl/icu/source/common/utext.cpp",
