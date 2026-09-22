@@ -107,6 +107,7 @@ class TargetServer(socketserver.ThreadingTCPServer):
     allow_reuse_address = True
     daemon_threads = True
     block_on_close = False
+    request_queue_size = 128
 
     def __init__(self, host="127.0.0.1"):
         super().__init__((host, 0), Target)
@@ -577,6 +578,7 @@ def open_tunnel(
     )
     sock.settimeout(timeout)
     try:
+        failure_detail = "local CONNECT failed"
         if listener == "socks":
             sock.sendall(b"\x05\x01\x00")
             require(receive(sock, 2) == b"\x05\x00", "SOCKS negotiation failed")
@@ -590,6 +592,7 @@ def open_tunnel(
             head = receive(sock, 4)
             require(head[0] == 5 and head[2] == 0, "invalid SOCKS reply")
             success = head[1] == 0
+            failure_detail = f"local CONNECT failed (SOCKS status 0x{head[1]:02x})"
             if head[3] == 1:
                 receive(sock, 6)
             elif head[3] == 4:
@@ -610,7 +613,7 @@ def open_tunnel(
             success = bytes(header).split(b" ", 2)[1] == b"200"
         require(
             success != rejected,
-            "unexpected local CONNECT success" if rejected else "local CONNECT failed",
+            "unexpected local CONNECT success" if rejected else failure_detail,
         )
         if rejected:
             sock.close()
