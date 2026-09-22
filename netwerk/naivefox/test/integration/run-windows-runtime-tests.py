@@ -244,6 +244,25 @@ def winpath(path):
     return subprocess.check_output(["wslpath", "-w", str(path)], text=True).strip()
 
 
+def windows_socket_listeners(port, udp=False):
+    protocol = "UDP" if udp else "TCP"
+    result = subprocess.run(
+        ["netstat", "-ano", "-p", protocol],
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    for line in result.stdout.splitlines():
+        fields = line.split()
+        if len(fields) < 4 or fields[0].upper() != protocol:
+            continue
+        if fields[1] != f"127.0.0.1:{port}":
+            continue
+        if udp or (len(fields) >= 5 and fields[3].upper() == "LISTENING"):
+            return True
+    return False
+
+
 class NativeClient:
     def __init__(self, module, process, directory):
         self.module = module
@@ -307,7 +326,9 @@ def stop_relay(bridge):
 
 def run_inside(args):
     module = fixture_module()
-    if os.name != "nt":
+    if os.name == "nt":
+        module.socket_listeners = windows_socket_listeners
+    else:
         subprocess.run(["ip", "link", "set", "lo", "up"], check=True)
     root = (args.work_dir or args.objdir / "naivefox-fixture").resolve()
     module.require(
