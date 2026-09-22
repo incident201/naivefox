@@ -412,8 +412,36 @@ def run_inside(args):
     original_start = module.start_caddy
 
     def start_caddy(*arguments):
+        admin_port = None
+        if os.name == "nt":
+            admin_port = module.free_port()
+            arguments[0].caddy_admin_port = admin_port
         process, port = original_start(*arguments)
         if os.name == "nt":
+            original_stop = process.stop
+
+            def stop_caddy():
+                if process.process.poll() is None:
+                    try:
+                        subprocess.run(
+                            [
+                                str(args.caddy),
+                                "stop",
+                                "--address",
+                                f"127.0.0.1:{admin_port}",
+                            ],
+                            check=True,
+                            capture_output=True,
+                            text=True,
+                            timeout=15,
+                        )
+                        process.process.wait(timeout=15)
+                    except (OSError, subprocess.SubprocessError):
+                        original_stop()
+                        raise
+                process.log.close()
+
+            process.stop = stop_caddy
             return process, port
         protocol = arguments[2]
         current_relays = []

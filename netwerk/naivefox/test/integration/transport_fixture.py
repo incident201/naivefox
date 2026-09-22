@@ -273,17 +273,21 @@ def fixture_credentials():
     return "fixture user@" + secrets.token_hex(8), "p:/" + secrets.token_hex(24) + " %"
 
 
-def caddyfile_text(allowed_ports=()):
+def caddyfile_text(allowed_ports=(), admin_port=None):
     require(
         all(type(port) is int and 1 <= port <= 65535 for port in allowed_ports),
         "invalid fixture destination port",
+    )
+    require(
+        admin_port is None or (type(admin_port) is int and 1 <= admin_port <= 65535),
+        "invalid fixture admin port",
     )
     ports = (
         "            ports " + " ".join(map(str, allowed_ports)) + "\n"
         if allowed_ports
         else ""
     )
-    return (
+    config = (
         """{
     admin off
     auto_https disable_redirects
@@ -312,6 +316,11 @@ https://:{$NF_PORT} {
 }
 """
     )
+    if admin_port is not None:
+        config = config.replace(
+            "    admin off\n", f"    admin 127.0.0.1:{admin_port}\n", 1
+        )
+    return config
 
 
 def prepare_application(run):
@@ -349,7 +358,12 @@ def start_caddy(args, run, protocol, target_port, user, password):
         identity, args.packet_server_pin = packet_identity(run)
     port = free_port(udp=protocol == "h3", dual=True)
     caddyfile = run / "Caddyfile"
-    caddyfile.write_text(caddyfile_text(getattr(args, "allowed_ports", ())))
+    caddyfile.write_text(
+        caddyfile_text(
+            getattr(args, "allowed_ports", ()),
+            getattr(args, "caddy_admin_port", None),
+        )
+    )
     env = dict(
         os.environ,
         NF_PROTOCOL=outer_protocol,
