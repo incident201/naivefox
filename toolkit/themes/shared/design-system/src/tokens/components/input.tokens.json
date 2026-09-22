@@ -48,6 +48,9 @@
     "color": {
       "@base": {
         "value": {
+          "brand": {
+            "default": "{text.color.@base}"
+          },
           "nativeTheme": "FieldText",
           "platform": {
             "light": "rgb(21, 20, 26)",
@@ -85,6 +88,11 @@
             "value": "{border.radius.circle}"
           }
         }
+      }
+    },
+    "icon": {
+      "size": {
+        "value": "{input.text.icon.size}"
       }
     }
   },

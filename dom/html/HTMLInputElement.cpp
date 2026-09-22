@@ -35,6 +35,7 @@
 #include "mozilla/dom/AutocompleteInfoBinding.h"
 #include "mozilla/dom/BlobImpl.h"
 #include "mozilla/dom/CustomEvent.h"
+#include "mozilla/dom/DirectionalityUtils.h"
 #include "mozilla/dom/Directory.h"
 #include "mozilla/dom/Document.h"
 #include "mozilla/dom/DocumentInlines.h"
@@ -2860,15 +2861,10 @@ nsresult HTMLInputElement::SetValueInternal(
   MOZ_ASSERT(GetValueMode() != VALUE_MODE_FILENAME,
              "Don't call SetValueInternal for file inputs");
 
-  // We want to remember if the SetValueInternal() call is being made for a XUL
-  // element.  We do that by looking at the parent node here, and if that node
-  // is a XUL node, we consider our control a XUL control. XUL controls preserve
-  // edit history across value setters.
-  //
-  // TODO(emilio): Rather than doing this maybe add an attribute instead and
-  // read it only on chrome docs or something? That'd allow front-end code to
-  // move away from xul without weird side-effects.
-  const bool forcePreserveUndoHistory = mParent && mParent->IsXULElement();
+  // An input carrying preserveundohistory keeps its edit history across value
+  // setters, in a chrome: document or an about: page such as about:newtab.
+  const bool forcePreserveUndoHistory = OwnerDoc()->ChromeRulesEnabled() &&
+                                        HasAttr(nsGkAtoms::preserveundohistory);
 
   if (aOptions.contains(ValueSetterOption::BySetUserInputAPI)) {
     mUserChangedSinceFocus = true;
@@ -4641,7 +4637,8 @@ void HTMLInputElement::MaybeDispatchLoginManagerEvents(HTMLFormElement* aForm) {
     } else {
       nsAutoString autocompleteValue;
       GetAutocomplete(autocompleteValue);
-      if (!autocompleteValue.EqualsASCII("username")) {
+      if (!autocompleteValue.EqualsASCII("username") &&
+          !autocompleteValue.EqualsASCII("webauthn")) {
         return;
       }
       target = GetComposedDoc();
@@ -5717,8 +5714,7 @@ nsChangeHint HTMLInputElement::GetAttributeChangeHint(
   return retval;
 }
 
-NS_IMETHODIMP_(bool)
-HTMLInputElement::IsAttributeMapped(const nsAtom* aAttribute) const {
+bool HTMLInputElement::IsNoNamespaceAttrMapped(const nsAtom* aAttribute) const {
   static const MappedAttributeEntry attributes[] = {
       {nsGkAtoms::align},
       {nullptr},

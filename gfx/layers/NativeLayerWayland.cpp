@@ -30,6 +30,7 @@
 #include "ScopedGLHelpers.h"
 #include "gfxUtils.h"
 #include "mozilla/StaticPrefs_widget.h"
+#include "mozilla/ToString.h"
 #include "mozilla/gfx/DataSurfaceHelpers.h"
 #include "mozilla/gfx/Logging.h"
 #include "mozilla/gfx/gfxVars.h"
@@ -37,6 +38,7 @@
 #include "mozilla/webrender/RenderDMABUFTextureHost.h"
 #include "mozilla/webrender/RenderThread.h"
 #include "mozilla/widget/WaylandSurface.h"
+#include "mozilla/widget/nsWaylandDisplay.h"
 #include "nsGtkUtils.h"
 
 #ifdef MOZ_LOGGING
@@ -1070,33 +1072,8 @@ bool NativeLayerWayland::Map(WaylandSurfaceLock& aParentWaylandSurfaceLock) {
         mRootLayer->VSyncCallbackHandler(aTime, aEmulated);
       });
 
-  if (mIsHDR) {
-    gfx::YUVColorSpace yuvColorSpace = gfx::YUVColorSpace::BT709;
-    gfx::TransferFunction transferFunction = gfx::TransferFunction::BT709;
-    mozilla::gfx::HDRMetadata hdrMetadata{};
-    if (auto* external = AsNativeLayerWaylandExternal()) {
-      if (RefPtr surface = external->GetSurface()) {
-        if (auto* surfaceYUV = surface->GetAsDMABufSurfaceYUV()) {
-          yuvColorSpace = surfaceYUV->GetYUVColorSpace();
-          transferFunction = surfaceYUV->GetTransferFunction();
-          hdrMetadata = surfaceYUV->GetHDRMetadata();
-        }
-      }
-    }
-    mSurface->EnableColorManagementLocked(surfaceLock, yuvColorSpace,
-                                          transferFunction, hdrMetadata,
-                                          parentSurface->GetGdkWindow());
-  }
-
-  if (auto* external = AsNativeLayerWaylandExternal()) {
-    if (RefPtr surface = external->GetSurface()) {
-      if (auto* surfaceYUV = surface->GetAsDMABufSurfaceYUV()) {
-        mSurface->SetColorRepresentationLocked(
-            surfaceLock, surfaceYUV->GetYUVColorSpace(),
-            surfaceYUV->IsFullRange(), surfaceYUV->GetWPChromaLocation());
-      }
-    }
-  }
+  // Color Management
+  SetColorProperties(surfaceLock, parentSurface);
 
   mNeedsMainThreadUpdate = MainThreadUpdate::Map;
   mState.mMutatedStackingOrder = true;
@@ -1104,6 +1081,72 @@ bool NativeLayerWayland::Map(WaylandSurfaceLock& aParentWaylandSurfaceLock) {
   mState.mMutatedPlacement = true;
   mState.mIsRendered = false;
   return true;
+}
+
+void NativeLayerWayland::SetColorProperties(
+    const WaylandSurfaceLock& aSurfaceLock, WaylandSurface* aParentSurface) {
+  LOG("NativeLayerWayland::SetColorProperties()");
+
+  auto* external = AsNativeLayerWaylandExternal();
+  if (!external) {
+    LOG("NativeLayerWayland::SetColorProperties() - Not an external surface. "
+        "Quit");
+    return;
+  }
+
+  RefPtr surface = external->GetSurface();
+  if (!surface) {
+    LOG("NativeLayerWayland::SetColorProperties() - Can't get a surface. Quit");
+    return;
+  }
+
+  mSurface->SetColorRepresentationLocked(
+      aSurfaceLock, surface->GetWLColorCoeficients(), surface->IsFullRange(),
+      surface->GetWPChromaLocation());
+
+  if (!WaylandDisplayGet()->IsParametricSupported()) {
+    LOG("NativeLayerWayland::SetColorProperties() - Parametric not supported. "
+        "Quit");
+    return;
+  }
+
+  auto* colorManager = WaylandDisplayGet()->GetColorManager();
+  if (!colorManager) {
+    LOG("NativeLayerWayland::SetColorProperties() - Color management is "
+        "missing. Quit");
+    return;
+  }
+
+  auto* params = wp_color_manager_v1_create_parametric_creator(colorManager);
+
+  gfx::YUVColorSpace surfaceColorSpace = surface->GetYUVColorSpace();
+  if (!mSurface->SetPrimaries(params, surfaceColorSpace)) {
+    LOG("No primaries for color space %s. Quit",
+        mozilla::ToString(surfaceColorSpace).c_str());
+
+    wp_image_description_creator_params_v1_destroy(params);
+    return;
+  }
+
+  gfx::TransferFunction surfaceTransferFunction =
+      surface->GetTransferFunction();
+  if (!mSurface->SetTransferFunction(params, surfaceTransferFunction)) {
+    LOG("Transfer function %s isn't supported. Quit",
+        mozilla::ToString(surfaceTransferFunction).c_str());
+
+    wp_image_description_creator_params_v1_destroy(params);
+    return;
+  }
+
+  if (surface->IsHDRSurface()) {
+    mSurface->SetHDRMetadata(params, surfaceTransferFunction,
+                             aParentSurface->GetGdkWindow(),
+                             surface->GetHDRMetadata());
+  }
+
+  mSurface->SetColorManagementLocked(aSurfaceLock, colorManager, params);
+  // SetColorManagementLocked() consumes params
+  params = nullptr;
 }
 
 void NativeLayerWayland::SetFrameCallbackState(bool aState) {
@@ -1463,7 +1506,10 @@ NativeLayerWaylandRender::~NativeLayerWaylandRender() {
 }
 
 RefPtr<DMABufSurface> NativeLayerWaylandExternal::GetSurface() {
-  return mTextureHost ? mTextureHost->GetSurface() : nullptr;
+  if (mFrontBuffer && mFrontBuffer->AsWaylandBufferDMABUF()) {
+    return mFrontBuffer->AsWaylandBufferDMABUF()->GetSurface();
+  }
+  return nullptr;
 }
 
 NativeLayerWaylandExternal::NativeLayerWaylandExternal(
@@ -1496,7 +1542,7 @@ void NativeLayerWaylandExternal::AttachExternalImage(
   }
   mTextureHost = texture;
 
-  auto surface = mTextureHost->GetSurface();
+  RefPtr<DMABufSurface> surface = mTextureHost->GetSurface();
   mIsHDR = surface->IsHDRSurface();
 
   LOG("NativeLayerWaylandExternal::AttachExternalImage() host [%p] "
@@ -1505,6 +1551,25 @@ void NativeLayerWaylandExternal::AttachExternalImage(
       mTextureHost.get(), mTextureHost->GetSurface().get(),
       mTextureHost->GetSurface()->GetUID(), mSize.width, mSize.height, mIsHDR,
       mIsOpaque, surface->CanRecycle());
+
+  // TODO: Cache converted surfaces if source is the same?
+
+  // If HLG is not supported, transfer to RGBA/PQ
+  if (mIsHDR && surface->GetTransferFunction() == gfx::TransferFunction::HLG &&
+      !WaylandDisplayGet()->IsTFSupported(
+          WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_HLG)) {
+    MOZ_DIAGNOSTIC_ASSERT(surface->GetAsDMABufSurfaceYUV(),
+                          "Unsupported surface type!");
+    surface =
+        surface->GetAsDMABufSurfaceYUV()->ConvertHLGToPQ(mRootLayer->gl());
+    if (!surface) {
+      LOG("  HLG->PQ conversion failed, quit.");
+      mFrontBuffer = nullptr;
+      return;
+    }
+    surface->DisableRecycle();
+    LOG("  HLG->PQ converted, new surface [%p]", surface.get());
+  }
 
   mFrontBuffer = surface->CanRecycle()
                      ? mRootLayer->BorrowExternalBuffer(surface)
@@ -1546,6 +1611,9 @@ bool NativeLayerWaylandExternal::CommitFrontBufferToScreenLocked(
     const WaylandSurfaceLock& aProofOfLock) {
   LOG("NativeLayerWaylandExternal::CommitFrontBufferToScreenLocked()");
   mSurface->InvalidateLocked(aProofOfLock);
+  if (auto* buffer = mFrontBuffer->AsWaylandBufferDMABUF()) {
+    buffer->GetSurface()->FenceWait(mRootLayer->gl());
+  }
   mSurface->AttachLocked(aProofOfLock, mFrontBuffer);
   return true;
 }

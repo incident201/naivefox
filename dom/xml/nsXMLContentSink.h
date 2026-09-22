@@ -178,7 +178,8 @@ class nsXMLContentSink : public nsContentSink,
 
   nsresult HandleStartElement(const char16_t* aName, const char16_t** aAtts,
                               uint32_t aAttsCount, uint32_t aLineNumber,
-                              uint32_t aColumnNumber, bool aInterruptable);
+                              uint32_t aColumnNumber,
+                              mozilla::dom::FromParser aFromParser);
   nsresult HandleEndElement(const char16_t* aName, bool aInterruptable);
   nsresult HandleCharacterData(const char16_t* aData, uint32_t aLength,
                                bool aInterruptable);
@@ -205,6 +206,7 @@ class nsXMLContentSink : public nsContentSink,
   nsTArray<StackNode> mContentStack;
 
   nsCOMPtr<nsIDocumentTransformer> mXSLTProcessor;
+  RefPtr<mozilla::dom::Document> mXSLTResultDocument;
 
   // Holds the children in the prolog until the root element is added, after
   // which they're inserted in the document. However, if we're doing an XSLT

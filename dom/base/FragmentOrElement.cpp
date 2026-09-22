@@ -21,6 +21,7 @@
 #include "mozilla/MouseEvents.h"
 #include "mozilla/PresShell.h"
 #include "mozilla/RestyleManager.h"
+#include "mozilla/ScrollState.h"
 #include "mozilla/StaticPtr.h"
 #include "mozilla/TextEditor.h"
 #include "mozilla/TouchEvents.h"
@@ -794,6 +795,10 @@ size_t FragmentOrElement::nsExtendedDOMSlots::SizeOfExcludingThis(
   // report the memory it's using directly.
   if (mControllers) {
     n += aMallocSizeOf(mControllers);
+  }
+
+  if (mSavedScrollState) {
+    n += aMallocSizeOf(mSavedScrollState.get());
   }
 
   if (mLabelsList) {
@@ -1835,6 +1840,7 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INTERNAL(FragmentOrElement)
     if (idAtom) {
       id.AppendLiteral(" id='");
       id.Append(nsDependentAtomString(idAtom));
+      id.ReplaceChar(char16_t('\n'), char16_t(' '));
       id.Append('\'');
     }
 

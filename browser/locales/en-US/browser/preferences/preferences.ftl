@@ -365,10 +365,6 @@ browser-layout-vertical-tabs2 =
     .title = Tabs on the side, in the sidebar
     .description = Tabs on the side, in the sidebar
 
-browser-layout-show-sidebar2 =
-    .label = Show sidebar
-    .description = Quickly access bookmarks, tabs from your phone, AI chatbots, and more without leaving your main view.
-
 page-navigation-group =
     .label = Page navigation
 
@@ -777,6 +773,9 @@ update-history-2 =
 update-application-installation =
     .label = Installation
 
+update-application-radio-group =
+    .aria-label = Installation
+
 update-application-auto-2 =
     .label = Automatically install updates (recommended)
     .accesskey = A
@@ -935,10 +934,6 @@ network-proxy-connection-settings2 =
 home-section =
     .heading = Home and startup
 
-home-new-windows-tabs-header = New Windows and Tabs
-
-home-new-windows-tabs-description2 = Choose what you see when you open your homepage, new windows, and new tabs.
-
 ## Home Section - Default Browser
 
 home-default-browser-title =
@@ -956,10 +951,6 @@ set-as-my-default-browser-2 =
 
 ## Home Section - Home Page Customization
 
-home-homepage-mode-label = Homepage and new windows
-
-home-newtabs-mode-label = New tabs
-
 home-restore-defaults =
     .label = Restore Defaults
     .accesskey = R
@@ -973,35 +964,10 @@ home-mode-choice-custom =
 home-mode-choice-blank =
     .label = Blank Page
 
-home-homepage-custom-url =
-    .placeholder = Paste a URL…
-
-# This button is shown when the homepage is managed by an extension and is placed below extension-controlling-homepage.
-home-homepage-manage-extension-button =
-    .label = Manage extension
-
 ## Custom Homepage subpage
-
-home-custom-homepage-header = Custom Homepage
 
 home-custom-homepage-subpage =
     .heading = Custom Homepage
-
-# This string has a special case for '1' and [other] (default). If necessary for
-# your language, you can add {$tabCount} to your translations and use the
-# standard CLDR forms, or only use the form for [other] if both strings should
-# be identical.
-use-current-pages =
-    .label =
-        { $tabCount ->
-            [1] Use Current Page
-           *[other] Use Current Pages
-        }
-    .accesskey = C
-
-choose-bookmark =
-    .label = Use Bookmark…
-    .accesskey = B
 
 home-homepage-title =
     .label = Homepage
@@ -1051,68 +1017,6 @@ home-custom-homepage-bookmarks-button =
 #   $extension (string) - Name of the extension
 home-prefs-homepage-extension-option =
     .label = Extension ({ $extension })
-
-## Home Section - Firefox Home Content Customization
-
-home-prefs-content-header2 = { -firefox-home-brand-name } Content
-home-prefs-content-description2 = Choose what content you want on your { -firefox-home-brand-name } screen.
-
-home-prefs-search-header =
-    .label = Web Search
-home-prefs-shortcuts-header =
-    .label = Shortcuts
-home-prefs-shortcuts-description = Sites you save or visit
-home-prefs-shortcuts-by-option-sponsored =
-    .label = Sponsored shortcuts
-
-home-prefs-recommended-by-header-generic =
-    .label = Recommended stories
-home-prefs-recommended-by-description-generic = Exceptional content curated by the { -brand-product-name } family
-
-home-prefs-stories-header =
-    .label = Stories
-home-prefs-stories-description = Personalized stories based on your activity
-
-##
-
-home-prefs-recommended-by-learn-more = How it works
-home-prefs-recommended-by-option-sponsored-stories =
-    .label = Sponsored stories
-
-home-prefs-highlights-option-visited-pages =
-    .label = Visited pages
-home-prefs-highlights-options-bookmarks =
-    .label = Bookmarks
-home-prefs-highlights-option-most-recent-download =
-    .label = Most recent download
-
-home-prefs-recent-activity-header =
-    .label = Recent activity
-home-prefs-recent-activity-description = A selection of recent sites and content
-
-# Variables:
-#   $num (number) - Number of rows displayed
-home-prefs-sections-rows-option =
-    .label =
-        { $num ->
-            [one] { $num } row
-           *[other] { $num } rows
-        }
-home-prefs-weather-header =
-  .label = Weather
-home-prefs-weather-description = Today’s forecast at a glance
-home-prefs-weather-learn-more-link = Learn more
-
-# "Support" here means to help sustain or contribute to something, especially through funding or sponsorship.
-home-prefs-support-firefox-header =
-    .label = Support { -brand-product-name }
-
-home-prefs-mission-message = Our sponsors support our mission to build a better web
-home-prefs-mission-message-learn-more-link = Find out how
-
-home-prefs-manage-topics-link = Manage topics
-
-home-prefs-choose-wallpaper-link = Choose a wallpaper
 
 ## Search Section
 
@@ -1825,6 +1729,9 @@ preferences-passwords-autofill-header =
 history-group =
     .label = History
 
+history-mode-radio-group =
+    .aria-label = History
+
 history-remember-option-all2 =
     .label = Remember history
 history-remember-option-never2 =
@@ -2315,6 +2222,9 @@ preferences-doh-status-not-active = Not active ({ $reason })
 
 preferences-doh-group-message2 = Enable DNS over HTTPS using:
 
+preferences-doh-radio-group =
+    .aria-label = Enable DNS over HTTPS using:
+
 preferences-doh-expand-section =
   .tooltiptext = More information
 
@@ -2576,6 +2486,10 @@ preferences-ai-controls-key-points-control =
     .label = Key points in link previews
     .description = See a quick summary before opening a link.
 
+preferences-ai-controls-speech-recognition-control =
+    .label = Speech recognition
+    .description = Transcribe speech locally.
+
 preferences-ai-controls-sidebar-chatbot-group-3 =
     .label = AI chatbot providers in sidebar
     .description = Keep a chatbot in view as you browse. Choose from multiple providers and switch anytime.
@@ -2607,6 +2521,7 @@ preferences-ai-controls-block-confirmation-pdfjs = Image alt text in { -brand-sh
 preferences-ai-controls-block-confirmation-tab-group-suggestions = Tab group suggestions
 preferences-ai-controls-block-confirmation-key-points = Key points in link previews
 preferences-ai-controls-block-confirmation-sidebar-chatbot = Chatbot providers in sidebar
+preferences-ai-controls-block-confirmation-speech-recognition = Speech recognition
 preferences-ai-controls-block-confirmation-features-after = Blocking also affects extensions that use AI provided by { -brand-short-name }.
 
 preferences-ai-controls-block-confirmation-cancel =
@@ -2662,6 +2577,9 @@ issue-card-dismiss-button =
 preferences-etp-status-header =
     .label = Enhanced Tracking Protection
     .description = Sites use trackers to follow you online and show creepy ads. { -brand-short-name } shields you as you browse, blocking trackers automatically so you’re in control of your digital trail.
+
+preferences-etp-level-radio-group =
+    .aria-label = Enhanced Tracking Protection
 
 preferences-etp-level-standard =
     .label = Standard (default)

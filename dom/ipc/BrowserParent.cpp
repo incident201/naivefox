@@ -278,6 +278,7 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(BrowserParent)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mBrowsingContext)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mFrameElement)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mBrowserDOMWindow)
+  NS_IMPL_CYCLE_COLLECTION_UNLINK(mBrowserHost)
   tmp->UnlinkManager();
   NS_IMPL_CYCLE_COLLECTION_UNLINK_WEAK_REFERENCE
 NS_IMPL_CYCLE_COLLECTION_UNLINK_END
@@ -287,6 +288,7 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(BrowserParent)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mBrowsingContext)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mFrameElement)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mBrowserDOMWindow)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mBrowserHost)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE_RAWPTR(Manager())
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
 
@@ -304,8 +306,6 @@ BrowserParent::BrowserParent(ContentParent* aManager, const TabId& aTabId,
       mBrowserDOMWindow(nullptr),
       mFrameLoader(nullptr),
       mChromeFlags(aChromeFlags),
-      mBrowserBridgeParent(nullptr),
-      mBrowserHost(nullptr),
       mContentCache(*this),
       mRect(0, 0, 0, 0),
       mDimensions(0, 0),
@@ -325,8 +325,6 @@ BrowserParent::BrowserParent(ContentParent* aManager, const TabId& aTabId,
       mHasPresented(false),
       mIsReadyToHandleInputEvents(false),
       mIsMouseEnterIntoWidgetEventSuppressed(false),
-      mLockedNativePointer(false),
-      mWaitingForNativeMouseMoveAfterUnlock(false),
       mShowingTooltip(false) {
   MOZ_ASSERT(aManager);
 
@@ -358,6 +356,9 @@ BrowserParent::BrowserParent(ContentParent* aManager, const TabId& aTabId,
 }
 
 BrowserParent::~BrowserParent() {
+  if (mRemoteLayerTreeOwner.IsInitialized()) {
+    RemoveBrowserParentFromTable(mRemoteLayerTreeOwner.GetLayersId());
+  }
   RequestingAccessKeyEventData::OnBrowserParentDestroyed();
 }
 
@@ -393,12 +394,17 @@ BrowserParent* BrowserParent::GetFrom(nsIContent* aContent) {
 }
 
 /* static */
-BrowserParent* BrowserParent::GetBrowserParentFromLayersId(
+already_AddRefed<BrowserParent> BrowserParent::GetBrowserParentFromLayersId(
     layers::LayersId aLayersId) {
   if (!sLayerToBrowserParentTable) {
     return nullptr;
   }
-  return sLayerToBrowserParentTable->Get(uint64_t(aLayersId));
+  nsWeakPtr weak = sLayerToBrowserParentTable->Get(uint64_t(aLayersId));
+  if (!weak) {
+    return nullptr;
+  }
+  RefPtr<BrowserParent> browserParent = do_QueryReferent(weak);
+  return browserParent.forget();
 }
 
 /*static*/
@@ -419,8 +425,8 @@ void BrowserParent::AddBrowserParentToTable(layers::LayersId aLayersId,
   if (!sLayerToBrowserParentTable) {
     sLayerToBrowserParentTable = new LayerToBrowserParentTable();
   }
-  sLayerToBrowserParentTable->InsertOrUpdate(uint64_t(aLayersId),
-                                             aBrowserParent);
+  sLayerToBrowserParentTable->InsertOrUpdate(
+      uint64_t(aLayersId), do_GetWeakReference(aBrowserParent));
 }
 
 void BrowserParent::RemoveBrowserParentFromTable(layers::LayersId aLayersId) {
@@ -564,7 +570,7 @@ LayersId BrowserParent::GetLayersId() const {
 }
 
 BrowserBridgeParent* BrowserParent::GetBrowserBridgeParent() const {
-  return mBrowserBridgeParent;
+  return mBrowserBridgeParent.get();
 }
 
 BrowserHost* BrowserParent::GetBrowserHost() const { return mBrowserHost; }
@@ -630,7 +636,6 @@ void BrowserParent::SetOwnerElement(Element* aElement) {
       newWindowHandle =
           reinterpret_cast<uintptr_t>(widget->GetNativeData(NS_NATIVE_WINDOW));
     }
-    (void)SendUpdateNativeWindowHandle(newWindowHandle);
     a11y::DocAccessibleParent* doc = GetTopLevelDocAccessible();
     if (doc) {
       HWND hWnd = reinterpret_cast<HWND>(doc->GetEmulatedWindowHandle());
@@ -706,7 +711,6 @@ void BrowserParent::Deactivated() {
     // Reuse the normal tooltip hiding method.
     (void)RecvHideTooltip();
   }
-  UnlockNativePointer();
   UnsetTopLevelWebFocus(this);
   if (sFocus == this) {
     sFocus = sTopLevelWebFocus;
@@ -784,6 +788,13 @@ mozilla::ipc::IPCResult BrowserParent::RecvEnsureLayersConnected(
     Maybe<CompositorOptions>* aCompositorOptions) {
   if (mRemoteLayerTreeOwner.IsInitialized()) {
     mRemoteLayerTreeOwner.EnsureLayersConnected(*aCompositorOptions);
+  }
+  return IPC_OK();
+}
+
+mozilla::ipc::IPCResult BrowserParent::Recv__delete__() {
+  if (!mIsDestroyed) {
+    return IPC_FAIL(this, "BrowserParent delete was initiated by the child");
   }
   return IPC_OK();
 }
@@ -879,6 +890,10 @@ void BrowserParent::ActorDestroy(ActorDestroyReason why) {
   // and it may confuse the frontend.
   mBrowsingContext->BrowserParentDestroyed(
       this, why == AbnormalShutdown || why == ManagedEndpointDropped);
+
+  // BrowserHost::DestroyComplete() has usually cleared this already, but it is
+  // never reached if we had no frame loader.
+  mBrowserHost = nullptr;
 }
 
 mozilla::ipc::IPCResult BrowserParent::RecvMoveFocus(
@@ -983,6 +998,9 @@ void BrowserParent::ResumeLoad(uint64_t aPendingSwitchID) {
 }
 
 void BrowserParent::InitRendering() {
+  if (!CanSend()) {
+    return;
+  }
   if (mRemoteLayerTreeOwner.IsInitialized()) {
     return;
   }
@@ -1059,6 +1077,20 @@ mozilla::ipc::IPCResult BrowserParent::RecvSetDimensions(
   docShell->GetTreeOwner(getter_AddRefs(treeOwner));
   nsCOMPtr<nsIBaseWindow> treeOwnerAsWin = do_QueryInterface(treeOwner);
   NS_ENSURE_TRUE(treeOwnerAsWin, IPC_OK());
+
+  if (nsCOMPtr<nsIDragService> dragService =
+          do_GetService("@mozilla.org/widget/dragservice;1")) {
+    RefPtr<nsIWidget> widget = GetTopLevelWidget();
+    if (RefPtr<nsIDragSession> session =
+            dragService->GetCurrentSession(widget)) {
+      session->EndDragSession(false, 0);
+    }
+  }
+
+  if (nsPresContext* presContext =
+          mFrameElement->OwnerDoc()->GetPresContext()) {
+    presContext->EventStateManager()->StopTrackingDragGesture(true);
+  }
 
   // `BrowserChild` only sends the values to actually be changed, see more
   // details in `BrowserChild::SetDimensions()`.
@@ -1892,14 +1924,8 @@ mozilla::ipc::IPCResult BrowserParent::RecvSynthesizeNativeMouseEvent(
 
 mozilla::ipc::IPCResult BrowserParent::RecvSynthesizeNativeMouseMove(
     const LayoutDeviceIntPoint& aPoint, const Maybe<uint64_t>& aCallbackId) {
-  NS_ENSURE_TRUE(
-      xpc::IsInAutomation()
-          // This is used by pointer lock API.  So, even if it's not
-          // in the automation mode, we need to accept the request.
-          || (mLockedNativePointer || mWaitingForNativeMouseMoveAfterUnlock),
-      IPC_FAIL(this, "Unexpected event"));
+  NS_ENSURE_TRUE(xpc::IsInAutomation(), IPC_FAIL(this, "Unexpected event"));
 
-  mWaitingForNativeMouseMoveAfterUnlock = false;
   nsCOMPtr<nsISynthesizedEventCallback> callback =
       SynthesizedEventCallback::MaybeCreate(this, aCallbackId);
   if (nsCOMPtr<nsIWidget> widget = GetWidget()) {
@@ -2007,42 +2033,6 @@ mozilla::ipc::IPCResult BrowserParent::RecvSynthesizeNativeTouchpadPan(
     widget->SynthesizeNativeTouchpadPan(aEventPhase, aPoint, aDeltaX, aDeltaY,
                                         aModifierFlags, callback);
   }
-  return IPC_OK();
-}
-
-mozilla::ipc::IPCResult BrowserParent::RecvLockNativePointer(
-    const nsIWidget::NativePointerLockMode& aNativePointerLockMode) {
-  // XXX(edgar): LockNativePointer IPC message can be removed if pointer lock
-  // is handled mainly from parent process.
-  NS_ENSURE_TRUE(
-      !StaticPrefs::dom_pointer_lock_reset_to_center_from_parent_enabled(),
-      IPC_FAIL(this, "Unexpected request"));
-
-  if (nsCOMPtr<nsIWidget> widget = GetWidget()) {
-    mLockedNativePointer = true;
-    widget->LockNativePointer(aNativePointerLockMode);
-  }
-  return IPC_OK();
-}
-
-void BrowserParent::UnlockNativePointer() {
-  if (!mLockedNativePointer) {
-    return;
-  }
-  if (nsCOMPtr<nsIWidget> widget = GetWidget()) {
-    widget->UnlockNativePointer();
-    mLockedNativePointer = false;
-    mWaitingForNativeMouseMoveAfterUnlock = true;
-  }
-}
-
-mozilla::ipc::IPCResult BrowserParent::RecvUnlockNativePointer() {
-  // XXX(edgar): LockNativePointer IPC message can be removed if pointer lock
-  // is handled mainly from parent process.
-  NS_ENSURE_TRUE(
-      !StaticPrefs::dom_pointer_lock_reset_to_center_from_parent_enabled(),
-      IPC_FAIL(this, "Unexpected request"));
-  UnlockNativePointer();
   return IPC_OK();
 }
 
@@ -3883,8 +3873,29 @@ mozilla::ipc::IPCResult BrowserParent::RecvInvokeDragSession(
     const CookieJarSettingsArgs& aCookieJarSettingsArgs,
     const MaybeDiscarded<WindowContext>& aSourceWindowContext,
     const MaybeDiscarded<WindowContext>& aSourceTopWindowContext) {
-  PresShell* presShell = mFrameElement->OwnerDoc()->GetPresShell();
-  if (!presShell) {
+  nsCOMPtr<nsIDragService> dragService =
+      do_GetService("@mozilla.org/widget/dragservice;1");
+  nsPresContext* presContext = mFrameElement->OwnerDoc()->GetPresContext();
+  const bool isValidRemoteDrag = [&]() {
+    if (!dragService || !presContext) {
+      return false;
+    }
+
+    if (dragService->GetIsSuppressed()) {
+      return false;
+    }
+
+    BrowserParent* dragTopLevelRemoteTarget =
+        presContext->EventStateManager()
+            ->GetTrackingDragGestureTopLevelRemoteTarget();
+    if (NS_WARN_IF(dragTopLevelRemoteTarget != TopLevelBrowserParent())) {
+      return false;
+    }
+
+    return true;
+  }();
+
+  if (!isValidRemoteDrag) {
     (void)SendEndDragSession(true, true, LayoutDeviceIntPoint(), 0,
                              nsIDragService::DRAGDROP_ACTION_NONE);
     // Continue sending input events with input priority when stopping the dnd
@@ -3922,15 +3933,10 @@ mozilla::ipc::IPCResult BrowserParent::RecvInvokeDragSession(
     }
   }
 
-  nsCOMPtr<nsIDragService> dragService =
-      do_GetService("@mozilla.org/widget/dragservice;1");
-  if (dragService) {
-    dragService->MaybeAddBrowser(this);
-  }
+  dragService->MaybeAddBrowser(this);
 
-  presShell->GetPresContext()
-      ->EventStateManager()
-      ->BeginTrackingRemoteDragGesture(mFrameElement, dragStartData);
+  presContext->EventStateManager()->BeginTrackingRemoteDragGesture(
+      mFrameElement, dragStartData);
 
   nsCOMPtr<nsIObserverService> os = services::GetObserverService();
   os->NotifyObservers(nullptr, "content-invoked-drag", nullptr);
@@ -4136,16 +4142,14 @@ void BrowserParent::LiveResizeStopped() { SuppressDisplayport(false); }
 void BrowserParent::SetBrowserBridgeParent(BrowserBridgeParent* aBrowser) {
   // We should either be clearing out our reference to a browser bridge, or not
   // have either a browser bridge, browser host, or owner content yet.
-  MOZ_ASSERT(!aBrowser ||
-             (!mBrowserBridgeParent && !mBrowserHost && !mFrameElement));
+  MOZ_RELEASE_ASSERT(!aBrowser || !IsEmbedded());
   mBrowserBridgeParent = aBrowser;
 }
 
 void BrowserParent::SetBrowserHost(BrowserHost* aBrowser) {
   // We should either be clearing out our reference to a browser host, or not
   // have either a browser bridge, browser host, or owner content yet.
-  MOZ_ASSERT(!aBrowser ||
-             (!mBrowserBridgeParent && !mBrowserHost && !mFrameElement));
+  MOZ_RELEASE_ASSERT(!aBrowser || !IsEmbedded());
   mBrowserHost = aBrowser;
 }
 

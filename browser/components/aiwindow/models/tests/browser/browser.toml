@@ -9,6 +9,7 @@ prefs = [
 
 ["browser_MemoriesManager.js"]
 ["browser_MemoriesSchedulers.js"]
+["browser_aitab_catalog.js"]
 ["browser_aitab_generation.js"]
 ["browser_aitab_schema_override.js"]
 ["browser_aitab_validation.js"]
@@ -19,6 +20,7 @@ prefs = [
 ["browser_monitor_agent.js"]
 ["browser_monitor_errors.js"]
 ["browser_monitor_store.js"]
+["browser_monitor_telemetry.js"]
 ["browser_prompt_loader_browser_context.js"]
 ["browser_prompt_loader_build_conversation.js"]
 ["browser_prompt_loader_chat_system_prompt.js"]
@@ -31,3 +33,4 @@ prefs = [
 ["browser_tools_get_page_content.js"]
 ["browser_tools_get_skill.js"]
 ["browser_utils_fxAccount.js"]
+["browser_utils_records_cache.js"]

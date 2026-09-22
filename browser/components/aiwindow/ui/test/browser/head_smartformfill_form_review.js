@@ -50,6 +50,7 @@ const { NonPrivateTabs } = ChromeUtils.importESModule(
  * @typedef {object} FormReviewSnapshot
  * @property {string} state - Current form review state.
  * @property {string|null} errorType - Current error result, if any.
+ * @property {number|null} filledFieldCount - Number of fields filled, if known.
  * @property {Array<object>} fields - Fields currently held by the component.
  * @property {string[]} l10nIds - Localization IDs rendered by the component.
  * @property {boolean|null} fillButtonDisabled - Fill button state, if rendered.
@@ -92,7 +93,8 @@ function respondToFormReviewMetadataRequest(schemaName, requestData, respond) {
       return;
 
     case RELEVANT_TABS_SCHEMA: {
-      const source = requestData.tabs.find(tab => tab.url === SOURCE_URL);
+      const sourceToken = new UrlTokenizer().encodeToken(SOURCE_URL);
+      const source = requestData.tabs.find(tab => tab.url === sourceToken);
       respond(
         JSON.stringify({
           selectedTabs: source
@@ -241,6 +243,27 @@ function waitForFormReviewTabChange(sourceEvent) {
 }
 
 /**
+ * Opens a foreground tab and waits for the open tab list to have caught up
+ * with it.
+ *
+ * The list reports an open in batches, the last of which trails the tab's
+ * title. A batch that lands later takes the source editor away the way a tab
+ * the user opened would, so every tab a test opens is waited out up to that
+ * last batch.
+ *
+ * @param {Window} win - AI Window to open the tab in.
+ * @param {string} url - Page to open.
+ * @returns {Promise<MozTabbrowserTab>} The opened tab.
+ */
+async function openTabAndWaitForTabList(win, url) {
+  const tabListUpdated = waitForFormReviewTabChange("TabAttrModified");
+  const tab = await BrowserTestUtils.openNewForegroundTab(win.gBrowser, url);
+  await tabListUpdated;
+
+  return tab;
+}
+
+/**
  * Creates an AI Window, source tab, and form tab ready for a review test.
  *
  * @returns {Promise<FormReviewTestContext>} Initialized test context.
@@ -257,7 +280,11 @@ async function setupFormReviewTest() {
     Region._setHomeRegion("US", false);
 
     await SpecialPowers.pushPrefEnv({
-      set: [["browser.smartwindow.smartformfill.enabled", true]],
+      set: [
+        [SMART_FORM_FILL_PREF, true],
+        // The test forms are smaller than the minimum the feature ships with.
+        [MIN_FORM_FIELDS_PREF, 1],
+      ],
     });
     context.prefEnvPushed = true;
 
@@ -270,16 +297,8 @@ async function setupFormReviewTest() {
 
     context.win = await openAIWindow();
 
-    const sourceTabUpdated = waitForFormReviewTabChange("TabAttrModified");
-    await BrowserTestUtils.openNewForegroundTab(
-      context.win.gBrowser,
-      SOURCE_URL
-    );
-    await sourceTabUpdated;
-
-    const formTabUpdated = waitForFormReviewTabChange("TabAttrModified");
-    await BrowserTestUtils.openNewForegroundTab(context.win.gBrowser, FORM_URL);
-    await formTabUpdated;
+    await openTabAndWaitForTabList(context.win, SOURCE_URL);
+    await openTabAndWaitForTabList(context.win, FORM_URL);
 
     const sidebarBrowser = await BrowserTestUtils.waitForMutationCondition(
       context.win.document.documentElement,
@@ -366,7 +385,45 @@ async function waitForFormReviewState(reviewBrowser, expectedState) {
     }
 
     await review.updateComplete;
+    await ContentTaskUtils.waitForCondition(
+      () =>
+        review.renderRoot.activeElement ===
+        review.renderRoot.querySelector(".form-review-dialog"),
+      `Waiting for the ${state} state to receive focus`
+    );
   });
+}
+
+/**
+ * Waits for an element in the review component to receive focus.
+ *
+ * @param {MozBrowser} reviewBrowser - Browser hosting the review component.
+ * @param {string} selector - Selector for the expected focused element.
+ * @returns {Promise<void>}
+ */
+async function waitForFormReviewFocus(reviewBrowser, selector) {
+  await SpecialPowers.spawn(reviewBrowser, [selector], async expected => {
+    const review = Cu.waiveXrays(
+      content.document.querySelector("ai-sff-form-review")
+    );
+
+    await ContentTaskUtils.waitForCondition(
+      () => review.renderRoot.activeElement?.matches(expected),
+      `Waiting for "${expected}" to receive focus`
+    );
+  });
+}
+
+/**
+ * Presses Tab and waits for the expected review element to receive focus.
+ *
+ * @param {MozBrowser} reviewBrowser - Browser hosting the review component.
+ * @param {string} selector - Selector for the expected focused element.
+ * @returns {Promise<void>}
+ */
+async function tabToFormReviewElement(reviewBrowser, selector) {
+  await BrowserTestUtils.synthesizeKey("KEY_Tab", {}, reviewBrowser);
+  await waitForFormReviewFocus(reviewBrowser, selector);
 }
 
 /**
@@ -385,6 +442,7 @@ async function getFormReviewSnapshot(reviewBrowser) {
     return {
       state: review.state,
       errorType: review.errorType,
+      filledFieldCount: review.filledFieldCount,
       fields: review.fields.map(field => ({ ...field })),
       l10nIds: [...review.renderRoot.querySelectorAll("[data-l10n-id]")].map(
         element => element.getAttribute("data-l10n-id")
@@ -475,7 +533,14 @@ async function scrollFormReviewFieldsToBottom(reviewBrowser) {
       throw new Error("Could not find form review fields");
     }
 
+    // The list sets scroll-behavior: smooth, so the position animates and only
+    // lands a few frames later.
     fields.scrollTop = fields.scrollHeight;
+    await ContentTaskUtils.waitForCondition(
+      () => fields.scrollHeight - fields.scrollTop - fields.clientHeight <= 1,
+      "Waiting for the review fields to reach their maximum scroll position"
+    );
+
     fields.dispatchEvent(new content.Event("scroll"));
     await review.updateComplete;
   });
@@ -529,7 +594,12 @@ async function editFormReviewInput(reviewBrowser, index, value) {
 
       EventUtils.synthesizeMouseAtCenter(input.inputEl, {}, content);
       EventUtils.synthesizeKey("a", { accelKey: true }, content);
-      await EventUtils.sendString(inputValue, content);
+      EventUtils.synthesizeKey("KEY_Backspace", {}, content);
+
+      if (inputValue) {
+        await EventUtils.sendString(inputValue, content);
+      }
+
       await review.updateComplete;
     }
   );

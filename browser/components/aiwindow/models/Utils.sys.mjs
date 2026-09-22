@@ -5,6 +5,7 @@
  */
 
 import { openAIEngine } from "moz-src:///browser/components/aiwindow/models/openAIEngine.sys.mjs";
+import { clearTimeout, setTimeout } from "resource://gre/modules/Timer.sys.mjs";
 import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
 
 // Re-exported for back-compat with existing tests that import openAIEngine
@@ -27,6 +28,29 @@ let _remoteClient = null;
 
 /** @type {Promise<object[]>|null} */
 let _recordsPromise = null;
+let _recordsIdleTimer = null;
+
+// The repeat reads worth collapsing all happen within one chat turn, so the
+// cache is released once idle rather than held for the session.
+const RECORDS_IDLE_MS = 15_000;
+let _recordsIdleMs = RECORDS_IDLE_MS;
+
+function dropRecordsCache() {
+  if (_recordsIdleTimer) {
+    clearTimeout(_recordsIdleTimer);
+    _recordsIdleTimer = null;
+  }
+  _recordsPromise = null;
+}
+
+// Re-armed on every read, so the window tracks idleness rather than age and a
+// long turn can't have the records dropped out from under it mid-flight.
+function touchRecordsCache() {
+  if (_recordsIdleTimer) {
+    clearTimeout(_recordsIdleTimer);
+  }
+  _recordsIdleTimer = setTimeout(dropRecordsCache, _recordsIdleMs);
+}
 
 /**
  * Gets the Remote Settings client for AI window configurations. Subscribes
@@ -44,7 +68,7 @@ export function getRemoteClient() {
   });
   client.on("sync", async () => {
     // Dropped before the models refresh below, which reads records back.
-    _recordsPromise = null;
+    dropRecordsCache();
     try {
       await refreshModelsDataCache();
     } catch (e) {
@@ -56,16 +80,17 @@ export function getRemoteClient() {
 }
 
 /**
- * Every record in the AI window collection, memoized for the session and
- * dropped on sync. `client.get()` is not a cheap repeat read: each call lists
- * the whole collection out of IndexedDB and re-runs the JEXL filter over every
- * record, and a single chat submit resolves records three to five times
- * (model config, system prompt assembly, per-turn browser context).
+ * Every record in the AI window collection, memoized until idle and dropped on
+ * sync. `client.get()` is not a cheap repeat read: each call lists the whole
+ * collection out of IndexedDB and re-runs the JEXL filter over every record,
+ * and a single chat submit resolves records three to five times (model config,
+ * system prompt assembly, per-turn browser context).
  *
  * @returns {Promise<object[]>}
  */
 export function getRemoteRecords() {
   if (_recordsPromise) {
+    touchRecordsCache();
     return _recordsPromise;
   }
   const promise = getRemoteClient()
@@ -75,11 +100,12 @@ export function getRemoteRecords() {
       // served for the rest of the session. Guarded so a sync that landed
       // while this read was in flight keeps its fresher entry.
       if (_recordsPromise === promise) {
-        _recordsPromise = null;
+        dropRecordsCache();
       }
       throw error;
     });
   _recordsPromise = promise;
+  touchRecordsCache();
   return promise;
 }
 
@@ -91,7 +117,7 @@ export function getRemoteRecords() {
  */
 export function _setRemoteClientForTesting(client) {
   _remoteClient = client;
-  _recordsPromise = null;
+  dropRecordsCache();
 }
 
 /**
@@ -99,7 +125,7 @@ export function _setRemoteClientForTesting(client) {
  */
 export function _clearRemoteClientForTesting() {
   _remoteClient = null;
-  _recordsPromise = null;
+  dropRecordsCache();
 }
 
 /**
@@ -107,7 +133,18 @@ export function _clearRemoteClientForTesting() {
  * tests that mutate a fake client's data between reads.
  */
 export function _clearRecordsCacheForTesting() {
-  _recordsPromise = null;
+  dropRecordsCache();
+}
+
+/**
+ * Test-only seam: shortens the idle window so a test can observe the release
+ * without waiting it out. Pass null to restore the default.
+ *
+ * @param {number|null} ms
+ */
+export function _setRecordsIdleMsForTesting(ms) {
+  _recordsIdleMs = ms ?? RECORDS_IDLE_MS;
+  dropRecordsCache();
 }
 
 const modelPrefObserver = {
@@ -117,7 +154,7 @@ const modelPrefObserver = {
         "Model preference changed, invalidating Remote Settings cache"
       );
       _remoteClient = null;
-      _recordsPromise = null;
+      dropRecordsCache();
     }
   },
 };
@@ -366,6 +403,16 @@ export const FALLBACK_MODELS_V2 = {
 };
 
 /**
+ * Checks if the modelChoiceId points at a custom model selection.
+ *
+ * @param {string} modelChoiceId
+ * @returns {boolean}
+ */
+function isCustomModelChoice(modelChoiceId) {
+  return modelChoiceId === "0" || modelChoiceId === "";
+}
+
+/**
  * Selects the main configuration for a feature based on version and model preferences.
  *
  * Remote Settings maintains only the latest minor version for each (feature, model, major_version) combination.
@@ -397,11 +444,12 @@ export function selectMainConfig(
     return null;
   }
 
-  // We only allow customization of main assistant model ("chat" feature)
+  // Only the main assistant model ("chat" feature) is selectable per model
+  // choice; other features always use their default config.
   // We figure out which model the user wants and load prompts for that model
   // If we can't find a config for the user selection, we load the generic one
   if (feature === MODEL_FEATURES.CHAT) {
-    if (modelChoiceId !== "0" && modelChoiceId !== "") {
+    if (!isCustomModelChoice(modelChoiceId)) {
       // First check the choice ID. If it's not 0, use the model associated with that ID
 
       // Look for config based on model choice ID
@@ -447,10 +495,13 @@ export function selectMainConfig(
   }
 
   // **For all features other than "chat"**
-  // If no user model pref OR user's model not found: use default
+  // If no user model pref OR user's model not found: use default, swapping in
+  // the userModel if needed
   const defaultConfig = sameMajor.find(config => config.is_default === true);
   if (defaultConfig) {
-    return defaultConfig;
+    return userModel && isCustomModelChoice(modelChoiceId)
+      ? { ...defaultConfig, model: userModel }
+      : defaultConfig;
   }
 
   // No default found - this shouldn't happen with proper Remote Settings data

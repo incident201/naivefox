@@ -44,7 +44,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "moz-src:///browser/components/customizableui/CustomizableUI.sys.mjs",
   ExperimentAPI: "resource://nimbus/ExperimentAPI.sys.mjs",
   FxAccounts: "resource://gre/modules/FxAccounts.sys.mjs",
-  GenAI: "resource:///modules/GenAI.sys.mjs",
+  GenAI: "moz-src:///browser/components/genai/GenAI.sys.mjs",
   ICON_CATALOG:
     // eslint-disable-next-line mozilla/no-browser-refs-in-toolkit
     "moz-src:///browser/components/shell/CustomIconManager.sys.mjs",
@@ -63,6 +63,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
   // eslint-disable-next-line mozilla/no-browser-refs-in-toolkit
   Referrals: "resource:///modules/referrals/Referrals.sys.mjs",
+  ResetProfile: "resource://gre/modules/ResetProfile.sys.mjs",
   // eslint-disable-next-line mozilla/no-browser-refs-in-toolkit
   SelectableProfileService:
     "resource:///modules/profiles/SelectableProfileService.sys.mjs",
@@ -391,6 +392,7 @@ export const SpecialMessageActions = {
     const allowedPrefs = [
       "browser.aboutwelcome.didSeeFinalScreen",
       "browser.sessionstore.newTabOnRestore",
+      "browser.smartwindow.agent.monitorAnnouncement",
       "browser.smartwindow.enabled",
       "browser.smartwindow.firstrun.hasCompleted",
       "browser.smartwindow.firstrun.modelChoice",
@@ -1063,6 +1065,9 @@ export const SpecialMessageActions = {
           false,
           action.data?.source ?? "asrouter"
         );
+      case "OPEN_SMARTWINDOW_MONITOR_CREATE":
+        lazy.AIWindowUI.showMonitorCreateForm(window);
+        break;
       case "OPEN_PROTECTION_PANEL": {
         let { gProtectionsHandler } = window;
         gProtectionsHandler.showProtectionsPopup({});
@@ -1092,8 +1097,8 @@ export const SpecialMessageActions = {
         Services.prefs.setStringPref(DOH_DOORHANGER_DECISION_PREF, "UIOk");
         break;
       case "CANCEL":
-        // A no-op used by CFRs that minimizes the notification but does not
-        // trigger a dismiss or block (it keeps the notification around)
+        // A no-op used by some surfaces that minimizes the notification but
+        // does not trigger a dismiss or block (it keeps the notification around)
         break;
       case "CONFIGURE_HOMEPAGE":
         this.configureHomepage(action.data);
@@ -1218,6 +1223,13 @@ export const SpecialMessageActions = {
           aboutPageURL.toString(),
           action.data.where || "tab"
         );
+        break;
+      }
+      case "RESET_PROFILE": {
+        if (!lazy.ResetProfile.resetSupported()) {
+          throw new Error("Profile reset is not supported for this profile.");
+        }
+        await lazy.ResetProfile.openConfirmationDialog(window);
         break;
       }
       default:

@@ -14,24 +14,24 @@ use crate::font_metrics::{FontMetrics, FontMetricsOrientation};
 use crate::gecko_bindings::structs::GeckoFontMetrics;
 use crate::parser::{Parse, ParserContext};
 use crate::typed_om::{NumericType, NumericValue, ToTyped, TypedValue, UnitValue};
+use crate::values::CSSFloat;
 use crate::values::computed::{self, CSSPixelLength, Context, FontSize};
+use crate::values::generics::NonNegative;
 use crate::values::generics::length as generics;
 use crate::values::generics::length::{
     GenericAnchorSizeFunction, GenericLengthOrNumber, GenericLengthPercentageOrNormal,
     GenericMargin, GenericMaxSize, GenericSize,
 };
-use crate::values::generics::NonNegative;
+use crate::values::specified::NonNegativeNumber;
 use crate::values::specified::calc::{
     AllowAnchorPositioningFunctions, CalcLengthPercentage, CalcNode, PercentageContext,
 };
 use crate::values::specified::font::QueryFontMetricsFlags;
 use crate::values::specified::percentage::NoCalcPercentage;
-use crate::values::specified::NonNegativeNumber;
 use crate::values::tagged_numeric::{Extracted, NumericUnion, Unpacked};
-use crate::values::CSSFloat;
 use crate::{Zero, ZeroNoPercent};
 use app_units::AU_PER_PX;
-use cssparser::{match_ignore_ascii_case, Parser, Token};
+use cssparser::{Parser, Token, match_ignore_ascii_case};
 use std::cmp;
 use std::fmt::{self, Write};
 use style_traits::values::specified::AllowedNumericType;
@@ -403,12 +403,12 @@ impl FontBaseSize {
     pub fn resolve(&self, context: &Context) -> computed::FontSize {
         let style = context.style();
         match *self {
-            Self::CurrentStyle => style.get_font().clone_font_size(),
+            Self::CurrentStyle => style.get_font().slow_clone_font_size(),
             Self::InheritedStyle => {
                 // If we're using the size from our inherited style, we still need to apply our
                 // own zoom.
                 let zoom = style.effective_zoom_for_inheritance;
-                style.get_parent_font().clone_font_size().zoom(zoom)
+                style.get_parent_font().slow_clone_font_size().zoom(zoom)
             },
         }
     }
@@ -780,7 +780,7 @@ impl NoCalcLength {
                     context
                         .device()
                         .calc_line_height(
-                            &context.default_style().get_font(),
+                            context.default_style().get_font(),
                             context.style().writing_mode,
                             None,
                         )
@@ -876,7 +876,7 @@ impl NoCalcLength {
                     context
                         .device()
                         .calc_line_height(
-                            &context.default_style().get_font(),
+                            context.default_style().get_font(),
                             context.style().writing_mode,
                             None,
                         )
@@ -1022,7 +1022,11 @@ impl NoCalcLength {
         }
         debug_assert_eq!(unit, LengthUnit::ServoCharacterWidth);
         self.servo_character_width_to_computed_value(
-            context.style().get_font().clone_font_size().computed_size(),
+            context
+                .style()
+                .get_font()
+                .slow_clone_font_size()
+                .computed_size(),
         )
     }
 }
@@ -1194,7 +1198,7 @@ impl Length {
                 )?;
                 Ok(Self::new_calc(Box::new(calc)))
             },
-            _ => return Err(ParseError::unexpected_token()),
+            _ => Err(ParseError::unexpected_token()),
         }
     }
 
@@ -1429,16 +1433,16 @@ impl LengthPercentage {
             Token::Dimension {
                 value, ref unit, ..
             } if num_context.is_ok(context.parsing_mode, value) => {
-                return NoCalcLength::parse_dimension_with_context(context, value, unit)
+                NoCalcLength::parse_dimension_with_context(context, value, unit)
                     .map(LengthPercentage::Length)
-                    .map_err(|()| ParseError::unexpected_token());
+                    .map_err(|()| ParseError::unexpected_token())
             },
             Token::Percentage { unit_value, .. }
                 if num_context.is_ok(context.parsing_mode, unit_value) =>
             {
-                return Ok(LengthPercentage::Percentage(NoCalcPercentage::new(
+                Ok(LengthPercentage::Percentage(NoCalcPercentage::new(
                     unit_value,
-                )));
+                )))
             },
             Token::Number { value, .. } if num_context.is_ok(context.parsing_mode, value) => {
                 let allowed = context.parsing_mode.allows_unitless_lengths()
@@ -1462,7 +1466,7 @@ impl LengthPercentage {
                 )?;
                 Ok(LengthPercentage::Calc(Box::new(calc)))
             },
-            _ => return Err(ParseError::unexpected_token()),
+            _ => Err(ParseError::unexpected_token()),
         }
     }
 
@@ -1568,14 +1572,14 @@ impl LengthPercentage {
     pub fn compute_without_context(&self) -> Option<computed::LengthPercentage> {
         use crate::values::normalize;
         match self {
-            Self::Length(ref length) => length
+            Self::Length(length) => length
                 .to_computed_pixel_length_without_context()
                 .map(|v| computed::LengthPercentage::new_length(computed::Length::new(v)))
                 .ok(),
-            Self::Percentage(ref pc) => Some(computed::LengthPercentage::new_percent(
+            Self::Percentage(pc) => Some(computed::LengthPercentage::new_percent(
                 computed::Percentage(normalize(pc.get())),
             )),
-            Self::Calc(ref calc) => calc.compute_without_context(),
+            Self::Calc(calc) => calc.compute_without_context(),
         }
     }
 }
@@ -1781,23 +1785,23 @@ macro_rules! parse_size_non_length {
 }
 
 fn is_webkit_fill_available_enabled_in_width_and_height() -> bool {
-    static_prefs::pref!("layout.css.webkit-fill-available.enabled")
+    crate::pref!("layout.css.webkit-fill-available.enabled")
 }
 
 fn is_webkit_fill_available_enabled_in_all_size_properties() -> bool {
     // For convenience at the callsites, we check both prefs here,
     // since both must be 'true' in order for the keyword to be
     // enabled in all size properties.
-    static_prefs::pref!("layout.css.webkit-fill-available.enabled")
-        && static_prefs::pref!("layout.css.webkit-fill-available.all-size-properties.enabled")
+    crate::pref!("layout.css.webkit-fill-available.enabled")
+        && crate::pref!("layout.css.webkit-fill-available.all-size-properties.enabled")
 }
 
 fn is_stretch_enabled() -> bool {
-    static_prefs::pref!("layout.css.stretch-size-keyword.enabled")
+    crate::pref!("layout.css.stretch-size-keyword.enabled")
 }
 
 fn is_fit_content_function_enabled() -> bool {
-    static_prefs::pref!("layout.css.fit-content-function.enabled")
+    crate::pref!("layout.css.fit-content-function.enabled")
 }
 
 macro_rules! parse_fit_content_function {

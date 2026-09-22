@@ -6,14 +6,14 @@
 
 use crate::derives::*;
 use crate::parser::{Parse, ParserContext};
+use crate::values::CustomIdent;
 use crate::values::generics::svg as generic;
-use crate::values::specified::color::Color;
-use crate::values::specified::url::SpecifiedUrl;
 use crate::values::specified::AllowQuirks;
 use crate::values::specified::LengthPercentage;
 use crate::values::specified::SVGPathData;
+use crate::values::specified::color::Color;
+use crate::values::specified::url::SpecifiedUrl;
 use crate::values::specified::{NonNegativeLengthPercentage, Opacity};
-use crate::values::CustomIdent;
 use cssparser::{Parser, Token};
 use std::fmt::{self, Write};
 use style_traits::{CommaWithSpace, CssWriter, ParseError, Separator};
@@ -32,15 +32,8 @@ pub type SVGWidth = generic::GenericSVGLength<NonNegativeLengthPercentage>;
 pub type SVGStrokeDashArray = generic::GenericSVGStrokeDashArray<NonNegativeLengthPercentage>;
 
 /// Whether the `context-value` value is enabled.
-#[cfg(feature = "gecko")]
 pub fn is_context_value_enabled() -> bool {
-    static_prefs::pref!("gfx.font_rendering.opentype_svg.enabled")
-}
-
-/// Whether the `context-value` value is enabled.
-#[cfg(not(feature = "gecko"))]
-pub fn is_context_value_enabled() -> bool {
-    false
+    crate::pref!("gfx.font_rendering.opentype_svg.enabled")
 }
 
 macro_rules! parse_svg_length {
@@ -145,7 +138,7 @@ impl SVGPaintOrder {
 
     /// Get variant of `paint-order`
     pub fn order_at(&self, pos: u8) -> PaintOrder {
-        match (self.0 >> pos * PAINT_ORDER_SHIFT) & PAINT_ORDER_MASK {
+        match (self.0 >> (pos * PAINT_ORDER_SHIFT)) & PAINT_ORDER_MASK {
             0 => PaintOrder::Normal,
             1 => PaintOrder::Fill,
             2 => PaintOrder::Stroke,
@@ -431,4 +424,229 @@ impl VectorEffect {
     pub fn none() -> Self {
         Self::NONE
     }
+}
+
+/// https://svgwg.org/svg2-draft/text.html#TextAnchorProperty
+#[allow(missing_docs)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Deserialize,
+    Eq,
+    FromPrimitive,
+    Hash,
+    MallocSizeOf,
+    Parse,
+    PartialEq,
+    Serialize,
+    SpecifiedValueInfo,
+    ToComputedValue,
+    ToCss,
+    ToResolvedValue,
+    ToShmem,
+    ToTyped,
+)]
+#[repr(u8)]
+pub enum TextAnchor {
+    Start,
+    Middle,
+    End,
+}
+
+/// https://svgwg.org/svg2-draft/painting.html#ShapeRenderingProperty
+#[allow(missing_docs)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Deserialize,
+    Eq,
+    FromPrimitive,
+    Hash,
+    MallocSizeOf,
+    Parse,
+    PartialEq,
+    Serialize,
+    SpecifiedValueInfo,
+    ToComputedValue,
+    ToCss,
+    ToResolvedValue,
+    ToShmem,
+    ToTyped,
+)]
+#[repr(u8)]
+pub enum ShapeRendering {
+    Auto,
+    Optimizespeed,
+    Crispedges,
+    Geometricprecision,
+}
+
+/// https://svgwg.org/svg2-draft/painting.html#StrokeLinecapProperty
+#[allow(missing_docs)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Deserialize,
+    Eq,
+    FromPrimitive,
+    Hash,
+    MallocSizeOf,
+    Parse,
+    PartialEq,
+    Serialize,
+    SpecifiedValueInfo,
+    ToComputedValue,
+    ToCss,
+    ToResolvedValue,
+    ToShmem,
+    ToTyped,
+)]
+#[repr(u8)]
+pub enum StrokeLinecap {
+    Butt,
+    Round,
+    Square,
+}
+
+/// https://svgwg.org/svg2-draft/painting.html#StrokeLinejoinProperty
+#[allow(missing_docs)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Deserialize,
+    Eq,
+    FromPrimitive,
+    Hash,
+    MallocSizeOf,
+    Parse,
+    PartialEq,
+    Serialize,
+    SpecifiedValueInfo,
+    ToComputedValue,
+    ToCss,
+    ToResolvedValue,
+    ToShmem,
+    ToTyped,
+)]
+#[repr(u8)]
+pub enum StrokeLinejoin {
+    Miter,
+    Round,
+    Bevel,
+}
+
+/// https://drafts.fxtf.org/css-masking-1/#propdef-mask-type
+#[allow(missing_docs)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Deserialize,
+    Eq,
+    FromPrimitive,
+    Hash,
+    MallocSizeOf,
+    Parse,
+    PartialEq,
+    Serialize,
+    SpecifiedValueInfo,
+    ToComputedValue,
+    ToCss,
+    ToResolvedValue,
+    ToShmem,
+    ToTyped,
+)]
+#[repr(u8)]
+pub enum MaskType {
+    Luminance,
+    Alpha,
+}
+
+/// https://drafts.fxtf.org/css-masking-1/#propdef-mask-mode
+#[allow(missing_docs)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Deserialize,
+    Eq,
+    FromPrimitive,
+    Hash,
+    MallocSizeOf,
+    Parse,
+    PartialEq,
+    Serialize,
+    SpecifiedValueInfo,
+    ToComputedValue,
+    ToCss,
+    ToResolvedValue,
+    ToShmem,
+    ToTyped,
+)]
+#[repr(u8)]
+pub enum MaskMode {
+    MatchSource,
+    Alpha,
+    Luminance,
+}
+
+/// https://drafts.fxtf.org/css-masking-1/#propdef-mask-composite
+#[allow(missing_docs)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Deserialize,
+    Eq,
+    FromPrimitive,
+    Hash,
+    MallocSizeOf,
+    Parse,
+    PartialEq,
+    Serialize,
+    SpecifiedValueInfo,
+    ToComputedValue,
+    ToCss,
+    ToResolvedValue,
+    ToShmem,
+    ToTyped,
+)]
+#[repr(u8)]
+pub enum MaskComposite {
+    Add,
+    Subtract,
+    Intersect,
+    Exclude,
+}
+
+/// https://svgwg.org/svg2-draft/painting.html#ColorInterpolationProperty
+#[allow(missing_docs)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Deserialize,
+    Eq,
+    FromPrimitive,
+    Hash,
+    MallocSizeOf,
+    Parse,
+    PartialEq,
+    Serialize,
+    SpecifiedValueInfo,
+    ToComputedValue,
+    ToCss,
+    ToResolvedValue,
+    ToShmem,
+    ToTyped,
+)]
+#[repr(u8)]
+pub enum ColorInterpolation {
+    Auto,
+    Srgb,
+    Linearrgb,
 }

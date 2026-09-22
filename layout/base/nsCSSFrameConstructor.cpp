@@ -47,6 +47,7 @@
 #include "mozilla/dom/ElementInlines.h"
 #include "mozilla/dom/GeneratedImageContent.h"
 #include "mozilla/dom/HTMLInputElement.h"
+#include "mozilla/dom/HTMLLabelElement.h"
 #include "mozilla/dom/HTMLSelectElement.h"
 #include "mozilla/dom/HTMLSharedListElement.h"
 #include "mozilla/dom/HTMLSummaryElement.h"
@@ -1720,6 +1721,13 @@ static bool HasUAWidget(const Element& aOriginatingElement) {
   return sr && sr->IsUAWidget();
 }
 
+static bool IsBaseAppearanceSelect(const Element& aElement) {
+  if (const auto* select = HTMLSelectElement::FromNode(aElement)) {
+    return select->IsBaseSelectAppearance();
+  }
+  return false;
+}
+
 /*
  * aParentFrame - the frame that should be the parent of the generated
  *   content.  This is the frame for the corresponding content node,
@@ -1750,7 +1758,8 @@ void nsCSSFrameConstructor::CreateGeneratedContentItem(
   if (aPseudoElement != PseudoStyleType::Backdrop &&
       aPseudoElement != PseudoStyleType::PickerIcon &&
       HasUAWidget(aOriginatingElement) &&
-      !aOriginatingElement.IsHTMLElement(nsGkAtoms::details)) {
+      !aOriginatingElement.IsHTMLElement(nsGkAtoms::details) &&
+      !IsBaseAppearanceSelect(aOriginatingElement)) {
     // ::before / ::after / ::marker shouldn't work on <video> / <input>.
     return;
   }
@@ -2321,18 +2330,11 @@ nsIFrame* nsCSSFrameConstructor::ConstructDocElementFrame(
 
   SetUpDocElementContainingBlock(aDocElement);
 
-  // This has the side-effect of getting `mFrameTreeState` from our docshell.
-  //
-  // FIXME(emilio): There may be a more sensible time to do this.
-  if (!mFrameTreeState) {
-    mPresShell->CaptureHistoryState(getter_AddRefs(mFrameTreeState));
-  }
-
   NS_ASSERTION(mDocElementContainingBlock, "Should have parent by now");
   nsFrameConstructorState state(
       mPresShell,
       GetAbsoluteContainingBlock(mDocElementContainingBlock, FIXED_POS),
-      nullptr, nullptr, do_AddRef(mFrameTreeState));
+      nullptr, nullptr);
 
   RefPtr<ComputedStyle> computedStyle =
       ServoStyleSet::ResolveServoStyle(*aDocElement);
@@ -2792,6 +2794,13 @@ void nsCSSFrameConstructor::SetUpDocElementContainingBlock(
   } else {
     viewportFrame->AppendFrames(FrameChildListID::Principal,
                                 nsFrameList(newFrame, newFrame));
+  }
+
+  if (ScrollContainerFrame* rootScroll = do_QueryFrame(newFrame)) {
+    if (nsCOMPtr state = mPresShell->GetDocument()->GetLayoutHistoryState();
+        state && state->HasStates()) {
+      rootScroll->RestoreState(state.get());
+    }
   }
 }
 
@@ -3422,6 +3431,9 @@ nsCSSFrameConstructor::FindHTMLData(const Element& aElement,
       SIMPLE_TAG_CREATE(progress, NS_NewProgressFrame),
       SIMPLE_TAG_CREATE(meter, NS_NewMeterFrame),
       SIMPLE_TAG_CHAIN(details, nsCSSFrameConstructor::FindDetailsData),
+      SIMPLE_TAG_CHAIN(label,
+                       nsCSSFrameConstructor::FindLabelOrDescriptionData),
+
   };
 
   return FindDataByTag(aElement, aStyle, sHTMLData, std::size(sHTMLData));
@@ -3989,9 +4001,9 @@ nsCSSFrameConstructor::FindXULTagData(const Element& aElement,
       SIMPLE_TAG_CREATE(image, NS_NewXULImageFrame),
       SIMPLE_TAG_CREATE(treechildren, NS_NewTreeBodyFrame),
       SIMPLE_TAG_CHAIN(label,
-                       nsCSSFrameConstructor::FindXULLabelOrDescriptionData),
+                       nsCSSFrameConstructor::FindLabelOrDescriptionData),
       SIMPLE_TAG_CHAIN(description,
-                       nsCSSFrameConstructor::FindXULLabelOrDescriptionData),
+                       nsCSSFrameConstructor::FindLabelOrDescriptionData),
       SIMPLE_TAG_CREATE(iframe, NS_NewSubDocumentFrame),
       SIMPLE_TAG_CREATE(editor, NS_NewSubDocumentFrame),
       SIMPLE_TAG_CREATE(browser, NS_NewSubDocumentFrame),
@@ -4012,8 +4024,12 @@ nsCSSFrameConstructor::FindXULTagData(const Element& aElement,
 
 /* static */
 const nsCSSFrameConstructor::FrameConstructionData*
-nsCSSFrameConstructor::FindXULLabelOrDescriptionData(const Element& aElement,
-                                                     ComputedStyle&) {
+nsCSSFrameConstructor::FindLabelOrDescriptionData(const Element& aElement,
+                                                  ComputedStyle&) {
+  if (!aElement.OwnerDoc()->ChromeRulesEnabled()) {
+    return nullptr;
+  }
+
   // Follow CSS display value if no value attribute
   if (!aElement.HasAttr(nsGkAtoms::value)) {
     return nullptr;
@@ -4356,11 +4372,6 @@ void nsCSSFrameConstructor::InitAndRestoreFrame(
   // Initialize the frame
   aNewFrame->Init(aContent, aParentFrame, nullptr);
   aNewFrame->AddStateBits(aState.mAdditionalStateBits);
-
-  if (aState.mFrameState) {
-    // Restore frame state for just the newly created frame.
-    RestoreFrameStateFor(aNewFrame, aState.mFrameState);
-  }
 
   if (aAllowCounters == AllowCounters::Yes &&
       mContainStyleScopeManager.AddCounterChanges(aNewFrame)) {
@@ -6287,8 +6298,7 @@ void nsCSSFrameConstructor::ContentRangeInserted(nsIContent* aStartChild,
   nsFrameConstructorState state(
       mPresShell, GetAbsoluteContainingBlock(insertion.mParentFrame, FIXED_POS),
       GetAbsoluteContainingBlock(insertion.mParentFrame, ABS_POS),
-      GetFloatContainingBlock(insertion.mParentFrame),
-      do_AddRef(mFrameTreeState));
+      GetFloatContainingBlock(insertion.mParentFrame));
 
   // Recover state for the containing block - we need to know if
   // it has :first-letter or :first-line style applied to it. The
@@ -6828,12 +6838,6 @@ bool nsCSSFrameConstructor::ContentWillBeRemoved(nsIContent* aChild,
       }
     }
     return false;
-  }
-
-  if (aKind != RemovalKind::Dom) {
-    // Before removing the frames associated with the content object,
-    // ask them to save their state onto our state object.
-    CaptureStateForFramesOf(aChild, mFrameTreeState);
   }
 
   InvalidateCanvasIfNeeded(mPresShell, aChild);
@@ -7588,25 +7592,6 @@ nsCSSFrameConstructor::InsertionPoint nsCSSFrameConstructor::GetInsertionPoint(
   }
 
   return {GetContentInsertionFrameFor(insertionElement), insertionElement};
-}
-
-// Capture state for the frame tree rooted at the frame associated with the
-// content object, aContent
-void nsCSSFrameConstructor::CaptureStateForFramesOf(
-    nsIContent* aContent, nsILayoutHistoryState* aHistoryState) {
-  if (!aHistoryState) {
-    return;
-  }
-  nsIFrame* frame = aContent->GetPrimaryFrame();
-  if (frame == mRootElementFrame) {
-    frame = mRootElementFrame
-                ? GetAbsoluteContainingBlock(mRootElementFrame, FIXED_POS)
-                : GetRootFrame();
-  }
-  for (; frame;
-       frame = nsLayoutUtils::GetNextContinuationOrIBSplitSibling(frame)) {
-    CaptureFrameState(frame, aHistoryState);
-  }
 }
 
 static bool IsWhitespaceFrame(nsIFrame* aFrame) {
@@ -11199,8 +11184,12 @@ bool nsCSSFrameConstructor::FrameConstructionItem::IsWhitespace(
   if (!mIsText) {
     return false;
   }
-  mContent->SetFlags(NS_CREATE_FRAME_IF_NON_WHITESPACE |
-                     NS_REFRAME_IF_WHITESPACE);
+  // Set content whitespace flags, but not for generated content, where we
+  // never expect to see these.
+  if (!(aState.mAdditionalStateBits & NS_FRAME_GENERATED_CONTENT)) {
+    mContent->SetFlags(NS_CREATE_FRAME_IF_NON_WHITESPACE |
+                       NS_REFRAME_IF_WHITESPACE);
+  }
   return mContent->TextIsOnlyWhitespace();
 }
 

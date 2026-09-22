@@ -7465,6 +7465,18 @@
   !endif
 !macroend
 
+/**
+ * Signal the push notification helper installed in $INSTDIR to stop, so that it
+ * can be replaced or removed. Does nothing when the helper is not installed.
+ */
+!macro SignalPushNotificationHelperStop _EXIT_CODE
+  ${If} ${FileExists} "$INSTDIR\notification-helper.exe"
+    nsExec::Exec /TIMEOUT=5000 '"$INSTDIR\notification-helper.exe" --stop'
+    Pop ${_EXIT_CODE}
+  ${EndIf}
+!macroend
+!define SignalPushNotificationHelperStop "!insertmacro SignalPushNotificationHelperStop"
+
 ################################################################################
 # Helpers for taskbar progress
 

@@ -1,6 +1,7 @@
 [DEFAULT]
 prefs = [
   "apz.zoom-to-focused-input.enabled=false",
+  "dom.navigation.navigationRateLimit.count=0",
   "test.ime_content_observer.assert_invalid_cache=true",
   "ui.dragThresholdX=4", # Bug 1873142
   "ui.dragThresholdY=4", # Bug 1873142
@@ -519,6 +520,8 @@ skip-if = [
 ["test_insertParagraph_in_inline_editing_host.html"]
 
 ["test_insertText_around_text_node_in_plaintext_mode.html"]
+
+["test_insertText_during_composition.html"]
 
 ["test_join_split_node_direction_change_command.html"]
 

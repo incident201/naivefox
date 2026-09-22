@@ -116,6 +116,18 @@ class GeckoViewSupport final
       const java::GeckoSession::Window::LocalRef& inst,
       jni::Object::Param aStream);
 
+  void RequestFullScreenshot(const java::GeckoSession::Window::LocalRef& inst,
+                             jni::Object::Param aResult,
+                             jni::Object::Param aTarget, int32_t aX, int32_t aY,
+                             int32_t aWidth, int32_t aHeight,
+                             float aRenderingScale);
+
+  // Query content for the top document's scroll size (in CSS pixels)
+  // and device pixel ratio (for calculating the size in device pixels)
+  void RequestContentMetrics(const java::GeckoSession::Window::LocalRef& inst,
+                             jni::Object::Param aResult,
+                             jni::Object::Param aMetrics);
+
   // See nsIHapticFeedback::HapticFeedbackType for available effects.
   void PerformHapticFeedback(int32_t aEffect);
 };

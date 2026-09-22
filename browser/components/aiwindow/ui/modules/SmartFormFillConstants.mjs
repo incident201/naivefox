@@ -24,6 +24,7 @@
  * @typedef {object} FormReviewFillResult
  * @property {boolean} hasErrors Whether the requested operation encountered an error.
  * @property {boolean} cancelled Whether the requested operation was cancelled.
+ * @property {number} filledFieldCount Number of fields successfully filled.
  */
 
 /** @typedef {"progress" | "review" | "final"} FormReviewState */
@@ -98,6 +99,5 @@ export const SUPPORTED_INPUT_TYPES = [
   "email",
   "tel",
   "number",
-  "search",
   "month",
 ];

@@ -11,20 +11,45 @@
  * accessor.
  */
 
+const lazy = typeof ChromeUtils != "undefined" ? {} : null;
+
+if (lazy) {
+  ChromeUtils.defineESModuleGetters(lazy, {
+    UrlbarPrefs: "moz-src:///browser/components/urlbar/UrlbarPrefs.sys.mjs",
+  });
+}
+
+/**
+ * @import {UrlbarActorPort} from "moz-src:///browser/components/urlbar/actors/UrlbarChild.sys.mjs"
+ * @import {URIFixupPrimitives} from "chrome://browser/content/urlbar/UrlbarShared.mjs"
+ */
+
+/**
+ * @typedef {object} ContainerInfo
+ *   A container, in the form a menu needs to offer it.
+ *
+ * @property {number} userContextId
+ *   The container's user context id.
+ * @property {?string} name
+ *   The container's name, null for one of the default containers.
+ * @property {?string} l10nId
+ *   The l10n id of a default container's name, null for a user-created one.
+ * @property {?string} iconURL
+ *   The container's icon, null if its icon isn't a known one.
+ * @property {?string} colorCode
+ *   The container's color as a CSS color, null if its color isn't a known one.
+ */
+
 /**
  * The port the actor publishes on a realm that routes through it, or null where
  * this realm reaches its privileged side itself. The actor's own scope has no
  * window, so its handlers always take the direct branch and never re-enter.
  *
- * @returns {?object}
+ * @returns {?UrlbarActorPort}
  */
 function port() {
   return globalThis.window?.UrlbarActorPort ?? null;
 }
-
-/**
- * @import {URIFixupPrimitives} from "chrome://browser/content/urlbar/UrlbarShared.mjs"
- */
 
 let platform;
 
@@ -188,4 +213,45 @@ export function willLoadInBackground(where, params) {
     ).BrowserUtils.willLoadInBackground(where, params);
   }
   return port().willLoadInBackground(where, params);
+}
+
+/**
+ * The public containers, in display order. Async because
+ * `ContextualIdentityService` reads the profile, which only the parent process
+ * can do, so a content realm takes them over the actor.
+ *
+ * @returns {Promise<ContainerInfo[]>}
+ */
+export function getContainers() {
+  if (port()) {
+    return port().sendQuery("GetContainers", {});
+  }
+  let { ContextualIdentityService } = ChromeUtils.importESModule(
+    "moz-src:///toolkit/components/contextualidentity/ContextualIdentityService.sys.mjs"
+  );
+  return Promise.resolve(
+    ContextualIdentityService.getPublicIdentities().map(identity => ({
+      userContextId: identity.userContextId,
+      name: ContextualIdentityService.getUserContextLabel(
+        identity.userContextId
+      ),
+      iconURL: ContextualIdentityService.getContainerIconURL(identity.icon),
+      colorCode: ContextualIdentityService.getContainerColorCode(
+        identity.color
+      ),
+    }))
+  );
+}
+
+/**
+ * Whether the message path or direct path should be used.
+ *
+ * @returns {boolean}
+ */
+export function usesMessagePath() {
+  return (
+    !lazy ||
+    Services.appinfo.processType != Services.appinfo.PROCESS_TYPE_DEFAULT ||
+    lazy.UrlbarPrefs.get("ipc.chromeMessagePassing")
+  );
 }

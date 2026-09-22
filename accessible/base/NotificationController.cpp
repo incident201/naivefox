@@ -341,6 +341,7 @@ void NotificationController::DropMutationEvent(AccTreeMutationEvent* aEvent) {
     MOZ_ASSERT(hideEvent);
 
     if (hideEvent->NeedsShutdown()) {
+      mDocument->UncacheChildrenInSubtree(aEvent->GetAccessible());
       mDocument->ShutdownChildrenInSubtree(aEvent->GetAccessible());
     }
   } else {
@@ -773,6 +774,15 @@ void NotificationController::WillRefresh(mozilla::TimeStamp aTime) {
       logging::MsgEnd();
     }
 #endif
+
+    if (!mDocument->DocumentNode()->IsCurrentActiveDocument()) {
+      // Our document is no longer current for its WindowGlobal; e.g. we're
+      // the initial about:blank and a new document has replaced us in that
+      // WindowGlobal. Shut ourselves down instead of building an accessibility
+      // tree (and IPC actor) nobody will use.
+      mDocument->Shutdown();
+      return;
+    }
 
     mDocument->DoInitialUpdate();
     if (AppShutdown::IsShutdownImpending()) {

@@ -1,7 +1,7 @@
 [DEFAULT]
 head = "head.js"
-skip-if = [
-  "os == 'android'",
+run-if = [
+  "os != 'android'",
 ]
 
 ["test_appgroup_profile.js"]
@@ -56,6 +56,33 @@ run-if = ["os == 'mac'"]
 ["test_new_profile_ping_sent.js"]
 
 ["test_new_profile_ping_skipped.js"]
+
+["test_profile_metrics.js"]
+
+["test_profile_metrics_after_submission.js"]
+
+["test_profile_metrics_time_since_install.js"]
+run-if = ["os == 'win' && !msix"]
+run-sequentially = ["true"]
+
+["test_profile_metrics_time_since_no_files.js"]
+run-sequentially = ["true"]
+
+["test_profile_metrics_time_since_update.js"]
+run-if = ["!msix"]
+run-sequentially = ["true"]
+
+["test_profile_metrics_excludes_current.js"]
+
+["test_profile_metrics_no_compat.js"]
+
+["test_profile_metrics_no_prefs.js"]
+
+["test_profile_metrics_other_install.js"]
+
+["test_profile_metrics_store_id_match.js"]
+
+["test_profile_metrics_store_id_mismatch.js"]
 
 ["test_previous_dedicated.js"]
 

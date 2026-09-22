@@ -10,6 +10,7 @@
 
 /**
  * @import { ChatConversation } from "moz-src:///browser/components/aiwindow/ui/modules/ChatConversation.sys.mjs"
+ * @import { TraceId } from "moz-src:///toolkit/components/pageextractor/PageExtractorEvents.sys.mjs"
  */
 
 import { getSkillPrompt } from "moz-src:///browser/components/aiwindow/models/PromptLoader.sys.mjs";
@@ -27,6 +28,13 @@ import {
   sanitizeUntrustedContent,
   isNewPageUrl,
 } from "moz-src:///browser/components/aiwindow/models/ChatUtils.sys.mjs";
+
+import {
+  CountVectorizer,
+  cosSim,
+} from "chrome://global/content/ml/NLPUtils.sys.mjs";
+import { EmbeddingsGenerator } from "chrome://global/content/ml/EmbeddingsGenerator.sys.mjs";
+import { SmartTabGroupingManager } from "moz-src:///browser/components/tabbrowser/SmartTabGrouping.sys.mjs";
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
@@ -66,10 +74,16 @@ ChromeUtils.defineLazyGetter(lazy, "console", () =>
 // of exfiltration for private data. While most users only have a few tabs open at a time,
 // some users can have thousands of tabs open at once.
 export const MAX_TABS = 30;
+// Max number of tabs to rank by semantic similarity to topic (safeguard to avoid embedding hundreds of tabs)
+export const MAX_RANK_TABS = 5 * MAX_TABS;
 
 // Allow list of URL protocols for tabs and pages exposed to the LLM. Only http/https are
 // permitted; internal (about:, chrome:, moz-extension:, file:, data:, etc.)
 const ALLOWED_URL_PROTOCOLS = new Set(["http:", "https:"]);
+
+const KEYWORD_WEIGHT = 0.3; // 0 = pure embedding, 1 = pure lexical
+
+const tokenizer = new CountVectorizer();
 
 /**
  * @param {string} url
@@ -82,6 +96,36 @@ function isAllowedURL(url) {
     return false;
   }
 }
+
+let _embeddingsGenerator = null;
+function getEmbeddingsGenerator() {
+  if (!_embeddingsGenerator) {
+    _embeddingsGenerator = EmbeddingsGenerator.forGeneral();
+  }
+  return _embeddingsGenerator;
+}
+
+async function embedTexts(texts) {
+  const result = await getEmbeddingsGenerator().embedMany(texts);
+  return result.output || result;
+}
+
+function keywordRecall(topicTokens, titleTokens) {
+  if (topicTokens.size == 0) {
+    return 0;
+  }
+  let hits = 0;
+  for (const token of topicTokens) {
+    if (titleTokens.has(token)) {
+      hits++;
+    }
+  }
+
+  return hits / topicTokens.size;
+}
+
+// this exists only to make writing tests easier
+export const _embeddingFunctions = { embedTexts, keywordRecall };
 
 // Important! Changing or removing this value requires a security review.
 //
@@ -243,12 +287,21 @@ export const toolsConfig = [
     function: {
       name: GET_OPEN_TABS,
       description:
-        `Access the user's browser and return up to ${MAX_TABS} currently open tabs, ` +
-        "ordered by most recently viewed. Tabs sharing a `windowId` are in the same " +
-        "browser window.",
+        `Return up to ${MAX_TABS} of the user's open tabs. ` +
+        "Default behavior is to retrieve tabs ordered by most " +
+        `recently viewed. If 'topic' is specified, ` +
+        "the tabs whose titles are most similar to the " +
+        "topic are returned instead, ordered by similarity. " +
+        "Tabs sharing a `windowId` are in the same browser window.",
       parameters: {
         type: "object",
-        properties: {},
+        properties: {
+          topic: {
+            type: "string",
+            description:
+              "Optional. Ranks tabs by similarity between tab metadata and this value. ",
+          },
+        },
       },
     },
   },
@@ -327,11 +380,12 @@ export const toolsConfig = [
             items: {
               type: "string",
               description:
-                "A URL token that appeared in the conversation, formatted as §url_token: DOMAIN_TLD_PATH_n§. " +
+                "A URL token formatted as §url_token: DOMAIN_TLD_PATH_n§. " +
                 "Do NOT fabricate tokens. Only use tokens from user messages and tool results.",
             },
             minItems: 1,
-            description: "List of URL tokens to fetch content from.",
+            description:
+              "List of URL tokens to fetch content from. Typically URL tokens are referenced in the conversation or found by searching open tabs.",
           },
         },
         required: ["url_list"],
@@ -527,16 +581,59 @@ export function getTabList(amount = MAX_TABS) {
  * Tabs are sorted by most recently accessed and limited to MAX_TABS results.
  * Only includes tabs with http/https URLs.
  *
+ * @param {object} toolParams
+ * @param {string} [toolParams.topic] - Optional. If specified, tabs are ranked by
+ *   similarity between the topic and each tab's title.
  * @param {ChatConversation} conversation
  * @returns {Promise<Array<TabInfo>>}
  */
-export async function getOpenTabs(conversation) {
+export async function getOpenTabs({ topic = "" } = {}, conversation) {
   // No security check needed. The security checks prevent data exfiltration,
   // which requires external communication. This tool makes no external requests.
 
   const startTime = ChromeUtils.now();
 
-  const recentTabs = getTabList(MAX_TABS);
+  const tabs = getTabList(topic ? MAX_RANK_TABS : MAX_TABS);
+
+  if (topic) {
+    const rankStart = ChromeUtils.now(); // for profiling topic-based ranking
+    try {
+      const titles = tabs.map(t =>
+        SmartTabGroupingManager.preprocessText(t.title || "")
+      );
+      const [topicEmbedding, ...titleEmbeddings] =
+        await _embeddingFunctions.embedTexts([topic, ...titles]);
+
+      const topicTokens = new Set(tokenizer.tokenize(topic));
+
+      const scored = tabs.map((tab, i) => {
+        // rescale cosine similarity to 0 - 1 to match keyword recall scale
+        const dense = (cosSim(topicEmbedding, titleEmbeddings[i]) + 1) / 2;
+        const titleTokens = new Set(tokenizer.tokenize(titles[i]));
+        const sparse = _embeddingFunctions.keywordRecall(
+          topicTokens,
+          titleTokens
+        );
+        return {
+          tab,
+          score: (1 - KEYWORD_WEIGHT) * dense + KEYWORD_WEIGHT * sparse,
+        };
+      });
+      scored.sort((a, b) => b.score - a.score);
+      tabs.length = 0;
+      tabs.push(...scored.map(s => s.tab));
+
+      ChromeUtils.addProfilerMarker(
+        "SmartWindow",
+        { startTime: rankStart },
+        `Tool:get_open_tabs:rank(n=${tabs.length})`
+      );
+    } catch (e) {
+      lazy.console.warn("[Tool] getOpenTabs topic embedding failed", e);
+    }
+  }
+
+  const recentTabs = tabs.slice(0, MAX_TABS);
 
   // Tab titles are truncated to 100 characters and therefore not expected to
   // contain enough untrusted data for a prompt injection attack.
@@ -994,6 +1091,50 @@ export class GetPageContent {
   }
 
   /**
+   * Whether getPageContent would surface content for `url` in this
+   * conversation (same allow/deny logic). Lets callers gate other
+   * page-derived data (e.g. AITab's per-tab og:image) on the same decision.
+   *
+   * @param {string} url
+   * @param {ChatConversation} conversation
+   * @returns {boolean}
+   */
+  static isContentAllowed(url, conversation) {
+    if (!isAllowedURL(url)) {
+      // Only http/https pages may be exposed to the LLM at all; internal
+      // schemes (about:, chrome:, file:, ...) stay out regardless of
+      // conversation state.
+      return false;
+    }
+    if (
+      GetPageContent.getTabWithURL(url) ||
+      conversation.getAllMentionURLs().has(url)
+    ) {
+      // The user deliberately brought this page into the conversation —
+      // it is open as a tab or was mentioned by them — so reading it
+      // reflects direct user intent rather than a model-chosen fetch.
+      return true;
+    }
+    if (
+      conversation.securityProperties.untrustedInput &&
+      conversation.securityProperties.privateData &&
+      !conversation.serpUrlsForAnonymousFetch.has(url)
+    ) {
+      // Anything else requires a headless network fetch of a URL the user
+      // never opened or mentioned. When the conversation holds both untrusted
+      // input (a prompt injection could have chosen this URL) and private
+      // data (something worth stealing), such a fetch is a potential
+      // exfiltration channel, so it is denied. SERP URLs are exempt because
+      // they get an anonymous fetch path that carries no user identity.
+      return false;
+    }
+    // A headless fetch is acceptable here: without the untrusted + private
+    // combination above, there is either no injected URL choice or no private
+    // data for it to leak.
+    return true;
+  }
+
+  /**
    * Search through all AI Windows to find the tab with the matching URL.
    *
    * @param {string} url
@@ -1078,13 +1219,14 @@ export class GetPageContent {
       if (conversation.serpUrlsForAnonymousFetch.has(url)) {
         return PageExtractorParent.getHeadlessExtractor({
           urlString: url,
-          callback: pageExtractor =>
+          callback: (pageExtractor, traceId) =>
             GetPageContent.#runExtraction(
               pageExtractor,
               conversation,
               label,
               url,
-              signal
+              signal,
+              traceId
             ),
           anonymousFetch: true,
         });
@@ -1099,13 +1241,14 @@ export class GetPageContent {
 
     return PageExtractorParent.getHeadlessExtractor({
       urlString: url,
-      callback: pageExtractor =>
+      callback: (pageExtractor, traceId) =>
         GetPageContent.#runExtraction(
           pageExtractor,
           conversation,
           label,
           url,
-          signal
+          signal,
+          traceId
         ),
     });
   }
@@ -1120,6 +1263,8 @@ export class GetPageContent {
    * @param {string} sourceUrl
    * @param {AbortSignal} [signal] - Rejects the extraction early if it aborts,
    *   which lets the headless browser hosting the read be torn down promptly.
+   * @param {TraceId} [traceId] - Correlates this extraction with the enclosing
+   *   headless-extractor profiler marker.
    * @returns {Promise<{ok: boolean, content: string}>}
    *  A promise resolving to a formatted string containing the page content
    *  with mode and label information, or (with ok false) a failure message
@@ -1130,15 +1275,19 @@ export class GetPageContent {
     conversation,
     label,
     sourceUrl,
-    signal
+    signal,
+    traceId
   ) {
     const extraction = await raceAbort(
-      pageExtractor.getText({
-        sufficientLength: GetPageContent.MAX_CHARACTERS,
-        cleanWhitespace: true,
-        removeBoilerplate: true,
-        sourceUrl,
-      }),
+      pageExtractor.getText(
+        {
+          sufficientLength: GetPageContent.MAX_CHARACTERS,
+          cleanWhitespace: true,
+          removeBoilerplate: true,
+          sourceUrl,
+        },
+        traceId
+      ),
       signal
     );
 
@@ -1273,8 +1422,8 @@ export async function createAITab({ url_list, focus }, conversation, signal) {
   if (result.error) {
     return `The page could not be created: ${result.error}.`;
   }
+  const viewerURL = lazy.AITab.buildViewerURL(viewerBase, result.surface);
 
-  const viewerURL = lazy.AITab.buildViewerURL(viewerBase, result.page);
   // Mark the viewer URL as seen so the chat renders it as a trusted, labeled
   // link. Unseen links are unfurled as "label (full URL)" for disclosure, and
   // this URL's hash carries the whole page config, so the full URL is very long.
@@ -1317,13 +1466,13 @@ function countOpenAIWindowTabs() {
 }
 
 /**
- * Determines the telemetry action_type for a manage_tabs invocation.
+ * Determines the telemetry trigger for a manage_tabs invocation.
  *
  * @param {ChatConversation} conversation
  * @param {string} action
  * @returns {"unsupported" | "tab_mention" | "description"}
  */
-function getActionType(conversation, action) {
+function getActionTrigger(conversation, action) {
   if (!TAB_ACTIONS.includes(action)) {
     return "unsupported";
   }
@@ -1362,31 +1511,26 @@ export async function manageTabs(
     label = "",
   } = params;
 
-  const actionType = getActionType(conversation, action);
-
-  if (conversation) {
-    conversation.lastBrowserActionType = actionType;
-  }
-
-  const promptVersion = conversation?.systemPromptVersion ?? "";
+  const actionTrigger = getActionTrigger(conversation, action);
 
   const baseTelemetryInfo = {
     location: mode,
-    chat_id: conversation?.id || "",
-    message_seq: conversation?.messageCount ?? 0,
+    chat_id: conversation.id,
+    message_seq: conversation.messageCount,
     model,
-    prompt_version: promptVersion,
-    action_type: actionType,
+    prompt_version: conversation.systemPromptVersion,
+    action: TAB_ACTIONS.includes(action) ? action : "unsupported",
+    trigger: actionTrigger,
   };
 
   lazy.ToolUITelemetry.recordBrowserActionSubmit({
     ...baseTelemetryInfo,
     tabs_open: countOpenAIWindowTabs(),
     mentions: conversation.getLatestUserMentionCount(),
-    submit_type: conversation?.lastSubmitType || "",
+    submit_type: conversation.lastSubmitType || "",
   });
 
-  if (actionType === "unsupported") {
+  if (actionTrigger === "unsupported") {
     lazy.ToolUITelemetry.recordBrowserActionComplete({
       ...baseTelemetryInfo,
       result: "error",

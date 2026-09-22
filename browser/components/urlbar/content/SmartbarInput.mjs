@@ -57,6 +57,8 @@ const lazy = XPCOMUtils.declareLazy({
   ExtensionSearchHandler:
     "resource://gre/modules/ExtensionSearchHandler.sys.mjs",
   ExtensionUtils: "resource://gre/modules/ExtensionUtils.sys.mjs",
+  handleBounceEventTrigger:
+    "moz-src:///browser/components/urlbar/UrlbarParentController.sys.mjs",
   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
   ReaderMode: "moz-src:///toolkit/components/reader/ReaderMode.sys.mjs",
   SearchUIUtils: "moz-src:///browser/components/search/SearchUIUtils.sys.mjs",
@@ -159,20 +161,18 @@ ${
         </html:panel-list>
 
         <html:moz-urlbar-slot name="site-info" />
-        <moz-input-box tooltip="aHTMLTooltip"
-                       class="urlbar-input-box"
-                       flex="1">
+        <html:div class="urlbar-input-box">
           <html:input id="urlbar-scheme"
                       required="required"/>
           <html:input id="urlbar-input"
                       class="urlbar-input textbox-input"
                       aria-controls="urlbar-results"
                       role="combobox"
-                      dir="auto"
                       aria-autocomplete="both"
-                      inputmode="mozAwesomebar"
+                      inputmode="search"
+                      preserveundohistory=""
                       data-l10n-id="smartbar-placeholder"/>
-        </moz-input-box>
+        </html:div>
         <html:smartwindow-panel-list></html:smartwindow-panel-list>
         <html:moz-urlbar-slot name="revert-button" />
         <html:img class="urlbar-icon urlbar-go-button"
@@ -185,13 +185,9 @@ ${
             context=""
             role="group"
             tooltip="aHTMLTooltip">
-        <html:div class="urlbarView-body-outer">
-          <html:div class="urlbarView-body-inner">
-            <html:div id="urlbar-results"
-                      class="urlbarView-results"
-                      role="listbox"/>
-          </html:div>
-        </html:div>
+        <html:div id="urlbar-results"
+                  class="urlbarView-results"
+                  role="listbox"/>
         <html:panel-list class="urlbarView-result-menu"></html:panel-list>
         <html:moz-urlbar-slot name="search-one-offs" />
       </html:div>
@@ -246,10 +242,22 @@ ${
     "selectionchange",
   ];
 
-  #allowBreakout = false;
+  #canOpenPopover = false;
   #gBrowserListenersAdded = false;
-  #breakoutBlockerCount = 0;
+  #popoverBlockerCount = 0;
+  #popoverAnchorUpdateKey = {};
   #isAddressbar = false;
+
+  /**
+   * The container the popover anchors to, which also reserves the space the
+   * bar leaves behind while it is in the top layer.
+   *
+   * @type {Element}
+   */
+  get #popoverAnchor() {
+    return this.parentNode;
+  }
+
   /**
    * Whether sapName == "smartbar".
    */
@@ -380,13 +388,6 @@ ${
     this.#isAddressbar = this.#sapName == "urlbar";
     this.#isSmartbarMode = this.#sapName == "smartbar";
 
-    // This listener must be added before connecting the fragment
-    // because the event could fire while or after connecting it.
-    this.addEventListener(
-      "moz-input-box-rebuilt",
-      this.#onContextMenuRebuilt.bind(this)
-    );
-
     this.appendChild(SmartbarInput.fragment);
 
     // Make sure all children have been parsed before calling #populateSlots.
@@ -497,7 +498,7 @@ ${
       return;
     }
 
-    this.updateLayoutExtend();
+    this.updatePopover();
   }
 
   connectedCallback() {
@@ -516,6 +517,9 @@ ${
       this.#initOnce();
     }
 
+    // After #initOnce(), which creates the view AddSearchEngineHelper needs.
+    this.#initContextMenuItems();
+
     this.searchModeSwitcher.connect();
 
     if (this.sapName == "searchbar") {
@@ -529,7 +533,7 @@ ${
       this.window.document.documentElement.hasAttribute("taskbartab") ||
       this.readOnly
     ) {
-      this.#stopBreakout();
+      this.#releasePopoverAnchor();
       return;
     }
 
@@ -562,12 +566,6 @@ ${
 
     this.window.addEventListener("customizationstarting", this);
     this.window.addEventListener("aftercustomization", this);
-    this.window.addEventListener("toolbarvisibilitychange", this);
-    let menuToolbar = this.window.document.getElementById("toolbar-menubar");
-    if (menuToolbar) {
-      menuToolbar.addEventListener("DOMMenuBarInactive", this);
-      menuToolbar.addEventListener("DOMMenuBarActive", this);
-    }
 
     if (this.window.gBrowser) {
       // On startup, this will be called again by browser-init.js
@@ -585,20 +583,9 @@ ${
     }
 
     // Expanding requires a parent toolbar, and us not being read-only.
-    this.#allowBreakout = !!this.closest("toolbar");
-    if (this.#allowBreakout) {
-      // TODO(emilio): This could use CSS anchor positioning rather than this
-      // ResizeObserver, eventually.
-      this._resizeObserver = new this.window.ResizeObserver(([entry]) => {
-        this.style.setProperty(
-          "--urlbar-width",
-          px(entry.borderBoxSize[0].inlineSize)
-        );
-      });
-      this._resizeObserver.observe(this.parentNode);
-    }
+    this.#canOpenPopover = !!this.closest("toolbar");
 
-    this.#updateLayoutBreakout();
+    this.#updatePopoverAnchor();
 
     this._addObservers();
   }
@@ -659,12 +646,6 @@ ${
 
     this.window.removeEventListener("customizationstarting", this);
     this.window.removeEventListener("aftercustomization", this);
-    this.window.removeEventListener("toolbarvisibilitychange", this);
-    let menuToolbar = this.window.document.getElementById("toolbar-menubar");
-    if (menuToolbar) {
-      menuToolbar.removeEventListener("DOMMenuBarInactive", this);
-      menuToolbar.removeEventListener("DOMMenuBarActive", this);
-    }
     if (this.#gBrowserListenersAdded) {
       this.window.gBrowser.tabContainer.removeEventListener("TabSelect", this);
       this.window.gBrowser.tabContainer.removeEventListener("TabClose", this);
@@ -691,7 +672,7 @@ ${
       this.removeEventListener("ai-website-chip:remove", this);
     }
 
-    this._resizeObserver?.disconnect();
+    this.#removeContextMenuItems();
 
     this._removeObservers();
 
@@ -704,73 +685,128 @@ ${
   }
 
   /**
-   * This method is used to attach new context menu options to the urlbar
-   * context menu, i.e. the context menu of the moz-input-box.
-   * It is called when the moz-input-box rebuilds its context menu.
+   * The text context menu shared by the inputs of the document this one lives
+   * in. In smartbar mode that document isn't this.document, which belongs to
+   * the top chrome window.
    *
-   * Note that it might be called before #init has finished.
+   * @type {object}
    */
-  #onContextMenuRebuilt() {
+  get #editContextMenu() {
+    return this.documentGlobal.EditContextMenu;
+  }
+
+  /**
+   * The sets this input registered with the text context menu.
+   *
+   * @type {object[]}
+   */
+  #contextMenuItemSets = [];
+
+  /**
+   * Contributes this input's own items to the text context menu. A document
+   * without one, i.e. any but a chrome document, gets no items.
+   */
+  #initContextMenuItems() {
+    if (!this.#editContextMenu) {
+      return;
+    }
+
     if (this.#isAddressbar || this.#isSmartbarMode) {
       this._initAutofillDismiss();
     }
     if (this.#isSmartbarMode) {
-      this.#initSmartbarContextMenuPaste();
       this._initPasteAndGo();
       return;
     }
     this._initStripOnShare();
     this._initPasteAndGo();
+    this.#initAddSearchEngines();
+  }
+
+  /**
+   * The engine items are rebuilt on every open, so the item set claims whatever
+   * AddSearchEngineHelper currently owns.
+   */
+  #initAddSearchEngines() {
+    this.#addContextMenuItems({
+      createItems: () => {
+        let fragment = this.ownerDocument.createDocumentFragment();
+        fragment.appendChild(
+          this.addSearchEngineHelper.createContextSeparator()
+        );
+        return fragment;
+      },
+      onShowing: (input, items) => {
+        items.length = 0;
+        items.push(...this.addSearchEngineHelper.refreshContextMenu());
+      },
+    });
+  }
+
+  /**
+   * Registers an item set with the text context menu, scoped to this input.
+   *
+   * @param {object} itemSet
+   *   As passed to EditContextMenu.addItems(), minus `matches`.
+   */
+  #addContextMenuItems(itemSet) {
+    this.#contextMenuItemSets.push(
+      this.#editContextMenu.addItems({
+        ...itemSet,
+        matches: input => input == this.inputField,
+      })
+    );
+  }
+
+  /**
+   * Unregisters the item sets, so a disconnected input stops contributing to
+   * the menu it shares with the other inputs of the document.
+   */
+  #removeContextMenuItems() {
+    for (let itemSet of this.#contextMenuItemSets) {
+      this.#editContextMenu.removeItems(itemSet);
+    }
+    this.#contextMenuItemSets = [];
   }
 
   // A right-click inside the multiline editor's contenteditable lands in the
-  // editor's shadow DOM, so the moz-input-box context menu isn't shown
-  // automatically. Open it explicitly at the cursor position.
+  // editor's shadow DOM, where the shared text context menu's listener doesn't
+  // reach it. Open the menu explicitly at the cursor position.
   #initSmartbarContextMenu() {
-    const inputBox = this.querySelector("moz-input-box");
-    const menupopup = inputBox?.menupopup;
-    if (!menupopup) {
+    if (!this.#editContextMenu) {
       return;
     }
     this.inputField.addEventListener("contextmenu", event => {
       this.#maybeSelectAll();
       event.preventDefault();
-      if (event.button) {
-        menupopup.openPopupAtScreen(event.screenX, event.screenY, true, event);
-      } else {
-        menupopup.openPopup(
-          this.inputField,
-          "after_start",
-          0,
-          0,
-          true,
-          false,
-          event
-        );
-      }
+      this.#initSmartbarContextMenuPaste();
+      this.#editContextMenu.open(this.inputField, event, {
+        anchor: event.button ? null : this.inputField,
+      });
     });
   }
 
+  #smartbarContextMenuPasteInitialized = false;
+
   // TODO(Bug 2047067): the multiline editor is a ProseMirror contenteditable.
-  // The native cmd_paste command the moz-input-box context menu dispatches
-  // does not reliably reach it inside a shadow DOM on Windows, even though
-  // Ctrl+V works (it fires a native paste event ProseMirror handles).
-  // Intercept cmd_paste on the menupopup and route it through the editor
-  // directly. Remove this workaround once the platform bug is fixed.
+  // The native cmd_paste command the text context menu dispatches does not
+  // reliably reach it inside a shadow DOM on Windows, even though Ctrl+V works
+  // (it fires a native paste event ProseMirror handles). Intercept the command
+  // and route it through the editor directly. Remove this workaround once the
+  // platform bug is fixed.
   #initSmartbarContextMenuPaste() {
-    const inputBox = this.querySelector("moz-input-box");
-    const menupopup = inputBox?.menupopup;
-    if (!menupopup) {
+    if (this.#smartbarContextMenuPasteInitialized) {
       return;
     }
-    menupopup.addEventListener(
-      "command",
-      event => {
-        const menuitem =
-          event.target?.localName == "menuitem"
-            ? event.target
-            : event.originalTarget;
-        if (menuitem?.getAttribute("cmd") != "cmd_paste") {
+    this.#smartbarContextMenuPasteInitialized = true;
+
+    // The paste item carries command="cmd_paste", so activating it dispatches
+    // the command event at the command element, not at the menu.
+    this.ownerDocument
+      .getElementById("cmd_paste")
+      .addEventListener("command", event => {
+        // The menu is shared, so only intercept opens on this input.
+        if (this.#editContextMenu.input != this.inputField) {
           return;
         }
         this.#ensureSmartbarEditor();
@@ -781,10 +817,10 @@ ${
         if (editor && dt) {
           editor.paste(dt);
         }
-        event.stopImmediatePropagation();
-      },
-      true
-    );
+        // Keep editMenuOverlay's commandset listener from dispatching the
+        // native command.
+        event.stopPropagation();
+      });
   }
 
   #readClipboardData() {
@@ -905,6 +941,10 @@ ${
    */
   get isSearchbarSAP() {
     return UrlbarShared.isSearchbarSAP(this.#sapName);
+  }
+
+  get parentController() {
+    return this.controller.parentController;
   }
 
   get smartbarAction() {
@@ -1486,9 +1526,7 @@ ${
     // Using browser navigation buttons should potentially trigger a bounce
     // telemetry event.
     if (webProgress.loadType & Ci.nsIDocShell.LOAD_CMD_HISTORY) {
-      this.controller.engagementEvent.handleBounceEventTrigger(
-        browser.browserId
-      );
+      lazy.handleBounceEventTrigger(browser);
     }
   }
 
@@ -1711,6 +1749,11 @@ ${
     }
 
     this.smartbarAction = event.detail.action;
+    if (!this.focused) {
+      // The CTA can be clicked when the input is not focused:
+      // Start an engagement session if none is currently open.
+      this.controller.engagementEvent.start(event, null, this.value);
+    }
     this.handleNavigation({ event });
   }
 
@@ -1824,7 +1867,7 @@ ${
       where,
       query: value,
     });
-    this.controller.openSERP(
+    this.parentController.openSERP(
       engine.id,
       value,
       where,
@@ -1989,7 +2032,7 @@ ${
       query: searchString,
       where,
     });
-    this.controller.openSERP(
+    this.parentController.openSERP(
       engine.id,
       searchString,
       where,
@@ -2275,10 +2318,11 @@ ${
         dueToTabSwitch: true,
         hideSearchTerms: true,
       });
-    } else {
+    } else if (!this.#isSmartbarMode) {
+      // The smartbar has no URI to revert to.
       this.value = "";
     }
-    if (this.value && this.focused) {
+    if (this.#isAddressbar && this.value && this.focused) {
       this.select();
     }
   }
@@ -2318,6 +2362,16 @@ ${
     } else {
       this.search(searchString);
     }
+  }
+
+  /**
+   * Whether pickResult() implements the result menu's commands for opening a
+   * result in a new tab or window. It doesn't, so the menu withholds them.
+   *
+   * @returns {boolean}
+   */
+  get handlesOpenInCommands() {
+    return false;
   }
 
   /**
@@ -2539,7 +2593,7 @@ ${
           windowMode: this.windowMode,
         });
 
-        this.controller.switchToTab({
+        this.parentController.switchToTab({
           url: result.payload.url,
           searchString,
           userContextId: result.payload.userContext?.id,
@@ -2586,7 +2640,7 @@ ${
           // Because we are directly asking for a search here, bypassing the
           // docShell, we need to do the same ourselves.
           // See also keyword-uri-fixup.
-          this.controller.checkKeywordURIFixup(
+          this.parentController.checkKeywordURIFixup(
             originalUntrimmedValue.trim(),
             browserId
           );
@@ -2731,7 +2785,7 @@ ${
       }
       // `input` may be an empty string, so do a strict comparison here.
       if (input !== undefined) {
-        this.controller.addToInputHistory(url, input);
+        this.parentController.addToInputHistory(url, input);
       }
     }
 
@@ -3399,7 +3453,7 @@ ${
           this.window.gBrowser.selectedBrowser
         );
       }
-      this.controller.openSERP(
+      this.parentController.openSERP(
         searchEngine.id,
         trimmedValue,
         where,
@@ -3408,7 +3462,7 @@ ${
       );
     } else {
       // Telemetry is handled by the function.
-      this.controller.openSearchForm(
+      this.parentController.openSearchForm(
         searchEngine.id,
         where,
         inBackground,
@@ -3591,7 +3645,7 @@ ${
         this.userTypedValue = this.untrimmedValue;
         this.valueIsTyped = true;
         if (!searchMode.isPreview && !areSearchModesSame) {
-          this.controller.recordSearchMode(searchMode);
+          this.parentController.recordSearchMode(searchMode);
         }
       }
     }
@@ -3701,10 +3755,8 @@ ${
   }
 
   get focused() {
-    return (
-      this.document.activeElement ==
-      (this.#smartbarInputController?.input ?? this.inputField)
-    );
+    const input = this.#smartbarInputController?.input ?? this.inputField;
+    return !!input && input.getRootNode().activeElement === input;
   }
 
   get goButton() {
@@ -3926,8 +3978,8 @@ ${
     return state;
   }
 
-  async #updateLayoutBreakout() {
-    if (!this.#allowBreakout) {
+  async #updatePopoverAnchor() {
+    if (!this.#canOpenPopover) {
       return;
     }
     if (this.document.fullscreenElement) {
@@ -3936,17 +3988,17 @@ ${
       this.window.addEventListener(
         "fullscreen",
         () => {
-          this.#updateLayoutBreakout();
+          this.#updatePopoverAnchor();
         },
         { once: true }
       );
       return;
     }
-    await this.#updateLayoutBreakoutDimensions();
+    await this.#measurePopoverAnchor();
   }
 
-  startLayoutExtend() {
-    if (!this.#allowBreakout || this.hasAttribute("breakout-extend")) {
+  #openPopover() {
+    if (!this.#canOpenPopover || this.hasAttribute("expanded")) {
       // Do not expand if the Urlbar does not support being expanded or it is
       // already expanded.
       return;
@@ -3955,38 +4007,35 @@ ${
       return;
     }
 
-    this.#updateTextboxPosition();
-
-    this.setAttribute("breakout-extend", "true");
+    this.setAttribute("expanded", "true");
 
     // Enable the animation only after the first extend call to ensure it
     // doesn't run when opening a new window.
-    if (!this.hasAttribute("breakout-extend-animate")) {
+    if (!this.hasAttribute("popover-animate")) {
       this.window.promiseDocumentFlushed(() => {
         this.window.requestAnimationFrame(() => {
-          this.setAttribute("breakout-extend-animate", "true");
+          this.setAttribute("popover-animate", "true");
         });
       });
     }
   }
 
-  endLayoutExtend() {
+  #closePopover() {
     // If reduce motion is enabled, we want to collapse the Urlbar here so the
     // user sees only sees two states: not expanded, and expanded with the view
     // open.
-    if (!this.hasAttribute("breakout-extend") || this.view.isOpen) {
+    if (!this.hasAttribute("expanded") || this.view.isOpen) {
       return;
     }
 
-    this.removeAttribute("breakout-extend");
-    this.#updateTextboxPosition();
+    this.removeAttribute("expanded");
   }
 
-  updateLayoutExtend() {
+  updatePopover() {
     if (this.view.isOpen) {
-      this.startLayoutExtend();
+      this.#openPopover();
     } else {
-      this.endLayoutExtend();
+      this.#closePopover();
     }
   }
 
@@ -4249,87 +4298,55 @@ ${
     this.view.close();
   }
 
-  #updateTextboxPosition() {
-    if (!this.view.isOpen) {
-      this.style.top = "";
-      return;
-    }
-    this.style.top = px(
-      this.parentNode.getBoxQuads({
-        ignoreTransforms: true,
-        flush: false,
-      })[0].p1.y
-    );
-  }
-
-  #updateTextboxPositionNextFrame() {
-    if (!this.hasAttribute("breakout")) {
-      return;
-    }
-    // Allow for any layout changes to take place (e.g. when the menubar becomes
-    // inactive) before re-measuring to position the textbox
-    this.window.requestAnimationFrame(() => {
-      this.window.requestAnimationFrame(() => {
-        this.#updateTextboxPosition();
-      });
-    });
-  }
-
-  #stopBreakout() {
-    this.removeAttribute("breakout");
-    this.parentNode.removeAttribute("breakout");
-    this.style.top = "";
+  #releasePopoverAnchor() {
     try {
       this.hidePopover();
     } catch (ex) {
       // No big deal if not a popover already.
     }
-    this._layoutBreakoutUpdateKey = {};
+    this.#popoverAnchorUpdateKey = {};
   }
 
-  incrementBreakoutBlockerCount() {
-    this.#breakoutBlockerCount++;
-    if (this.#breakoutBlockerCount == 1) {
-      this.#stopBreakout();
+  incrementPopoverBlockerCount() {
+    this.#popoverBlockerCount++;
+    if (this.#popoverBlockerCount == 1) {
+      this.#releasePopoverAnchor();
     }
   }
 
-  decrementBreakoutBlockerCount() {
-    if (this.#breakoutBlockerCount > 0) {
-      this.#breakoutBlockerCount--;
+  decrementPopoverBlockerCount() {
+    if (this.#popoverBlockerCount > 0) {
+      this.#popoverBlockerCount--;
     }
-    if (this.#breakoutBlockerCount === 0) {
-      this.#updateLayoutBreakout();
+    if (this.#popoverBlockerCount === 0) {
+      this.#updatePopoverAnchor();
     }
   }
 
-  async #updateLayoutBreakoutDimensions() {
-    this.#stopBreakout();
+  async #measurePopoverAnchor() {
+    this.#releasePopoverAnchor();
 
     // When this method gets called a second time before the first call
     // finishes, we need to disregard the first one.
     let updateKey = {};
-    this._layoutBreakoutUpdateKey = updateKey;
+    this.#popoverAnchorUpdateKey = updateKey;
     await this.window.promiseDocumentFlushed(() => {});
     await new Promise(resolve => {
       this.window.requestAnimationFrame(() => {
-        if (this._layoutBreakoutUpdateKey != updateKey || !this.isConnected) {
+        if (this.#popoverAnchorUpdateKey != updateKey || !this.isConnected) {
           return;
         }
 
-        this.parentNode.style.setProperty(
+        this.#popoverAnchor.style.setProperty(
           "--urlbar-container-height",
-          px(getBoundsWithoutFlushing(this.parentNode).height)
+          px(getBoundsWithoutFlushing(this.#popoverAnchor).height)
         );
 
-        if (this.#breakoutBlockerCount) {
+        if (this.#popoverBlockerCount) {
           return;
         }
 
-        this.setAttribute("breakout", "true");
-        this.parentNode.setAttribute("breakout", "true");
         this.showPopover();
-        this.#updateTextboxPosition();
 
         resolve();
       });
@@ -4853,9 +4870,9 @@ ${
       },
     };
     if (where.startsWith("tab")) {
-      this.controller.recordSearchInOpenedTab(searchData);
+      this.parentController.recordSearchInOpenedTab(searchData);
     } else {
-      this.controller.recordSearch(searchData);
+      this.parentController.recordSearch(searchData);
     }
   }
 
@@ -4904,7 +4921,6 @@ ${
     }
 
     let suffix = Services.locale.urlFixupSuffix;
-    Glean.urlfixup.suffix.get("smartbar", suffix).add(1);
     if (!suffix.endsWith("/")) {
       suffix += "/";
     }
@@ -5169,7 +5185,7 @@ ${
     // Notify about the start of navigation.
     this.#notifyStartNavigation(resultDetails);
 
-    let loadStatus = await this.controller.loadURL({
+    let loadStatus = await this.parentController.loadURL({
       loadRequest,
       where,
       params,
@@ -5199,30 +5215,6 @@ ${
     }
     this._copyCutController = new CopyCutController(this);
     this.inputField.controllers.insertControllerAt(0, this._copyCutController);
-  }
-
-  /**
-   * Searches the context menu for the location of a specific command.
-   *
-   * @param {string} menuItemCommand
-   *    The command to search for.
-   * @returns {HTMLElement}
-   *    Html element that matches the command or
-   *    the last element if we could not find the command.
-   */
-  #findMenuItemLocation(menuItemCommand) {
-    let inputBox = this.querySelector("moz-input-box");
-    let contextMenu = inputBox.menupopup;
-    let insertLocation = contextMenu.firstElementChild;
-    // find the location of the command
-    while (
-      insertLocation.nextElementSibling &&
-      insertLocation.getAttribute("cmd") != menuItemCommand
-    ) {
-      insertLocation = insertLocation.nextElementSibling;
-    }
-
-    return insertLocation;
   }
 
   /**
@@ -5378,48 +5370,51 @@ ${
   // The strip-on-share feature will strip known tracking/decorational
   // query params from the URI and copy the stripped version to the clipboard.
   _initStripOnShare() {
-    let contextMenu = this.querySelector("moz-input-box").menupopup;
-    let insertLocation = this.#findMenuItemLocation("cmd_copy");
-    // set up the menu item
-    let stripOnShare = this.document.createXULElement("menuitem");
-    this.document.l10n.setAttributes(
-      stripOnShare,
-      "text-action-copy-clean-link"
-    );
-    stripOnShare.setAttribute("anonid", "strip-on-share");
-    stripOnShare.id = "strip-on-share";
+    this.#addContextMenuItems({
+      after: "edit-contextmenu-copy",
+      createItems: () => {
+        let doc = this.ownerDocument;
+        let fragment = doc.createDocumentFragment();
+        let stripOnShare = doc.createXULElement("menuitem");
+        doc.l10n.setAttributes(stripOnShare, "text-action-copy-clean-link");
+        stripOnShare.setAttribute("anonid", "strip-on-share");
+        stripOnShare.id = "strip-on-share";
 
-    insertLocation.insertAdjacentElement("afterend", stripOnShare);
+        // Register listener that returns the stripped url or falls back
+        // to the original url if nothing can be stripped.
+        stripOnShare.addEventListener("command", () => {
+          let strippedURI = this.#stripURI();
+          lazy.ClipboardHelper.copyString(strippedURI.displaySpec);
+        });
 
-    // Register listener that returns the stripped url or falls back
-    // to the original url if nothing can be stripped.
-    stripOnShare.addEventListener("command", () => {
-      let strippedURI = this.#stripURI();
-      lazy.ClipboardHelper.copyString(strippedURI.displaySpec);
-    });
-
-    // Register a listener that hides the menu item if there is nothing to copy.
-    contextMenu.addEventListener("popupshowing", () => {
-      // feature is not enabled
-      if (!UrlbarPrefs.get("privacy.query_stripping.strip_on_share.enabled")) {
-        stripOnShare.setAttribute("hidden", true);
-        return;
-      }
-      let controller =
-        this.document.commandDispatcher.getControllerForCommand("cmd_copy");
-      if (
-        !controller.isCommandEnabled("cmd_copy") ||
-        !this.#isClipboardURIValid()
-      ) {
-        stripOnShare.setAttribute("hidden", true);
-        return;
-      }
-      stripOnShare.removeAttribute("hidden");
-      if (!this.#canStrip()) {
-        stripOnShare.setAttribute("disabled", true);
-        return;
-      }
-      stripOnShare.removeAttribute("disabled");
+        fragment.appendChild(stripOnShare);
+        return fragment;
+      },
+      // Hide the menu item if there is nothing to copy.
+      onShowing: (input, [stripOnShare]) => {
+        // feature is not enabled
+        if (
+          !UrlbarPrefs.get("privacy.query_stripping.strip_on_share.enabled")
+        ) {
+          stripOnShare.setAttribute("hidden", true);
+          return;
+        }
+        let controller =
+          this.document.commandDispatcher.getControllerForCommand("cmd_copy");
+        if (
+          !controller.isCommandEnabled("cmd_copy") ||
+          !this.#isClipboardURIValid()
+        ) {
+          stripOnShare.setAttribute("hidden", true);
+          return;
+        }
+        stripOnShare.removeAttribute("hidden");
+        if (!this.#canStrip()) {
+          stripOnShare.setAttribute("disabled", true);
+          return;
+        }
+        stripOnShare.removeAttribute("disabled");
+      },
     });
   }
 
@@ -5456,89 +5451,93 @@ ${
   }
 
   _initPasteAndGo() {
-    let inputBox = this.querySelector("moz-input-box");
-    let contextMenu = inputBox.menupopup;
-    let insertLocation = this.#findMenuItemLocation("cmd_paste");
-    if (!insertLocation) {
-      return;
-    }
+    this.#addContextMenuItems({
+      after: "edit-contextmenu-paste",
+      createItems: () => {
+        let doc = this.ownerDocument;
+        let fragment = doc.createDocumentFragment();
+        let pasteAndGo = doc.createXULElement("menuitem");
+        pasteAndGo.id = "paste-and-go";
+        let label = Services.strings
+          .createBundle("chrome://browser/locale/browser.properties")
+          .GetStringFromName("pasteAndGo.label");
+        pasteAndGo.setAttribute("label", label);
+        pasteAndGo.setAttribute("anonid", "paste-and-go");
+        pasteAndGo.addEventListener("command", () => {
+          this.suppressStartQuery();
 
-    let pasteAndGo = contextMenu.ownerDocument.createXULElement("menuitem");
-    pasteAndGo.id = "paste-and-go";
-    let label = Services.strings
-      .createBundle("chrome://browser/locale/browser.properties")
-      .GetStringFromName("pasteAndGo.label");
-    pasteAndGo.setAttribute("label", label);
-    pasteAndGo.setAttribute("anonid", "paste-and-go");
-    pasteAndGo.addEventListener("command", () => {
-      this.suppressStartQuery();
+          this.select();
+          this.#pasteForPasteAndGo();
+          this.setResultForCurrentValue(null);
+          this.handleCommand();
+          this.parentController.clearLastQueryContextCache();
 
-      this.select();
-      this.#pasteForPasteAndGo();
-      this.setResultForCurrentValue(null);
-      this.handleCommand();
-      this.controller.clearLastQueryContextCache();
+          if (!this._permanentlySuppressStartQuery) {
+            this.unsuppressStartQuery();
+          }
+        });
 
-      if (!this._permanentlySuppressStartQuery) {
-        this.unsuppressStartQuery();
-      }
+        fragment.appendChild(pasteAndGo);
+        return fragment;
+      },
+      onShowing: (input, [pasteAndGo]) => {
+        // Close the results pane, because paste and go doesn't want a result
+        // selection. This has to happen before the menu opens: ending
+        // breakout-extend once it's open keeps it from showing (bug 2037468).
+        this.view.close();
+
+        if (this.#pasteAndGoEnabled()) {
+          pasteAndGo.removeAttribute("disabled");
+        } else {
+          pasteAndGo.setAttribute("disabled", "true");
+        }
+      },
     });
-
-    contextMenu.addEventListener("popupshowing", () => {
-      // Close the results pane when the input field contextual menu is open,
-      // because paste and go doesn't want a result selection.
-      this.view.close();
-
-      if (this.#pasteAndGoEnabled()) {
-        pasteAndGo.removeAttribute("disabled");
-      } else {
-        pasteAndGo.setAttribute("disabled", "true");
-      }
-    });
-
-    insertLocation.insertAdjacentElement("afterend", pasteAndGo);
   }
 
   // Adds "Dismiss" and "Forget this site" entries to the urlbar input context
   // menu, both hidden unless the heuristic result is autofill.
   _initAutofillDismiss() {
-    let contextMenu = this.querySelector("moz-input-box").menupopup;
-    let insertLocation = this.#findMenuItemLocation("cmd_selectAll");
-    if (!insertLocation) {
-      return;
-    }
+    this.#addContextMenuItems({
+      after: "edit-contextmenu-select-all",
+      createItems: () => {
+        // Use ownerDocument so the elements share a docgroup with the context
+        // menu. In smartbar mode this.document points at the top chrome window,
+        // which is a different docgroup than the AI window that hosts the
+        // input.
+        let doc = this.ownerDocument;
+        let fragment = doc.createDocumentFragment();
 
-    // Use ownerDocument so the elements share a docgroup with the context
-    // menu. In smartbar mode this.document points at the top chrome window,
-    // which is a different docgroup than the AI window that hosts the input.
-    let doc = this.ownerDocument;
-    let separator = doc.createXULElement("menuseparator");
-    separator.setAttribute("anonid", "urlbar-input-autofill-dismiss-separator");
+        let separator = doc.createXULElement("menuseparator");
+        separator.setAttribute(
+          "anonid",
+          "urlbar-input-autofill-dismiss-separator"
+        );
 
-    let dismiss = doc.createXULElement("menuitem");
-    dismiss.setAttribute("anonid", "urlbar-input-dismiss-autofill");
-    doc.l10n.setAttributes(dismiss, "urlbar-input-dismiss-autofill");
-    dismiss.addEventListener("command", () => {
-      this.#dismissAdaptiveAutofillFromContextMenu("dismiss");
-    });
+        let dismiss = doc.createXULElement("menuitem");
+        dismiss.setAttribute("anonid", "urlbar-input-dismiss-autofill");
+        doc.l10n.setAttributes(dismiss, "urlbar-input-dismiss-autofill");
+        dismiss.addEventListener("command", () => {
+          this.#dismissAdaptiveAutofillFromContextMenu("dismiss");
+        });
 
-    let forget = doc.createXULElement("menuitem");
-    forget.setAttribute("anonid", "urlbar-input-remove-from-history");
-    doc.l10n.setAttributes(forget, "urlbar-input-remove-from-history");
-    forget.addEventListener("command", () => {
-      this.#dismissAdaptiveAutofillFromContextMenu("forget");
-    });
+        let forget = doc.createXULElement("menuitem");
+        forget.setAttribute("anonid", "urlbar-input-remove-from-history");
+        doc.l10n.setAttributes(forget, "urlbar-input-remove-from-history");
+        forget.addEventListener("command", () => {
+          this.#dismissAdaptiveAutofillFromContextMenu("forget");
+        });
 
-    insertLocation.insertAdjacentElement("afterend", separator);
-    separator.insertAdjacentElement("afterend", dismiss);
-    dismiss.insertAdjacentElement("afterend", forget);
-
-    contextMenu.addEventListener("popupshowing", () => {
-      let { showDismiss, showForget } =
-        this.#autofillDismissContextMenuVisibility();
-      separator.hidden = !showDismiss && !showForget;
-      dismiss.hidden = !showDismiss;
-      forget.hidden = !showForget;
+        fragment.append(separator, dismiss, forget);
+        return fragment;
+      },
+      onShowing: (input, [separator, dismiss, forget]) => {
+        let { showDismiss, showForget } =
+          this.#autofillDismissContextMenuVisibility();
+        separator.hidden = !showDismiss && !showForget;
+        dismiss.hidden = !showDismiss;
+        forget.hidden = !showForget;
+      },
     });
   }
 
@@ -5595,7 +5594,7 @@ ${
       return;
     }
 
-    await this.controller
+    await this.parentController
       .dismissAutofill(result.payload.url, action)
       .catch(console.error);
 
@@ -6067,6 +6066,9 @@ ${
    *  Urlbar state, and whether the selection is empty.
    */
   #maybeSelectAll() {
+    if (this.#isSmartbarMode) {
+      return;
+    }
     if (
       !this._preventClickSelectsAll &&
       this.#compositionState != UrlbarShared.COMPOSITION.COMPOSING &&
@@ -6216,10 +6218,6 @@ ${
   }
 
   _on_contextmenu(event) {
-    if (!this.#isSmartbarMode) {
-      this.addSearchEngineHelper.refreshContextMenu();
-    }
-
     // Context menu opened via keyboard shortcut.
     if (!event.button) {
       return;
@@ -6314,7 +6312,7 @@ ${
       case this: {
         this._mousedownOnUrlbarDescendant = true;
         if (
-          event.composedTarget != this.inputField &&
+          !this.#isInsideContainer(event.composedTarget, this.inputField) &&
           event.composedTarget != this._inputContainer
         ) {
           if (
@@ -6334,7 +6332,7 @@ ${
         // Keep the focus status, since the attribute may be changed
         // upon calling this.focus().
         const hasFocus = this.hasAttribute("focused");
-        if (event.composedTarget != this.inputField) {
+        if (!this.#isInsideContainer(event.composedTarget, this.inputField)) {
           this.focus();
         }
 
@@ -6345,7 +6343,7 @@ ${
 
         // Clear any previous selection unless we are focused, to ensure it
         // doesn't affect drag selection.
-        if (this.focusedViaMousedown) {
+        if (this.focusedViaMousedown && !this.#isSmartbarMode) {
           this.setSelectionRange(0, 0);
         }
 
@@ -6405,7 +6403,7 @@ ${
         event.inputType === "deleteContentForward")
     ) {
       // Take a telemetry if user deleted whole autofilled value.
-      this.controller.recordAutofillDeletion();
+      this.parentController.recordAutofillDeletion();
     }
 
     let value = this.value;
@@ -6786,9 +6784,7 @@ ${
   }
 
   _on_TabClose(event) {
-    this.controller.engagementEvent.handleBounceEventTrigger(
-      event.target.linkedBrowser.browserId
-    );
+    lazy.handleBounceEventTrigger(event.target.linkedBrowser);
 
     if (this.view.isOpen) {
       // Refresh results when a tab is closed while the results view is open.
@@ -6910,7 +6906,7 @@ ${
     });
   }
 
-  async _on_keyup(event) {
+  _on_keyup(event) {
     if (event.currentTarget == this.window) {
       this._untrimOnFocusAfterKeydown = false;
       return;
@@ -6940,14 +6936,27 @@ ${
     // Enter key before releasing Meta key, the keyup event is not fired.
     // Therefore, if Enter keydown is detecting, continue the post processing
     // for Enter key when any keyup event is detected.
+    if (this._keyDownEnterDeferred && !this._finishingDeferredEnter) {
+      this.#finishDeferredEnter();
+    }
+  }
+
+  /**
+   * Completes the deferred handling of an Enter keypress once a keyup arrives.
+   * Split out of `_on_keyup` so the common keyup path stays synchronous.
+   */
+  async #finishDeferredEnter() {
+    // Guard against a second keyup re-entering while the awaits below are
+    // pending; released in the finally along with the deferred.
+    this._finishingDeferredEnter = true;
     let keyDownEnterDeferred = this._keyDownEnterDeferred;
-    if (keyDownEnterDeferred) {
+    try {
       if (keyDownEnterDeferred.loadedContent) {
         try {
           const browserId = await keyDownEnterDeferred.promise;
           // The parent focuses the loading browser if it's still selected,
           // since only it can reach the browser element and the chrome window.
-          let { focused } = await this.controller.focusBrowser(browserId);
+          let { focused } = await this.parentController.focusBrowser(browserId);
           // focusBrowser resolves asynchronously; if the user began a fresh
           // search since this Enter (a later input bumped the epoch), its
           // caret must be left alone -- only keep the domain visible for our load.
@@ -6958,15 +6967,18 @@ ${
         } catch (ex) {
           // Not all the Enter actions in the urlbar will cause a navigation, then it
           // is normal for this to be rejected.
-          // If _keyDownEnterDeferred was rejected on keydown, we don't nullify it here
-          // to ensure not overwriting the new value created by keydown.
         }
       } else {
         // Discard the _keyDownEnterDeferred promise to receive any key inputs immediately.
         keyDownEnterDeferred.resolve();
       }
-
-      this._keyDownEnterDeferred = null;
+    } finally {
+      // Only clear if a newer Enter keydown hasn't already replaced it, so we
+      // don't overwrite that fresh deferred; then release the re-entry guard.
+      if (this._keyDownEnterDeferred === keyDownEnterDeferred) {
+        this._keyDownEnterDeferred = null;
+      }
+      this._finishingDeferredEnter = false;
     }
   }
 
@@ -7067,7 +7079,10 @@ ${
 
     event.dataTransfer.setData("text/x-moz-url", `${href}\n${title}`);
     event.dataTransfer.setData("text/plain", href);
-    event.dataTransfer.setData("text/html", `<a href="${href}">${title}</a>`);
+    event.dataTransfer.setData(
+      "text/html",
+      `<a href="${UrlbarShared.escapeHtmlEntities(href)}">${UrlbarShared.escapeHtmlEntities(title)}</a>`
+    );
     event.dataTransfer.effectAllowed = "copyLink";
     event.stopPropagation();
   }
@@ -7101,7 +7116,7 @@ ${
       // To simplify tracking of events, register an initial event for event
       // telemetry, to replace the missing input event.
       let queryContext = this.#makeQueryContext({ searchString: droppedURL });
-      this.controller.setLastQueryContextCache(queryContext);
+      this.parentController.setLastQueryContextCache(queryContext);
       this.controller.engagementEvent.start(event, queryContext);
       this.handleNavigation({ triggeringPrincipal: principal });
       if (this.#isAddressbar) {
@@ -7116,32 +7131,20 @@ ${
   }
 
   _on_customizationstarting() {
-    this.incrementBreakoutBlockerCount();
+    this.incrementPopoverBlockerCount();
     this.blur();
   }
 
   _on_aftercustomization() {
-    this.decrementBreakoutBlockerCount();
-    this.#updateLayoutBreakout();
+    this.decrementPopoverBlockerCount();
+    this.#updatePopoverAnchor();
   }
 
   uiDensityChanged() {
-    if (this.#breakoutBlockerCount) {
+    if (this.#popoverBlockerCount) {
       return;
     }
-    this.#updateLayoutBreakout();
-  }
-
-  _on_toolbarvisibilitychange() {
-    this.#updateTextboxPositionNextFrame();
-  }
-
-  _on_DOMMenuBarActive() {
-    this.#updateTextboxPositionNextFrame();
-  }
-
-  _on_DOMMenuBarInactive() {
-    this.#updateTextboxPositionNextFrame();
+    this.#updatePopoverAnchor();
   }
 
   #allTextSelectedOnKeyDown = false;
@@ -7747,13 +7750,19 @@ class CopyCutController {
  *
  * Note: setEnginesFromBrowser must be invoked from the outside when the
  *       page provided engines list changes.
- *       refreshContextMenu must be invoked when the context menu is opened.
  */
 class AddSearchEngineHelper {
   /**
    * @type {UrlbarSearchOneOffs}
    */
   shortcutButtons;
+
+  /**
+   * The engines the page offers, empty until OpenSearchManager reports any.
+   *
+   * @type {object[]}
+   */
+  engines = [];
 
   /**
    * @param {SmartbarInput} input The parent SmartbarInput.
@@ -7800,11 +7809,12 @@ class AddSearchEngineHelper {
   }
 
   _createMenuitem(engine, index) {
-    let elt = this.input.document.createXULElement("menuitem");
+    let doc = this.input.ownerDocument;
+    let elt = doc.createXULElement("menuitem");
     elt.setAttribute("anonid", `add-engine-${index}`);
     elt.classList.add("menuitem-iconic");
     elt.classList.add("context-menu-add-engine");
-    this.input.document.l10n.setAttributes(elt, "search-one-offs-add-engine", {
+    doc.l10n.setAttributes(elt, "search-one-offs-add-engine", {
       engineName: engine.title,
     });
     elt.setAttribute("uri", engine.uri);
@@ -7818,45 +7828,60 @@ class AddSearchEngineHelper {
   }
 
   _createMenu(engine) {
-    let elt = this.input.document.createXULElement("menu");
+    let doc = this.input.ownerDocument;
+    let elt = doc.createXULElement("menu");
     elt.setAttribute("anonid", "add-engine-menu");
     elt.classList.add("menu-iconic");
     elt.classList.add("context-menu-add-engine");
-    this.input.document.l10n.setAttributes(
-      elt,
-      "search-one-offs-add-engine-menu"
-    );
+    doc.l10n.setAttributes(elt, "search-one-offs-add-engine-menu");
     if (engine.icon) {
       elt.setAttribute("image", ChromeUtils.encodeURIForSrcset(engine.icon));
     }
-    let popup = this.input.document.createXULElement("menupopup");
+    let popup = doc.createXULElement("menupopup");
     elt.appendChild(popup);
     return elt;
   }
 
+  /**
+   * The items this helper has put in the context menu, after its separator.
+   *
+   * @type {Element[]}
+   */
+  #contextItems = [];
+
+  /**
+   * Creates the separator the engine items go after. The context menu is shared
+   * with other inputs, so it's owned as part of this input's item set rather
+   * than looked up in the menu.
+   *
+   * @returns {Element}
+   *   The separator.
+   */
+  createContextSeparator() {
+    this.contextSeparator =
+      this.input.ownerDocument.createXULElement("menuseparator");
+    this.contextSeparator.setAttribute("anonid", "add-engine-separator");
+    this.contextSeparator.classList.add("menuseparator-add-engine");
+    this.contextSeparator.collapsed = true;
+    return this.contextSeparator;
+  }
+
+  /**
+   * Rebuilds the engine items.
+   *
+   * @returns {Element[]}
+   *   The separator and the items, for the item set to claim.
+   */
   refreshContextMenu() {
     let engines = this.engines;
-    let contextMenu = this.input.querySelector("moz-input-box").menupopup;
-
-    // Certain operations, like customization, destroy and recreate widgets,
-    // so we cannot rely on cached elements.
-    if (!contextMenu.querySelector(".menuseparator-add-engine")) {
-      this.contextSeparator =
-        this.input.document.createXULElement("menuseparator");
-      this.contextSeparator.setAttribute("anonid", "add-engine-separator");
-      this.contextSeparator.classList.add("menuseparator-add-engine");
-      this.contextSeparator.collapsed = true;
-      contextMenu.appendChild(this.contextSeparator);
-    }
 
     this.contextSeparator.collapsed = !engines.length;
     let curElt = this.contextSeparator;
     // Remove the previous items, if any.
-    for (let elt = curElt.nextElementSibling; elt; ) {
-      let nextElementSibling = elt.nextElementSibling;
+    for (let elt of this.#contextItems) {
       elt.remove();
-      elt = nextElementSibling;
     }
+    this.#contextItems = [];
 
     // If the page provides too many engines, we only show a single menu entry
     // with engines in a submenu.
@@ -7866,6 +7891,7 @@ class AddSearchEngineHelper {
       // choice here.
       let elt = this._createMenu(engines[0]);
       this.contextSeparator.insertAdjacentElement("afterend", elt);
+      this.#contextItems.push(elt);
       curElt = elt.lastElementChild;
     }
 
@@ -7876,9 +7902,12 @@ class AddSearchEngineHelper {
         curElt.appendChild(elt);
       } else {
         curElt.insertAdjacentElement("afterend", elt);
+        this.#contextItems.push(elt);
       }
       curElt = elt;
     }
+
+    return [this.contextSeparator, ...this.#contextItems];
   }
 
   async _onCommand(event) {

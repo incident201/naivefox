@@ -274,6 +274,11 @@ newtab-error-fallback-refresh-link = Refresh page to try again.
 
 ## Customization Menu
 
+# An arrow button that goes back from a sub-panel in the customize panel, such as a wallpaper category, to the main Customize panel.
+newtab-customize-panel-back-button =
+    .aria-label = Back to Customize
+    .title = Back to Customize
+
 #  (developer note): @nova-cleanup(remove-string): Remove old string once Nova lands. The newtab-custom-shortcuts-nova string will take over
 newtab-custom-shortcuts-toggle =
   .label = Shortcuts
@@ -321,12 +326,15 @@ newtab-custom-widget-sports-toggle2 =
   .label = Sports
 newtab-custom-widget-privacy-toggle =
   .label = Privacy
+# Crossword is a widget on New Tab that shows a daily crossword puzzle.
+newtab-custom-widget-crossword-toggle =
+  .label = Crossword
 newtab-custom-widget-stocks-toggle =
   .label = Stocks
 newtab-custom-widget-picture-toggle =
   .label = Picture of the day
-newtab-custom-widget-recent-searches-toggle =
-  .label = Recent searches
+newtab-custom-widget-search-toggle =
+  .label = Search
 newtab-custom-widget-section-title = Widgets
 newtab-custom-widget-section-toggle =
     .label = Widgets
@@ -375,6 +383,9 @@ newtab-wallpaper-add-an-image = Add an image
 newtab-wallpaper-custom-color = Choose a color
 newtab-wallpaper-toggle-title =
     .label = Wallpapers
+# Label for the grid of wallpaper categories in the customize panel
+newtab-wallpaper-category-list =
+    .aria-label = Wallpaper categories
 # Variables
 #   $file_size (number) - The number of the maximum image file size (in MB) that may be uploaded
 newtab-wallpaper-error-max-file-size = The image exceeded the file size limit of { $file_size }MB. Please try uploading a smaller file.
@@ -393,6 +404,48 @@ newtab-wallpaper-dark-mountain = Landscape mountain
 newtab-wallpaper-dark-city = Purple city landscape
 newtab-wallpaper-dark-fox-anniversary = A fox on the pavement near a forest
 newtab-wallpaper-light-fox-anniversary = A fox in a grassy field with a misty mountain landscape
+
+## "Your images" is the folder of wallpapers someone has saved. A saved wallpaper
+## can be a file they uploaded, a Picture of the Day they chose to keep, or a
+## Firefox wallpaper kept for them when it was retired.
+
+newtab-wallpaper-your-images = Your images
+# Accessible name for the tile that opens the "Your images" folder in the
+# wallpaper picker. The tile shows one of the saved images and has no text of
+# its own, so this is all a screen reader has to go on.
+newtab-wallpaper-your-images-folder =
+    .aria-label = Your images, wallpapers that you have saved
+# Read by screen readers for a saved image that has a name of its own: a kept
+# Picture of the Day, or a Firefox wallpaper kept when it was retired. An image
+# someone added themselves is numbered instead, see the string below.
+# Variables:
+#   $name (string) - The picture's own title, or the Firefox wallpaper's name
+newtab-wallpaper-your-images-item = { $name }
+# Read by screen readers for an image someone added themselves. Firefox counts
+# these as they are saved rather than keeping the name of their file.
+# Variables:
+#   $number (number) - Which saved image this is, counting from one
+newtab-wallpaper-your-images-item-numbered = Image { $number }
+# Each saved image has its own remove button. The tooltip stays short because
+# a name can be long and some locales put it before the verb, which would push
+# "remove" out of view. The full name is on the label a screen reader reads.
+# Variables:
+#   $name (string) - The picture's own title, or the Firefox wallpaper's name
+newtab-wallpaper-remove-image =
+    .title = Remove image
+    .aria-label = Remove { $name }
+# The remove button for an image someone added themselves. .title is the
+# tooltip and .aria-label is what a screen reader reads.
+# Variables:
+#   $number (number) - Which saved image this is, counting from one
+newtab-wallpaper-remove-image-numbered =
+    .title = Remove image { $number }
+    .aria-label = Remove image { $number }
+newtab-wallpaper-remove-image-title = Remove image?
+# "This action" refers to removing a saved wallpaper image.
+newtab-wallpaper-remove-image-body = This action cannot be undone.
+newtab-wallpaper-remove-image-confirm = Remove
+newtab-wallpaper-remove-image-cancel = Cancel
 
 ## Solid Colors
 
@@ -462,6 +515,24 @@ newtab-wallpaper-celestial-river = Satellite image of river
 
 newtab-wallpaper-category-title-firefox = { -brand-product-name }
 
+## Firefox wallpaper descriptions used for screen readers
+
+newtab-wallpaper-firefox-orange = A fox at the right edge on an orange background
+newtab-wallpaper-firefox-colorful-sky = Waves of orange across a purple night sky
+newtab-wallpaper-firefox-desert-dark = A fox sitting in a dark purple desert
+newtab-wallpaper-firefox-desert-light = A fox running across a light desert
+newtab-wallpaper-firefox-hills-dark = A fox running over dark hills
+newtab-wallpaper-firefox-hills-light = A fox running over light hills
+newtab-wallpaper-firefox-tail-dark = A fox’s tail on a dark background
+newtab-wallpaper-firefox-tail-light = A fox’s tail on a light background
+newtab-wallpaper-firefox-side-kit-dark = A fox on the left side, on a dark background
+newtab-wallpaper-firefox-side-kit-light = A fox on the left side, on a light background
+newtab-wallpaper-firefox-sitting-hill-dark = A fox sitting on dark purple hills
+newtab-wallpaper-firefox-sitting-hill-light = A fox sitting on light hills
+newtab-wallpaper-firefox-peak-dark = A fox’s face at the left edge, on a dark background
+newtab-wallpaper-firefox-peak-light = A fox’s face at the left edge, on a light background
+newtab-wallpaper-firefox-sky-dark = Dark purple hills under a night sky
+newtab-wallpaper-firefox-sky-light = Light hills under a soft sky
 
 # Variables
 #   $author_string (String) - The name of the creator of the photo.
@@ -492,6 +563,9 @@ newtab-weather-menu-change-location = Change location
 newtab-weather-change-location-search-input-placeholder =
     .placeholder = Search location
     .aria-label = Search location
+newtab-weather-cancel-input =
+    .title = Cancel
+    .aria-label = Cancel
 # "Current" refers to the user's physical/geographic location detected via geolocation.
 newtab-weather-change-location-search-use-current =
     .label = Use current location
@@ -590,6 +664,14 @@ newtab-section-unfollow-button-label =
 # A modal may appear next to the Follow button, directing users to try out the feature
 newtab-section-follow-highlight-title = Fine-tune your feed
 newtab-section-follow-highlight-subtitle = Follow your interests to see more of what you like.
+
+## Topic navigation
+## A row of buttons above the stories, each scrolling the page to that topic's section.
+
+newtab-topic-navigation-label =
+    .aria-label = Topics
+# Opens a menu listing the topics that did not fit in the row.
+newtab-topic-navigation-more-button = More
 
 ## Button to block/unblock listed topics
 ## "Block", "unblocked", and "blocked" are social media terms that refer to hiding a section of stories.
@@ -732,6 +814,11 @@ newtab-widget-section-maximize =
 newtab-widget-section-minimize =
     .title = Minimize widgets
     .aria-label = Collapse all widgets to compact size
+# Shown on the widgets section header button while the section is
+# auto-minimized to its title row, to open the section back up.
+newtab-widget-section-show-widgets =
+    .title = Show widgets
+    .aria-label = Show the widgets section
 newtab-widget-section-menu-button =
     .title = Widgets menu
     .aria-label = Open widgets menu
@@ -786,6 +873,10 @@ newtab-widget-lists-menu-create = Create a new list
 newtab-widget-lists-menu-delete = Delete this list
 newtab-widget-lists-menu-copy = Copy list to clipboard
 newtab-widget-lists-menu-learn-more = Learn more
+# "Change" is a verb here: the button switches which list is shown
+newtab-widget-lists-change-list =
+    .title = Change list
+    .aria-label = Change list
 newtab-widget-lists-button-add-item = Add an item
 newtab-widget-lists-input-add-an-item2 =
     .placeholder = Add an item
@@ -1201,6 +1292,16 @@ newtab-activation-window-message-customization-focus-primary-button =
 newtab-activation-window-message-values-focus-header = This space plays by your rules
 newtab-activation-window-message-values-focus-message = { -brand-product-name } lets you browse the way you like, with a more personal way to start your day online. Make { -brand-product-name } your own.
 
+## Strings for the New Tab customization callout shown at the Nova launch.
+
+# "Put your finishing touch on" means to add the last, personal detail that
+# makes something yours. The call to action is to open the New Tab
+# customization panel and pick a theme or wallpaper.
+newtab-nova-customization-callout-header = Put your finishing touch on { -brand-product-name }
+newtab-nova-customization-callout-message = Explore light or dark themes and wallpapers that make the new { -brand-product-name } feel more like yours.
+newtab-nova-customization-callout-primary-button =
+    .label = Choose your look
+
 ## Strings for the Clock widget
 
 newtab-clock-widget-menu-learn-more = Learn more
@@ -1279,12 +1380,12 @@ newtab-clock-widget-custom-zone-results =
 newtab-clock-widget-custom-zone-no-results = No matching time zones
 # Returns from the custom clock form back to the city search.
 newtab-clock-widget-custom-back = Back
-# "Open menu for clock" is an icon-only button in the widget toolbar — the
+# "Clock options" is an icon-only button in the widget toolbar — the
 # attributes are consumed as tooltip/screen-reader label only. The button
 # never renders visible text.
-newtab-clock-widget-menu-button =
-    .title = Open menu for clock
-    .aria-label = Open menu for clock
+newtab-clock-widget-menu-button2 =
+    .title = Clock options
+    .aria-label = Clock options
 # $nickname (String) - The user-defined nickname for a saved clock location (e.g., "Home", "Office").
 newtab-clock-widget-label-nickname-with-value = Nickname: { $nickname }
 
@@ -1444,9 +1545,10 @@ home-prefs-stocks-header =
 home-prefs-picture-header =
     .label = Picture of the day
 
-# Recent searches is a widget on New Tab that shows the user's recent searches.
-home-prefs-recent-searches-header =
-    .label = Recent searches
+# Search is a widget on New Tab that shows the user's recent and trending
+# searches.
+home-prefs-search-widget-header =
+    .label = Search
 
 home-prefs-mission-message2 =
     .message = Our sponsors support our mission to build a better web.
@@ -1474,19 +1576,6 @@ home-prefs-sections-rows-option-srd =
             [one] { $num } row
            *[other] { $num } rows
         }
-
-home-restore-defaults-srd =
-    .label = Restore Defaults
-    .accesskey = R
-
-home-mode-choice-default-fx-srd =
-    .label = { -firefox-home-brand-name } (Default)
-
-home-mode-choice-custom-srd =
-    .label = Custom URLs…
-
-home-mode-choice-blank-srd =
-    .label = Blank Page
 
 home-prefs-shortcuts-header-srd =
     .label = Shortcuts
@@ -1533,6 +1622,13 @@ newtab-privacy-widget-label =
 # Context menu item linking to more information about the Privacy widget.
 newtab-privacy-menu-learn-more = Learn more
 
+# "Privacy options" is an icon-only button in the widget toolbar — the
+# attributes are consumed as tooltip/screen-reader label only. The button
+# never renders visible text.
+newtab-privacy-widget-menu-button =
+    .title = Privacy options
+    .aria-label = Privacy options
+
 ## Privacy widget — count readout
 
 # Label shown under the large tracker-count number, appearing like:
@@ -1563,7 +1659,11 @@ newtab-privacy-across-sites =
 ## Privacy widget — empty state
 
 # Shown when no trackers have been blocked yet today.
-newtab-privacy-empty = { -brand-short-name } blocks trackers as you browse. You’ll see them here.
+newtab-privacy-empty-state = { -brand-short-name } automatically blocks trackers, keeping more of your activity private.
+# "A running tally" is an informal way to say a total that keeps updating as it goes.
+# Here we are referring to the number of trackers blocked, which increases as the user browses.
+# An alternative can be "See a running total here"
+newtab-privacy-empty-state-tally = See a running tally here.
 
 ## Privacy widget — Enhanced Tracking Protection off state
 
@@ -1719,6 +1819,26 @@ newtab-stocks-widget-menu-button =
     .title = Stocks widget options
     .aria-label = Stocks widget options
 
+# Toolbar button that opens the stock search. It shows only the icon until it is
+# hovered or focused, then the .label as well; "Search" is a verb. .title and
+# .aria-label name it for tooltips and screen readers.
+newtab-stocks-search-button =
+    .label = Search
+    .title = Search by name or symbol
+    .aria-label = Search by name or symbol
+
+# Shown on the Watchlist while the user has no stocks in it, above a button that
+# opens the stock search.
+newtab-stocks-watchlist-empty = Start watching stocks that matter to you
+
+# Button under the empty-watchlist message that opens the stock search. Shown
+# with a magnifying-glass icon and the .label, where "Search" is a verb; .title
+# and .aria-label name it the same way as the toolbar search button.
+newtab-stocks-watchlist-empty-search =
+    .label = Search
+    .title = Search by name or symbol
+    .aria-label = Search by name or symbol
+
 ## Screen-reader summary of a stock ticker.
 ## Variables:
 ##   $name (String) - the full fund/ETF name, e.g. "SPDR S&P 500 ETF Trust".
@@ -1779,6 +1899,10 @@ newtab-stocks-search-input =
 # search. It means "results of the search", not "search within the results".
 newtab-stocks-search-results =
     .aria-label = Search results
+
+# Shown in the search panel, where the results will appear, until the user
+# has searched.
+newtab-stocks-search-hint = Search for symbols or companies to add to your watchlist
 
 # "Back" is an icon-only button in the search panel header that returns to the
 # widget — the attributes are consumed as tooltip/screen-reader label only. The
@@ -1870,17 +1994,45 @@ newtab-picture-check-back = Check back tomorrow for a new picture
 # provides no localized description.
 newtab-picture-image-alt = Wikimedia Commons picture of the day
 
-## Strings for the Recent Searches widget
+## Strings for the Search widget
 
 # Widget heading; also the widget's accessible name.
-newtab-recent-searches-widget-title = Recent searches
+newtab-search-widget-title = Search
 
 # Screen reader label for the widget's icon-only menu button.
-newtab-recent-searches-widget-menu-button =
-    .aria-label = Recent searches options
+newtab-search-widget-menu-button =
+    .aria-label = Search options
 
 # Context menu item linking to more information about the widget.
 newtab-recent-searches-menu-learn-more = Learn more
+
+# Tab listing the searches the user has made recently.
+newtab-recent-searches-tab-recent = Recent searches
+
+# Tab listing what is trending with the user's search engine.
+newtab-recent-searches-tab-trending = Trending
+
+# Informs the user which engine the trending results come from.
+# Variables:
+#   $engine (string) - Name of the default search engine, e.g. "Google".
+newtab-recent-searches-trending-attribution = via { $engine }
+
+# Relative time shown for a search made less than a minute ago.
+newtab-recent-searches-just-now = Just now
+
+# Screen reader label for the button that forgets one listed search.
+# Variables:
+#   $search (string) - The search the row shows, e.g. "puffin colonies".
+newtab-recent-searches-row-remove =
+    .aria-label = Remove “{ $search }” from recent searches
+
+## Recent searches widget — empty states
+
+# Shown in place of the list when the user has made no searches recently.
+newtab-recent-searches-empty-recent = Recent searches will show here so you can pick them up again anytime.
+
+# Shown in place of the list when there are no trending search results.
+newtab-recent-searches-empty-trending = Trending searches are not available right now.
 
 ## Strings for the navigable panels that new tab content area can be
 ## split into.

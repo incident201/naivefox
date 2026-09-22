@@ -6018,8 +6018,8 @@ void nsContentUtils::ReportDeprecation(
       new DeprecationReportBody(aGlobal, type, nullptr /* date */, msg,
                                 sourceFile, lineNumber, columnNumber);
 
-  ReportingUtils::Report(aGlobal, nsGkAtoms::deprecation, u"default"_ns,
-                         NS_ConvertUTF8toUTF16(url), body);
+  ReportingUtils::Report(aGlobal, nsGkAtoms::deprecation, "default"_ns, url,
+                         body);
 }
 
 void nsContentUtils::LogMessageToConsole(const char* aMsg) {
@@ -6900,13 +6900,14 @@ static void SetAndFilterHTML(
 
   // Step 2. Let sanitizer be the result of calling get a sanitizer instance
   // from options with options and safe.
-  nsCOMPtr<nsIGlobalObject> global = aTarget->GetRelevantGlobal();
-  if (!global) {
+  nsCOMPtr<nsPIDOMWindowInner> window =
+      do_QueryInterface(aTarget->GetRelevantGlobal());
+  if (!window) {
     aError.ThrowInvalidStateError("Missing owner global.");
     return;
   }
   RefPtr<Sanitizer> sanitizer =
-      Sanitizer::GetInstance(global, aSanitizerOptions, aSafe, aError);
+      Sanitizer::GetInstance(window, aSanitizerOptions, aSafe, aError);
   if (aError.Failed()) {
     return;
   }
@@ -6946,10 +6947,15 @@ static void SetAndFilterHTML(
   int32_t flags =
       aSafe ? nsContentUtils::kParseFragmentNoSanitization
             : nsContentUtils::kParseFragmentPrivilegedDefaultSanitization;
+
+  const bool sanitizeWhileParsing =
+      StaticPrefs::dom_security_sanitizer_while_parsing();
+
   aError = nsContentUtils::ParseFragmentHTML(
       aHTML, fragment, contextLocalName, contextNameSpaceID,
       /* aQuirks */ false, /* aPreventScriptExecution */ true, flags,
-      mozilla::Nothing());
+      mozilla::Nothing(), sanitizeWhileParsing ? sanitizer.get() : nullptr,
+      aSafe);
   if (aError.Failed()) {
     return;
   }
@@ -6959,10 +6965,12 @@ static void SetAndFilterHTML(
   // mutation listeners on the fragment that comes from the parser.
   nsAutoScriptBlockerSuppressNodeRemoved scriptBlocker;
 
-  // Step 6. Run sanitize on fragment using sanitizer and safe.
-  sanitizer->Sanitize(fragment, aSafe, aError);
-  if (aError.Failed()) {
-    return;
+  if (!sanitizeWhileParsing) {
+    // Step 6. Run sanitize on fragment using sanitizer and safe.
+    sanitizer->Sanitize(fragment, aSafe, aError);
+    if (aError.Failed()) {
+      return;
+    }
   }
 
   // Step 7. Replace all with fragment within target.
@@ -7120,7 +7128,10 @@ nsresult nsContentUtils::ParseFragmentHTML(
     nsAtom* aContextLocalName, int32_t aContextNamespace, bool aQuirks,
     bool aPreventScriptExecution, int32_t aFlags,
     mozilla::Maybe<RefPtr<mozilla::dom::CustomElementRegistry>>
-        aCustomElementRegistry) {
+        aCustomElementRegistry,
+    Sanitizer* aSanitizer, bool aSanitizerSafe) {
+  MOZ_ASSERT(!aSanitizer ||
+             StaticPrefs::dom_security_sanitizer_while_parsing());
   if (nsContentUtils::sFragmentParsingActive) {
     MOZ_ASSERT_UNREACHABLE("Re-entrant fragment parsing attempted.");
     return NS_ERROR_DOM_INVALID_STATE_ERR;
@@ -7167,7 +7178,8 @@ nsresult nsContentUtils::ParseFragmentHTML(
 
   nsresult rv = sHTMLFragmentParser->ParseFragment(
       aSourceBuffer, target, aContextLocalName, aContextNamespace, aQuirks,
-      aPreventScriptExecution, false, std::move(aCustomElementRegistry));
+      aPreventScriptExecution, false, std::move(aCustomElementRegistry),
+      aSanitizer, aSanitizerSafe);
   NS_ENSURE_SUCCESS(rv, rv);
 
   if (fragment) {
@@ -7189,7 +7201,10 @@ nsresult nsContentUtils::ParseFragmentHTML(
 /* static */
 nsresult nsContentUtils::ParseDocumentHTML(
     const nsAString& aSourceBuffer, Document* aTargetDocument,
-    bool aScriptingEnabledForNoscriptParsing) {
+    bool aScriptingEnabledForNoscriptParsing, Sanitizer* aSanitizer,
+    bool aSanitizerSafe) {
+  MOZ_ASSERT(!aSanitizer ||
+             StaticPrefs::dom_security_sanitizer_while_parsing());
   if (nsContentUtils::sFragmentParsingActive) {
     MOZ_ASSERT_UNREACHABLE("Re-entrant fragment parsing attempted.");
     return NS_ERROR_DOM_INVALID_STATE_ERR;
@@ -7201,7 +7216,8 @@ nsresult nsContentUtils::ParseDocumentHTML(
     // Now sHTMLFragmentParser owns the object
   }
   nsresult rv = sHTMLFragmentParser->ParseDocument(
-      aSourceBuffer, aTargetDocument, aScriptingEnabledForNoscriptParsing);
+      aSourceBuffer, aTargetDocument, aScriptingEnabledForNoscriptParsing,
+      aSanitizer, aSanitizerSafe);
   return rv;
 }
 
@@ -8711,10 +8727,10 @@ bool nsContentUtils::IsPDFJS(nsIPrincipal* aPrincipal) {
   if (!aPrincipal || !aPrincipal->SchemeIs("resource")) {
     return false;
   }
-  nsAutoCString spec;
-  nsresult rv = aPrincipal->GetAsciiSpec(spec);
+  nsAutoCString originNoSuffix;
+  nsresult rv = aPrincipal->GetOriginNoSuffix(originNoSuffix);
   NS_ENSURE_SUCCESS(rv, false);
-  return spec.EqualsLiteral("resource://pdf.js/web/viewer.html");
+  return originNoSuffix.Equals("resource://pdf.js"_ns);
 }
 
 bool nsContentUtils::IsSystemOrPDFJS(JSContext* aCx, JSObject*) {

@@ -14,8 +14,11 @@ import {
   PREF_PAGE_LAYOUT_VARIANT,
   isSideBySideAssigned,
   isSpacesAssigned,
+  isSpacesThematicAssigned,
+  PREF_SPACES_CONFIG,
   resolvePageLayoutVariant,
   resolvePopulatedSpaces,
+  resolveThematicSpacesConfig,
 } from "common/PageLayoutVariants.mjs";
 import { connect } from "react-redux";
 import React from "react";
@@ -60,9 +63,26 @@ const WIDGET_EXTRA_FEATURES = {
   privacy: [{ pref: "widgets.privacy.showVpnMessages", label: "VPN messages" }],
 };
 
+// Indents a JSON string for editing, or hands back whatever it was given when
+// that is not possible -- a draft mid-edit is often not valid JSON.
+function prettyJson(value) {
+  try {
+    return JSON.stringify(JSON.parse(value), null, 2);
+  } catch {
+    return value;
+  }
+}
+
 // Devtools-only copy, so not localized. A variant with no entry falls back to its
 // raw pref value and renders no description.
 const PAGE_LAYOUTS_INFO = {
+  // @experiment(remove) { bug 2066527 }
+  [PAGE_LAYOUT_VARIANTS.AUTO_MINIMIZE_WIDGETS]: {
+    label: "Auto-minimize Widgets",
+    description:
+      "Nova, but the widgets section collapses to just its title a few " +
+      "seconds after load.",
+  },
   [PAGE_LAYOUT_VARIANTS.NOVA_FULL_WIDTH]: {
     label: "Nova",
     description:
@@ -103,7 +123,26 @@ const PAGE_LAYOUTS_INFO = {
     label: "Spaces (Buttons at the top)",
     description: "Same as above, with the segmented control above the content.",
   },
+  [PAGE_LAYOUT_VARIANTS.SPACES_THEMATIC_V1]: {
+    label: "Spaces (Thematic)",
+    description:
+      "Panels named for interests rather than for what is in them, each " +
+      "holding the whole side-by-side pair over only its own content topics " +
+      "and widgets.",
+  },
+  // @experiment(remove) { bug 2069496 }
+  [PAGE_LAYOUT_VARIANTS.WIDGETS_AD_LARGE]: {
+    label: "Widgets row ad (large)",
+    description:
+      "Nova, plus a large sponsored card at the end of the first widget row. " +
+      "At one card column it sits second. It stays large when minimized.",
+  },
 };
+
+// Falls back to the raw pref value for a variant with no PAGE_LAYOUTS_INFO entry.
+function variantLabel(variant) {
+  return PAGE_LAYOUTS_INFO[variant]?.label ?? variant;
+}
 
 const Row = props => (
   <tr className="message-item" {...props}>
@@ -204,6 +243,9 @@ export class DiscoveryStreamAdminUI extends React.PureComponent {
       this.handleResetWidgetsToDefaults.bind(this);
     this.handlePageLayoutChange = this.handlePageLayoutChange.bind(this);
     this.handleResetPageLayout = this.handleResetPageLayout.bind(this);
+    this.handleSpacesConfigChange = this.handleSpacesConfigChange.bind(this);
+    this.handleResetSpacesConfig = this.handleResetSpacesConfig.bind(this);
+    this.handleSubmitSpacesConfig = this.handleSubmitSpacesConfig.bind(this);
     this.toggleIABBanners = this.toggleIABBanners.bind(this);
     this.handleAllizomToggle = this.handleAllizomToggle.bind(this);
     this.sendConversionEvent = this.sendConversionEvent.bind(this);
@@ -212,6 +254,8 @@ export class DiscoveryStreamAdminUI extends React.PureComponent {
       weatherQuery: "",
       pendingOverrides: {},
       overridesTogglePressed: null,
+      // null means "show the pref", so an external change is picked up.
+      spacesConfigDraft: null,
     };
   }
 
@@ -539,6 +583,79 @@ export class DiscoveryStreamAdminUI extends React.PureComponent {
     this.clearPrefs([PREF_PAGE_LAYOUT_VARIANT]);
   }
 
+  // Held locally and applied on submit, so typing does not reconfigure the page
+  // on every keystroke.
+  handleSpacesConfigChange(e) {
+    this.setState({ spacesConfigDraft: e.target.value });
+  }
+
+  handleSubmitSpacesConfig() {
+    const draft = this.state.spacesConfigDraft;
+    let value = draft;
+    try {
+      // Stored compact whatever was typed. An unparseable draft is written as
+      // typed, so the config's own warning explains it rather than this.
+      value = JSON.stringify(JSON.parse(draft));
+    } catch {}
+    this.props.dispatch(ac.SetPref(PREF_SPACES_CONFIG, value));
+  }
+
+  // Clears the user value, so the pref falls back to the default this build
+  // ships. Clearing the draft too, or the box would still show the old edit.
+  handleResetSpacesConfig() {
+    this.setState({ spacesConfigDraft: null });
+    this.clearPrefs([PREF_SPACES_CONFIG]);
+  }
+
+  // The spaces config as it stands, so a recipe or a hand-edit can be checked
+  // against what the page will actually do with it.
+  renderSpacesConfig() {
+    const prefs = this.props.otherPrefs;
+    const prefValue = prefs[PREF_SPACES_CONFIG] ?? "";
+    // The pref holds it compact, which is what about:config and a recipe want.
+    // Indented here because this is the one place it gets read and edited.
+    const draft = this.state.spacesConfigDraft ?? prettyJson(prefValue);
+    const trainhopConfig = prefs.trainhopConfig?.spaces;
+    const resolved = resolveThematicSpacesConfig(prefs);
+
+    return (
+      <>
+        <p className="layout-status">
+          Space ids, order, labels, icons, sections and widgets. Nothing is
+          merged: an unusable config turns the layout off rather than
+          half-applying, so a mistake here is visible.
+        </p>
+        <textarea
+          className="spaces-config-input"
+          rows="12"
+          value={draft}
+          onChange={this.handleSpacesConfigChange}
+        />
+        <moz-button
+          disabled={draft === prettyJson(prefValue) ? true : null}
+          onClick={this.handleSubmitSpacesConfig}
+        >
+          Apply config
+        </moz-button>
+        <moz-button onClick={this.handleResetSpacesConfig}>
+          Reset to default
+        </moz-button>
+        {trainhopConfig && (
+          <p className="layout-status layout-status-warning">
+            A train-hop experiment is supplying the config, so editing here does
+            nothing. See Train Hop above.
+          </p>
+        )}
+        {!resolved && (
+          <p className="layout-status layout-status-warning">
+            This config cannot render: it needs an <code>order</code> array of
+            ids and a <code>spaces</code> object giving each of them a label.
+          </p>
+        )}
+      </>
+    );
+  }
+
   // Names the first isSideBySideActive gate that fails, so a variant falling back to
   // one column says why. Callers check the variant is side-by-side first.
   pageLayoutInactiveReason() {
@@ -563,6 +680,11 @@ export class DiscoveryStreamAdminUI extends React.PureComponent {
   // today's page, since spaces adds no visible frame of its own when it falls
   // back. Callers check the variant is spaces first.
   spacesInactiveReason() {
+    // Every thematic space holds the pair, so when they are empty it is the pair
+    // that is missing rather than any one space's own feed.
+    if (isSpacesThematicAssigned(this.props.otherPrefs)) {
+      return this.pageLayoutInactiveReason();
+    }
     const populated = resolvePopulatedSpaces(this.props.otherPrefs);
     if (populated.length > 1) {
       return null;
@@ -586,30 +708,36 @@ export class DiscoveryStreamAdminUI extends React.PureComponent {
     return (
       <>
         <div className="layout-variants">
-          {Object.values(PAGE_LAYOUT_VARIANTS).map(variant => (
-            <label key={variant} className="layout-variant">
-              <input
-                type="radio"
-                name="page-layout-variant"
-                value={variant}
-                checked={prefVariant === variant}
-                onChange={this.handlePageLayoutChange}
-              />
-              <span className="layout-variant-text">
-                <span className="layout-variant-name">
-                  {PAGE_LAYOUTS_INFO[variant]?.label ?? variant}
-                  {variant === DEFAULT_PAGE_LAYOUT_VARIANT ? " (default)" : ""}
-                  {/* The pref value, for a Nimbus recipe or about:config. */}
-                  <code className="layout-variant-value">{variant}</code>
-                </span>
-                {PAGE_LAYOUTS_INFO[variant]?.description && (
-                  <span className="layout-variant-description">
-                    {PAGE_LAYOUTS_INFO[variant].description}
+          {Object.values(PAGE_LAYOUT_VARIANTS)
+            // By pref value, not label: locale collation orders the
+            // parenthesised labels' punctuation unintuitively.
+            .sort((a, b) => a.localeCompare(b))
+            .map(variant => (
+              <label key={variant} className="layout-variant">
+                <input
+                  type="radio"
+                  name="page-layout-variant"
+                  value={variant}
+                  checked={prefVariant === variant}
+                  onChange={this.handlePageLayoutChange}
+                />
+                <span className="layout-variant-text">
+                  <span className="layout-variant-name">
+                    {variantLabel(variant)}
+                    {variant === DEFAULT_PAGE_LAYOUT_VARIANT
+                      ? " (default)"
+                      : ""}
+                    {/* The pref value, for a Nimbus recipe or about:config. */}
+                    <code className="layout-variant-value">{variant}</code>
                   </span>
-                )}
-              </span>
-            </label>
-          ))}
+                  {PAGE_LAYOUTS_INFO[variant]?.description && (
+                    <span className="layout-variant-description">
+                      {PAGE_LAYOUTS_INFO[variant].description}
+                    </span>
+                  )}
+                </span>
+              </label>
+            ))}
         </div>
         <moz-button
           disabled={prefVariant === DEFAULT_PAGE_LAYOUT_VARIANT ? true : null}
@@ -1206,6 +1334,12 @@ export class DiscoveryStreamAdminUI extends React.PureComponent {
           <summary>Page Layouts (experimental)</summary>
           {this.renderLayouts()}
         </details>
+        {isSpacesThematicAssigned(this.props.otherPrefs) && (
+          <details className="details-section">
+            <summary>Thematic spaces config</summary>
+            {this.renderSpacesConfig()}
+          </details>
+        )}
         <details className="details-section">
           <summary>IAB Banner Ad Sizes</summary>
           <div className="toggle-wrapper">

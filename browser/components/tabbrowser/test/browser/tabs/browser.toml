@@ -13,9 +13,6 @@ prefs = [
   "browser.sessionstore.closedTabsFromClosedWindows=true",
   "sidebar.verticalTabs.dragToPinPromo.dismissed=true",
 ]
-skip-if = [
-  "os == 'linux' && os_version == '24.04' && arch == 'x86_64' && tsan", # Bug 2057863
-]
 
 ["browser_1936752_lock_tab_sizing.js"]
 
@@ -51,10 +48,7 @@ https_first_disabled = true
 run-if = [
   "fission",
 ]
-skip-if = [
-  "os == 'linux' && os_version == '24.04' && arch == 'x86_64' && display == 'x11' && debug", # Bug 1934436
-  "verify-standalone",
-]
+skip-if = ["verify-standalone"]
 
 ["browser_blank_tab_label.js"]
 tags = "vertical-tabs"
@@ -662,11 +656,12 @@ skip-if = [
 ["browser_tab_splitview_about_opentabs.js"]
 skip-if = [
   "os == 'linux' && os_version == '24.04' && arch == 'x86_64' && display == 'x11' && opt && a11y_checks", # Bug 2014213
-  "os == 'mac' && os_version == '15.30' && arch == 'aarch64'", # Bug 2019466
 ]
 
 
 ["browser_tab_splitview_alt_click.js"]
+
+["browser_tab_splitview_content_size.js"]
 
 ["browser_tab_splitview_contextmenu.js"]
 skip-if = [
@@ -686,6 +681,8 @@ support-files = ["file_withicon.html"]
 ["browser_tab_splitview_splitter_keyboard.js"]
 
 ["browser_tab_splitview_splitter_keyboard_boundary.js"]
+
+["browser_tab_splitview_tab_height.js"]
 
 ["browser_tab_splitview_tab_order.js"]
 
@@ -724,6 +721,8 @@ tags = "vertical-tabs"
 skip-if = [
   "os == 'linux' && os_version == '24.04' && arch == 'x86_64' && display == 'x11' && vertical_tab", # Bug 1971008
 ]
+
+["browser_tabswitch_discard.js"]
 
 ["browser_tabswitch_select.js"]
 support-files = ["open_window_in_new_tab.html"]

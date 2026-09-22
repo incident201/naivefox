@@ -13,17 +13,6 @@
 namespace mozilla {
 namespace gfx {
 
-struct Circle {
-  Point origin;
-  float radius;
-  bool closed = false;
-};
-
-struct Line {
-  Point origin;
-  Point destination;
-};
-
 class PathOps {
  public:
   PathOps() = default;
@@ -47,11 +36,13 @@ class PathOps {
 
   bool CheckedStreamToSink(PathSink& aPathSink) const;
 
-  PathOps TransformedCopy(const Matrix& aTransform) const;
+  void TransformedCopyTo(const Matrix& aTransform, PathOps& aDest) const;
 
   void TransformInPlace(const Matrix& aTransform);
 
   size_t NumberOfOps() const;
+
+  void Clear() { mPathData.clear(); }
 
  private:
   enum class OpType : uint32_t {
@@ -126,8 +117,8 @@ class PathOps {
 
   void Close() { AppendPathOp(OpType::OP_CLOSE); }
 
-  Maybe<Circle> AsCircle() const;
-  Maybe<Line> AsLine() const;
+  Maybe<Path::Circle> AsCircle() const;
+  Maybe<Path::Line> AsLine() const;
 
   bool IsActive() const { return !mPathData.empty(); }
 
@@ -159,14 +150,9 @@ class PathBuilderRecording final : public PathBuilder {
  public:
   MOZ_DECLARE_REFCOUNTED_VIRTUAL_TYPENAME(PathBuilderRecording, override)
 
-  PathBuilderRecording(BackendType aBackend, FillRule aFillRule)
-      : mBackendType(aBackend), mFillRule(aFillRule) {}
-
-  PathBuilderRecording(BackendType aBackend, PathOps&& aPathOps,
-                       FillRule aFillRule)
-      : mBackendType(aBackend),
-        mFillRule(aFillRule),
-        mPathOps(std::move(aPathOps)) {}
+  PathBuilderRecording(BackendType aBackend, FillRule aFillRule);
+  PathBuilderRecording(BackendType aBackend, FillRule aFillRule,
+                       already_AddRefed<PathRecording> aPath);
 
   /* Move the current point in the path, any figure currently being drawn will
    * be considered closed during fill operations, however when stroking the
@@ -194,32 +180,45 @@ class PathBuilderRecording final : public PathBuilder {
 
   already_AddRefed<Path> Finish() final;
 
+  void Reset(FillRule aFillRule) final;
+
+  void RecyclePath(already_AddRefed<Path> aPath) final;
+
+  void Transform(const Matrix& aTransform) final;
+
   BackendType GetBackendType() const final { return BackendType::RECORDING; }
 
-  bool IsActive() const final { return mPathOps.IsActive(); }
+  bool IsActive() const final;
+
+  Maybe<Path::Circle> AsCircle() const final;
+  Maybe<Path::Line> AsLine() const final;
 
  private:
+  friend class PathRecording;
+
   BackendType mBackendType;
-  FillRule mFillRule;
-  PathOps mPathOps;
+  RefPtr<PathRecording> mPath;
 };
 
 class PathRecording final : public Path {
  public:
   MOZ_DECLARE_REFCOUNTED_VIRTUAL_TYPENAME(PathRecording, override)
 
-  PathRecording(BackendType aBackend, PathOps&& aOps, FillRule aFillRule,
-                const Point& aCurrentPoint, const Point& aBeginPoint);
+  PathRecording(BackendType aBackend, FillRule aFillRule);
+  PathRecording(BackendType aBackend, FillRule aFillRule,
+                const Point& aCurrentPoint, const Point& aBeginPoint,
+                const PathOps& aPathOps = PathOps());
 
   ~PathRecording();
 
   BackendType GetBackendType() const final { return BackendType::RECORDING; }
-  already_AddRefed<PathBuilder> CopyToBuilder(FillRule aFillRule) const final;
+  already_AddRefed<PathBuilder> CopyToBuilder(
+      FillRule aFillRule, already_AddRefed<PathBuilder> aBuilder) const final;
   already_AddRefed<PathBuilder> TransformedCopyToBuilder(
-      const Matrix& aTransform, FillRule aFillRule) const final;
-  already_AddRefed<PathBuilder> MoveToBuilder(FillRule aFillRule) final;
-  already_AddRefed<PathBuilder> TransformedMoveToBuilder(
-      const Matrix& aTransform, FillRule aFillRule) final;
+      const Matrix& aTransform, FillRule aFillRule,
+      already_AddRefed<PathBuilder> aBuilder) const final;
+  already_AddRefed<PathBuilder> MoveToBuilder(
+      FillRule aFillRule, already_AddRefed<PathBuilder> aBuilder) final;
 
   bool ContainsPoint(const Point& aPoint,
                      const Matrix& aTransform) const final {
@@ -249,14 +248,12 @@ class PathRecording final : public Path {
     return mPath->AsRect();
   }
 
-  Maybe<Circle> AsCircle() const { return mPathOps.AsCircle(); }
-  Maybe<Line> AsLine() const { return mPathOps.AsLine(); }
+  Maybe<Path::Circle> AsCircle() const final { return mPathOps.AsCircle(); }
+  Maybe<Path::Line> AsLine() const final { return mPathOps.AsLine(); }
 
   void StreamToSink(PathSink* aSink) const final {
     mPathOps.StreamToSink(*aSink);
   }
-
-  FillRule GetFillRule() const final { return mFillRule; }
 
   bool IsEmpty() const final { return mPathOps.IsEmpty(); }
 
@@ -264,19 +261,30 @@ class PathRecording final : public Path {
   friend class DrawTargetWrapAndRecord;
   friend class DrawTargetRecording;
   friend class RecordedPathCreation;
+  friend class PathBuilderRecording;
 
   void EnsurePath() const;
+  void ResetCachedState();
 
   BackendType mBackendType;
   mutable RefPtr<Path> mPath;
   PathOps mPathOps;
-  FillRule mFillRule;
-  Point mCurrentPoint;
-  Point mBeginPoint;
 
   // Event recorders that have this path in their event stream.
   std::vector<RefPtr<DrawEventRecorderPrivate>> mStoredRecorders;
 };
+
+inline bool PathBuilderRecording::IsActive() const {
+  return mPath->mPathOps.IsActive();
+}
+
+inline Maybe<Path::Circle> PathBuilderRecording::AsCircle() const {
+  return mPath->mPathOps.AsCircle();
+}
+
+inline Maybe<Path::Line> PathBuilderRecording::AsLine() const {
+  return mPath->mPathOps.AsLine();
+}
 
 }  // namespace gfx
 }  // namespace mozilla

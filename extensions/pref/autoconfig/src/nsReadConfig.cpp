@@ -105,8 +105,7 @@ NS_IMETHODIMP nsReadConfig::Observe(nsISupports* aSubject, const char* aTopic,
           nsCOMPtr<nsIAppStartup> appStartup =
               components::AppStartup::Service();
           if (appStartup) {
-            bool userAllowedQuit = true;
-            appStartup->Quit(nsIAppStartup::eAttemptQuit, 0, &userAllowedQuit);
+            appStartup->Quit(nsIAppStartup::eAttemptQuit, 0);
           }
         }
       }

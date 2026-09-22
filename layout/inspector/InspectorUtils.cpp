@@ -826,8 +826,7 @@ void InspectorUtils::ColorToRGBA(GlobalObject& aGlobal,
   }();
 
   nscolor color = NS_RGB(0, 0, 0);
-  if (!ServoCSSParser::ComputeColor(styleData, NS_RGB(0, 0, 0), aColorString,
-                                    &color)) {
+  if (!ServoCSSParser::ComputeColor(styleData, aColorString, &color)) {
     aResult.SetNull();
     return;
   }
@@ -1412,7 +1411,8 @@ void InspectorUtils::GetAnchorFor(GlobalObject&, Element& aElement,
     name = NS_Atomize(aName);
     scopedName = {name, StyleCascadeLevel::Default()};
   }
-  anchor = frame->PresShell()->GetAnchorPosAnchor(scopedName, frame);
+  anchor = frame->PresShell()->GetAnchorPosAnchor(scopedName, frame,
+                                                  frame->GetDepthInFrameTree());
   if (!anchor) {
     return;
   }
@@ -1444,7 +1444,7 @@ void InspectorUtils::GetComputationSteps(GlobalObject& aGlobalObject,
                                          const nsAString& aExpression,
                                          Element& aElement,
                                          const nsAString& aPseudo,
-                                         nsTArray<nsString>& aResult) {
+                                         nsTArray<nsCString>& aResult) {
   Document* doc = aElement.GetComposedDoc();
   if (!doc) {
     return;

@@ -54,7 +54,6 @@
 #include "mozilla/dom/ElementBinding.h"
 #include "mozilla/dom/Event.h"
 #include "mozilla/dom/Exceptions.h"
-#include "mozilla/dom/FeaturePolicyUtils.h"
 #include "mozilla/dom/HTMLButtonElement.h"
 #include "mozilla/dom/HTMLDetailsElement.h"
 #include "mozilla/dom/HTMLDialogElement.h"
@@ -69,6 +68,7 @@
 #include "mozilla/dom/NodeBinding.h"
 #include "mozilla/dom/NodeInfo.h"
 #include "mozilla/dom/NodeInfoInlines.h"
+#include "mozilla/dom/PermissionsPolicyUtils.h"
 #include "mozilla/dom/PolicyContainer.h"
 #include "mozilla/dom/SVGUseElement.h"
 #include "mozilla/dom/ScriptSettings.h"
@@ -3639,9 +3639,18 @@ void nsINode::BindObject(nsISupports* aObject, UnbindCallback aDtor) {
 }
 
 void nsINode::UnbindObject(nsISupports* aObject) {
-  if (auto* slots = GetExistingSlots()) {
-    slots->mBoundObjects.UnorderedRemoveElement(aObject);
+  auto* slots = GetExistingSlots();
+  if (!slots) {
+    return;
   }
+  // Keep only single-object storage for nodes that are repeatedly observed.
+  if (slots->mBoundObjects.Capacity() == 1 &&
+      slots->mBoundObjects.Length() == 1 &&
+      slots->mBoundObjects[0] == aObject) {
+    slots->mBoundObjects.ClearAndRetainStorage();
+    return;
+  }
+  slots->mBoundObjects.UnorderedRemoveElement(aObject);
 }
 
 already_AddRefed<AccessibleNode> nsINode::GetAccessibleNode() {
@@ -4323,6 +4332,12 @@ already_AddRefed<nsINode> nsINode::CloneAndAdopt(
     bool wasRegistered = false;
     if (elem) {
       wasRegistered = oldDoc->UnregisterActivityObserver(elem);
+
+      if (elem->State().HasAtLeastOneOfStates(
+              ElementState::HAS_DIR_ATTR_RTL |
+              ElementState::HAS_DIR_ATTR_LIKE_AUTO)) {
+        newDoc->SetNeedsDirHandling();
+      }
     }
 
     const bool hadProperties = aNode->HasProperties();
@@ -4338,10 +4353,6 @@ already_AddRefed<nsINode> nsINode::CloneAndAdopt(
 
     aNode->mNodeInfo.swap(newNodeInfo);
 
-    // https://dom.spec.whatwg.org/#concept-node-adopt 3.3. onward
-    // 3.3. Otherwise, if inclusiveDescendant is an element:
-    // 3.3.1. Set the node document of each attribute in inclusiveDescendant's
-    //        attribute list to document.
     aNode->NodeInfoChanged(oldDoc);
 
     MOZ_ASSERT(newDoc != oldDoc);
@@ -4938,7 +4949,8 @@ void nsINode::AncestorRevealingAlgorithm(ErrorResult& aRv) {
 
 void nsINode::AriaNotify(const nsAString& aAnnouncement,
                          const AriaNotificationOptions& aOptions) {
-  if (!FeaturePolicyUtils::IsFeatureAllowed(OwnerDoc(), u"aria-notify"_ns)) {
+  if (!PermissionsPolicyUtils::IsFeatureAllowed(OwnerDoc(),
+                                                u"aria-notify"_ns)) {
     return;
   }
 #ifdef ACCESSIBILITY

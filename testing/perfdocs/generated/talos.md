@@ -315,7 +315,8 @@ Tests which are imported benchmarks are:
 - [dromaeo](#dromaeo)
 - [JetStream](#jetstream)
 - [kraken](#kraken)
-- [motionmark](#motionmark)
+- motionmark ([animometer](#motionmark_animometer),
+  [htmlsuite](#motionmark_htmlsuite), [webgl](#motionmark_webgl))
 - [stylebench](#stylebench)
 
 ### Row major vs. column major
@@ -377,7 +378,7 @@ For the sample commands found below, note that the capitalization used is import
 * tppagecycles: 1
 * **Test Task**:
 
-:::{list-table} **test-linux2404-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -394,7 +395,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-macosx1470-64-shippable/opt**
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -411,7 +412,24 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-motionmark-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -458,7 +476,7 @@ For the sample commands found below, note that the capitalization used is import
 * tppagecycles: 1
 * **Test Task**:
 
-:::{list-table} **test-linux2404-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -475,7 +493,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-macosx1470-64-shippable/opt**
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -492,7 +510,24 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-motionmark-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -553,7 +588,7 @@ For the sample commands found below, note that the capitalization used is import
 * unit: ms
 * **Test Task**:
 
-:::{list-table} **test-linux2404-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -585,7 +620,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-linux2404-64/opt**
+:::{list-table} **{ref}`test-linux2404-64/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -612,39 +647,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-macosx1470-64-shippable/opt**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-other**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-other-no-nv**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-other-profiling**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **talos-other-swr**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-:::
-
-
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -676,7 +679,71 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-other**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-other-no-nv**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-other-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-other-swr**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-other**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-other-no-nv**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-other-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-other-swr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -765,7 +832,7 @@ For the sample commands found below, note that the capitalization used is import
 * unit: ms
 * **Test Task**:
 
-:::{list-table} **test-linux1804-64-qr/opt**
+:::{list-table} **{ref}`test-linux1804-64-qr/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -792,7 +859,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-linux1804-64-shippable-qr/opt**
+:::{list-table} **{ref}`test-linux1804-64-shippable-qr/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -819,24 +886,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-linux2404-64-shippable/opt**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-chrome-profiling**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-:::
-
-
-:::{list-table} **test-macosx1470-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -868,7 +918,34 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64/opt <hardware-hpe-moonshot>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-chrome**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-chrome-no-nv**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-chrome-swr**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -900,7 +977,71 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-chrome**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-chrome-no-nv**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-chrome-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-chrome-swr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-chrome**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-chrome-no-nv**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-chrome-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-chrome-swr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -988,7 +1129,7 @@ For the sample commands found below, note that the capitalization used is import
 * unit: ms/frame
 * **Test Task**:
 
-:::{list-table} **test-linux2404-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -1015,7 +1156,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-linux2404-64/opt**
+:::{list-table} **{ref}`test-linux2404-64/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -1037,34 +1178,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-macosx1470-64-shippable/opt**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-bcv**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-bcv-profiling**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **talos-bcv-swr**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-:::
-
-
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -1091,7 +1205,61 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-bcv**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-bcv-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-bcv-swr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-bcv**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-bcv-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-bcv-swr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -1162,7 +1330,7 @@ For the sample commands found below, note that the capitalization used is import
 * win_counters: None
 * **Test Task**:
 
-:::{list-table} **test-linux2404-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -1189,7 +1357,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-linux2404-64/opt**
+:::{list-table} **{ref}`test-linux2404-64/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -1211,34 +1379,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-macosx1470-64-shippable/opt**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-webgl**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-webgl-profiling**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **talos-webgl-swr**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-:::
-
-
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -1265,7 +1406,61 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-webgl**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-webgl-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-webgl-swr**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-webgl**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-webgl-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-webgl-swr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -1322,7 +1517,7 @@ For the sample commands found below, note that the capitalization used is import
 * unit: ms
 * **Test Task**:
 
-:::{list-table} **test-linux2404-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -1354,7 +1549,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-linux2404-64/opt**
+:::{list-table} **{ref}`test-linux2404-64/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -1381,39 +1576,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-macosx1470-64-shippable/opt**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-other**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-other-no-nv**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-other-profiling**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **talos-other-swr**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-:::
-
-
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -1445,7 +1608,71 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-other**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-other-no-nv**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-other-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-other-swr**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-other**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-other-no-nv**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-other-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-other-swr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -1507,7 +1734,7 @@ For the sample commands found below, note that the capitalization used is import
 * unit: ms
 * **Test Task**:
 
-:::{list-table} **test-linux2404-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -1539,7 +1766,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-linux2404-64/opt**
+:::{list-table} **{ref}`test-linux2404-64/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -1566,39 +1793,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-macosx1470-64-shippable/opt**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-other**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-other-no-nv**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-other-profiling**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **talos-other-swr**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-:::
-
-
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -1630,7 +1825,71 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-other**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-other-no-nv**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-other-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-other-swr**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-other**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-other-no-nv**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-other-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-other-swr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -1743,7 +2002,7 @@ For the sample commands found below, note that the capitalization used is import
 * win_counters: None
 * **Test Task**:
 
-:::{list-table} **test-linux1804-64-qr/opt**
+:::{list-table} **{ref}`test-linux1804-64-qr/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -1765,7 +2024,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-linux1804-64-shippable-qr/opt**
+:::{list-table} **{ref}`test-linux1804-64-shippable-qr/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -1787,41 +2046,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-linux2404-64-shippable/opt**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-damp-other**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-:::
-
-
-:::{list-table} **test-linux2404-64/opt**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-damp-other**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-:::
-
-
-:::{list-table} **test-macosx1470-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -1848,7 +2073,34 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64/opt <hardware-hpe-moonshot>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-damp-inspector**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-damp-other**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-damp-webconsole**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -1875,7 +2127,61 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-damp-inspector**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-damp-other**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-damp-webconsole**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-damp-inspector**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-damp-other**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-damp-webconsole**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -1945,7 +2251,7 @@ For the sample commands found below, note that the capitalization used is import
 * win_counters: None
 * **Test Task**:
 
-:::{list-table} **test-linux2404-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -1972,7 +2278,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-linux2404-64/opt**
+:::{list-table} **{ref}`test-linux2404-64/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -1994,34 +2300,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-macosx1470-64-shippable/opt**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-g4**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-g4-profiling**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **talos-g4-swr**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-:::
-
-
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -2048,7 +2327,61 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-g4**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-g4-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-g4-swr**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-g4**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-g4-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-g4-swr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -2147,7 +2480,7 @@ For the sample commands found below, note that the capitalization used is import
 * unit: score
 * **Test Task**:
 
-:::{list-table} **test-linux2404-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -2169,7 +2502,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-linux2404-64/opt**
+:::{list-table} **{ref}`test-linux2404-64/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -2186,29 +2519,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-macosx1470-64-shippable/opt**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-dromaeojs**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-dromaeojs-profiling**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-:::
-
-
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -2230,7 +2541,51 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-dromaeojs**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-dromaeojs-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-dromaeojs**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-dromaeojs-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -2293,7 +2648,7 @@ For the sample commands found below, note that the capitalization used is import
 * unit: score
 * **Test Task**:
 
-:::{list-table} **test-linux2404-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -2320,7 +2675,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-linux2404-64/opt**
+:::{list-table} **{ref}`test-linux2404-64/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -2342,7 +2697,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-macosx1470-64-shippable/opt**
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -2359,7 +2714,24 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-g3-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -2428,7 +2800,7 @@ For the sample commands found below, note that the capitalization used is import
 * win_counters: None
 * **Test Task**:
 
-:::{list-table} **test-linux2404-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -2455,7 +2827,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-linux2404-64/opt**
+:::{list-table} **{ref}`test-linux2404-64/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -2477,34 +2849,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-macosx1470-64-shippable/opt**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-webgl**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-webgl-profiling**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **talos-webgl-swr**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-:::
-
-
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -2531,7 +2876,61 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-webgl**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-webgl-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-webgl-swr**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-webgl**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-webgl-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-webgl-swr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -2602,7 +3001,7 @@ For the sample commands found below, note that the capitalization used is import
 * win_counters: None
 * **Test Task**:
 
-:::{list-table} **test-linux2404-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -2629,7 +3028,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-linux2404-64/opt**
+:::{list-table} **{ref}`test-linux2404-64/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -2651,34 +3050,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-macosx1470-64-shippable/opt**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-webgl**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-webgl-profiling**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **talos-webgl-swr**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-:::
-
-
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -2705,7 +3077,61 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-webgl**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-webgl-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-webgl-swr**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-webgl**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-webgl-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-webgl-swr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -2784,7 +3210,7 @@ For the sample commands found below, note that the capitalization used is import
 * unit: score
 * **Test Task**:
 
-:::{list-table} **test-linux2404-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -2806,7 +3232,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-linux2404-64/opt**
+:::{list-table} **{ref}`test-linux2404-64/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -2823,29 +3249,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-macosx1470-64-shippable/opt**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-dromaeojs**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-dromaeojs-profiling**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-:::
-
-
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -2867,7 +3271,51 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-dromaeojs**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-dromaeojs-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-dromaeojs**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-dromaeojs-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -2909,7 +3357,7 @@ For the sample commands found below, note that the capitalization used is import
 * tpmanifest: ${talos}/tests/motionmark/animometer.manifest
 * **Test Task**:
 
-:::{list-table} **test-linux2404-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -2926,7 +3374,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-macosx1470-64-shippable/opt**
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -2943,7 +3391,24 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-motionmark-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -2977,7 +3442,7 @@ For the sample commands found below, note that the capitalization used is import
 * tpmanifest: ${talos}/tests/motionmark/htmlsuite.manifest
 * **Test Task**:
 
-:::{list-table} **test-linux2404-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -2994,7 +3459,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-macosx1470-64-shippable/opt**
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -3011,7 +3476,24 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-motionmark-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -3054,7 +3536,7 @@ For the sample commands found below, note that the capitalization used is import
 * unit: fps
 * **Test Task**:
 
-:::{list-table} **test-linux2404-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -3081,7 +3563,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-linux2404-64/opt**
+:::{list-table} **{ref}`test-linux2404-64/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -3103,34 +3585,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-macosx1470-64-shippable/opt**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-webgl**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-webgl-profiling**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **talos-webgl-swr**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-:::
-
-
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -3157,7 +3612,61 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-webgl**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-webgl-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-webgl-swr**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-webgl**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-webgl-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-webgl-swr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -3228,7 +3737,7 @@ For the sample commands found below, note that the capitalization used is import
 * win_counters: None
 * **Test Task**:
 
-:::{list-table} **test-linux2404-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -3255,7 +3764,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-linux2404-64/opt**
+:::{list-table} **{ref}`test-linux2404-64/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -3277,34 +3786,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-macosx1470-64-shippable/opt**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-webgl**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-webgl-profiling**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **talos-webgl-swr**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-:::
-
-
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -3331,7 +3813,61 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-webgl**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-webgl-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-webgl-swr**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-webgl**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-webgl-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-webgl-swr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -3449,7 +3985,7 @@ For the sample commands found below, note that the capitalization used is import
 * win_counters: None
 * **Test Task**:
 
-:::{list-table} **test-linux2404-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -3476,7 +4012,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-linux2404-64/opt**
+:::{list-table} **{ref}`test-linux2404-64/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -3498,34 +4034,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-macosx1470-64-shippable/opt**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-webgl**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-webgl-profiling**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **talos-webgl-swr**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-:::
-
-
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -3552,7 +4061,61 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-webgl**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-webgl-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-webgl-swr**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-webgl**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-webgl-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-webgl-swr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -3623,7 +4186,7 @@ For the sample commands found below, note that the capitalization used is import
 * win_counters: None
 * **Test Task**:
 
-:::{list-table} **test-linux2404-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -3650,7 +4213,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-linux2404-64/opt**
+:::{list-table} **{ref}`test-linux2404-64/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -3672,34 +4235,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-macosx1470-64-shippable/opt**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-webgl**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-webgl-profiling**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **talos-webgl-swr**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-:::
-
-
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -3726,7 +4262,61 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-webgl**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-webgl-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-webgl-swr**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-webgl**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-webgl-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-webgl-swr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -3797,7 +4387,7 @@ For the sample commands found below, note that the capitalization used is import
 * win_counters: None
 * **Test Task**:
 
-:::{list-table} **test-linux2404-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -3824,7 +4414,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-linux2404-64/opt**
+:::{list-table} **{ref}`test-linux2404-64/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -3846,34 +4436,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-macosx1470-64-shippable/opt**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-webgl**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-webgl-profiling**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **talos-webgl-swr**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-:::
-
-
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -3900,7 +4463,61 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-webgl**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-webgl-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-webgl-swr**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-webgl**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-webgl-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-webgl-swr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -3971,7 +4588,7 @@ For the sample commands found below, note that the capitalization used is import
 * win_counters: None
 * **Test Task**:
 
-:::{list-table} **test-linux2404-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -3998,7 +4615,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-linux2404-64/opt**
+:::{list-table} **{ref}`test-linux2404-64/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -4020,34 +4637,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-macosx1470-64-shippable/opt**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-webgl**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-webgl-profiling**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **talos-webgl-swr**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-:::
-
-
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -4074,7 +4664,61 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-webgl**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-webgl-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-webgl-swr**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-webgl**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-webgl-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-webgl-swr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -4145,7 +4789,7 @@ For the sample commands found below, note that the capitalization used is import
 * win_counters: None
 * **Test Task**:
 
-:::{list-table} **test-linux2404-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -4172,7 +4816,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-linux2404-64/opt**
+:::{list-table} **{ref}`test-linux2404-64/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -4194,34 +4838,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-macosx1470-64-shippable/opt**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-webgl**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-webgl-profiling**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **talos-webgl-swr**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-:::
-
-
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -4248,7 +4865,61 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-webgl**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-webgl-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-webgl-swr**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-webgl**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-webgl-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-webgl-swr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -4366,7 +5037,7 @@ For the sample commands found below, note that the capitalization used is import
 * win_counters: None
 * **Test Task**:
 
-:::{list-table} **test-linux2404-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -4393,7 +5064,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-linux2404-64/opt**
+:::{list-table} **{ref}`test-linux2404-64/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -4415,34 +5086,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-macosx1470-64-shippable/opt**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-webgl**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-webgl-profiling**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **talos-webgl-swr**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-:::
-
-
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -4469,7 +5113,61 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-webgl**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-webgl-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-webgl-swr**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-webgl**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-webgl-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-webgl-swr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -4540,7 +5238,7 @@ For the sample commands found below, note that the capitalization used is import
 * win_counters: None
 * **Test Task**:
 
-:::{list-table} **test-linux2404-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -4567,7 +5265,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-linux2404-64/opt**
+:::{list-table} **{ref}`test-linux2404-64/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -4589,34 +5287,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-macosx1470-64-shippable/opt**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-webgl**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-webgl-profiling**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **talos-webgl-swr**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-:::
-
-
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -4643,7 +5314,61 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-webgl**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-webgl-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-webgl-swr**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-webgl**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-webgl-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-webgl-swr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -4714,7 +5439,7 @@ For the sample commands found below, note that the capitalization used is import
 * win_counters: None
 * **Test Task**:
 
-:::{list-table} **test-linux2404-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -4741,7 +5466,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-linux2404-64/opt**
+:::{list-table} **{ref}`test-linux2404-64/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -4763,34 +5488,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-macosx1470-64-shippable/opt**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-webgl**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-webgl-profiling**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **talos-webgl-swr**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-:::
-
-
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -4817,7 +5515,61 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-webgl**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-webgl-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-webgl-swr**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-webgl**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-webgl-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-webgl-swr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -4888,7 +5640,7 @@ For the sample commands found below, note that the capitalization used is import
 * win_counters: None
 * **Test Task**:
 
-:::{list-table} **test-linux2404-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -4915,7 +5667,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-linux2404-64/opt**
+:::{list-table} **{ref}`test-linux2404-64/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -4937,34 +5689,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-macosx1470-64-shippable/opt**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-webgl**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-webgl-profiling**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **talos-webgl-swr**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-:::
-
-
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -4991,7 +5716,61 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-webgl**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-webgl-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-webgl-swr**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-webgl**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-webgl-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-webgl-swr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -5047,7 +5826,7 @@ For the sample commands found below, note that the capitalization used is import
 * unit: ms
 * **Test Task**:
 
-:::{list-table} **test-linux2404-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -5159,7 +5938,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-linux2404-64/opt**
+:::{list-table} **{ref}`test-linux2404-64/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -5271,7 +6050,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-macosx1470-64-shippable/opt**
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -5383,7 +6162,119 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-pdfpaint-1**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-pdfpaint-1-swr**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-pdfpaint-10**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-pdfpaint-10-swr**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-pdfpaint-2**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-pdfpaint-2-swr**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-pdfpaint-3**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-pdfpaint-3-swr**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-pdfpaint-4**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-pdfpaint-4-swr**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-pdfpaint-5**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-pdfpaint-5-swr**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-pdfpaint-6**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-pdfpaint-6-swr**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-pdfpaint-7**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-pdfpaint-7-swr**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-pdfpaint-8**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-pdfpaint-8-swr**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-pdfpaint-9**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-pdfpaint-9-swr**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -5495,7 +6386,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2/opt**
+:::{list-table} **{ref}`test-windows11-64-24h2/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -5682,7 +6573,7 @@ For the sample commands found below, note that the capitalization used is import
 * unit: ms
 * **Test Task**:
 
-:::{list-table} **test-linux2404-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -5709,7 +6600,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-linux2404-64/opt**
+:::{list-table} **{ref}`test-linux2404-64/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -5731,34 +6622,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-macosx1470-64-shippable/opt**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-perf-reftest**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-perf-reftest-profiling**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **talos-perf-reftest-swr**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-:::
-
-
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -5785,7 +6649,61 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-perf-reftest**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-perf-reftest-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-perf-reftest-swr**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-perf-reftest**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-perf-reftest-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-perf-reftest-swr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -5858,7 +6776,7 @@ For the sample commands found below, note that the capitalization used is import
 * unit: ms
 * **Test Task**:
 
-:::{list-table} **test-linux2404-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -5880,7 +6798,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-linux2404-64/opt**
+:::{list-table} **{ref}`test-linux2404-64/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -5897,29 +6815,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-macosx1470-64-shippable/opt**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-perf-reftest-singletons**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-perf-reftest-singletons-profiling**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-:::
-
-
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -5941,7 +6837,51 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-perf-reftest-singletons**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-perf-reftest-singletons-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-perf-reftest-singletons**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-perf-reftest-singletons-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -6007,7 +6947,7 @@ For the sample commands found below, note that the capitalization used is import
 * win_counters: None
 * **Test Task**:
 
-:::{list-table} **test-linux2404-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -6034,7 +6974,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-linux2404-64/opt**
+:::{list-table} **{ref}`test-linux2404-64/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -6056,34 +6996,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-macosx1470-64-shippable/opt**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-g4**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-g4-profiling**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **talos-g4-swr**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-:::
-
-
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -6110,7 +7023,61 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-g4**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-g4-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-g4-swr**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-g4**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-g4-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-g4-swr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -6179,7 +7146,7 @@ For the sample commands found below, note that the capitalization used is import
 * win_counters: None
 * **Test Task**:
 
-:::{list-table} **test-linux2404-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -6206,7 +7173,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-linux2404-64/opt**
+:::{list-table} **{ref}`test-linux2404-64/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -6228,34 +7195,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-macosx1470-64-shippable/opt**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-g4**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-g4-profiling**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **talos-g4-swr**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-:::
-
-
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -6282,7 +7222,61 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-g4**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-g4-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-g4-swr**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-g4**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-g4-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-g4-swr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -6362,7 +7356,7 @@ For the sample commands found below, note that the capitalization used is import
 * url: about:home
 * **Test Task**:
 
-:::{list-table} **test-linux2404-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -6394,7 +7388,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-linux2404-64/opt**
+:::{list-table} **{ref}`test-linux2404-64/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -6421,39 +7415,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-macosx1470-64-shippable/opt**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-other**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-other-no-nv**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-other-profiling**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **talos-other-swr**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-:::
-
-
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -6485,7 +7447,71 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-other**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-other-no-nv**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-other-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-other-swr**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-other**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-other-no-nv**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-other-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-other-swr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -6529,7 +7555,7 @@ For the sample commands found below, note that the capitalization used is import
 * profile_path: ${talos}/startup_test/sessionrestore/profile-manywindows
 * **Test Task**:
 
-:::{list-table} **test-linux2404-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -6561,7 +7587,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-linux2404-64/opt**
+:::{list-table} **{ref}`test-linux2404-64/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -6588,39 +7614,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-macosx1470-64-shippable/opt**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-sessionrestore-many-windows**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-sessionrestore-many-windows-no-nv**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-sessionrestore-many-windows-profiling**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **talos-sessionrestore-many-windows-swr**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-:::
-
-
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -6652,7 +7646,71 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-sessionrestore-many-windows**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-sessionrestore-many-windows-no-nv**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-sessionrestore-many-windows-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-sessionrestore-many-windows-swr**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-sessionrestore-many-windows**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-sessionrestore-many-windows-no-nv**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-sessionrestore-many-windows-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-sessionrestore-many-windows-swr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -6697,7 +7755,7 @@ For the sample commands found below, note that the capitalization used is import
 * timeout: 300
 * **Test Task**:
 
-:::{list-table} **test-linux2404-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -6729,7 +7787,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-linux2404-64/opt**
+:::{list-table} **{ref}`test-linux2404-64/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -6756,39 +7814,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-macosx1470-64-shippable/opt**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-other**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-other-no-nv**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-other-profiling**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **talos-other-swr**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-:::
-
-
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -6820,7 +7846,71 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-other**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-other-no-nv**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-other-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-other-swr**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-other**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-other-no-nv**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-other-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-other-swr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -6881,7 +7971,7 @@ For the sample commands found below, note that the capitalization used is import
 * url: None
 * **Test Task**:
 
-:::{list-table} **test-linux2404-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -6913,7 +8003,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-linux2404-64/opt**
+:::{list-table} **{ref}`test-linux2404-64/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -6940,39 +8030,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-macosx1470-64-shippable/opt**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-other**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-other-no-nv**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-other-profiling**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **talos-other-swr**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-:::
-
-
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -7004,7 +8062,71 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-other**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-other-no-nv**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-other-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-other-swr**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-other**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-other-no-nv**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-other-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-other-swr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -7056,7 +8178,7 @@ For the sample commands found below, note that the capitalization used is import
 * url: None
 * **Test Task**:
 
-:::{list-table} **test-linux2404-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -7088,7 +8210,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-linux2404-64/opt**
+:::{list-table} **{ref}`test-linux2404-64/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -7115,39 +8237,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-macosx1470-64-shippable/opt**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-other**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-other-no-nv**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-other-profiling**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **talos-other-swr**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-:::
-
-
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -7179,7 +8269,71 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-other**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-other-no-nv**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-other-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-other-swr**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-other**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-other-no-nv**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-other-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-other-swr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -7240,7 +8394,7 @@ For the sample commands found below, note that the capitalization used is import
 * webextensions_folder: ${talos}/webextensions
 * **Test Task**:
 
-:::{list-table} **test-linux2404-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -7262,7 +8416,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-linux2404-64/opt**
+:::{list-table} **{ref}`test-linux2404-64/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -7279,7 +8433,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-macosx1470-64-shippable/opt**
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -7301,7 +8455,29 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-realworld-webextensions**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-realworld-webextensions-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -7323,7 +8499,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2/opt**
+:::{list-table} **{ref}`test-windows11-64-24h2/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -7407,7 +8583,7 @@ For the sample commands found below, note that the capitalization used is import
 * unit: ms
 * **Test Task**:
 
-:::{list-table} **test-linux2404-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -7439,7 +8615,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-linux2404-64/opt**
+:::{list-table} **{ref}`test-linux2404-64/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -7466,39 +8642,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-macosx1470-64-shippable/opt**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-other**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-other-no-nv**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-other-profiling**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **talos-other-swr**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-:::
-
-
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -7530,7 +8674,71 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-other**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-other-no-nv**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-other-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-other-swr**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-other**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-other-no-nv**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-other-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-other-swr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -7647,7 +8855,7 @@ For the sample commands found below, note that the capitalization used is import
 * unit: ms
 * **Test Task**:
 
-:::{list-table} **test-linux2404-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -7679,7 +8887,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-linux2404-64/opt**
+:::{list-table} **{ref}`test-linux2404-64/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -7706,39 +8914,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-macosx1470-64-shippable/opt**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-tabswitch**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **talos-tabswitch-no-nv**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **talos-tabswitch-profiling**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **talos-tabswitch-swr**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-:::
-
-
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -7770,7 +8946,71 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-tabswitch**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-tabswitch-no-nv**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-tabswitch-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-tabswitch-swr**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-tabswitch**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-tabswitch-no-nv**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-tabswitch-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-tabswitch-swr**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -7887,7 +9127,7 @@ For the sample commands found below, note that the capitalization used is import
 * win_counters: None
 * **Test Task**:
 
-:::{list-table} **test-linux2404-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -7914,7 +9154,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-linux2404-64/opt**
+:::{list-table} **{ref}`test-linux2404-64/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -7936,34 +9176,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-macosx1470-64-shippable/opt**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-svgr**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-svgr-profiling**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **talos-svgr-swr**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-:::
-
-
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -7990,7 +9203,61 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-svgr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-svgr-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-svgr-swr**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-svgr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-svgr-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-svgr-swr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -8069,7 +9336,7 @@ For the sample commands found below, note that the capitalization used is import
 * xperf_user_providers: ['Mozilla Generic Provider', 'Microsoft-Windows-TCPIP']
 * **Test Task**:
 
-:::{list-table} **test-windows11-64-25h2-shippable/opt**
+:::{list-table} **{ref}`test-windows11-64-25h2-shippable/opt <hardware-azure-standard-f8alds-v7>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -8091,7 +9358,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-25h2/opt**
+:::{list-table} **{ref}`test-windows11-64-25h2/opt <hardware-azure-standard-f8alds-v7>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -8231,7 +9498,7 @@ For the sample commands found below, note that the capitalization used is import
 * win_counters: ['% Processor Time']
 * **Test Task**:
 
-:::{list-table} **test-linux2404-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -8258,7 +9525,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-linux2404-64/opt**
+:::{list-table} **{ref}`test-linux2404-64/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -8280,34 +9547,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-macosx1470-64-shippable/opt**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-tp5o**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-tp5o-profiling**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **talos-tp5o-swr**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-:::
-
-
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -8334,7 +9574,61 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-tp5o**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-tp5o-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-tp5o-swr**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-tp5o**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-tp5o-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-tp5o-swr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -8461,7 +9755,7 @@ For the sample commands found below, note that the capitalization used is import
 * unit: 1/FPS
 * **Test Task**:
 
-:::{list-table} **test-linux2404-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -8488,7 +9782,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-linux2404-64/opt**
+:::{list-table} **{ref}`test-linux2404-64/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -8510,34 +9804,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-macosx1470-64-shippable/opt**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-g1**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-g1-profiling**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **talos-g1-swr**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-:::
-
-
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -8564,7 +9831,61 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-g1**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-g1-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-g1-swr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-g1**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-g1-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-g1-swr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -8604,7 +9925,7 @@ For the sample commands found below, note that the capitalization used is import
 * webextensions: ${talos}/webextensions/dummy/dummy.xpi
 * **Test Task**:
 
-:::{list-table} **test-linux2404-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -8631,7 +9952,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-linux2404-64/opt**
+:::{list-table} **{ref}`test-linux2404-64/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -8653,34 +9974,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-macosx1470-64-shippable/opt**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-g5**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-g5-profiling**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **talos-g5-swr**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-:::
-
-
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -8707,7 +10001,61 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-g5**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-g5-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-g5-swr**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-g5**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-g5-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-g5-swr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -8782,7 +10130,7 @@ For the sample commands found below, note that the capitalization used is import
 * unit: ms
 * **Test Task**:
 
-:::{list-table} **test-linux1804-64-qr/opt**
+:::{list-table} **{ref}`test-linux1804-64-qr/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -8809,7 +10157,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-linux1804-64-shippable-qr/opt**
+:::{list-table} **{ref}`test-linux1804-64-shippable-qr/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -8836,24 +10184,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-linux2404-64-shippable/opt**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-chrome-profiling**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-:::
-
-
-:::{list-table} **test-macosx1470-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -8885,7 +10216,34 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64/opt <hardware-hpe-moonshot>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-chrome**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-chrome-no-nv**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-chrome-swr**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -8917,7 +10275,71 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-chrome**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-chrome-no-nv**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-chrome-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-chrome-swr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-chrome**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-chrome-no-nv**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-chrome-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-chrome-swr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -8992,7 +10414,7 @@ For the sample commands found below, note that the capitalization used is import
 * xperf_counters: []
 * **Test Task**:
 
-:::{list-table} **test-linux2404-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -9024,7 +10446,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-linux2404-64/opt**
+:::{list-table} **{ref}`test-linux2404-64/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -9051,39 +10473,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-macosx1470-64-shippable/opt**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-other**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-other-no-nv**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-other-profiling**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **talos-other-swr**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-:::
-
-
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -9115,7 +10505,71 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-other**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-other-no-nv**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-other-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-other-swr**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-other**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-other-no-nv**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-other-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-other-swr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -9176,7 +10630,7 @@ For the sample commands found below, note that the capitalization used is import
 * webextensions: ${talos}/webextensions/dummy/dummy.xpi
 * **Test Task**:
 
-:::{list-table} **test-linux2404-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -9203,7 +10657,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-linux2404-64/opt**
+:::{list-table} **{ref}`test-linux2404-64/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -9225,34 +10679,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-macosx1470-64-shippable/opt**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-g5**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-g5-profiling**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **talos-g5-swr**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-:::
-
-
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -9279,7 +10706,61 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-g5**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-g5-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-g5-swr**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-g5**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-g5-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-g5-swr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -9357,7 +10838,7 @@ For the sample commands found below, note that the capitalization used is import
 * unit: ms
 * **Test Task**:
 
-:::{list-table} **test-linux2404-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -9384,7 +10865,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-linux2404-64/opt**
+:::{list-table} **{ref}`test-linux2404-64/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -9406,34 +10887,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-macosx1470-64-shippable/opt**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-svgr**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-svgr-profiling**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **talos-svgr-swr**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-:::
-
-
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -9460,7 +10914,61 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-svgr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-svgr-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-svgr-swr**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-svgr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-svgr-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-svgr-swr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -9499,7 +11007,7 @@ For the sample commands found below, note that the capitalization used is import
 * preferences: {'layout.frame_rate': 0, 'docshell.event_starvation_delay_hint': 1, 'dom.send_after_paint_to_content': True, 'apz.paint_skipping.enabled': True, 'layout.css.scroll-snap.spring-constant': "'10'", 'layout.css.scroll-behavior.same-physics-as-user-input': False, 'toolkit.framesRecording.bufferSize': 10000}
 * **Test Task**:
 
-:::{list-table} **test-linux2404-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -9526,7 +11034,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-linux2404-64/opt**
+:::{list-table} **{ref}`test-linux2404-64/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -9548,34 +11056,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-macosx1470-64-shippable/opt**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-svgr**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-svgr-profiling**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **talos-svgr-swr**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-:::
-
-
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -9602,7 +11083,61 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-svgr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-svgr-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-svgr-swr**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-svgr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-svgr-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-svgr-swr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -9665,7 +11200,7 @@ For the sample commands found below, note that the capitalization used is import
 * unit: ms
 * **Test Task**:
 
-:::{list-table} **test-linux2404-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -9692,7 +11227,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-linux2404-64/opt**
+:::{list-table} **{ref}`test-linux2404-64/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -9714,34 +11249,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-macosx1470-64-shippable/opt**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-svgr**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-svgr-profiling**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **talos-svgr-swr**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-:::
-
-
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -9768,7 +11276,61 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-svgr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-svgr-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-svgr-swr**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-svgr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-svgr-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-svgr-swr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -9865,7 +11427,7 @@ For the sample commands found below, note that the capitalization used is import
 * unit: ms
 * **Test Task**:
 
-:::{list-table} **test-linux2404-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -9892,7 +11454,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-linux2404-64/opt**
+:::{list-table} **{ref}`test-linux2404-64/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -9914,34 +11476,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-macosx1470-64-shippable/opt**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-svgr**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-svgr-profiling**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **talos-svgr-swr**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-:::
-
-
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -9968,7 +11503,61 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-svgr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-svgr-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-svgr-swr**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-svgr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-svgr-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-svgr-swr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -10051,7 +11640,7 @@ For the sample commands found below, note that the capitalization used is import
 * unit: ms
 * **Test Task**:
 
-:::{list-table} **test-linux2404-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -10078,7 +11667,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-linux2404-64/opt**
+:::{list-table} **{ref}`test-linux2404-64/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -10100,34 +11689,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-macosx1470-64-shippable/opt**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-svgr**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-svgr-profiling**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **talos-svgr-swr**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-:::
-
-
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -10154,7 +11716,61 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-svgr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-svgr-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-svgr-swr**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-svgr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-svgr-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-svgr-swr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -10219,7 +11835,7 @@ For the sample commands found below, note that the capitalization used is import
 * unit: ms
 * **Test Task**:
 
-:::{list-table} **test-linux2404-64-shippable/opt**
+:::{list-table} **{ref}`test-linux2404-64-shippable/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -10251,7 +11867,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-linux2404-64/opt**
+:::{list-table} **{ref}`test-linux2404-64/opt <hardware-hpe-moonshot>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -10278,39 +11894,7 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-macosx1470-64-shippable/opt**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **talos-other**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-other-no-nv**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-* - **talos-other-profiling**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **talos-other-swr**
-  - ✅
-  - ✅
-  - ❌
-  - ❌
-:::
-
-
-:::{list-table} **test-windows11-64-24h2-shippable/opt**
+:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 
@@ -10342,7 +11926,71 @@ For the sample commands found below, note that the capitalization used is import
 :::
 
 
-:::{list-table} **test-windows11-64-24h2/opt**
+:::{list-table} **{ref}`test-macosx1500-aarch64-shippable/opt <hardware-mac-mini-m4>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-other**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-other-no-nv**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-other-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-other-swr**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2-shippable/opt <hardware-nuc13-windows11>`**
+:widths: 30 15 15 15 15
+:header-rows: 1
+
+* - **Test Name**
+  - mozilla-central
+  - autoland
+  - mozilla-release
+  - mozilla-beta
+* - **talos-other**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-other-no-nv**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+* - **talos-other-profiling**
+  - ❌
+  - ❌
+  - ❌
+  - ❌
+* - **talos-other-swr**
+  - ✅
+  - ✅
+  - ❌
+  - ❌
+:::
+
+
+:::{list-table} **{ref}`test-windows11-64-24h2/opt <hardware-nuc13-windows11>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 

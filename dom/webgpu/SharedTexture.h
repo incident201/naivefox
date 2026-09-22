@@ -17,6 +17,10 @@ namespace ipc {
 class Shmem;
 }
 
+namespace layers {
+class TextureHost;
+}  // namespace layers
+
 namespace webgpu {
 
 class SharedTextureD3D11;
@@ -72,6 +76,12 @@ class SharedTexture {
 
   virtual bool IsSubmitted() { return mSubmissionIndex > 0; }
 
+  RefPtr<layers::TextureHost> GetTextureHost();
+
+  void SetTextureHost(layers::TextureHost* aTextureHost);
+
+  void ClearTextureHost();
+
   const uint32_t mWidth;
   const uint32_t mHeight;
   const struct ffi::WGPUTextureFormat mFormat;
@@ -80,6 +90,7 @@ class SharedTexture {
  protected:
   uint64_t mSubmissionIndex = 0;
   layers::RemoteTextureOwnerId mOwnerId;
+  RefPtr<layers::TextureHost> mTextureHost;
 };
 
 // Dummy class

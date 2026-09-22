@@ -1786,10 +1786,6 @@ JS_PUBLIC_API bool js::ShouldIgnorePropertyDefinition(JSContext* cx,
   }
 
 #ifdef JS_HAS_INTL_API
-  if (key == JSProto_Date && !JS::Prefs::experimental_temporal() &&
-      id == NameToId(cx->names().toTemporalInstant)) {
-    return true;
-  }
   if (key == JSProto_Locale && !JS::Prefs::experimental_intl_locale_info()) {
     if (id == NameToId(cx->names().firstDayOfWeek) ||
         id == NameToId(cx->names().getTextInfo) ||
@@ -2315,6 +2311,22 @@ void GetObjectSlotNameFunctor::operator()(JS::TracingContext* tcx,
             } else if (slot == WithEnvironmentObject::thisSlot()) {
               slotname = "with_this";
             }
+          }
+        } else if (obj->is<JSFunction>()) {
+          if (slot == JSFunction::FlagsAndArgCountSlot) {
+            slotname = "flags_and_arg_count";
+          } else if (slot == JSFunction::NativeFuncOrInterpretedEnvSlot) {
+            slotname = "native_func_or_env";
+          } else if (slot == JSFunction::NativeJitInfoOrInterpretedScriptSlot) {
+            slotname = "native_jit_info_or_script";
+          } else if (slot == JSFunction::AtomSlot) {
+            slotname = "atom";
+          } else if (slot == FunctionExtended::FirstExtendedSlot) {
+            slotname = "extended_slot_0";
+          } else if (slot == FunctionExtended::SecondExtendedSlot) {
+            slotname = "extended_slot_1";
+          } else if (slot == FunctionExtended::ThirdExtendedSlot) {
+            slotname = "extended_slot_2";
           }
         }
       }
@@ -2948,20 +2960,6 @@ void JSObject::traceChildren(JSTracer* trc) {
       JS::AutoTracingDetails ctx(trc, func);
       TraceRange(trc, nslots - nfixed, nobj->slots_.get(),
                  "objectDynamicSlots");
-
-#if defined(JS_GC_CONCURRENT_MARKING) && defined(DEBUG)
-      // Any unused dynamic slots that should be undefined.
-      if (nobj->hasDynamicSlots()) {
-        uint32_t nfixed = nobj->numFixedSlots();
-        uint32_t start = nslots;
-        uint32_t end = nfixed + nobj->numDynamicSlots();
-        MOZ_ASSERT(start >= nobj->numFixedSlots());
-        HeapSlot* dynamicSlots = nobj->getSlotAddressUnchecked(start);
-        for (uint32_t i = 0; i < end - start; i++) {
-          MOZ_ASSERT(dynamicSlots[i].isUndefined());
-        }
-      }
-#endif
     }
 
     TraceRange(trc, nobj->getDenseInitializedLength(),

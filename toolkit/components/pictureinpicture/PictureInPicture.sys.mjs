@@ -27,7 +27,7 @@ const PLAYER_URI = "chrome://global/content/pictureinpicture/player.xhtml";
 // Currently, we need titlebar="yes" on macOS in order for the player window
 // to be resizable. See bug 1824171.
 const TITLEBAR = AppConstants.platform == "macosx" ? "yes" : "no";
-const PLAYER_FEATURES = `chrome,alwaysontop,lockaspectratio,resizable,dialog,titlebar=${TITLEBAR}`;
+const PLAYER_FEATURES = `chrome,alwaysontop,lockaspectratio,resizable,dialog,mediapip,titlebar=${TITLEBAR}`;
 
 const WINDOW_TYPE = "Toolkit:PictureInPicture";
 const TOGGLE_ENABLED_PREF =
@@ -41,6 +41,12 @@ const TOGGLE_POSITION_PREF =
 const TOGGLE_POSITION_RIGHT = "right";
 const TOGGLE_POSITION_LEFT = "left";
 const RESIZE_MARGIN_PX = 16;
+// Close reasons that should suppress auto-toggle when the originating tab is backgrounded
+const DELIBERATE_CLOSE_REASONS = [
+  "CloseButton",
+  "ClosePlayerShortcut",
+  "Shortcut",
+];
 
 XPCOMUtils.defineLazyPreferenceGetter(
   lazy,
@@ -121,6 +127,15 @@ export class PictureInPictureToggleParent extends JSWindowActorParent {
         if (!lazy.PIP_ENABLED || !lazy.PIP_WHEN_SWITCHING_TABS) {
           break;
         }
+
+        // Suppress auto-toggle if the user deliberately closed this PiP window
+        if (
+          PictureInPicture.weakAutoPipBrowserClosedDeliberately.has(browser)
+        ) {
+          PictureInPicture.weakAutoPipBrowserClosedDeliberately.delete(browser);
+          break;
+        }
+
         // If the tab is still selected, then we can ignore this event
         if (browser.documentGlobal.gBrowser.selectedBrowser == browser) {
           break;
@@ -262,6 +277,9 @@ export var PictureInPicture = {
 
   // Maps auto pip browser to PictureInPictureParent actor
   weakAutoPipBrowserToParent: new WeakMap(),
+
+  // Browsers with deliberately closed PiP windows; suppresses auto-toggle.
+  weakAutoPipBrowserClosedDeliberately: new WeakSet(),
 
   /**
    * Returns the player window if one exists and if it hasn't yet been closed.
@@ -443,6 +461,16 @@ export var PictureInPicture = {
   onPipSwappedBrowsers(event) {
     let otherTab = event.detail;
     if (otherTab) {
+      if (
+        this.weakAutoPipBrowserClosedDeliberately.has(
+          event.target.linkedBrowser
+        )
+      ) {
+        this.weakAutoPipBrowserClosedDeliberately.add(otherTab.linkedBrowser);
+        this.weakAutoPipBrowserClosedDeliberately.delete(
+          event.target.linkedBrowser
+        );
+      }
       for (let win of Services.wm.getEnumerator(WINDOW_TYPE)) {
         if (this.weakWinToBrowser.get(win) === event.target.linkedBrowser) {
           this.weakWinToBrowser.set(win, otherTab.linkedBrowser);
@@ -529,6 +557,17 @@ export var PictureInPicture = {
 
     let gBrowser = browser.getTabBrowser();
     let tab = gBrowser.getTabForBrowser(browser);
+
+    // "Back to tab" is a deliberate request to return to the originating tab.
+    // On macOS the player is a non-activating window (bug 1688932): a plain
+    // window focus marks the originating window active but does not order it in
+    // front of another application's fullscreen Space, so it stays hidden.
+    // Activating the application brings Firefox forward onto that Space.
+    if (AppConstants.platform == "macosx") {
+      Cc["@mozilla.org/widget/macdocksupport;1"]
+        .getService(Ci.nsIMacDockSupport)
+        .activateApplication(true);
+    }
 
     // focus the tab's window
     tab.documentGlobal.focus();
@@ -901,6 +940,16 @@ export var PictureInPicture = {
     if (!win) {
       return;
     }
+
+    const browser = this.weakWinToBrowser.get(win);
+
+    if (browser && DELIBERATE_CLOSE_REASONS.includes(reason)) {
+      const tabbrowser = browser.getTabBrowser();
+      if (tabbrowser && tabbrowser.selectedBrowser != browser) {
+        PictureInPicture.weakAutoPipBrowserClosedDeliberately.add(browser);
+      }
+    }
+
     this.removePiPBrowserFromWeakMap(this.weakWinToBrowser.get(win));
     this.weakAutoPipBrowserToParent.delete(this.weakWinToBrowser.get(win));
 

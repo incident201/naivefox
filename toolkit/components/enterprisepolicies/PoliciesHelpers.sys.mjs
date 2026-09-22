@@ -37,6 +37,85 @@ ChromeUtils.defineLazyGetter(lazy, "log", () => {
 
 const ABOUT_CONTRACT = "@mozilla.org/network/protocol/about;1?what=";
 
+/**
+ * Records the operations that failed while a policy was being applied, so that
+ * about:policies can report that policy as only partially applied.
+ *
+ * A policy whose operation failed stays in getActivePolicies(): those are the
+ * parameters the administrator asked for, and most of the policy may well have
+ * been applied. What failed is recorded here instead.
+ */
+export const PolicyFailures = {
+  /** @type {Map<string, string[]>} */
+  _failures: new Map(),
+
+  /**
+   * Records a failed operation of a policy. Callers log the message
+   * themselves, with their own logger.
+   *
+   * @param {string} policyName
+   *        The policy the failed operation belongs to.
+   * @param {string} message
+   *        A description of what failed.
+   */
+  report(policyName, message) {
+    let messages = this._failures.get(policyName);
+    if (!messages) {
+      messages = [];
+      this._failures.set(policyName, messages);
+    }
+    if (!messages.includes(message)) {
+      messages.push(message);
+    }
+  },
+
+  /**
+   * @returns {object}
+   *          The failures of every policy, keyed by policy name.
+   */
+  getAll() {
+    const failures = {};
+    for (const [policyName, messages] of this._failures) {
+      failures[policyName] = [...messages];
+    }
+    return failures;
+  },
+
+  /**
+   * Forgets the failures of a policy, which happens when the policy is
+   * applied again or removed.
+   *
+   * @param {string} policyName policy name
+   */
+  clear(policyName) {
+    this._failures.delete(policyName);
+  },
+
+  clearAll() {
+    this._failures.clear();
+  },
+};
+
+/**
+ * Logs a failed operation of a policy and records it against that policy, so
+ * that about:policies reports the policy as only partially applied. Add-on
+ * installations happen asynchronously, long after the policy callback
+ * returned, so their failures have to be reported here explicitly to be
+ * visible at all.
+ *
+ * @param {string} policyName
+ *        The policy the failed operation belongs to. When it isn't known, the
+ *        failure is only logged.
+ * @param {string} message
+ *        A description of what failed.
+ */
+export function reportFailure(policyName, message) {
+  lazy.log.error(message);
+  if (policyName) {
+    PolicyFailures.report(policyName, message);
+  }
+}
+
 /*
  * ====================
  * = HELPER FUNCTIONS =
@@ -145,6 +224,45 @@ export const PoliciesUtils = {
   },
 };
 
+const PREF_TYPE_NAMES = {
+  [Ci.nsIPrefBranch.PREF_BOOL]: "boolean",
+  [Ci.nsIPrefBranch.PREF_INT]: "number",
+  [Ci.nsIPrefBranch.PREF_STRING]: "string",
+};
+
+/**
+ * Describes why a preference could not be set, in terms an administrator can
+ * act on: which type the preference takes, and what the policy provided.
+ *
+ * @param {string} preference
+ *        The preference that could not be set.
+ * @param {boolean|number|string} value
+ *        The value the policy asked for.
+ * @param {Error} ex
+ *        The failure raised while setting it.
+ * @returns {string}
+ *        A description of what to correct.
+ */
+export function describePreferenceFailure(preference, value, ex) {
+  const expected =
+    PREF_TYPE_NAMES[
+      Services.prefs.getDefaultBranch("").getPrefType(preference)
+    ];
+  if (expected && expected != typeof value) {
+    return (
+      `Unable to set preference ${preference}: it takes a ${expected}, ` +
+      `but the policy provided a ${typeof value}.`
+    );
+  }
+  if (expected == "number" && !Number.isInteger(value)) {
+    return `Unable to set preference ${preference}: it takes a whole number.`;
+  }
+  const reason = ex?.result
+    ? ChromeUtils.getXPCOMErrorName(ex.result)
+    : (ex?.message ?? ex);
+  return `Unable to set preference ${preference}: ${reason}`;
+}
+
 /**
  * setDefaultPermission
  *
@@ -186,11 +304,10 @@ export function addAllowDenyPermissions(permissionName, allowList, blockList) {
 
   for (let origin of allowList) {
     try {
-      Services.perms.addFromPrincipal(
-        Services.scriptSecurityManager.createContentPrincipalFromOrigin(origin),
+      addPolicyPermission(
+        origin,
         permissionName,
-        Ci.nsIPermissionManager.ALLOW_ACTION,
-        Ci.nsIPermissionManager.EXPIRE_POLICY
+        Ci.nsIPermissionManager.ALLOW_ACTION
       );
     } catch (ex) {
       // It's possible if the origin was invalid, we'll have a string instead of an origin.
@@ -203,13 +320,111 @@ export function addAllowDenyPermissions(permissionName, allowList, blockList) {
   }
 
   for (let origin of blockList) {
-    Services.perms.addFromPrincipal(
-      Services.scriptSecurityManager.createContentPrincipalFromOrigin(origin),
+    addPolicyPermission(
+      origin,
       permissionName,
-      Ci.nsIPermissionManager.DENY_ACTION,
-      Ci.nsIPermissionManager.EXPIRE_POLICY
+      Ci.nsIPermissionManager.DENY_ACTION
     );
   }
+}
+
+/**
+ * addPolicyPermission
+ *
+ * Sets a permission from a policy site list. A host and its trailing dot form
+ * are distinct permission origins, so both get the permission.
+ *
+ * @param {URL|string} origin
+ *        The origin the permission applies to.
+ * @param {string} permissionName
+ *        The name of the permission to set.
+ * @param {number} permission
+ *        The permission value to set, for example ALLOW_ACTION.
+ */
+export function addPolicyPermission(origin, permissionName, permission) {
+  let principal =
+    Services.scriptSecurityManager.createContentPrincipalFromOrigin(origin);
+
+  for (let prin of [principal, trailingDotPrincipal(principal)]) {
+    if (prin) {
+      Services.perms.addFromPrincipal(
+        prin,
+        permissionName,
+        permission,
+        Ci.nsIPermissionManager.EXPIRE_POLICY
+      );
+    }
+  }
+}
+
+/**
+ * Returns the principal for aPrincipal's other host form: bare for a host with
+ * trailing dots, one trailing dot for a bare host. Null when there is no such
+ * principal: no host, an IP address host, or a host setHost rejects.
+ *
+ * @param {nsIPrincipal} aPrincipal
+ * @returns {nsIPrincipal?}
+ */
+function trailingDotPrincipal(aPrincipal) {
+  let host = principalHost(aPrincipal);
+
+  if (!host || aPrincipal.isIpAddress) {
+    return null;
+  }
+
+  let bareHost = host.replace(/\.+$/, "");
+  let otherHost = bareHost == host ? `${host}.` : bareHost;
+
+  try {
+    return Services.scriptSecurityManager.createContentPrincipal(
+      aPrincipal.URI.mutate().setHost(otherHost).finalize(),
+      aPrincipal.originAttributes
+    );
+  } catch (ex) {
+    return null;
+  }
+}
+
+// nsIPrincipal.host throws for a URI with no host, such as an about: URI.
+function principalHost(aPrincipal) {
+  try {
+    return aPrincipal.host;
+  } catch (ex) {
+    return "";
+  }
+}
+
+/**
+ * isTrailingDotPolicyDuplicate
+ *
+ * True when aPermission is a policy permission for a trailing dot host and the
+ * same policy permission exists for the bare host. A permission list UI lists
+ * the site once, so it skips these. A trailing dot host with a permission of
+ * its own is not a duplicate and stays listed.
+ *
+ * Callers check expireType first, so a profile with no policy permissions
+ * never imports this module.
+ *
+ * @param {nsIPermission} aPermission
+ * @returns {boolean}
+ */
+export function isTrailingDotPolicyDuplicate(aPermission) {
+  if (
+    aPermission.expireType != Ci.nsIPermissionManager.EXPIRE_POLICY ||
+    !principalHost(aPermission.principal).endsWith(".")
+  ) {
+    return false;
+  }
+
+  let barePrincipal = trailingDotPrincipal(aPermission.principal);
+  let barePermission =
+    barePrincipal &&
+    Services.perms.getPermissionObject(barePrincipal, aPermission.type, true);
+
+  return (
+    barePermission?.expireType == Ci.nsIPermissionManager.EXPIRE_POLICY &&
+    barePermission.capability == aPermission.capability
+  );
 }
 
 /**
@@ -358,19 +573,36 @@ export function applyExtensionGuards(extensionSettings) {
   lazy.setEnterpriseGuards(guards);
 }
 
-export function installAddonFromRepository(extensionID) {
+/**
+ * installAddonFromRepository
+ *
+ * Helper function that installs an addon from addons.mozilla.org.
+ *
+ * @param {string} extensionID The extension ID that is to be installed.
+ * @param {string} [policyName] The policy requesting the installation.
+ */
+export function installAddonFromRepository(extensionID, policyName) {
   lazy.AddonRepository.getAddonsByIDs([extensionID])
     .then(repoAddons => {
       if (!repoAddons[0]?.sourceURI) {
-        lazy.log.error(
+        reportFailure(
+          policyName,
           `No XPI URL found on AMO for ${extensionID}. Please use install_url for add-ons not listed on addons.mozilla.org.`
         );
         return;
       }
-      installAddonFromURL(repoAddons[0].sourceURI.spec, extensionID, null);
+      installAddonFromURL(
+        repoAddons[0].sourceURI.spec,
+        extensionID,
+        null,
+        policyName
+      );
     })
     .catch(err => {
-      lazy.log.error(`Failed to retrieve ${extensionID} from AMO: ${err}`);
+      reportFailure(
+        policyName,
+        `Failed to retrieve ${extensionID} from AMO: ${err}`
+      );
     });
 }
 
@@ -383,8 +615,9 @@ export function installAddonFromRepository(extensionID) {
  * @param {string} url The URL to install from.
  * @param {string} extensionID The extension ID that is to be installed.
  * @param {object|null} addon Object representing the addon.
+ * @param {string} [policyName] The policy requesting the installation.
  */
-export function installAddonFromURL(url, extensionID, addon) {
+export function installAddonFromURL(url, extensionID, addon, policyName) {
   if (
     addon &&
     addon.sourceURI &&
@@ -396,95 +629,109 @@ export function installAddonFromURL(url, extensionID, addon) {
   }
   lazy.AddonManager.getInstallForURL(url, {
     telemetryInfo: { source: "enterprise-policy" },
-  }).then(install => {
-    if (install.addon && install.addon.appDisabled) {
-      lazy.log.error(`Incompatible add-on - ${install.addon.id}`);
-      install.cancel();
-      return;
-    }
-    let listener = {
-      /* eslint-disable-next-line no-shadow */
-      onDownloadEnded: install => {
-        // Install failed, error will be reported elsewhere.
-        if (!install.addon) {
-          return;
-        }
-        if (extensionID && install.addon.id != extensionID) {
-          lazy.log.error(
-            `Add-on downloaded from ${url} had unexpected id (got ${install.addon.id} expected ${extensionID})`
-          );
-          install.removeListener(listener);
-          install.cancel();
-          return;
-        }
-        if (install.addon.appDisabled) {
-          lazy.log.error(`Incompatible add-on - ${url}`);
-          install.removeListener(listener);
-          install.cancel();
-          return;
-        }
-        if (
-          addon &&
-          Services.vc.compare(addon.version, install.addon.version) == 0
-        ) {
-          lazy.log.debug(
-            "Installation cancelled because versions are the same"
-          );
-          install.removeListener(listener);
-          install.cancel();
-          return;
-        }
-
-        // Cancel install if the addon version downloaded is detected
-        // to be a downgrade compared to the version already installed.
-        if (
-          addon &&
-          Services.vc.compare(addon.version, install.addon.version) > 0
-        ) {
-          lazy.log.warn(
-            `Installation cancelled because installed version ${addon.version} is greater than ${install.addon.version} downloaded from ${url}`
-          );
-          install.removeListener(listener);
-          install.cancel();
-        }
-      },
-      onDownloadFailed: () => {
-        install.removeListener(listener);
-        lazy.log.error(
-          `Download failed - ${lazy.AddonManager.errorToString(
-            install.error
-          )} - ${url}`
-        );
-        clearRunOnceModification("extensionsInstall");
-      },
-      onInstallFailed: () => {
-        install.removeListener(listener);
-        lazy.log.error(
-          `Installation failed - ${lazy.AddonManager.errorToString(
-            install.error
-          )} - ${url}`
-        );
-      },
-      /* eslint-disable-next-line no-shadow */
-      onInstallEnded: (install, addon) => {
-        if (addon.type == "theme") {
-          addon.enable();
-        }
-        install.removeListener(listener);
-        lazy.log.debug(`Installation succeeded - ${url}`);
-      },
-    };
-    // If it's a local file install, onDownloadEnded is never called.
-    // So we call it manually, to handle some error cases.
-    if (url.startsWith("file:")) {
-      listener.onDownloadEnded(install);
-      if (install.state == lazy.AddonManager.STATE_CANCELLED) {
+  })
+    .then(install => {
+      if (!install) {
+        reportFailure(policyName, `Unable to install add-on from ${url}`);
         return;
       }
-    }
-    install.addListener(listener);
-    install.install();
-  });
+      if (install.addon && install.addon.appDisabled) {
+        reportFailure(policyName, `Incompatible add-on - ${install.addon.id}`);
+        install.cancel();
+        return;
+      }
+      let listener = {
+        /* eslint-disable-next-line no-shadow */
+        onDownloadEnded: install => {
+          // Install failed, error will be reported elsewhere.
+          if (!install.addon) {
+            return;
+          }
+          if (extensionID && install.addon.id != extensionID) {
+            reportFailure(
+              policyName,
+              `Add-on downloaded from ${url} had unexpected id (got ${install.addon.id} expected ${extensionID})`
+            );
+            install.removeListener(listener);
+            install.cancel();
+            return;
+          }
+          if (install.addon.appDisabled) {
+            reportFailure(policyName, `Incompatible add-on - ${url}`);
+            install.removeListener(listener);
+            install.cancel();
+            return;
+          }
+          if (
+            addon &&
+            Services.vc.compare(addon.version, install.addon.version) == 0
+          ) {
+            lazy.log.debug(
+              "Installation cancelled because versions are the same"
+            );
+            install.removeListener(listener);
+            install.cancel();
+            return;
+          }
+
+          // Cancel install if the addon version downloaded is detected
+          // to be a downgrade compared to the version already installed.
+          if (
+            addon &&
+            Services.vc.compare(addon.version, install.addon.version) > 0
+          ) {
+            lazy.log.warn(
+              `Installation cancelled because installed version ${addon.version} is greater than ${install.addon.version} downloaded from ${url}`
+            );
+            install.removeListener(listener);
+            install.cancel();
+          }
+        },
+        onDownloadFailed: () => {
+          install.removeListener(listener);
+          reportFailure(
+            policyName,
+            `Download failed - ${lazy.AddonManager.errorToString(
+              install.error
+            )} - ${url}`
+          );
+          clearRunOnceModification("extensionsInstall");
+        },
+        onInstallFailed: () => {
+          install.removeListener(listener);
+          reportFailure(
+            policyName,
+            `Installation failed - ${lazy.AddonManager.errorToString(
+              install.error
+            )} - ${url}`
+          );
+        },
+        /* eslint-disable-next-line no-shadow */
+        onInstallEnded: (install, addon) => {
+          if (addon.type == "theme") {
+            addon.enable();
+          }
+          install.removeListener(listener);
+          lazy.log.debug(`Installation succeeded - ${url}`);
+        },
+      };
+      // If it's a local file install, onDownloadEnded is never called.
+      // So we call it manually, to handle some error cases.
+      if (url.startsWith("file:")) {
+        listener.onDownloadEnded(install);
+        if (install.state == lazy.AddonManager.STATE_CANCELLED) {
+          return;
+        }
+      }
+      install.addListener(listener);
+      install.install();
+    })
+    .catch(e => {
+      reportFailure(
+        policyName,
+        `Unable to install add-on from ${url}: ${e.message ?? e}`
+      );
+    });
 }
 
 let gBlockedAboutPages = [];
@@ -570,7 +817,7 @@ export function pemToBase64(pem) {
     .replace(/[\r\n]/g, "");
 }
 
-export function processMIMEInfo(mimeInfo, realMIMEInfo) {
+export function processMIMEInfo(mimeInfo, realMIMEInfo, policyName) {
   if ("handlers" in mimeInfo) {
     let firstHandler = true;
     for (let handler of mimeInfo.handlers) {
@@ -586,15 +833,26 @@ export function processMIMEInfo(mimeInfo, realMIMEInfo) {
             ].createInstance(Ci.nsILocalHandlerApp);
             handlerApp.executable = file;
           } catch (ex) {
-            lazy.log.error(
+            reportFailure(
+              policyName,
               `Unable to create handler executable (${handler.path})`
             );
             continue;
           }
         } else if ("uriTemplate" in handler) {
-          let templateURL = new URL(handler.uriTemplate);
+          let templateURL;
+          try {
+            templateURL = new URL(handler.uriTemplate);
+          } catch (ex) {
+            reportFailure(
+              policyName,
+              `Invalid web handler URL (${handler.uriTemplate})`
+            );
+            continue;
+          }
           if (templateURL.protocol != "https:") {
-            lazy.log.error(
+            reportFailure(
+              policyName,
               `Web handler must be https (${handler.uriTemplate})`
             );
             continue;
@@ -603,7 +861,8 @@ export function processMIMEInfo(mimeInfo, realMIMEInfo) {
             !templateURL.pathname.includes("%s") &&
             !templateURL.search.includes("%s")
           ) {
-            lazy.log.error(
+            reportFailure(
+              policyName,
               `Web handler must contain %s (${handler.uriTemplate})`
             );
             continue;
@@ -613,7 +872,7 @@ export function processMIMEInfo(mimeInfo, realMIMEInfo) {
           ].createInstance(Ci.nsIWebHandlerApp);
           handlerApp.uriTemplate = handler.uriTemplate;
         } else {
-          lazy.log.error("Invalid handler");
+          reportFailure(policyName, "Invalid handler");
           continue;
         }
         if ("name" in handler) {
@@ -633,7 +892,7 @@ export function processMIMEInfo(mimeInfo, realMIMEInfo) {
       action == realMIMEInfo.useHelperApp &&
       !realMIMEInfo.possibleApplicationHandlers.length
     ) {
-      lazy.log.error("useHelperApp requires a handler");
+      reportFailure(policyName, "useHelperApp requires a handler");
       return;
     }
     realMIMEInfo.preferredAction = action;

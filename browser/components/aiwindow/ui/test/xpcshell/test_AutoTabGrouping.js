@@ -107,20 +107,6 @@ add_task(function test_getCandidateTabs_excludesStillLoadingTabs() {
   );
 });
 
-add_task(function test_getCandidateTabs_excludesAlreadyGroupedTabs() {
-  const ungrouped = makeTab({ url: "https://a.example/" });
-  const grouped = makeTab({ url: "https://b.example/", group: { id: "g1" } });
-  const win = makeWin([ungrouped, grouped]);
-
-  const candidates = AutoTabGroupingSuggestions.getCandidateTabs(win);
-
-  Assert.deepEqual(
-    candidates,
-    [ungrouped],
-    "Tabs already in a group are never re-suggested"
-  );
-});
-
 add_task(function test_selectClusters_filtersSortsAndCaps() {
   // Sizes 1 and 1 are below minTabsPerGroup (2) and dropped; the rest are
   // ordered largest-first and capped at maxGroups (3).
@@ -286,6 +272,65 @@ add_task(async function test_buildProposals_cachesLabelsBySourceTabs() {
       second[0].label,
       "Work",
       "Second run returns the cached label"
+    );
+  } finally {
+    AutoTabGroupingSuggestions._manager = originalManager;
+    AutoTabGroupingSuggestions._llmLabelForGroup = originalLlm;
+    AutoTabGroupingSuggestions._labelCache.clear();
+  }
+});
+
+add_task(function test_uniqueLabel_avoidsTakenLabels() {
+  const taken = new Set(["news", "shopping 2"]);
+
+  Assert.equal(
+    AutoTabGroupingSuggestions.uniqueLabel("Work", taken),
+    "Work",
+    "A label nothing uses is kept as is"
+  );
+  Assert.equal(
+    AutoTabGroupingSuggestions.uniqueLabel("NEWS", taken),
+    "NEWS 2",
+    "A label a group already has gets a suffix, whatever its case"
+  );
+  Assert.equal(
+    AutoTabGroupingSuggestions.uniqueLabel("Shopping", taken),
+    "Shopping",
+    "Only the exact label counts as taken, not one with a suffix"
+  );
+  Assert.equal(
+    AutoTabGroupingSuggestions.uniqueLabel("Shopping", taken),
+    "Shopping 3",
+    "The suffix skips the ones already in use, including the label just chosen"
+  );
+});
+
+add_task(async function test_buildProposals_avoidsExistingGroupNames() {
+  const originalManager = AutoTabGroupingSuggestions._manager;
+  const originalLlm = AutoTabGroupingSuggestions._llmLabelForGroup;
+  AutoTabGroupingSuggestions._llmLabelForGroup = async () => {
+    throw new Error("force on-device");
+  };
+  AutoTabGroupingSuggestions._manager = {
+    async generateClusters() {
+      return {
+        clusterRepresentations: [makeCluster(3, 0.9), makeCluster(2, 0.9)],
+      };
+    },
+    async getPredictedLabelForGroup() {
+      return "Work";
+    },
+  };
+  AutoTabGroupingSuggestions._labelCache.clear();
+  try {
+    const proposals = await AutoTabGroupingSuggestions.buildProposals(
+      [],
+      ["Work"]
+    );
+    Assert.deepEqual(
+      proposals.map(p => p.label),
+      ["Work 2", "Work 3"],
+      "Neither proposal repeats the existing group's name, nor each other's"
     );
   } finally {
     AutoTabGroupingSuggestions._manager = originalManager;

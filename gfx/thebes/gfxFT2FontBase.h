@@ -106,12 +106,12 @@ class gfxFT2FontBase : public gfxFont {
  protected:
   ~gfxFT2FontBase() override;
   void InitMetrics();
-  const Metrics& GetHorizontalMetrics() const override { return mMetrics; }
+  void InitExtraMetrics(gfxFloat aEmHeight, gfxFloat aLineHeight);
+
   FT_Vector GetEmboldenStrength(FT_Face aFace) const;
 
   RefPtr<mozilla::gfx::SharedFTFace> mFTFace;
 
-  Metrics mMetrics;
   int mFTLoadFlags;
   bool mEmbolden;
   gfxFloat mFTSize;

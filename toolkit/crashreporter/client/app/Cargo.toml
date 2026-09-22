@@ -62,10 +62,10 @@ features = [
 
 [features]
 # Required for tests
-mock = []
+mock = ["glean/mozbuild-rustlib"]
 
 [build-dependencies]
-bindgen = { version = "0.69", default-features = false, features = ["runtime"] }
+bindgen = { version = "0.73", default-features = false, features = ["runtime"] }
 embed-manifest = "1.4"
 mozbuild = "0.1"
 phf_codegen = "0.14"

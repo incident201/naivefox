@@ -58,6 +58,7 @@ import mozilla.components.ui.icons.R as iconsR
 import org.mozilla.fenix.R
 import org.mozilla.fenix.compose.Favicon
 import org.mozilla.fenix.compose.TabThumbnail
+import org.mozilla.fenix.compose.swipeToDismissFade
 import org.mozilla.fenix.tabstray.TabsTrayTestTag
 import org.mozilla.fenix.tabstray.browser.compose.TabItemInteractionState
 import org.mozilla.fenix.tabstray.data.TabsTrayItem
@@ -118,7 +119,7 @@ fun TabGridTabItem(
         onDismiss = onDismiss,
     ) {
         TabContent(
-            modifier = Modifier.fadeOnSwipeToDismiss(swipeToDismissBoxState),
+            modifier = Modifier.swipeToDismissFade(swipeToDismissBoxState),
             tab = tab,
             thumbnailSize = thumbnailSizePx,
             selectionState = selectionState,
@@ -210,10 +211,14 @@ private fun TabContent(
                         ),
                     shape = thumbnailShape,
                 ) {
-                    Thumbnail(
-                        tab = tab,
-                        size = thumbnailSize,
-                    )
+                    Box {
+                        Thumbnail(
+                            tab = tab,
+                            size = thumbnailSize,
+                        )
+
+                        MediaPlaybackIndicator(isMediaActive = tab.isMediaActive)
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(FirefoxTheme.layout.space.static50))
@@ -467,6 +472,31 @@ private fun TabGridItemPreview(
             clickHandler = TabsTrayItemClickHandler(onClick = {}, onCloseClick = {}),
             onCloseTabClick = {},
             interactionState = tabGridItemState.value.interactionState,
+        )
+    }
+}
+
+@Composable
+@PreviewLightDark
+private fun TabGridItemMediaPreview() {
+    FirefoxTheme {
+        TabContent(
+            tab =
+                createTab(
+                    url = "www.mozilla.org",
+                    title = "Mozilla Domain",
+                    isMediaActive = true,
+                ),
+            selectionState =
+                TabsTrayItemSelectionState(
+                    isSelected = false,
+                    isFocused = false,
+                    multiSelectEnabled = false,
+                ),
+            thumbnailSize = 108,
+            clickHandler = TabsTrayItemClickHandler(onClick = {}, onCloseClick = {}),
+            onCloseTabClick = {},
+            interactionState = TabItemInteractionState(),
         )
     }
 }

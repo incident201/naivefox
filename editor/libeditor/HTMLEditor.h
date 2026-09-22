@@ -858,8 +858,8 @@ class HTMLEditor final : public EditorBase,
    */
   [[nodiscard]] MOZ_CAN_RUN_SCRIPT Result<InsertTextResult, nsresult>
   ReplaceTextWithTransaction(dom::Text& aTextNode, uint32_t aOffset,
-                             uint32_t aLength,
-                             const nsAString& aStringToInsert);
+                             uint32_t aLength, const nsAString& aStringToInsert,
+                             InsertTextFor aPurpose);
 
   struct NormalizedStringToInsertText;
 
@@ -871,7 +871,8 @@ class HTMLEditor final : public EditorBase,
    */
   [[nodiscard]] MOZ_CAN_RUN_SCRIPT Result<InsertTextResult, nsresult>
   InsertOrReplaceTextWithTransaction(const EditorDOMPoint& aPointToInsert,
-                                     const NormalizedStringToInsertText& aData);
+                                     const NormalizedStringToInsertText& aData,
+                                     InsertTextFor aPurpose);
 
   struct ReplaceWhiteSpacesData;
 
@@ -880,7 +881,8 @@ class HTMLEditor final : public EditorBase,
    */
   [[nodiscard]] MOZ_CAN_RUN_SCRIPT Result<InsertTextResult, nsresult>
   ReplaceTextWithTransaction(dom::Text& aTextNode,
-                             const ReplaceWhiteSpacesData& aData);
+                             const ReplaceWhiteSpacesData& aData,
+                             InsertTextFor aPurpose);
 
   /**
    * Insert aStringToInsert to aPointToInsert.  If the point is not editable,
@@ -889,7 +891,8 @@ class HTMLEditor final : public EditorBase,
   [[nodiscard]] MOZ_CAN_RUN_SCRIPT Result<InsertTextResult, nsresult>
   InsertTextWithTransaction(const nsAString& aStringToInsert,
                             const EditorDOMPoint& aPointToInsert,
-                            InsertTextTo aInsertTextTo) final;
+                            InsertTextTo aInsertTextTo,
+                            InsertTextFor aPurpose) final;
 
   /**
    * CopyLastEditableChildStyles() clones inline container elements into
@@ -3013,7 +3016,6 @@ class HTMLEditor final : public EditorBase,
                                    Selection& aSelection);
 
     bool operator==(const CellIndexes& aOther) const = default;
-    bool operator!=(const CellIndexes& aOther) const = default;
 
     [[nodiscard]] bool isErr() const { return mRow < 0 || mColumn < 0; }
 
@@ -4695,8 +4697,6 @@ class HTMLEditor final : public EditorBase,
   bool mDisabledLinkHandling = false;
   bool mOldLinkHandlingEnabled = false;
 
-  bool mHasBeforeInputBeenCanceled = false;
-
   bool mHasFocus = false;
   bool mIsInDesignMode = false;
 
@@ -4721,7 +4721,7 @@ class HTMLEditor final : public EditorBase,
                               // PrepareToInsertBRElement,
                               // ReflectPaddingBRElementForEmptyEditor,
                               // RefreshEditingUI,
-                              // mComposerUpdater, mHasBeforeInputBeenCanceled
+                              // mComposerUpdater
   friend class JoinNodesTransaction;  // DidJoinNodesTransaction, DoJoinNodes,
                                       // DoSplitNode, // RangeUpdaterRef
   friend class ListElementSelectionState;      // CollectEditTargetNodes,

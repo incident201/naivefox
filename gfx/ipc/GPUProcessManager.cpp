@@ -206,7 +206,7 @@ void GPUProcessManager::OnPreferenceChange(const char16_t* aData) {
                           /* isSanitized */ false, Nothing(), Nothing());
 
   Preferences::GetPreference(&pref, GeckoProcessType_GPU,
-                             /* remoteType */ ""_ns);
+                             /* remoteType */ {});
   if (mGPUChild) {
     MOZ_ASSERT(mQueuedPrefs.IsEmpty());
     mGPUChild->SendPreferenceUpdate(pref);
@@ -1689,7 +1689,8 @@ uint32_t GPUProcessManager::AllocateNamespace() {
 
 bool GPUProcessManager::AllocateAndConnectLayerTreeId(
     PCompositorBridgeChild* aCompositorBridge, base::ProcessId aOtherPid,
-    LayersId* aOutLayersId, CompositorOptions* aOutCompositorOptions) {
+    LayersId aEmbedderLayersId, LayersId* aOutLayersId,
+    CompositorOptions* aOutCompositorOptions) {
   MOZ_ASSERT(aOutLayersId);
 
   LayersId layersId = AllocateLayerTreeId();
@@ -1711,10 +1712,10 @@ bool GPUProcessManager::AllocateAndConnectLayerTreeId(
   if (aCompositorBridge) {
     if (mGPUChild) {
       return aCompositorBridge->SendMapAndNotifyChildCreated(
-          layersId, aOtherPid, aOutCompositorOptions);
+          layersId, aEmbedderLayersId, aOtherPid, aOutCompositorOptions);
     }
-    return aCompositorBridge->SendNotifyChildCreated(layersId,
-                                                     aOutCompositorOptions);
+    return aCompositorBridge->SendNotifyChildCreated(
+        layersId, aEmbedderLayersId, aOutCompositorOptions);
   }
 
   // If we don't have a CompositorBridgeChild, we just need to call

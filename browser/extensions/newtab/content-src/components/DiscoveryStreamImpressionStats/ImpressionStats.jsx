@@ -3,7 +3,11 @@
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 import { actionCreators as ac, actionTypes as at } from "common/Actions.mjs";
-import { getActiveCardSize, getNovaColumnLayout } from "../../lib/utils";
+import {
+  getActiveCardSize,
+  getCardColumn,
+  getNovaColumnLayout,
+} from "../../lib/utils";
 import { TOP_SITES_SOURCE } from "../TopSites/TopSitesConstants";
 import React from "react";
 
@@ -93,6 +97,8 @@ export class ImpressionStats extends React.PureComponent {
     }
 
     if (this._needsImpressionStats(cards)) {
+      // Every card this wrapper reports on shares its grid item, so measure once.
+      const cardColumn = getCardColumn(this.impressionRef.current);
       const impressionData = {
         source: props.source.toUpperCase(),
         window_inner_width: window.innerWidth,
@@ -106,9 +112,13 @@ export class ImpressionStats extends React.PureComponent {
           scheduled_corpus_item_id: link.scheduled_corpus_item_id,
           recommended_at: link.recommended_at,
           received_rank: link.received_rank,
+          variant_id: link.variant_id,
+          source_section_id: link.source_section_id,
           topic: link.topic,
           features: link.features,
           attribution: link.attribution,
+          is_ad_eligible_position: link.is_ad_eligible_position,
+          ...(cardColumn ? { card_column: cardColumn } : {}),
           ...(link.format
             ? { format: link.format }
             : {

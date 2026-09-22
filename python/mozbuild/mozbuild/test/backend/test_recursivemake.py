@@ -1123,6 +1123,50 @@ class TestRecursiveMakeBackend(BackendTester):
             "RUST_LIBRARY_FILE := x86_64-unknown-linux-gnu/release/libtest_library.a",
             "CARGO_FILE := $(srcdir)/Cargo.toml",
             "CARGO_TARGET_DIR := %s" % env.topobjdir,
+            "RUST_LIBRARY_LTO := 1",
+        ]
+
+        self.assertEqual(lines, expected)
+
+    def test_rust_library_with_no_lto(self):
+        """Test that a Rust library's LTO opt out keeps RUST_LIBRARY_LTO unset."""
+        env = self._consume("rust-library-no-lto", RecursiveMakeBackend)
+
+        backend_path = mozpath.join(env.topobjdir, "backend.mk")
+        lines = [
+            l.strip()
+            for l in open(backend_path).readlines()[2:]
+            # Strip out computed flags, they're a PITA to test.
+            if not l.startswith("COMPUTED_")
+        ]
+
+        expected = [
+            "RUST_LIBRARY_FILE := x86_64-unknown-linux-gnu/release/libno_lto_library.a",
+            "CARGO_FILE := $(srcdir)/Cargo.toml",
+            "CARGO_TARGET_DIR := %s" % env.topobjdir,
+        ]
+
+        self.assertEqual(lines, expected)
+
+    def test_rust_library_with_cargo_profile(self):
+        """Test that a Rust library's Cargo profile is written to backend.mk."""
+        env = self._consume("rust-library-cargo-profile", RecursiveMakeBackend)
+
+        backend_path = mozpath.join(env.topobjdir, "backend.mk")
+        lines = [
+            l.strip()
+            for l in open(backend_path).readlines()[2:]
+            # Strip out computed flags, they're a PITA to test.
+            if not l.startswith("COMPUTED_")
+        ]
+
+        expected = [
+            "RUST_LIBRARY_FILE := "
+            "x86_64-unknown-linux-gnu/release-custom/libprofile_library.a",
+            "CARGO_FILE := $(srcdir)/Cargo.toml",
+            f"CARGO_TARGET_DIR := {env.topobjdir}",
+            "RUST_LIBRARY_CARGO_PROFILE_SUFFIX := custom",
+            "RUST_LIBRARY_CARGO_CRATE_TYPE := staticlib",
         ]
 
         self.assertEqual(lines, expected)
@@ -1185,6 +1229,7 @@ class TestRecursiveMakeBackend(BackendTester):
             "CARGO_FILE := $(srcdir)/Cargo.toml",
             "CARGO_TARGET_DIR := %s" % env.topobjdir,
             "RUST_LIBRARY_FEATURES := musthave,cantlivewithout",
+            "RUST_LIBRARY_LTO := 1",
         ]
 
         self.assertEqual(lines, expected)
@@ -1263,6 +1308,14 @@ class TestRecursiveMakeBackend(BackendTester):
             any(l == "recurse_compile: code/host code/target" for l in lines)
         )
 
+        root_path = mozpath.join(env.topobjdir, "root.mk")
+        with open(root_path) as fh:
+            syms_line = next(
+                (l for l in fh.read().splitlines() if l.startswith("syms_targets :=")),
+                "",
+            )
+        self.assertIn("code/syms", syms_line)
+
     def test_host_rust_program_output_category(self):
         """Test that a host Rust program with output_category is written correctly."""
         env = self._consume("host-rust-program-output-category", RecursiveMakeBackend)
@@ -1285,6 +1338,30 @@ class TestRecursiveMakeBackend(BackendTester):
         ]
 
         self.assertEqual(lines, expected)
+
+    def test_rust_program_output_category(self):
+        """A Rust program with output_category is excluded from syms_targets."""
+        env = self._consume("rust-program-output-category", RecursiveMakeBackend)
+
+        root_path = mozpath.join(env.topobjdir, "root.mk")
+        with open(root_path) as fh:
+            content = fh.read()
+
+        syms_line = next(
+            (l for l in content.splitlines() if l.startswith("syms_targets :=")),
+            "",
+        )
+
+        self.assertIn("without-output-category/syms", syms_line)
+        self.assertNotIn("with-output-category/syms", syms_line)
+
+        self.assertIn("mixed/syms", syms_line)
+        backend_path = mozpath.join(env.topobjdir, "mixed/backend.mk")
+        with open(backend_path) as fh:
+            lines = [l.strip() for l in fh.readlines()]
+        rust_program = "$(DEPTH)/i686-pc-windows-msvc/release/mixed-rust.exe"
+        self.assertIn(f"RUST_PROGRAMS += {rust_program}", lines)
+        self.assertIn(f"MOZBUILD_NON_DEFAULT_TARGETS += {rust_program}", lines)
 
     def test_final_target(self):
         """Test that FINAL_TARGET is written to backend.mk correctly."""
@@ -1337,6 +1414,33 @@ class TestRecursiveMakeBackend(BackendTester):
         ]
 
         found = [str for str in lines if "DIST_FILES" in str]
+        self.assertEqual(found, expected)
+
+    def test_final_target_files_absolute(self):
+        """Absolute FINAL_TARGET_FILES are installed, and libraries checked."""
+        env = self._get_environment("final-target-files-absolute")
+
+        # The files only need to exist for the moz.build to be read, and *.pdb
+        # is ignored tree-wide, so create them in the objdir rather than
+        # checking them in.
+        so = mozpath.join(env.topobjdir, "libfoo.so")
+        pdb = mozpath.join(env.topobjdir, "libfoo.pdb")
+        for path in (so, pdb):
+            open(path, "a").close()
+
+        self._consume("final-target-files-absolute", RecursiveMakeBackend, env=env)
+
+        backend_path = mozpath.join(env.topobjdir, "backend.mk")
+        lines = [l.strip() for l in open(backend_path).readlines()[2:]]
+
+        expected = [
+            # Debug information is installed, but there is nothing to check.
+            f"$(INSTALL) {pdb} $(DEPTH)/dist/bin/",
+            f"$(INSTALL) {so} $(DEPTH)/dist/bin/",
+            "$(call py_action,check_binary libfoo.so,$(DEPTH)/dist/bin/libfoo.so)",
+        ]
+
+        found = [str for str in lines if "libfoo." in str]
         self.assertEqual(found, expected)
 
     def test_pp_files_extra_deps(self):
@@ -1561,7 +1665,7 @@ class TestRecursiveMakeBackend(BackendTester):
         with open(root_deps_path) as fh:
             lines = [l.strip() for l in fh.readlines()]
 
-        self.assertIn("rust/uniffi-target: archive/target", lines)
+        self.assertIn("rust/uniffi-target: archive/target middle/target-objects", lines)
         self.assertIn("archive/target: archive/target-objects", lines)
 
         backend_path = mozpath.join(env.topobjdir, "archive", "backend.mk")
@@ -1658,6 +1762,34 @@ class TestRecursiveMakeBackend(BackendTester):
             root_content = fh.read()
         self.assertNotIn("generated.plist:", root_content)
 
+        sharedlib_backend = mozpath.join(env.topobjdir, "sharedlib", "backend.mk")
+        with open(sharedlib_backend) as fh:
+            sharedlib_content = fh.read()
+        self.assertIn(
+            "libextra-link-deps-lib.so: generated.rsp",
+            sharedlib_content,
+        )
+        self.assertIn("COMPUTED_LDFLAGS += @generated.rsp", sharedlib_content)
+        # A response file the link reads has to be written before the link, so
+        # its rule belongs to the directory rather than the top level.
+        self.assertIn("generated.rsp:", sharedlib_content)
+        self.assertNotIn("generated.rsp:", root_content)
+
+        # A response file no link reads keeps its rule at the top level, where
+        # a consumer in another directory can still see it.
+        unrelated_backend = mozpath.join(env.topobjdir, "unrelated", "backend.mk")
+        with open(unrelated_backend) as fh:
+            unrelated_content = fh.read()
+        self.assertIn("unrelated.rsp:", root_content)
+        self.assertNotIn("unrelated.rsp:", unrelated_content)
+
+        # nested/deep.rsp and other/deep.rsp share a base name and only the
+        # first is linked against, so the two are told apart by path.
+        self.assertIn("nested/deep.rsp:", sharedlib_content)
+        self.assertNotIn("sharedlib/nested/deep.rsp:", root_content)
+        self.assertNotIn("other/deep.rsp:", sharedlib_content)
+        self.assertIn("sharedlib/other/deep.rsp:", root_content)
+
     def test_shared_library_output_category(self):
         """SharedLibrary with output_category should be excluded from
         syms_targets, since the default %/syms: %/target static pattern in
@@ -1697,6 +1829,33 @@ class TestRecursiveMakeBackend(BackendTester):
                     if line.startswith(prefix)
                 ][0]
                 self.assertEqual(shared_lib, expected_shared_lib)
+
+    def test_licenses_json(self):
+        """LICENSES declarations are aggregated into licenses.json."""
+        env = self._consume("licenses", RecursiveMakeBackend)
+
+        with open(mozpath.join(env.topobjdir, "licenses.json")) as fh:
+            licenses = json.load(fh)["licenses"]
+
+        by_id = {license["id"]: license for license in licenses}
+        self.assertEqual(sorted(by_id), ["MIT", "mylib"])
+
+        mit = by_id["MIT"]
+        self.assertEqual(mit["title"], "MIT License")
+        self.assertEqual(mit["spdx"], "MIT")
+        self.assertFalse(mit["html"])
+        self.assertIn("Permission is hereby granted", mit["text"])
+        # The explicit path plus the path-scoped LICENSED_UNDER entry. The
+        # declaring directory itself is not listed, because paths narrowed it.
+        self.assertEqual(
+            mit["paths"], ["lib/vendor/dep.js", "third_party/rust/byteorder"]
+        )
+
+        mylib = by_id["mylib"]
+        self.assertEqual(mylib["declared_in"], "lib")
+        self.assertEqual(mylib["notice"], "Copyright 2026 Somebody.")
+        self.assertTrue(mylib["html"])
+        self.assertEqual(mylib["paths"], [])
 
 
 if __name__ == "__main__":

@@ -7,34 +7,24 @@
 #include "ExtraFileParser.h"
 
 #include "json/json.h"
-#include "nsAppDirectoryServiceDefs.h"
-#include "nsComponentManagerUtils.h"
-#include "nsDirectoryServiceDefs.h"
-#include "nsDirectoryService.h"
 #include "nsIDUtils.h"
 #include "nsIFileStreams.h"
 #include "nsNetUtil.h"
 #include "nsString.h"
-#include "mozilla/DebugOnly.h"
 #include "mozilla/GeckoArgs.h"
 #include "mozilla/EnumeratedRange.h"
 #include "mozilla/Services.h"
 #include "nsIObserverService.h"
 #include "mozilla/RuntimeExceptionModule.h"
-#include "mozilla/ScopeExit.h"
-#include "mozilla/Sprintf.h"
 #include "mozilla/StaticPrefs_browser.h"
-#include "mozilla/SyncRunnable.h"
 #include "mozilla/ToString.h"
 #include "mozilla/TimeStamp.h"
 
 #include "nsPrintfCString.h"
 #include "nsSystemInfo.h"
+#include "prsystem.h"
 #include "nsThreadUtils.h"
 #include "nsThread.h"
-#include "jsfriendapi.h"
-#include "base/process_util.h"
-#include "common/basictypes.h"
 
 #include "mozilla/toolkit/crashreporter/mozannotation_client_ffi_generated.h"
 #include "mozilla/crash_helper_client_ffi_generated.h"
@@ -43,24 +33,30 @@
 #  include "mozilla/BackgroundTasks.h"
 #endif
 
+#if defined(XP_LINUX) && !defined(ANDROID)
+#  include "mozilla/widget/LSBUtils.h"
+#endif
+
 #if defined(XP_WIN)
 #  ifdef WIN32_LEAN_AND_MEAN
 #    undef WIN32_LEAN_AND_MEAN
 #  endif
 
 #  include "nsXULAppAPI.h"
-#  include "nsIXULAppInfo.h"
-#  include "nsIWindowsRegKey.h"
 #  include "breakpad-client/windows/crash_generation/client_info.h"
 #  include "breakpad-client/windows/crash_generation/crash_generation_server.h"
 #  include "breakpad-client/windows/handler/exception_handler.h"
 #  include <dbghelp.h>
+#  include <filesystem>
 #  include <string.h>
-#  include "nsDirectoryServiceUtils.h"
-
-#  include "nsWindowsDllInterceptor.h"
+#  include "mozilla/DebugOnly.h"
 #  include "mozilla/WindowsDllBlocklist.h"
+#  include "nsDirectoryServiceUtils.h"
+#  include "nsWindowsDllInterceptor.h"
 #  include "psapi.h"  // For PERFORMANCE_INFORMATION and K32GetPerformanceInfo()
+#  if defined(HAVE_64BIT_BUILD)
+#    include "jsfriendapi.h"
+#  endif  // defined(HAVE_64BIT_BUILD)
 #elif defined(XP_MACOSX)
 #  include "breakpad-client/mac/crash_generation/client_info.h"
 #  include "breakpad-client/mac/crash_generation/crash_generation_server.h"
@@ -94,6 +90,7 @@
 #  include "sys/sysinfo.h"
 #  include <sys/wait.h>
 #  include <unistd.h>
+#  include "mozilla/ScopeExit.h"
 
 #  if defined(MOZ_OXIDIZED_BREAKPAD)
 #    include "mozilla/toolkit/crashreporter/rust_minidump_writer_linux_ffi_generated.h"
@@ -104,9 +101,6 @@
 #  error "Not yet implemented for this platform"
 #endif  // defined(XP_WIN)
 
-#ifdef XP_WIN
-#  include <filesystem>
-#endif
 #include <fmt/format.h>
 #include <fstream>
 #include <optional>
@@ -1268,6 +1262,10 @@ static bool LaunchCrashHandlerService(const XP_CHAR* aProgramPath,
 #endif
 
 nsresult RecordPlatformAnnotations() {
+  if (!GetEnabled()) {
+    return NS_ERROR_NOT_INITIALIZED;
+  }
+
   // CPU architecture values corresponding to `system_info.cpu_arch` values in
   // https://github.com/rust-minidump/rust-minidump/blob/main/minidump-processor/json-schema.md,
   // which is the format expected by Socorro.
@@ -1313,6 +1311,39 @@ nsresult RecordPlatformAnnotations() {
 #endif
                                   ));
 
+  // These values are read straight from NSPR and LSBUtils rather than through
+  // @mozilla.org/system-info;1, so that recording them neither instantiates
+  // that service nor requires XPCOM to be initialized.
+#if !defined(ANDROID)
+  // nsSystemInfo reports the Android SDK version rather than the release here,
+  // and lib-crash records OSVersion for Android itself.
+  char sysRelease[SYS_INFO_BUFFER_LENGTH];
+  if (PR_GetSystemInfo(PR_SI_RELEASE, sysRelease, sizeof(sysRelease)) ==
+      PR_SUCCESS) {
+    nsAutoCString osVersion(sysRelease);
+    char sysBuild[SYS_INFO_BUFFER_LENGTH];
+    if (PR_GetSystemInfo(PR_SI_RELEASE_BUILD, sysBuild, sizeof(sysBuild)) ==
+        PR_SUCCESS) {
+      osVersion.Append(
+#  if defined(XP_WIN)
+          '.'
+#  else
+          ' '
+#  endif
+      );
+      osVersion.Append(sysBuild);
+    }
+    MOZ_TRY(RecordAnnotationNSCString(Annotation::OSVersion, osVersion));
+  }
+#endif
+
+#if defined(XP_LINUX) && !defined(ANDROID)
+  nsAutoCString dist, desc, release, codename;
+  if (widget::lsb::GetLSBRelease(dist, desc, release, codename)) {
+    MOZ_TRY(RecordAnnotationNSCString(Annotation::LinuxLSBDescription, desc));
+  }
+#endif
+
   return NS_OK;
 }
 
@@ -1332,48 +1363,18 @@ static nsresult RecordCPUInfoAnnotation() {
 }
 
 nsresult RecordXPCOMPlatformAnnotations() {
-  nsCOMPtr<nsIPropertyBag2> sysInfo = do_GetService(NS_SYSTEMINFO_CONTRACTID);
-  if (!sysInfo) {
-    NS_WARNING(
-        "expected nsSystemInfo to be available for platform crash annotations");
+  if (!GetEnabled()) {
     return NS_ERROR_NOT_INITIALIZED;
   }
 
-  nsCString osVersion;
-  if (NS_SUCCEEDED(sysInfo->GetPropertyAsACString(u"version"_ns, osVersion))) {
-    nsCString build;
-    if (NS_SUCCEEDED(sysInfo->GetPropertyAsACString(u"build"_ns, build))) {
-      osVersion.Append(
-#if defined(XP_WIN)
-          '.'
-#else
-          ' '
-#endif
-      );
-      osVersion.Append(build);
-    }
-    MOZ_TRY(
-        RecordAnnotationNSCString(Annotation::OSVersion, std::move(osVersion)));
-  }
-
-#if defined(XP_LINUX)
-  nsCString lsbDesc;
-  if (NS_SUCCEEDED(sysInfo->GetPropertyAsACString(u"distroDesc"_ns, lsbDesc))) {
-    MOZ_TRY(RecordAnnotationNSCString(
-        CrashReporter::Annotation::LinuxLSBDescription, std::move(lsbDesc)));
-  }
-#endif
-
-  MOZ_TRY(RecordCPUInfoAnnotation());
-
-  return NS_OK;
+  return RecordCPUInfoAnnotation();
 }
 
 static void WriteAnnotations(AnnotationWriter& aWriter,
                              const AnnotationTable& aAnnotations) {
   for (auto key : MakeEnumeratedRange(Annotation::Count)) {
     const nsCString& value = aAnnotations[key];
-    if (!value.IsEmpty()) {
+    if (!value.IsEmpty() && ShouldIncludeAnnotation(key, value.get())) {
       aWriter.Write(key, value.get(), value.Length());
     }
   }
@@ -3178,20 +3179,6 @@ bool WriteExtraFile(const nsAString& id, const AnnotationTable& annotations) {
   return WriteExtraFile(pw, annotations);
 }
 
-// This filters out annotations that have specific values we don't want to
-// include and adds common annotations which are present in every crash report
-// including crash time, uptime, etc...
-static void AddSharedAnnotations(AnnotationTable& aAnnotations) {
-  for (auto key : MakeEnumeratedRange(Annotation::Count)) {
-    if (!aAnnotations[key].IsEmpty() &&
-        !ShouldIncludeAnnotation(key, aAnnotations[key].get())) {
-      aAnnotations[key] = EmptyCString();
-    }
-  }
-
-  AddCommonAnnotations(aAnnotations);
-}
-
 // It really only makes sense to call this function when
 // ShouldReport() is true.
 // Uses dumpFile's filename to generate memoryReport's filename (same name
@@ -3544,7 +3531,7 @@ bool TakeMinidumpForChild(GeckoChildID aChildId, nsIFile** dump,
 
   nsresult rv = ReadExtraFile(extra, aAnnotations);
 
-  // Unconditionally remove the temporary .extra file, it will be regenarated
+  // Unconditionally remove the temporary .extra file, it will be regenerated
   // later when we finalize the crash report.
   extra->Remove(false);
 
@@ -3554,7 +3541,7 @@ bool TakeMinidumpForChild(GeckoChildID aChildId, nsIFile** dump,
     return false;
   }
 
-  AddSharedAnnotations(aAnnotations);
+  AddCommonAnnotations(aAnnotations);
 
   if (error.Length() > 0) {
     aAnnotations[Annotation::DumperError] = std::move(error);
@@ -3619,33 +3606,6 @@ static void RenameAdditionalHangMinidump(nsIFile* minidump,
   }
 }
 
-// Stores the minidump in the nsIFile pointed by the |context| parameter.
-static bool PairedDumpCallback(
-#ifdef XP_LINUX
-    const MinidumpDescriptor& descriptor,
-#else
-    const XP_CHAR* dump_path, const XP_CHAR* minidump_id,
-#endif
-    void* context,
-#ifdef XP_WIN
-    EXCEPTION_POINTERS* /*unused*/, MDRawAssertionInfo* /*unused*/,
-#endif
-    const phc::AddrInfo* addrInfo, bool succeeded) {
-  XP_CHAR* path = static_cast<XP_CHAR*>(context);
-  size_t size = XP_PATH_MAX;
-
-#ifdef XP_LINUX
-  Concat(path, descriptor.path(), &size);
-#else
-  path = Concat(path, dump_path, &size);
-  path = Concat(path, XP_PATH_SEPARATOR, &size);
-  path = Concat(path, minidump_id, &size);
-  Concat(path, dumpFileExtension, &size);
-#endif
-
-  return true;
-}
-
 ThreadId CurrentThreadId() {
 #if defined(XP_WIN)
   return ::GetCurrentThreadId();
@@ -3660,8 +3620,7 @@ ThreadId CurrentThreadId() {
 #endif
 }
 
-bool CreateMinidumpsAndPair(ProcessHandle aTargetHandle,
-                            ThreadId aTargetBlamedThread,
+bool CreateMinidumpsAndPair(GeckoChildID aId, ThreadId aTargetBlamedThread,
                             const nsACString& aIncomingPairName,
                             AnnotationTable& aTargetAnnotations,
                             nsIFile** aMainDumpOut) {
@@ -3670,56 +3629,66 @@ bool CreateMinidumpsAndPair(ProcessHandle aTargetHandle,
   }
 
   AutoIOInterposerDisable disableIOInterposition;
-
-  xpstring dump_path;
-#ifndef XP_LINUX
-  dump_path = gExceptionHandler->dump_path();
-#else
-  dump_path = gExceptionHandler->minidump_descriptor().directory();
+#if defined(XP_WIN) && defined(DEBUG) && defined(HAS_DLL_BLOCKLIST)
+  DllBlocklist_Shutdown();
 #endif
 
-  // Ugly, but due to Breakpad limitations we can't allocate memory in the
-  // callback when generating a dump of the calling process.
-  XP_CHAR minidumpPath[XP_PATH_MAX] = {};
+  CrashReport* crash_report = nullptr;
 
-  // dump the target
-  if (!google_breakpad::ExceptionHandler::WriteMinidumpForChild(
-          aTargetHandle, aTargetBlamedThread,
-#if defined(XP_LINUX) && defined(MOZ_OXIDIZED_BREAKPAD)
-          /* auxvInfo */ nullptr,
-#endif  // defined(XP_LINUX) && defined(MOZ_OXIDIZED_BREAKPAD)
-          dump_path, PairedDumpCallback, static_cast<void*>(minidumpPath)
-#ifdef XP_WIN
-                                             ,
-          GetMinidumpType()
-#endif
-              )) {
+  {
+    StaticMutexAutoLock lock(gCrashHelperClientMutex);
+    if (gCrashHelperClient) {
+#if defined(XP_DARWIN)
+      // We need to make a copy of this right as the Rust code will take
+      // ownership of it (and eventually dispose of the right).
+      aTargetBlamedThread = RetainMachSendRight(aTargetBlamedThread).release();
+#endif  // defined(XP_DARWIN)
+      crash_report =
+          generate_crash_report(gCrashHelperClient, aId, aTargetBlamedThread);
+    }
+  }
+
+  if (!crash_report) {
     return false;
   }
 
   nsCOMPtr<nsIFile> targetMinidump;
-  CreateFileFromPath(xpstring(minidumpPath), getter_AddRefs(targetMinidump));
+  CreateFileFromPath(xpstring((XP_CHAR*)crash_report->path),
+                     getter_AddRefs(targetMinidump));
+  nsCString error =
+      crash_report->error ? nsCString(crash_report->error) : ""_ns;
+  release_crash_report(crash_report);
   MOZ_ASSERT(targetMinidump);
 
-  // Create a dump of this process.
-  if (!google_breakpad::ExceptionHandler::WriteMinidump(
-          dump_path,
-#ifdef XP_MACOSX
-          true,
-#endif
-          PairedDumpCallback, static_cast<void*>(minidumpPath)
-#ifdef XP_WIN
-                                  ,
-          GetMinidumpType()
-#endif
-              )) {
-    targetMinidump->Remove(false);
+  nsCOMPtr<nsIFile> extra = nullptr;
+  NS_ENSURE_TRUE(GetExtraFileForMinidump(targetMinidump, getter_AddRefs(extra)),
+                 false);
+
+  // Create a dump of the main process.
+  {
+    StaticMutexAutoLock lock(gCrashHelperClientMutex);
+    crash_report =
+        generate_crash_report(gCrashHelperClient, 0, CurrentThreadId());
+  }
+
+  if (!crash_report) {
+    // We're leaving behind a minidump, clean it up?
     return false;
   }
 
   nsCOMPtr<nsIFile> incomingDump;
-  CreateFileFromPath(xpstring(minidumpPath), getter_AddRefs(incomingDump));
+  CreateFileFromPath(xpstring((XP_CHAR*)crash_report->path),
+                     getter_AddRefs(incomingDump));
+  release_crash_report(crash_report);
   MOZ_ASSERT(incomingDump);
+
+  // We're ignoring the errors we might have encountered while dumping the
+  // parent, they're not really important in this context and we don't need
+  // the crash annotations either.
+  nsCOMPtr<nsIFile> incomingExtra = nullptr;
+  if (GetExtraFileForMinidump(incomingDump, getter_AddRefs(incomingExtra))) {
+    incomingExtra->Remove(false);
+  }
 
   RenameAdditionalHangMinidump(incomingDump, targetMinidump, aIncomingPairName);
 
@@ -3727,12 +3696,24 @@ bool CreateMinidumpsAndPair(ProcessHandle aTargetHandle,
     MoveToPending(targetMinidump, nullptr, nullptr);
     MoveToPending(incomingDump, nullptr, nullptr);
   }
-#if defined(DEBUG) && defined(HAS_DLL_BLOCKLIST)
-  DllBlocklist_Shutdown();
-#endif
 
-  AddSharedAnnotations(aTargetAnnotations);
-  // TODO: Retrieve annotations from child process
+  nsresult rv = ReadExtraFile(extra, aTargetAnnotations);
+
+  // Unconditionally remove the temporary .extra file, it will be regenerated
+  // later when we finalize the crash report.
+  extra->Remove(false);
+
+  if (rv != NS_OK) {
+    // TODO: We failed to read the annotations, this will leave an orphaned
+    // crash that we won't be able to submit. Clean everything up instead?
+    return false;
+  }
+
+  AddCommonAnnotations(aTargetAnnotations);
+
+  if (error.Length() > 0) {
+    aTargetAnnotations[Annotation::DumperError] = std::move(error);
+  }
 
   targetMinidump.forget(aMainDumpOut);
 

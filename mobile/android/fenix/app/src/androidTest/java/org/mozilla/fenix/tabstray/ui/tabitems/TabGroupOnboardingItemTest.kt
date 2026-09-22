@@ -210,6 +210,7 @@ class TabGroupOnboardingItemTest {
                         onCloseTabGroupClick = {},
                         onShareTabGroupClick = {},
                         onDeleteTabGroupClick = {},
+                        onUngroupTabGroupClick = {},
                         onTabGroupOnboardingDismiss = {},
                         liveReorderEnabled = false,
                     )

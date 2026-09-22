@@ -9,6 +9,7 @@ import org.junit.After
 import org.junit.Ignore
 import org.junit.Test
 import org.mozilla.fenix.R
+import org.mozilla.fenix.customannotations.Critical
 import org.mozilla.fenix.customannotations.SmokeTest
 import org.mozilla.fenix.helpers.AppAndSystemHelper.stubFilePickerSelection
 import org.mozilla.fenix.helpers.Constants
@@ -23,14 +24,12 @@ import org.mozilla.fenix.ui.efficiency.selectors.BookmarksSelectors
 import org.mozilla.fenix.ui.efficiency.selectors.BrowserPageSelectors
 import org.mozilla.fenix.ui.efficiency.selectors.HomeSelectors
 import org.mozilla.fenix.ui.efficiency.selectors.MainMenuSelectors
+import org.mozilla.fenix.ui.efficiency.selectors.ShareOverlaySelectors
 import org.mozilla.fenix.ui.efficiency.selectors.TabDrawerSelectors
 
 class BookmarksTest : BaseTest() {
 
     // TODO (I. RIOS 3/20/2026): add to BaseTest for State Machine
-    private val mockWebServer
-        get() = fenixTestRule.mockWebServer
-
     private var importedBookmarksFile: File? = null
 
     @After
@@ -89,7 +88,7 @@ class BookmarksTest : BaseTest() {
 
         on.bookmarks.navigateToPage().mozVerify(BookmarksSelectors.BOOKMARK_ITEM(defaultWebPage.title))
         on.bookmarks.openItemMenu(defaultWebPage.title).mozClick(BookmarksSelectors.SHARE_BUTTON)
-        on.shareOverlay.mozVerifyElementsByGroup("shareTabLayout")
+        on.shareOverlay.mozVerifyElementsByGroup(ShareOverlaySelectors.Group.SHARE_TAB_LAYOUT)
         on.shareOverlay.verifySharingWithSelectedApp(
             appName = Constants.GMAIL_APP_NAME,
             appPackageName = Constants.PackageName.GMAIL_APP,
@@ -204,7 +203,7 @@ class BookmarksTest : BaseTest() {
     fun verifyEmptyBookmarksViewImportBookmarksTest() {
         on.bookmarks
             .navigateToPage()
-            .mozVerifyElementsByGroup("emptyBookmarksMenuView")
+            .mozVerifyElementsByGroup(BookmarksSelectors.Group.EMPTY_BOOKMARKS_MENU_VIEW)
             .mozClick(BookmarksSelectors.IMPORT_BOOKMARKS_BUTTON)
             .mozVerify(BookmarksSelectors.IMPORT_MENU_BUTTON)
     }
@@ -217,7 +216,23 @@ class BookmarksTest : BaseTest() {
         importedBookmarksFile = createBookmarksHtmlFile()
         stubFilePickerSelection(importedBookmarksFile!!)
 
-        on.bookmarks.navigateToPage().mozVerifyElementsByGroup("emptyBookmarksMenuView")
+        on.bookmarks.navigateToPage().mozVerifyElementsByGroup(BookmarksSelectors.Group.EMPTY_BOOKMARKS_MENU_VIEW)
         on.bookmarks.importBookmarksFromFile().mozVerify(BookmarksSelectors.BOOKMARK_ITEM(importedBookmarksFolder))
+    }
+
+    // TestRail link: https://mozilla.testrail.io/index.php?/cases/view/2833698
+    @Critical
+    @Test
+    fun deleteBookmarkInEditModeTest() {
+        val defaultWebPage = mockWebServer.getGenericAsset(1)
+
+        createBookmarkItem(defaultWebPage.url.toString(), defaultWebPage.title, null)
+
+        on.bookmarks
+            .navigateToPage()
+            .openItemMenu(defaultWebPage.title)
+            .mozClick(BookmarksSelectors.EDIT_BUTTON)
+            .mozClick(BookmarksSelectors.DELETE_BOOKMARK_BUTTON)
+            .mozVerifyElementAbsent(BookmarksSelectors.BOOKMARK_ITEM(defaultWebPage.title))
     }
 }

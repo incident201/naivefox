@@ -22,7 +22,6 @@ import mozharness
 from mozharness.base.config import parse_config_file
 from mozharness.base.errors import PythonErrorList
 from mozharness.base.log import CRITICAL, DEBUG, ERROR, INFO, WARNING, OutputParser
-from mozharness.base.python import Python3Virtualenv
 from mozharness.base.vcs.vcsbase import MercurialScript
 from mozharness.mozilla.automation import (
     TBPL_FAILURE,
@@ -125,9 +124,7 @@ class TalosOutputParser(OutputParser):
         super().parse_single_line(line)
 
 
-class Talos(
-    TestingMixin, MercurialScript, TooltoolMixin, Python3Virtualenv, CodeCoverageMixin
-):
+class Talos(TestingMixin, MercurialScript, TooltoolMixin, CodeCoverageMixin):
     """
     install and run Talos tests
     """

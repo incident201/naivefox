@@ -492,6 +492,14 @@
       row.description = line2?.textContent ?? null;
     }
 
+    _closeSecondaryActionMenus() {
+      for (const rowItem of this.richlistbox.querySelectorAll(
+        "autocomplete-row-item"
+      )) {
+        rowItem.closeActionsMenu();
+      }
+    }
+
     _appendAutocompleteResults() {
       const controller = this.mInput.controller;
       const matchCount = this.matchCount;
@@ -534,23 +542,42 @@
           row.icon = parsedComment?.icon ?? image;
           row.value = value;
           const secondaryAction = parsedComment?.secondaryAction;
-          row.actions = {
-            primary: () => {},
-            secondary: secondaryAction
-              ? {
-                  type: secondaryAction.type,
-                  label: secondaryAction.label,
-                  action: () =>
-                    lazy.AutoCompleteParent.getCurrentActor()?.selectAutoCompleteEntry(
-                      true
-                    ),
-                }
-              : null,
-          };
+          let secondary = null;
+          if (secondaryAction) {
+            secondary = {
+              type: secondaryAction.type,
+              label: secondaryAction.label,
+            };
+            // Route each secondary action back to its provider through the
+            // parent actor, identifying a menu action by its index (a single
+            // action omits it).
+            const activateAction = actionIndex => () =>
+              lazy.AutoCompleteParent.getCurrentActor()?.selectAutoCompleteEntry(
+                true,
+                actionIndex
+              );
+            if (secondaryAction.actions) {
+              secondary.actions = secondaryAction.actions.map(
+                ({ label }, index) => ({
+                  label,
+                  action: activateAction(index),
+                })
+              );
+            } else {
+              secondary.action = activateAction();
+            }
+          }
+          row.actions = { primary: () => {}, secondary };
+          // Rows are reused between searches, so close any actions menu left
+          // open by the entry that previously occupied this row.
+          row.closeActionsMenu();
 
           row.type = parsedComment?.type ?? null;
           row.sources = parsedComment?.sources ?? [];
           row.sourcesLabel = parsedComment?.sourcesLabel ?? null;
+          row.sourcesPillsLabel = parsedComment?.sourcesPillsLabel ?? null;
+          row.sourcesPillsLabelHover =
+            parsedComment?.sourcesPillsLabelHover ?? null;
           row.loading = parsedComment?.loading ?? false;
           row.loadingLabel = parsedComment?.loadingLabel ?? null;
           row.emptySourcesLabel = parsedComment?.emptySourcesLabel ?? null;
@@ -617,8 +644,16 @@
     _setSecondaryActionFocused(focused) {
       this._secondaryActionFocused = focused;
       const rowItem = this._selectedRowItem;
-      if (rowItem) {
-        rowItem.subfocused = focused;
+      if (focused) {
+        if (rowItem) {
+          rowItem.subfocused = true;
+        }
+      } else {
+        for (const item of this.richlistbox.querySelectorAll(
+          "autocomplete-row-item"
+        )) {
+          item.subfocused = false;
+        }
       }
       if (focused && this.mPopupOpen && this.richlistbox.selectedItem) {
         this.richlistbox.ensureElementIsVisible(this.richlistbox.selectedItem);
@@ -655,7 +690,16 @@
         return false;
       }
       const rowItem = this._selectedRowItem;
-      rowItem?.activateSecondaryAction();
+      if (!rowItem?.activateSecondaryAction()) {
+        this._setSecondaryActionFocused(false);
+      }
+      return true;
+    }
+
+    maybeLeaveSecondaryAction() {
+      if (!this._secondaryActionFocused) {
+        return false;
+      }
       this._setSecondaryActionFocused(false);
       return true;
     }
@@ -671,7 +715,14 @@
     }
 
     setListeners() {
-      this.addEventListener("popupshowing", () => {
+      // Popups nested inside this panel (such as a row's secondary action menu)
+      // bubble their own popup events up to here, so only react to our own.
+      const isOwnEvent = event => event.target == this;
+
+      this.addEventListener("popupshowing", event => {
+        if (!isOwnEvent(event)) {
+          return;
+        }
         // If normalMaxRows wasn't already set by the input, then set it here
         // so that we restore the correct number when the popup is hidden.
 
@@ -683,14 +734,23 @@
         this.mPopupOpen = true;
       });
 
-      this.addEventListener("popupshown", () => {
+      this.addEventListener("popupshown", event => {
+        if (!isOwnEvent(event)) {
+          return;
+        }
         if (this._adjustHeightOnPopupShown) {
           this._adjustHeightOnPopupShown = false;
           this.adjustHeight();
         }
       });
 
-      this.addEventListener("popuphiding", () => {
+      this.addEventListener("popuphiding", event => {
+        if (!isOwnEvent(event)) {
+          this._setSecondaryActionFocused(false);
+          return;
+        }
+
+        this._closeSecondaryActionMenus();
         var isListActive = true;
         if (this.selectedIndex == -1) {
           isListActive = false;

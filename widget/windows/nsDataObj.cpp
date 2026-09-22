@@ -14,6 +14,7 @@
 #include "WinUtils.h"
 #include "imgIEncoder.h"
 #include "imgITools.h"
+#include "mozilla/CheckedInt.h"
 #include "mozilla/Components.h"
 #include "mozilla/LazyIdleThread.h"
 #include "mozilla/Preferences.h"
@@ -743,8 +744,7 @@ STDMETHODIMP nsDataObj::GetData(LPFORMATETC aFormat, LPSTGMEDIUM pSTM) {
          dfInx < mDataFlavors.Length()) {
     nsCString const& df = mDataFlavors.ElementAt(dfInx);
     if (FormatsMatch(fe, *aFormat)) {
-      pSTM->pUnkForRelease =
-          nullptr;  // caller is responsible for deleting this data
+      *pSTM = STGMEDIUM{};
       CLIPFORMAT const format = aFormat->cfFormat;
 
       // compile-time-constant format indicators:
@@ -1648,22 +1648,44 @@ HRESULT nsDataObj::GetText(const nsACString& aDataFlavor, FORMATETC& aFE,
   if (aFE.cfFormat == CF_TEXT) {
     // Someone is asking for text/plain; convert the unicode (assuming it's
     // present) to text with the correct platform encoding.
-    size_t bufferSize = sizeof(char) * (len + 2);
-    char* plainTextData = static_cast<char*>(moz_xmalloc(bufferSize));
+    //
+    // One UTF-16 code unit can encode to more than two bytes: U+0800..U+FFFF
+    // takes three when the ANSI code page is UTF-8. Size the buffer from the
+    // code page's own maximum rather than assuming two.
+    // The code page is fixed until a Windows reboot.
+    static UINT sMaxCharSize = []() {
+      CPINFO cpInfo;
+      if (!::GetCPInfo(CP_ACP, &cpInfo)) {
+        MOZ_ASSERT_UNREACHABLE("Couldn't get code page info?");
+        // The max ANSI code page character size at the moment is four bytes.
+        return 4u;
+      }
+      return cpInfo.MaxCharSize;
+    }();
+
+    // |len| is a byte count; the conversion counts UTF-16 code units, and
+    // includes the terminating null.
+    CheckedInt<int> const unitCount = CheckedInt<int>(len) / 2 + 1;
+    CheckedInt<int> const bufferSize = unitCount * sMaxCharSize;
+    if (!bufferSize.isValid()) {
+      return E_FAIL;
+    }
+
+    char* plainTextData = static_cast<char*>(moz_xmalloc(bufferSize.value()));
     auto const _release =
         mozilla::MakeScopeExit([plainTextData]() { ::free(plainTextData); });
 
     char16_t* castedUnicode = reinterpret_cast<char16_t*>(data);
-    int32_t plainTextLen =
-        WideCharToMultiByte(CP_ACP, 0, (LPCWSTR)castedUnicode, len / 2 + 1,
-                            plainTextData, bufferSize, NULL, NULL);
+    int32_t plainTextLen = WideCharToMultiByte(
+        CP_ACP, 0, (LPCWSTR)castedUnicode, unitCount.value(), plainTextData,
+        bufferSize.value(), NULL, NULL);
 
     if (plainTextLen) {
       return assignDataToStg(plainTextData, plainTextLen);
     }
 
     NS_WARNING("Oh no, couldn't convert unicode to plain text");
-    return S_OK;
+    return E_FAIL;
   }
 
   if (aFE.cfFormat == nsClipboard::GetHtmlClipboardFormat()) {
@@ -1682,7 +1704,7 @@ HRESULT nsDataObj::GetText(const nsACString& aDataFlavor, FORMATETC& aFE,
     }
 
     NS_WARNING("Oh no, couldn't convert to HTML");
-    return S_OK;
+    return E_FAIL;
   }
 
   // We assume that any data-format that isn't caught above can be satisfied by

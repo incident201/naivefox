@@ -110,7 +110,7 @@ impl Parse for LayerName {
                 }
 
                 let name = match input.next_including_whitespace()? {
-                    Token::Ident(ref ident) => ident,
+                    Token::Ident(ident) => ident,
                     other => {
                         let _ = other.clone();
                         return Err(ParseError::unexpected_token());
@@ -184,7 +184,7 @@ impl DeepCloneWithLock for LayerBlockRule {
                         .deep_clone_with_lock(lock, guard),
                 ),
             ),
-            source_location: self.source_location.clone(),
+            source_location: self.source_location,
         }
     }
 }

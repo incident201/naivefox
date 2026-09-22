@@ -207,6 +207,7 @@ linux-tests:
     - mochitest-chrome-gpu
     - mochitest-devtools-chrome
     - mochitest-media
+    - mochitest-speech-recognition
     - mochitest-plain
     - mochitest-plain-gpu
     - mochitest-remote
@@ -239,6 +240,7 @@ linux-2404-tsan-tests:
     - mochitest-chrome-gpu
     - mochitest-devtools-chrome
     - mochitest-media
+    - mochitest-speech-recognition
     - mochitest-plain
     - mochitest-plain-gpu
     - mochitest-remote
@@ -279,6 +281,7 @@ linux2204-wayland-tests:
     - mochitest-chrome-gpu
     - mochitest-devtools-chrome
     - mochitest-media
+    - mochitest-speech-recognition
     - mochitest-plain
     - mochitest-plain-gpu
     - mochitest-remote
@@ -359,6 +362,7 @@ windows11-25h2-tests:
     - mochitest-chrome-gpu
     - mochitest-devtools-chrome
     - mochitest-media
+    - mochitest-speech-recognition
     - mochitest-plain
     - mochitest-plain-gpu
     - mochitest-remote
@@ -437,9 +441,6 @@ talos-xperf:
     - talos-xperf
 
 # macOS
-macosx1500-64-jittests:
-    - jittest
-
 macosx1500-64-tests:
     - cppunittest
     - crashtest
@@ -457,6 +458,7 @@ macosx1500-64-tests:
     - mochitest-chrome-gpu
     - mochitest-devtools-chrome
     - mochitest-media
+    - mochitest-speech-recognition
     - mochitest-plain
     - mochitest-plain-gpu
     - mochitest-remote
@@ -487,7 +489,6 @@ macosx1500-aarch64-tests:
     - marionette-integration
     - marionette-unittest
     - crashtest
-    - jittest
     - mochitest-a11y
     - mochitest-browser-a11y
     - mochitest-browser-chrome
@@ -497,6 +498,7 @@ macosx1500-aarch64-tests:
     - mochitest-chrome-gpu
     - mochitest-devtools-chrome
     - mochitest-media
+    - mochitest-speech-recognition
     - mochitest-plain
     - mochitest-plain-gpu
     - mochitest-remote
@@ -652,8 +654,9 @@ android-hw-speedometer-tests:
     - browsertime-benchmark-speedometer2-mobile
     - browsertime-benchmark-speedometer3-mobile
 
-android-em-arm64-speedometer-tests:
+android-em-arm64-benchmark-tests:
     - browsertime-benchmark-speedometer3-mobile
+    - browsertime-benchmark-jetstream3
 
 android-hw-power-tests:
     - browsertime-youtube-playback-power-mobile

@@ -42,7 +42,6 @@
 #include "mozilla/StaticPrefs_editor.h"
 #include "mozilla/StyleSheet.h"
 #include "mozilla/StyleSheetInlines.h"
-#include "mozilla/glean/EditorLibeditorMetrics.h"
 #include "mozilla/TextControlElement.h"
 #include "mozilla/TextEditor.h"
 #include "mozilla/TextEvents.h"
@@ -260,25 +259,6 @@ HTMLEditor::HTMLEditor(const Document& aDocument)
       mDefaultParagraphSeparator(ParagraphSeparator::div) {}
 
 HTMLEditor::~HTMLEditor() {
-  glean::htmleditors::with_beforeinput_listeners
-      .EnumGet(static_cast<glean::htmleditors::WithBeforeinputListenersLabel>(
-          MayHaveBeforeInputEventListenersForTelemetry() ? 1 : 0))
-      .Add();
-  glean::htmleditors::overridden_by_beforeinput_listeners
-      .EnumGet(static_cast<
-               glean::htmleditors::OverriddenByBeforeinputListenersLabel>(
-          mHasBeforeInputBeenCanceled ? 1 : 0))
-      .Add();
-  glean::htmleditors::with_mutation_observers_without_beforeinput_listeners
-      .EnumGet(static_cast<
-               glean::htmleditors::
-                   WithMutationObserversWithoutBeforeinputListenersLabel>(
-          !MayHaveBeforeInputEventListenersForTelemetry() &&
-                  MutationObserverHasObservedNodeForTelemetry()
-              ? 1
-              : 0))
-      .Add();
-
   mPendingStylesToApplyToNewContent = nullptr;
 
   if (mDisabledLinkHandling) {
@@ -4031,11 +4011,12 @@ Result<CaretPoint, nsresult> HTMLEditor::DeleteTextWithTransaction(
 }
 
 Result<InsertTextResult, nsresult> HTMLEditor::ReplaceTextWithTransaction(
-    dom::Text& aTextNode, const ReplaceWhiteSpacesData& aData) {
+    dom::Text& aTextNode, const ReplaceWhiteSpacesData& aData,
+    InsertTextFor aPurpose) {
   Result<InsertTextResult, nsresult> insertTextResultOrError =
       ReplaceTextWithTransaction(aTextNode, aData.mReplaceStartOffset,
-                                 aData.ReplaceLength(),
-                                 aData.mNormalizedString);
+                                 aData.ReplaceLength(), aData.mNormalizedString,
+                                 aPurpose);
   if (MOZ_UNLIKELY(insertTextResultOrError.isErr()) ||
       aData.mNewOffsetAfterReplace > aTextNode.TextDataLength()) {
     return insertTextResultOrError;
@@ -4049,7 +4030,7 @@ Result<InsertTextResult, nsresult> HTMLEditor::ReplaceTextWithTransaction(
 
 Result<InsertTextResult, nsresult> HTMLEditor::ReplaceTextWithTransaction(
     Text& aTextNode, uint32_t aOffset, uint32_t aLength,
-    const nsAString& aStringToInsert) {
+    const nsAString& aStringToInsert, InsertTextFor aPurpose) {
   MOZ_ASSERT(IsEditActionDataAvailable());
   MOZ_ASSERT(aLength > 0 || !aStringToInsert.IsEmpty());
 
@@ -4066,9 +4047,9 @@ Result<InsertTextResult, nsresult> HTMLEditor::ReplaceTextWithTransaction(
 
   if (!aLength) {
     Result<InsertTextResult, nsresult> insertTextResult =
-        InsertTextWithTransaction(aStringToInsert,
-                                  EditorDOMPoint(&aTextNode, aOffset),
-                                  InsertTextTo::ExistingTextNodeIfAvailable);
+        InsertTextWithTransaction(
+            aStringToInsert, EditorDOMPoint(&aTextNode, aOffset),
+            InsertTextTo::ExistingTextNodeIfAvailable, aPurpose);
     NS_WARNING_ASSERTION(insertTextResult.isOk(),
                          "HTMLEditor::InsertTextWithTransaction() failed");
     return insertTextResult;
@@ -4152,18 +4133,18 @@ Result<InsertTextResult, nsresult> HTMLEditor::ReplaceTextWithTransaction(
 Result<InsertTextResult, nsresult>
 HTMLEditor::InsertOrReplaceTextWithTransaction(
     const EditorDOMPoint& aPointToInsert,
-    const NormalizedStringToInsertText& aData) {
+    const NormalizedStringToInsertText& aData, InsertTextFor aPurpose) {
   MOZ_ASSERT(aPointToInsert.IsInContentNodeAndValid());
   MOZ_ASSERT_IF(aData.ReplaceLength(), aPointToInsert.IsInTextNode());
 
   Result<InsertTextResult, nsresult> insertTextResultOrError =
       !aData.ReplaceLength()
           ? InsertTextWithTransaction(aData.mNormalizedString, aPointToInsert,
-                                      InsertTextTo::SpecifiedPoint)
+                                      InsertTextTo::SpecifiedPoint, aPurpose)
           : ReplaceTextWithTransaction(
                 MOZ_KnownLive(*aPointToInsert.ContainerAs<Text>()),
                 aData.mReplaceStartOffset, aData.ReplaceLength(),
-                aData.mNormalizedString);
+                aData.mNormalizedString, aPurpose);
   if (MOZ_UNLIKELY(insertTextResultOrError.isErr())) {
     NS_WARNING(!aData.ReplaceLength()
                    ? "HTMLEditor::InsertTextWithTransaction() failed"
@@ -4202,7 +4183,7 @@ HTMLEditor::InsertOrReplaceTextWithTransaction(
 
 Result<InsertTextResult, nsresult> HTMLEditor::InsertTextWithTransaction(
     const nsAString& aStringToInsert, const EditorDOMPoint& aPointToInsert,
-    InsertTextTo aInsertTextTo) {
+    InsertTextTo aInsertTextTo, InsertTextFor aPurpose) {
   if (NS_WARN_IF(!aPointToInsert.IsSet())) {
     return Err(NS_ERROR_INVALID_ARG);
   }
@@ -4214,7 +4195,7 @@ Result<InsertTextResult, nsresult> HTMLEditor::InsertTextWithTransaction(
   }
 
   return EditorBase::InsertTextWithTransaction(aStringToInsert, aPointToInsert,
-                                               aInsertTextTo);
+                                               aInsertTextTo, aPurpose);
 }
 
 Result<EditorDOMPoint, nsresult> HTMLEditor::PrepareToInsertLineBreak(
@@ -5455,17 +5436,18 @@ Result<SplitNodeResult, nsresult> HTMLEditor::DoSplitNode(
                            "Text::SubstringData() failed, but ignored");
       error.SuppressException();
 
-      // XXX This call may destroy us.
-      DoDeleteText(MOZ_KnownLive(*originalTextNode), cutStartOffset, cutLength,
-                   error);
-      NS_WARNING_ASSERTION(!error.Failed(),
-                           "EditorBase::DoDeleteText() failed, but ignored");
-      error.SuppressException();
-
-      // XXX This call may destroy us.
-      DoSetText(MOZ_KnownLive(*newTextNode), movingText, error);
-      NS_WARNING_ASSERTION(!error.Failed(),
-                           "EditorBase::DoSetText() failed, but ignored");
+      nsresult rvDeleteText = DoDeleteText(MOZ_KnownLive(*originalTextNode),
+                                           cutStartOffset, cutLength);
+      // To avoid dataloss, we should keep setting to the new node.
+      nsresult rvSetText = DoSetText(MOZ_KnownLive(*newTextNode), movingText);
+      if (NS_FAILED(rvDeleteText)) [[unlikely]] {
+        NS_WARNING("EditorBase::DoDeleteText() failed");
+        return rvDeleteText;
+      }
+      if (NS_FAILED(rvSetText)) [[unlikely]] {
+        NS_WARNING("EditorBase::DoSetText() failed");
+        return rvSetText;
+      }
       return NS_OK;
     }
 
@@ -5816,15 +5798,13 @@ nsresult HTMLEditor::DoJoinNodes(nsIContent& aContentToKeep,
       }
       // Even if we've already destroyed, let's update aContentToKeep for
       // avoiding a dataloss bug.
-      IgnoredErrorResult ignoredError;
-      DoInsertText(MOZ_KnownLive(*aContentToKeep.AsText()),
-                   aContentToKeep.AsText()->TextDataLength(), rightText,
-                   ignoredError);
-      if (NS_WARN_IF(Destroyed())) {
-        return NS_ERROR_EDITOR_DESTROYED;
+      nsresult rv =
+          DoInsertText(MOZ_KnownLive(*aContentToKeep.AsText()),
+                       aContentToKeep.AsText()->TextDataLength(), rightText);
+      if (NS_FAILED(rv)) [[unlikely]] {
+        NS_WARNING("EditorBase::DoSetText() failed");
+        return rv;
       }
-      NS_WARNING_ASSERTION(!ignoredError.Failed(),
-                           "EditorBase::DoSetText() failed, but ignored");
       return NS_OK;
     }
     // Otherwise it's an interior node, so shuffle around the children.

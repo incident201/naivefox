@@ -1146,12 +1146,13 @@ bool nsLayoutUtils::IsAncestorFrameCrossDocInProcessConsideringContinuations(
     const nsIFrame* aCommonAncestor) {
   MOZ_ASSERT(aAncestorFrame);
   const nsIFrame* ancestorFirstContinuation =
-      aAncestorFrame->FirstContinuation();
+      FirstContinuationOrIBSplitSibling(aAncestorFrame);
   const nsIFrame* commonFirstContinuation =
-      aCommonAncestor ? aCommonAncestor->FirstContinuation() : nullptr;
+      aCommonAncestor ? FirstContinuationOrIBSplitSibling(aCommonAncestor)
+                      : nullptr;
 
   for (const nsIFrame* f = aFrame; f; f = GetCrossDocParentFrameInProcess(f)) {
-    auto* first = f->FirstContinuation();
+    auto* first = FirstContinuationOrIBSplitSibling(f);
     if (first == ancestorFirstContinuation) {
       return true;
     }
@@ -1395,6 +1396,21 @@ nsLayoutUtils::GetNearestScrollContainerFrameToScrollTowards(
         scrollContainerFrame->SidesToScrollForUserInputEvents().Intersects(
             aSideBits)) {
       return scrollContainerFrame;
+    }
+
+    // A frame fixed with respect to the viewport is a child of the viewport
+    // frame, so walking up from it would skip over the root scroll container
+    // frame. SCROLLABLE_FIXEDPOS_FINDS_ROOT exists for the same reason, but
+    // unlike it we keep walking when the root can't scroll toward aSideBits.
+    if (f->StyleDisplay()->mPosition == StylePositionProperty::Fixed &&
+        nsLayoutUtils::IsReallyFixedPos(f)) {
+      ScrollContainerFrame* rootScrollContainerFrame =
+          f->PresShell()->GetRootScrollContainerFrame();
+      if (rootScrollContainerFrame &&
+          rootScrollContainerFrame->SidesToScrollForUserInputEvents()
+              .Intersects(aSideBits)) {
+        return rootScrollContainerFrame;
+      }
     }
   }
   return nullptr;
@@ -3965,7 +3981,7 @@ already_AddRefed<nsFontMetrics> nsLayoutUtils::GetFontMetricsForComputedStyle(
   WritingMode wm(aComputedStyle);
   const nsStyleFont* styleFont = aComputedStyle->StyleFont();
   nsFontMetrics::Params params;
-  params.language = styleFont->mLanguage;
+  params.language = styleFont->GetLangAtom();
   params.explicitLanguage = styleFont->mExplicitLanguage;
   params.orientation =
       !aForceHorizontalMetrics && wm.IsVertical() && !wm.IsSideways()
@@ -6536,7 +6552,8 @@ IntSize nsLayoutUtils::ComputeImageContainerDrawingParameters(
     imgIContainer* aImage, nsIFrame* aForFrame,
     const LayoutDeviceRect& aDestRect, const LayoutDeviceRect& aFillRect,
     const StackingContextHelper& aSc, uint32_t aFlags,
-    SVGImageContext& aSVGContext, Maybe<ImageIntRegion>& aRegion) {
+    SVGImageContext& aSVGContext, Maybe<ImageIntRegion>& aRegion,
+    bool* aRasterizedForDest) {
   MOZ_ASSERT(aImage);
   MOZ_ASSERT(aForFrame);
 
@@ -6555,6 +6572,13 @@ IntSize nsLayoutUtils::ComputeImageContainerDrawingParameters(
 
   const gfx::Matrix& itm = aSc.GetInheritedTransform();
   LayerIntRect destRect = SnapRectForImage(itm, scaleFactors, aDestRect);
+  const IntSize snappedDestSize = destRect.Size().ToUnknownSize();
+  auto setRasterizedForDest = [&](const IntSize& aSize) {
+    if (aRasterizedForDest) {
+      *aRasterizedForDest = aSize == snappedDestSize;
+    }
+    return aSize;
+  };
 
   // Since we always decode entire raster images, we only care about the
   // ImageIntRegion for vector images when we are recording blobs, for which we
@@ -6575,9 +6599,9 @@ IntSize nsLayoutUtils::ComputeImageContainerDrawingParameters(
       destRect.height = scaleHeight;
     }
 
-    return aImage->OptimalImageSizeForDest(
+    return setRasterizedForDest(aImage->OptimalImageSizeForDest(
         gfxSize(destRect.Width(), destRect.Height()),
-        imgIContainer::FRAME_CURRENT, samplingFilter, aFlags);
+        imgIContainer::FRAME_CURRENT, samplingFilter, aFlags));
   }
 
   // We only use the region rect with blob recordings. This is because when we
@@ -6611,7 +6635,7 @@ IntSize nsLayoutUtils::ComputeImageContainerDrawingParameters(
 
   // VectorImage::OptimalImageSizeForDest will just round up, but we already
   // have an integer size.
-  return destRect.Size().ToUnknownSize();
+  return setRasterizedForDest(destRect.Size().ToUnknownSize());
 }
 
 /* static */
@@ -9791,7 +9815,7 @@ already_AddRefed<nsFontMetrics> nsLayoutUtils::GetMetricsFor(
   gfxFont::Orientation orientation =
       aIsVertical ? nsFontMetrics::eVertical : nsFontMetrics::eHorizontal;
   nsFontMetrics::Params params;
-  params.language = aStyleFont->mLanguage;
+  params.language = aStyleFont->GetLangAtom();
   params.explicitLanguage = aStyleFont->mExplicitLanguage;
   params.orientation = orientation;
   params.userFontSet =

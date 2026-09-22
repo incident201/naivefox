@@ -5,6 +5,7 @@
 #ifdef XP_WIN
 #  include "WMF.h"
 #  include "WMFDecoderModule.h"
+#  include "WMFEncoderModule.h"
 #endif
 #include "FFVPXRuntimeLinker.h"
 #include "GLContextProvider.h"
@@ -47,6 +48,7 @@
 #include "mozilla/layers/APZInputBridgeParent.h"
 #include "mozilla/layers/APZPublicUtils.h"  // for apz::InitializeGlobalState
 #include "mozilla/layers/APZThreadUtils.h"
+#include "mozilla/layers/CompositeProcessFencesHolderMap.h"
 #include "mozilla/layers/CompositorBridgeParent.h"
 #include "mozilla/layers/CompositorManagerParent.h"
 #include "mozilla/layers/CompositorThread.h"
@@ -76,7 +78,6 @@
 #  include "gfxDWriteFonts.h"
 #  include "gfxWindowsPlatform.h"
 #  include "mozilla/gfx/DeviceManagerDx.h"
-#  include "mozilla/layers/CompositeProcessD3D11FencesHolderMap.h"
 #  include "mozilla/layers/GpuProcessD3D11TextureMap.h"
 #  include "mozilla/layers/TextureD3D11.h"
 #  include "mozilla/widget/WinCompositorWindowThread.h"
@@ -196,12 +197,15 @@ bool GPUParent::Init(mozilla::ipc::UntypedEndpoint&& aEndpoint,
 #if defined(XP_WIN)
   gfxWindowsPlatform::InitMemoryReportersForGPUProcess();
   DeviceManagerDx::Init();
-  CompositeProcessD3D11FencesHolderMap::Init();
   GpuProcessD3D11TextureMap::Init();
   auto rv = wmf::MediaFoundationInitializer::HasInitialized();
   if (!rv) {
     NS_WARNING("Failed to init Media Foundation in the GPU process");
   }
+#endif
+
+#if defined(XP_WIN) || defined(XP_MACOSX)
+  CompositeProcessFencesHolderMap::Init();
 #endif
 
   CompositorThreadHolder::Start();
@@ -516,6 +520,7 @@ mozilla::ipc::IPCResult GPUParent::RecvUpdateVar(
           []() {
 #ifdef XP_WIN
             WMFDecoderModule::Init();
+            WMFEncoderModule::ClearCache();
 #endif
             if (StaticPrefs::media_ffvpx_hw_enabled()) {
               FFVPXRuntimeLinker::Init();
@@ -804,9 +809,13 @@ void GPUParent::ActorDestroy(ActorDestroyReason aWhy) {
 
 #if defined(XP_WIN)
         GpuProcessD3D11TextureMap::Shutdown();
-        CompositeProcessD3D11FencesHolderMap::Shutdown();
         DeviceManagerDx::Shutdown();
 #endif
+
+#if defined(XP_WIN) || defined(XP_MACOSX)
+        CompositeProcessFencesHolderMap::Shutdown();
+#endif
+
         LayerTreeOwnerTracker::Shutdown();
         gfxVars::Shutdown();
         gfxConfig::Shutdown();

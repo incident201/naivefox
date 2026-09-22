@@ -409,7 +409,36 @@ document.addEventListener("DOMContentLoaded", function () {
     window.PrivateBrowsingRecordClick("InfoLink");
   });
 
-  if (RPMGetBoolPref("browser.nova.enabled", false)) {
+  const isNovaEnabled = RPMGetBoolPref("browser.nova.enabled", false);
+  const isPrivateWindowRedesignEnabled =
+    window.PrivateBrowsingRedesignEnabled?.();
+
+  // privateWindowRedesign requires Nova to be enabled
+  if (isPrivateWindowRedesignEnabled && isNovaEnabled) {
+    // For privateWindowRedesign: use custom subheader and hide info-body
+    document.getElementById("info-title").hidden = true;
+    const subheader = document.querySelector(".nova-subheader");
+    if (subheader) {
+      document.l10n.setAttributes(
+        subheader,
+        "about-private-browsing-private-window-redesign-subheader"
+      );
+    }
+    document.getElementById("info-body").hidden = true;
+    document.getElementById("private-browsing-myths").hidden = true;
+
+    const basicsLink = document.getElementById("private-window-basics");
+    basicsLink.hidden = false;
+    basicsLink.addEventListener("click", async e => {
+      e.preventDefault();
+      window.PrivateBrowsingRecordClick("PrivateWindowBasicsLink");
+      // Trigger the spotlight
+      await RPMSendAsyncMessage("TRIGGER_MESSAGING_EVENT", {
+        id: "privateWindowBasicsLinkClick",
+      });
+    });
+  } else if (isNovaEnabled) {
+    // For nova.enabled only: use nova strings
     document.getElementById("info-title").hidden = true;
     document.l10n.setAttributes(
       document.getElementById("info-body"),
@@ -419,6 +448,31 @@ document.addEventListener("DOMContentLoaded", function () {
       document.getElementById("private-browsing-myths"),
       "about-private-browsing-nova-info-link"
     );
+  }
+
+  // Redesign experiment: swap the static mask for the animated intro, played
+  // once per profile (seen-once flag persisted via RPMSetPref) and skipped
+  // under reduced motion.
+  if (RPMGetBoolPref("browser.privateWindowRedesign.enabled", false)) {
+    const maskIntro = document.getElementById(
+      "about-private-browsing-mask-intro"
+    );
+    const staticLogo = document.getElementById("about-private-browsing-logo");
+    staticLogo.hidden = true;
+    maskIntro.hidden = false;
+
+    const alreadyShown = RPMGetBoolPref(
+      "browser.privatebrowsing.introAnimationShown",
+      false
+    );
+    const reduceMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    ).matches;
+
+    if (!alreadyShown && !reduceMotion) {
+      maskIntro.play = true;
+      RPMSetPref("browser.privatebrowsing.introAnimationShown", true);
+    }
   }
 
   // We don't do this setup until now, because we don't want to record any impressions until we're

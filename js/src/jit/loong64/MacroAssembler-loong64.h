@@ -5,9 +5,14 @@
 #ifndef jit_loong64_MacroAssembler_loong64_h
 #define jit_loong64_MacroAssembler_loong64_h
 
+#include <type_traits>
+
 #include "jit/loong64/Assembler-loong64.h"
 #include "jit/MoveResolver.h"
 #include "wasm/WasmBuiltins.h"
+
+using js::wasm::FaultingCodeRange;
+using js::wasm::FaultingCodeRangePair;
 
 namespace js {
 namespace jit {
@@ -107,6 +112,8 @@ class MacroAssemblerLOONG64 : public Assembler {
                             FPConditionBit fcc = FCC0);
 
  public:
+  void ma_move(Register dest, Register src);
+
   void ma_li(Register dest, CodeLabel* label);
   void ma_li(Register dest, ImmWord imm);
   void ma_liPatchable(Register dest, ImmPtr imm);
@@ -202,6 +209,9 @@ class MacroAssemblerLOONG64 : public Assembler {
   }
 
   void ma_bl(Label* l);
+
+  void ma_jump36(int32_t offset, Register scratch);
+  void ma_call36(int32_t offset, Register scratch);
 
   // fp instructions
   void ma_lid(FloatRegister dest, double value);
@@ -385,10 +395,14 @@ class MacroAssemblerLOONG64 : public Assembler {
 
   void outOfLineWasmTruncateToInt32Check(
       FloatRegister input, Register output, MIRType fromType, TruncFlags flags,
-      Label* rejoin, const wasm::TrapSiteDesc& trapSiteDesc);
+      Label* rejoin, const wasm::TrapSiteDesc& trapSiteDesc,
+      wasm::StackMap* stackMapForTraps,
+      wasm::StackMapRegistry* stackMapRegistry);
   void outOfLineWasmTruncateToInt64Check(
       FloatRegister input, Register64 output, MIRType fromType,
-      TruncFlags flags, Label* rejoin, const wasm::TrapSiteDesc& trapSiteDesc);
+      TruncFlags flags, Label* rejoin, const wasm::TrapSiteDesc& trapSiteDesc,
+      wasm::StackMap* stackMapForTraps,
+      wasm::StackMapRegistry* stackMapRegistry);
 
   // The complete address is in `address`, and `access` is used for its type
   // attributes only; its `offset` is ignored.
@@ -421,20 +435,24 @@ class MacroAssemblerLOONG64 : public Assembler {
                              AnyRegister value, Register memoryBase,
                              uint64_t address);
 
-  void wasmLoadImpl(const wasm::MemoryAccessDesc& access, Register memoryBase,
-                    Register ptr, AnyRegister output);
-  void wasmLoadImpl(const wasm::MemoryAccessDesc& access, Address address,
-                    AnyRegister output);
-  void wasmLoadImpl(const wasm::MemoryAccessDesc& access, Register memoryBase,
-                    Register ptr, Register ptrScratch, AnyRegister output,
-                    Register tmp);
-  void wasmStoreImpl(const wasm::MemoryAccessDesc& access, AnyRegister value,
-                     Register memoryBase, Register ptr);
-  void wasmStoreImpl(const wasm::MemoryAccessDesc& access, AnyRegister value,
-                     Address address);
-  void wasmStoreImpl(const wasm::MemoryAccessDesc& access, AnyRegister value,
-                     Register memoryBase, Register ptr, Register ptrScratch,
-                     Register tmp);
+  FaultingCodeRange wasmLoadImpl(const wasm::MemoryAccessDesc& access,
+                                 Register memoryBase, Register ptr,
+                                 AnyRegister output);
+  FaultingCodeRange wasmLoadImpl(const wasm::MemoryAccessDesc& access,
+                                 Address address, AnyRegister output);
+  FaultingCodeRange wasmLoadImpl(const wasm::MemoryAccessDesc& access,
+                                 Register memoryBase, Register ptr,
+                                 Register ptrScratch, AnyRegister output,
+                                 Register tmp);
+  FaultingCodeRange wasmStoreImpl(const wasm::MemoryAccessDesc& access,
+                                  AnyRegister value, Register memoryBase,
+                                  Register ptr);
+  FaultingCodeRange wasmStoreImpl(const wasm::MemoryAccessDesc& access,
+                                  AnyRegister value, Address address);
+  FaultingCodeRange wasmStoreImpl(const wasm::MemoryAccessDesc& access,
+                                  AnyRegister value, Register memoryBase,
+                                  Register ptr, Register ptrScratch,
+                                  Register tmp);
 };
 
 class MacroAssembler;
@@ -521,7 +539,7 @@ class MacroAssemblerLOONG64Compat : public MacroAssemblerLOONG64 {
 
   void j(Label* dest) { ma_b(dest); }
 
-  void mov(Register src, Register dest) { as_ori(dest, src, 0); }
+  void mov(Register src, Register dest) { ma_move(dest, src); }
   void mov(ImmWord imm, Register dest) { ma_li(dest, imm); }
   void mov(ImmPtr imm, Register dest) {
     mov(ImmWord(uintptr_t(imm.value)), dest);
@@ -547,7 +565,7 @@ class MacroAssemblerLOONG64Compat : public MacroAssemblerLOONG64 {
     Register scratch = temps.Acquire();
     BufferOffset bo = m_buffer.nextOffset();
     addPendingJump(bo, ImmPtr(c->raw()), RelocationKind::JITCODE);
-    ma_liPatchable(scratch, ImmPtr(c->raw()));
+    as_pcaddu18i(scratch, 0);
     as_jirl(zero, scratch, BOffImm16(0));
   }
   void branch(const Register reg) { as_jirl(zero, reg, BOffImm16(0)); }
@@ -586,18 +604,51 @@ class MacroAssemblerLOONG64Compat : public MacroAssemblerLOONG64 {
   void pop(Register reg) { ma_pop(reg); }
   void pop(FloatRegister reg) { ma_pop(reg); }
 
+  template <typename... Regs>
+  void pushRegs(const Regs&... regs) {
+    static_assert((std::is_convertible_v<Regs, Register> && ...));
+    static_assert(sizeof...(Regs) > 0);
+
+    if (((static_cast<Register>(regs) == StackPointer) || ...)) {
+      (ma_push(regs), ...);
+      return;
+    }
+
+    int32_t offset = int32_t(sizeof...(Regs) * sizeof(intptr_t));
+    ma_sub_d(StackPointer, StackPointer, Imm32(offset));
+    (storePtr(regs, Address(StackPointer, offset -= int32_t(sizeof(intptr_t)))),
+     ...);
+  }
+
+  template <typename... Regs>
+  void popRegs(const Regs&... regs) {
+    static_assert((std::is_convertible_v<Regs, Register> && ...));
+    static_assert(sizeof...(Regs) > 0);
+
+    if (((static_cast<Register>(regs) == StackPointer) || ...)) {
+      (ma_pop(regs), ...);
+      return;
+    }
+
+    int32_t offset = -int32_t(sizeof(intptr_t));
+    (loadPtr(Address(StackPointer, offset += int32_t(sizeof(intptr_t))), regs),
+     ...);
+    ma_add_d(StackPointer, StackPointer,
+             Imm32(int32_t(sizeof...(Regs) * sizeof(intptr_t))));
+  }
+
   // Emit a branch that can be toggled to a non-operation. On LOONG64 we use
   // "andi" instruction to toggle the branch.
   // See ToggleToJmp(), ToggleToCmp().
   CodeOffset toggledJump(Label* label);
 
-  // Emit a "jalr" or "nop" instruction. ToggleCall can be used to patch
-  // this instruction.
+  // Emit a "jalr" or "bne $zero, $zero, ..." instruction. ToggleCall can be
+  // used to patch this instruction.
   CodeOffset toggledCall(JitCode* target, bool enabled);
 
   static size_t ToggledCallSize(uint8_t* code) {
-    // Four instructions used in: MacroAssemblerLOONG64Compat::toggledCall
-    return 4 * sizeof(uint32_t);
+    // Two instructions used in: MacroAssemblerLOONG64Compat::toggledCall
+    return 2 * sizeof(uint32_t);
   }
 
   CodeOffset pushWithPatch(ImmWord imm) {
@@ -1046,12 +1097,14 @@ class MacroAssemblerLOONG64Compat : public MacroAssemblerLOONG64 {
  protected:
   bool buildOOLFakeExitFrame(void* fakeReturnAddr);
 
-  void wasmLoadI64Impl(const wasm::MemoryAccessDesc& access,
-                       Register memoryBase, Register ptr, Register ptrScratch,
-                       Register64 output, Register tmp);
-  void wasmStoreI64Impl(const wasm::MemoryAccessDesc& access, Register64 value,
-                        Register memoryBase, Register ptr, Register ptrScratch,
-                        Register tmp);
+  FaultingCodeRange wasmLoadI64Impl(const wasm::MemoryAccessDesc& access,
+                                    Register memoryBase, Register ptr,
+                                    Register ptrScratch, Register64 output,
+                                    Register tmp);
+  FaultingCodeRange wasmStoreI64Impl(const wasm::MemoryAccessDesc& access,
+                                     Register64 value, Register memoryBase,
+                                     Register ptr, Register ptrScratch,
+                                     Register tmp);
 
  public:
   void lea(Operand addr, Register dest) {

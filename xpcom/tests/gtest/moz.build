@@ -13,6 +13,7 @@ UNIFIED_SOURCES += [
     "TestBase64.cpp",
     "TestCallTemplates.cpp",
     "TestCloneInputStream.cpp",
+    "TestCollectorLogLoading.cpp",
     "TestCOMPtrEq.cpp",
     "TestCRT.cpp",
     "TestDafsa.cpp",
@@ -157,6 +158,11 @@ if (
 if CONFIG["MOZ_MEMORY"]:
     UNIFIED_SOURCES += [
         "TestAllocReplacement.cpp",
+    ]
+
+if CONFIG["MOZ_DIAGNOSTIC_ASSERT_ENABLED"]:
+    UNIFIED_SOURCES += [
+        "TestThreadShutdownAnnotations.cpp",
     ]
 
 SOURCES += [

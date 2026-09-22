@@ -1401,7 +1401,7 @@ void GetJarPrefix(bool aInIsolatedMozBrowser, nsACString& aJarPrefix) {
 
 // This method computes and returns our best guess for the temporary storage
 // limit (in bytes), based on disk capacity.
-Result<uint64_t, nsresult> GetTemporaryStorageLimit(nsIFile& aStorageDir) {
+Result<int64_t, nsresult> GetTemporaryStorageLimit(nsIFile& aStorageDir) {
   if (nsContentUtils::ShouldResistFingerprinting(
           "The storage limit is set only once and not webpage specific.",
           RFPTarget::DiskStorageLimit)) {
@@ -2118,7 +2118,7 @@ void QuotaManager::RemovePendingDirectoryLock(DirectoryLockImpl& aLock) {
 }
 
 uint64_t QuotaManager::CollectOriginsForEviction(
-    uint64_t aMinSizeToBeFreed, nsTArray<RefPtr<OriginDirectoryLock>>& aLocks) {
+    int64_t aMinSizeToBeFreed, nsTArray<RefPtr<OriginDirectoryLock>>& aLocks) {
   AssertIsOnOwningThread();
   MOZ_ASSERT(aLocks.IsEmpty());
 
@@ -2256,7 +2256,7 @@ uint64_t QuotaManager::CollectOriginsForEviction(
         // Create a list of inactive and the least recently used origins
         // whose aggregate size is greater or equals the minimal size to be
         // freed.
-        uint64_t sizeToBeFreed = 0;
+        int64_t sizeToBeFreed = 0;
         for (uint32_t count = inactiveOrigins.Length(), index = 0;
              index < count; index++) {
           if (sizeToBeFreed >= aMinSizeToBeFreed) {
@@ -2956,6 +2956,10 @@ nsresult QuotaManager::LoadQuota() {
   MOZ_ASSERT(mStorageConnection);
   MOZ_ASSERT(!mTemporaryStorageInitializedInternal);
 
+  // If we are shutting down, it's too late to load quota. Stop now: any rescan
+  // needed will be done on next startup.
+  QM_TRY(OkIf(!IsShuttingDown()), NS_ERROR_ABORT);
+
   // A list of all unaccessed default or temporary origins.
   nsTArray<FullOriginMetadata> unaccessedOrigins;
 
@@ -3169,6 +3173,8 @@ nsresult QuotaManager::LoadQuota() {
       nsTArray<RenameAndInitInfo> renameAndInitInfos;
       nsTArray<FullOriginMetadata> failedOrigins;
       for (auto& dirtyOrigin : dirtyOrigins) {
+        QM_TRY(OkIf(!IsShuttingDown()), NS_ERROR_ABORT);
+
         QM_WARNONLY_TRY_UNWRAP(
             auto maybeOk,
             RestoreAndInitializeOrigin(dirtyOrigin, renameAndInitInfos));
@@ -3176,6 +3182,8 @@ nsresult QuotaManager::LoadQuota() {
           failedOrigins.AppendElement(std::move(dirtyOrigin));
         }
       }
+
+      QM_TRY(OkIf(!IsShuttingDown()), NS_ERROR_ABORT);
 
       if (failedOrigins.IsEmpty()) {
         QM_TRY(MOZ_TO_RESULT(InitializeFlushTimer()));
@@ -3293,11 +3301,25 @@ void QuotaManager::UnloadQuota() {
 
   auto autoRemoveQuota = MakeScopeExit([&] { RemoveQuota(); });
 
-  // Each per-origin CreateDirectoryMetadata2 auto-commits its own
-  // statement; a crash mid-loop leaves the cache `valid` bit unchanged
-  // (still 0 from InvalidateQuotaCache earlier), and the next startup's
-  // InitializeRepository reconciliation will patch up any divergent
-  // rows and delete orphans.
+  // Group cache-DB upserts (OriginUpserter::Refresh, also reached through
+  // SettleDirectoryMetadata2) into common transactions, to prevent each loop
+  // iteration from triggering a fsync.
+  // Avoid a single transaction though: if UnloadQuota still takes too long and
+  // gets killed at shutdown for this reason, we don't want all the UnloadQuota
+  // work to be lost, as this could result in a lot of work upon restart.
+  const auto createTransaction =
+      [this](Maybe<mozStorageTransaction>& transaction) {
+        transaction.reset();
+        transaction.emplace(mStorageConnection, /* aCommitOnComplete */ false,
+                            mozIStorageConnection::TRANSACTION_IMMEDIATE);
+        QM_WARNONLY_TRY(MOZ_TO_RESULT(transaction->Start()));
+      };
+  Maybe<mozStorageTransaction> transaction;
+  createTransaction(transaction);
+
+  static const int32_t kTransactionBatchSize = 50;
+  int32_t transactionCount = 0;
+
   {
     MutexAutoLock lock(mQuotaMutex);
 
@@ -3336,6 +3358,7 @@ void QuotaManager::UnloadQuota() {
               DebugOnly<nsresult> rv =
                   SettleDirectoryMetadata2(*originDirectory.ref(), metadata);
               MOZ_ASSERT(NS_FAILED(rv) == metadata.mDirty);
+              ++transactionCount;
             }
           } else if (mCacheRequiresFullScan) {
             // The cache DB was freshly created (or recreated after
@@ -3346,6 +3369,13 @@ void QuotaManager::UnloadQuota() {
             // could have been updated on disk after initialization).
             MOZ_ASSERT(mOriginUpserter, "We must have an origin upserter here");
             QM_WARNONLY_TRY(mOriginUpserter->Refresh(metadata));
+            ++transactionCount;
+          }
+
+          if (transactionCount >= kTransactionBatchSize) {
+            QM_WARNONLY_TRY(MOZ_TO_RESULT(transaction->Commit()));
+            createTransaction(transaction);
+            transactionCount = 0;
           }
         }
 
@@ -3366,6 +3396,8 @@ void QuotaManager::UnloadQuota() {
   QM_TRY(MOZ_TO_RESULT(stmt->BindUTF8StringByName("buildId"_ns, *gBuildId)),
          QM_VOID);
   QM_TRY(MOZ_TO_RESULT(stmt->Execute()), QM_VOID);
+
+  QM_TRY(MOZ_TO_RESULT(transaction->Commit()), QM_VOID);
 }
 
 void QuotaManager::RemoveOriginFromCacheForEviction(
@@ -3579,10 +3611,12 @@ void QuotaManager::PersistOrigin(const OriginMetadata& aOriginMetadata) {
   AssertIsOnIOThread();
 
   DirtyTrackingAutoLock lock(mQuotaMutex, mGroupInfoPairs, aOriginMetadata);
-  RefPtr<OriginInfo> originInfo =
-      LockedGetOriginInfo(PERSISTENCE_TYPE_DEFAULT, aOriginMetadata);
+  if (!lock.IsValid()) {
+    return;
+  }
 
-  if (originInfo && !originInfo->LockedPersisted()) {
+  RefPtr<OriginInfo> originInfo = lock.GetOriginInfo();
+  if (!originInfo->LockedPersisted()) {
     originInfo->LockedPersist(lock);
   }
 }
@@ -4400,6 +4434,10 @@ nsresult QuotaManager::InitializeRepository(PersistenceType aPersistenceType,
              aPersistenceType == PERSISTENCE_TYPE_TEMPORARY ||
              aPersistenceType == PERSISTENCE_TYPE_DEFAULT);
 
+  // If we are shutting down, it's too late to initialize the repository.
+  // Stop now: any rescan needed will be done on next startup.
+  QM_TRY(OkIf(!IsShuttingDown()), NS_ERROR_ABORT);
+
   // Pre-load the L1 cache rows for this repository so the disk walk
   // can decide per-origin whether the cached row already matches the
   // metadata we'd otherwise rewrite. Keys claimed during the walk are
@@ -4468,6 +4506,10 @@ nsresult QuotaManager::InitializeRepository(PersistenceType aPersistenceType,
 
   for (auto& info : renameAndInitInfos) {
     QM_TRY(([&]() -> Result<Ok, nsresult> {
+      if (NS_WARN_IF(IsShuttingDown())) {
+        RETURN_STATUS_OR_RESULT(statusKeeper, NS_ERROR_ABORT);
+      }
+
       QM_TRY(
           ([&directory, &info, this, aPersistenceType, &aOriginFunc,
             &cacheMap]() -> Result<Ok, nsresult> {
@@ -4722,8 +4764,9 @@ nsresult QuotaManager::InitializeOrigin(
 
   if (trackQuota) {
     const auto usage = std::accumulate(
-        clientUsages.cbegin(), clientUsages.cend(), CheckedUint64(0),
-        [](CheckedUint64 value, const Maybe<uint64_t>& clientUsage) {
+        clientUsages.cbegin(), clientUsages.cend(), CheckedInt64(0),
+        [](CheckedInt64 value, const Maybe<int64_t>& clientUsage) {
+          QM_ASSERT_NOT_NEGATIVE(clientUsage.valueOr(0));
           return value + clientUsage.valueOr(0);
         });
 
@@ -8319,19 +8362,19 @@ void QuotaManager::SetThumbnailPrivateIdentityId(
 }
 
 /* static */
-uint64_t QuotaManager::GetGroupLimitForLimit(uint64_t aLimit) {
+int64_t QuotaManager::GetGroupLimitForLimit(int64_t aLimit) {
   // To avoid one group evicting all the rest, limit the amount any one group
   // can use to 20% resp. a fifth. To prevent individual sites from using
   // exorbitant amounts of storage where there is a lot of free space, cap the
   // group limit to 10GB.
-  const auto x = std::min<uint64_t>(aLimit / 5, 10 GB);
+  const auto x = std::min<int64_t>(aLimit / 5, 10 GB);
 
   // In low-storage situations, make an exception (while not exceeding the total
   // storage limit).
-  return std::min<uint64_t>(aLimit, std::max<uint64_t>(x, 10 MB));
+  return std::min<int64_t>(aLimit, std::max<int64_t>(x, 10 MB));
 }
 
-uint64_t QuotaManager::GetGroupLimit() const {
+int64_t QuotaManager::GetGroupLimit() const {
   return GetGroupLimitForLimit(mTemporaryStorageLimit);
 }
 
@@ -8356,7 +8399,7 @@ std::pair<uint64_t, uint64_t> QuotaManager::GetUsageAndLimitForEstimate(
     const OriginMetadata& aOriginMetadata) {
   AssertIsOnIOThread();
 
-  uint64_t totalGroupUsage = 0;
+  int64_t totalGroupUsage = 0;
 
   {
     MutexAutoLock lock(mQuotaMutex);
@@ -8374,8 +8417,10 @@ std::pair<uint64_t, uint64_t> QuotaManager::GetUsageAndLimitForEstimate(
             // bound by the global temporary storage limit instead, so it
             // reports its own origin usage against that limit.
             if (originInfo && originInfo->LockedPersisted()) {
-              return std::pair(originInfo->LockedUsage(),
-                               static_cast<uint64_t>(mTemporaryStorageLimit));
+              // This is exposed to content via navigator.storage.estimate() so
+              // clamp it to 0.
+              return std::pair(QM_CLAMP_TO_ZERO(originInfo->LockedUsage()),
+                               mTemporaryStorageLimit);
             }
           }
 
@@ -8386,14 +8431,15 @@ std::pair<uint64_t, uint64_t> QuotaManager::GetUsageAndLimitForEstimate(
     }
   }
 
-  return std::pair(totalGroupUsage, GetGroupLimit());
+  // Also exposed to content via navigator.storage.estimate().
+  return std::pair(QM_CLAMP_TO_ZERO(totalGroupUsage), GetGroupLimit());
 }
 
 uint64_t QuotaManager::GetOriginUsage(
     const PrincipalMetadata& aPrincipalMetadata) {
   AssertIsOnIOThread();
 
-  uint64_t usage = 0;
+  int64_t usage = 0;
 
   {
     MutexAutoLock lock(mQuotaMutex);
@@ -8414,7 +8460,9 @@ uint64_t QuotaManager::GetOriginUsage(
     }
   }
 
-  return usage;
+  // Exposed to callers outside the quota manager (e.g. via
+  // GetCachedOriginUsageOp).
+  return QM_CLAMP_TO_ZERO(usage);
 }
 
 Maybe<FullOriginMetadata> QuotaManager::GetFullOriginMetadata(
@@ -8704,7 +8752,7 @@ QuotaManager::GetOriginInfosExceedingGroupLimit() const {
     MOZ_ASSERT(!entry.GetKey().IsEmpty());
     MOZ_ASSERT(pair);
 
-    uint64_t groupUsage = 0;
+    int64_t groupUsage = 0;
 
     const RefPtr<GroupInfo> temporaryGroupInfo =
         pair->LockedGetGroupInfo(PERSISTENCE_TYPE_TEMPORARY);

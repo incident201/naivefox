@@ -6,7 +6,7 @@
 
 use std::fmt::Write;
 
-use super::{parsing::ChannelKeyword, AbsoluteColor};
+use super::{AbsoluteColor, parsing::ChannelKeyword};
 use crate::derives::*;
 use crate::typed_om::NumericType;
 use crate::{
@@ -14,10 +14,10 @@ use crate::{
     values::{
         animated::ToAnimatedValue,
         computed,
-        specified::calc::{CalcNode, CalcParseFlags, Leaf, PercentageContext},
+        specified::calc::{CalcParseFlags, Leaf, PercentageContext, SpecifiedCalcNode},
     },
 };
-use cssparser::{color::OPAQUE, Parser, Token};
+use cssparser::{Parser, Token, color::OPAQUE};
 use style_traits::{ParseError, StyleParseErrorKind, ToCss};
 
 /// A single color component.
@@ -31,7 +31,7 @@ pub enum ColorComponent<ValueType> {
     /// A channel keyword, e.g. `r`, `l`, `alpha`, etc.
     ChannelKeyword(ChannelKeyword),
     /// A calc() value.
-    Calc(Box<CalcNode>),
+    Calc(Box<SpecifiedCalcNode>),
     /// Used when alpha components are not specified.
     AlphaOmitted,
 }
@@ -60,7 +60,7 @@ pub trait ColorComponentType: Sized + Clone {
     fn try_from_token(token: &Token) -> Result<Self, ()>;
 
     /// Try to create a new component from the given [CalcNodeLeaf] that was
-    /// resolved from a [CalcNode].
+    /// resolved from a [SpecifiedCalcNode].
     fn try_from_leaf(leaf: &Leaf) -> Result<Self, ()>;
 }
 
@@ -84,10 +84,10 @@ impl<ValueType: ColorComponentType> ColorComponent<ValueType> {
                 _ => return Err(ParseError::unexpected_token()),
             }),
             Token::Function(ref name) => {
-                let function = CalcNode::math_function(context, name)?;
+                let function = SpecifiedCalcNode::math_function(context, name)?;
                 let mut flags = CalcParseFlags::new(percentage_context);
                 flags.color_components = allowed_channel_keywords;
-                let mut node = CalcNode::parse(context, input, function, flags)?;
+                let mut node = SpecifiedCalcNode::parse(context, input, function, flags)?;
                 node.simplify_and_sort();
                 if !node
                     .numeric_type()
@@ -130,13 +130,12 @@ impl<ValueType: ColorComponentType> ColorComponent<ValueType> {
                 // Try to compute, substitute channels and fold the calc tree in a
                 // single pass. If it resolves to a concrete value, collapse to a
                 // value; otherwise keep the computed (still symbolic) calc tree.
-                if let Ok(value) = node
+                match node
                     .resolve_map(|leaf| Ok(leaf.to_computed_value(context, origin_color)))
                     .and_then(|leaf| ValueType::try_from_leaf(&leaf))
                 {
-                    Self::Value(value)
-                } else {
-                    Self::Calc(Box::new(node.to_computed_value(context, origin_color)))
+                    Ok(value) => Self::Value(value),
+                    Err(..) => Self::Calc(Box::new(node.to_computed_value(context, origin_color))),
                 }
             },
             Self::AlphaOmitted => match origin_color {

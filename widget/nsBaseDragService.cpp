@@ -1161,6 +1161,13 @@ nsBaseDragService::Suppress() {
 
 NS_IMETHODIMP
 nsBaseDragService::Unsuppress() {
+  MOZ_ASSERT(mSuppressLevel > 0, "Unbalanced call to unsuppress()");
+  if (!mSuppressLevel) {
+    // Decrementing here would wrap the level around and leave drag and drop
+    // disabled for the rest of the session.
+    return NS_ERROR_UNEXPECTED;
+  }
+
   --mSuppressLevel;
   LOGI(
       "[%p] %s | mSuppressLevel (after decrement): %u | "
@@ -1168,6 +1175,8 @@ nsBaseDragService::Unsuppress() {
       this, __FUNCTION__, mSuppressLevel);
   return NS_OK;
 }
+
+bool nsBaseDragService::GetIsSuppressed() { return mSuppressLevel > 0; }
 
 NS_IMETHODIMP
 nsBaseDragSession::UserCancelled() {

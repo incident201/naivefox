@@ -6,13 +6,19 @@ package org.mozilla.fenix.pdf
 
 import android.content.Context
 import android.os.Looper
+import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.coordinatorlayout.widget.CoordinatorLayout
+import androidx.core.view.children
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.slot
+import io.mockk.verify
 import kotlin.test.assertIs
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.TestScope
 import mozilla.components.browser.state.action.BrowserAction
 import mozilla.components.browser.state.action.ContentAction
@@ -20,13 +26,17 @@ import mozilla.components.browser.state.action.EngineAction
 import mozilla.components.browser.state.action.ShareResourceAction
 import mozilla.components.browser.state.engine.EngineMiddleware
 import mozilla.components.browser.state.state.BrowserState
+import mozilla.components.browser.state.state.EngineState
 import mozilla.components.browser.state.state.TabSessionState
 import mozilla.components.browser.state.state.content.ShareResourceState
 import mozilla.components.browser.state.state.createTab
 import mozilla.components.browser.state.store.BrowserStore
+import mozilla.components.concept.engine.EngineSession
 import mozilla.components.support.test.middleware.CaptureActionsMiddleware
 import mozilla.components.support.test.robolectric.testContext
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -36,6 +46,7 @@ import org.mozilla.fenix.ext.components
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
+import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
 class PdfToolsIntegrationTest {
@@ -62,6 +73,9 @@ class PdfToolsIntegrationTest {
 
     private val browserStore = storeOf(pdfTab)
 
+    private fun pdfTabWith(engineSession: EngineSession) =
+        pdfTab.copy(engineState = EngineState(engineSession = engineSession))
+
     private fun integration(
         isAddressBarAtBottom: Boolean = true,
         store: BrowserStore = browserStore,
@@ -70,6 +84,7 @@ class PdfToolsIntegrationTest {
             container = container,
             browserStore = store,
             isAddressBarAtBottom = isAddressBarAtBottom,
+            mainDispatcher = Dispatchers.Unconfined,
         )
 
     @Before
@@ -88,7 +103,7 @@ class PdfToolsIntegrationTest {
 
         integration.start()
         shadowOf(Looper.getMainLooper()).idle()
-        assertEquals(1, container.childCount)
+        assertEquals(2, container.childCount)
 
         integration.stop()
         assertEquals(0, container.childCount)
@@ -104,7 +119,7 @@ class PdfToolsIntegrationTest {
         integration.start()
         shadowOf(Looper.getMainLooper()).idle()
 
-        assertEquals(1, container.childCount)
+        assertEquals(2, container.childCount)
     }
 
     @Test
@@ -115,7 +130,7 @@ class PdfToolsIntegrationTest {
         integration.start()
         shadowOf(Looper.getMainLooper()).idle()
 
-        assertEquals(1, container.childCount)
+        assertEquals(2, container.childCount)
     }
 
     @Test
@@ -123,7 +138,44 @@ class PdfToolsIntegrationTest {
         integration().start()
         shadowOf(Looper.getMainLooper()).idle()
 
-        assertIs<PdfToolsBehavior>(layoutParams.behavior)
+        assertIs<PdfOverlayBehavior>(layoutParams.behavior)
+    }
+
+    @Test
+    @Config(qualifiers = "sw800dp")
+    fun `GIVEN a tablet window WHEN the feature is started THEN the tools and the dialog anchor to opposite edges`() {
+        // Test for Bug 2067261
+        integration(isAddressBarAtBottom = false).start()
+        shadowOf(Looper.getMainLooper()).idle()
+
+        val gravities =
+            container.children.map { overlay ->
+                val params = overlay.layoutParams as CoordinatorLayout.LayoutParams
+                val behavior = params.behavior as PdfOverlayBehavior
+                behavior.onLayoutChild(container, overlay, View.LAYOUT_DIRECTION_LTR)
+                params.gravity
+            }
+
+        assertEquals(listOf(Gravity.TOP, Gravity.BOTTOM), gravities.toList())
+    }
+
+    @Test
+    fun `WHEN a signature is added THEN the typed text is handed to the engine and the dialog closes`() {
+        val engineSession = mockk<EngineSession>()
+        val onResult = slot<() -> Unit>()
+        every { engineSession.addSignatureToPdf(any(), capture(onResult), any()) } returns Unit
+        val integration = integration(store = storeOf(pdfTabWith(engineSession)))
+        integration.handleSignClick()
+        integration.signatureState.signature.setTextAndPlaceCursorAtEnd("Test User")
+
+        integration.handleSignAddClick()
+
+        verify { engineSession.addSignatureToPdf(eq("Test User"), any(), any()) }
+        assertTrue("The dialog stays up until the engine has the signature.", integration.signatureState.isSigning)
+
+        onResult.captured()
+
+        assertFalse(integration.signatureState.isSigning)
     }
 
     @Test
@@ -175,6 +227,50 @@ class PdfToolsIntegrationTest {
         captureActionsMiddleware.assertNotDispatched(ShareResourceAction.AddShareAction::class)
     }
 
+    @Test
+    fun `GIVEN a signature is in progress WHEN another PDF becomes the selected tab THEN the signature is abandoned`() {
+        val integration = integration()
+        integration.handleSignClick()
+        integration.signatureState.signature.setTextAndPlaceCursorAtEnd("Mark Johnson")
+
+        integration.handlePdfTabChanged("2")
+
+        assertFalse(integration.signatureState.isSigning)
+        assertEquals("", integration.signatureState.signature.text.toString())
+    }
+
+    @Test
+    fun `GIVEN a signature is in progress WHEN the selected tab stops showing a PDF THEN the signature is abandoned`() {
+        val integration = integration()
+        integration.handleSignClick()
+
+        integration.handlePdfTabChanged(null)
+
+        assertFalse(integration.signatureState.isSigning)
+    }
+
+    @Test
+    fun `GIVEN a signature is in progress WHEN the same PDF stays selected THEN the signature is kept`() {
+        val integration = integration()
+        integration.handleSignClick()
+
+        integration.handlePdfTabChanged(tabId)
+
+        assertTrue(integration.signatureState.isSigning)
+    }
+
+    @Test
+    fun `GIVEN the feature is started WHEN the selected tab leaves the PDF viewer THEN the signature is abandoned`() {
+        val integration = integration()
+        integration.start()
+        shadowOf(Looper.getMainLooper()).idle()
+        integration.handleSignClick()
+
+        browserStore.dispatch(ContentAction.ExitedPdfViewer(tabId))
+
+        assertFalse(integration.signatureState.isSigning)
+    }
+
     /** Stands in for the browser toolbar, which removes the navigation bar as its composition is created. */
     private class SiblingRemovingView(context: Context, private val sibling: View) : View(context) {
         override fun onAttachedToWindow() {
@@ -200,6 +296,6 @@ class PdfToolsIntegrationTest {
 
         activity.setContentView(detachedContainer)
         shadowOf(Looper.getMainLooper()).idle()
-        assertEquals(2, detachedContainer.childCount)
+        assertEquals(3, detachedContainer.childCount)
     }
 }

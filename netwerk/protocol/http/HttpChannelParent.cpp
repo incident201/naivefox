@@ -162,12 +162,13 @@ bool HttpChannelParent::Init(const HttpChannelCreationArgs& aArgs) {
       return DoAsyncOpen(
           a.uri(), a.original(), a.doc(), a.referrerInfo(), a.apiRedirectTo(),
           a.topWindowURI(), a.loadFlags(), a.requestHeaders(),
-          a.requestMethod(), a.uploadStream(), a.priority(), a.classOfService(),
-          a.redirectionLimit(), a.allowSTS(), a.thirdPartyFlags(), a.resumeAt(),
-          a.startPos(), a.entityID(), a.allowSpdy(), a.allowHttp3(),
-          a.allowAltSvc(), a.beConservative(), a.bypassProxy(), a.tlsFlags(),
-          a.loadInfo(), a.cacheKey(), a.requestContextID(), a.preflightArgs(),
-          a.initialRwin(), a.blockAuthPrompt(), a.allowStaleCacheContent(),
+          a.requestMethod(), a.uploadStream(), a.uploadStreamIsStreaming(),
+          a.priority(), a.classOfService(), a.redirectionLimit(),
+          a.thirdPartyFlags(), a.resumeAt(), a.startPos(), a.entityID(),
+          a.allowSpdy(), a.allowHttp3(), a.allowAltSvc(), a.beConservative(),
+          a.bypassProxy(), a.tlsFlags(), a.loadInfo(), a.cacheKey(),
+          a.requestContextID(), a.preflightArgs(), a.initialRwin(),
+          a.blockAuthPrompt(), a.allowStaleCacheContent(),
           a.preferCacheLoadOverBypass(), a.contentTypeHint(), a.requestMode(),
           a.redirectMode(), a.channelId(), a.contentWindowId(),
           a.preferredAlternativeTypes(), a.browserId(),
@@ -433,9 +434,9 @@ bool HttpChannelParent::DoAsyncOpen(
     nsIReferrerInfo* aReferrerInfo, nsIURI* aAPIRedirectToURI,
     nsIURI* aTopWindowURI, const uint32_t& aLoadFlags,
     const RequestHeaderTuples& requestHeaders, const nsCString& requestMethod,
-    const Maybe<IPCStream>& uploadStream, const int16_t& priority,
-    const ClassOfService& classOfService, const uint8_t& redirectionLimit,
-    const bool& allowSTS, const uint32_t& thirdPartyFlags,
+    const Maybe<IPCStream>& uploadStream, const bool& uploadStreamIsStreaming,
+    const int16_t& priority, const ClassOfService& classOfService,
+    const uint8_t& redirectionLimit, const uint32_t& thirdPartyFlags,
     const bool& doResumeAt, const uint64_t& startPos, const nsCString& entityID,
     const bool& allowSpdy, const bool& allowHttp3, const bool& allowAltSvc,
     const bool& beConservative, const bool& bypassProxy,
@@ -488,6 +489,10 @@ bool HttpChannelParent::DoAsyncOpen(
     return false;
   }
 
+  if (!CanSend()) {
+    return false;
+  }
+
   LOG(("HttpChannelParent RecvAsyncOpen [this=%p uri=%s, gid=%" PRIu64
        " browserid=%" PRIx64 "]\n",
        this, aURI->GetSpecOrDefault().get(), aChannelId, aBrowserId));
@@ -497,11 +502,10 @@ bool HttpChannelParent::DoAsyncOpen(
                   aURI->GetSpecOrDefault(), aChannelId);
 
   nsresult rv;
-  nsAutoCString remoteType;
-  rv = GetRemoteType(remoteType);
-  if (NS_FAILED(rv)) {
-    return SendFailedAsyncOpen(rv);
-  }
+
+  dom::PContentParent* pcp = Manager()->Manager();
+  const dom::RemoteType& remoteType =
+      static_cast<dom::ContentParent*>(pcp)->GetRemoteType();
 
   nsCOMPtr<nsILoadInfo> loadInfo;
   rv = mozilla::ipc::LoadInfoArgsToLoadInfo(aLoadInfoArgs, remoteType,
@@ -601,6 +605,9 @@ bool HttpChannelParent::DoAsyncOpen(
 
   nsCOMPtr<nsIInputStream> stream = DeserializeIPCStream(uploadStream);
   if (stream) {
+    if (uploadStreamIsStreaming) {
+      httpChannel->SetUploadStreamIsStreaming(true);
+    }
     rv = httpChannel->InternalSetUploadStream(stream);
     if (NS_FAILED(rv)) {
       return SendFailedAsyncOpen(rv);
@@ -634,7 +641,6 @@ bool HttpChannelParent::DoAsyncOpen(
     httpChannel->SetClassOfService(classOfService);
   }
   httpChannel->SetRedirectionLimit(redirectionLimit);
-  httpChannel->SetAllowSTS(allowSTS);
   httpChannel->SetThirdPartyFlags(thirdPartyFlags);
   httpChannel->SetAllowSpdy(allowSpdy);
   httpChannel->SetAllowHttp3(allowHttp3);
@@ -1403,7 +1409,11 @@ HttpChannelParent::OnStartRequest(nsIRequest* aRequest) {
         responseHead == &cleanedUpResponseHead ||
             responseHead == chan->GetResponseHead(),
         "mResponseHead changed between GetResponseHead and copy");
-    nsHttpResponseHead newResponseHead = *responseHead;
+    // The channel keeps its own head; the local one can be moved.
+    nsHttpResponseHead newResponseHead =
+        responseHead == &cleanedUpResponseHead
+            ? std::move(cleanedUpResponseHead)
+            : nsHttpResponseHead(*responseHead);
     if (!mBgParent->OnStartRequest(
             std::move(newResponseHead), useResponseHead,
             cleanedUpRequest ? cleanedUpRequestHeaders : requestHead->Headers(),
@@ -1824,7 +1834,7 @@ HttpChannelParent::Delete() {
 }
 
 NS_IMETHODIMP
-HttpChannelParent::GetRemoteType(nsACString& aRemoteType) {
+HttpChannelParent::GetRemoteType(dom::RemoteType& aRemoteType) {
   if (!CanSend()) {
     return NS_ERROR_UNEXPECTED;
   }
@@ -1980,7 +1990,9 @@ HttpChannelParent::StartRedirect(nsIChannel* newChannel, uint32_t redirectFlags,
   }
 
   if (!mIPCClosed) {
-    cleanedUpResponseHead = *responseHead;
+    if (responseHead != &cleanedUpResponseHead) {  // avoid self-assignment
+      cleanedUpResponseHead = *responseHead;
+    }
     if (!SendRedirect1Begin(mRedirectChannelId, newOriginalURI, newLoadFlags,
                             redirectFlags, loadInfoForwarderArg,
                             std::move(cleanedUpResponseHead), securityInfo,

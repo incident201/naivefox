@@ -602,6 +602,15 @@ class nsPresContext : public nsISupports,
       const mozilla::StyleLinkParameters& aLinkParameters);
 
   /**
+   * Content-area scrollbar insets forwarded from the <browser> embedder, per
+   * physical side, in app units.
+   */
+  const nsMargin& EmbedderScrollbarInset() const {
+    return mEmbedderScrollbarInset;
+  }
+  void SetEmbedderScrollbarInset(const nsMargin& aInset);
+
+  /**
    * Return the device's screen size in inches, for font size
    * inflation.
    *
@@ -1078,7 +1087,17 @@ class nsPresContext : public nsISupports,
 
   void UpdateContainerQueryStylesAndAnchorPosLayout();
 
-  mozilla::intl::Bidi& BidiEngine();
+  // Call GetBidiEngine to get a bidi-resolution engine from the prescontext.
+  // This may be an previously-cached object or a newly-constructed one.
+  // The caller then has sole ownership of the returned object.
+  mozilla::UniquePtr<mozilla::intl::Bidi> GetBidiEngine();
+
+  // Call ReleaseBidiEngine when finished with a bidi-resolution engine. This
+  // allows the prescontext to keep it around for subsequent re-use.
+  void ReleaseBidiEngine(
+      mozilla::UniquePtr<mozilla::intl::Bidi>&& aBidiEngine) {
+    mBidiEngine = std::move(aBidiEngine);
+  }
 
   gfxFontFeatureValueSet* GetFontFeatureValuesLookup() const {
     return mFontFeatureValuesLookup;
@@ -1433,6 +1452,7 @@ class nsPresContext : public nsISupports,
   mozilla::dom::PrefersColorSchemeOverride mOverriddenOrEmbedderColorScheme;
   mozilla::StyleForcedColors mForcedColors;
   mozilla::StyleLinkParameters mLinkParameters;
+  nsMargin mEmbedderScrollbarInset;
 
  protected:
   virtual ~nsPresContext();

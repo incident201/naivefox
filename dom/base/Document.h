@@ -51,6 +51,7 @@
 #include "mozilla/dom/EventTarget.h"
 #include "mozilla/dom/LargestContentfulPaint.h"
 #include "mozilla/dom/Nullable.h"
+#include "mozilla/dom/PermissionsPolicy.h"
 #include "mozilla/dom/RadioGroupContainer.h"
 #include "mozilla/dom/TreeOrderedArray.h"
 #include "mozilla/dom/UserActivation.h"
@@ -242,7 +243,7 @@ class EditContext;
 class Event;
 class EventListener;
 struct FailedCertSecurityInfo;
-class FeaturePolicy;
+class PermissionsPolicy;
 class FontFaceSet;
 class FragmentDirective;
 class FrameRequestCallback;
@@ -268,6 +269,7 @@ class NodeInfo;
 class NodeIterator;
 enum class OrientationType : uint8_t;
 enum class PopoverAttributeState : uint8_t;
+enum class SkipTransitionReason : uint8_t;
 class ProcessingInstruction;
 class Promise;
 struct PropertyDefinition;
@@ -1033,6 +1035,17 @@ class Document : public nsINode,
   void SetBidiEnabled() { mBidiEnabled = true; }
 
   /**
+   * If false, every element in this document is definitely LTR.
+   * If true, there might be <bdi> elements or dir!=LTR attributes.
+   */
+  bool NeedsDirHandling() const { return mNeedsDirHandling; }
+
+  /**
+   * Irreversibly indicate that elements might have RTL directionality.
+   */
+  void SetNeedsDirHandling() { mNeedsDirHandling = true; }
+
+  /**
    * Whether a document is the initial document in its window, and if so,
    * which stage of initialness it is in.
    */
@@ -1340,6 +1353,21 @@ class Document : public nsINode,
       const nsAString& aThirdPartyOrigin, const bool aRequireUserInteraction,
       ErrorResult& aRv);
 
+ private:
+  // Consumes transient user gesture activation and rejects aPromise with a
+  // NotAllowedError, as done whenever requestStorageAccess (or
+  // requestStorageAccessForOrigin) is denied.
+  void ConsumeUserGestureAndRejectRequestStorageAccessPromise(
+      Promise* aPromise);
+
+  // If aMaybeResult has a value, resolves or rejects aPromise accordingly and
+  // returns true so the caller can return early. Returns false if
+  // aMaybeResult is empty, meaning the caller should continue on to its next
+  // check.
+  bool MaybeResolveOrRejectRequestStorageAccessPromise(
+      const Maybe<bool>& aMaybeResult, Promise* aPromise);
+
+ public:
   bool UseRegularPrincipal() const;
 
   /**
@@ -1587,6 +1615,9 @@ class Document : public nsINode,
   EditContext* GetActiveEditContext() const { return mActiveEditContext; }
   // https://w3c.github.io/edit-context/#dfn-update-the-text-edit-context
   MOZ_CAN_RUN_SCRIPT void UpdateTextEditContext();
+  // Deactivate the current EditContext and, even if the active editor
+  // is not an EditContext, commit the current composition.
+  MOZ_CAN_RUN_SCRIPT void DeactivateEditContextAndEndComposition();
 
   void SetKeyPressEventModel(uint16_t aKeyPressEventModel);
 
@@ -1613,9 +1644,10 @@ class Document : public nsINode,
 
   MOZ_CAN_RUN_SCRIPT void DoNotifyPossibleTitleChange();
 
-  void InitFeaturePolicy(const Variant<Nothing, FeaturePolicyInfo, Element*>&
-                             aContainerFeaturePolicy);
-  nsresult InitFeaturePolicy(nsIChannel* aChannel);
+  void InitPermissionsPolicy(
+      const Variant<Nothing, PermissionsPolicyInfo, Element*>&
+          aContainerPermissionsPolicy);
+  nsresult InitPermissionsPolicy(nsIChannel* aChannel);
 
   void EnsureNotEnteringAndExitFullscreen();
 
@@ -1644,7 +1676,9 @@ class Document : public nsINode,
                          NotNull<const Encoding*>& aEncoding,
                          nsHtml5TreeOpExecutor* aExecutor);
 
-  MOZ_CAN_RUN_SCRIPT void DispatchContentLoadedEvents();
+  MOZ_CAN_RUN_SCRIPT void DispatchContentLoadedEvents(bool aFinishSync);
+  // Unblocks the load event. An aborted load also gets readyState complete.
+  MOZ_CAN_RUN_SCRIPT void FinishDOMContentLoaded();
 
   // TODO: Convert this to MOZ_CAN_RUN_SCRIPT (bug 1415230)
   MOZ_CAN_RUN_SCRIPT_BOUNDARY void DispatchPageTransition(
@@ -2110,8 +2144,11 @@ class Document : public nsINode,
       UniquePtr<FullscreenExit>);
 
   /**
-   * Returns true if this document is a fullscreen leaf document, i.e. it
-   * is in fullscreen mode and has no fullscreen children.
+   * Returns true if this document is a fullscreen leaf document, i.e. it is
+   * in fullscreen mode and its current fullscreen element does not embed
+   * another in-process fullscreen document. Note that this document may still
+   * have other fullscreen subdocuments which are not part of the current
+   * fullscreen document chain.
    */
   bool IsFullscreenLeaf();
 
@@ -2214,7 +2251,10 @@ class Document : public nsINode,
   uint32_t UpdateNestingLevel() { return mUpdateNestLevel; }
 
   void BeginLoad();
-  virtual void EndLoad();
+  // aFireDOMContentLoadedSync must be false for a terminated parse.
+  // See bug 344305.
+  MOZ_CAN_RUN_SCRIPT_BOUNDARY virtual void EndLoad(
+      bool aFireDOMContentLoadedSync);
 
   enum ReadyState {
     READYSTATE_UNINITIALIZED = 0,
@@ -2617,7 +2657,8 @@ class Document : public nsINode,
 
   void BlockDOMContentLoaded() { ++mBlockDOMContentLoaded; }
 
-  MOZ_CAN_RUN_SCRIPT_BOUNDARY void UnblockDOMContentLoaded();
+  // If aFireSync is false, DOMContentLoaded fires from a task instead.
+  MOZ_CAN_RUN_SCRIPT_BOUNDARY void UnblockDOMContentLoaded(bool aFireSync);
 
   /**
    * Notification that the page has been shown, for documents which are loaded
@@ -4219,6 +4260,7 @@ class Document : public nsINode,
     return mActiveViewTransition;
   }
   void ClearActiveViewTransition();
+  void MaybeSkipActiveViewTransition(SkipTransitionReason);
   MOZ_CAN_RUN_SCRIPT void PerformPendingViewTransitionOperations();
   void EnsureViewTransitionOperationsHappen();
   void MaybeSkipTransitionAfterVisibilityChange();
@@ -4388,9 +4430,11 @@ class Document : public nsINode,
   // mScaleMinFloat, mScaleMaxFloat and mScaleFloat respectively.
   void ParseScalesInViewportMetaData(const ViewportMetaData& aViewportMetaData);
 
-  // Get parent FeaturePolicy from container. The parent FeaturePolicy is
-  // stored in parent iframe or container's browsingContext (cross process)
-  already_AddRefed<mozilla::dom::FeaturePolicy> GetParentFeaturePolicy();
+  // Get the parent PermissionsPolicy from the container. The parent
+  // PermissionsPolicy is stored in parent iframe or container's browsingContext
+  // (cross process)
+  already_AddRefed<mozilla::dom::PermissionsPolicy>
+  GetParentPermissionsPolicy();
 
  public:
   const OriginTrials& Trials() const { return mTrials; }
@@ -4463,7 +4507,7 @@ class Document : public nsINode,
     --mIgnoreOpensDuringUnloadCounter;
   }
 
-  mozilla::dom::FeaturePolicy* FeaturePolicy() const;
+  mozilla::dom::PermissionsPolicy* PermissionsPolicy() const;
 
   /**
    * Find the (non-anonymous) content in this document for aFrame. It will
@@ -5048,8 +5092,8 @@ class Document : public nsINode,
 
   RefPtr<Promise> mReadyForIdle;
 
-  // Lazily created in FeaturePolicy().
-  mutable RefPtr<mozilla::dom::FeaturePolicy> mFeaturePolicy;
+  // Lazily created in PermissionsPolicy().
+  mutable RefPtr<mozilla::dom::PermissionsPolicy> mPermissionsPolicy;
 
   // Permission Delegate Handler, lazily-initialized in
   // GetPermissionDelegateHandler
@@ -5078,6 +5122,9 @@ class Document : public nsINode,
 
   // True if BIDI is enabled.
   bool mBidiEnabled : 1;
+
+  // True if we cannot assume all elements to be LTR and need to compute.
+  bool mNeedsDirHandling : 1;
 
   // True if we are trying to fire the load event for the initial about:blank.
   // Since the initial about:blank is already in READYSTATE_COMPLETE when

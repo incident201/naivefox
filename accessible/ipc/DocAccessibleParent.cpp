@@ -7,9 +7,6 @@
 #include "ARIAMap.h"
 #include "CacheConstants.h"
 #include "CachedTableAccessible.h"
-#ifdef MOZ_ENABLE_SKIA_PDF
-#  include "mozilla/a11y/PdfStructTreeBuilder.h"
-#endif
 #include "Relation.h"
 #include "RootAccessible.h"
 #include "TextRange.h"
@@ -17,6 +14,7 @@
 #include "mozilla/PerfStats.h"
 #include "mozilla/ProfilerMarkers.h"
 #include "mozilla/StaticPrefs_accessibility.h"
+#include "mozilla/a11y/PdfStructTreeBuilder.h"
 #include "mozilla/a11y/Platform.h"
 #include "mozilla/dom/BrowserBridgeParent.h"
 #include "mozilla/dom/BrowserParent.h"
@@ -989,7 +987,7 @@ mozilla::ipc::IPCResult DocAccessibleParent::RecvTextSelectionChangeEvent(
 }
 
 mozilla::ipc::IPCResult DocAccessibleParent::RecvRoleChangedEvent(
-    const a11y::role& aRole, const uint8_t& aRoleMapEntryIndex) {
+    const uint8_t& aRoleMapEntryIndex) {
   ACQUIRE_ANDROID_LOCK
   if (mShutdown) {
     return IPC_OK();
@@ -999,11 +997,14 @@ mozilla::ipc::IPCResult DocAccessibleParent::RecvRoleChangedEvent(
     return IPC_FAIL(this, "Invalid role map entry index");
   }
 
-  mNativeRole = aRole;
+  const nsRoleMapEntry* entry = aria::GetRoleMapFromIndex(aRoleMapEntryIndex);
+  if (entry && !nsAccUtils::IsARIARoleAllowedOnContentDoc(entry->role)) {
+    return IPC_FAIL(this, "Invalid role on document");
+  }
   mRoleMapEntryIndex = aRoleMapEntryIndex;
 
 #ifdef MOZ_WIDGET_COCOA
-  PlatformRoleChangedEvent(this, aRole, aRoleMapEntryIndex);
+  PlatformRoleChangedEvent(this, Role(), aRoleMapEntryIndex);
 #endif
 
   return IPC_OK();
@@ -1319,15 +1320,14 @@ void DocAccessibleParent::MaybeInitWindowEmulation() {
     isActive = GetBrowsingContext()->IsActive();
   }
 
-  // onCreate is guaranteed to be called synchronously by
-  // nsWinUtils::CreateNativeWindow, so this reference isn't really necessary.
-  // However, static analysis complains without it.
   RefPtr<DocAccessibleParent> thisRef = this;
-  nsWinUtils::NativeWindowCreateProc onCreate([thisRef](HWND aHwnd) -> void {
-    ::SetPropW(aHwnd, kPropNameDocAccParent,
-               reinterpret_cast<HANDLE>(thisRef.get()));
-    thisRef->SetEmulatedWindowHandle(aHwnd);
-  });
+  nsWinUtils::NativeWindowCreateProc onCreate(
+      [thisRef](HWND aHwnd) mutable -> void {
+        thisRef->SetEmulatedWindowHandle(aHwnd);
+        HANDLE val;
+        thisRef.forget(&val);  // Release in SetEmulatedWindowHandle.
+        ::SetPropW(aHwnd, kPropNameDocAccParent, val);
+      });
 
   HWND parentWnd = reinterpret_cast<HWND>(rootDocument->GetNativeWindow());
   DebugOnly<HWND> hWnd = nsWinUtils::CreateNativeWindow(
@@ -1339,6 +1339,7 @@ void DocAccessibleParent::MaybeInitWindowEmulation() {
 void DocAccessibleParent::SetEmulatedWindowHandle(HWND aWindowHandle) {
   if (!aWindowHandle && mEmulatedWindowHandle && IsTopLevel()) {
     ::DestroyWindow(mEmulatedWindowHandle);
+    Release();  // AddRef in MaybeInitWindowEmulation.
   }
   mEmulatedWindowHandle = aWindowHandle;
 }
@@ -1408,7 +1409,8 @@ void DocAccessibleParent::SelectionRanges(nsTArray<TextRange>* aRanges) const {
     auto* startAcc =
         const_cast<RemoteAccessible*>(GetAccessible(data.StartID()));
     auto* endAcc = const_cast<RemoteAccessible*>(GetAccessible(data.EndID()));
-    if (!startAcc || !endAcc) {
+    if (!startAcc || !endAcc || !startAcc->IsHyperText() ||
+        !endAcc->IsHyperText()) {
       continue;
     }
     // Offset 0 is always valid, even if the container is empty.
@@ -1566,19 +1568,16 @@ NS_IMPL_QUERY_INTERFACE(DocAccessibleParent, nsIMemoryReporter)
 NS_IMPL_ADDREF_INHERITED(DocAccessibleParent, RemoteAccessible)
 NS_IMPL_RELEASE_INHERITED(DocAccessibleParent, RemoteAccessible)
 
-#ifdef MOZ_ENABLE_SKIA_PDF
 mozilla::ipc::IPCResult DocAccessibleParent::RecvPrinting() {
   if (!mShutdown) {
     PdfStructTreeBuilder::Init(Manager());
   }
   return IPC_OK();
 }
-#endif
 
 DocAccessibleParent::AllowConstruction
 DocAccessibleParent::ShouldAllowConstruction() const {
   if (IsPrintDoc()) {
-#ifdef MOZ_ENABLE_SKIA_PDF
     if (!StaticPrefs::accessibility_tagged_pdf_output_enabled()) {
       return AllowConstruction::Disallow;
     }
@@ -1597,7 +1596,6 @@ DocAccessibleParent::ShouldAllowConstruction() const {
       }
       bp = bridge->Manager();
     }
-#endif  // MOZ_ENABLE_SKIA_PDF
     return AllowConstruction::Disallow;
   }
   // For non-print documents, only allow construction if the accessibility

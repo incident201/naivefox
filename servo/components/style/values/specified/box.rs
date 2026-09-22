@@ -9,14 +9,14 @@ pub use crate::logical_geometry::WritingModeProperty;
 use crate::parser::{Parse, ParserContext};
 use crate::properties::{LonghandId, PropertyDeclarationId, PropertyId};
 pub use crate::typed_om::{KeywordValue, ToTyped, TypedValue};
+use crate::values::CustomIdent;
 use crate::values::generics::box_::{
     BaselineShiftKeyword, BlockEllipsis, GenericBaselineShift, GenericContainIntrinsicSize,
-    GenericLineClamp, GenericOverflowClipMargin, GenericPerspective, MaxLines,
-    OverflowClipMarginBox,
+    GenericLineClamp, GenericOverflowClipMargin, GenericPerspective, GenericScrollbarInset,
+    MaxLines, OverflowClipMarginBox,
 };
 use crate::values::specified::length::{LengthPercentage, NonNegativeLength};
 use crate::values::specified::{AllowQuirks, NonNegativeNumberOrPercentage, PositiveInteger};
-use crate::values::CustomIdent;
 use cssparser::Parser;
 use num_traits::FromPrimitive;
 use std::fmt::{self, Write};
@@ -24,24 +24,19 @@ use style_traits::{CssWriter, KeywordsCollectFn, ParseError /*CssString*/};
 use style_traits::{SpecifiedValueInfo, StyleParseErrorKind, ToCss};
 use thin_vec::ThinVec;
 
-#[cfg(not(feature = "servo"))]
+#[inline]
 fn grid_enabled() -> bool {
-    true
-}
-
-#[cfg(feature = "servo")]
-fn grid_enabled() -> bool {
-    static_prefs::pref!("layout.grid.enabled")
+    crate::pref!("layout.grid.enabled", gecko = true)
 }
 
 #[inline]
 fn appearance_base_enabled(_context: &ParserContext) -> bool {
-    static_prefs::pref!("layout.css.appearance-base.enabled")
+    crate::pref!("layout.css.appearance-base.enabled")
 }
 
 #[inline]
 fn appearance_base_select_enabled(_context: &ParserContext) -> bool {
-    static_prefs::pref!("dom.select.customizable_select.enabled")
+    crate::pref!("dom.select.customizable_select.enabled")
 }
 
 #[derive(
@@ -114,6 +109,20 @@ impl Parse for OverflowClipMargin {
             offset: offset.unwrap_or_else(NonNegativeLength::zero),
             visual_box: visual_box.unwrap_or(OverflowClipMarginBox::PaddingBox),
         })
+    }
+}
+
+/// The specified value of `-moz-scrollbar-inset-block` / `-inline`.
+pub type ScrollbarInset = GenericScrollbarInset<NonNegativeLength>;
+
+impl Parse for ScrollbarInset {
+    // <length>{1,2}
+    fn parse(context: &ParserContext, input: &mut Parser) -> Result<Self, ParseError> {
+        let start = NonNegativeLength::parse(context, input)?;
+        let end = input
+            .try_parse(|i| NonNegativeLength::parse(context, i))
+            .unwrap_or_else(|_| start.clone());
+        Ok(Self { start, end })
     }
 }
 
@@ -599,7 +608,7 @@ impl ToTyped for Display {
         debug_assert!(!AsRef::<[u8]>::as_ref(&keyword).contains(&b' '));
 
         dest.push(TypedValue::Keyword(KeywordValue(keyword)));
-        return Ok(());
+        Ok(())
     }
 }
 
@@ -642,7 +651,7 @@ impl Parse for Display {
             return Err(ParseError::custom(StyleParseErrorKind::UnspecifiedError));
         }
 
-        return Ok(Display::from3(outside, inside, got_list_item));
+        Ok(Display::from3(outside, inside, got_list_item))
     }
 }
 
@@ -1095,6 +1104,7 @@ pub enum ScrollSnapStop {
 pub enum OverscrollBehavior {
     Auto,
     Contain,
+    Chain,
     None,
 }
 
@@ -1285,7 +1295,7 @@ impl Parse for WillChange {
             } else if ident.0 == atom!("scroll-position") {
                 bits |= WillChangeBits::SCROLL;
             } else {
-                bits |= change_bits_for_maybe_property(&parser_ident, context);
+                bits |= change_bits_for_maybe_property(parser_ident, context);
             }
             Ok(ident)
         })?;
@@ -1414,11 +1424,11 @@ impl Parse for MaxLines<PositiveInteger> {
         let mut auto = false;
 
         loop {
-            if lines.is_none() {
-                if let Ok(value) = input.try_parse(|i| PositiveInteger::parse(context, i)) {
-                    lines = Some(value);
-                    continue;
-                }
+            if lines.is_none()
+                && let Ok(value) = input.try_parse(|i| PositiveInteger::parse(context, i))
+            {
+                lines = Some(value);
+                continue;
             }
 
             if !auto && input.try_parse(|i| i.expect_ident_matching("auto")).is_ok() {
@@ -1448,17 +1458,17 @@ impl Parse for LineClamp {
         let mut block_ellipsis = None;
 
         loop {
-            if max_lines.is_none() {
-                if let Ok(value) = input.try_parse(|i| MaxLines::parse(context, i)) {
-                    max_lines = Some(value);
-                    continue;
-                }
+            if max_lines.is_none()
+                && let Ok(value) = input.try_parse(|i| MaxLines::parse(context, i))
+            {
+                max_lines = Some(value);
+                continue;
             }
-            if block_ellipsis.is_none() {
-                if let Ok(value) = input.try_parse(|i| BlockEllipsis::parse(context, i)) {
-                    block_ellipsis = Some(value);
-                    continue;
-                }
+            if block_ellipsis.is_none()
+                && let Ok(value) = input.try_parse(|i| BlockEllipsis::parse(context, i))
+            {
+                block_ellipsis = Some(value);
+                continue;
             }
 
             break;
@@ -1599,9 +1609,7 @@ impl ContainerType {
         if self.contains(Self::SIZE | Self::INLINE_SIZE) {
             return false;
         }
-        if self.contains(Self::SCROLL_STATE)
-            && !static_prefs::pref!("layout.css.scroll-state.enabled")
-        {
+        if self.contains(Self::SCROLL_STATE) && !crate::pref!("layout.css.scroll-state.enabled") {
             return false;
         }
         true
@@ -1651,7 +1659,7 @@ impl ContainerName {
         if !for_query && first.eq_ignore_ascii_case("none") {
             return Ok(Self::none());
         }
-        const DISALLOWED_CONTAINER_NAMES: &'static [&'static str] = &["none", "not", "or", "and"];
+        const DISALLOWED_CONTAINER_NAMES: &[&str] = &["none", "not", "or", "and"];
         idents.push(CustomIdent::from_ident(first, DISALLOWED_CONTAINER_NAMES)?);
         if !for_query {
             while let Ok(name) =
@@ -2124,8 +2132,7 @@ impl Parse for Overflow {
             "scroll" => Self::Scroll,
             "auto" | "overlay" => Self::Auto,
             "clip" => Self::Clip,
-            #[cfg(feature = "gecko")]
-            "-moz-hidden-unscrollable" if static_prefs::pref!("layout.css.overflow-moz-hidden-unscrollable.enabled") => {
+            "-moz-hidden-unscrollable" if crate::pref!("layout.css.overflow-moz-hidden-unscrollable.enabled") => {
                 Overflow::Clip
             },
         })
@@ -2216,3 +2223,394 @@ impl Zoom {
 }
 
 pub use crate::values::generics::box_::PositionProperty;
+
+/// Whether an element lives in the top layer. Set by UA sheets.
+#[allow(missing_docs)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Deserialize,
+    Eq,
+    FromPrimitive,
+    Hash,
+    MallocSizeOf,
+    Parse,
+    PartialEq,
+    Serialize,
+    SpecifiedValueInfo,
+    ToComputedValue,
+    ToCss,
+    ToResolvedValue,
+    ToShmem,
+    ToTyped,
+)]
+#[repr(u8)]
+pub enum TopLayer {
+    None,
+    Auto,
+}
+
+/// https://drafts.csswg.org/cssom-view/#propdef-scroll-behavior
+#[allow(missing_docs)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Deserialize,
+    Eq,
+    FromPrimitive,
+    Hash,
+    MallocSizeOf,
+    Parse,
+    PartialEq,
+    Serialize,
+    SpecifiedValueInfo,
+    ToComputedValue,
+    ToCss,
+    ToResolvedValue,
+    ToShmem,
+    ToTyped,
+)]
+#[repr(u8)]
+pub enum ScrollBehavior {
+    Auto,
+    Smooth,
+}
+
+/// https://drafts.fxtf.org/compositing/#isolation
+#[allow(missing_docs)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Deserialize,
+    Eq,
+    FromPrimitive,
+    Hash,
+    MallocSizeOf,
+    Parse,
+    PartialEq,
+    Serialize,
+    SpecifiedValueInfo,
+    ToComputedValue,
+    ToCss,
+    ToResolvedValue,
+    ToShmem,
+    ToTyped,
+)]
+#[repr(u8)]
+pub enum Isolation {
+    Auto,
+    Isolate,
+}
+
+/// https://drafts.csswg.org/css-transforms/#backface-visibility-property
+#[allow(missing_docs)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Deserialize,
+    Eq,
+    FromPrimitive,
+    Hash,
+    MallocSizeOf,
+    Parse,
+    PartialEq,
+    Serialize,
+    SpecifiedValueInfo,
+    ToComputedValue,
+    ToCss,
+    ToResolvedValue,
+    ToShmem,
+    ToTyped,
+)]
+#[repr(u8)]
+pub enum BackfaceVisibility {
+    Visible,
+    Hidden,
+}
+
+/// Nonstandard (https://developer.mozilla.org/en-US/docs/Web/CSS/-moz-orient)
+#[allow(missing_docs)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Deserialize,
+    Eq,
+    FromPrimitive,
+    Hash,
+    MallocSizeOf,
+    Parse,
+    PartialEq,
+    Serialize,
+    SpecifiedValueInfo,
+    ToComputedValue,
+    ToCss,
+    ToResolvedValue,
+    ToShmem,
+    ToTyped,
+)]
+#[repr(u8)]
+pub enum Orient {
+    Inline,
+    Block,
+    Horizontal,
+    Vertical,
+}
+
+/// https://drafts.csswg.org/css-box/#propdef-visibility
+#[allow(missing_docs)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Deserialize,
+    Eq,
+    FromPrimitive,
+    Hash,
+    MallocSizeOf,
+    Parse,
+    PartialEq,
+    Serialize,
+    SpecifiedValueInfo,
+    ToAnimatedValue,
+    ToComputedValue,
+    ToCss,
+    ToResolvedValue,
+    ToShmem,
+    ToTyped,
+)]
+#[repr(u8)]
+pub enum Visibility {
+    Visible,
+    Hidden,
+    Collapse,
+}
+
+/// Whether flexbox visibility: collapse items use legacy -moz-box behavior or not.
+#[allow(missing_docs)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Deserialize,
+    Eq,
+    FromPrimitive,
+    Hash,
+    MallocSizeOf,
+    Parse,
+    PartialEq,
+    Serialize,
+    SpecifiedValueInfo,
+    ToComputedValue,
+    ToCss,
+    ToResolvedValue,
+    ToShmem,
+    ToTyped,
+)]
+#[repr(u8)]
+pub enum BoxCollapse {
+    Flex,
+    Legacy,
+}
+
+/// https://drafts.csswg.org/css-writing-modes/#propdef-text-orientation
+#[allow(missing_docs)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Deserialize,
+    Eq,
+    FromPrimitive,
+    Hash,
+    MallocSizeOf,
+    Parse,
+    PartialEq,
+    Serialize,
+    SpecifiedValueInfo,
+    ToComputedValue,
+    ToCss,
+    ToResolvedValue,
+    ToShmem,
+    ToTyped,
+)]
+#[repr(u8)]
+pub enum TextOrientation {
+    Mixed,
+    Upright,
+    #[cfg_attr(feature = "gecko", parse(aliases = "sideways-right"))]
+    Sideways,
+}
+
+/// https://drafts.csswg.org/css-images/#propdef-image-orientation
+#[allow(missing_docs)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Deserialize,
+    Eq,
+    FromPrimitive,
+    Hash,
+    MallocSizeOf,
+    Parse,
+    PartialEq,
+    Serialize,
+    SpecifiedValueInfo,
+    ToComputedValue,
+    ToCss,
+    ToResolvedValue,
+    ToShmem,
+    ToTyped,
+)]
+#[repr(u8)]
+pub enum ImageOrientation {
+    FromImage,
+    None,
+}
+
+/// Nonstandard (https://developer.mozilla.org/en-US/docs/Web/CSS/box-align)
+#[allow(missing_docs)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Deserialize,
+    Eq,
+    FromPrimitive,
+    Hash,
+    MallocSizeOf,
+    Parse,
+    PartialEq,
+    Serialize,
+    SpecifiedValueInfo,
+    ToComputedValue,
+    ToCss,
+    ToResolvedValue,
+    ToShmem,
+    ToTyped,
+)]
+#[repr(u8)]
+pub enum BoxAlign {
+    Stretch,
+    Start,
+    Center,
+    Baseline,
+    End,
+}
+
+/// Nonstandard (https://developer.mozilla.org/en-US/docs/Web/CSS/box-direction)
+#[allow(missing_docs)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Deserialize,
+    Eq,
+    FromPrimitive,
+    Hash,
+    MallocSizeOf,
+    Parse,
+    PartialEq,
+    Serialize,
+    SpecifiedValueInfo,
+    ToComputedValue,
+    ToCss,
+    ToResolvedValue,
+    ToShmem,
+    ToTyped,
+)]
+#[repr(u8)]
+pub enum BoxDirection {
+    Normal,
+    Reverse,
+}
+
+/// Nonstandard (https://developer.mozilla.org/en-US/docs/Web/CSS/box-orient)
+#[allow(missing_docs)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Deserialize,
+    Eq,
+    FromPrimitive,
+    Hash,
+    MallocSizeOf,
+    Parse,
+    PartialEq,
+    Serialize,
+    SpecifiedValueInfo,
+    ToComputedValue,
+    ToCss,
+    ToResolvedValue,
+    ToShmem,
+    ToTyped,
+)]
+#[repr(u8)]
+pub enum BoxOrient {
+    #[cfg_attr(feature = "gecko", parse(aliases = "inline-axis"))]
+    Horizontal,
+    #[cfg_attr(feature = "gecko", parse(aliases = "block-axis"))]
+    Vertical,
+}
+
+/// Nonstandard (https://developer.mozilla.org/en-US/docs/Web/CSS/box-pack)
+#[allow(missing_docs)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Deserialize,
+    Eq,
+    FromPrimitive,
+    Hash,
+    MallocSizeOf,
+    Parse,
+    PartialEq,
+    Serialize,
+    SpecifiedValueInfo,
+    ToComputedValue,
+    ToCss,
+    ToResolvedValue,
+    ToShmem,
+    ToTyped,
+)]
+#[repr(u8)]
+pub enum BoxPack {
+    Start,
+    Center,
+    End,
+    Justify,
+}
+
+/// https://drafts.csswg.org/css-writing-modes/#propdef-direction
+#[allow(missing_docs)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Deserialize,
+    Eq,
+    FromPrimitive,
+    Hash,
+    MallocSizeOf,
+    Parse,
+    PartialEq,
+    Serialize,
+    SpecifiedValueInfo,
+    ToComputedValue,
+    ToCss,
+    ToResolvedValue,
+    ToShmem,
+    ToTyped,
+)]
+#[repr(u8)]
+pub enum DirectionProperty {
+    Ltr,
+    Rtl,
+}

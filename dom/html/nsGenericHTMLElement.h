@@ -435,7 +435,7 @@ class nsGenericHTMLElement : public nsGenericHTMLElementBase {
   bool ParseBackgroundAttribute(int32_t aNamespaceID, nsAtom* aAttribute,
                                 const nsAString& aValue, nsAttrValue& aResult);
 
-  NS_IMETHOD_(bool) IsAttributeMapped(const nsAtom* aAttribute) const override;
+  bool IsNoNamespaceAttrMapped(const nsAtom* aAttribute) const override;
   nsMapRuleToAttributesFunc GetAttributeMappingFunction() const override;
 
   /**
@@ -508,9 +508,6 @@ class nsGenericHTMLElement : public nsGenericHTMLElementBase {
    */
   static bool ParseImageAttribute(nsAtom* aAttribute, const nsAString& aString,
                                   nsAttrValue& aResult);
-
-  static bool ParseReferrerAttribute(const nsAString& aString,
-                                     nsAttrValue& aResult);
 
   /**
    * Convert a frameborder string to value (yes/no/1/0)
@@ -1064,7 +1061,9 @@ class nsGenericHTMLFormElement : public nsGenericHTMLElement {
    */
   virtual void FieldSetDisabledChanged(bool aNotify);
 
-  void FieldSetFirstLegendChanged(bool aNotify) { UpdateFieldSet(aNotify); }
+  void FieldSetFirstLegendChanged(bool aNotify) {
+    FieldSetDisabledChanged(aNotify);
+  }
 
   /**
    * This callback is called by a fieldset on all it's elements when it's being
@@ -1111,6 +1110,7 @@ class nsGenericHTMLFormElement : public nsGenericHTMLElement {
    * state to decide whether our disabled flag should be toggled.
    */
   virtual void UpdateDisabledState(bool aNotify);
+  bool IsDisabledByAncestorFieldSet() const;
   bool IsReadOnlyInternal() const final;
 
   virtual void SetFormInternal(mozilla::dom::HTMLFormElement* aForm,
@@ -1118,6 +1118,10 @@ class nsGenericHTMLFormElement : public nsGenericHTMLElement {
 
   virtual mozilla::dom::HTMLFormElement* GetFormInternal() const {
     return nullptr;
+  }
+
+  mozilla::dom::HTMLFormElement* GetFormIfRegistered() const {
+    return HasFlag(ADDED_TO_FORM) ? GetFormInternal() : nullptr;
   }
 
   virtual mozilla::dom::HTMLFieldSetElement* GetFieldSetInternal() const {
@@ -1203,6 +1207,8 @@ class nsGenericHTMLFormControlElement : public nsGenericHTMLFormElement,
       already_AddRefed<mozilla::dom::NodeInfo> aNodeInfo, FormControlType);
 
   NS_DECL_ISUPPORTS_INHERITED
+  NS_DECL_CYCLE_COLLECTION_CLASS_INHERITED(nsGenericHTMLFormControlElement,
+                                           nsGenericHTMLFormElement);
 
   NS_IMPL_FROMNODE_HELPER(nsGenericHTMLFormControlElement,
                           IsHTMLFormControlElement())
@@ -1263,7 +1269,7 @@ class nsGenericHTMLFormControlElement : public nsGenericHTMLFormElement,
   void SetFormAutofillState(const nsAString& aState);
 
   /** The form that contains this control */
-  mozilla::dom::HTMLFormElement* mForm;
+  RefPtr<mozilla::dom::HTMLFormElement> mForm;
 
   /* This is a pointer to our closest fieldset parent if any */
   mozilla::dom::HTMLFieldSetElement* mFieldSet;

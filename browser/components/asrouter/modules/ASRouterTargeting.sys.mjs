@@ -1,4 +1,4 @@
-/* This Source Code Form is subject to the terms of the Mozilla PublicddonMa
+/* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 const FXA_ENABLED_PREF = "identity.fxaccounts.enabled";
@@ -62,7 +62,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "resource:///modules/asrouter/ASRouterPreferences.sys.mjs",
   AttributionCode:
     "moz-src:///browser/components/attribution/AttributionCode.sys.mjs",
-  BackupService: "resource:///modules/backup/BackupService.sys.mjs",
+  BackupService: "moz-src:///browser/components/backup/BackupService.sys.mjs",
   BrowserInitState: "resource:///modules/BrowserGlue.sys.mjs",
   BrowserWindowTracker: "resource:///modules/BrowserWindowTracker.sys.mjs",
   ClientEnvironment: "resource://normandy/lib/ClientEnvironment.sys.mjs",
@@ -72,10 +72,13 @@ ChromeUtils.defineESModuleGetters(lazy, {
   ExtensionUtils: "resource://gre/modules/ExtensionUtils.sys.mjs",
   FeatureCalloutBroker:
     "resource:///modules/asrouter/FeatureCalloutBroker.sys.mjs",
+  FormHistory: "resource://gre/modules/FormHistory.sys.mjs",
   HomePage: "resource:///modules/HomePage.sys.mjs",
   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
   ProfileAge: "resource://gre/modules/ProfileAge.sys.mjs",
   Region: "resource://gre/modules/Region.sys.mjs",
+  ReinstallCheck: "moz-src:///browser/components/ReinstallCheck.sys.mjs",
+  ResetProfile: "resource://gre/modules/ResetProfile.sys.mjs",
   SearchService: "moz-src:///toolkit/components/search/SearchService.sys.mjs",
   // eslint-disable-next-line mozilla/no-browser-refs-in-toolkit
   SelectableProfileService:
@@ -99,6 +102,15 @@ ChromeUtils.defineLazyGetter(lazy, "fxAccounts", () => {
     "resource://gre/modules/FxAccounts.sys.mjs"
   ).getFxAccountsSingleton();
 });
+
+ChromeUtils.defineLazyGetter(
+  lazy,
+  "searchFormHistoryFieldname",
+  () =>
+    ChromeUtils.importESModule(
+      "moz-src:///toolkit/components/search/SearchSuggestionController.sys.mjs"
+    ).DEFAULT_FORM_HISTORY_PARAM
+);
 
 XPCOMUtils.defineLazyPreferenceGetter(
   lazy,
@@ -785,6 +797,22 @@ const TargetingGetters = {
   get profileAgeReset() {
     return lazy.ProfileAge().then(times => times.reset);
   },
+  get profileLastUse() {
+    // The lock file records when the profile was last used, but it can be
+    // unreliable, e.g. on NFS or when the previous session ran for a very long
+    // time. Use the prefs.js modification time as a backstop. See bug 1054947
+    // and related bugs.
+    return Math.max(
+      Services.appinfo.replacedLockTime,
+      Services.prefs.userPrefsFileLastModifiedAtStartup
+    );
+  },
+  get canResetProfile() {
+    return lazy.ResetProfile.resetSupported();
+  },
+  get isFirefoxReinstalled() {
+    return lazy.ReinstallCheck.wasReinstalled;
+  },
   get usesFirefoxSync() {
     return Services.prefs.prefHasUserValue(FXA_USERNAME_PREF);
   },
@@ -895,11 +923,24 @@ const TargetingGetters = {
         .catch(() => resolve(NONE));
     });
   },
+  get recentSearchCount() {
+    const RECENT_SEARCH_WINDOW_DAYS = 28;
+    // FormHistory times are in microseconds, so we need to multiply by 1000 to get the correct time.
+    const lastUsedStart =
+      (Date.now() - RECENT_SEARCH_WINDOW_DAYS * 24 * 60 * 60 * 1000) * 1000;
+    return lazy.FormHistory.count({
+      fieldname: lazy.searchFormHistoryFieldname,
+      lastUsedStart,
+    }).catch(() => 0);
+  },
   get isDefaultBrowser() {
     return QueryCache.getters.isDefaultBrowser.get().catch(() => null);
   },
   get isDefaultBrowserUncached() {
     return ShellService.isDefaultBrowser();
+  },
+  get hasAttemptedSetDefault() {
+    return ShellService.attemptedSetDefaultThisSession;
   },
   get isOneClickSetDefaultEnabled() {
     return QueryCache.getters.isOneClickSetDefaultEnabled
@@ -1182,6 +1223,13 @@ const TargetingGetters = {
 
   get userMonthlyActivity() {
     return QueryCache.queries.UserMonthlyActivity.get();
+  },
+
+  get allowedNotificationOrigins() {
+    // getAllByTypes returns denials as well as grants.
+    return Services.perms
+      .getAllByTypes(["desktop-notification"])
+      .filter(perm => perm.capability === Services.perms.ALLOW_ACTION).length;
   },
 
   get doesAppNeedPin() {

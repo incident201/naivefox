@@ -373,6 +373,19 @@ class SettingsTest {
     }
 
     @Test
+    fun shouldUseOledTheme() {
+        // When just created
+        // Then
+        assertFalse(settings.shouldUseOledTheme)
+
+        // When
+        settings.shouldUseOledTheme = true
+
+        // Then
+        assertTrue(settings.shouldUseOledTheme)
+    }
+
+    @Test
     fun shouldFollowDeviceTheme() {
         // When just created
         // Then
@@ -1074,6 +1087,37 @@ class SettingsTest {
         dataStoreFile.createNewFile()
         settings.deleteReportSiteDomainsDataStoreIfNeeded()
         assertTrue(dataStoreFile.exists())
+    }
+
+    @Test
+    fun `GIVEN the tab strip is enabled at the top WHEN checking if it should be shown at the top THEN return true`() {
+        settings.isTabStripEnabled = true
+        settings.shouldUseBottomTabStrip = false
+
+        assertTrue(settings.shouldShowTabStripAtTop)
+        assertFalse(settings.shouldShowTabStripAtBottom)
+    }
+
+    @Test
+    fun `GIVEN the tab strip is enabled at the bottom WHEN checking if it should be shown at the bottom THEN return true`() {
+        settings.isTabStripEnabled = true
+        settings.shouldUseBottomTabStrip = true
+
+        assertFalse(settings.shouldShowTabStripAtTop)
+        assertTrue(settings.shouldShowTabStripAtBottom)
+    }
+
+    @Test
+    fun `GIVEN the tab strip is disabled WHEN checking where it should be shown THEN return false`() {
+        settings.isTabStripEnabled = false
+
+        settings.shouldUseBottomTabStrip = false
+        assertFalse(settings.shouldShowTabStripAtTop)
+        assertFalse(settings.shouldShowTabStripAtBottom)
+
+        settings.shouldUseBottomTabStrip = true
+        assertFalse(settings.shouldShowTabStripAtTop)
+        assertFalse(settings.shouldShowTabStripAtBottom)
     }
 
     @Test

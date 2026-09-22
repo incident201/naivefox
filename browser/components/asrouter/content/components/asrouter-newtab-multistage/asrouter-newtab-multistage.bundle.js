@@ -2629,15 +2629,17 @@ const TileList = props => {
   if (!content) {
     return null;
   }
-  const CONFIGURABLE_STYLES = ["background", "borderRadius", "height", "marginBlock", "marginBlockStart", "marginBlockEnd", "marginInline", "paddingBlock", "paddingBlockStart", "paddingBlockEnd", "paddingInline", "paddingInlineStart", "paddingInlineEnd", "width"];
+  const CONFIGURABLE_STYLES = ["background", "borderRadius", "color", "display", "height", "listStyle", "marginBlock", "marginBlockStart", "marginBlockEnd", "marginInline", "marginInlineStart", "paddingBlock", "paddingBlockStart", "paddingBlockEnd", "paddingInline", "paddingInlineStart", "paddingInlineEnd", "width"];
   return /*#__PURE__*/external_React_default().createElement("div", {
     className: "tile-list-container"
   }, content.items.map(({
     icon,
-    text
+    text,
+    style
   }, index) => /*#__PURE__*/external_React_default().createElement("div", {
     key: index,
-    className: "tile-list-item"
+    className: "tile-list-item",
+    style: MultiStageUtils.getValidStyle(style, CONFIGURABLE_STYLES)
   }, /*#__PURE__*/external_React_default().createElement("div", {
     className: "tile-list-icon-wrapper"
   }, /*#__PURE__*/external_React_default().createElement("div", {
@@ -3231,7 +3233,7 @@ const EmbeddedMigrationWizard = ({
     "force-show-import-all": options?.force_show_import_all || "false",
     "auto-request-state": "",
     ref: ref,
-    "option-expander-title-string": options?.option_expander_title_string || "",
+    "option-expander-title-string": options?.option_expander_title_string,
     "hide-option-expander-subtitle": options?.hide_option_expander_subtitle || false,
     "data-import-complete-success-string": options?.data_import_complete_success_string || "",
     "selection-header-string": options?.selection_header_string || "",
@@ -3255,8 +3257,24 @@ const EmbeddedMigrationWizard = ({
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 
-const EmbeddedThemePicker = () => {
-  return /*#__PURE__*/external_React_default().createElement("theme-picker", null);
+const EmbeddedThemePicker = ({
+  installSource
+}) => {
+  const themePickerRef = (0,external_React_namespaceObject.useRef)(null);
+  (0,external_React_namespaceObject.useEffect)(() => {
+    if (installSource !== "about:welcome") {
+      return;
+    }
+    // The widget may not be upgraded from a plain element yet when this
+    // mounts, so wait for its class definition before calling `shown()`.
+    customElements.whenDefined("theme-picker").then(() => {
+      themePickerRef.current?.shown();
+    });
+  }, [installSource]);
+  return /*#__PURE__*/external_React_default().createElement("theme-picker", {
+    ref: themePickerRef,
+    installsource: installSource
+  });
 };
 ;// ./content-src/components/EmbeddedFxBackupOptIn.jsx
 /* This Source Code Form is subject to the terms of the Mozilla Public
@@ -3854,6 +3872,7 @@ function _extends() { return _extends = Object.assign ? Object.assign.bind() : f
 
 
 
+
 const HEADER_STYLES = ["backgroundColor", "border", "padding", "margin", "width", "height"];
 const ContentTiles_TILE_STYLES = ["border", "borderRadius", "marginBlock", "marginInline", "paddingBlock", "paddingInline"];
 const CONTAINER_STYLES = ["padding", "margin", "marginBlock", "marginInline", "paddingBlock", "paddingInline", "flexDirection", "flexWrap", "flexFlow", "flexGrow", "flexShrink", "justifyContent", "alignItems", "gap"];
@@ -4025,7 +4044,7 @@ const ContentTiles = props => {
       className: `content-tile ${header ? "has-header" : ""}`,
       style: MultiStageUtils.getTileStyle(tile, ContentTiles_TILE_STYLES)
     }, header?.title && /*#__PURE__*/external_React_default().createElement("button", _extends({
-      className: "tile-header secondary",
+      className: `tile-header secondary${header.linkStyle ? " link-style" : ""}`,
       onClick: () => toggleTile(index, tile)
     }, tileHeaderProps, {
       style: MultiStageUtils.getValidStyle(header.style, HEADER_STYLES)
@@ -4098,7 +4117,8 @@ const ContentTiles = props => {
         tiles: tile
       }
     }), tile.type === "theme-picker" && /*#__PURE__*/external_React_default().createElement(EmbeddedThemePicker, {
-      handleAction: props.handleAction
+      handleAction: props.handleAction,
+      installSource: tile.data?.installSource
     }), tile.type === "action_checklist" && tile.data && /*#__PURE__*/external_React_default().createElement(ActionChecklist, {
       content: content,
       message_id: props.messageId,
@@ -4141,6 +4161,9 @@ const ContentTiles = props => {
         tiles: tile
       },
       contentToggled: props.contentToggleChecked
+    }), tile.type === "text" && tile.text && /*#__PURE__*/external_React_default().createElement(LinkParagraph, {
+      text_content: tile,
+      handleAction: props.handleAction
     })) : null);
   };
   const renderContentTiles = () => {
@@ -4192,6 +4215,36 @@ const ContentTiles = props => {
 const DEFAULT_AUTO_ADVANCE_MS = 20000;
 const CORNER_IMAGE_POSITIONS = new Set(["bottom-left", "bottom-right", "top-left", "top-right"]);
 const DEFAULT_CORNER_IMAGE_POSITION = "bottom-right";
+const CORNER_IMAGE_ENTRANCE_ANIMATIONS = new Set(["none", "fade", "slide-block", "slide-inline", "slide-corner", "zoom"]);
+const DEFAULT_CORNER_IMAGE_ENTRANCE_ANIMATION = "none";
+// Direction-relative aliases for the positions above, mapped to [ltr, rtl] so
+// that `*-end` follows the reading direction the way inset-inline-end would.
+const CORNER_IMAGE_LOGICAL_POSITIONS = new Map([["bottom-start", ["bottom-left", "bottom-right"]], ["bottom-end", ["bottom-right", "bottom-left"]], ["top-start", ["top-left", "top-right"]], ["top-end", ["top-right", "top-left"]]]);
+
+/**
+ * Resolves a corner_image position to one of CORNER_IMAGE_POSITIONS, so the
+ * rendered class is always a physical corner. Unsupported values fall back
+ * to bottom-right.
+ */
+function resolveCornerImagePosition(position) {
+  const logical = CORNER_IMAGE_LOGICAL_POSITIONS.get(position);
+  if (logical) {
+    const isRTL = typeof document !== "undefined" && document.documentElement.matches(":dir(rtl)");
+    return logical[isRTL ? 1 : 0];
+  }
+  return CORNER_IMAGE_POSITIONS.has(position) ? position : DEFAULT_CORNER_IMAGE_POSITION;
+}
+
+/**
+ * Applies an image's `rtl` overrides when the document is right-to-left.
+ */
+function resolveDirectionalImage(image) {
+  const isRTL = typeof document !== "undefined" && document.documentElement.matches(":dir(rtl)");
+  return isRTL && image?.rtl ? {
+    ...image,
+    ...image.rtl
+  } : image;
+}
 const MultiStageProtonScreen = props => {
   const {
     autoAdvance,
@@ -4545,21 +4598,22 @@ class ProtonScreen extends (external_React_default()).PureComponent {
       ref: titleRef
     }));
   }
-  renderPicture({
-    imageURL = "chrome://branding/content/about-logo.svg",
-    darkModeImageURL,
-    reducedMotionImageURL,
-    darkModeReducedMotionImageURL,
-    videoURL,
-    alt = "",
-    width,
-    height,
-    marginBlock,
-    marginInline,
-    style,
-    imgStyle,
-    className = "logo-container"
-  }) {
+  renderPicture(image) {
+    const {
+      imageURL = "chrome://branding/content/about-logo.svg",
+      darkModeImageURL,
+      reducedMotionImageURL,
+      darkModeReducedMotionImageURL,
+      videoURL,
+      alt = "",
+      width,
+      height,
+      marginBlock,
+      marginInline,
+      style,
+      imgStyle,
+      className = "logo-container"
+    } = resolveDirectionalImage(image);
     function getLoadingStrategy() {
       for (let url of [imageURL, darkModeImageURL, reducedMotionImageURL, darkModeReducedMotionImageURL]) {
         if (MultiStageUtils.getLoadingStrategyFor(url) === "lazy") {
@@ -4642,9 +4696,11 @@ class ProtonScreen extends (external_React_default()).PureComponent {
       className: "noodle yellow-circle"
     }));
   }
-  renderCornerImage() {
+  renderCornerImage(anchor) {
     const cornerImage = this.props.content.corner_image;
-    const position = CORNER_IMAGE_POSITIONS.has(cornerImage.position) ? cornerImage.position : DEFAULT_CORNER_IMAGE_POSITION;
+    const position = resolveCornerImagePosition(cornerImage.position);
+    const entranceAnimation = cornerImage.entrance_animation ?? {};
+    const entranceType = CORNER_IMAGE_ENTRANCE_ANIMATIONS.has(entranceAnimation.type) ? entranceAnimation.type : DEFAULT_CORNER_IMAGE_ENTRANCE_ANIMATION;
     return /*#__PURE__*/external_React_default().createElement("div", {
       className: "corner-image-container"
     }, this.renderPicture({
@@ -4652,12 +4708,20 @@ class ProtonScreen extends (external_React_default()).PureComponent {
       darkModeImageURL: cornerImage.darkModeImageURL,
       reducedMotionImageURL: cornerImage.reducedMotionImageURL,
       darkModeReducedMotionImageURL: cornerImage.darkModeReducedMotionImageURL,
+      rtl: cornerImage.rtl,
       height: cornerImage.height,
       width: cornerImage.width,
       marginBlock: cornerImage.marginBlock,
       marginInline: cornerImage.marginInline,
-      style: cornerImage.style,
-      className: `corner-image ${position}`
+      style: {
+        // Read indirectly by _multistage.scss, so reduced motion can
+        // override them. Undefined values fall through to its defaults.
+        "--corner-image-entrance-distance": entranceAnimation.distance,
+        "--corner-image-entrance-duration": entranceAnimation.duration,
+        "--corner-image-entrance-delay": entranceAnimation.delay,
+        ...cornerImage.style
+      },
+      className: `corner-image ${position}${anchor === "screen" ? ` entrance-${entranceType}` : ""}`
     }));
   }
   renderLanguageSwitcher() {
@@ -4740,8 +4804,9 @@ class ProtonScreen extends (external_React_default()).PureComponent {
   }
   getEffectiveBackground(content) {
     if (content.position !== "split") {
-      const combinedBackground = content.background && content.zap_border ? `linear-gradient(96deg, #B89CFF 20.68%, #FF9565 79.34%) border-box border-area, image(${content.background}) padding-box` : content.background;
-      const combinedBackgroundStatic = content.background_static && content.zap_border ? `linear-gradient(96deg, #B89CFF 20.68%, #FF9565 79.34%) border-box border-area, image(${content.background_static}) padding-box` : content.background_static;
+      const gradient = content.zap_border_gradient || "linear-gradient(96deg, #B89CFF 20.68%, #FF9565 79.34%)";
+      const combinedBackground = content.background && content.zap_border ? `${gradient} border-box border-area, image(${content.background}) padding-box` : content.background;
+      const combinedBackgroundStatic = content.background_static && content.zap_border ? `${gradient} border-box border-area, image(${content.background_static}) padding-box` : content.background_static;
       return this.props.animationsPaused && content.background_static ? combinedBackgroundStatic : combinedBackground;
     }
     return this.props.animationsPaused && content.background_static ? content.background_static : content.background;
@@ -4912,7 +4977,14 @@ class ProtonScreen extends (external_React_default()).PureComponent {
     } = this.props;
     const includeNoodles = content.has_noodles;
     const isCenterLargeFullscreen = content.position === "center-large" && !!content.fullscreen;
-    const includeCornerImage = !!content.corner_image && isCenterLargeFullscreen;
+    // Where the corner image is anchored, which decides where it gets rendered.
+    // The fullscreen FRO layout anchors to the window, so its container stays a
+    // child of .screen. Every other layout anchors to the card instead, which
+    // means rendering inside .section-main (the positioned card wrapper).
+    let cornerImageAnchor = null;
+    if (content.corner_image) {
+      cornerImageAnchor = isCenterLargeFullscreen ? "screen" : "card";
+    }
     const secondaryCTATop = content.secondary_button_top ? /*#__PURE__*/external_React_default().createElement(SecondaryCTA, {
       content: content,
       handleAction: this.props.handleAction,
@@ -4957,16 +5029,16 @@ class ProtonScreen extends (external_React_default()).PureComponent {
         this.mainContentHeader = input;
       },
       "no-rdm": content.no_rdm ? "" : null
-    }, includeCornerImage ? this.renderCornerImage() : null, isCenterPosition ? null : this.renderSecondarySection(content), /*#__PURE__*/external_React_default().createElement("div", {
+    }, cornerImageAnchor === "screen" ? this.renderCornerImage("screen") : null, isCenterPosition ? null : this.renderSecondarySection(content), /*#__PURE__*/external_React_default().createElement("div", {
       className: `section-main ${isEmbeddedMigration ? "embedded-migration" : ""}${isSystemPromptStyleSpotlight ? "system-prompt-spotlight" : ""}`,
       "hide-secondary-section": content.hide_secondary_section ? String(content.hide_secondary_section) : null,
       role: "document",
       style: content.screen_style && MultiStageUtils.getValidStyle(content.screen_style, ["width", "padding", "height"])
-    }, isCenterLargeFullscreen ? null : secondaryCTATop, includeNoodles ? this.renderNoodles() : null, content.more_button ? this.renderMoreButton() : null, content.dismiss_button && !content.reverse_split ? this.renderDismissButton() : null, /*#__PURE__*/external_React_default().createElement("div", {
+    }, cornerImageAnchor === "card" ? this.renderCornerImage("card") : null, isCenterLargeFullscreen ? null : secondaryCTATop, includeNoodles ? this.renderNoodles() : null, content.more_button ? this.renderMoreButton() : null, content.dismiss_button && !content.reverse_split ? this.renderDismissButton() : null, /*#__PURE__*/external_React_default().createElement("div", {
       className: `main-content ${hideStepsIndicator ? "no-steps" : ""}`,
       style: {
         background: isCenterPosition && !isCenterLargeFullscreen && this.getEffectiveBackground(content) ? this.getEffectiveBackground(content) : null,
-        width: content.width && content.position !== "split" ? content.width : null,
+        width: content.width && !["split", "card-stack"].includes(content.position) ? content.width : null,
         paddingBlock: content.split_content_padding_block ? content.split_content_padding_block : null,
         paddingInline: content.split_content_padding_inline ? content.split_content_padding_inline : null,
         justifyContent: screenStyleJustifyContent
@@ -5096,7 +5168,7 @@ const buttonPropTypes = prop_types_default().exact({
 });
 const screenContentShape = {
   // The layout position of the screen.
-  position: prop_types_default().oneOf(["center", "split", "callout"]),
+  position: prop_types_default().oneOf(["center", "center-large", "split", "callout", "card-stack"]),
   // If true, the screens are displayed in fullscreen.
   fullscreen: (prop_types_default()).bool,
   // If true, the progress bar will be shown. Defaults to true.
@@ -5184,6 +5256,10 @@ const screenContentShape = {
   // 'absolute_position' or 'arrow_position'. There is no effect if HCM or a
   // custom theme add-on is enabled.
   zap_shadow: (prop_types_default()).bool,
+  // If present, a custom gradient to use in conjuction with the
+  // 'background' and 'zap_border' properties. Only applied if
+  // both other properties are present.
+  zap_border_gradient: (prop_types_default()).string,
   // An optional object representing a large illustration to show above other
   // content.
   logo: prop_types_default().shape({
@@ -5199,12 +5275,74 @@ const screenContentShape = {
     // Ignored (falls back to the image URLs above) for users who prefer reduced
     // motion.
     videoURL: (prop_types_default()).string,
+    // Right-to-left replacements for any of the URLs above, applied over them
+    // when the document is RTL. Omitted keys keep their base value.
+    rtl: prop_types_default().shape({
+      imageURL: (prop_types_default()).string,
+      darkModeImageURL: (prop_types_default()).string,
+      reducedMotionImageURL: (prop_types_default()).string,
+      darkModeReducedMotionImageURL: (prop_types_default()).string,
+      videoURL: (prop_types_default()).string
+    }),
     // The <img> alt text.
     alt: prop_types_default().oneOfType([(prop_types_default()).string, (prop_types_default()).object]),
     // The CSS style overriding the width property.
     width: (prop_types_default()).string,
     // The CSS style overriding the height property.
     height: (prop_types_default()).string
+  }),
+  // An optional object representing an illustration anchored to a corner of the
+  // screen. The fullscreen center-large layout anchors it to the window; every
+  // other layout anchors it to the card.
+  corner_image: prop_types_default().shape({
+    // The image URL.
+    imageURL: (prop_types_default()).string,
+    // The dark mode image URL.
+    darkModeImageURL: (prop_types_default()).string,
+    // The reduced motion image URL.
+    reducedMotionImageURL: (prop_types_default()).string,
+    // The dark mode reduced motion image URL.
+    darkModeReducedMotionImageURL: (prop_types_default()).string,
+    // Right-to-left replacements for any of the URLs above, applied over them
+    // when the document is RTL. Omitted keys keep their base value.
+    rtl: prop_types_default().shape({
+      imageURL: (prop_types_default()).string,
+      darkModeImageURL: (prop_types_default()).string,
+      reducedMotionImageURL: (prop_types_default()).string,
+      darkModeReducedMotionImageURL: (prop_types_default()).string
+    }),
+    // The corner the illustration is anchored to. Defaults to 'bottom-right'.
+    // The -start/-end values are direction-relative and resolve against the
+    // text direction, so they mirror in RTL; the left/right values are always
+    // that physical corner.
+    position: prop_types_default().oneOf(["bottom-left", "bottom-right", "top-left", "top-right", "bottom-start", "bottom-end", "top-start", "top-end"]),
+    // The CSS style overriding the width property.
+    width: (prop_types_default()).string,
+    // The CSS style overriding the height property.
+    height: (prop_types_default()).string,
+    // The CSS style overriding the marginBlock property.
+    marginBlock: (prop_types_default()).string,
+    // The CSS style overriding the marginInline property.
+    marginInline: (prop_types_default()).string,
+    // CSS overrides applied to the illustration container. Avoid 'translate'
+    // and 'scale' when using 'entrance_animation', which animates those two
+    // properties and would be overridden by them. 'transform' is unaffected.
+    style: (prop_types_default()).object,
+    // How the illustration animates in each time the screen is entered. The
+    // direction is derived from 'position', so a 'bottom-left' illustration
+    // rises and a 'top-left' one descends. Every type degrades to an
+    // opacity-only fade for users who prefer reduced motion.
+    entrance_animation: prop_types_default().shape({
+      // The animation to run. Defaults to 'none'.
+      type: prop_types_default().oneOf(["none", "fade", "slide-block", "slide-inline", "slide-corner", "zoom"]),
+      // The CSS length the illustration travels, for the 'slide-*' types.
+      distance: (prop_types_default()).string,
+      // The CSS time the animation takes.
+      duration: (prop_types_default()).string,
+      // The CSS time to wait before starting, for staggering the illustration
+      // against the screen's other content.
+      delay: (prop_types_default()).string
+    })
   }),
   // The text for the headline.
   title: localizableThingPropTypes,
@@ -5857,7 +5995,7 @@ const renderSingleSecondaryCTAButton = ({
 }) => {
   let buttonStyling = button?.has_arrow_icon ? `secondary arrow-icon` : `secondary`;
   const isPrimary = button?.style === "primary";
-  const isTextLink = !["split", "callout", "center-large"].includes(content.position) && content.tiles?.type !== "addons-picker" && !isPrimary;
+  const isTextLink = !["split", "callout", "center-large", "card-stack"].includes(content.position) && content.tiles?.type !== "addons-picker" && !isPrimary;
   const isSplitButton = content.submenu_button?.attached_to === targetElement;
   let className = "secondary-cta";
   if (position) {
@@ -6392,12 +6530,16 @@ function MultistageWithDismiss({
     handleBlock?.();
     handleDismiss?.();
   }
+
+  // The card-stack template has its own inline dismiss button, so it doesn't
+  // need the corner one.
+  const isCardStack = config.screens?.[0]?.content?.position === "card-stack";
   return /*#__PURE__*/external_React_default().createElement("div", {
     className: "multistage-newtab-wrapper",
     style: config.wrapper_content_style ? MultiStageUtils.getValidStyle(config.wrapper_content_style, ["height"]) : {
       height: "500px"
     }
-  }, /*#__PURE__*/external_React_default().createElement("moz-button", {
+  }, isCardStack ? null : /*#__PURE__*/external_React_default().createElement("moz-button", {
     type: "icon ghost",
     size: "small",
     iconsrc: "chrome://global/skin/icons/close.svg",

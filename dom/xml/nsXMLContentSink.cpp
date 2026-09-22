@@ -127,7 +127,8 @@ NS_IMPL_RELEASE_INHERITED(nsXMLContentSink, nsContentSink)
 
 NS_IMPL_CYCLE_COLLECTION_INHERITED(nsXMLContentSink, nsContentSink,
                                    mCurrentHead, mDocElement, mLastTextNode,
-                                   mContentStack, mDocumentChildren)
+                                   mContentStack, mDocumentChildren,
+                                   mXSLTResultDocument)
 
 // nsIContentSink
 NS_IMETHODIMP
@@ -305,6 +306,7 @@ nsXMLContentSink::DidBuildModel(bool aTerminated) {
     mDocument->RemoveObserver(this);
     mIsDocumentObserver = false;
 
+    const RefPtr<nsXMLContentSink> kungFuDeathGrip(this);
     RefPtr<Document> doc = mDocument;
     if (!mDeferredLayoutStart && doc->IsBeingUsedAsImage()) {
       // Eagerly layout image documents, so that layout-triggered loads have a
@@ -312,7 +314,7 @@ nsXMLContentSink::DidBuildModel(bool aTerminated) {
       doc->FlushPendingNotifications(FlushType::Layout);
     }
 
-    doc->EndLoad();
+    doc->EndLoad(/* aFireDOMContentLoadedSync = */ !aTerminated);
 
     DropParserAndPerfHint();
   }
@@ -329,7 +331,10 @@ nsresult nsXMLContentSink::OnDocumentCreated(Document* aSourceDocument,
   // Make sure that we haven't loaded a new document into the documentviewer
   // after starting the XSLT transform.
   if (viewer && viewer->GetDocument() == aSourceDocument) {
-    return viewer->SetDocumentInternal(aResultDocument, true);
+    nsresult rv = viewer->SetDocumentInternal(aResultDocument, true);
+    NS_ENSURE_SUCCESS(rv, rv);
+    mXSLTResultDocument = aResultDocument;
+    aResultDocument->BeginLoad();
   }
   return NS_OK;
 }
@@ -340,6 +345,7 @@ nsresult nsXMLContentSink::OnTransformDone(Document* aSourceDocument,
   MOZ_ASSERT(aResultDocument,
              "Don't notify about transform end without a document.");
 
+  RefPtr<Document> transformedDocument = mXSLTResultDocument.forget();
   mDocumentChildren.Clear();
 
   nsCOMPtr<nsIDocumentViewer> viewer;
@@ -402,11 +408,16 @@ nsresult nsXMLContentSink::OnTransformDone(Document* aSourceDocument,
     ScrollToRef();
   }
 
-  originalDocument->EndLoad();
+  const RefPtr<nsXMLContentSink> kungFuDeathGrip(this);
+  originalDocument->EndLoad(/* aFireDOMContentLoadedSync = */ true);
   if (blockingOnload) {
     // This UnblockOnload call corresponds to the BlockOnload call in
     // nsContentSink::WillBuildModelImpl.
     originalDocument->UnblockOnload(true);
+  }
+  // On failure, aResultDocument is a separate error document.
+  if (transformedDocument && transformedDocument->IsExpectingEndLoad()) {
+    transformedDocument->EndLoad(/* aFireDOMContentLoadedSync = */ true);
   }
 
   DropParserAndPerfHint();
@@ -953,6 +964,9 @@ bool nsXMLContentSink::SetDocElement(int32_t aNameSpaceID, nsAtom* aTagName,
     }
     if (MOZ_UNLIKELY(child->GetParentNode())) {
       child->Remove();
+      if (MOZ_UNLIKELY(child->GetParentNode())) {
+        return false;
+      }
     }
     mDocument->AppendChildTo(child, false, IgnoreErrors());
     if (linkStyle) {
@@ -1007,12 +1021,12 @@ nsXMLContentSink::HandleStartElement(const char16_t* aName,
                                      uint32_t aAttsCount, uint32_t aLineNumber,
                                      uint32_t aColumnNumber) {
   return HandleStartElement(aName, aAtts, aAttsCount, aLineNumber,
-                            aColumnNumber, true);
+                            aColumnNumber, FROM_PARSER_NETWORK);
 }
 
 nsresult nsXMLContentSink::HandleStartElement(
     const char16_t* aName, const char16_t** aAtts, uint32_t aAttsCount,
-    uint32_t aLineNumber, uint32_t aColumnNumber, bool aInterruptable) {
+    uint32_t aLineNumber, uint32_t aColumnNumber, FromParser aFromParser) {
   MOZ_RELEASE_ASSERT(aAttsCount % 2 == 0, "incorrect aAttsCount");
   // Adjust aAttsCount so it's the actual number of attributes
   aAttsCount /= 2;
@@ -1045,9 +1059,9 @@ nsresult nsXMLContentSink::HandleStartElement(
   nodeInfo = mNodeInfoManager->GetNodeInfo(localName, prefix, nameSpaceID,
                                            nsINode::ELEMENT_NODE);
 
-  result = CreateElement(aAtts, aAttsCount, nodeInfo, aLineNumber,
-                         aColumnNumber, getter_AddRefs(content), &appendContent,
-                         FROM_PARSER_NETWORK);
+  result =
+      CreateElement(aAtts, aAttsCount, nodeInfo, aLineNumber, aColumnNumber,
+                    getter_AddRefs(content), &appendContent, aFromParser);
   NS_ENSURE_SUCCESS(result, result);
 
   // Have to do this before we push the new content on the stack... and have to
@@ -1069,6 +1083,9 @@ nsresult nsXMLContentSink::HandleStartElement(
 
       if (MOZ_UNLIKELY(content->GetParentNode())) {
         content->Remove();
+        if (MOZ_UNLIKELY(content->GetParentNode())) {
+          return NS_ERROR_UNEXPECTED;
+        }
       }
       parent->AppendChildTo(content, false, IgnoreErrors());
     }
@@ -1095,8 +1112,7 @@ nsresult nsXMLContentSink::HandleStartElement(
       nsContentUtils::AddScriptRunner(
           MakeAndAddRef<nsDocElementCreatedNotificationRunner>(mDocument));
 
-      if (aInterruptable && NS_SUCCEEDED(result) && mParser &&
-          !mParser->IsParserEnabled()) {
+      if (NS_SUCCEEDED(result) && mParser && !mParser->IsParserEnabled()) {
         return NS_ERROR_HTMLPARSER_BLOCK;
       }
     } else if (!mCurrentHead) {
@@ -1106,8 +1122,7 @@ nsresult nsXMLContentSink::HandleStartElement(
     }
   }
 
-  return aInterruptable && NS_SUCCEEDED(result) ? DidProcessATokenImpl()
-                                                : result;
+  return NS_SUCCEEDED(result) ? DidProcessATokenImpl() : result;
 }
 
 NS_IMETHODIMP

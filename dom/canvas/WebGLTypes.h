@@ -215,6 +215,7 @@ enum class WebGLExtensionID : uint8_t {
   EXT_disjoint_timer_query,
   EXT_float_blend,
   EXT_frag_depth,
+  EXT_polygon_offset_clamp,
   EXT_shader_texture_lod,
   EXT_sRGB,
   EXT_texture_compression_bptc,
@@ -440,7 +441,6 @@ struct avec2 {
   avec2(const T _x, const T _y) : x(_x), y(_y) {}
 
   bool operator==(const avec2& rhs) const = default;
-  bool operator!=(const avec2& rhs) const = default;
 
 #define _(OP)                                 \
   avec2 operator OP(const avec2& rhs) const { \
@@ -505,7 +505,6 @@ struct avec3 {
   avec3(const T _x, const T _y, const T _z) : x(_x), y(_y), z(_z) {}
 
   bool operator==(const avec3& rhs) const = default;
-  bool operator!=(const avec3& rhs) const = default;
 };
 
 using ivec2 = avec2<int32_t>;

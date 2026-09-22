@@ -1769,7 +1769,8 @@ nsresult WebSocketChannel::ProcessInput(uint8_t* buffer, uint32_t count) {
 
 #ifndef MOZ_NAIVEFOX
         if (frame) {
-          mService->FrameReceived(mSerial, mInnerWindowID, frame.forget());
+          mService->FrameReceived(mSerial, mInnerWindowID, mHttpChannelId,
+                                  frame.forget());
         }
 #endif
 
@@ -1844,7 +1845,8 @@ nsresult WebSocketChannel::ProcessInput(uint8_t* buffer, uint32_t count) {
         if (frame) {
           // We send the frame immediately becuase we want to have it dispatched
           // before the CallOnServerClose.
-          mService->FrameReceived(mSerial, mInnerWindowID, frame.forget());
+          mService->FrameReceived(mSerial, mInnerWindowID, mHttpChannelId,
+                                  frame.forget());
           frame = nullptr;
         }
 #endif
@@ -1895,7 +1897,8 @@ nsresult WebSocketChannel::ProcessInput(uint8_t* buffer, uint32_t count) {
 
 #ifndef MOZ_NAIVEFOX
       if (frame) {
-        mService->FrameReceived(mSerial, mInnerWindowID, frame.forget());
+        mService->FrameReceived(mSerial, mInnerWindowID, mHttpChannelId,
+                                frame.forget());
       }
 #endif
     } else if (opcode == nsIWebSocketFrame::OPCODE_BINARY) {
@@ -1933,7 +1936,8 @@ nsresult WebSocketChannel::ProcessInput(uint8_t* buffer, uint32_t count) {
 #endif
 #ifndef MOZ_NAIVEFOX
         if (frame) {
-          mService->FrameReceived(mSerial, mInnerWindowID, frame.forget());
+          mService->FrameReceived(mSerial, mInnerWindowID, mHttpChannelId,
+                                  frame.forget());
         }
 #endif
 
@@ -2306,7 +2310,8 @@ void WebSocketChannel::PrimeNewOutgoingMessage() {
 
 #ifndef MOZ_NAIVEFOX
   if (frame) {
-    mService->FrameSent(mSerial, mInnerWindowID, frame.forget());
+    mService->FrameSent(mSerial, mInnerWindowID, mHttpChannelId,
+                        frame.forget());
   }
 #endif
 

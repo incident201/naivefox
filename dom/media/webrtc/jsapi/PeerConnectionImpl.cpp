@@ -2177,6 +2177,11 @@ void PeerConnectionImpl::GetDefaultRtpExtensions(
         nsLiteralCString(webrtc::RtpExtension::kTransportSequenceNumberUri)};
     aRtpExtensions->AppendElement(std::move(transportSequenceNumber));
   }
+
+  RtpExtensionHeader videoOrientation = {
+      JsepMediaType::kVideo, SdpDirectionAttribute::Direction::kSendrecv,
+      nsLiteralCString(webrtc::RtpExtension::kVideoRotationUri)};
+  aRtpExtensions->AppendElement(std::move(videoOrientation));
 }
 
 /* static */
@@ -3089,12 +3094,17 @@ void PeerConnectionImpl::DoSetDescriptionSuccessPostProcessing(
           // We do this to ensure the mediaPipelineFilter is ready to receive
           // PTs in our offer. This is mainly used for when bundle is involved
           // but for whatever reason mid or SSRC is not signaled.
+          // We also update the conduit here to support early media
+          // (bug 2019381): if this transceiver is bundled onto a transport
+          // that was already negotiated (and is thus live), we can start
+          // receiving before this transceiver itself has an answer.
           for (const auto& transceiverImpl : mTransceivers) {
             if ((transceiverImpl->Direction() ==
                  RTCRtpTransceiverDirection::Sendrecv) ||
                 (transceiverImpl->Direction() ==
                  RTCRtpTransceiverDirection::Recvonly)) {
               transceiverImpl->Receiver()->UpdateTransport();
+              transceiverImpl->Receiver()->UpdateConduit();
             }
           }
         }
@@ -3453,10 +3463,11 @@ void PeerConnectionImpl::IceConnectionStateChange(
     RefPtr<RTCIceCandidatePair> newCandidatePair;
     if (aSelectedPair.isSome()) {
       nsCOMPtr<nsIGlobalObject> global = do_QueryInterface(mWindow);
-      RefPtr<RTCIceCandidate> local =
-          RTCIceCandidate::FromAttribute(global, aSelectedPair->local());
+      RefPtr<RTCIceCandidate> local = RTCIceCandidate::FromAttribute(
+          global, aSelectedPair->local(),
+          /*aHidePrflx=*/GetPrefObfuscateHostAddresses());
       RefPtr<RTCIceCandidate> remote = RTCIceCandidate::FromAttribute(
-          global, aSelectedPair->remote(), /*aRemote=*/true);
+          global, aSelectedPair->remote(), /*aHidePrflx=*/true);
       newCandidatePair = new RTCIceCandidatePair(global, local, remote);
     }
 
@@ -3536,8 +3547,8 @@ RTCIceConnectionState PeerConnectionImpl::GetNewIceConnectionState() const {
   std::set<RefPtr<RTCDtlsTransport>> transports(GetActiveTransports());
   for (const auto& transport : transports) {
     RefPtr<dom::RTCIceTransport> iceTransport = transport->IceTransport();
-    CSFLogWarn(LOGTAG, "GetNewIceConnectionState: %p %d", iceTransport.get(),
-               static_cast<int>(iceTransport->State()));
+    CSFLogDebug(LOGTAG, "GetNewIceConnectionState: %p %d", iceTransport.get(),
+                static_cast<int>(iceTransport->State()));
     statesFound.insert(iceTransport->State());
   }
 
@@ -3661,8 +3672,8 @@ void PeerConnectionImpl::IceGatheringStateChange(
     return;
   }
 
-  CSFLogWarn(LOGTAG, "IceGatheringStateChange: %s %d (%p)",
-             aTransportId.c_str(), static_cast<int>(state), this);
+  CSFLogDebug(LOGTAG, "IceGatheringStateChange: %s %d (%p)",
+              aTransportId.c_str(), static_cast<int>(state), this);
 
   // Let transport be the RTCIceTransport for which candidate gathering
   // began/finished.
@@ -4225,20 +4236,9 @@ void PeerConnectionImpl::StunAddrsHandler::OnMDNSQueryComplete(
   if (itor != pcw.impl()->mQueriedMDNSHostnames.end()) {
     if (address) {
       for (auto& cand : itor->second) {
-        // Replace obfuscated address with actual address
-        std::string obfuscatedAddr = cand.mTokenizedCandidate[4];
-        cand.mTokenizedCandidate[4] = address->get();
-        std::ostringstream o;
-        for (size_t i = 0; i < cand.mTokenizedCandidate.size(); ++i) {
-          o << cand.mTokenizedCandidate[i];
-          if (i + 1 != cand.mTokenizedCandidate.size()) {
-            o << " ";
-          }
-        }
-        std::string mungedCandidate = o.str();
         pcw.impl()->StampTimecard("Done looking up mDNS name");
         pcw.impl()->mTransportHandler->AddIceCandidate(
-            cand.mTransportId, mungedCandidate, cand.mUfrag, obfuscatedAddr);
+            cand.mTransportId, cand.mCandidate, cand.mUfrag, address->get());
       }
     } else {
       pcw.impl()->StampTimecard("Failed looking up mDNS name");
@@ -4625,7 +4625,7 @@ void PeerConnectionImpl::AddIceCandidate(const std::string& aCandidate,
           addr.rfind(".local") + dotLocalLength == addr.length()) {
         if (mStunAddrsRequest) {
           PendingIceCandidate cand;
-          cand.mTokenizedCandidate = std::move(tokens);
+          cand.mCandidate = aCandidate;
           cand.mTransportId = aTransportId;
           cand.mUfrag = aUfrag;
           mQueriedMDNSHostnames[addr].push_back(std::move(cand));
@@ -4692,8 +4692,12 @@ void PeerConnectionImpl::GatherIfReady() {
     InitLocalAddrs();
   }
 
-  // If we had previously queued gathering or ICE start, unqueue them
-  mQueuedIceCtxOperations.clear();
+  // Unlike before bug 2019381, we don't clear mQueuedIceCtxOperations here:
+  // it can also hold an unrelated, still-pending StartIceChecks (eg; for a
+  // bundled transport that was already negotiated in an earlier round),
+  // which remains valid and must still run. A stale queued gather running
+  // alongside a fresh one is harmless -- EnsureIceGathering() is a no-op
+  // once gathering for the current round is already underway.
   nsCOMPtr<nsIRunnable> runnable(WrapRunnable(
       RefPtr<PeerConnectionImpl>(this), &PeerConnectionImpl::EnsureIceGathering,
       GetPrefDefaultAddressOnly(), GetPrefObfuscateHostAddresses()));

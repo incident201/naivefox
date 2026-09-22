@@ -68,7 +68,7 @@
         "firefox_enterprise": { "version_added": "149.0.2" }
       },
       "x-restart-required": true,
-      "description": "Controls access to AI features: Translations, PDF alt text generation, smart tab groups, display summaries in link previews, AI chatbot in the sidebar and smart windows. The `Default` value applies to all AI features, unless overridden by a specific feature.",
+      "description": "Controls access to AI features: Translations, PDF alt text generation, smart tab groups, display summaries in link previews, AI chatbot in the sidebar, smart windows and on-device speech recognition. The `Default` value applies to all AI features, unless overridden by a specific feature.",
       "examples": [
         {
           "Default": {
@@ -242,6 +242,18 @@
               "type": "boolean"
             }
           }
+        },
+        "SpeechRecognition": {
+          "type": "object",
+          "properties": {
+            "Value": {
+              "type": "string",
+              "enum": ["available", "blocked"]
+            },
+            "Locked": {
+              "type": "boolean"
+            }
+          }
         }
       }
     },
@@ -303,7 +315,7 @@
       "x-compatibility": {
         "firefox": { "version_added": "62" },
         "firefox_esr": { "version_added": "60.2.0" },
-        "firefox_enterprise": { "version_added": false }
+        "firefox_enterprise": { "version_added": "149" }
       },
       "x-restart-required": true,
       "description": "Change the URL for application update if you are providing Firefox updates from a custom update server.",
@@ -521,7 +533,7 @@
       "x-compatibility": {
         "firefox": { "version_added": "60" },
         "firefox_esr": { "version_added": "60" },
-        "firefox_enterprise": { "version_added": "149" }
+        "firefox_enterprise": { "version_added": false }
       },
       "x-restart-required": true,
       "description": "Add bookmarks in either the bookmarks toolbar or menu. Use 'ManagedBookmarks' instead.",
@@ -639,6 +651,48 @@
       }
     },
 
+    "ClearOnShutdown": {
+      "type": ["boolean", "object"],
+      "x-category": "Local data storage",
+      "x-compatibility": {
+        "firefox": { "version_added": "158" },
+        "firefox_esr": { "version_added": false },
+        "firefox_enterprise": { "version_added": "158" }
+      },
+      "x-restart-required": true,
+      "description": "Clear browsing data when the browser closes. Only the named categories are enforced.",
+      "examples": [
+        false,
+        {
+          "BrowsingHistoryAndDownloads": true,
+          "CookiesAndStorage": true,
+          "Cache": true,
+          "Exceptions": ["https://example.com"]
+        }
+      ],
+      "properties": {
+        "BrowsingHistoryAndDownloads": {
+          "type": "boolean"
+        },
+        "CookiesAndStorage": {
+          "type": "boolean"
+        },
+        "Cache": {
+          "type": "boolean"
+        },
+        "FormData": {
+          "type": "boolean"
+        },
+        "SiteSettings": {
+          "type": "boolean"
+        },
+        "Exceptions": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/origin" }
+        }
+      }
+    },
+
     "CNSA2KeyAgreementEnabled": {
       "type": "boolean",
       "x-category": "Network security",
@@ -747,6 +801,10 @@
               "Enabled": true,
               "PlainTextOnly": true
             },
+            "ClipboardCopy": {
+              "Enabled": false,
+              "PlainTextOnly": true
+            },
             "Download": {
               "Enabled": false
             },
@@ -812,6 +870,17 @@
           "type": "object",
           "properties": {
             "Clipboard": {
+              "type": "object",
+              "properties": {
+                "Enabled": {
+                  "type": "boolean"
+                },
+                "PlainTextOnly": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "ClipboardCopy": {
               "type": "object",
               "properties": {
                 "Enabled": {
@@ -1314,10 +1383,13 @@
       "x-compatibility": {
         "firefox": { "version_added": "155" },
         "firefox_esr": { "version_added": false },
-        "firefox_enterprise": { "version_added": "155" }
+        "firefox_enterprise": { "version_added": "155" },
+        "notes": [
+          "Windows support added in 155, macOS support added in 156. Has no effect on Linux."
+        ]
       },
       "x-restart-required": true,
-      "description": "Prevent Firefox from launching automatically when the user logs in, and prevent the user from enabling this setting. This policy currently only has an effect on Windows.",
+      "description": "Prevent Firefox from launching automatically when the user logs in, and prevent the user from enabling this setting.",
       "examples": [true]
     },
 
@@ -1366,7 +1438,7 @@
       "x-compatibility": {
         "firefox": { "version_added": "60" },
         "firefox_esr": { "version_added": "60" },
-        "firefox_enterprise": { "version_added": "149" }
+        "firefox_enterprise": { "version_added": false }
       },
       "x-restart-required": true,
       "description": "Remove access to private browsing.",
@@ -3743,6 +3815,12 @@
             "Policies": {
               "HttpsOnly": true
             }
+          },
+          {
+            "Match": ["*.example.com"],
+            "Policies": {
+              "Container": { "id": "work" }
+            }
           }
         ]
       ],
@@ -3774,6 +3852,19 @@
               },
               "DisableServiceWorkers": {
                 "type": "boolean"
+              },
+              "Container": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "ephemeral": {
+                    "type": "boolean"
+                  }
+                },
+                "required": ["id"]
               }
             }
           }

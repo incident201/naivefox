@@ -35,6 +35,7 @@ import org.mozilla.fenix.theme.FirefoxTheme
 /**
  * Card asking the user to allow search suggestions in private mode.
  *
+ * @param modifier [Modifier] to be applied to this card.
  * @param onSearchSuggestionsInPrivateModeAllowed Callback to be invoked when the user allows search suggestions in
  *   private mode.
  * @param onSearchSuggestionsInPrivateModeBlocked Callback to be invoked when the user blocks search suggestions in
@@ -43,11 +44,12 @@ import org.mozilla.fenix.theme.FirefoxTheme
  */
 @Composable
 internal fun PrivateSuggestionsCard(
+    modifier: Modifier = Modifier,
     onSearchSuggestionsInPrivateModeAllowed: () -> Unit = {},
     onSearchSuggestionsInPrivateModeBlocked: () -> Unit = {},
     onLearnMoreClick: () -> Unit = {},
 ) {
-    Surface {
+    Surface(modifier = modifier) {
         Column {
             Row(
                 modifier =

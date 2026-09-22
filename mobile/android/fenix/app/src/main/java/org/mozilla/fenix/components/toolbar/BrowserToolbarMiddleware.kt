@@ -6,6 +6,7 @@ package org.mozilla.fenix.components.toolbar
 
 import android.content.Context
 import android.os.Build
+import android.text.TextUtils
 import androidx.annotation.VisibleForTesting
 import androidx.navigation.NavController
 import kotlinx.coroutines.CoroutineDispatcher
@@ -26,6 +27,7 @@ import mozilla.components.browser.state.state.SecurityInfo
 import mozilla.components.browser.state.state.selectedOrDefaultSearchEngine
 import mozilla.components.browser.state.store.BrowserStore
 import mozilla.components.browser.thumbnails.BrowserThumbnails
+import mozilla.components.browser.thumbnails.facts.BrowserThumbnailsFacts
 import mozilla.components.browser.toolbar.R as toolbarR
 import mozilla.components.compose.browser.toolbar.concept.Action
 import mozilla.components.compose.browser.toolbar.concept.Action.ActionButton
@@ -326,6 +328,7 @@ class BrowserToolbarMiddleware(
                 observePageSecurityUpdates(store)
                 observePermissionHighlightsUpdates(store)
                 observeIPProtectionUpdates(store)
+                observeTabReloadCoverUpdates(store)
             }
 
             is StartPageActions.SiteInfoClicked -> {
@@ -341,14 +344,21 @@ class BrowserToolbarMiddleware(
             is MenuClicked -> {
                 navController.nav(
                     R.id.browserFragment,
-                    BrowserFragmentDirections.actionGlobalMenuDialogFragment(accesspoint = MenuAccessPoint.Browser),
+                    when (settings.isMenuCustomizationEnabled) {
+                        true -> BrowserFragmentDirections.actionBrowserFragmentToMenuFragment()
+                        else ->
+                            BrowserFragmentDirections.actionGlobalMenuDialogFragment(
+                                accesspoint = MenuAccessPoint.Browser
+                            )
+                    },
                 )
 
                 next(action)
             }
 
             is TabCounterClicked -> {
-                thumbnailsFeature()?.requestScreenshot()
+                thumbnailsFeature()
+                    ?.requestScreenshot(trigger = BrowserThumbnailsFacts.CaptureAttemptedTriggers.TAB_COUNTER_CLICK)
 
                 navController.nav(
                     R.id.browserFragment,
@@ -419,7 +429,9 @@ class BrowserToolbarMiddleware(
                         )
                     )
                 } else {
-                    store.dispatch(SearchQueryUpdated(BrowserToolbarQuery(searchTerms), true))
+                    if (!settings.showAddressBarInFocusMode) {
+                        store.dispatch(SearchQueryUpdated(BrowserToolbarQuery(searchTerms), true))
+                    }
                     appStore.dispatch(SearchStarted(selectedTab.id))
                 }
             }
@@ -1021,7 +1033,7 @@ class BrowserToolbarMiddleware(
             }
         val searchTerms = browserStore.state.selectedTab?.content?.searchTerms ?: ""
 
-        val displayUrl = url?.let { originalUrl ->
+        val baseDisplayUrl = url?.let { originalUrl ->
             if (originalUrl.toString() == ABOUT_HOME_URL) {
                 // Default to showing the toolbar hint when the URL is ABOUT_HOME.
                 ""
@@ -1031,6 +1043,16 @@ class BrowserToolbarMiddleware(
                 URLStringUtils.toDisplayUrl(originalUrl)
             }
         }
+        val displayUrl =
+            if (browserScreenStore.state.isShowingTabReloadCover && !baseDisplayUrl.isNullOrEmpty()) {
+                TextUtils.concat(
+                    uiContext.getText(R.string.browser_toolbar_cached_page_indicator),
+                    " | ",
+                    baseDisplayUrl,
+                )
+            } else {
+                baseDisplayUrl
+            }
 
         store.dispatch(
             BrowserDisplayToolbarAction.PageOriginUpdated(
@@ -1071,6 +1093,16 @@ class BrowserToolbarMiddleware(
                 .collect {
                     updateStartPageActions(store)
                     updateEndPageActions(store)
+                }
+        }
+    }
+
+    private fun observeTabReloadCoverUpdates(store: Store<BrowserToolbarState, BrowserToolbarAction>) {
+        browserScreenStore.observeWhileActive {
+            distinctUntilChangedBy { it.isShowingTabReloadCover }
+                .collect {
+                    updateStartPageActions(store)
+                    updateCurrentPageOrigin(store)
                 }
         }
     }
@@ -1320,7 +1352,16 @@ class BrowserToolbarMiddleware(
                     (browserStore.state.selectedTab?.content?.permissionHighlights?.permissionsChanged == true) ||
                         (browserStore.state.selectedTab?.trackingProtection?.ignoredOnTrackingProtection == true)
                 val selectedTab = browserStore.state.selectedTab
-                if (selectedTab?.content?.url?.isContentUrl() == true) {
+                if (browserScreenStore.state.isShowingTabReloadCover) {
+                    // Placeholder warning shield while a cached thumbnail is covering the engine view.
+                    buildSiteInfoAction(
+                        drawableResId = iconsR.drawable.mozac_ic_shield_exclamation_mark_24,
+                        contentDescription = toolbarR.string.mozac_browser_toolbar_content_description_site_info,
+                        highlighted = highlight,
+                        onClick = StartPageActions.SiteInfoClicked,
+                        testTag = SITE_INFO_INSECURE_CONNECTION,
+                    )
+                } else if (selectedTab?.content?.url?.isContentUrl() == true) {
                     ActionButtonRes(
                         drawableResId = iconsR.drawable.mozac_ic_page_portrait_24,
                         contentDescription = toolbarR.string.mozac_browser_toolbar_content_description_site_info,

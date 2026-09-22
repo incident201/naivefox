@@ -264,6 +264,7 @@
 #include "nsIPermissionManager.h"
 #include "nsIPrefBranch.h"
 #include "nsIPrincipal.h"
+#include "nsIPrintSettings.h"
 #include "nsIPrompt.h"
 #include "nsIRunnable.h"
 #include "nsIScreen.h"
@@ -320,10 +321,6 @@
 #include "prtypes.h"
 #include "xpcprivate.h"
 #include "xpcpublic.h"
-
-#ifdef NS_PRINTING
-#  include "nsIPrintSettings.h"
-#endif
 
 #ifdef MOZ_WEBSPEECH
 #  include "mozilla/dom/SpeechSynthesis.h"
@@ -726,7 +723,7 @@ void nsGlobalWindowInner::RemoveIdleCallback(
                                   Timeout::Reason::eIdleCallbackTimeout);
   }
 
-  aRequest->removeFrom(mIdleRequestCallbacks);
+  aRequest->RemoveFromList();
 }
 
 void nsGlobalWindowInner::RunIdleRequest(IdleRequest* aRequest,
@@ -834,6 +831,7 @@ uint32_t nsGlobalWindowInner::RequestIdleCallback(
     request->SetTimeoutHandle(timeoutHandle);
   }
 
+  request->SetContainer(mIdleRequestCallbacksByHandle);
   mIdleRequestCallbacks.insertBack(request);
 
   if (!IsSuspended()) {
@@ -844,11 +842,8 @@ uint32_t nsGlobalWindowInner::RequestIdleCallback(
 }
 
 void nsGlobalWindowInner::CancelIdleCallback(uint32_t aHandle) {
-  for (IdleRequest* r : mIdleRequestCallbacks) {
-    if (r->Handle() == aHandle) {
-      RemoveIdleCallback(r);
-      break;
-    }
+  if (IdleRequest* request = mIdleRequestCallbacksByHandle->Get(aHandle)) {
+    RemoveIdleCallback(request);
   }
 }
 
@@ -931,6 +926,7 @@ nsGlobalWindowInner::nsGlobalWindowInner(nsGlobalWindowOuter* aOuterWindow,
 #endif
       mFocusMethod(0),
       mIdleRequestCallbackCounter(1),
+      mIdleRequestCallbacksByHandle(new mozilla::dom::IdleRequestMap()),
       mIdleRequestExecutor(nullptr),
       mObservingRefresh(false),
       mIteratingDocumentFlushedResolvers(false),

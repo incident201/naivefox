@@ -9,6 +9,9 @@ import {
 import { UrlbarPrefs } from "moz-src:///browser/components/urlbar/UrlbarPrefs.sys.mjs";
 
 const FEATURE_GATE = "newtabFeatureGate";
+const VARIANT_A = "newtabVariantA";
+const VARIANT_B = "newtabVariantB";
+const NOVA_PREF = "browser.nova.enabled";
 
 /**
  * A registrant that adds `<moz-urlbar>` to about:newtab / about:home while the
@@ -28,7 +31,17 @@ export class UrlbarNewTabComponentRegistrant extends BaseAboutNewTabComponentReg
   }
 
   onNimbusChanged(variable) {
-    if (variable == FEATURE_GATE) {
+    if (
+      variable == FEATURE_GATE ||
+      variable == VARIANT_A ||
+      variable == VARIANT_B
+    ) {
+      this.updated();
+    }
+  }
+
+  onPrefChanged(pref) {
+    if (pref == NOVA_PREF) {
       this.updated();
     }
   }
@@ -38,19 +51,33 @@ export class UrlbarNewTabComponentRegistrant extends BaseAboutNewTabComponentReg
       return [];
     }
 
+    // The variants are branches of one experiment, so at most one applies.
+    let variant = null;
+    if (UrlbarPrefs.get(VARIANT_B)) {
+      variant = "variant-b";
+    } else if (UrlbarPrefs.get(VARIANT_A)) {
+      variant = "variant-a";
+    }
+
     return [
       {
         type: AboutNewTabComponentRegistry.TYPES.SEARCH,
-        l10nURLs: ["browser/browser.ftl", "preview/enUS-searchFeatures.ftl"],
+        l10nURLs: [
+          "browser/browser.ftl",
+          "preview/enUS-searchFeatures.ftl",
+          "toolkit/global/contextual-identity.ftl",
+        ],
+        stylesURLs: ["chrome://browser/skin/urlbar.css"],
         componentURL: "chrome://browser/content/urlbar/UrlbarInput.mjs",
         tagName: "moz-urlbar",
         attributes: {
           class: "urlbar",
+          role: "group",
           pageproxystate: "invalid",
-          popover: "manual",
           "in-page": "",
           "sap-name": "newtab_searchbar",
           "unifiedsearchbutton-available": "",
+          ...(variant ? { [variant]: "" } : {}),
         },
       },
     ];

@@ -40,6 +40,8 @@ skip-if = ["os == 'win'"]
 
 ["test_file_whitespace.py"]
 
+["test_ffvpx_symbols.py"]
+
 ["test_fluent_lint.py"]
 
 ["test_forbid_moduleloaderbase_include.py"]
@@ -64,6 +66,8 @@ skip-if = ["os == 'win'"]
 
 ["test_node_package_names.py"]
 
+["test_pnpm_audit.py"]
+
 ["test_python_sites.py"]
 
 ["test_ruff.py"]
@@ -73,6 +77,8 @@ skip-if = ["os == 'win'"]
 ["test_rustfmt.py"]
 
 ["test_shellcheck.py"]
+
+["test_spidermonkey.py"]
 
 ["test_stylelint.py"]
 skip-if = ["os == 'win'"]  # busts the tree for subsequent tasks on the same worker (bug 1708591)

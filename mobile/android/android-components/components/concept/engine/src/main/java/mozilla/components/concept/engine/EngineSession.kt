@@ -426,6 +426,8 @@ abstract class EngineSession(private val delegate: Observable<Observer> = Observ
         val bounceTrackingProtectionMode: BounceTrackingProtectionMode = BounceTrackingProtectionMode.DISABLED,
         val allowListBaselineTrackingProtection: Boolean = true,
         val allowListConvenienceTrackingProtection: Boolean = true,
+        val fingerprintingProtection: Boolean? = null,
+        val fingerprintingProtectionPrivateBrowsing: Boolean? = null,
     ) {
 
         /**
@@ -538,6 +540,8 @@ abstract class EngineSession(private val delegate: Observable<Observer> = Observ
                     bounceTrackingProtectionMode = BounceTrackingProtectionMode.ENABLED,
                     allowListBaselineTrackingProtection = allowListBaselineTrackingProtection,
                     allowListConvenienceTrackingProtection = allowListConvenienceTrackingProtection,
+                    fingerprintingProtection = true,
+                    fingerprintingProtectionPrivateBrowsing = true,
                 )
 
             /**
@@ -550,9 +554,11 @@ abstract class EngineSession(private val delegate: Observable<Observer> = Observ
                     cookiePolicy = ACCEPT_FIRST_PARTY_AND_ISOLATE_OTHERS,
                     strictSocialTrackingProtection = false,
                     cookiePurging = true,
-                    bounceTrackingProtectionMode = BounceTrackingProtectionMode.ENABLED_STANDBY,
+                    bounceTrackingProtectionMode = BounceTrackingProtectionMode.ENABLED_DRY_RUN,
                     allowListBaselineTrackingProtection = true,
                     allowListConvenienceTrackingProtection = true,
+                    fingerprintingProtection = false,
+                    fingerprintingProtectionPrivateBrowsing = true,
                 )
 
             /**
@@ -580,9 +586,11 @@ abstract class EngineSession(private val delegate: Observable<Observer> = Observ
                 strictSocialTrackingProtection: Boolean? = null,
                 cookiePurging: Boolean = false,
                 bounceTrackingProtectionMode: BounceTrackingProtectionMode =
-                    BounceTrackingProtectionMode.ENABLED_STANDBY,
+                    BounceTrackingProtectionMode.ENABLED_DRY_RUN,
                 allowListBaselineTrackingProtection: Boolean = true,
                 allowListConvenienceTrackingProtection: Boolean = false,
+                fingerprintingProtection: Boolean? = null,
+                fingerprintingProtectionPrivateBrowsing: Boolean? = null,
             ) =
                 TrackingProtectionPolicyForSessionTypes(
                     trackingCategory = trackingCategories,
@@ -593,6 +601,8 @@ abstract class EngineSession(private val delegate: Observable<Observer> = Observ
                     bounceTrackingProtectionMode = bounceTrackingProtectionMode,
                     allowListBaselineTrackingProtection = allowListBaselineTrackingProtection,
                     allowListConvenienceTrackingProtection = allowListConvenienceTrackingProtection,
+                    fingerprintingProtection = fingerprintingProtection,
+                    fingerprintingProtectionPrivateBrowsing = fingerprintingProtectionPrivateBrowsing,
                 )
         }
 
@@ -656,6 +666,8 @@ abstract class EngineSession(private val delegate: Observable<Observer> = Observ
         bounceTrackingProtectionMode: BounceTrackingProtectionMode = BounceTrackingProtectionMode.DISABLED,
         allowListBaselineTrackingProtection: Boolean = true,
         allowListConvenienceTrackingProtection: Boolean = true,
+        fingerprintingProtection: Boolean? = null,
+        fingerprintingProtectionPrivateBrowsing: Boolean? = null,
     ) :
         TrackingProtectionPolicy(
             trackingCategories = trackingCategory,
@@ -666,6 +678,8 @@ abstract class EngineSession(private val delegate: Observable<Observer> = Observ
             bounceTrackingProtectionMode = bounceTrackingProtectionMode,
             allowListBaselineTrackingProtection = allowListBaselineTrackingProtection,
             allowListConvenienceTrackingProtection = allowListConvenienceTrackingProtection,
+            fingerprintingProtection = fingerprintingProtection,
+            fingerprintingProtectionPrivateBrowsing = fingerprintingProtectionPrivateBrowsing,
         ) {
         /** Marks this policy to be used for private sessions only. */
         fun forPrivateSessionsOnly() =
@@ -680,6 +694,8 @@ abstract class EngineSession(private val delegate: Observable<Observer> = Observ
                 bounceTrackingProtectionMode = bounceTrackingProtectionMode,
                 allowListBaselineTrackingProtection = allowListBaselineTrackingProtection,
                 allowListConvenienceTrackingProtection = allowListConvenienceTrackingProtection,
+                fingerprintingProtection = fingerprintingProtection,
+                fingerprintingProtectionPrivateBrowsing = fingerprintingProtectionPrivateBrowsing,
             )
 
         /** Marks this policy to be used for regular (non-private) sessions only. */
@@ -695,6 +711,8 @@ abstract class EngineSession(private val delegate: Observable<Observer> = Observ
                 bounceTrackingProtectionMode = bounceTrackingProtectionMode,
                 allowListBaselineTrackingProtection = allowListBaselineTrackingProtection,
                 allowListConvenienceTrackingProtection = allowListConvenienceTrackingProtection,
+                fingerprintingProtection = fingerprintingProtection,
+                fingerprintingProtectionPrivateBrowsing = fingerprintingProtectionPrivateBrowsing,
             )
     }
 
@@ -890,6 +908,22 @@ abstract class EngineSession(private val delegate: Observable<Observer> = Observ
      * @param onError callback invoked if there was an error getting the response.
      */
     abstract fun checkForPdfViewer(onResult: (Boolean) -> Unit, onException: (Throwable) -> Unit)
+
+    /**
+     * Can be used to add a signature to a PDF, when the [EngineSession] is showing a PDF.
+     *
+     * The PDF viewer itself will place the signature and control placement.
+     *
+     * @param text The signature the user typed.
+     * @param onResult Callback invoked once the engine's PDF viewer has been given the signature.
+     * @param onException Callback invoked if the signature could not be handed to a PDF viewer, which includes the
+     *   session not displaying a PDF at all.
+     */
+    abstract fun addSignatureToPdf(
+        text: String,
+        onResult: () -> Unit,
+        onException: (Throwable) -> Unit,
+    )
 
     /**
      * Send the broken site report using Glean.

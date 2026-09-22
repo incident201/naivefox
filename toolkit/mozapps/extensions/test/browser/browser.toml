@@ -60,11 +60,6 @@ support-files = ["head_abuse_report.js"]
 
 ["browser_checkAddonCompatibility.js"]
 
-["browser_colorwaybuiltins_notification.js"]
-run-if = [
-  "appname == 'firefox'",
-]
-
 ["browser_dragdrop.js"]
 skip-if = [
   "true", # Bug 1626824
@@ -78,6 +73,8 @@ skip-if = [
 
 ["browser_history_navigation.js"]
 https_first_disabled = true
+
+["browser_html_a11y_no_horizontal_overflow.js"]
 
 ["browser_html_detail_permissions.js"]
 

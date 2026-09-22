@@ -22,6 +22,7 @@ UNIFIED_SOURCES += [
     "TestHttpAuthUtils.cpp",
     "TestHttpChannel.cpp",
     "TestHttpResponseHead.cpp",
+    "TestHttpTransactionRestart.cpp",
     "TestIDNA.cpp",
     "TestInputStreamTransport.cpp",
     "TestIsValidIp.cpp",
@@ -35,12 +36,14 @@ UNIFIED_SOURCES += [
     "TestPollableEvent.cpp",
     "TestProtocolProxyService.cpp",
     "TestReadStreamToString.cpp",
+    "TestSanitizedSpec.cpp",
     "TestServerTimingHeader.cpp",
     "TestSFV.cpp",
     "TestSocketTransportService.cpp",
     "TestSSLTokensCache.cpp",
     "TestStandardURL.cpp",
     "TestStorageAccessHeader.cpp",
+    "TestSyncStreamListener.cpp",
     "TestUDPSocket.cpp",
     "TestURIMutator.cpp",
     "TestUriTemplate.cpp",
@@ -58,6 +61,7 @@ SOURCES += [
     "TestCacheCrypto.cpp",
     "TestCacheEntryWriterHang.cpp",
     "TestHappyEyeballsConnectionAttempt.cpp",
+    "TestHappyEyeballsNetAddrArray.cpp",
 ]
 
 if CONFIG["OS_TARGET"] == "WINNT":

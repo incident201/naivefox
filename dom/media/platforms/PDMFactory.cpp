@@ -6,6 +6,7 @@
 
 #include "AOMDecoder.h"
 #include "AgnosticDecoderModule.h"
+#include "AllocationPolicy.h"
 #include "AudioTrimmer.h"
 #include "BlankDecoderModule.h"
 #include "DecoderDoctorDiagnostics.h"
@@ -482,6 +483,77 @@ DecodeSupportSet PDMFactory::Supports(
 
   // We have a PDM - check for + return SW/HW support info
   return current->Supports(aParams, aDiagnostics);
+}
+
+RefPtr<PDMSupportsDecoderPromise> PDMFactory::SupportsAsync(
+    const SupportDecoderParams& aParams) const {
+  if (mEMEPDM) {
+    return mEMEPDM->SupportsAsync(aParams);
+  }
+
+  nsTArray<RefPtr<PDMSupportsDecoderPromise>> promises(mCurrentPDMs.Length());
+  for (const auto& m : mCurrentPDMs) {
+    if (!m->Supports(aParams, nullptr).isEmpty()) {
+      promises.AppendElement(m->SupportsAsync(aParams));
+    }
+  }
+  return PDMSupportsDecoderPromise::AllSettled(GetCurrentSerialEventTarget(),
+                                               promises)
+      ->Then(
+          GetCurrentSerialEventTarget(), __func__,
+          [mimeType = aParams.mConfig.mMimeType](
+              CopyableTArray<PDMSupportsDecoderPromise::ResolveOrRejectValue>&&
+                  aValues) -> RefPtr<PDMSupportsDecoderPromise> {
+            DecodeSupportSet support{};
+            for (const auto& value : aValues) {
+              if (value.IsResolve()) {
+                support += value.ResolveValue();
+              }
+            }
+            return PDMSupportsDecoderPromise::CreateAndResolve(support,
+                                                               __func__);
+          },
+          [] {
+            MOZ_CRASH("AllSettled does not reject");
+            return RefPtr<PDMSupportsDecoderPromise>(nullptr);
+          });
+}
+
+/* static */
+RefPtr<PDMSupportsDecoderPromise> PDMFactory::StrictSupportsAsync(
+    const CreateDecoderParams& aParams, AllocPolicy* aPolicy) {
+  return AllocationWrapper::CreateDecoder(aParams, aPolicy)
+      ->Then(
+          GetCurrentSerialEventTarget(), __func__,
+          [](AllocationWrapper::AllocateDecoderPromise::ResolveOrRejectValue&&
+                 aValue) -> RefPtr<PDMSupportsDecoderPromise> {
+            if (aValue.IsReject()) {
+              // The decoder could not be created: report unsupported.
+              return PDMSupportsDecoderPromise::CreateAndResolve(
+                  DecodeSupportSet{}, __func__);
+            }
+            RefPtr<MediaDataDecoder> decoder = std::move(aValue.ResolveValue());
+            return decoder->Init()->Then(
+                GetCurrentSerialEventTarget(), __func__,
+                [decoder](
+                    MediaDataDecoder::InitPromise::ResolveOrRejectValue&& aInit)
+                    -> RefPtr<PDMSupportsDecoderPromise> {
+                  DecodeSupportSet support{};
+                  if (aInit.IsResolve()) {
+                    nsAutoCString reason;
+                    support += decoder->IsHardwareAccelerated(reason)
+                                   ? DecodeSupport::HardwareDecode
+                                   : DecodeSupport::SoftwareDecode;
+                  }
+                  // Keep the decoder alive until its shutdown completes.
+                  decoder->Shutdown()->Then(
+                      GetCurrentSerialEventTarget(), __func__,
+                      [decoder](const ShutdownPromise::ResolveOrRejectValue&) {
+                      });
+                  return PDMSupportsDecoderPromise::CreateAndResolve(support,
+                                                                     __func__);
+                });
+          });
 }
 
 /* static */

@@ -11,7 +11,7 @@ use crate::internal_types::{FastHashMap, FrameMemory};
 use crate::print_tree::{PrintableTree, PrintTree, PrintTreePrinter};
 use crate::scene::SceneProperties;
 use crate::spatial_node::{ReferenceFrameInfo, SpatialNode, SpatialNodeDescriptor, SpatialNodeType, StickyFrameInfo};
-use crate::spatial_node::{ScrollFrameKind, SceneSpatialNode, SpatialNodeInfo};
+use crate::spatial_node::{ScrollFrameInfo, ScrollFrameKind, SceneSpatialNode, SpatialNodeInfo};
 use crate::util::{FastTransform, LayoutToWorldFastTransform, MatrixHelpers, ScaleOffset, scale_factors};
 use smallvec::SmallVec;
 use crate::util::TransformedRectKind;
@@ -91,6 +91,26 @@ const MIN_SCROLLABLE_AMOUNT: f32 = 0.01;
 
 // The minimum size for a scroll frame for it to be considered for a scroll root.
 const MIN_SCROLL_ROOT_SIZE: f32 = 128.0;
+
+/// Whether an explicit scroll frame is a real scroll root, as opposed to a
+/// redundant one that is not worth a picture cache slice of its own.
+///
+/// A frame with no scrollable area is skipped. This helps pages that have a
+/// nested scroll root within a redundant scroll root to avoid selecting the
+/// wrong reference spatial node for a picture cache.
+///
+/// Since we are skipping redundant scroll roots, we may end up selecting inner
+/// scroll roots that are very small. There is no performance benefit to
+/// creating a slice for these roots, as they are cheap to rasterize. The size
+/// comparison is in local-space, but makes for a reasonable estimate. The value
+/// is arbitrary, but is generally small enough to ignore things like scroll
+/// roots around text input elements.
+fn is_real_scroll_root(info: &ScrollFrameInfo) -> bool {
+    (info.scrollable_size.width > MIN_SCROLLABLE_AMOUNT ||
+     info.scrollable_size.height > MIN_SCROLLABLE_AMOUNT) &&
+    info.viewport_rect.width() > MIN_SCROLL_ROOT_SIZE &&
+    info.viewport_rect.height() > MIN_SCROLL_ROOT_SIZE
+}
 
 impl SpatialNodeIndex {
     pub fn new(index: usize) -> Self {
@@ -298,27 +318,8 @@ impl SceneSpatialTree {
                             // If the previously identified scroll root is sticky then we don't
                             // want to choose an ancestor scroll root, as we want the sticky item
                             // to have its own picture cache slice.
-                            if !current_scroll_root_is_sticky {
-                                // If the scroll root has no scrollable area, we don't want to
-                                // consider it. This helps pages that have a nested scroll root
-                                // within a redundant scroll root to avoid selecting the wrong
-                                // reference spatial node for a picture cache.
-                                if info.scrollable_size.width > MIN_SCROLLABLE_AMOUNT ||
-                                   info.scrollable_size.height > MIN_SCROLLABLE_AMOUNT {
-                                    // Since we are skipping redundant scroll roots, we may end up
-                                    // selecting inner scroll roots that are very small. There is
-                                    // no performance benefit to creating a slice for these roots,
-                                    // as they are cheap to rasterize. The size comparison is in
-                                    // local-space, but makes for a reasonable estimate. The value
-                                    // is arbitrary, but is generally small enough to ignore things
-                                    // like scroll roots around text input elements.
-                                    if info.viewport_rect.width() > MIN_SCROLL_ROOT_SIZE &&
-                                       info.viewport_rect.height() > MIN_SCROLL_ROOT_SIZE {
-                                        // If we've found a root that is scrollable, and a reasonable
-                                        // size, select that as the current root for this node
-                                        real_scroll_root = node_index;
-                                    }
-                                }
+                            if !current_scroll_root_is_sticky && is_real_scroll_root(info) {
+                                real_scroll_root = node_index;
                             }
                         }
                     }
@@ -336,6 +337,20 @@ impl SceneSpatialTree {
             outermost_scroll_root
         } else {
             real_scroll_root
+        }
+    }
+
+    /// Whether a scroll root returned by `find_scroll_root` is worth its own
+    /// picture cache slice. A redundant scroll frame (see `is_real_scroll_root`)
+    /// is only selected through the `outermost_scroll_root` fallback; a slice
+    /// boundary at it splits content that would otherwise composite as one
+    /// surface.
+    pub fn is_slice_worthy_scroll_root(&self, spatial_node_index: SpatialNodeIndex) -> bool {
+        match self.get_node_info(spatial_node_index).node_type {
+            SpatialNodeType::ScrollFrame(ref info) if info.frame_kind == ScrollFrameKind::Explicit => {
+                is_real_scroll_root(info)
+            }
+            _ => true,
         }
     }
 
@@ -812,8 +827,40 @@ impl SpatialTree {
         node_index
     }
 
+    /// Whether `get_relative_transform(child_index, parent_index)` can be
+    /// computed, i.e. whether `parent_index`'s coordinate system is an ancestor
+    /// of (or the same as) `child_index`'s.
+    ///
+    /// Relative transforms are only available in that direction. Building one
+    /// walks from the child's coordinate system up to the parent's, accumulating
+    /// each system's transform, so there is nothing to walk when the parent is
+    /// not on that path. The other direction is deliberately not offered rather
+    /// than merely missing: a transform away from the root is not always
+    /// invertible, so there is not always a transform to return. A caller that
+    /// needs the reverse has to handle the answer not existing.
+    pub fn can_get_relative_transform(
+        &self,
+        child_index: SpatialNodeIndex,
+        parent_index: SpatialNodeIndex,
+    ) -> bool {
+        let target = self.get_spatial_node(parent_index).coordinate_system_id;
+        let mut current = self.get_spatial_node(child_index).coordinate_system_id;
+
+        loop {
+            if current == target {
+                return true;
+            }
+
+            match self.coord_systems[current.0 as usize].parent {
+                Some(parent) => current = parent,
+                None => return false,
+            }
+        }
+    }
+
     /// Calculate the relative transform from `child_index` to `parent_index`.
-    /// This method will panic if the nodes are not connected!
+    /// This method will panic if the nodes are not connected! See
+    /// `can_get_relative_transform` for what "connected" means here.
     pub fn get_relative_transform(
         &self,
         child_index: SpatialNodeIndex,

@@ -9,6 +9,7 @@
 #include "EventTokenBucket.h"
 #include "HttpTransactionShell.h"
 #include "TimingStruct.h"
+#include "gtest/MozGtestFriend.h"
 #include "mozilla/StaticPrefs_security.h"
 #include "mozilla/net/ClassOfService.h"
 #include "mozilla/net/DNS.h"
@@ -82,7 +83,7 @@ class nsHttpTransaction final : public nsAHttpTransaction,
   nsIEventTarget* ConsumerTarget() { return mConsumerTarget; }
 
   // Called to set/find out if the transaction generated a complete response.
-  void SetResponseIsComplete() { mResponseIsComplete = true; }
+  void SetResponseIsComplete();
 
   void EnableKeepAlive() { mCaps |= NS_HTTP_ALLOW_KEEPALIVE; }
   void MakeSticky() { mCaps |= NS_HTTP_STICKY_CONNECTION; }
@@ -156,6 +157,9 @@ class nsHttpTransaction final : public nsAHttpTransaction,
   bool ChannelPipeFull() { return mWaitingOnPipeOut; }
 
   // Locked methods to get and set timing info
+  // Replaces the domainLookup, connect and TLS timings with aTimes, which is
+  // empty for a transaction running on a connection it did not establish, so
+  // that it can't report a connect phase belonging to another connection.
   void BootstrapTimings(TimingStruct times);
   void SetConnectStart(mozilla::TimeStamp timeStamp, bool onlyIfNull = false);
   void SetConnectEnd(mozilla::TimeStamp timeStamp, bool onlyIfNull = false);
@@ -258,6 +262,15 @@ class nsHttpTransaction final : public nsAHttpTransaction,
   void SetIsTRRTransaction() override { mIsTRRTransaction = true; }
   bool IsTRRTransaction() { return mIsTRRTransaction; }
 
+  // Marks this transaction as uploading a non-replayable streaming body,
+  // whose length is not known when the transaction is initialised. Restart
+  // and retry logic must not attempt to re-send it, because the body stream
+  // has already been consumed.
+  void SetRequestBodyIsStreaming(bool aIsStreaming) override {
+    mRequestBodyIsStreaming = aIsStreaming;
+  }
+  bool RequestBodyIsStreaming() const { return mRequestBodyIsStreaming; }
+
   // Used by the HE speculative path to propagate the failed-handshake
   // security info onto the real transaction whose mConnection was never
   // set (so its own MaybeRefreshSecurityInfo skips). Without this the
@@ -275,6 +288,8 @@ class nsHttpTransaction final : public nsAHttpTransaction,
   virtual ~nsHttpTransaction();
 
   [[nodiscard]] nsresult Restart();
+  FRIEND_TEST(HttpTransactionRestart,
+              RestartRefusesStartedStreamingRequestBody);
   // For an accepted 0-RTT request, report connectEnd and requestStart at the
   // early-data send point. Caller must hold mLock.
   void Apply0RTTTimingOverride();
@@ -540,6 +555,7 @@ class nsHttpTransaction final : public nsAHttpTransaction,
   bool mReceivedData{false};
   bool mStatusEventPending{false};
   bool mHasRequestBody{false};
+  bool mRequestBodyIsStreaming{false};
   bool mProxyConnectFailed{false};
   bool mHttpResponseMatched{false};
   bool mPreserveStream{false};

@@ -161,7 +161,9 @@ impl Parse for GridLine<specified::Integer> {
                 }
 
                 is_span = true;
-            } else if let Ok(i) = input.try_parse(|i| specified::Integer::parse(context, i)) {
+                continue;
+            }
+            if let Ok(i) = input.try_parse(|i| specified::Integer::parse(context, i)) {
                 if val_before_span || line_num.is_some() {
                     return Err(ParseError::custom(StyleParseErrorKind::UnspecifiedError));
                 }
@@ -171,16 +173,18 @@ impl Parse for GridLine<specified::Integer> {
                 }
 
                 line_num = Some(i);
-            } else if let Ok(name) = input.try_parse(|i| CustomIdent::parse(i, &["auto"])) {
+                continue;
+            }
+            if let Ok(name) = input.try_parse(|i| CustomIdent::parse(i, &["auto"])) {
                 if val_before_span || ident.is_some() {
                     return Err(ParseError::custom(StyleParseErrorKind::UnspecifiedError));
                 }
                 // NOTE(emilio): `span` is consumed above, so we only need to
                 // reject `auto`.
                 ident = Some(name);
-            } else {
-                break;
+                continue;
             }
+            break;
         }
 
         if line_num.is_none() && ident.is_none() {
@@ -403,10 +407,10 @@ impl<L: ToCss> ToCss for TrackSize<L> {
             TrackSize::Minmax(ref min, ref max) => {
                 // According to gecko minmax(auto, <flex>) is equivalent to <flex>,
                 // and both are serialized as <flex>.
-                if let TrackBreadth::Auto = *min {
-                    if let TrackBreadth::Flex(_) = *max {
-                        return max.to_css(dest);
-                    }
+                if let TrackBreadth::Auto = *min
+                    && let TrackBreadth::Flex(_) = *max
+                {
+                    return max.to_css(dest);
                 }
 
                 dest.write_str("minmax(")?;
@@ -570,7 +574,7 @@ impl<L: ToCss, I: ToCss> ToCss for TrackRepeat<L, I> {
         dest.write_str(", ")?;
 
         let mut line_names_iter = self.line_names.iter();
-        for (i, (ref size, ref names)) in self
+        for (i, (ref size, names)) in self
             .track_sizes
             .iter()
             .zip(&mut line_names_iter)
@@ -712,7 +716,7 @@ impl<L: ToCss, I: ToCss> ToCss for TrackList<L, I> {
             }
 
             if values_iter.peek().is_some()
-                || line_names_iter.peek().map_or(false, |v| !v.is_empty())
+                || line_names_iter.peek().is_some_and(|v| !v.is_empty())
                 || (idx + 1 == self.auto_repeat_index)
             {
                 dest.write_char(' ')?;
@@ -777,7 +781,7 @@ impl<I: ToCss> ToCss for NameRepeat<I> {
         self.count.to_css(dest)?;
         dest.write_char(',')?;
 
-        for ref names in self.line_names.iter() {
+        for names in self.line_names.iter() {
             if names.is_empty() {
                 // Note: concat_serialize_idents() skip the empty list so we have to handle it
                 // manually for NameRepeat.

@@ -324,9 +324,6 @@ enum class StackingContextBits : uint8_t {
   ContainsMixBlendMode = 1 << 0,
   // Similar, but for backdrop-filter.
   ContainsBackdropFilter = 1 << 1,
-  // Whether we can contain a non-isolated 3d or perspective transform that
-  // might need explicit flattening.
-  MayContainNonIsolated3DTransform = 1 << 2,
 };
 MOZ_MAKE_ENUM_CLASS_BITWISE_OPERATORS(StackingContextBits);
 
@@ -1491,6 +1488,11 @@ class nsDisplayListBuilder {
     // TODO(emilio, bug 1968754): Deal with nested captures properly.
     bool mContainingBlockInViewTransitionCapture;
 
+#ifdef DEBUG
+    // Assert that the asr is as expected.
+    void CheckASR(nsDisplayListBuilder* aBuilder, nsIFrame* aFrame);
+#endif
+
     static nsRect ComputeVisibleRectForFrame(nsDisplayListBuilder* aBuilder,
                                              nsIFrame* aFrame,
                                              const nsRect& aVisibleRect,
@@ -1568,10 +1570,6 @@ class nsDisplayListBuilder {
   bool ContainsBlendMode() const {
     return bool(mStackingContextBits &
                 StackingContextBits::ContainsMixBlendMode);
-  }
-  bool MayContainNonIsolated3DTransform() const {
-    return bool(mStackingContextBits &
-                StackingContextBits::MayContainNonIsolated3DTransform);
   }
   bool ContainsBackdropFilter() const {
     return bool(mStackingContextBits &
@@ -1675,21 +1673,10 @@ class nsDisplayListBuilder {
    * Modified frames and rects are removed and re-added to the region if needed.
    */
   struct WeakFrameRegion {
-    /**
-     * A wrapper to store WeakFrame and the pointer to the underlying frame.
-     * This is needed because WeakFrame does not store the frame pointer after
-     * the frame has been deleted.
-     */
-    struct WeakFrameWrapper {
-      explicit WeakFrameWrapper(nsIFrame* aFrame)
-          : mWeakFrame(new WeakFrame(aFrame)), mFrame(aFrame) {}
-
-      UniquePtr<WeakFrame> mWeakFrame;
-      void* mFrame;
-    };
-
     nsTHashSet<void*> mFrameSet;
-    nsTArray<WeakFrameWrapper> mFrames;
+    // WeakFrame does not store the frame pointer after the frame has been
+    // deleted, so keep the raw pointer around to remove it from mFrameSet.
+    nsTArray<std::pair<WeakFrame, void*>> mFrames;
     nsTArray<pixman_box32_t> mRects;
 
     template <typename RectType>
@@ -1699,7 +1686,7 @@ class nsDisplayListBuilder {
       }
 
       mFrameSet.Insert(aFrame);
-      mFrames.AppendElement(WeakFrameWrapper(aFrame));
+      mFrames.EmplaceBack(aFrame, aFrame);
       mRects.AppendElement(nsRegion::RectToBox(aRect));
     }
 
@@ -6709,7 +6696,8 @@ class nsDisplayText final : public nsPaintedDisplayItem {
       // On OS X, web authors can turn off subpixel text rendering using the
       // CSS property -moz-osx-font-smoothing. If they do that, we don't need
       // to use component alpha layers for the affected text.
-      if (mFrame->StyleFont()->mFont.smoothing == NS_FONT_SMOOTHING_GRAYSCALE) {
+      if (mFrame->StyleFont()->mFont.smoothing ==
+          mozilla::StyleFontSmoothing::Grayscale) {
         return nsRect();
       }
     }

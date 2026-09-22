@@ -411,14 +411,13 @@ class BrowserChild final : public nsMessageManagerScriptExecutor,
   mozilla::ipc::IPCResult RecvNormalPriorityInsertText(
       const nsAString& aStringToInsert);
 
-  mozilla::ipc::IPCResult RecvReplaceText(const nsString& aReplaceSrcString,
-                                          const nsString& aStringToInsert,
-                                          uint32_t aOffset,
-                                          bool aPreventSetSelection);
+  mozilla::ipc::IPCResult RecvReplaceText(
+      const nsString& aReplaceSrcString, const nsString& aStringToInsert,
+      uint32_t aOffset, PreventSetSelection aPreventSetSelection);
 
   mozilla::ipc::IPCResult RecvNormalPriorityReplaceText(
       const nsString& aReplaceSrcString, const nsString& aStringToInsert,
-      uint32_t aOffset, bool aPreventSetSelection);
+      uint32_t aOffset, PreventSetSelection aPreventSetSelection);
 
   MOZ_CAN_RUN_SCRIPT_BOUNDARY
   mozilla::ipc::IPCResult RecvPasteTransferable(
@@ -542,9 +541,6 @@ class BrowserChild final : public nsMessageManagerScriptExecutor,
   MOZ_CAN_RUN_SCRIPT_BOUNDARY mozilla::ipc::IPCResult RecvDestroyPrintClone(
       const MaybeDiscardedBrowsingContext&);
 
-  mozilla::ipc::IPCResult RecvUpdateNativeWindowHandle(
-      const uintptr_t& aNewHandle);
-
   mozilla::ipc::IPCResult RecvWillChangeProcess();
 
   PPaymentRequestChild* AllocPPaymentRequestChild();
@@ -616,10 +612,6 @@ class BrowserChild final : public nsMessageManagerScriptExecutor,
   nsresult CanCancelContentJS(nsIRemoteTab::NavigationType aNavigationType,
                               int32_t aNavigationIndex, nsIURI* aNavigationURI,
                               int32_t aEpoch, bool* aCanCancel);
-
-#if defined(XP_WIN) && defined(ACCESSIBILITY)
-  uintptr_t GetNativeWindowHandle() const { return mNativeWindowHandle; }
-#endif
 
   BrowsingContext* GetBrowsingContext() const { return mBrowsingContext; }
 
@@ -767,7 +759,7 @@ class BrowserChild final : public nsMessageManagerScriptExecutor,
 
   mozilla::ipc::IPCResult RecvReleasePointerLock();
 
-#if defined(ACCESSIBILITY) && defined(MOZ_ENABLE_SKIA_PDF)
+#ifdef ACCESSIBILITY
   mozilla::ipc::IPCResult RecvRequestDocAccessibleForPrint();
 #endif
 
@@ -947,11 +939,6 @@ class BrowserChild final : public nsMessageManagerScriptExecutor,
 
   RefPtr<layers::IAPZCTreeManager> mApzcTreeManager;
   RefPtr<SessionStoreChild> mSessionStoreChild;
-
-#if defined(XP_WIN) && defined(ACCESSIBILITY)
-  // The handle associated with the native window that contains this tab
-  uintptr_t mNativeWindowHandle;
-#endif  // defined(XP_WIN)
 
   int32_t mCancelContentJSEpoch;
 

@@ -245,16 +245,20 @@ typescript:
             # Files that are likely audited.
             # These should be kept in sync with the list of includes in
             # tools/lint/typescript.yml
-            # Not adding `jsx` for these since we know there's no jsx files in
-            # these directories.
+            # Not adding `jsx` here: these directories either have no jsx files,
+            # or, for newtab, its jsx under content-src/ is not yet included.
             - 'browser/components/places/**/*.*js'
             - 'browser/components/places/**/*.ts'
             - 'browser/components/search/**/*.*js'
             - 'browser/components/search/**/*.ts'
+            - 'browser/components/sessionstore/**/*.*js'
+            - 'browser/components/sessionstore/**/*.ts'
             - 'browser/components/tabbrowser/**/*.*js'
             - 'browser/components/tabbrowser/**/*.ts'
             - 'browser/components/urlbar/**/*.*js'
             - 'browser/components/urlbar/**/*.ts'
+            - 'browser/extensions/newtab/**/*.*js'
+            - 'browser/extensions/newtab/**/*.ts'
             - 'toolkit/components/extensions/**/*.*js'
             - 'toolkit/components/extensions/**/*.ts'
             - 'toolkit/components/places/**/*.*js'
@@ -352,6 +356,7 @@ node-licenses:
             - tools/lint/eslint/eslint-plugin-mozilla/package.json
             - tools/lint/stylelint/stylelint-plugin-mozilla/package.json
             - tools/terser/package.json
+            - third_party/node/**
     fetches:
         toolchain:
             - linux64-node
@@ -453,6 +458,23 @@ python-sites:
         files-changed:
             - 'python/sites/**'
 
+
+spidermonkey:
+    description: "SpiderMonkey #include style, MacroAssembler and bytecode doc checks"
+    treeherder:
+        symbol: js(SM)
+    run:
+        mach: lint -v -l spidermonkey -f treeherder -f json:/builds/worker/mozlint.json .
+    when:
+        files-changed:
+            - 'intl/components/**/*.h'
+            - 'js/public/**'
+            - 'js/src/**'
+            - 'memory/mozalloc/**/*.h'
+            - 'mfbt/**/*.h'
+            - 'mozglue/**/*.h'
+            - 'tools/lint/spidermonkey.yml'
+            - 'tools/lint/spidermonkey/**'
 
 test-manifest:
     description: lint test manifests
@@ -661,6 +683,23 @@ cargo-audit:
     fetches:
         toolchain:
             - linux64-rust
+
+pnpm-audit:
+    description: Audit the vendored node packages for vulnerable dependencies
+    treeherder:
+        symbol: node(pnpm-audit)
+    run:
+        mach: lint -v --warnings=soft -l pnpm-audit -f treeherder -f json:/builds/worker/mozlint.json .
+    when:
+        files-changed:
+            - 'third_party/node/pnpm-lock.yaml'
+            - 'tools/lint/pnpm-audit.yml'
+            - 'tools/lint/pnpm-audit/**'
+    fetches:
+        toolchain:
+            - linux64-node
+        fetch:
+            - pnpm
 
 mozcheck-tests:
     description: mozcheck Rust unit tests

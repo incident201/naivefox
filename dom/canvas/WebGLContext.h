@@ -667,6 +667,7 @@ class WebGLContext : public VRefCounted, public SupportsWeakPtr {
   void LineWidth(GLfloat width);
   void LinkProgram(WebGLProgram& prog);
   void PolygonOffset(GLfloat factor, GLfloat units);
+  void PolygonOffsetClampEXT(GLfloat factor, GLfloat units, GLfloat clamp);
   void ProvokingVertex(webgl::ProvokingVertex) const;
 
   ////
@@ -939,7 +940,6 @@ class WebGLContext : public VRefCounted, public SupportsWeakPtr {
   bool mOptionsFrozen = false;
   bool mIsMesa = false;
   bool mLoseContextOnMemoryPressure = false;
-  bool mCanLoseContextInForeground = true;
   bool mShouldPresent = false;
   bool mDisableFragHighP = false;
   bool mForceResizeOnPresent = false;

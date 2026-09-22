@@ -9,6 +9,7 @@
 
 #include "CookieCommons.h"
 #include "CookieKey.h"
+#include "mozilla/net/Cookie.h"
 #include "nsICookieNotification.h"
 #include "nsIObserver.h"
 #include "nsTHashtable.h"
@@ -22,7 +23,6 @@ class nsIPrefBranch;
 namespace mozilla {
 namespace net {
 
-class Cookie;
 class CookieParser;
 
 // Inherit from CookieKey so this can be stored in nsTHashTable
@@ -215,7 +215,7 @@ class CookieStorage : public nsIObserver, public nsSupportsWeakReference {
 
   void RemoveCookieFromListInternal(const CookieListIter& aIter);
 
-  virtual void RemoveCookieFromDB(const Cookie& aCookie) = 0;
+  virtual void RemoveCookieFromDB(Cookie* aCookie) = 0;
 
   already_AddRefed<nsIArray> PurgeCookiesWithCallbacks(
       int64_t aCurrentTimeInUsec, uint16_t aMaxNumberOfCookies,
@@ -248,6 +248,8 @@ class CookieStorage : public nsIObserver, public nsSupportsWeakReference {
   virtual already_AddRefed<nsIArray> PurgeCookies(int64_t aCurrentTimeInUsec,
                                                   uint16_t aMaxNumberOfCookies,
                                                   int64_t aCookiePurgeAge) = 0;
+
+  void PurgeExpiredCookies();
 
   void RemoveCookiesFromBack(nsTArray<CookieListIter>& aCookieIters,
                              nsCOMPtr<nsIArray>& aPurgedList);

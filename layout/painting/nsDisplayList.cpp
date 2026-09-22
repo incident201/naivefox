@@ -624,6 +624,53 @@ nsPresContext* nsDisplayListBuilder::CurrentPresContext() {
   return CurrentPresShellState()->mPresShell->GetPresContext();
 }
 
+#ifdef DEBUG
+// A weird case for native anonymous content in the custom content container
+// when the root is captured by a view transition. This content is built outside
+// of the view transition capture but the containing block (the canvas frame)
+// was built inside the capture, so savedOutOfFlowData is saved as if we are
+// inside the capture while we are outside it (bug 2002160).
+static bool InTopLayerAndActiveViewTransition(nsIFrame* aFrame) {
+  if (!aFrame->PresContext()->Document()->GetActiveViewTransition()) {
+    return false;
+  }
+  if (!aFrame->GetContent()->IsInNativeAnonymousSubtree()) {
+    return false;
+  }
+  for (nsIFrame* curr = aFrame; curr; curr = curr->GetParent()) {
+    if (curr->StyleDisplay()->mTopLayer == StyleTopLayer::Auto) {
+      return true;
+    }
+  }
+  return false;
+}
+
+void nsDisplayListBuilder::OutOfFlowDisplayData::CheckASR(
+    nsDisplayListBuilder* aBuilder, nsIFrame* aFrame) {
+  if (!aBuilder->IsPaintingToWindow()) {
+    return;
+  }
+  auto* asr = mContainingBlockActiveScrolledRoot;
+  if (mContainingBlockInViewTransitionCapture) {
+    MOZ_ASSERT(!asr);
+    MOZ_ASSERT(aBuilder->IsInViewTransitionCapture() ||
+               InTopLayerAndActiveViewTransition(aFrame));
+    return;
+  }
+  auto frameAndASRKind = asr ? FrameAndASRKind{asr->mFrame, asr->mKind}
+                             : FrameAndASRKind::default_value();
+  if (frameAndASRKind ==
+      DisplayPortUtils::GetASRAncestorFrame(
+          {aFrame->GetParent(), ActiveScrolledRoot::ASRKind::Scroll},
+          aBuilder)) {
+    // All as expected.
+    return;
+  }
+  MOZ_ASSERT(!asr);
+  MOZ_ASSERT(InTopLayerAndActiveViewTransition(aFrame));
+}
+#endif
+
 /* static */
 nsRect nsDisplayListBuilder::OutOfFlowDisplayData::ComputeVisibleRectForFrame(
     nsDisplayListBuilder* aBuilder, nsIFrame* aFrame,
@@ -1955,10 +2002,6 @@ size_t nsDisplayListBuilder::WeakFrameRegion::SizeOfExcludingThis(
     MallocSizeOf aMallocSizeOf) const {
   size_t n = 0;
   n += mFrames.ShallowSizeOfExcludingThis(aMallocSizeOf);
-  for (const auto& frame : mFrames) {
-    const UniquePtr<WeakFrame>& weakFrame = frame.mWeakFrame;
-    n += aMallocSizeOf(weakFrame.get());
-  }
   n += mRects.ShallowSizeOfExcludingThis(aMallocSizeOf);
   return n;
 }
@@ -1973,13 +2016,13 @@ void nsDisplayListBuilder::WeakFrameRegion::RemoveModifiedFramesAndRects() {
   uint32_t length = mFrames.Length();
 
   while (i < length) {
-    auto& wrapper = mFrames[i];
+    auto& [weakFrame, rawFrame] = mFrames[i];
 
-    if (!wrapper.mWeakFrame->IsAlive() ||
-        AnyContentAncestorModified(wrapper.mWeakFrame->GetFrame())) {
+    if (!weakFrame.IsAlive() ||
+        AnyContentAncestorModified(weakFrame.GetFrame())) {
       // To avoid multiple O(n) shifts in the array, move the last element of
       // the array to the current position and decrease the array length.
-      mFrameSet.Remove(wrapper.mFrame);
+      mFrameSet.Remove(rawFrame);
       mFrames[i] = std::move(mFrames[length - 1]);
       mRects[i] = std::move(mRects[length - 1]);
       length--;
@@ -6907,10 +6950,12 @@ WebRenderCommandsResult nsDisplayTransform::CreateWebRenderCommands(
       GetTransformForRendering(&position, aDisplayListBuilder);
 
   gfx::Matrix4x4* transformForSC = &newTransformMatrix;
-  if (newTransformMatrix.IsIdentity()) {
+  if (newTransformMatrix.IsIdentity() && !mHasAssociatedPerspective) {
     // If the transform is an identity transform, strip it out so that WR
     // doesn't turn this stacking context into a reference frame, as it
-    // affects positioning.
+    // affects positioning. Keep it when paired with a perspective: the
+    // reference frame is what tells WR to flatten our 3D descendants into
+    // our plane before the perspective applies.
     transformForSC = nullptr;
 
     // In ChooseScaleAndSetTransform, we round the offset from the reference
@@ -8707,6 +8752,14 @@ WebRenderCommandsResult nsDisplayFilters::CreateWebRenderCommands(
     wr::DisplayListBuilder& aBuilder, wr::IpcResourceUpdateQueue& aResources,
     const StackingContextHelper& aSc, RenderRootStateManager* aManager,
     nsDisplayListBuilder* aDisplayListBuilder) {
+  // The SVG spec says not to draw anything for an element without valid
+  // dimensions, filter included. SVGIntegrationUtils::PaintFilter bails out for
+  // the software path; this one has to do the same or a filter that paints
+  // without reading its input, feFlood say, still fills the filter region.
+  if (!ValidateSVGFrame()) {
+    return Ok();
+  }
+
   WrFiltersHolder wrFilters;
   const ComputedStyle& style = mStyle ? *mStyle : *mFrame->Style();
   auto filterChain = style.StyleEffects()->mFilters.AsSpan();

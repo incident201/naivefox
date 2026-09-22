@@ -13,6 +13,7 @@
 
 #include <stdlib.h>
 
+#include <algorithm>
 #include <ctime>
 
 #include "GetAddrInfo.h"
@@ -65,10 +66,6 @@
 
 using namespace mozilla;
 using namespace mozilla::net;
-
-// None of our implementations expose a TTL for negative responses, so we use a
-// constant always.
-static const unsigned int NEGATIVE_RECORD_LIFETIME = 60;
 
 //----------------------------------------------------------------------------
 
@@ -184,7 +181,7 @@ nsresult nsHostResolver::Init() MOZ_NO_THREAD_SAFETY_ANALYSIS {
 #  else
   sNativeHTTPSSupported = jni::GetAPIVersion() >= 29;
 #  endif
-#elif defined(XP_LINUX) || defined(XP_MACOSX)
+#elif defined(XP_LINUX) || defined(XP_MACOSX) || defined(XP_FREEBSD)
   sNativeHTTPSSupported = true;
 #endif
   LOG(("Native HTTPS records supported=%d", bool(sNativeHTTPSSupported)));
@@ -641,6 +638,21 @@ nsresult nsHostResolver::ResolveHost(const nsACString& aHost,
             glean::dns::lookup_method.AccumulateSingleSample(
                 METHOD_NETWORK_FIRST);
           }
+          // Record why the cache could not serve this lookup (A/AAAA or by-type
+          // such as HTTPS), keyed by family:
+          //   absent  - no entry existed (never cached, or previously evicted);
+          //   expired - an entry existed and its TTL had lapsed (a longer TTL
+          //             would have turned this into a hit);
+          //   refresh - an entry existed and was still valid, but we bypassed
+          //             it (RESOLVE_BYPASS_CACHE / *REFRESH* flags, incl. Happy
+          //             Eyeballs' negative-cache refresh).
+          nsLiteralCString missReason =
+              rec->mValidStart.IsNull() ? "absent"_ns
+              : (rec->CheckExpiration(now) == nsHostRecord::EXP_EXPIRED)
+                  ? "expired"_ns
+                  : "refresh"_ns;
+          glean::dns::cache_miss_reason.Get(RecordFamilyLabel(rec), missReason)
+              .Add(1);
           if (NS_FAILED(rv) && callback->isInList()) {
             callback->remove();
           } else {
@@ -1309,9 +1321,13 @@ void nsHostResolver::PrepareRecordExpirationAddrRecord(
   MOZ_ASSERT(((bool)rec->addr_info) != rec->negative);
   mQueue.mLock.AssertCurrentThreadOwns();
   if (!rec->addr_info) {
-    rec->SetExpiration(TimeStamp::NowLoRes(), NEGATIVE_RECORD_LIFETIME, 0);
+    // None of our implementations expose a TTL for negative responses, so we
+    // use a configurable constant lifetime.
+    unsigned int negativeLifetime =
+        StaticPrefs::network_dnsNegativeCacheExpiration();
+    rec->SetExpiration(TimeStamp::NowLoRes(), negativeLifetime, 0);
     LOG(("Caching host [%s] negative record for %u seconds.\n", rec->host.get(),
-         NEGATIVE_RECORD_LIFETIME));
+         negativeLifetime));
     return;
   }
 
@@ -1347,12 +1363,9 @@ static bool different_rrset(AddrInfo* rrset1, AddrInfo* rrset2) {
     return true;
   }
 
-  nsTArray<NetAddr> orderedSet1 = rrset1->Addresses().Clone();
-  nsTArray<NetAddr> orderedSet2 = rrset2->Addresses().Clone();
-  orderedSet1.Sort();
-  orderedSet2.Sort();
-
-  bool eq = orderedSet1 == orderedSet2;
+  bool eq = std::is_permutation(
+      rrset1->Addresses().begin(), rrset1->Addresses().end(),
+      rrset2->Addresses().begin(), rrset2->Addresses().end());
   if (!eq) {
     LOG(("different_rrset true due to content change\n"));
   } else {

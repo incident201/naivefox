@@ -11,6 +11,7 @@
   ChromeUtils.defineESModuleGetters(lazy, {
     OpenInTabsUtils:
       "moz-src:///browser/components/tabbrowser/OpenInTabsUtils.sys.mjs",
+    Tabbrowser: "moz-src:///browser/components/tabbrowser/Tabbrowser.sys.mjs",
   });
 
   const isTab = element => gBrowser.isTab(element);
@@ -574,6 +575,14 @@
             ? gBrowser.pinnedTabCount
             : dropIndex,
         });
+
+        // The group's tabs leave the window along with the group, so there is
+        // no _expandGroupOnDrop to release the space _resetTabsAfterDrop keeps
+        // reserved for them.
+        let periphery = draggedTab.ownerDocument.getElementById(
+          "tabbrowser-arrowscrollbox-periphery"
+        );
+        this.#releaseSpaceInScrolledContent(periphery);
       } else if (draggedTab) {
         // Move the tabs into this window. To avoid multiple tab-switches in
         // the original window, the selected tab should be adopted last.
@@ -2514,7 +2523,7 @@
           dropElementSize
         );
 
-        moveOverThreshold = gBrowser.tabGroupsEnabled
+        moveOverThreshold = lazy.Tabbrowser.prefs.tabGroupsEnabled
           ? Services.prefs.getIntPref(
               "browser.tabs.dragDrop.moveOverThresholdPercent"
             ) / 100
@@ -2587,7 +2596,7 @@
       }
 
       if (
-        gBrowser.tabGroupsEnabled &&
+        lazy.Tabbrowser.prefs.tabGroupsEnabled &&
         (isTab(draggedTab) || isSplitViewWrapper(draggedTab)) &&
         !isPinned &&
         (!numPinned || newDropElementIndex >= numPinned)

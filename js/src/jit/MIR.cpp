@@ -3002,7 +3002,6 @@ static inline bool NeedNegativeZeroCheck(MDefinition* def) {
         break;
       case MDefinition::Opcode::StoreElementHole:
       case MDefinition::Opcode::StoreTypedArrayElementHole:
-      case MDefinition::Opcode::PostWriteElementBarrier:
         // Only allowed to remove check when definition is the third operand.
         for (size_t i = 0, e = use_def->numOperands(); i < e; i++) {
           if (i == 2) {
@@ -4920,6 +4919,26 @@ MDefinition* MToFloat16::foldsTo(TempAllocator& alloc) {
     if (toDoubleInput->type() == MIRType::Float32 ||
         toDoubleInput->type() == MIRType::Int32) {
       return MToFloat16::New(alloc, toDoubleInput);
+    }
+  }
+
+  return this;
+}
+
+MDefinition* MUnsignedToDouble::foldsTo(TempAllocator& alloc) {
+  if (input()->isConstant()) {
+    return MConstant::NewDouble(alloc,
+                                uint32_t(input()->toConstant()->toInt32()));
+  }
+
+  return this;
+}
+
+MDefinition* MUnsignedToFloat32::foldsTo(TempAllocator& alloc) {
+  if (input()->isConstant()) {
+    double dval = double(uint32_t(input()->toConstant()->toInt32()));
+    if (IsFloat32Representable(dval)) {
+      return MConstant::NewFloat32(alloc, float(dval));
     }
   }
 
@@ -7937,8 +7956,11 @@ JSOp MBinaryCache::jsop() const { return JSOp(*resumePoint()->pc()); }
 template <typename T>
 static wasm::MaybeRefType GetBaseRefTypeForWasmLoadOrStore(T ins) {
   const MDefinition* structObject;
-  if (ins->base()->type() == MIRType::WasmStructData) {
-    MOZ_RELEASE_ASSERT(ins->base()->isWasmLoadField());
+  if (ins->base()->type() == MIRType::WasmStructData &&
+      ins->base()->isWasmLoadField()) {
+    // Struct data pointers have no ref type, but always come from some struct
+    // object, so go back to that base object if possible. (We cannot do this
+    // 100% of the time because of phis.)
     structObject = ins->base()->toWasmLoadField()->base();
   } else {
     structObject = ins->base();

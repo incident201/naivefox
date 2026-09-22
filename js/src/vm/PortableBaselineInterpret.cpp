@@ -634,7 +634,7 @@ uint64_t ICInterpretOps(uint64_t arg0, uint64_t arg1, ICStub* stub,
     DECLARE_CACHEOP_CASE(GuardDynamicSlotValue);
     DECLARE_CACHEOP_CASE(LoadFixedSlot);
     DECLARE_CACHEOP_CASE(LoadDynamicSlot);
-    DECLARE_CACHEOP_CASE(GuardNoAllocationMetadataBuilder);
+    DECLARE_CACHEOP_CASE(AssertNoAllocationMetadataBuilder);
     DECLARE_CACHEOP_CASE(GuardFunctionHasJitEntry);
     DECLARE_CACHEOP_CASE(GuardFunctionHasNoJitEntry);
     DECLARE_CACHEOP_CASE(GuardFunctionIsNonBuiltinCtor);
@@ -1233,6 +1233,11 @@ uint64_t ICInterpretOps(uint64_t arg0, uint64_t arg1, ICStub* stub,
           case GuardClassKind::Map:
           case GuardClassKind::BoundFunction:
           case GuardClassKind::Date:
+          case GuardClassKind::Duration:
+          case GuardClassKind::PlainTime:
+          case GuardClassKind::PlainDateTime:
+          case GuardClassKind::Instant:
+          case GuardClassKind::ZonedDateTime:
           case GuardClassKind::WeakMap:
           case GuardClassKind::WeakSet:
             if (object->getClass() != jit::ClassFor(kind)) {
@@ -1676,13 +1681,13 @@ uint64_t ICInterpretOps(uint64_t arg0, uint64_t arg1, ICStub* stub,
         DISPATCH_CACHEOP();
       }
 
-      CACHEOP_CASE(GuardNoAllocationMetadataBuilder) {
+      CACHEOP_CASE(AssertNoAllocationMetadataBuilder) {
         uint32_t builderAddrOffset = cacheIRReader.stubOffset();
         uintptr_t builderAddr =
             stubInfo->getStubRawWord(cstub, builderAddrOffset);
-        if (*reinterpret_cast<uintptr_t*>(builderAddr) != 0) {
-          FAIL_IC();
-        }
+        (void)builderAddr;
+        MOZ_ASSERT(*reinterpret_cast<uintptr_t*>(builderAddr) == 0,
+                   "unexpected allocation metadata builder");
         DISPATCH_CACHEOP();
       }
 
@@ -3870,11 +3875,8 @@ uint64_t ICInterpretOps(uint64_t arg0, uint64_t arg1, ICStub* stub,
       CACHEOP_CASE(Int32MinMaxArrayResult) {
         ObjOperandId arrayId = cacheIRReader.objOperandId();
         bool isMax = cacheIRReader.readBool();
-        // ICs that use this opcode depend on implicit unboxing due to
-        // type-overload on ObjOperandId when a value is loaded
-        // directly from an argument slot. We explicitly unbox here.
-        NativeObject* nobj = reinterpret_cast<NativeObject*>(
-            &READ_VALUE_REG(arrayId.id()).toObject());
+        NativeObject* nobj =
+            reinterpret_cast<NativeObject*>(READ_REG(arrayId.id()));
         uint32_t len = nobj->getDenseInitializedLength();
         if (len == 0) {
           FAIL_IC();
@@ -3903,11 +3905,8 @@ uint64_t ICInterpretOps(uint64_t arg0, uint64_t arg1, ICStub* stub,
       CACHEOP_CASE(NumberMinMaxArrayResult) {
         ObjOperandId arrayId = cacheIRReader.objOperandId();
         bool isMax = cacheIRReader.readBool();
-        // ICs that use this opcode depend on implicit unboxing due to
-        // type-overload on ObjOperandId when a value is loaded
-        // directly from an argument slot. We explicitly unbox here.
-        NativeObject* nobj = reinterpret_cast<NativeObject*>(
-            &READ_VALUE_REG(arrayId.id()).toObject());
+        NativeObject* nobj =
+            reinterpret_cast<NativeObject*>(READ_REG(arrayId.id()));
         uint32_t len = nobj->getDenseInitializedLength();
         if (len == 0) {
           FAIL_IC();

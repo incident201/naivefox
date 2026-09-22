@@ -744,67 +744,6 @@ const MESSAGES = () => [
     trigger: { id: "momentsUpdate" },
   },
   {
-    id: "PERSONALIZED_CFR_MESSAGE",
-    template: "cfr_doorhanger",
-    groups: ["cfr"],
-    content: {
-      layout: "icon_and_message",
-      category: "cfrFeatures",
-      bucket_id: "PERSONALIZED_CFR_MESSAGE",
-      notification_text: "Personalized CFR Recommendation",
-      heading_text: { string_id: "cfr-doorhanger-bookmark-fxa-header" },
-      info_icon: {
-        label: {
-          attributes: {
-            tooltiptext: { string_id: "cfr-doorhanger-fxa-close-btn-tooltip" },
-          },
-        },
-        sumo_path: "https://example.com",
-      },
-      text: { string_id: "cfr-doorhanger-bookmark-fxa-body-2" },
-      icon: "chrome://branding/content/icon64.png",
-      icon_class: "cfr-doorhanger-large-icon",
-      persistent_doorhanger: true,
-      buttons: {
-        primary: {
-          label: { string_id: "cfr-doorhanger-milestone-ok-button" },
-          action: {
-            type: "OPEN_URL",
-            data: {
-              args: "https://send.firefox.com/login/?utm_source=activity-stream&entrypoint=activity-stream-cfr-pdf",
-              where: "tabshifted",
-            },
-          },
-        },
-        secondary: [
-          {
-            label: { string_id: "cfr-doorhanger-extension-cancel-button" },
-            action: { type: "CANCEL" },
-          },
-          {
-            label: {
-              string_id: "cfr-doorhanger-extension-never-show-recommendation",
-            },
-          },
-          {
-            label: {
-              string_id: "cfr-doorhanger-extension-manage-settings-button",
-            },
-            action: {
-              type: "OPEN_PREFERENCES_PAGE",
-              data: { category: "general-cfrfeatures" },
-            },
-          },
-        ],
-      },
-    },
-    targeting: "scores.PERSONALIZED_CFR_MESSAGE.score > scoreThreshold",
-    trigger: {
-      id: "openURL",
-      patterns: ["*://*/*.pdf"],
-    },
-  },
-  {
     id: "TEST_BMB_BUTTON",
     groups: [],
     template: "bookmarks_bar_button",
@@ -2854,6 +2793,66 @@ const MESSAGES = () => [
     trigger: {
       id: "newtabMessageCheck",
     },
+  },
+  // The base template for the new tab card stack component (bug 2069986).
+  {
+    id: "TEST_HNT_CARD_STACK",
+    template: "newtab_message",
+    groups: [],
+    content: {
+      messageType: "ASRouterMultistageMessage",
+      id: "TEST_HNT_CARD_STACK",
+      transitions: false,
+      backdrop: "transparent",
+      wrapper_content_style: { height: "204px" },
+      screens: [
+        {
+          id: "CARD_STACK_SCREEN_1",
+          force_hide_steps_indicator: true,
+          content: {
+            position: "card-stack",
+            background:
+              "url('chrome://activity-stream/content/data/content/assets/br-set-default-fox-heart.svg') center / contain no-repeat",
+            title: { raw: "This is a card-stack headline" },
+            subtitle: {
+              raw: "This is a card-stack subtitle, lower in the visual hierarchy.",
+            },
+            primary_button: {
+              label: { raw: "Primary action" },
+              action: { navigate: true },
+            },
+            secondary_button: {
+              label: { raw: "Dismiss" },
+              action: { navigate: true },
+            },
+          },
+        },
+        {
+          id: "CARD_STACK_SCREEN_2",
+          force_hide_steps_indicator: true,
+          content: {
+            position: "card-stack",
+            background:
+              "url('chrome://activity-stream/content/data/content/assets/br-import-fox-house.svg') center / contain no-repeat",
+            title: {
+              raw: "This is a card-stack headline, on the second screen",
+            },
+            subtitle: {
+              raw: "This is a card-stack subtitle, lower in the visual hierarchy, on the second screen.",
+            },
+            primary_button: {
+              label: { raw: "Primary action" },
+              action: { dismiss: true },
+            },
+            secondary_button: {
+              label: { raw: "Dismiss" },
+              action: { dismiss: true },
+            },
+          },
+        },
+      ],
+    },
+    trigger: { id: "newtabMessageCheck" },
   },
   {
     id: "UNIVERSAL_INFOBAR_WITH_EMBEDDED_LINKS",

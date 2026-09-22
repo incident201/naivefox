@@ -33,6 +33,7 @@
 #include "nsCOMPtr.h"
 #include "nsCRTGlue.h"
 #include "nsCSSProps.h"
+#include "nsChangeHint.h"
 #include "nsContainerFrame.h"
 #include "nsDeviceContext.h"
 #include "nsIURI.h"
@@ -206,6 +207,13 @@ static StyleXTextScale InitialTextScale(const Document& aDoc) {
   return StyleXTextScale::All;
 }
 
+static StyleAtom InitialLang(const Document& aDoc) {
+  if (auto* lang = aDoc.GetLanguageForStyle()) {
+    return StyleAtom{do_AddRef(lang)};
+  }
+  return StyleAtom{nsGkAtoms::empty};
+}
+
 nsStyleFont::nsStyleFont(const Document& aDocument)
     : mFont(*aDocument.GetFontPrefsForLang(nullptr)->GetDefaultFont(
           StyleGenericFontFamily::None)),
@@ -223,14 +231,14 @@ nsStyleFont::nsStyleFont(const Document& aDocument)
       mScriptUnconstrainedSize(mSize),
       mScriptMinSize(Length::FromPixels(
           CSSPixel::FromPoints(kMathMLDefaultScriptMinSizePt))),
-      mLanguage(aDocument.GetLanguageForStyle()) {
+      mLanguage(InitialLang(aDocument)) {
   MOZ_COUNT_CTOR(nsStyleFont);
   MOZ_ASSERT(NS_IsMainThread());
   mFont.family.is_initial = true;
   mFont.size = mSize;
   if (MinFontSizeEnabled()) {
     const Length minimumFontSize =
-        aDocument.GetFontPrefsForLang(mLanguage)->mMinimumFontSize;
+        aDocument.GetFontPrefsForLang(GetLangAtom())->mMinimumFontSize;
     mFont.size = Length::FromPixels(
         std::max(mSize.ToCSSPixels(), minimumFontSize.ToCSSPixels()));
   }
@@ -2070,10 +2078,10 @@ void nsStyleImageLayers::Layer::Initialize(
   mPosition = Position::FromPercentage(0.);
 
   if (aType == LayerType::Background) {
-    mOrigin = StyleGeometryBox::PaddingBox;
+    mOrigin = StyleBackgroundOrigin::PaddingBox;
   } else {
     MOZ_ASSERT(aType == LayerType::Mask, "unsupported layer type.");
-    mOrigin = StyleGeometryBox::BorderBox;
+    mOrigin = StyleBackgroundOrigin::BorderBox;
   }
 }
 
@@ -2264,6 +2272,8 @@ nsStyleDisplay::nsStyleDisplay()
       mScrollSnapStop{StyleScrollSnapStop::Normal},
       mScrollSnapType{StyleScrollSnapAxis::Both,
                       StyleScrollSnapStrictness::None},
+      mScrollbarInsetBlock{StyleLength{0.}, StyleLength{0.}},
+      mScrollbarInsetInline{StyleLength{0.}, StyleLength{0.}},
       mBackfaceVisibility(StyleBackfaceVisibility::Visible),
       mTransformStyle(StyleTransformStyle::Flat),
       mTransformBox(StyleTransformBox::ViewBox),
@@ -2323,6 +2333,8 @@ nsStyleDisplay::nsStyleDisplay(const nsStyleDisplay& aSource)
       mScrollSnapAlign(aSource.mScrollSnapAlign),
       mScrollSnapStop(aSource.mScrollSnapStop),
       mScrollSnapType(aSource.mScrollSnapType),
+      mScrollbarInsetBlock(aSource.mScrollbarInsetBlock),
+      mScrollbarInsetInline(aSource.mScrollbarInsetInline),
       mBackfaceVisibility(aSource.mBackfaceVisibility),
       mTransformStyle(aSource.mTransformStyle),
       mTransformBox(aSource.mTransformBox),
@@ -2736,6 +2748,10 @@ nsChangeHint nsStyleDisplay::CalcDifference(
   // container-query selection on descendants).
   // container-type / contain / content-visibility are handled by the
   // mEffectiveContainment check.
+  //
+  // scrollbar-inset changes are dealt with in
+  // nsSubDocumentFrame::DidSetComputedStyle and
+  // ScrollContainerFrame::DidSetComputedStyle.
   if (!hint && (mWillChange != aNewData.mWillChange ||
                 mOverflowAnchor != aNewData.mOverflowAnchor ||
                 mContentVisibility != aNewData.mContentVisibility ||
@@ -2743,7 +2759,9 @@ nsChangeHint nsStyleDisplay::CalcDifference(
                 mContain != aNewData.mContain ||
                 mContainerName != aNewData.mContainerName ||
                 mAnchorName != aNewData.mAnchorName ||
-                mAnchorScope != aNewData.mAnchorScope)) {
+                mAnchorScope != aNewData.mAnchorScope ||
+                mScrollbarInsetBlock != aNewData.mScrollbarInsetBlock ||
+                mScrollbarInsetInline != aNewData.mScrollbarInsetInline)) {
     hint |= nsChangeHint_NeutralChange;
   }
 

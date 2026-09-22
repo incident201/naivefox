@@ -80,6 +80,7 @@ internal fun PrivateTabsPage(
                 onCloseTabGroupClick = {},
                 onShareTabGroupClick = {},
                 onDeleteTabGroupClick = {},
+                onUngroupTabGroupClick = {},
                 onTabGroupOnboardingDismiss = {},
                 dragAndDropEnabled = false,
                 displayTabGroupOnboarding = false,

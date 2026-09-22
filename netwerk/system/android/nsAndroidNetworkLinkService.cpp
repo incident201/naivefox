@@ -8,6 +8,7 @@
 #include "mozilla/Logging.h"
 #include "mozilla/Services.h"
 #include "mozilla/StaticPrefs_network.h"
+#include "nsCharSeparatedTokenizer.h"
 #include "nsIObserverService.h"
 #include "nsServiceManagerUtils.h"
 

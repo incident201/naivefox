@@ -9,10 +9,12 @@ ChromeUtils.defineESModuleGetters(lazy, {
   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
   CustomizableUI:
     "moz-src:///browser/components/customizableui/CustomizableUI.sys.mjs",
-  IPPExceptionsManager:
-    "moz-src:///toolkit/components/ipprotection/IPPExceptionsManager.sys.mjs",
+  IPPPermissionRules:
+    "moz-src:///toolkit/components/ipprotection/IPPSiteRuleManager.sys.mjs",
   IPPPrincipalRules:
-    "moz-src:///toolkit/components/ipprotection/IPPExceptionsManager.sys.mjs",
+    "moz-src:///toolkit/components/ipprotection/IPPSiteRuleManager.sys.mjs",
+  IPPSiteRuleManager:
+    "moz-src:///toolkit/components/ipprotection/IPPSiteRuleManager.sys.mjs",
   IPPOnboardingMessage:
     "moz-src:///browser/components/ipprotection/IPPOnboardingMessageHelper.sys.mjs",
   ERRORS: "moz-src:///toolkit/components/ipprotection/IPPProxyManager.sys.mjs",
@@ -141,6 +143,8 @@ export class IPProtectionPanel {
    * True if the VPN service has been paused due to bandwidth limits
    * @property {boolean} isSiteExceptionsEnabled
    * True if site exceptions support is enabled, else false.
+   * @property {boolean} isSiteInclusionsEnabled
+   * True if site inclusions support is enabled, else false.
    * @property {object} siteData
    * Data about the currently loaded site, including "isExclusion".
    * @property {object} bandwidthUsage
@@ -365,6 +369,17 @@ export class IPProtectionPanel {
     );
   }
 
+  /**
+   * Gets the value of the pref
+   * browser.ipProtection.features.siteInclusions.
+   */
+  get isInclusionsFeatureEnabled() {
+    return Services.prefs.getBoolPref(
+      "browser.ipProtection.features.siteInclusions",
+      false
+    );
+  }
+
   get isDefaultBrowser() {
     let isDefaultBrowser = lazy.ShellService.isDefaultBrowser();
     return isDefaultBrowser;
@@ -407,6 +422,7 @@ export class IPProtectionPanel {
       bandwidthWarning: false,
       paused: lazy.IPPProxyManager.state === lazy.IPPProxyStates.PAUSED,
       isSiteExceptionsEnabled: this.isExceptionsFeatureEnabled,
+      isSiteInclusionsEnabled: this.isInclusionsFeatureEnabled,
       siteData: this.#getSiteData(),
       bandwidthUsage: this.#getBandwidthUsage(),
       isActivating:
@@ -605,12 +621,10 @@ export class IPProtectionPanel {
       lazy.IPPProxyManager.refreshUsage();
     }
 
-    // Only check default browser on panel open if not premium to limit calls to the Shell Service
-    const isPremium = this.state.isPremium ? true : this.isPremium;
-
     this.setState({
-      isPremium,
+      isPremium: this.isPremium,
       isSiteExceptionsEnabled: this.isExceptionsFeatureEnabled,
+      isSiteInclusionsEnabled: this.isInclusionsFeatureEnabled,
       bandwidthWarning: this.#shouldShowBandwidthWarning(),
     });
 
@@ -793,6 +807,7 @@ export class IPProtectionPanel {
     const result = await enrolling;
     Glean.ipprotection.enrollment.record({
       enrolled: result?.isEnrolledAndEntitled,
+      reason: result?.isEnrolledAndEntitled ? "" : (result?.error ?? ""),
     });
   }
 
@@ -968,8 +983,8 @@ export class IPProtectionPanel {
       "IPPAuthProvider:StateChanged",
       this.handleEvent
     );
-    lazy.IPPExceptionsManager.addEventListener(
-      "IPPExceptionsManager:ExclusionChanged",
+    lazy.IPPSiteRuleManager.addEventListener(
+      "SiteRuleManager:RuleChanged",
       this.handleEvent
     );
     lazy.IPProtectionServerlist.addEventListener(
@@ -999,8 +1014,8 @@ export class IPProtectionPanel {
       "IPProtectionService:StateChanged",
       this.handleEvent
     );
-    lazy.IPPExceptionsManager.removeEventListener(
-      "IPPExceptionsManager:ExclusionChanged",
+    lazy.IPPSiteRuleManager.removeEventListener(
+      "SiteRuleManager:RuleChanged",
       this.handleEvent
     );
     lazy.IPProtectionServerlist.removeEventListener(
@@ -1085,7 +1100,7 @@ export class IPProtectionPanel {
    * Gets siteData by reading the current URL bar's URI.
    *
    * @returns {object|null}
-   *  An object with data relevant to a site (eg. isExclusion),
+   *  An object with data relevant to a site (eg. isExclusion, hasSiteRule),
    *  or null otherwise if invalid.
    *
    * @see State.siteData
@@ -1093,13 +1108,14 @@ export class IPProtectionPanel {
 
   #getSiteData() {
     const principal = getSitePrincipal(this.gBrowser);
-    if (!principal || !lazy.IPPExceptionsManager.canManage(principal)) {
+    if (!principal || !lazy.IPPSiteRuleManager.canManage(principal)) {
       return null;
     }
-    const isExclusion =
-      lazy.IPPExceptionsManager.getPrincipalRule(principal) ===
-      lazy.IPPPrincipalRules.EXCLUDED;
-    return { isExclusion };
+    const rule = lazy.IPPSiteRuleManager.getRule(principal);
+    const isExclusion = rule === lazy.IPPPrincipalRules.EXCLUDED;
+    const isInclusion = rule === lazy.IPPPrincipalRules.INCLUDED;
+    const hasSiteRule = rule !== lazy.IPPPrincipalRules.DEFAULT;
+    return { isExclusion, isInclusion, hasSiteRule };
   }
 
   /**
@@ -1198,7 +1214,7 @@ export class IPProtectionPanel {
             : false,
         paused: lazy.IPPProxyManager.state === lazy.IPPProxyStates.PAUSED,
       });
-    } else if (event.type == "IPPExceptionsManager:ExclusionChanged") {
+    } else if (event.type == "SiteRuleManager:RuleChanged") {
       this.#updateSiteData();
     } else if (event.type == "IPProtectionServerlist:ListChanged") {
       this.setState({
@@ -1208,13 +1224,19 @@ export class IPProtectionPanel {
       const win = event.target.documentGlobal;
       const principal = getSitePrincipal(win?.gBrowser);
 
-      lazy.IPPExceptionsManager.setExclusion(principal, false);
+      lazy.IPPPermissionRules.setRule(
+        principal,
+        lazy.IPPPrincipalRules.DEFAULT
+      );
       Glean.ipprotection.exclusionToggled.record({ excluded: false });
     } else if (event.type == "IPProtection:UserDisableVPNForSite") {
       const win = event.target.documentGlobal;
       const principal = getSitePrincipal(win?.gBrowser);
 
-      lazy.IPPExceptionsManager.setExclusion(principal, true);
+      lazy.IPPPermissionRules.setRule(
+        principal,
+        lazy.IPPPrincipalRules.EXCLUDED
+      );
       Glean.ipprotection.exclusionToggled.record({ excluded: true });
     } else if (event.type == "IPProtection:DismissBandwidthWarning") {
       const state = lazy.IPPUsageHelper.state;

@@ -212,8 +212,6 @@ class DMABufSurfaceReporter final : public nsIMemoryReporter {
 
 NS_IMPL_ISUPPORTS(DMABufSurfaceReporter, nsIMemoryReporter)
 
-size_t DMABufSurfaceRGBA::GetUsedMemoryRGBA() { return mWidth * mHeight * 4; }
-
 void DMABufSurface::InitMemoryReporting() {
   RegisterStrongMemoryReporter(MakeAndAddRef<DMABufSurfaceReporter>());
 }
@@ -359,6 +357,28 @@ bool DMABufSurface::IsGlobalRefSet() {
   return poll(&pfd, 1, 0) == 1;
 }
 
+int DMABufSurface::GetGlobalRefCountFd() {
+  MutexAutoLock lock(mSurfaceLock);
+  return mGlobalRefCountFd;
+}
+
+/* static */
+void DMABufSurface::GetGlobalRefsSet(Span<const int> aRefCountFds,
+                                     nsTArray<bool>& aRefSet) {
+  // poll() ignores negative fds and reports no events for them, so surfaces
+  // without a global refcount still get a slot and the two arrays map 1:1.
+  AutoTArray<struct pollfd, 32> pfds;
+  pfds.SetCapacity(aRefCountFds.Length());
+  for (int fd : aRefCountFds) {
+    pfds.AppendElement(pollfd{fd ? fd : -1, POLLIN, 0});
+  }
+  aRefSet.SetCapacity(aRefCountFds.Length());
+  bool ret = poll(pfds.Elements(), pfds.Length(), 0) > 0;
+  for (const auto& pfd : pfds) {
+    aRefSet.AppendElement(ret && (pfd.revents & POLLIN));
+  }
+}
+
 void DMABufSurface::GlobalRefRelease() {
 #ifdef HAVE_EVENTFD
   MutexAutoLock lock(mSurfaceLock);
@@ -472,28 +492,12 @@ bool DMABufSurface::ReleaseDMABuf() {
 }
 
 DMABufSurface::DMABufSurface(SurfaceType aSurfaceType)
-    : mSurfaceType(aSurfaceType),
-      mBufferPlaneCount(0),
-      mStrides(),
-      mOffsets(),
-      mGbmBufferObject(),
-      mGbmBufferFlags(0),
-#ifdef MOZ_LOGGING
-      mMappedRegion(),
-      mMappedRegionStride(),
-#endif
-      mSync(nullptr),
-      mGlobalRefCountFd(0),
-      mUID(gNewSurfaceUID++),
-      mPID(0),
-      mCanRecycle(true),
-      mSurfaceLock("DMABufSurface") {
+    : mUID(gNewSurfaceUID++), mPID(0), mSurfaceLock("DMABufSurface") {
   MOZ_COUNT_CTOR(DMABufSurface);
 }
 
 DMABufSurface::~DMABufSurface() {
   MOZ_COUNT_DTOR(DMABufSurface);
-  FenceDelete();
   GlobalRefRelease();
   GlobalRefCountDelete();
 }
@@ -520,53 +524,29 @@ already_AddRefed<DMABufSurface> DMABufSurface::CreateDMABufSurface(
   return surf.forget();
 }
 
-/* static */
-void DMABufSurface::FenceDelete(RefPtr<gl::GLContext> aGL, EGLSyncKHR aSync) {
-  if (!aSync) {
-    return;
-  }
-  const auto& gle = gl::GLContextEGL::Cast(aGL);
-  const auto& egl = gle->mEgl;
-  egl->fDestroySync(aSync);
-}
-
-void DMABufSurface::FenceDeleteLocked(const MutexAutoLock& aProofOfLock) {
-  mSyncFd = nullptr;
-  if (!mGL) {
-    return;
-  }
-  EGLSyncKHR sync = mSync;
-  mSync = nullptr;
-  FenceDelete(mGL, sync);
-}
-
-void DMABufSurface::FenceDelete() {
-  MutexAutoLock lock(mSurfaceLock);
-  FenceDeleteLocked(lock);
-}
-
 void DMABufSurface::FenceSet() {
-  if (!HoldsTexture()) {
+  MutexAutoLock lock(mSurfaceLock);
+
+  if (!mGL) {
+    gfxCriticalNoteOnce
+        << "DMABufSurface::FenceSet() failed: missing GL context";
     return;
   }
 
-  MutexAutoLock lock(mSurfaceLock);
-  if (!mGL || !mGL->MakeCurrent()) {
-    MOZ_DIAGNOSTIC_ASSERT(mGL,
-                          "DMABufSurface::FenceSet(): missing GL context!");
-    return;
-  }
+  mGL->MakeCurrent();
+
   const auto& gle = gl::GLContextEGL::Cast(mGL);
   const auto& egl = gle->mEgl;
 
+  LOGDMABUF("DMABufSurface::FenceSet() UID %d", mUID);
+
   if (egl->IsExtensionSupported(EGLExtension::KHR_fence_sync) &&
       egl->IsExtensionSupported(EGLExtension::ANDROID_native_fence_sync)) {
-    FenceDeleteLocked(lock);
-
-    mSync = egl->fCreateSyncKHR(LOCAL_EGL_SYNC_NATIVE_FENCE_ANDROID, nullptr);
-    if (mSync) {
-      auto rawFd = egl->fDupNativeFenceFDANDROID(mSync);
+    if (EGLSyncKHR sync =
+            egl->fCreateSyncKHR(LOCAL_EGL_SYNC_NATIVE_FENCE_ANDROID, nullptr)) {
+      auto rawFd = egl->fDupNativeFenceFDANDROID(sync);
       mSyncFd = new gfx::FileHandleWrapper(UniqueFileHandle(rawFd));
+      egl->fDestroySync(sync);
       mGL->fFlush();
       return;
     }
@@ -576,8 +556,8 @@ void DMABufSurface::FenceSet() {
 }
 
 /* static */
-void DMABufSurface::FenceWait(RefPtr<gl::GLContext> aGL,
-                              RefPtr<gfx::FileHandleWrapper> aSyncFd) {
+void DMABufSurface::FenceWaitFd(RefPtr<gl::GLContext> aGL,
+                                RefPtr<gfx::FileHandleWrapper> aSyncFd) {
   const auto& gle = gl::GLContextEGL::Cast(aGL);
   const auto& egl = gle->mEgl;
   auto syncFd = aSyncFd->ClonePlatformHandle();
@@ -606,34 +586,32 @@ void DMABufSurface::FenceWait(RefPtr<gl::GLContext> aGL,
   (void)syncFd.release();
 
   egl->fClientWaitSync(sync, 0, LOCAL_EGL_FOREVER);
-  const EGLint waitErr = egl->mLib->fGetError();
-  if (waitErr != LOCAL_EGL_SUCCESS) {
-    gfxCriticalNoteOnce << "ClientWaitSync failed: " << FormatEGLError(waitErr);
-    egl->fDestroySync(sync);
-    return;
-  }
   egl->fDestroySync(sync);
 }
 
-void DMABufSurface::FenceWait() {
-  if (!HoldsTexture()) {
-    return;
-  }
-
+void DMABufSurface::FenceWait(mozilla::gl::GLContext* aGLContext) {
   RefPtr<gl::GLContext> gl;
   RefPtr<gfx::FileHandleWrapper> syncFd;
   {
     MutexAutoLock lock(mSurfaceLock);
-    if (!mGL || !mSyncFd) {
-      MOZ_DIAGNOSTIC_ASSERT(mGL,
-                            "DMABufSurface::FenceWait() missing GL context!");
+    if (!mSyncFd) {
       return;
     }
     gl = mGL;
+    // eglCreateSyncKHR() can use any GL context to sync and wait to finish.
+    if (!gl) {
+      gl = aGLContext;
+    }
+    if (!gl) {
+      gfxCriticalNoteOnce
+          << "DMABufSurface::FenceWait() failed: missing GL context";
+      return;
+    }
     syncFd = mSyncFd.forget();
   }
 
-  FenceWait(std::move(gl), std::move(syncFd));
+  LOGDMABUF("DMABufSurface::FenceWait() UID %d", mUID);
+  FenceWaitFd(std::move(gl), std::move(syncFd));
 }
 
 void DMABufSurface::SetSemaphoreFd(int aDuppedRawFd, bool aIsSyncFd) {
@@ -669,7 +647,7 @@ void DMABufSurface::MaybeSemaphoreWait(GLuint aGlTexture) {
     const auto& gle = gl::GLContextEGL::Cast(gl);
     const auto& egl = gle->mEgl;
     if (egl->IsExtensionSupported(EGLExtension::ANDROID_native_fence_sync)) {
-      FenceWait(gl, new gfx::FileHandleWrapper(std::move(fd)));
+      FenceWaitFd(gl, new gfx::FileHandleWrapper(std::move(fd)));
     }
     return;
   }
@@ -677,7 +655,7 @@ void DMABufSurface::MaybeSemaphoreWait(GLuint aGlTexture) {
   if (!gl->IsExtensionSupported(gl::GLContext::EXT_semaphore) ||
       !gl->IsExtensionSupported(gl::GLContext::EXT_semaphore_fd)) {
     MOZ_ASSERT_UNREACHABLE("unexpected to be called");
-    gfxCriticalNoteOnce << "EXT_semaphore_fd is not suppored";
+    gfxCriticalNoteOnce << "EXT_semaphore_fd is not supported";
     return;
   }
 
@@ -878,6 +856,19 @@ bool DMABufSurfaceRGBA::OpenFileDescriptorForPlane(
 bool DMABufSurfaceRGBA::Create(mozilla::gl::GLContext* aGLContext, int aWidth,
                                int aHeight, int aDMABufSurfaceFlags,
                                RefPtr<DRMFormat> aFormat) {
+  if (!aFormat) {
+    mFOURCCFormat = aDMABufSurfaceFlags & DMABUF_ALPHA ? GBM_FORMAT_ARGB8888
+                                                       : GBM_FORMAT_XRGB8888;
+    aFormat = GetGlobalDMABufFormats()->GetDRMFormat(mFOURCCFormat);
+    if (!aFormat) {
+      LOGDMABUF("DMABufSurfaceRGBA::Create(): Missing drm format 0x%x!",
+                mFOURCCFormat);
+      return false;
+    }
+  } else {
+    mFOURCCFormat = aFormat->GetFormat();
+  }
+
   bool useGLSnapshot = gfx::gfxVars::UseDMABufSurfaceExport() && !aGLContext;
   if (useGLSnapshot) {
     LOGDMAVERBOSES("DMABufSurfaceRGBA::Create(): use GL snapshot.");
@@ -896,7 +887,7 @@ bool DMABufSurfaceRGBA::Create(mozilla::gl::GLContext* aGLContext, int aWidth,
           "UseDmaBufExportExtension!");
       return false;
     }
-    return CreateExport(context, aWidth, aHeight, aDMABufSurfaceFlags);
+    return CreateExport(context, aWidth, aHeight, aDMABufSurfaceFlags, aFormat);
   }
 
   if (gfx::gfxVars::UseDMABufSurfaceExport()) {
@@ -906,19 +897,10 @@ bool DMABufSurfaceRGBA::Create(mozilla::gl::GLContext* aGLContext, int aWidth,
           "UseDmaBufExportExtension!");
       return false;
     }
-    return CreateExport(aGLContext, aWidth, aHeight, aDMABufSurfaceFlags);
+    return CreateExport(aGLContext, aWidth, aHeight, aDMABufSurfaceFlags,
+                        aFormat);
   }
 
-  if (!aFormat) {
-    mFOURCCFormat = aDMABufSurfaceFlags & DMABUF_ALPHA ? GBM_FORMAT_ARGB8888
-                                                       : GBM_FORMAT_XRGB8888;
-    aFormat = GetGlobalDMABufFormats()->GetDRMFormat(mFOURCCFormat);
-    if (!aFormat) {
-      LOGDMABUF("DMABufSurfaceRGBA::Create(): Missing drm format 0x%x!",
-                mFOURCCFormat);
-      return false;
-    }
-  }
   return CreateGBM(aWidth, aHeight, aDMABufSurfaceFlags, aFormat);
 }
 
@@ -995,20 +977,24 @@ bool DMABufSurfaceRGBA::CreateGBM(int aWidth, int aHeight,
 
   LOGDMABUF("    Success\n");
 
-  LogMemoryAddRGBA(GetUID(), GetUsedMemoryRGBA());
+  LogMemoryAddRGBA(GetUID(), GetUsedMemory(mWidth, mHeight));
   return true;
 }
 
 bool DMABufSurfaceRGBA::CreateExport(mozilla::gl::GLContext* aGLContext,
                                      int aWidth, int aHeight,
-                                     int aDMABufSurfaceFlags) {
-  LOGDMABUF("DMABufSurfaceRGBA::CreateExport() UID %d size %d x %d flags %d",
-            mUID, aWidth, aHeight, aDMABufSurfaceFlags);
-
+                                     int aDMABufSurfaceFlags,
+                                     const DRMFormat* aFormat) {
   MOZ_ASSERT(aGLContext);
   MOZ_DIAGNOSTIC_ASSERT(!mTexture && !mEGLImage, "Already exported??");
   MOZ_DIAGNOSTIC_ASSERT(!mGL || mGL == aGLContext);
   MOZ_DIAGNOSTIC_ASSERT(aGLContext);
+  MOZ_DIAGNOSTIC_ASSERT(aFormat);
+
+  LOGDMABUF(
+      "DMABufSurfaceRGBA::CreateExport() UID %d size %d x %d flags %d format "
+      "0x%x",
+      mUID, aWidth, aHeight, aDMABufSurfaceFlags, aFormat->GetFormat());
 
   mGL = aGLContext;
   auto releaseTextures = MakeScopeExit([&] { ReleaseTextures(); });
@@ -1025,8 +1011,12 @@ bool DMABufSurfaceRGBA::CreateExport(mozilla::gl::GLContext* aGLContext,
   const ScopedBindTexture savedTex(mGL, mTexture);
 
   GLContext::LocalErrorScope errorScope(*mGL);
+  GLenum type = LOCAL_GL_UNSIGNED_BYTE;
+  if (aFormat->GetFormat() == GBM_FORMAT_ABGR2101010) {
+    type = LOCAL_GL_UNSIGNED_INT_2_10_10_10_REV;
+  }
   mGL->fTexImage2D(LOCAL_GL_TEXTURE_2D, 0, LOCAL_GL_RGBA, mWidth, mHeight, 0,
-                   LOCAL_GL_RGBA, LOCAL_GL_UNSIGNED_BYTE, nullptr);
+                   LOCAL_GL_RGBA, type, nullptr);
   const auto err = errorScope.GetError();
   if (err) {
     LOGDMABUF("  TexImage2D failed %x error %s", err,
@@ -1090,7 +1080,7 @@ bool DMABufSurfaceRGBA::CreateExport(mozilla::gl::GLContext* aGLContext,
 
   releaseTextures.release();
 
-  LogMemoryAddRGBA(GetUID(), GetUsedMemoryRGBA());
+  LogMemoryAddRGBA(GetUID(), GetUsedMemory(mWidth, mHeight));
   return true;
 }
 
@@ -1117,7 +1107,7 @@ bool DMABufSurfaceRGBA::Create(
     mOffsets[i] = aDMABufInfo.offsets[i];
   }
 
-  LogMemoryAddRGBA(GetUID(), GetUsedMemoryRGBA());
+  LogMemoryAddRGBA(GetUID(), GetUsedMemory(mWidth, mHeight));
   return true;
 }
 
@@ -1170,7 +1160,7 @@ bool DMABufSurfaceRGBA::ImportSurfaceDescriptor(
   LOGDMABUF("  imported size %d x %d format %x planes %d", mWidth, mHeight,
             mFOURCCFormat, mBufferPlaneCount);
 
-  LogMemoryAddRGBA(GetUID(), GetUsedMemoryRGBA());
+  LogMemoryAddRGBA(GetUID(), GetUsedMemory(mWidth, mHeight));
   return true;
 }
 
@@ -1201,7 +1191,7 @@ bool DMABufSurfaceRGBA::Serialize(
     offsets.AppendElement(mOffsets[i]);
   }
 
-  if (mSync && mSyncFd) {
+  if (mSyncFd) {
     fenceFDs.AppendElement(WrapNotNull(mSyncFd));
   }
 
@@ -1212,7 +1202,7 @@ bool DMABufSurfaceRGBA::Serialize(
   // GCC needs it (Bug 1959653).
   AutoTArray<uint32_t, 1> tmp;
   aOutDescriptor = SurfaceDescriptorDMABuf(
-      mSurfaceType, mFOURCCFormat, modifiers, mGbmBufferFlags, fds, width,
+      GetSurfaceType(), mFOURCCFormat, modifiers, mGbmBufferFlags, fds, width,
       height, width, height, tmp, strides, offsets, GetYUVColorSpace(),
       mColorRange, mozilla::gfx::ColorSpace2::UNKNOWN,
       mozilla::gfx::TransferFunction::Default, 0, fenceFDs, mUID,
@@ -1312,7 +1302,6 @@ bool DMABufSurfaceRGBA::HoldsTexture() { return mTexture || mEGLImage; }
 
 void DMABufSurfaceRGBA::ReleaseTextures() {
   LOGDMABUF("DMABufSurfaceRGBA::ReleaseTextures() UID %d\n", mUID);
-  FenceDelete();
 
   if (!HoldsTexture()) {
     return;
@@ -1349,7 +1338,7 @@ void DMABufSurfaceRGBA::ReleaseSurface() {
   MOZ_ASSERT(!IsMapped(), "We can't release mapped buffer!");
   ReleaseTextures();
   if (ReleaseDMABuf()) {
-    LogMemorySubRGBA(GetUID(), GetUsedMemoryRGBA());
+    LogMemorySubRGBA(GetUID(), GetUsedMemory(mWidth, mHeight));
   }
 }
 
@@ -1497,40 +1486,6 @@ nsresult DMABufSurface::BuildSurfaceDescriptorBuffer(
   return NS_ERROR_NOT_IMPLEMENTED;
 }
 
-#ifdef MOZ_LOGGING
-// Universal OpenGL version but needs GL/textures.
-void DMABufSurfaceRGBA::DumpToFile(const char* aFile) {
-  RefPtr<gfx::DataSourceSurface> surf = GetAsSourceSurface();
-  gfxUtils::WriteAsPNG(surf, aFile);
-}
-
-#  if 0
-// A direct mapping version without GL.
-void DMABufSurfaceRGBA::DumpToFile(const char* pFile) {
-  uint32_t stride;
-
-  if (!MapReadOnly(&stride)) {
-    return;
-  }
-  cairo_surface_t* surface = nullptr;
-
-  auto unmap = MakeScopeExit([&] {
-    if (surface) {
-      cairo_surface_destroy(surface);
-    }
-    Unmap();
-  });
-
-  surface = cairo_image_surface_create_for_data(
-      (unsigned char*)mMappedRegion[0], CAIRO_FORMAT_ARGB32, mWidth, mHeight,
-      stride);
-  if (cairo_surface_status(surface) == CAIRO_STATUS_SUCCESS) {
-    cairo_surface_write_to_png(surface, pFile);
-  }
-}
-#  endif
-#endif
-
 #if 0
 // Copy from source surface by GL
 #  include "GLBlitHelper.h"
@@ -1567,44 +1522,6 @@ void DMABufSurfaceRGBA::Clear(unsigned int aValue) {
   Unmap();
 }
 #endif
-
-bool DMABufSurfaceRGBA::HasAlpha() {
-  return mFOURCCFormat == GBM_FORMAT_ARGB8888 ||
-         mFOURCCFormat == GBM_FORMAT_ABGR8888 ||
-         mFOURCCFormat == GBM_FORMAT_RGBA8888 ||
-         mFOURCCFormat == GBM_FORMAT_BGRA8888;
-}
-
-gfx::SurfaceFormat DMABufSurfaceRGBA::GetFormat() {
-  switch (mFOURCCFormat) {
-    case GBM_FORMAT_ARGB8888:
-      return gfx::SurfaceFormat::B8G8R8A8;
-    case GBM_FORMAT_ABGR8888:
-      return gfx::SurfaceFormat::R8G8B8A8;
-    case GBM_FORMAT_BGRA8888:
-      return gfx::SurfaceFormat::A8R8G8B8;
-    case GBM_FORMAT_RGBA8888:
-      gfxCriticalError() << "DMABufSurfaceRGBA::GetFormat(): Unsupported "
-                            "format GBM_FORMAT_RGBA8888";
-      return gfx::SurfaceFormat::UNKNOWN;
-
-    case GBM_FORMAT_XRGB8888:
-      return gfx::SurfaceFormat::B8G8R8X8;
-    case GBM_FORMAT_XBGR8888:
-      return gfx::SurfaceFormat::R8G8B8X8;
-    case GBM_FORMAT_BGRX8888:
-      return gfx::SurfaceFormat::X8R8G8B8;
-    case GBM_FORMAT_RGBX8888:
-      gfxCriticalError() << "DMABufSurfaceRGBA::GetFormat(): Unsupported "
-                            "format GBM_FORMAT_RGBX8888";
-      return gfx::SurfaceFormat::UNKNOWN;
-
-    default:
-      gfxCriticalError() << "DMABufSurfaceRGBA::GetFormat(): Unknown format"
-                         << gfx::hexa(mFOURCCFormat);
-      return gfx::SurfaceFormat::UNKNOWN;
-  }
-}
 
 already_AddRefed<DMABufSurfaceRGBA> DMABufSurfaceRGBA::CreateDMABufSurface(
     mozilla::gl::GLContext* aGLContext, int aWidth, int aHeight,
@@ -1648,26 +1565,6 @@ already_AddRefed<DMABufSurfaceYUV> DMABufSurfaceYUV::CopyYUVSurface(
     return nullptr;
   }
   return surf.forget();
-}
-
-size_t DMABufSurfaceYUV::GetUsedMemoryYUV(int32_t aFOURCCFormat, int aWidth,
-                                          int aHeight) {
-  switch (aFOURCCFormat) {
-    case VA_FOURCC_P010:
-    case VA_FOURCC_P016:
-      // one plane 16b + two planes 16b (half sized).
-      return aWidth * aHeight * 2 + (aWidth >> 1) * (aHeight >> 1) * 4;
-    case VA_FOURCC_NV12:
-    case VA_FOURCC_YV12:
-    case VA_FOURCC_I420:
-      // one plane 8b + two planes 8b (half sized).
-      return aWidth * aHeight + (aWidth >> 1) * (aHeight >> 1) * 2;
-    default:
-      gfxCriticalError()
-          << "DMABufSurfaceYUV::GetUsedMemoryYUV(): unknown format: "
-          << gfx::hexa(aFOURCCFormat);
-      return 0;
-  }
 }
 
 DMABufSurfaceYUV::DMABufSurfaceYUV()
@@ -1729,7 +1626,6 @@ bool DMABufSurfaceYUV::ImportPRIMESurfaceDescriptor(
               aDesc.num_layers, aDesc.num_objects);
     return false;
   }
-  mSurfaceType = SURFACE_YUV;
   mFOURCCFormat = aDesc.fourcc;
   mBufferPlaneCount = aDesc.num_layers;
 
@@ -1781,8 +1677,7 @@ bool DMABufSurfaceYUV::MoveYUVDataImpl(const VADRMPRIMESurfaceDescriptor& aDesc,
     auto rawFd = dup(aDesc.objects[object].fd);
     mDmabufFds[i] = new gfx::FileHandleWrapper(UniqueFileHandle(rawFd));
   }
-  LogMemoryAddYUV(GetUID(),
-                  GetUsedMemoryYUV(mFOURCCFormat, mWidth[0], mHeight[0]));
+  LogMemoryAddYUV(GetUID(), GetUsedMemory(mWidth[0], mHeight[0]));
   return true;
 }
 
@@ -1986,8 +1881,7 @@ bool DMABufSurfaceYUV::CopyYUVDataImpl(const VADRMPRIMESurfaceDescriptor& aDesc,
         LOCAL_GL_TEXTURE_2D);
   }
 
-  LogMemoryAddYUV(GetUID(),
-                  GetUsedMemoryYUV(mFOURCCFormat, mWidth[0], mHeight[0]));
+  LogMemoryAddYUV(GetUID(), GetUsedMemory(mWidth[0], mHeight[0]));
   return true;
 }
 
@@ -2054,8 +1948,7 @@ bool DMABufSurfaceYUV::UpdateYUVData(
     }
   }
 
-  LogMemoryAddYUV(GetUID(),
-                  GetUsedMemoryYUV(mFOURCCFormat, mWidth[0], mHeight[0]));
+  LogMemoryAddYUV(GetUID(), GetUsedMemory(mWidth[0], mHeight[0]));
   return context->BlitHelper()->BlitYCbCrImageToDMABuf(aData, this);
 }
 
@@ -2079,7 +1972,6 @@ bool DMABufSurfaceYUV::ImportSurfaceDescriptor(
     return false;
   }
 
-  mSurfaceType = SURFACE_YUV;
   mFOURCCFormat = aDesc.fourccFormat();
   mColorSpace = aDesc.yUVColorSpace();
   mColorRange = aDesc.colorRange();
@@ -2121,8 +2013,7 @@ bool DMABufSurfaceYUV::ImportSurfaceDescriptor(
     GlobalRefCountImport(aDesc.refCount()[0].ClonePlatformHandle().release());
   }
 
-  LogMemoryAddYUV(GetUID(),
-                  GetUsedMemoryYUV(mFOURCCFormat, mWidth[0], mHeight[0]));
+  LogMemoryAddYUV(GetUID(), GetUsedMemory(mWidth[0], mHeight[0]));
   return true;
 }
 
@@ -2154,7 +2045,7 @@ bool DMABufSurfaceYUV::Serialize(
     modifiers.AppendElement(mBufferModifiers[i]);
   }
 
-  if (mSync && mSyncFd) {
+  if (mSyncFd) {
     fenceFDs.AppendElement(WrapNotNull(mSyncFd));
   }
 
@@ -2163,7 +2054,7 @@ bool DMABufSurfaceYUV::Serialize(
   }
 
   aOutDescriptor = SurfaceDescriptorDMABuf(
-      mSurfaceType, mFOURCCFormat, modifiers, mGbmBufferFlags, fds, width,
+      GetSurfaceType(), mFOURCCFormat, modifiers, mGbmBufferFlags, fds, width,
       height, widthBytes, heightBytes, format, strides, offsets,
       GetYUVColorSpace(), mColorRange, mColorPrimaries, mTransferFunction,
       mWPChromaLocation, fenceFDs, mUID, mCanRecycle ? getpid() : 0,
@@ -2393,9 +2284,6 @@ bool DMABufSurfaceYUV::HoldsTexture() {
 
 void DMABufSurfaceYUV::ReleaseTextures() {
   LOGDMABUF("DMABufSurfaceYUV::ReleaseTextures() UID %d", mUID);
-
-  FenceDelete();
-
   if (!HoldsTexture()) {
     return;
   }
@@ -2454,24 +2342,6 @@ bool DMABufSurfaceYUV::VerifyTextureCreation() {
   return true;
 }
 
-gfx::SurfaceFormat DMABufSurfaceYUV::GetFormat() {
-  switch (mFOURCCFormat) {
-    case VA_FOURCC_P010:
-      return gfx::SurfaceFormat::P010;
-    case VA_FOURCC_P016:
-      return gfx::SurfaceFormat::P016;
-    case VA_FOURCC_NV12:
-      return gfx::SurfaceFormat::NV12;
-    case VA_FOURCC_YV12:
-    case VA_FOURCC_I420:
-      return gfx::SurfaceFormat::YUV420;
-    default:
-      gfxCriticalNoteOnce << "DMABufSurfaceYUV::GetFormat() unknown format: "
-                          << mFOURCCFormat;
-      return gfx::SurfaceFormat::UNKNOWN;
-  }
-}
-
 gfx::SurfaceFormat DMABufSurfaceYUV::GetHWFormat(gfx::SurfaceFormat aSWFormat) {
   switch (aSWFormat) {
     case gfx::SurfaceFormat::YUV420P10:
@@ -2489,8 +2359,7 @@ void DMABufSurfaceYUV::ReleaseSurface() {
   LOGDMABUF("DMABufSurfaceYUV::ReleaseSurface() UID %d", mUID);
   ReleaseTextures();
   if (ReleaseDMABuf()) {
-    LogMemorySubYUV(GetUID(),
-                    GetUsedMemoryYUV(mFOURCCFormat, mWidth[0], mHeight[0]));
+    LogMemorySubYUV(GetUID(), GetUsedMemory(mWidth[0], mHeight[0]));
   }
 }
 
@@ -2616,6 +2485,274 @@ wl_buffer* DMABufSurfaceYUV::CreateWlBuffer() {
 }
 #endif
 
+static const char kHLGToPQVertexShader[] = R"(
+  #version 300 es
+  in vec2 aPosition;
+  out vec2 vTexCoord;
+  void main() {
+    gl_Position = vec4(aPosition * 2.0 - 1.0, 0.0, 1.0);
+    vTexCoord = aPosition;
+  }
+)";
+
+static const char kHLGToPQFragmentShader[] = R"(
+  #version 300 es
+  precision highp float;
+  in vec2 vTexCoord;
+  out vec4 fragColor;
+
+  uniform sampler2D uTexY;
+  uniform sampler2D uTexUV;
+  uniform mat4 uYuvToRgb;
+
+  // BT.2100 HLG inverse OETF: HLG signal [0, 1] to scene light normalized so
+  // that 1.0 is the scene peak. The two branches meet at signal 0.5 / scene
+  // 1/12. Note that gfx/gl/Colorspaces.cpp uses the other common scaling of
+  // this curve, where scene peak is 12.0 rather than 1.0.
+  vec3 HLGtoScene(vec3 e) {
+    float a = 0.17883277;
+    float b = 0.28466892;
+    float c = 0.55991073;
+    return mix(e * e / 3.0, (exp((e - c) / a) + b) / 12.0, step(0.5, e));
+  }
+
+  // BT.2100 HLG reference OOTF, minus its alpha = Lw factor which is folded
+  // into the PQ normalization in main(): scene light to display light, both
+  // normalized to [0, 1]. The luma coefficients are BT.2020 and gamma = 1.2
+  // is the value BT.2100 specifies for a 1000 cd/m^2 nominal peak display.
+  vec3 ApplyOOTF(vec3 scene) {
+    float gamma = 1.2;
+    float Ys = dot(scene, vec3(0.2627, 0.6780, 0.0593));
+    return scene * pow(max(Ys, 0.0), gamma - 1.0);
+  }
+
+  // Inverse of the PQ (SMPTE ST 2084) EOTF: display light normalized so that
+  // 1.0 is 10000 cd/m^2, to a PQ signal in [0, 1].
+  vec3 LinearToPQ(vec3 rgb) {
+    float m1 = 0.1593017578;
+    float m2 = 78.84375;
+    float c1 = 0.8359375;
+    float c2 = 18.8515625;
+    float c3 = 18.6875;
+    vec3 y = pow(max(rgb, 0.0), vec3(m1));
+    return pow((c1 + c2 * y) / (1.0 + c3 * y), vec3(m2));
+  }
+
+  void main() {
+    vec2 uv = vTexCoord;
+    float y = texture(uTexY, uv).r;
+    vec2 cbcr = texture(uTexUV, uv).rg;
+    vec3 srcYUV = vec3(y, cbcr.x, cbcr.y);
+    vec3 srcRGB = (uYuvToRgb * vec4(srcYUV, 1.0)).rgb;
+    // Clamp to avoid negative values from narrow range YUV to RGB conversion.
+    srcRGB = max(srcRGB, 0.0);
+
+    vec3 scene = HLGtoScene(srcRGB);
+    vec3 display = ApplyOOTF(scene);
+
+    // Scale from [0, 1] display light (representing [0, Lw] nits) to the PQ
+    // domain [0, 1] (representing [0, 10000] nits). Lw is the OOTF alpha and
+    // must match the gamma picked in ApplyOOTF(); with 1000 nits, HLG
+    // reference white (signal 0.75) lands on 203 nits, which is
+    // Rec2100ReferenceDisplayWhite in gfx/gl/Colorspaces.h.
+    float Lw = 1000.0;
+    vec3 pq = LinearToPQ(display * (Lw / 10000.0));
+    fragColor = vec4(pq, 1.0);
+  }
+)";
+
+// BT.2020 non-constant-luminance YUV to RGB matrices for P010 (10-bit).
+// Row-major layout, uploaded with GL_TRUE transpose for GLSL mat4.
+// P010 stores 10 bits in the high bits of a 16-bit word, so sampling gives
+// code * 64 / 65535, and the studio range scales are computed against
+// 65535/64 rather than 1023.
+static const float kYuvToRgbBT2020Studio[16] = {
+    1.168932f,  0.000000f, 1.685231f, -0.915688f, 1.168932f,  -0.188058f,
+    -0.652965f, 0.347458f, 1.168932f, 2.150139f,  -0.000000f, -1.148145f,
+    0.000000f,  0.000000f, 0.000000f, 1.000000f};
+
+static const float kYuvToRgbBT2020Full[16] = {
+    1.000000f,  -0.000000f, 1.474600f, -0.737311f, 1.000000f,  -0.164553f,
+    -0.571353f, 0.367959f,  1.000000f, 1.881400f,  -0.000000f, -0.940714f,
+    0.000000f,  0.000000f,  0.000000f, 1.000000f};
+
+static GLuint sHLGToPQProgram = 0;
+static uintptr_t sHLGToPQProgramContext = 0;
+
+static GLuint CompileShader(GLContext* gl, GLenum type, const char* src) {
+  GLuint shader = gl->fCreateShader(type);
+  gl->fShaderSource(shader, 1, &src, nullptr);
+  gl->fCompileShader(shader);
+  GLint status = 0;
+  gl->fGetShaderiv(shader, LOCAL_GL_COMPILE_STATUS, &status);
+  if (!status) {
+    gl->fDeleteShader(shader);
+    return 0;
+  }
+  return shader;
+}
+
+static GLuint GetHLGToPQProgram(GLContext* gl) {
+  if (sHLGToPQProgram &&
+      sHLGToPQProgramContext == reinterpret_cast<uintptr_t>(gl)) {
+    return sHLGToPQProgram;
+  }
+
+  // We may leak the sHLGToPQProgram here but it doesn't matter - it will be
+  // deleted with its GL context.
+  sHLGToPQProgram = 0;
+
+  GLuint vs = CompileShader(gl, LOCAL_GL_VERTEX_SHADER, kHLGToPQVertexShader);
+  if (!vs) {
+    return 0;
+  }
+  GLuint fs =
+      CompileShader(gl, LOCAL_GL_FRAGMENT_SHADER, kHLGToPQFragmentShader);
+  if (!fs) {
+    gl->fDeleteShader(vs);
+    return 0;
+  }
+
+  GLuint program = gl->fCreateProgram();
+  gl->fAttachShader(program, vs);
+  gl->fAttachShader(program, fs);
+  gl->fBindAttribLocation(program, 0, "aPosition");
+  gl->fLinkProgram(program);
+  gl->fDeleteShader(vs);
+  gl->fDeleteShader(fs);
+
+  GLint status = 0;
+  gl->fGetProgramiv(program, LOCAL_GL_LINK_STATUS, &status);
+  if (!status) {
+    gl->fDeleteProgram(program);
+    return 0;
+  }
+
+  sHLGToPQProgramContext = reinterpret_cast<uintptr_t>(gl);
+  sHLGToPQProgram = program;
+  return program;
+}
+
+already_AddRefed<DMABufSurfaceRGBA> DMABufSurfaceYUV::ConvertHLGToPQ(
+    GLContext* gl) {
+  MOZ_DIAGNOSTIC_ASSERT(GetTransferFunction() == gfx::TransferFunction::HLG,
+                        "Unexpected transfer function!");
+  if (GetFOURCCFormat() != VA_FOURCC_P010) {
+    LOGDMABUF("DMABufSurfaceYUV::ConvertHLGToPQ(): failed, unknown format [%x]",
+              GetFOURCCFormat());
+    return nullptr;
+  }
+
+  for (int i = 0; i < GetTextureCount(); i++) {
+    if (!CreateTexture(gl, i)) {
+      return nullptr;
+    }
+  }
+
+  int width = GetWidth();
+  int height = GetHeight();
+
+  auto format = GetGlobalDMABufFormats()->GetDRMFormat(GBM_FORMAT_ABGR2101010);
+  if (!format) {
+    LOGDMABUF(
+        "DMABufSurfaceYUV::ConvertHLGToPQ(): 10-bit RGBA format is not "
+        "suppored");
+    return nullptr;
+  }
+
+  LOGDMABUF("DMABufSurfaceYUV::ConvertHLGToPQ() size [%d x %d]", width, height);
+
+  RefPtr<DMABufSurfaceRGBA> target = DMABufSurfaceRGBA::CreateDMABufSurface(
+      gl, width, height, DMABUF_TEXTURE | DMABUF_USE_MODIFIERS, format);
+  if (!target) {
+    LOGDMABUF(" failed to create GBM_FORMAT_ABGR2101010 dmabuf");
+    return nullptr;
+  }
+  if (!target->CreateTexture(gl)) {
+    LOGDMABUF(" failed to create texture");
+    return nullptr;
+  }
+
+  ScopedFramebufferForTexture autoFBForTex(gl, target->GetTexture());
+  if (!autoFBForTex.IsComplete()) {
+    LOGDMABUF(" failed to create framebuffer for texture");
+    return nullptr;
+  }
+  const ScopedBindFramebuffer bindFB(gl, autoFBForTex.FB());
+  const ScopedViewportRect viewport(gl, 0, 0, width, height);
+
+  GLuint program = GetHLGToPQProgram(gl);
+  if (!program) {
+    LOGDMABUF(" failed to get HLG to PQ shader");
+    return nullptr;
+  }
+  const ScopedBindProgram bindProg(gl, program);
+
+  const ScopedSaveMultiTex saveTex(gl, 2, LOCAL_GL_TEXTURE_2D);
+
+  gl->fActiveTexture(LOCAL_GL_TEXTURE0);
+  gl->fBindTexture(LOCAL_GL_TEXTURE_2D, GetTexture(0));
+  gl->fTexParameteri(LOCAL_GL_TEXTURE_2D, LOCAL_GL_TEXTURE_MIN_FILTER,
+                     LOCAL_GL_LINEAR);
+  gl->fTexParameteri(LOCAL_GL_TEXTURE_2D, LOCAL_GL_TEXTURE_MAG_FILTER,
+                     LOCAL_GL_LINEAR);
+  gl->fUniform1i(gl->fGetUniformLocation(program, "uTexY"), 0);
+
+  gl->fActiveTexture(LOCAL_GL_TEXTURE1);
+  gl->fBindTexture(LOCAL_GL_TEXTURE_2D, GetTexture(1));
+  gl->fTexParameteri(LOCAL_GL_TEXTURE_2D, LOCAL_GL_TEXTURE_MIN_FILTER,
+                     LOCAL_GL_LINEAR);
+  gl->fTexParameteri(LOCAL_GL_TEXTURE_2D, LOCAL_GL_TEXTURE_MAG_FILTER,
+                     LOCAL_GL_LINEAR);
+  gl->fUniform1i(gl->fGetUniformLocation(program, "uTexUV"), 1);
+
+  const float* matrix =
+      IsFullRange() ? kYuvToRgbBT2020Full : kYuvToRgbBT2020Studio;
+  gl->fUniformMatrix4fv(gl->fGetUniformLocation(program, "uYuvToRgb"), 1,
+                        LOCAL_GL_TRUE, matrix);
+
+  const float quad[] = {0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f};
+
+  GLuint oldVAO = 0;
+  GLuint vao = 0;
+  if (gl->IsSupported(GLFeature::vertex_array_object)) {
+    oldVAO = gl->GetIntAs<GLuint>(LOCAL_GL_VERTEX_ARRAY_BINDING);
+    gl->fGenVertexArrays(1, &vao);
+    gl->fBindVertexArray(vao);
+  }
+
+  GLuint vbo = 0;
+  gl->fGenBuffers(1, &vbo);
+
+  {
+    const ScopedVertexAttribPointer autoAttrib(gl, 0, 2, LOCAL_GL_FLOAT,
+                                               LOCAL_GL_FALSE, 0, vbo, nullptr);
+    gl->fBufferData(LOCAL_GL_ARRAY_BUFFER, sizeof(quad), quad,
+                    LOCAL_GL_STATIC_DRAW);
+    gl->fDrawArrays(LOCAL_GL_TRIANGLE_STRIP, 0, 4);
+  }
+
+  if (vao) {
+    gl->fBindVertexArray(oldVAO);
+    gl->fDeleteVertexArrays(1, &vao);
+  }
+  gl->fDeleteBuffers(1, &vbo);
+
+  target->SetTransferFunction(gfx::TransferFunction::PQ);
+  target->SetYUVColorSpace(gfx::YUVColorSpace::BT2020);
+  target->SetColorRange(gfx::ColorRange::FULL);
+  target->SetColorPrimaries(gfx::ColorSpace2::BT2020);
+  target->SetHDRMetadata(GetHDRMetadata());
+
+  // Add fence to commit all changes before we derive wl_buffer from it.
+  target->FenceSet();
+
+  // We're finished here, keep dmabuf memory only.
+  target->ReleaseTextures();
+
+  return target.forget();
+}
+
 #if 0
 void DMABufSurfaceYUV::ClearPlane(int aPlane) {
   if (!MapInternal(0, 0, mWidth[aPlane], mHeight[aPlane], nullptr,
@@ -2628,12 +2765,5 @@ void DMABufSurfaceYUV::ClearPlane(int aPlane) {
   memset((char*)mMappedRegion[aPlane], 0,
          mMappedRegionStride[aPlane] * mHeight[aPlane]);
   Unmap(aPlane);
-}
-#endif
-
-#ifdef MOZ_LOGGING
-void DMABufSurfaceYUV::DumpToFile(const char* aFile) {
-  RefPtr<gfx::DataSourceSurface> surf = GetAsSourceSurface();
-  gfxUtils::WriteAsPNG(surf, aFile);
 }
 #endif

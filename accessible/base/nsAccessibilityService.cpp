@@ -130,7 +130,7 @@ static already_AddRefed<LocalAccessible> MaybeCreateSpecificARIAAccessible(
         return nullptr;
       }
     }
-    if (parent->IsTable()) {
+    if (parent->IsTable() && !parent->IsCustomTable()) {
       return MakeAndAddRef<ARIAGridCellAccessible>(aContent, aDocument);
     }
   }
@@ -481,7 +481,7 @@ nsAccessibilityService::ListenersChanged(nsIArray* aEventChanges) {
     RefPtr<EventTarget> target;
     change->GetTarget(getter_AddRefs(target));
     nsIContent* content(nsIContent::FromEventTargetOrNull(target));
-    if (!content || !content->IsHTMLElement()) {
+    if (!content || !content->IsElement()) {
       continue;
     }
 
@@ -518,7 +518,8 @@ nsAccessibilityService::ListenersChanged(nsIArray* aEventChanges) {
         } else if (acc) {
           if ((acc->IsHTMLLink() && !acc->AsHTMLLink()->IsLinked()) ||
               (content->IsElement() &&
-               content->AsElement()->IsHTMLElement(nsGkAtoms::a) &&
+               (content->AsElement()->IsHTMLElement(nsGkAtoms::a) ||
+                content->AsElement()->IsMathMLElement(nsGkAtoms::a)) &&
                !acc->IsHTMLLink())) {
             // An HTML link without an href attribute should have a generic
             // role, unless it has a click listener. Since we might have gained
@@ -783,6 +784,28 @@ void nsAccessibilityService::NotifyARIAAttributeDefaultChanged(
     mozilla::dom::Element* aElement, nsAtom* aAttribute, AttrModType aModType) {
   if (DocAccessible* docAcc = GetDocAccessible(aElement->GetComposedDoc())) {
     docAcc->ARIAAttributeDefaultChanged(aElement, aAttribute, aModType);
+  }
+}
+
+void nsAccessibilityService::NotifyOfEditContextAttachmentChange(
+    mozilla::dom::Element* aElement) {
+  dom::Document* doc = aElement->GetComposedDoc();
+  if (!doc) {
+    return;
+  }
+  DocAccessible* docAcc = GetExistingDocAccessible(doc);
+  if (!docAcc) {
+    return;
+  }
+  if (LocalAccessible* acc = docAcc->GetAccessible(aElement)) {
+    // Only the root of an EditContext should get the focusable state, unlike
+    // the editable state, which all descendants also get. The DOM READWRITE
+    // state has already been updated by this point, so we can just let
+    // AccStateChangeEvent recalculate whether acc is focusable now. We can't do
+    // this in DocAccessible::ElementStateChanged because there's no way to tell
+    // which element was the EditContext root once the EditContext is detached.
+    auto event = MakeRefPtr<AccStateChangeEvent>(acc, states::FOCUSABLE);
+    docAcc->FireDelayedEvent(event);
   }
 }
 

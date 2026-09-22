@@ -23,6 +23,9 @@
 #include "nsGtkKeyUtils.h"
 #include "nsString.h"
 #include "nsWindow.h"
+#ifdef MOZ_WAYLAND
+#  include "nsWindowWayland.h"
+#endif
 #include "prenv.h"
 #include "prtime.h"
 
@@ -347,11 +350,56 @@ class MOZ_STACK_CLASS IMContextWrapper::AutoHandlingCompositionSignalHelper {
     return mIMContextWrapper.mHandlingKeyEvent && !mTemporarilySetEvent;
   }
 
+  /**
+   * Return true if the owner should not dispatch eKeyDown for handling a commit
+   * event without composing state anymore.
+   */
+  [[nodiscard]] bool ShouldNotDispatchKeyEvents() const {
+    // If the owner is NOT handling the event during a call of
+    // gtk_im_context_filter_keypress(), we may need to dispatch another
+    // eKeyDown event for IME which consumes the keyboard events such as
+    // Wayland.
+    return IsCallingGtkIMContextFilterKeypress() &&
+           // Otherwise, i.e., if the commit occurs during a call of
+           // gtk_im_context_filter_keypress() and we've already dispatched
+           // eKeyDown for the handling key event, we should not dispatch
+           // another eKeyDown for web apps which count the `keydown` events,
+           // e.g., typing apps.
+           mIMContextWrapper.mKeyboardEventWasDispatched;
+  }
+
   [[nodiscard]] bool EditorMayHandleKeyPressEventAsTextInput() const {
     return mIMContextWrapper.mHandlingKeyEvent &&
            mIMContextWrapper.mHandlingKeyEvent->type == GDK_KEY_PRESS &&
            KeymapWrapper::EditorMayHandleKeyPressEventAsTextInput(
                mIMContextWrapper.mHandlingKeyEvent->state);
+  }
+
+  /**
+   * Return true if the handling event may be intended to use a shortcut key or
+   * an access key.
+   */
+  [[nodiscard]] bool MaybeShortcutOrAccessKeyPress(
+      const gchar* aUTF8CommitString) const {
+    // If the handling key event is a GDK_KEY_PRESS and Ctrl, Alt or Meta DOM
+    // modifier is pressed, the user may intent to use a shortcut key or an
+    // access key.
+    if (!mIMContextWrapper.mHandlingKeyEvent ||
+        mIMContextWrapper.mHandlingKeyEvent->type != GDK_KEY_PRESS ||
+        KeymapWrapper::EditorMayHandleKeyPressEventAsTextInput(
+            mIMContextWrapper.mHandlingKeyEvent->state)) {
+      return false;
+    }
+    // Let's consider the key press is a shortcut key or a access key if the
+    // commit string matches with the introduced character by the event.
+    char keyval_utf8[8];  // should have at least 6 bytes of space
+    gint keyval_utf8_len;
+    guint32 keyval_unicode;
+    keyval_unicode =
+        gdk_keyval_to_unicode(mIMContextWrapper.mHandlingKeyEvent->keyval);
+    keyval_utf8_len = g_unichar_to_utf8(keyval_unicode, keyval_utf8);
+    keyval_utf8[keyval_utf8_len] = '\0';
+    return !strcmp(aUTF8CommitString, keyval_utf8);
   }
 
  private:
@@ -1211,11 +1259,13 @@ KeyHandlingState IMContextWrapper::OnKeyEvent(
   // the caller should've stopped handling the event if preceding eKeyDown
   // event was consumed.
   if (aKeyboardEventWasDispatched) {
+    MOZ_ASSERT(mGraphemeClusterFallbackToKeyEvent.IsVoid());
     return KeyHandlingState::eNotHandledButEventDispatched;
   }
   if (!mKeyboardEventWasDispatched) {
     return KeyHandlingState::eNotHandled;
   }
+  MOZ_ASSERT(mGraphemeClusterFallbackToKeyEvent.IsVoid());
   return mKeyboardEventWasConsumed
              ? KeyHandlingState::eNotHandledButEventConsumed
              : KeyHandlingState::eNotHandledButEventDispatched;
@@ -2018,15 +2068,15 @@ void IMContextWrapper::OnCommitCompositionNative(GtkIMContext* aContext,
       "{} OnCommitCompositionNative(aContext={}), "
       "current context={}, active context={}, utf8CommitString=\"{}\", "
       "mHandlingKeyEvent={}, mPendingKeyEvents.CountOfPendingEvents()={}, "
-      "IsComposingOn(aContext)={}, editorMayTreatKeyPressAsTypingText={}",
+      "IsComposingOn(aContext)={}, EditorMayTreatKeyPressAsTypingText={}, "
+      "ShouldNotDispatchKeyEvents()={}",
       static_cast<void*>(this), static_cast<void*>(aContext),
       static_cast<void*>(GetCurrentContext()),
       static_cast<void*>(GetActiveContext()), utf8CommitString,
       static_cast<void*>(mHandlingKeyEvent),
-      mPendingKeyEvents.CountOfPendingEvents(),
-      TrueOrFalse(IsComposingOn(aContext)),
-      TrueOrFalse(
-          signalHandlerHelper.EditorMayHandleKeyPressEventAsTextInput()));
+      mPendingKeyEvents.CountOfPendingEvents(), IsComposingOn(aContext),
+      signalHandlerHelper.EditorMayHandleKeyPressEventAsTextInput(),
+      signalHandlerHelper.ShouldNotDispatchKeyEvents());
 
   if (!IsComposingOn(aContext)) {
     // If we are not in composition and committing with empty string,
@@ -2043,13 +2093,32 @@ void IMContextWrapper::OnCommitCompositionNative(GtkIMContext* aContext,
     }
 
     if (KeymapWrapper::StringHasOnlyOneGraphemeCluster(utf16CommitString) &&
-        aContext == GetCurrentContext()) {
-      // If IME inserts commit string for the current key press event or for the
-      // immediate preceding key press event without composing state, the IME
-      // must want to work as a keyboard layout. Then, if and only if the commit
-      // string is a grapheme character, we should treat it as a key press for
-      // avoiding to behave as IME.
-      if (signalHandlerHelper.EditorMayHandleKeyPressEventAsTextInput()) {
+        aContext == GetCurrentContext() &&
+        // Some IME may cancel composition and then commit composition without
+        // another composing state. In this case, we've already dispatched a
+        // processed keydown event. So, we should not dispatch another keydown
+        // event followed by a printable keypress event in such case. Anyway,
+        // we cannot do that via OnKeyEvent().
+        !signalHandlerHelper.ShouldNotDispatchKeyEvents()) {
+      const bool editorMayHandleKeyPressAsTextInput =
+          signalHandlerHelper.EditorMayHandleKeyPressEventAsTextInput();
+      const bool treatAsNormalKeyPress = [&]() {
+        // If IME inserts commit string for the current key press event or for
+        // the immediate preceding key press event without composing state, the
+        // IME must want to work as a keyboard layout. Then, if and only if the
+        // commit string is a grapheme character, we should treat it as a key
+        // press for avoiding to behave as IME.
+        if (editorMayHandleKeyPressAsTextInput) {
+          return true;
+        }
+        // When user uses Super key as a shortcut key modifier by the pref, we
+        // should dispatch eKeyDown event to perform the shortcut key since if
+        // we dispatch a composition event or a commit event instead, the global
+        // key handler cannot this input as a shortcut.
+        return signalHandlerHelper.MaybeShortcutOrAccessKeyPress(
+            utf8CommitString);
+      }();
+      if (treatAsNormalKeyPress) {
         // If the commit composition is generated synchronously for the key
         // press, we should use the normal keyboard event dispatching path.
         if (signalHandlerHelper.IsCallingGtkIMContextFilterKeypress()) {
@@ -2080,7 +2149,7 @@ void IMContextWrapper::OnCommitCompositionNative(GtkIMContext* aContext,
             return;
           }
         }
-      } else if (!mHandlingKeyEvent) {
+      } else if (!mHandlingKeyEvent && editorMayHandleKeyPressAsTextInput) {
         // Wayland text-input protocol without GDK key event (bug 2010538).
         // When we receive a grapheme cluster commit without a key event,
         // dispatch synthesized keydown/keypress/keyup events.
@@ -2681,12 +2750,11 @@ bool IMContextWrapper::DispatchCompositionCommitEvent(
   if (!dispatcher) {
     MOZ_ASSERT(aCommitString);
     MOZ_ASSERT(!aCommitString->IsEmpty());
-    WidgetContentCommandEvent insertTextEvent(true, eContentCommandInsertText,
-                                              lastFocusedWindow);
-    insertTextEvent.mString.emplace(*aCommitString);
-    lastFocusedWindow->DispatchEvent(&insertTextEvent);
-
-    if (!insertTextEvent.mSucceeded) {
+    dispatcher = GetTextEventDispatcher();
+    MOZ_ASSERT(dispatcher);
+    const Result<bool, nsresult> insertTextResult =
+        dispatcher->DispatchInsertTextCommandEvent(*aCommitString);
+    if (insertTextResult.isErr()) [[unlikely]] {
       MOZ_LOG(gIMELog, LogLevel::Error,
               ("0x%p   DispatchCompositionChangeEvent(), FAILED, inserting "
                "text failed",
@@ -3139,13 +3207,8 @@ void IMContextWrapper::SetCursorPosition(GtkIMContext* aContext) {
   GdkRectangle area = rootWindow->DevicePixelsToGdkRectRoundOut(rect);
   gtk_im_context_set_cursor_location(aContext, &area);
 #ifdef MOZ_WAYLAND
-  if (GdkIsWaylandDisplay()) {
-    if (mOwnerWindow) {
-      GdkWindow* gdkWindow = mOwnerWindow->GetToplevelGdkWindow();
-      if (gdkWindow) {
-        gdk_window_invalidate_rect(gdkWindow, nullptr, false);
-      }
-    }
+  if (mOwnerWindow && mOwnerWindow->AsWayland()) {
+    mOwnerWindow->AsWayland()->ForceToplevelCommit();
   }
 #endif
 }
@@ -3352,21 +3415,22 @@ nsresult IMContextWrapper::DeleteText(GtkIMContext* aContext, int32_t aOffset,
       g_utf8_offset_to_pointer(utf8Str.get(), endInUTF8Characters);
 
   // Set selection to delete
-  WidgetSelectionEvent selectionEvent(true, eSetSelection, mLastFocusedWindow);
-
+  const RefPtr<TextEventDispatcher> dispatcher = GetTextEventDispatcher();
+  if (NS_WARN_IF(!dispatcher)) {
+    return NS_ERROR_FAILURE;
+  }
   nsDependentCSubstring utf8StrBeforeOffset(utf8Str, 0,
                                             charAtOffset - utf8Str.get());
-  selectionEvent.mOffset = NS_ConvertUTF8toUTF16(utf8StrBeforeOffset).Length();
+  const uint32_t offset = NS_ConvertUTF8toUTF16(utf8StrBeforeOffset).Length();
 
   nsDependentCSubstring utf8DeletingStr(utf8Str, utf8StrBeforeOffset.Length(),
                                         charAtEnd - charAtOffset);
-  selectionEvent.mLength = NS_ConvertUTF8toUTF16(utf8DeletingStr).Length();
+  const uint32_t length = NS_ConvertUTF8toUTF16(utf8DeletingStr).Length();
 
-  selectionEvent.mReversed = false;
-  selectionEvent.mExpandToClusterBoundary = false;
-  lastFocusedWindow->DispatchEvent(&selectionEvent);
+  const bool setSelectionSucceeded = dispatcher->DispatchSetSelectionEvent(
+      offset, length, ExpandToClusterBoundary::No);
 
-  if (!selectionEvent.mSucceeded || lastFocusedWindow != mLastFocusedWindow ||
+  if (!setSelectionSucceeded || lastFocusedWindow != mLastFocusedWindow ||
       lastFocusedWindow->Destroyed()) {
     MOZ_LOG(gIMELog, LogLevel::Error,
             ("0x%p   DeleteText(), FAILED, setting selection caused "
@@ -3386,12 +3450,10 @@ nsresult IMContextWrapper::DeleteText(GtkIMContext* aContext, int32_t aOffset,
   }
 
   // Delete the selection
-  WidgetContentCommandEvent contentCommandEvent(true, eContentCommandDelete,
-                                                mLastFocusedWindow);
-  mLastFocusedWindow->DispatchEvent(&contentCommandEvent);
+  const Result<bool, nsresult> deleteCommandResult =
+      dispatcher->DispatchContentCommandEvent(eContentCommandDelete);
 
-  if (!contentCommandEvent.mSucceeded ||
-      lastFocusedWindow != mLastFocusedWindow ||
+  if (deleteCommandResult.isErr() || lastFocusedWindow != mLastFocusedWindow ||
       lastFocusedWindow->Destroyed()) {
     MOZ_LOG(gIMELog, LogLevel::Error,
             ("0x%p   DeleteText(), FAILED, deleting the selection caused "

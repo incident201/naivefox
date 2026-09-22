@@ -4213,8 +4213,9 @@ var gCSSProperties = {
       "saturation",
       "color",
       "luminosity",
+      "plus-lighter",
     ],
-    invalid_values: ["none", "10px", "multiply multiply", "plus-lighter"],
+    invalid_values: ["none", "10px", "multiply multiply"],
   },
   "background-clip": {
     /*
@@ -13539,7 +13540,7 @@ gCSSProperties["overscroll-behavior-x"] = {
   inherited: false,
   type: CSS_TYPE_LONGHAND,
   initial_values: ["auto"],
-  other_values: ["contain", "none"],
+  other_values: ["contain", "chain", "none"],
   invalid_values: ["left", "1px"],
 };
 gCSSProperties["overscroll-behavior-y"] = {
@@ -13547,7 +13548,7 @@ gCSSProperties["overscroll-behavior-y"] = {
   inherited: false,
   type: CSS_TYPE_LONGHAND,
   initial_values: ["auto"],
-  other_values: ["contain", "none"],
+  other_values: ["contain", "chain", "none"],
   invalid_values: ["left", "1px"],
 };
 gCSSProperties["overscroll-behavior-inline"] = {
@@ -13556,7 +13557,7 @@ gCSSProperties["overscroll-behavior-inline"] = {
   logical: true,
   type: CSS_TYPE_LONGHAND,
   initial_values: ["auto"],
-  other_values: ["contain", "none"],
+  other_values: ["contain", "chain", "none"],
   invalid_values: ["left", "1px"],
 };
 gCSSProperties["overscroll-behavior-block"] = {
@@ -13565,7 +13566,7 @@ gCSSProperties["overscroll-behavior-block"] = {
   logical: true,
   type: CSS_TYPE_LONGHAND,
   initial_values: ["auto"],
-  other_values: ["contain", "none"],
+  other_values: ["contain", "chain", "none"],
   invalid_values: ["left", "1px"],
 };
 gCSSProperties["overscroll-behavior"] = {
@@ -13576,9 +13577,12 @@ gCSSProperties["overscroll-behavior"] = {
   initial_values: ["auto"],
   other_values: [
     "contain",
+    "chain",
     "none",
     "contain contain",
     "contain auto",
+    "chain chain",
+    "chain auto",
     "none contain",
   ],
   invalid_values: ["left", "1px", "contain auto none", "contain nonsense"],
@@ -13898,6 +13902,24 @@ if (false) {
       "fill, default",
       "2px",
     ],
+  };
+
+  gCSSProperties["-moz-scrollbar-inset-block"] = {
+    // domProp: "MozScrollbarInsetBlock",
+    inherited: false,
+    type: CSS_TYPE_LONGHAND,
+    initial_values: ["0", "0 0"],
+    other_values: ["1px 2px", "calc(2em + 3ex)", "1px calc(2em)"],
+    invalid_values: ["auto", "20%", "-10px", "1px 2px 3px", "1px 2px 3px 4px"],
+  };
+
+  gCSSProperties["-moz-scrollbar-inset-inline"] = {
+    // domProp: "MozScrollbarInsetInline",
+    inherited: false,
+    type: CSS_TYPE_LONGHAND,
+    initial_values: ["0", "0 0"],
+    other_values: ["1px 2px", "calc(2em + 3ex)", "1px calc(2em)"],
+    invalid_values: ["auto", "20%", "-10px", "1px 2px 3px", "1px 2px 3px 4px"],
   };
 }
 
@@ -14705,7 +14727,7 @@ if (IsCSSPropertyPrefEnabled("layout.css.corner-shape.enabled")) {
   const cornerShapeLonghand = {
     inherited: false,
     type: CSS_TYPE_LONGHAND,
-    initial_values: ["round"],
+    initial_values: ["round", "superellipse(1)"],
     other_values: [
       "scoop",
       "bevel",
@@ -14713,7 +14735,6 @@ if (IsCSSPropertyPrefEnabled("layout.css.corner-shape.enabled")) {
       "square",
       "squircle",
       "superellipse(0)",
-      "superellipse(1)",
       "superellipse(2)",
       "superellipse(-1)",
       "superellipse(0.5)",
@@ -14729,7 +14750,6 @@ if (IsCSSPropertyPrefEnabled("layout.css.corner-shape.enabled")) {
       "superellipse(round)",
       "superellipse(1, 2)",
       "superellipse 1",
-      "round scoop",
     ],
   };
   Object.assign(gCSSProperties, {

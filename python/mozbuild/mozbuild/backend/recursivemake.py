@@ -585,6 +585,8 @@ class RecursiveMakeBackend(MakeBackend):
             build_target = self._build_target_for_obj(obj)
             self._compile_graph[build_target]
             self._rust_targets.add(build_target)
+            if not obj.output_category:
+                self._no_skip["syms"].add(backend_file.relobjdir)
 
         elif isinstance(obj, HostRustProgram):
             self._process_host_rust_program(obj, backend_file)
@@ -1560,8 +1562,23 @@ class RecursiveMakeBackend(MakeBackend):
             backend_file.write(
                 f"{libdef.FEATURES_VAR} := {','.join(libdef.features)}\n"
             )
+        if libdef.cargo_profile_suffix:
+            backend_file.write(
+                f"RUST_LIBRARY_CARGO_PROFILE_SUFFIX := {libdef.cargo_profile_suffix}\n"
+            )
+        if libdef.cargo_crate_type:
+            backend_file.write(
+                f"RUST_LIBRARY_CARGO_CRATE_TYPE := {libdef.cargo_crate_type}\n"
+            )
         if libdef.output_category:
             self._process_non_default_target(libdef, rust_lib, backend_file)
+
+        if (
+            libdef.KIND == "target"
+            and not libdef.no_lto
+            and self.environment.substs.get("RUST_LTO_ELIGIBLE")
+        ):
+            backend_file.write("RUST_LIBRARY_LTO := 1\n")
 
     def _process_host_shared_library(self, libdef, backend_file):
         backend_file.write("HOST_SHARED_LIBRARY = %s\n" % libdef.lib_name)
@@ -1577,14 +1594,28 @@ class RecursiveMakeBackend(MakeBackend):
             target_name = "target"
         return f"{obj.relobjdir}/{target_name}"
 
+    def _add_build_order_deps(self, build_target, obj):
+        # Make the build target depend on all the target/host-objects that
+        # recursively are linked into it.
+        for lib in obj.linked_libraries:
+            if (
+                isinstance(lib, (StaticLibrary, HostLibrary))
+                and not lib.build_static_lib_archive
+            ):
+                self._add_build_order_deps(build_target, lib)
+            elif not isinstance(lib, ExternalLibrary):
+                self._compile_graph[build_target].add(self._build_target_for_obj(lib))
+        objects_target = mozpath.join(obj.relobjdir, f"{obj.KIND}-objects")
+        if objects_target != build_target and objects_target in self._compile_graph:
+            self._compile_graph[build_target].add(objects_target)
+
     def _add_rust_build_order_deps(self, obj):
         # Cargo handles the actual linking for Rust libraries and tests, so we
         # don't go through _process_linked_libraries. We still need their
         # USE_LIBS built first, so add them as build-order dependencies.
         build_target = self._build_target_for_obj(obj)
-        for lib in obj.linked_libraries:
-            if not isinstance(lib, ExternalLibrary):
-                self._compile_graph[build_target].add(self._build_target_for_obj(lib))
+        self._compile_graph[build_target]
+        self._add_build_order_deps(build_target, obj)
 
     def _process_linked_libraries(self, obj, backend_file):
         objs, shared_libs, os_libs, static_libs = self._expand_libs(obj)
@@ -1673,25 +1704,7 @@ class RecursiveMakeBackend(MakeBackend):
             # This will create the node even if there aren't any linked libraries.
             build_target = self._build_target_for_obj(obj)
             self._compile_graph[build_target]
-
-            # Make the build target depend on all the target/host-objects that
-            # recursively are linked into it.
-            def recurse_libraries(obj):
-                for lib in obj.linked_libraries:
-                    if (
-                        isinstance(lib, (StaticLibrary, HostLibrary))
-                        and not lib.no_expand_lib
-                    ):
-                        recurse_libraries(lib)
-                    elif not isinstance(lib, ExternalLibrary):
-                        self._compile_graph[build_target].add(
-                            self._build_target_for_obj(lib)
-                        )
-                objects_target = mozpath.join(obj.relobjdir, f"{obj.KIND}-objects")
-                if objects_target in self._compile_graph:
-                    self._compile_graph[build_target].add(objects_target)
-
-            recurse_libraries(obj)
+            self._add_build_order_deps(build_target, obj)
 
         # Process library-based defines
         self._process_defines(obj.lib_defines, backend_file)
@@ -1819,14 +1832,23 @@ class RecursiveMakeBackend(MakeBackend):
                 # Windows, the absolute file paths that we want to install
                 # from often have spaces.  So we write our own rule.
                 self._no_skip["misc"].add(backend_file.relobjdir)
-                backend_file.write(
-                    "misc::\n%s\n"
-                    % "\n".join(
+                rules = []
+                for f in absolute_files:
+                    basename = mozpath.basename(f)
+                    rules.append(
                         "\t$(INSTALL) %s %s"
                         % (make_quote(shell_quote(f)), install_location)
-                        for f in absolute_files
                     )
-                )
+                    # Libraries installed this way are prebuilt, coming from
+                    # outside the build, so unlike the ones we link ourselves,
+                    # nothing has checked that they work on the systems we
+                    # support. Do it here, as this is where they enter the build.
+                    if f.lower().endswith((".dll", ".so", ".dylib")):
+                        rules.append(
+                            "\t$(call py_action,check_binary %s,%s)"
+                            % (basename, mozpath.join(install_location, basename))
+                        )
+                backend_file.write("misc::\n%s\n" % "\n".join(rules))
 
     def _process_final_target_pp_files(self, obj, files, backend_file, name):
         # Bug 1177710 - We'd like to install these via manifests as

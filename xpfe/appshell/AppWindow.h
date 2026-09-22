@@ -15,18 +15,14 @@
 #include "nsTArray.h"
 #include "nsString.h"
 #include "nsWeakReference.h"
-#include "nsCOMArray.h"
 #include "nsDocShell.h"
-#include "nsRect.h"
 #include "Units.h"
 #include "mozilla/Maybe.h"
-#include "mozilla/Mutex.h"
 
 // Interfaces needed
 #include "nsIBaseWindow.h"
 #include "nsIDocShellTreeItem.h"
 #include "nsIInterfaceRequestor.h"
-#include "nsIInterfaceRequestorUtils.h"
 #include "nsIAppWindow.h"
 #include "nsIPrompt.h"
 #include "nsIAuthPrompt.h"
@@ -97,6 +93,8 @@ class AppWindow final : public nsIBaseWindow,
     MOZ_CAN_RUN_SCRIPT_BOUNDARY
     void SizeModeChanged(nsSizeMode sizeMode) override;
     MOZ_CAN_RUN_SCRIPT_BOUNDARY
+    void FullscreenChangeFailed(bool aInFullscreen) override;
+    MOZ_CAN_RUN_SCRIPT_BOUNDARY
     void MacFullscreenMenubarOverlapChanged(
         mozilla::DesktopCoord aOverlapAmount) override;
     MOZ_CAN_RUN_SCRIPT_BOUNDARY
@@ -150,6 +148,7 @@ class AppWindow final : public nsIBaseWindow,
   void WindowResized(nsIWidget*, const mozilla::LayoutDeviceIntSize&);
   MOZ_CAN_RUN_SCRIPT bool RequestWindowClose(nsIWidget* aWidget);
   MOZ_CAN_RUN_SCRIPT void SizeModeChanged(nsSizeMode aSizeMode);
+  MOZ_CAN_RUN_SCRIPT void FullscreenChangeFailed(bool aInFullscreen);
   MOZ_CAN_RUN_SCRIPT void FullscreenWillChange(bool aInFullscreen);
   MOZ_CAN_RUN_SCRIPT void FullscreenChanged(bool aInFullscreen);
   MOZ_CAN_RUN_SCRIPT void MacFullscreenMenubarOverlapChanged(
@@ -194,7 +193,6 @@ class AppWindow final : public nsIBaseWindow,
 
   MOZ_CAN_RUN_SCRIPT void FinishFullscreenChange(bool aInFullscreen);
 
-  void ApplyChromeFlags();
   MOZ_CAN_RUN_SCRIPT_BOUNDARY void SizeShell();
   void OnChromeLoaded();
   void StaggerPosition(int32_t& aRequestedX, int32_t& aRequestedY,
@@ -207,12 +205,10 @@ class AppWindow final : public nsIBaseWindow,
   void SavePersistentAttributes(PersistentAttributes);
   void MaybeSavePersistentPositionAndSize(PersistentAttributes,
                                           dom::Element& aRootElement,
-                                          const nsAString& aPersistString,
-                                          bool aShouldPersist);
+                                          const nsAString& aPersistString);
   void MaybeSavePersistentMiscAttributes(PersistentAttributes,
                                          dom::Element& aRootElement,
-                                         const nsAString& aPersistString,
-                                         bool aShouldPersist);
+                                         const nsAString& aPersistString);
   void SavePersistentAttributes() {
     SavePersistentAttributes(mPersistentAttributesDirty);
   }
@@ -250,9 +246,10 @@ class AppWindow final : public nsIBaseWindow,
   void PersistentAttributesDirty(PersistentAttributes,
                                  PersistentAttributeUpdate);
 
+  bool ShouldSavePersistentValues() const;
   void LoadPersistentWindowState();
   nsresult GetPersistentValue(const nsAtom* aAttr, nsAString& aValue);
-  nsresult SetPersistentValue(const nsAtom* aAttr, const nsAString& aValue);
+  void MaybeSetPersistentValue(const nsAtom* aAttr, const nsAString& aValue);
 
   // Saves window size and positioning values in order to display a very early
   // skeleton UI. This has to happen before we can reasonably initialize the

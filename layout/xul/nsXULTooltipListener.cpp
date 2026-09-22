@@ -56,6 +56,16 @@ nsXULTooltipListener::~nsXULTooltipListener() {
 NS_IMPL_ISUPPORTS(nsXULTooltipListener, nsIDOMEventListener)
 
 void nsXULTooltipListener::MouseOut(Event* aEvent) {
+  // This listener is a process-wide singleton, so mouseouts of nodes we are not
+  // tracking reach it too. They say nothing about the node the mouse is
+  // hovering, and acting on them cancels a tooltip about to show in another
+  // window.
+  nsCOMPtr<nsIContent> previousTarget =
+      do_QueryReferent(mPreviousMouseMoveTarget);
+  if (previousTarget != aEvent->GetOriginalTarget()) {
+    return;
+  }
+
   // reset flag so that tooltip will display on the next MouseMove
   mTooltipShownOnce = false;
   mPreviousMouseMoveTarget = nullptr;
@@ -143,11 +153,6 @@ void nsXULTooltipListener::MouseMove(Event* aEvent) {
 
   auto* const sourceContent =
       nsIContent::FromEventTargetOrNull(aEvent->GetCurrentTarget());
-  mSourceNode = do_GetWeakReference(sourceContent);
-  mIsSourceTree = sourceContent->IsXULElement(nsGkAtoms::treechildren);
-  if (mIsSourceTree) {
-    CheckTreeBodyMove(mouseEvent);
-  }
 
   // as the mouse moves, we want to make sure we reset the timer to show it,
   // so that the delay is from when the mouse stops moving, not when it enters
@@ -160,6 +165,16 @@ void nsXULTooltipListener::MouseMove(Event* aEvent) {
   if (!isSameTarget) {
     HideTooltip();
     mTooltipShownOnce = false;
+  }
+
+  mIsSourceTree = sourceContent->IsXULElement(nsGkAtoms::treechildren);
+  // Record the source only once the tooltip that was showing has been torn
+  // down: HideTooltip() runs DestroyTooltip(), which clears mSourceNode, and
+  // ShowTooltip() needs it when the timer armed below fires.
+  // CheckTreeBodyMove() needs it too.
+  mSourceNode = do_GetWeakReference(sourceContent);
+  if (mIsSourceTree) {
+    CheckTreeBodyMove(mouseEvent);
   }
 
   // If the mouse moves while the tooltip is up, hide it. If nothing is

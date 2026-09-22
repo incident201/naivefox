@@ -211,6 +211,12 @@ Opens `about:protections`
 
 Opens the protection panel behind on the lock icon of the awesomebar
 
+### `OPEN_SMARTWINDOW_MONITOR_CREATE`
+
+Opens the Smart Window Monitor toolbar panel straight to the create form.
+
+* args: (none)
+
 ### `DISABLE_STP_DOORHANGERS`
 
 Disables all Social Tracking Protection messages
@@ -542,6 +548,14 @@ Notify Firefox that the Terms of Use policy was interacted with.
 Creates a new user profile and launches it in a separate instance.
 
 Any message that uses this action should have `canCreateSelectableProfiles` as part of the targeting, to ensure we don't accidentally show a message where the action will not work.
+
+- args: (none)
+
+### `RESET_PROFILE`
+
+Opens the refresh confirmation dialog, which resets the current profile and restarts the browser
+
+Any message that uses this action should have `canResetProfile` as part of the targeting, to ensure we don't show a message where the action will not work.
 
 - args: (none)
 

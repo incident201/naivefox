@@ -28,6 +28,7 @@
 #include "builtin/Eval.h"
 #include "builtin/JSON.h"
 #include "builtin/Math.h"
+#include "builtin/ModuleObject.h"
 #include "builtin/Promise.h"
 #include "builtin/Symbol.h"
 #include "frontend/FrontendContext.h"  // AutoReportFrontendContext
@@ -2791,6 +2792,11 @@ JS_PUBLIC_API JSString* JS_DecompileFunction(JSContext* cx,
 
 JS_PUBLIC_API void JS::SetScriptPrivate(JSScript* script,
                                         const JS::Value& value) {
+  // The referrer passed to the HostLoadImportedModule hook is either a module
+  // record or a classic script's private value, so a module object must not be
+  // used as a script private. See JS::GetReferrerPrivate.
+  MOZ_ASSERT_IF(value.isObject(), !value.toObject().is<js::ModuleObject>());
+
   JSRuntime* rt = script->zone()->runtimeFromMainThread();
   script->sourceObject()->setPrivate(rt, value);
 }
@@ -3063,7 +3069,6 @@ JS_PUBLIC_API bool JS::RejectPromise(JSContext* cx, JS::HandleObject promiseObj,
   return ResolveOrRejectPromise(cx, promiseObj, rejectionValue, true);
 }
 
-#ifdef NIGHTLY_BUILD
 JS_PUBLIC_API bool JS::SafeResolve(JSContext* cx, JS::HandleObject promiseObj,
                                    JS::HandleValue resolutionValue) {
   AssertHeapIsIdle();
@@ -3091,7 +3096,6 @@ JS_PUBLIC_API bool JS::SafeResolve(JSContext* cx, JS::HandleObject promiseObj,
 
   return js::SafeResolvePromise(cx, promise, resolution);
 }
-#endif  // NIGHTLY_BUILD
 
 JS_PUBLIC_API JSObject* JS::CallOriginalPromiseThen(
     JSContext* cx, JS::HandleObject promiseObj, JS::HandleObject onFulfilled,
@@ -4601,11 +4605,6 @@ JS_PUBLIC_API void JS_SetGlobalJitCompilerOption(JSContext* cx,
     case JSJITCOMPILER_WASM_JIT_OPTIMIZING:
       JS::ContextOptionsRef(cx).setWasmIon(!!value);
       break;
-#ifdef NIGHTLY_BUILD
-    case JSJITCOMPILER_REGEXP_BUFFER_BOUNDARIES:
-      jit::JitOptions.js_regexp_buffer_boundaries = !!value;
-      break;
-#endif
 #ifdef DEBUG
     case JSJITCOMPILER_FULL_DEBUG_CHECKS:
       jit::JitOptions.fullDebugChecks = !!value;

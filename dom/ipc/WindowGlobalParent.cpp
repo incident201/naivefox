@@ -227,12 +227,6 @@ void WindowGlobalParent::Init() {
     processId = cp->ChildID();
   }
 
-  MOZ_DIAGNOSTIC_ASSERT(
-      !BrowsingContext()->GetParent() ||
-          BrowsingContext()->GetEmbedderInnerWindowId(),
-      "When creating a non-root WindowGlobalParent, the WindowGlobalParent "
-      "for our embedder should've already been created.");
-
   // Ensure we have a document URI
   if (!mDocumentURI) {
     NS_NewURI(getter_AddRefs(mDocumentURI), "about:blank");
@@ -323,6 +317,12 @@ already_AddRefed<WindowGlobalParent> WindowGlobalParent::GetByInnerWindowId(
   }
 
   return WindowContext::GetById(aInnerWindowId).downcast<WindowGlobalParent>();
+}
+
+/* static */
+WindowGlobalParent* WindowGlobalParent::Cast(WindowContext* aContext) {
+  MOZ_RELEASE_ASSERT(XRE_IsParentProcess());
+  return static_cast<WindowGlobalParent*>(aContext);
 }
 
 already_AddRefed<WindowGlobalChild> WindowGlobalParent::GetChildActor() {
@@ -676,16 +676,16 @@ IPCResult WindowGlobalParent::RecvRawMessage(const JSActorMessageMeta& aMeta,
   return IPC_OK();
 }
 
-const nsACString& WindowGlobalParent::GetRemoteType() const {
+const RemoteType& WindowGlobalParent::GetRemoteType() const {
   if (RefPtr<BrowserParent> browserParent = GetBrowserParent()) {
     return browserParent->Manager()->GetRemoteType();
   }
 
-  return NOT_REMOTE_TYPE;
+  return RemoteType::NotRemote();
 }
 
 void WindowGlobalParent::GetRemoteType(nsACString& aRemoteType) const {
-  aRemoteType = GetRemoteType();
+  aRemoteType = GetRemoteType().Stringify();
 }
 
 void WindowGlobalParent::NotifyContentBlockingEvent(
@@ -1327,9 +1327,8 @@ already_AddRefed<mozilla::dom::Promise> WindowGlobalParent::DrawSnapshot(
   }
 
   nscolor color;
-  if (NS_WARN_IF(!ServoCSSParser::ComputeColor(nullptr, NS_RGB(0, 0, 0),
-                                               aBackgroundColor, &color,
-                                               nullptr, nullptr))) {
+  if (NS_WARN_IF(
+          !ServoCSSParser::ComputeColor(nullptr, aBackgroundColor, &color))) {
     aRv = NS_ERROR_FAILURE;
     return nullptr;
   }
@@ -1343,11 +1342,8 @@ already_AddRefed<mozilla::dom::Promise> WindowGlobalParent::DrawSnapshot(
     flags |= gfx::CrossProcessPaintFlags::ResetScrollPosition;
   }
 
-  if (!gfx::CrossProcessPaint::Start(this, aRect, (float)aScale, color, flags,
-                                     promise)) {
-    aRv = NS_ERROR_FAILURE;
-    return nullptr;
-  }
+  gfx::CrossProcessPaint::Start(this, aRect, (float)aScale, color, flags,
+                                promise);
   return promise.forget();
 }
 
@@ -1383,8 +1379,7 @@ mozilla::ipc::IPCResult WindowGlobalParent::RecvExpectPageUseCounters(
   // page use counters.  This causes us to wait for this window to go away
   // (in WindowGlobalParent::ActorDestroy) before reporting the page use
   // counters via Telemetry.
-  RefPtr<WindowGlobalParent> page =
-      static_cast<WindowGlobalParent*>(aTop.GetMaybeDiscarded());
+  RefPtr<WindowGlobalParent> page = Cast(aTop.GetMaybeDiscarded());
   if (!page || page->mSentPageUseCounters) {
     MOZ_LOG(gUseCountersLog, LogLevel::Debug,
             (" > too late, won't report page use counters for this straggler"));
@@ -1668,8 +1663,8 @@ mozilla::ipc::IPCResult WindowGlobalParent::RecvSetDocumentDomain(
     return IPC_FAIL(this, "Sandbox disallows domain setting.");
   }
 
-  // Might need to do a featurepolicy check here, like we currently do in the
-  // child process?
+  // Might need to do a permissions policy check here, like we currently do in
+  // the child process?
 
   nsCOMPtr<nsIURI> uri;
   mDocumentPrincipal->GetDomain(getter_AddRefs(uri));
@@ -1888,36 +1883,6 @@ void WindowGlobalParent::ActorDestroy(ActorDestroyReason aWhy) {
 
   if (GetBrowsingContext()->IsTopContent() &&
       !mDocumentPrincipal->SchemeIs("about")) {
-    // Record the mixed content status of the docshell in Telemetry
-    enum {
-      NO_MIXED_CONTENT = 0,  // There is no Mixed Content on the page
-      MIXED_DISPLAY_CONTENT =
-          1,  // The page attempted to load Mixed Display Content
-      MIXED_ACTIVE_CONTENT =
-          2,  // The page attempted to load Mixed Active Content
-      MIXED_DISPLAY_AND_ACTIVE_CONTENT = 3  // The page attempted to load Mixed
-                                            // Display & Mixed Active Content
-    };
-
-    bool hasMixedDisplay =
-        mSecurityState &
-        (nsIWebProgressListener::STATE_LOADED_MIXED_DISPLAY_CONTENT |
-         nsIWebProgressListener::STATE_BLOCKED_MIXED_DISPLAY_CONTENT);
-    bool hasMixedActive =
-        mSecurityState &
-        (nsIWebProgressListener::STATE_LOADED_MIXED_ACTIVE_CONTENT |
-         nsIWebProgressListener::STATE_BLOCKED_MIXED_ACTIVE_CONTENT);
-
-    uint32_t mixedContentLevel = NO_MIXED_CONTENT;
-    if (hasMixedDisplay && hasMixedActive) {
-      mixedContentLevel = MIXED_DISPLAY_AND_ACTIVE_CONTENT;
-    } else if (hasMixedActive) {
-      mixedContentLevel = MIXED_ACTIVE_CONTENT;
-    } else if (hasMixedDisplay) {
-      mixedContentLevel = MIXED_DISPLAY_CONTENT;
-    }
-    glean::mixed_content::page_load.AccumulateSingleSample(mixedContentLevel);
-
     if (GetDocTreeHadMedia()) {
       glean::media::element_in_page_count.Add(1);
     }
@@ -2065,8 +2030,7 @@ bool WindowGlobalParent::ShouldTrackSiteOriginTelemetry() {
   }
 
   RefPtr<BrowserParent> browserParent = GetBrowserParent();
-  if (!browserParent ||
-      !IsWebRemoteType(browserParent->Manager()->GetRemoteType())) {
+  if (!browserParent || !browserParent->Manager()->GetRemoteType().IsWeb()) {
     return false;
   }
 
@@ -2288,13 +2252,13 @@ mozilla::ipc::IPCResult WindowGlobalParent::RecvPDocAccessibleConstructor(
     return IPC_FAIL(
         this,
         "Attempt to construct PDocAccessible when accessibility not in use");
-  } else if (allow ==
-             a11y::DocAccessibleParent::AllowConstruction::AllowButIgnore) {
+  }
+  if (allow == a11y::DocAccessibleParent::AllowConstruction::AllowButIgnore) {
     doc->MarkAsShutdown();
     return IPC_OK();
   }
 
-  if (GetBrowsingContext()->IsDiscarded()) {
+  if (GetBrowsingContext()->IsDiscarded() || !IsCurrentGlobal()) {
     // This document is about to die, so ignore it. This is particularly
     // important on Android because we must never have more than one active top
     // level DocAccessible at the same time there.

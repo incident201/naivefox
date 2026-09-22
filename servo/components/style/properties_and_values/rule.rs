@@ -17,11 +17,10 @@ use crate::custom_properties::{Name as CustomPropertyName, SpecifiedValue};
 use crate::derives::*;
 use crate::error_reporting::ContextualParseError;
 use crate::parser::{Parse, ParserContext};
+use crate::properties::PropertyIdRef;
 use crate::shared_lock::{SharedRwLockReadGuard, ToCssWithGuard};
 use crate::values::{computed, serialize_atom_name};
-use cssparser::{
-    BasicParseErrorKind, ParseErrorKind, Parser, ParserInput, RuleBodyParser, SourceLocation,
-};
+use cssparser::{BasicParseErrorKind, ParseErrorKind, Parser, RuleBodyParser, SourceLocation};
 use malloc_size_of::{MallocSizeOf, MallocSizeOfOps};
 use servo_arc::Arc;
 use std::fmt::{self, Write};
@@ -49,10 +48,10 @@ pub fn parse_property_block(
         context,
         descriptors: &mut descriptors,
     };
-    let mut iter = RuleBodyParser::new(input, &mut parser);
+    let iter = RuleBodyParser::new(input, &mut parser);
     let mut syntax_err = None;
     let mut inherits_err = None;
-    while let Some(declaration) = iter.next() {
+    for declaration in iter {
         if !context.error_reporting_enabled() {
             continue;
         }
@@ -119,8 +118,12 @@ pub fn parse_property_block(
         });
     };
 
-    if PropertyRegistration::validate_initial_value(syntax, descriptors.initial_value.as_deref())
-        .is_err()
+    if PropertyRegistration::validate_initial_value(
+        PropertyIdRef::from(&name.0),
+        syntax,
+        descriptors.initial_value.as_deref(),
+    )
+    .is_err()
     {
         return Err(ParseError::from_basic_kind(
             BasicParseErrorKind::AtRuleBodyInvalid,
@@ -162,8 +165,7 @@ impl PropertyRegistration {
             return Ok(ComputedRegisteredValue::universal(Arc::clone(initial)));
         }
 
-        let mut input = ParserInput::new(initial.css_text());
-        let mut input = Parser::new(&mut input);
+        let mut input = Parser::new(initial.css_text());
         input.skip_whitespace();
 
         match SpecifiedRegisteredValue::compute(
@@ -174,6 +176,7 @@ impl PropertyRegistration {
             computed_context,
             AllowComputationallyDependent::No,
             /* attr_taint */ Default::default(),
+            Some(PropertyIdRef::Custom(&self.name.0)),
         ) {
             Ok(computed) => Ok(computed),
             Err(_) => Err(()),
@@ -183,6 +186,7 @@ impl PropertyRegistration {
     /// Performs syntax validation as per the initial value descriptor.
     /// https://drafts.css-houdini.org/css-properties-values-api-1/#initial-value-descriptor
     pub fn validate_initial_value(
+        property_id: PropertyIdRef,
         syntax: &SyntaxDescriptor,
         initial_value: Option<&SpecifiedValue>,
     ) -> Result<(), PropertyRegistrationError> {
@@ -208,8 +212,7 @@ impl PropertyRegistration {
             return Err(PropertyRegistrationError::InitialValueNotComputationallyIndependent);
         }
 
-        let mut input = ParserInput::new(initial.css_text());
-        let mut input = Parser::new(&mut input);
+        let mut input = Parser::new(initial.css_text());
         input.skip_whitespace();
 
         // The initial-value cannot include CSS-wide keywords.
@@ -224,6 +227,7 @@ impl PropertyRegistration {
             None,
             AllowComputationallyDependent::No,
             /* attr_taint */ Default::default(),
+            Some(property_id),
         ) {
             Ok(_) => {},
             Err(_) => return Err(PropertyRegistrationError::InvalidInitialValue),
@@ -306,7 +310,7 @@ impl Parse for InitialValue {
         Ok(Arc::new(SpecifiedValue::parse(
             input,
             Some(&context.namespaces.prefixes),
-            &context.url_data,
+            context.url_data,
         )?))
     }
 }
@@ -330,6 +334,6 @@ impl Descriptors {
 
     /// Whether this property uses universal syntax.
     pub fn is_universal(&self) -> bool {
-        self.syntax.as_ref().map_or(true, |s| s.is_universal())
+        self.syntax.as_ref().is_none_or(|s| s.is_universal())
     }
 }

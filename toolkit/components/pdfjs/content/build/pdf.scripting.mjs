@@ -15,14 +15,13 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  * @licend The above is the entire license notice for the
  * JavaScript code in this page
  */
 
 /**
- * pdfjsVersion = 6.3.237
- * pdfjsBuild = 9aea8e2df
+ * pdfjsVersion = 6.4.191
+ * pdfjsBuild = ccd820e12
  */
 
 ;// ./src/scripting_api/constants.js
@@ -176,10 +175,7 @@ function getFieldType(actions) {
   if (format.startsWith("AFDate_")) {
     return FieldType.date;
   }
-  if (format.startsWith("AFTime_")) {
-    return FieldType.time;
-  }
-  return FieldType.none;
+  return format.startsWith("AFTime_") ? FieldType.time : FieldType.none;
 }
 
 ;// ./src/scripting_api/app_utils.js
@@ -982,10 +978,7 @@ class AForm {
       str = `0${str}`;
     }
     const numbers = str.match(/(\d+)/g);
-    if (numbers.length === 0) {
-      return null;
-    }
-    return numbers;
+    return numbers.length === 0 ? null : numbers;
   }
   AFMakeNumber(str) {
     if (typeof str === "number") {
@@ -996,10 +989,7 @@ class AForm {
     }
     str = str.trim().replace(",", ".");
     const number = parseFloat(str);
-    if (isNaN(number) || !isFinite(number)) {
-      return null;
-    }
-    return number;
+    return isNaN(number) || !isFinite(number) ? null : number;
   }
   AFMakeArrayFromList(string) {
     return typeof string === "string" ? string.split(/, ?/g) : string;
@@ -3025,10 +3015,7 @@ class Doc extends PDFObject {
   }
   getField(cName) {
     const field = this._getField(cName);
-    if (!field) {
-      return null;
-    }
-    return field.wrapped;
+    return !field ? null : field.wrapped;
   }
   _getChildren(fieldName) {
     const len = fieldName.length;
@@ -3067,10 +3054,7 @@ class Doc extends PDFObject {
     if (typeof nIndex !== "number") {
       throw new TypeError("Invalid field index: must be a number");
     }
-    if (0 <= nIndex && nIndex < this.numFields) {
-      return this._fieldNames[Math.trunc(nIndex)];
-    }
-    return null;
+    return nIndex >= 0 && nIndex < this.numFields ? this._fieldNames[Math.trunc(nIndex)] : null;
   }
   getNthTemplate() {
     return null;
@@ -3212,17 +3196,11 @@ class ProxyHandler {
   get(obj, prop) {
     if (prop in obj._expandos) {
       const val = obj._expandos[prop];
-      if (typeof val === "function") {
-        return val.bind(obj);
-      }
-      return val;
+      return typeof val === "function" ? val.bind(obj) : val;
     }
     if (typeof prop === "string" && !prop.startsWith("_") && prop in obj) {
       const val = obj[prop];
-      if (typeof val === "function") {
-        return val.bind(obj);
-      }
-      return val;
+      return typeof val === "function" ? val.bind(obj) : val;
     }
     return undefined;
   }
@@ -3273,14 +3251,11 @@ class ProxyHandler {
         value: obj._expandos[prop]
       };
     }
-    if (typeof prop === "string" && !prop.startsWith("_") && prop in obj) {
-      return {
-        configurable: true,
-        enumerable: true,
-        value: obj[prop]
-      };
-    }
-    return undefined;
+    return typeof prop === "string" && !prop.startsWith("_") && prop in obj ? {
+      configurable: true,
+      enumerable: true,
+      value: obj[prop]
+    } : undefined;
   }
   defineProperty(obj, key, descriptor) {
     Object.defineProperty(obj._expandos, key, descriptor);
@@ -3475,9 +3450,7 @@ class Util extends PDFObject {
       seconds: oDate.getSeconds()
     };
     const patterns = /(mmmm|mmm|mm|m|dddd|ddd|dd|d|yyyy|yy|HH|H|hh|h|MM|M|ss|s|tt|t|\\.)/g;
-    return cFormat.replaceAll(patterns, function (_, pattern) {
-      return pattern in handlers ? handlers[pattern](data) : pattern.charCodeAt(1);
-    });
+    return cFormat.replaceAll(patterns, (_, pattern) => pattern in handlers ? handlers[pattern](data) : pattern.charCodeAt(1));
   }
   printx(cFormat, cSource) {
     cSource = (cSource ?? "").toString();

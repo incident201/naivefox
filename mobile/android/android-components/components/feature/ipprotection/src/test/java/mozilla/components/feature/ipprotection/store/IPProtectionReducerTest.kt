@@ -26,6 +26,7 @@ import mozilla.components.feature.ipprotection.store.state.PendingActivationRequ
 import mozilla.components.feature.ipprotection.store.state.ProxyActivation
 import mozilla.components.feature.ipprotection.store.state.Recommended
 import mozilla.components.feature.ipprotection.store.state.Uninitialized
+import mozilla.components.feature.ipprotection.store.state.isActivationInFlight
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Test
@@ -120,7 +121,7 @@ class IPProtectionReducerTest {
         val state = buildIPProtectionState().copy(pendingActivationRequest = PendingActivationRequest.Activate(null))
         assertEquals(
             state.copy(pendingActivationRequest = null),
-            iPProtectionReducer(state, IPProtectionAction.ToggleFailed()),
+            iPProtectionReducer(state, IPProtectionAction.ToggleFailed(ActivationOperation.Activate)),
         )
     }
 
@@ -157,7 +158,7 @@ class IPProtectionReducerTest {
                 pendingActivationRequest = null,
                 accountState = state.accountState.copy(status = AccountStatus.TryAgain),
             ),
-            iPProtectionReducer(state, IPProtectionAction.ToggleFailed()),
+            iPProtectionReducer(state, IPProtectionAction.ToggleFailed(ActivationOperation.Activate)),
         )
     }
 
@@ -172,7 +173,7 @@ class IPProtectionReducerTest {
                 )
         assertEquals(
             state.copy(pendingActivationRequest = null, accountState = state.accountState),
-            iPProtectionReducer(state, IPProtectionAction.ToggleFailed()),
+            iPProtectionReducer(state, IPProtectionAction.ToggleFailed(ActivationOperation.Activate)),
         )
     }
 
@@ -761,7 +762,7 @@ class IPProtectionReducerTest {
         val resultState =
             iPProtectionReducer(
                 state = initialState,
-                action = IPProtectionAction.LocationChanged(updatedLocation),
+                action = IPProtectionAction.LocationChanged(updatedLocation, userAction = true),
             )
 
         assertEquals(updatedLocation, resultState.locationState.selectedLocation)
@@ -777,7 +778,7 @@ class IPProtectionReducerTest {
         val resultState =
             iPProtectionReducer(
                 state = initialState,
-                action = IPProtectionAction.LocationChanged(updatedLocation),
+                action = IPProtectionAction.LocationChanged(updatedLocation, userAction = true),
             )
 
         assertEquals(updatedLocation, resultState.locationState.selectedLocation)
@@ -797,11 +798,47 @@ class IPProtectionReducerTest {
         val resultState =
             iPProtectionReducer(
                 state = initialState,
-                action = IPProtectionAction.LocationChanged(updatedLocation),
+                action = IPProtectionAction.LocationChanged(updatedLocation, userAction = true),
             )
 
         assertEquals(updatedLocation, resultState.locationState.selectedLocation)
         assertEquals(null, resultState.pendingActivationRequest)
+    }
+
+    @Test
+    fun `WHEN the engine accepts a queued activation THEN the request is retired`() {
+        val request = PendingActivationRequest.Activate("JP", isLocationSwitch = true)
+        val initialState =
+            buildIPProtectionState(serviceStatus = ServiceState.Ready, proxyStatus = Authorized.Active)
+                .copy(pendingActivationRequest = request)
+
+        val resultState =
+            iPProtectionReducer(
+                state = initialState,
+                action = IPProtectionAction.ActivationRequestCompleted(request),
+            )
+
+        assertEquals(null, resultState.pendingActivationRequest)
+        assertEquals(false, resultState.isActivationInFlight)
+    }
+
+    @Test
+    fun `GIVEN a newer queued activation WHEN the engine accepts the previous one THEN the newer request is kept`() {
+        val newerRequest = PendingActivationRequest.Activate("DE", isLocationSwitch = true)
+        val initialState =
+            buildIPProtectionState(serviceStatus = ServiceState.Ready, proxyStatus = Authorized.Active)
+                .copy(pendingActivationRequest = newerRequest)
+
+        val resultState =
+            iPProtectionReducer(
+                state = initialState,
+                action =
+                    IPProtectionAction.ActivationRequestCompleted(
+                        PendingActivationRequest.Activate("JP", isLocationSwitch = true)
+                    ),
+            )
+
+        assertEquals(newerRequest, resultState.pendingActivationRequest)
     }
 
     @Test
@@ -815,7 +852,7 @@ class IPProtectionReducerTest {
         val resultState =
             iPProtectionReducer(
                 state = initialState,
-                action = IPProtectionAction.LocationChanged(updatedLocation),
+                action = IPProtectionAction.LocationChanged(updatedLocation, userAction = true),
             )
 
         assertEquals(updatedLocation, resultState.locationState.selectedLocation)
@@ -835,7 +872,7 @@ class IPProtectionReducerTest {
         val resultState =
             iPProtectionReducer(
                 state = initialState,
-                action = IPProtectionAction.LocationChanged(updatedLocation),
+                action = IPProtectionAction.LocationChanged(updatedLocation, userAction = true),
             )
 
         assertEquals(updatedLocation, resultState.locationState.selectedLocation)
@@ -907,7 +944,7 @@ class IPProtectionReducerTest {
         val resultState =
             iPProtectionReducer(
                 state = initialState,
-                action = IPProtectionAction.LocationChanged(Country("JP", available = true)),
+                action = IPProtectionAction.LocationChanged(Country("JP", available = true), userAction = true),
             )
 
         assertEquals(LocationListUpdateState.Updated, resultState.locationState.updateState)
@@ -920,7 +957,7 @@ class IPProtectionReducerTest {
         val resultState =
             iPProtectionReducer(
                 state = initialState,
-                action = IPProtectionAction.LocationReset,
+                action = IPProtectionAction.LocationReset(countryCode = "JP", status = CachedLocationStatus.Missing),
             )
 
         assertEquals(LocationListUpdateState.Updated, resultState.locationState.updateState)

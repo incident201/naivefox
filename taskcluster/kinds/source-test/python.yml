@@ -225,6 +225,8 @@ mozlint:
                     - win64-node
                     - win64-rust
                     - win64-mozcheck
+        fetch:
+            - pnpm
         clang-tidy:
             - artifact: clang-tidy.tar.zst
               dest: clang-tools
@@ -357,6 +359,7 @@ taskgraph-tests:
         subsuite: taskgraph
     when:
         files-changed:
+            - 'build/sparse-profiles/**'
             - 'python/mach/**/*.py'
             - 'taskcluster/**/*.py'
             - 'taskcluster/requirements.txt'
@@ -394,7 +397,7 @@ update-packaging:
 
 mozbuild:
     matrix:
-        python: ['3.9', '3.11']
+        python: ['3.10', '3.11']
     description: mozbuild unit tests (python{matrix[python]})
     platform:
         - linux2404-64/opt
@@ -565,7 +568,6 @@ fxms-schemas:
             - 'browser/components/asrouter/content-src/schemas/extract-test-corpus.js'
             - 'browser/components/asrouter/content-src/schemas/make-schemas.py'
             - 'browser/components/asrouter/content-src/**/*.schema.json'
-            - 'browser/components/asrouter/modules/CFRMessageProvider.sys.mjs'
             - 'browser/components/asrouter/modules/OnboardingMessageProvider.sys.mjs'
             - 'browser/components/asrouter/modules/PanelTestProvider.sys.mjs'
 

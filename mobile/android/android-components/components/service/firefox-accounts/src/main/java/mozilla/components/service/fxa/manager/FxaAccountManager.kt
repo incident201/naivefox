@@ -16,6 +16,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mozilla.appservices.fxaclient.DeviceConfig as ASDeviceConfig
@@ -47,11 +49,13 @@ import mozilla.components.service.fxa.SharedPrefAccountStorage
 import mozilla.components.service.fxa.StorageWrapper
 import mozilla.components.service.fxa.emitSyncFailedFact
 import mozilla.components.service.fxa.into
+import mozilla.components.service.fxa.sync.SharedPrefsSyncStateStorage
+import mozilla.components.service.fxa.sync.SyncConnectionState
 import mozilla.components.service.fxa.sync.SyncManager
 import mozilla.components.service.fxa.sync.SyncReason
+import mozilla.components.service.fxa.sync.SyncStateStorage
 import mozilla.components.service.fxa.sync.SyncStatusObserver
 import mozilla.components.service.fxa.sync.WorkManagerSyncManager
-import mozilla.components.service.fxa.sync.clearSyncState
 import mozilla.components.support.base.log.logger.Logger
 import mozilla.components.support.base.observer.Observable
 import mozilla.components.support.base.observer.ObserverRegistry
@@ -148,9 +152,20 @@ open class FxaAccountManager(
     // Note that trying to perform a sync while account isn't authenticated will not succeed.
     @GuardedBy("this") private var syncManager: SyncManager? = null
 
+    /** Emits whether sync is connected on this device. */
+    val syncConnectionState: StateFlow<SyncConnectionState> by lazy {
+        syncManager?.syncConnectionState ?: MutableStateFlow(SyncConnectionState.Uninitialized)
+    }
+
+    /** Provider for retrieving a [SyncStateStorage] instance. */
+    private val syncStateStorageProvider by lazy {
+        SharedPrefsSyncStateStorage.SingletonProvider(context, coroutineContext)
+    }
+
     init {
         registerForAccountEvents(accountStateEventsObserver, ProcessLifecycleOwner.get(), false)
 
+        GlobalAccountManager.setSyncStateStorageProvider(syncStateStorageProvider)
         syncConfig?.let {
             // Initialize sync manager with the passed-in config.
             require(syncConfig.supportedEngines.isNotEmpty()) {
@@ -221,6 +236,9 @@ open class FxaAccountManager(
                         }
                         syncManager?.now(reason, debounce, customEngineSubset)
                     }
+
+                    // refresh profile on explicit "sync now" action
+                    refreshProfile(ignoreCache = true)
                 }
                 else -> logger.info("Ignoring syncNow request, not in the right state: $s")
             }
@@ -255,6 +273,8 @@ open class FxaAccountManager(
     /** Call this after registering your observers, and before interacting with this class. */
     suspend fun start() =
         withContext(coroutineContext) {
+            syncManager?.initialize()
+
             processQueue(Event.Account.Start)
 
             if (!isAccountManagerReady) {
@@ -583,7 +603,7 @@ open class FxaAccountManager(
         // layers as well; if they're already empty (unused), nothing bad will happen
         // and extra overhead is quite small.
         SyncEnginesStorage(context).clear()
-        clearSyncState(context)
+        syncStateStorageProvider.get().clear()
     }
 
     private fun persistDeclinedEngines(declinedEngines: Set<SyncEngine>) {
@@ -645,6 +665,7 @@ open class FxaAccountManager(
         return WorkManagerSyncManager(
             context = context,
             syncConfig = config,
+            syncStateStorageProvider = syncStateStorageProvider,
             coroutineContext = coroutineContext,
         )
     }

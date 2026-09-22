@@ -776,6 +776,7 @@ MSG_DEF(JSMSG_BAD_MODULE_TYPE,              0, JSEXN_TYPEERR, "invalid module ty
 MSG_DEF(JSMSG_ABSTRACT_MODULE_SOURCE_CTOR,  0, JSEXN_TYPEERR, "AbstractModuleSource cannot be constructed directly")
 MSG_DEF(JSMSG_MODULE_SOURCE_NOT_AVAILABLE,  0, JSEXN_SYNTAXERR, "Source phase imports not supported for this module type")
 MSG_DEF(JSMSG_WASM_ESM_EVAL_NOT_SUPPORTED, 0, JSEXN_SYNTAXERR, "Evaluation phase imports of wasm modules are unsupported")
+MSG_DEF(JSMSG_MODULE_SYNC_EVALUATION_NOT_READY, 0, JSEXN_TYPEERR, "Deferred module is not ready for synchronous evaluation")
 
 // Import maps
 MSG_DEF(JSMSG_IMPORT_MAPS_PARSE_FAILED, 1, JSEXN_SYNTAXERR, "Failed to parse import map: Invalid JSON format. {0}")
@@ -845,6 +846,7 @@ MSG_DEF(JSMSG_BAD_WEAKREF_TARGET,                        0, JSEXN_TYPEERR, "cann
 
 // Iterator Helpers
 MSG_DEF(JSMSG_NEGATIVE_LIMIT,                            0, JSEXN_RANGEERR, "Iterator limits cannot be negative")
+MSG_DEF(JSMSG_LIMIT_TOO_LARGE,                           0, JSEXN_RANGEERR, "Iterator limit must be a finite number not greater than 2**53-1")
 MSG_DEF(JSMSG_INVALID_CHUNKSIZE,                         0, JSEXN_RANGEERR, "Iterator chunkSize must be an integer between 1 and 2**32-1 inclusive")
 MSG_DEF(JSMSG_CHUNK_SIZE_NOT_INTEGER,                    0, JSEXN_TYPEERR, "Iterator chunkSize must be an integral Number")
 MSG_DEF(JSMSG_INVALID_WINDOWSIZE,                        0, JSEXN_RANGEERR, "Iterator windowSize must be an integer between 1 and 2**32-1 inclusive")

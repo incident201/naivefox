@@ -23,6 +23,8 @@ support-files = [
   "../fixtures/**",
 ]
 
+["browser_address_migration.js"]
+
 ["browser_autocomplete_footer.js"]
 skip-if = [
   "verify-standalone",
@@ -38,6 +40,8 @@ skip-if = [
 ]
 
 ["browser_autocomplete_region.js"]
+
+["browser_autocomplete_secondary_action.js"]
 
 ["browser_autofill_address_housenumber.js"]
 
@@ -135,6 +139,10 @@ skip-if = [
 ["browser_managePersonalInfoSubpage.js"]
 
 ["browser_ml_heuristics.js"]
+
+["browser_ml_ignore_field_types.js"]
+
+["browser_ml_mldata_features.js"]
 
 ["browser_ml_native_onnx_availability.js"]
 

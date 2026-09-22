@@ -21,6 +21,8 @@ skip-if = [
   "os == 'mac' && os_version == '10.15' && arch == 'x86_64' && opt", # perma-fail see Bug 1600059
 ]
 
+["browser_creditCard_capture_cvv.js"]
+
 ["browser_creditCard_capture_form_removal.js"]
 
 ["browser_creditCard_capture_multiple_cc_number.js"]
@@ -55,11 +57,6 @@ skip-if = [
   "os == 'mac' && os_version == '10.15' && arch == 'x86_64' && opt", # perma-fail see Bug 1655601
 ]
 
-["browser_creditCard_doorhanger_keyboard.js"]
-skip-if = [
-  "os == 'mac' && os_version == '10.15' && arch == 'x86_64' && opt", # perma-fail see Bug 1655601
-]
-
 ["browser_creditCard_doorhanger_logo.js"]
 skip-if = [
   "os == 'mac' && os_version == '10.15' && arch == 'x86_64' && opt", # perma-fail see Bug 1655601
@@ -85,6 +82,8 @@ skip-if = [
   "os == 'linux' && os_version == '22.04' && arch == 'x86_64' && display == 'wayland'",
   "os == 'linux' && os_version == '24.04' && arch == 'x86_64' && display == 'x11'",
 ]
+
+["browser_creditCard_secondary_action.js"]
 
 ["browser_creditCard_heuristics.js"]
 

@@ -449,7 +449,7 @@ def modify_mozharness_configs(config, tests):
         if "mac" in test_platform:
             mozharness["config"] = ["raptor/mac_external_browser_config.py"]
         elif "windows" in test_platform:
-            mozharness["config"] = ["raptor/windows_external_browser_config.py"]
+            mozharness["config"] = ["raptor/windows_config.py"]
         elif "linux" in test_platform:
             mozharness["config"] = ["raptor/linux_external_browser_config.py"]
         elif "android" in test_platform:
@@ -477,7 +477,7 @@ def apply_raptor_device_optimization(config, tests):
     # For now, only change the back stop optimization strategy for A55 devices
     for test in tests:
         if test["test-platform"].startswith("android-hw-a55"):
-            test["optimization"] = {"skip-unless-backstop": None}
+            test["optimization"] = {"perf-cadence-backstop": None}
         yield test
 
 
@@ -519,6 +519,15 @@ def setup_autoland_retriggers(config, tasks):
             task["label"]
         ):
             attrs["task_duplicates"] = 12
+        yield task
+
+
+@task_transforms.add
+def set_task_label_env(config, tasks):
+    """Tell the harness which task it is running as."""
+    for task in tasks:
+        env = task.setdefault("worker", {}).setdefault("env", {})
+        env["RAPTOR_TASK_LABEL"] = task["label"]
         yield task
 
 

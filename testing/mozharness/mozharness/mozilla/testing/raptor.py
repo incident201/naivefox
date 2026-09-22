@@ -13,7 +13,6 @@ import pathlib
 import re
 import subprocess
 import sys
-import tempfile
 from shutil import copyfile, rmtree
 
 from mozsystemmonitor.resourcemonitor import SystemResourceMonitor
@@ -21,7 +20,6 @@ from mozsystemmonitor.resourcemonitor import SystemResourceMonitor
 import mozharness
 from mozharness.base.errors import PythonErrorList
 from mozharness.base.log import CRITICAL, DEBUG, ERROR, INFO, OutputParser
-from mozharness.base.python import Python3Virtualenv
 from mozharness.base.vcs.vcsbase import MercurialScript
 from mozharness.mozilla.automation import (
     EXIT_STATUS_DICT,
@@ -78,9 +76,7 @@ FFMPEG_LOCAL_CACHE = {
 }
 
 
-class Raptor(
-    TestingMixin, MercurialScript, CodeCoverageMixin, AndroidMixin, Python3Virtualenv
-):
+class Raptor(TestingMixin, MercurialScript, CodeCoverageMixin, AndroidMixin):
     """
     Install and run Raptor tests
     """
@@ -180,6 +176,16 @@ class Raptor(
             [
                 ["--test"],
                 {"action": "store", "dest": "test", "help": "Raptor test to run"},
+            ],
+            [
+                ["--power-profile"],
+                {
+                    "action": "store",
+                    "choices": ["performance"],
+                    "dest": "power_profile",
+                    "help": "Set the host power-profiles-daemon profile to performance "
+                    "for the duration of the Raptor run.",
+                },
             ],
             [
                 ["--app"],
@@ -909,34 +915,6 @@ class Raptor(
         self.device.install_app(str(cstm_car_m_apk))
         self.info("Custom Chromium-as-Release for Android successfully installed")
 
-    def download_chrome_android(self):
-        # Fetch the APK
-        tmpdir = tempfile.mkdtemp()
-        self.tooltool_fetch(
-            os.path.join(
-                self.raptor_path,
-                "raptor",
-                "tooltool-manifests",
-                "chrome-android",
-                "chrome87.manifest",
-            ),
-            output_dir=tmpdir,
-        )
-        files = os.listdir(tmpdir)
-        if len(files) > 1:
-            raise Exception(
-                "Found more than one chrome APK file after tooltool download"
-            )
-        chromeapk = os.path.join(tmpdir, files[0])
-
-        # Disable verification and install the APK
-        self.device.shell_output("settings put global verifier_verify_adb_installs 0")
-        self.install_android_app(chromeapk, replace=True)
-
-        # Re-enable verification and delete the temporary directory
-        self.device.shell_output("settings put global verifier_verify_adb_installs 1")
-        rmtree(tmpdir)
-
     def install_safari_technology_preview(self):
         """Ensure latest version of Safari TP binary is running in CI"""
 
@@ -1310,15 +1288,7 @@ class Raptor(
         # Add modules required for visual metrics. Packages with non-Python
         # components are particularly fussy about python version.
         py3_minor = sys.version_info.minor
-        if py3_minor <= 7:
-            modules.extend([
-                "numpy==1.16.1",
-                "Pillow==6.1.0",
-                "scipy==1.2.3",
-                "pyssim==0.4",
-                "opencv-python==4.5.4.60",
-            ])
-        elif py3_minor <= 11:
+        if py3_minor <= 11:
             modules.extend([
                 "numpy==1.23.5",
                 "Pillow==9.2.0",
@@ -1450,6 +1420,7 @@ class Raptor(
         if not os.path.isdir(env["MOZ_UPLOAD_DIR"]):
             self.mkdir_p(env["MOZ_UPLOAD_DIR"])
         env = self.query_env(partial_env=env, log_level=INFO)
+        power_profile = self.config.get("power_profile")
         # adjust PYTHONPATH to be able to use raptor as a python package
         if "PYTHONPATH" in env:
             env["PYTHONPATH"] = self.raptor_path + os.pathsep + env["PYTHONPATH"]
@@ -1522,6 +1493,30 @@ class Raptor(
             self.logcat_start()
 
         command = [python, run_tests] + options + mozlog_opts
+        if power_profile:
+            command = [
+                "powerprofilesctl",
+                "launch",
+                "--profile",
+                "performance",
+                "--reason",
+                "Raptor performance test",
+                "--appid",
+                "org.mozilla.raptor",
+                "--",
+                "/bin/sh",
+                "-c",
+                (
+                    'profile="$(powerprofilesctl get)" || exit $?; '
+                    'printf "Active power profile: %s\\n" "$profile"; '
+                    'if [ "$profile" != performance ]; then '
+                    'printf "Expected active power profile performance, got %s\\n" '
+                    '"$profile" >&2; exit 1; fi; '
+                    'exec "$@"'
+                ),
+                "raptor-power-profile",
+            ] + command
+
         if launch_in_debug_mode(command):
             raptor_process = subprocess.Popen(command, cwd=self.workdir, env=env)
             raptor_process.wait()

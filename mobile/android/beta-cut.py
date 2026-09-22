@@ -14,13 +14,6 @@ MOBILE_ANDROID_DIR = os.path.abspath(os.path.dirname(__file__))
 CHANGELOG_FILE = os.path.join(
     MOBILE_ANDROID_DIR, "android-components/docs/changelog.md"
 )
-SOURCE_JSON = os.path.join(
-    MOBILE_ANDROID_DIR, "../../services/settings/dumps/main/search-telemetry-v2.json"
-)
-TARGET_JSON = os.path.join(
-    MOBILE_ANDROID_DIR,
-    "android-components/components/feature/search/src/main/assets/search/search_telemetry_v2.json",
-)
 EXPIRED_STRING_VERSION_OFFSET = 3
 
 
@@ -53,8 +46,8 @@ def check_uncommitted_changes():
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Perform the Android beta cut: update changelog, remove "
-        "expired strings, and sync search telemetry JSON."
+        description="Perform the Android beta cut: update changelog and remove "
+        "expired strings."
     )
     parser.add_argument("bug_id", help="Bugzilla bug ID for the commit message")
     parser.add_argument(
@@ -145,16 +138,6 @@ def remove_expired_strings(expired_string_version):
     return False
 
 
-def update_json_if_necessary():
-    """Check if JSON files differ and copy if necessary."""
-    if os.path.exists(SOURCE_JSON) and os.path.exists(TARGET_JSON):
-        result = subprocess.run(["cmp", "-s", SOURCE_JSON, TARGET_JSON], check=False)
-        if result.returncode != 0:  # Files differ
-            subprocess.run(["cp", SOURCE_JSON, TARGET_JSON], check=True)
-            return True
-    return False
-
-
 def search_remaining_occurrences(removed_strings):
     """Search for remaining occurrences of each removed string."""
     remaining_use_message = ""
@@ -179,18 +162,13 @@ def search_remaining_occurrences(removed_strings):
     return remaining_use_message
 
 
-def commit_changes(bug_id, new_version_number, strings_removed, json_updated):
+def commit_changes(bug_id, new_version_number, strings_removed):
     """Commit all changes with a constructed commit message."""
     commit_message = (
         f"Bug {bug_id} - Start the nightly {new_version_number} development cycle.\n\n"
     )
     if strings_removed:
         commit_message += f"Strings expiring in version {new_version_number - EXPIRED_STRING_VERSION_OFFSET} have been removed\n"
-    if json_updated:
-        commit_message += (
-            "search_telemetry_v2.json was updated in Android Components, based on the "
-            "content of services/settings/dumps/main/search-telemetry-v2.json\n"
-        )
     subprocess.run(["git", "add", "-u"], check=False)
     subprocess.run(["git", "commit", "--quiet", "-m", commit_message], check=False)
 
@@ -222,12 +200,9 @@ def main():
         strings_removed = False
         remaining_use_message = ""
 
-    # Check JSON update
-    json_updated = update_json_if_necessary()
-
     # Commit changes
     if not args.no_commit:
-        commit_changes(args.bug_id, new_version, strings_removed, json_updated)
+        commit_changes(args.bug_id, new_version, strings_removed)
 
     # Output final message
     print(f"✅ Changelog updated to version {new_version}")
@@ -235,11 +210,6 @@ def main():
         print(f"✅ Removed 'moz:removedIn=\"{expired_string_version}\"' entries")
     else:
         print(f"ℹ️  No 'moz:removedIn=\"{expired_string_version}\"' entries found")
-
-    if json_updated:
-        print("✅ search_telemetry_v2.json was updated in Android Components")
-    else:
-        print("ℹ️  search_telemetry_v2.json was already up to date and was not modified")
 
     if not args.no_commit:
         print(f"✅ Changes committed with Bug ID {args.bug_id}.")

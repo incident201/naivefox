@@ -266,7 +266,7 @@ class CssRuleView extends EventEmitter {
       this.onHighlighterHidden
     );
 
-    this.shortcuts = new KeyShortcuts({ window: this.styleWindow });
+    this.shortcuts = new KeyShortcuts(this.styleWindow);
     this.shortcuts.on("Escape", event => this.#onShortcut("Escape", event));
     this.shortcuts.on("Return", event => this.#onShortcut("Return", event));
     this.shortcuts.on("Space", event => this.#onShortcut("Space", event));
@@ -2993,11 +2993,7 @@ class RuleViewTool {
       this.onPanelSelected,
       baseEventConfig
     );
-    this.inspector.styleChangeTracker.on(
-      "style-changed",
-      this.refresh,
-      baseEventConfig
-    );
+    this.inspector.on("style-changed", this.refresh, baseEventConfig);
 
     this.inspector.commands.resourceCommand.watchResources(
       [

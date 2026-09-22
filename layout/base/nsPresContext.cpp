@@ -35,6 +35,7 @@
 #include "mozilla/PresShellInlines.h"
 #include "mozilla/RestyleManager.h"
 #include "mozilla/SMILAnimationController.h"
+#include "mozilla/ScrollContainerFrame.h"
 #include "mozilla/ServoBindings.h"
 #include "mozilla/ServoStyleSet.h"
 #include "mozilla/StaticPrefs_bidi.h"
@@ -896,6 +897,21 @@ void nsPresContext::SetLinkParametersOverride(
   RebuildAllStyleData(nsChangeHint(0), RestyleHint::RecascadeSubtree());
 }
 
+void nsPresContext::SetEmbedderScrollbarInset(const nsMargin& aInset) {
+  if (mEmbedderScrollbarInset == aInset) {
+    return;
+  }
+  mEmbedderScrollbarInset = aInset;
+
+  // Read directly by nsScrollbarFrame::Reflow for the viewport scroll frame,
+  // so nothing needs re-cascading; just reflow the scrollbars.
+  if (mozilla::PresShell* presShell = GetPresShell()) {
+    if (ScrollContainerFrame* sf = presShell->GetRootScrollContainerFrame()) {
+      sf->MarkScrollbarsDirtyForReflow();
+    }
+  }
+}
+
 void nsPresContext::UpdateAnimationsPlayBackRateMultiplier(double aMultiplier) {
   if (mAnimationsPlayBackRateMultiplier == aMultiplier) {
     return;
@@ -938,6 +954,9 @@ void nsPresContext::RecomputeBrowsingContextDependentData() {
     }
     return browsingContext->GetEmbedderColorSchemes().mPreferred;
   }());
+
+  SetEmbedderScrollbarInset(LayoutDevicePixel::ToAppUnits(
+      browsingContext->GetEmbedderScrollbarInset(), AppUnitsPerDevPixel()));
 
   UpdateForcedColors();
 
@@ -2810,13 +2829,13 @@ uint64_t nsPresContext::GetUndisplayedRestyleGeneration() const {
   return mRestyleManager->GetUndisplayedRestyleGeneration();
 }
 
-mozilla::intl::Bidi& nsPresContext::BidiEngine() {
+UniquePtr<intl::Bidi> nsPresContext::GetBidiEngine() {
   MOZ_ASSERT(NS_IsMainThread());
 
-  if (!mBidiEngine) {
-    mBidiEngine = MakeUnique<mozilla::intl::Bidi>();
+  if (mBidiEngine) {
+    return std::move(mBidiEngine);
   }
-  return *mBidiEngine;
+  return MakeUnique<mozilla::intl::Bidi>();
 }
 
 void nsPresContext::FlushFontFeatureValues() {

@@ -24,11 +24,13 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import mozilla.components.browser.state.selector.selectedTab
 import mozilla.components.browser.state.state.CustomTabSessionState
 import mozilla.components.browser.state.state.SessionState
 import mozilla.components.browser.state.state.TabSessionState
 import mozilla.components.browser.state.state.selectedOrDefaultSearchEngine
 import mozilla.components.browser.thumbnails.BrowserThumbnails
+import mozilla.components.browser.thumbnails.facts.BrowserThumbnailsFacts
 import mozilla.components.concept.engine.HitResult
 import mozilla.components.concept.engine.permission.SitePermissions
 import mozilla.components.concept.engine.prompt.ShareData
@@ -36,6 +38,7 @@ import mozilla.components.feature.app.links.AppLinksUseCases
 import mozilla.components.feature.contextmenu.ContextMenuCandidate
 import mozilla.components.feature.contextmenu.ContextMenuCandidate.Companion.createOpenInExternalAppCandidate
 import mozilla.components.feature.contextmenu.R as contextMenuR
+import mozilla.components.feature.listentopage.ListenAction
 import mozilla.components.feature.readerview.ReaderViewFeature
 import mozilla.components.feature.tab.collections.TabCollection
 import mozilla.components.feature.tabs.WindowFeature
@@ -73,6 +76,7 @@ import org.mozilla.fenix.ext.requireComponents
 import org.mozilla.fenix.ext.runIfFragmentIsAttached
 import org.mozilla.fenix.home.HomeFragment
 import org.mozilla.fenix.ipprotection.store.Surface as IPProtectionSurface
+import org.mozilla.fenix.listentopage.ListenSheetIntegration
 import org.mozilla.fenix.nimbus.FxNimbus
 import org.mozilla.fenix.onboarding.OnboardingFragmentDirections
 import org.mozilla.fenix.onboarding.OnboardingReason
@@ -92,6 +96,7 @@ class BrowserFragment : BaseBrowserFragment(), UserInteractionHandler, SystemIns
     private val translationsBinding = ViewBoundFeatureWrapper<TranslationsBinding>()
     private val translationsBannerIntegration = ViewBoundFeatureWrapper<TranslationsBannerIntegration>()
     private val pdfToolsIntegration = ViewBoundFeatureWrapper<PdfToolsIntegration>()
+    private val listenSheetIntegration = ViewBoundFeatureWrapper<ListenSheetIntegration>()
     private val continuousOnboardingFeature = ViewBoundFeatureWrapper<ContinuousOnboardingFeature>()
     private var qrScanFenixFeature: ViewBoundFeatureWrapper<QrScanFenixFeature>? =
         ViewBoundFeatureWrapper<QrScanFenixFeature>()
@@ -162,6 +167,7 @@ class BrowserFragment : BaseBrowserFragment(), UserInteractionHandler, SystemIns
         initBrowserToolbarComposableUpdates(view)
         initTranslationsUpdates(context = context, rootView = view)
         initPdfTools(context = context, rootView = view)
+        initListenSheet(context = context, rootView = view)
         initContinuousOnboardingFeature()
 
         thumbnailsFeature.set(
@@ -213,7 +219,11 @@ class BrowserFragment : BaseBrowserFragment(), UserInteractionHandler, SystemIns
                     store = components.core.store,
                     selectTabUseCase = components.useCases.tabsUseCases.selectTab,
                     onSwipeStarted = {
-                        thumbnailsFeature.get()?.requestScreenshot()
+                        thumbnailsFeature
+                            .get()
+                            ?.requestScreenshot(
+                                trigger = BrowserThumbnailsFacts.CaptureAttemptedTriggers.SWIPE_TO_SWITCH_TABS
+                            )
                     },
                 )
             )
@@ -335,6 +345,35 @@ class BrowserFragment : BaseBrowserFragment(), UserInteractionHandler, SystemIns
                     container = binding.browserLayout,
                     browserStore = context.components.core.store,
                     isAddressBarAtBottom = settings.toolbarPosition == ToolbarPosition.BOTTOM,
+                ),
+            owner = this,
+            view = rootView,
+        )
+    }
+
+    private fun initListenSheet(context: Context, rootView: View) {
+        val settings = context.components.settings
+        if (!settings.listenToPageFeatureFlagEnabled) {
+            return
+        }
+
+        listenSheetIntegration.set(
+            feature =
+                ListenSheetIntegration(
+                    container = binding.browserLayout,
+                    browserStore = context.components.core.store,
+                    listenStore = context.components.listenToPage.store,
+                    isAddressBarAtBottom = settings.toolbarPosition == ToolbarPosition.BOTTOM,
+                    onListenClicked = {
+                        context.components.core.store.state.selectedTab?.let { tab ->
+                            context.components.listenToPage.store.dispatch(
+                                ListenAction.Session.ListenRequested(tabId = tab.id, url = tab.content.url)
+                            )
+                        }
+                    },
+                    onCustomizeReaderViewClicked = {
+                        context.components.appStore.dispatch(AppAction.ReaderViewAction.ReaderViewControlsShown)
+                    },
                 ),
             owner = this,
             view = rootView,

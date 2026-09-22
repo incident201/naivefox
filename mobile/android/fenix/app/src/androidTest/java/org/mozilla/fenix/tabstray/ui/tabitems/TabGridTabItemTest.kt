@@ -6,6 +6,7 @@ package org.mozilla.fenix.tabstray.ui.tabitems
 
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -104,10 +105,34 @@ class TabGridTabItemTest {
         }
     }
 
+    @Test
+    fun verifyMediaIndicatorVisible() {
+        composeTestRule.setContent {
+            ComposableUnderTest(isMediaActive = true)
+        }
+        composeTestRule
+            .onNodeWithTag(
+                TabsTrayTestTag.TAB_ITEM_MEDIA_INDICATOR,
+                useUnmergedTree = true,
+            )
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun verifyMediaIndicatorNotVisible() {
+        composeTestRule.setContent {
+            ComposableUnderTest(isMediaActive = false)
+        }
+        composeTestRule.onNodeWithTag(TabsTrayTestTag.TAB_ITEM_MEDIA_INDICATOR).assertDoesNotExist()
+    }
+
     @Composable
-    private fun ComposableUnderTest(interactionState: TabItemInteractionState = TabItemInteractionState()) {
+    private fun ComposableUnderTest(
+        interactionState: TabItemInteractionState = TabItemInteractionState(),
+        isMediaActive: Boolean = false,
+    ) {
         TabGridTabItem(
-            tab = createTab(url = "mozilla.org"),
+            tab = createTab(url = "mozilla.org", isMediaActive = isMediaActive),
             swipeToDismissBoxState = rememberSwipeToDismissBoxState(),
             swipingEnabled = true,
             interactionState = interactionState,

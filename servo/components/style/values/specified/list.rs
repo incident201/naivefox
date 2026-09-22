@@ -170,7 +170,7 @@ impl Parse for Quotes {
         let mut quotes = Vec::new();
         loop {
             let opening = match input.next() {
-                Ok(&Token::QuotedString(ref value)) => value.as_ref().to_owned().into(),
+                Ok(Token::QuotedString(value)) => value.as_ref().to_owned().into(),
                 Ok(_) => return Err(ParseError::unexpected_token()),
                 Err(_) => break,
             };
@@ -187,4 +187,31 @@ impl Parse for Quotes {
             Err(ParseError::custom(StyleParseErrorKind::UnspecifiedError))
         }
     }
+}
+
+/// https://drafts.csswg.org/css-lists/#propdef-list-style-position
+#[allow(missing_docs)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Deserialize,
+    Eq,
+    FromPrimitive,
+    Hash,
+    MallocSizeOf,
+    Parse,
+    PartialEq,
+    Serialize,
+    SpecifiedValueInfo,
+    ToComputedValue,
+    ToCss,
+    ToResolvedValue,
+    ToShmem,
+    ToTyped,
+)]
+#[repr(u8)]
+pub enum ListStylePosition {
+    Outside,
+    Inside,
 }

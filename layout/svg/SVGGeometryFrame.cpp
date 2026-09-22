@@ -267,9 +267,11 @@ void SVGGeometryFrame::ReflowSVG() {
     return;
   }
 
+  // Speed is more important than accuracy here - we don't care if the stroke
+  // bounds are slightly too large so we set EstimateStrokeBounds.
   SVGBBoxFlags flags = {SVGBBoxFlag::IncludeFillGeometry,
-                        SVGBBoxFlag::IncludeStroke,
-                        SVGBBoxFlag::IncludeMarkers};
+                        SVGBBoxFlag::IncludeStroke, SVGBBoxFlag::IncludeMarkers,
+                        SVGBBoxFlag::EstimateStrokeBounds};
 
   // Our "visual" overflow rect needs to be valid for building display lists
   // for hit testing, which means that for certain values of 'pointer-events'
@@ -331,15 +333,15 @@ void SVGGeometryFrame::NotifySVGChanged(ChangeFlags aFlags) {
   if (aFlags.contains(ChangeFlag::CoordContextChanged)) {
     auto* geom = static_cast<SVGGeometryElement*>(GetContent());
     // Stroke currently contributes to our mRect, which is why we have to take
-    // account of stroke-width here. Note that we do not need to take account
-    // of stroke-dashoffset since, although that can have a percentage value
-    // that is resolved against our coordinate context, it does not affect our
-    // mRect.
-    const auto& strokeWidth = StyleSVG()->mStrokeWidth;
-    if (geom->GeometryDependsOnCoordCtx() ||
-        (strokeWidth.IsLengthPercentage() &&
-         strokeWidth.AsLengthPercentage().HasPercent())) {
+    // account of stroke-width here.
+    if (geom->GeometryDependsOnCoordCtx()) {
       geom->ClearAnyCachedPath();
+      SVGUtils::ScheduleReflowSVG(this);
+    } else if (SVGContentUtils::HasPercentageDependentStroke(
+                   Style(), SVGContextPaint::GetContextPaint(geom)) ||
+               (StyleSVG()->HasMarker() && geom->IsMarkable()) ||
+               SVGIntegrationUtils::UsingEffectsForFrame(this)) {
+      // Stroke, effects and markers may have percentage dependent units.
       SVGUtils::ScheduleReflowSVG(this);
     }
   }
@@ -412,6 +414,9 @@ SVGBBox SVGGeometryFrame::GetBBoxContribution(const Matrix& aToBBoxUserspace,
   Maybe<Rect> simpleBounds;
   if (getStroke && userToOuterSVG) {
     Matrix m = ToMatrix(*userToOuterSVG);
+    if (m.IsSingular()) {
+      return bbox;
+    }
     simpleBounds =
         element->GetGeometryBounds(strokeOptions, aToBBoxUserspace, &m);
   } else if (getFill || getStroke) {
@@ -445,7 +450,8 @@ SVGBBox SVGGeometryFrame::GetBBoxContribution(const Matrix& aToBBoxUserspace,
       //   stroke bounds that it will return will be empty.
 
       Maybe<Rect> strokeBBoxExtents;
-      if (StaticPrefs::svg_Moz2D_strokeBounds_enabled()) {
+      if (!aFlags.contains(SVGBBoxFlag::EstimateStrokeBounds) &&
+          StaticPrefs::svg_Moz2D_strokeBounds_enabled()) {
         if (userToOuterSVG) {
           Matrix m = ToMatrix(*userToOuterSVG);
           Matrix outerSVGToBBox = aToBBoxUserspace * m.Inverse();

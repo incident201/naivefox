@@ -49,6 +49,17 @@ val IPProtectionState.isEligible
     get() = eligibilityStatus == EligibilityStatus.Eligible
 
 /**
+ * Whether we are waiting on the VPN to connect, either because it is being turned on or because the country is being
+ * changed.
+ *
+ * This is true from the moment we queue the request, which is earlier than [proxyStatus] becoming
+ * [Authorized.Activating] - that only happens once the engine replies. We cannot change where the VPN is connecting
+ * during that time, so anything that lets the user try should be disabled while this is true.
+ */
+val IPProtectionState.isActivationInFlight
+    get() = proxyStatus == Authorized.Activating || pendingActivationRequest is PendingActivationRequest.Activate
+
+/**
  * If we have negative values, then we haven't received new usage data yet.
  *
  * N.B: If we get -1, and we try to render that then the values are obviously incorrect, but we let the consumer handle
@@ -112,19 +123,19 @@ object Recommended : Location {
  *
  * @property countryCode ISO 3166-1 alpha-2 country code.
  * @property available Whether the country could be selected as the active proxy.
- * @property displayName The localized name for UI. If localization fails, returns raw [countryCode].
  */
 data class Country(
     override val countryCode: String,
     val available: Boolean,
 ) : Location {
-    val displayName: String
-        get() =
-            try {
-                Locale.Builder().setRegion(countryCode).build().getDisplayCountry(Locale.getDefault())
-            } catch (_: IllformedLocaleException) {
-                countryCode
-            }
+
+    /** Returns the country name localized for a [locale]. If localization fails, returns raw [countryCode]. */
+    fun displayName(locale: Locale): String =
+        try {
+            Locale.Builder().setRegion(countryCode).build().getDisplayCountry(locale)
+        } catch (_: IllformedLocaleException) {
+            countryCode
+        }
 }
 
 /** Represents the state of the location list update. */

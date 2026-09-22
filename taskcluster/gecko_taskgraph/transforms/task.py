@@ -385,10 +385,21 @@ def get_treeherder_link(config) -> str:
     return f"{TREEHERDER_ROOT_URL}/#/jobs?repo={th_project}&revision={branch_rev}&selectedTaskRun=<self>"
 
 
+def get_task_source_url(config, task):
+    clone_with = task.get("attributes", {}).get("clone_with")
+    if config.params["repository_type"] == "hg" and clone_with == "git":
+        repo = config.params["head_git_repository"].rstrip("/")
+        rev = config.params["head_git_rev"]
+        return f"{repo}/blob/{rev}/{config.path}"
+    return config.params.file_url(config.path, pretty=True)
+
+
 @functools.cache
-def get_default_priority(graph_config, project):
+def get_default_priority(graph_config, project, shipping):
     return evaluate_keyed_by(
-        graph_config["task-priority"], "Graph Config", {"project": project}
+        graph_config["task-priority"],
+        "Graph Config",
+        {"project": project, "shipping": str(shipping).lower()},
     )
 
 
@@ -2567,7 +2578,9 @@ def build_task(config, tasks):
 
         if "priority" not in task:
             task["priority"] = get_default_priority(
-                config.graph_config, config.params["project"]
+                config.graph_config,
+                config.params["project"],
+                config.params["shipping"],
             )
 
         tags = task.get("tags", {})
@@ -2594,7 +2607,7 @@ def build_task(config, tasks):
                 "description": task["description"],
                 "name": task["label"],
                 "owner": config.params["owner"],
-                "source": config.params.file_url(config.path, pretty=True),
+                "source": get_task_source_url(config, task),
             },
             "extra": extra,
             "tags": tags,

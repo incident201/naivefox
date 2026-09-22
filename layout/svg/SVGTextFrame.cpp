@@ -2915,7 +2915,7 @@ void SVGTextFrame::ReflowSVGNonDisplayText() {
 
   // We had a style change, so we mark this frame as dirty so that the next
   // time it is painted, we reflow the anonymous block frame.
-  this->MarkSubtreeDirty();
+  MarkSubtreeDirty();
 
   // Finally, we need to actually reflow the anonymous block frame and update
   // mPositions, in case we are being reflowed immediately after a DOM
@@ -3075,9 +3075,16 @@ void SVGTextFrame::NotifySVGChanged(ChangeFlags aFlags) {
 
   bool needNewBounds = false;
   bool needGlyphMetricsUpdate = false;
-  if (aFlags.contains(ChangeFlag::CoordContextChanged) &&
-      HasAnyStateBits(NS_STATE_SVG_POSITIONING_MAY_USE_PERCENTAGES)) {
-    needGlyphMetricsUpdate = true;
+  if (aFlags.contains(ChangeFlag::CoordContextChanged)) {
+    if (HasAnyStateBits(NS_STATE_SVG_POSITIONING_MAY_USE_PERCENTAGES)) {
+      needGlyphMetricsUpdate = true;
+    }
+    if (SVGContentUtils::HasPercentageDependentStroke(
+            Style(), SVGContextPaint::GetContextPaint(GetContent())) ||
+        SVGIntegrationUtils::UsingEffectsForFrame(this)) {
+      // Stroke and effects may have percentage dependent units.
+      needNewBounds = true;
+    }
   }
 
   if (aFlags.contains(ChangeFlag::TransformChanged)) {
@@ -3476,11 +3483,19 @@ SVGBBox SVGTextFrame::GetBBoxContribution(const Matrix& aToBBoxUserspace,
     return bbox;
   }
 
+  return GetSubtreeBBox(nullptr, aToBBoxUserspace, aFlags);
+}
+
+SVGBBox SVGTextFrame::GetSubtreeBBox(const nsIFrame* aSubtree,
+                                     const Matrix& aToBBoxUserspace,
+                                     SVGBBoxFlags aFlags) {
   UpdateGlyphPositioning();
 
   nsPresContext* presContext = PresContext();
 
-  TextRenderedRunIterator it(this);
+  SVGBBox bbox;
+  TextRenderedRunIterator it(
+      this, TextRenderedRunIterator::RenderedRunFilter::AllFrames, aSubtree);
   for (TextRenderedRun run = it.Current(); run.mFrame; run = it.Next()) {
     TextRenderedRun::GeometryFlags flags =
         TextRenderedRunFlagsForBBoxContribution(run, aFlags);
@@ -5161,8 +5176,8 @@ void SVGTextFrame::MaybeReflowAnonymousBlockChild() {
     return;
   }
 
-  NS_ASSERTION(!kid->HasAnyStateBits(NS_FRAME_IN_REFLOW),
-               "should not be in reflow when about to reflow again");
+  MOZ_ASSERT(!kid->HasAnyStateBits(NS_FRAME_IN_REFLOW),
+             "should not be in reflow when about to reflow again");
 
   if (IsSubtreeDirty()) {
     if (HasAnyStateBits(NS_FRAME_IS_DIRTY)) {
@@ -5442,6 +5457,9 @@ gfxRect SVGTextFrame::TransformFrameRectFromTextChild(
 
     // Scale it into frame user space.
     gfxRect rectInFrameUserSpace = AppUnitsToFloatCSSPixels(rectInTextFrame);
+
+    // Take into account any font size scaling
+    rectInFrameUserSpace.Scale(1.0 / mFontSizeScaleFactor);
 
     // Intersect it with the run.
     TextRenderedRun::GeometryFlags flags(

@@ -288,11 +288,13 @@ function safeGetState(fetchState) {
 function monotonicCountdown(delay) {
   let DELAY_BEAT = 1000;
   let timer = Cc["@mozilla.org/timer;1"].createInstance(Ci.nsITimer);
-  let deadline = ChromeUtils.now() + delay;
+  // On Windows TimeStamp keeps counting through sleep and expired timers fire
+  // on wake, so we cannot use ChromeUtils.now().
+  let deadline = ChromeUtils.awakeNow() + delay;
   let deferred = Promise.withResolvers();
   timer.initWithCallback(
     function () {
-      if (ChromeUtils.now() >= deadline) {
+      if (ChromeUtils.awakeNow() >= deadline) {
         deferred.resolve();
       }
     },
@@ -1063,6 +1065,7 @@ Barrier.prototype = Object.freeze({
               "AsyncShutdownTimeout",
               JSON.stringify(this._gatherCrashReportTimeoutData(topic, state))
             );
+            Services.startup.collectShutdownHangAnnotations();
           } else {
             warn("No crash reporter available");
           }

@@ -24,6 +24,10 @@ const { getInferenceProcessInfo } = ChromeUtils.importESModule(
   "chrome://global/content/ml/Utils.sys.mjs"
 );
 
+const { splitContext } = ChromeUtils.importESModule(
+  "resource://gre/modules/shared/FormAutofillML.sys.mjs"
+);
+
 const { HttpServer } = ChromeUtils.importESModule(
   "resource://testing-common/httpd.sys.mjs"
 );
@@ -95,6 +99,13 @@ async function setup({
       await SpecialPowers.popPrefEnv();
     },
   };
+}
+
+function setupNativeOnnxRuntimeAvailabilityTest() {
+  EngineProcess.resetNativeOnnxRuntimeAvailabilityForTests();
+  registerCleanupFunction(() => {
+    EngineProcess.resetNativeOnnxRuntimeAvailabilityForTests();
+  });
 }
 
 function getDefaultWasmRecords(backend) {

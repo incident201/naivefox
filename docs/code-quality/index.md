@@ -98,6 +98,11 @@ typescript/index
      - `bug 1558517 <https://bugzilla.mozilla.org/show_bug.cgi?id=1558517>`__
      - :ref:`JavaScript Coding style`
      - https://prettier.io/
+   * - pnpm-audit
+     -
+     - `bug 2065363 <https://bugzilla.mozilla.org/show_bug.cgi?id=2065363>`__
+     - :ref:`pnpm-audit`
+     - https://pnpm.io/cli/audit
 ```
 
 ```{eval-rst}

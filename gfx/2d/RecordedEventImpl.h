@@ -317,7 +317,7 @@ class RecordedStrokeLine : public RecordedEventDerived<RecordedStrokeLine>,
 class RecordedStrokeCircle : public RecordedEventDerived<RecordedStrokeCircle>,
                              public RecordedStrokeOptionsMixin {
  public:
-  RecordedStrokeCircle(Circle aCircle, const Pattern& aPattern,
+  RecordedStrokeCircle(Path::Circle aCircle, const Pattern& aPattern,
                        const StrokeOptions& aStrokeOptions,
                        const DrawOptions& aOptions)
       : RecordedEventDerived(STROKECIRCLE),
@@ -342,7 +342,7 @@ class RecordedStrokeCircle : public RecordedEventDerived<RecordedStrokeCircle>,
   template <class S>
   MOZ_IMPLICIT RecordedStrokeCircle(S& aStream);
 
-  Circle mCircle;
+  Path::Circle mCircle;
   PatternStorage mPattern;
   StrokeOptions mStrokeOptions;
   DrawOptions mOptions;
@@ -380,7 +380,7 @@ class RecordedFill : public RecordedEventDerived<RecordedFill> {
 
 class RecordedFillCircle : public RecordedEventDerived<RecordedFillCircle> {
  public:
-  RecordedFillCircle(Circle aCircle, const Pattern& aPattern,
+  RecordedFillCircle(Path::Circle aCircle, const Pattern& aPattern,
                      const DrawOptions& aOptions)
       : RecordedEventDerived(FILLCIRCLE),
         mCircle(aCircle),
@@ -403,7 +403,7 @@ class RecordedFillCircle : public RecordedEventDerived<RecordedFillCircle> {
   template <class S>
   MOZ_IMPLICIT RecordedFillCircle(S& aStream);
 
-  Circle mCircle;
+  Path::Circle mCircle;
   PatternStorage mPattern;
   DrawOptions mOptions;
 };
@@ -1620,7 +1620,7 @@ class RecordedScaledFontCreation
     : public RecordedEventDerived<RecordedScaledFontCreation> {
  public:
   static void FontInstanceDataProc(const uint8_t* aData, uint32_t aSize,
-                                   const FontVariation* aVariations,
+                                   const wr::FontVariation* aVariations,
                                    uint32_t aNumVariations, void* aBaton) {
     auto recordedScaledFontCreation =
         static_cast<RecordedScaledFontCreation*>(aBaton);
@@ -1646,7 +1646,7 @@ class RecordedScaledFontCreation
   std::string GetName() const override { return "ScaledFont Creation"; }
 
   void SetFontInstanceData(const uint8_t* aData, uint32_t aSize,
-                           const FontVariation* aVariations,
+                           const wr::FontVariation* aVariations,
                            uint32_t aNumVariations);
 
  private:
@@ -1656,7 +1656,7 @@ class RecordedScaledFontCreation
   ReferencePtr mUnscaledFont;
   Float mGlyphSize;
   RecordedEventArray<uint8_t> mInstanceData;
-  RecordedEventArray<FontVariation> mVariations;
+  RecordedEventArray<wr::FontVariation> mVariations;
 
   template <class S>
   MOZ_IMPLICIT RecordedScaledFontCreation(S& aStream);
@@ -4386,7 +4386,7 @@ inline void RecordedScaledFontCreation::OutputSimpleEventInfo(
 }
 
 inline void RecordedScaledFontCreation::SetFontInstanceData(
-    const uint8_t* aData, uint32_t aSize, const FontVariation* aVariations,
+    const uint8_t* aData, uint32_t aSize, const wr::FontVariation* aVariations,
     uint32_t aNumVariations) {
   if (aSize) {
     mInstanceData.Assign(aData, aSize);
