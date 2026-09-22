@@ -1,0 +1,192 @@
+name: Native Windows runtime gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Full-source commit to validate before minimal export
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  windows-runtime:
+    runs-on: windows-2022
+    timeout-minutes: 180
+    steps:
+      - name: Check out the exact full-source commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.source_sha }}
+          fetch-depth: 1
+
+      - name: Verify source identity
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          test -f netwerk/naivefox/test/integration/run-windows-runtime-tests.py
+
+      - name: Prepare MozillaBuild
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installer = Join-Path $env:RUNNER_TEMP 'MozillaBuildSetup.exe'
+          curl.exe --fail --location `
+            'https://ftp.mozilla.org/pub/mozilla/libraries/win32/MozillaBuildSetup-Latest.exe' `
+            --output $installer
+          7z x $installer '-oC:\mozilla-build' -y
+          if (-not (Test-Path 'C:\mozilla-build\VERSION')) {
+            throw 'MozillaBuild extraction failed'
+          }
+          New-Item -ItemType Directory -Force `
+            -Path 'C:\mozilla-build\msys2\tmp' | Out-Null
+
+          $nasmArchive = Join-Path $env:RUNNER_TEMP 'nasm-3.01-win64.zip'
+          $nasmRoot = Join-Path $env:RUNNER_TEMP 'nasm-3.01-win64'
+          curl.exe --fail --location `
+            'https://www.nasm.us/pub/nasm/releasebuilds/3.01/win64/nasm-3.01-win64.zip' `
+            --output $nasmArchive
+          $nasmSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $nasmArchive).Hash
+          if ($nasmSha256 -ne 'E0BA5157007ABC7B1A65118A96657A961DDF55F7E3F632EE035366DFCE039CA4') {
+            throw "unexpected NASM archive SHA-256: $nasmSha256"
+          }
+          7z x $nasmArchive "-o$nasmRoot" -y
+          $nasm = Get-ChildItem -Path $nasmRoot -Filter nasm.exe -Recurse |
+            Select-Object -First 1
+          if (-not $nasm) { throw 'NASM extraction failed' }
+          $nasm.DirectoryName | Out-File `
+            -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+          $appSdkArchive = Join-Path $env:RUNNER_TEMP `
+            'winappsdk-x86_64-pc-windows-msvc.tar.zst'
+          $appSdkParent = Join-Path $env:RUNNER_TEMP 'windows-app-sdk'
+          curl.exe --fail --location `
+            'https://firefox-ci-tc.services.mozilla.com/api/queue/v1/task/WB_mKg31SO2GAGiahx2A8w/artifacts/public/build/winappsdk-x86_64-pc-windows-msvc.tar.zst' `
+            --output $appSdkArchive
+          $appSdkSha256 = (
+            Get-FileHash -Algorithm SHA256 -LiteralPath $appSdkArchive
+          ).Hash
+          if ($appSdkSha256 -ne 'BEFC65BD587A7268C30E3EE45AFC787C6E2F138767E039F7B71E34B83C7A696A') {
+            throw "unexpected Windows App SDK archive SHA-256: $appSdkSha256"
+          }
+          New-Item -ItemType Directory -Force -Path $appSdkParent | Out-Null
+          tar.exe -xf $appSdkArchive -C $appSdkParent
+          if ($LASTEXITCODE -ne 0) { throw 'Windows App SDK extraction failed' }
+          $appSdkDir = Join-Path $appSdkParent `
+            'winappsdk-x86_64-pc-windows-msvc'
+          foreach ($dll in @(
+            'CoreMessagingXP.dll', 'marshal.dll',
+            'Microsoft.InputStateManager.dll',
+            'Microsoft.Internal.FrameworkUdk.dll',
+            'Microsoft.UI.Composition.OSSupport.dll',
+            'Microsoft.UI.Input.dll',
+            'Microsoft.UI.Windowing.Core.dll',
+            'Microsoft.UI.Windowing.dll'
+          )) {
+            if (-not (Test-Path (Join-Path $appSdkDir $dll))) {
+              throw "Windows App SDK is missing $dll"
+            }
+          }
+          "MOZ_WINDOWS_APP_SDK_DIR=$appSdkDir" | Out-File `
+            -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+          $windowsRsArchive = Join-Path $env:RUNNER_TEMP 'windows-0.62.2.crate'
+          $windowsRsParent = Join-Path $env:RUNNER_TEMP 'windows-rs'
+          curl.exe --fail --location `
+            'https://static.crates.io/crates/windows/windows-0.62.2.crate' `
+            --output $windowsRsArchive
+          $windowsRsSha256 = (
+            Get-FileHash -Algorithm SHA256 -LiteralPath $windowsRsArchive
+          ).Hash
+          if ($windowsRsSha256 -ne '527FADEE13E0C05939A6A05D5BD6EEC6CD2E3DBD648B9F8E447C6518133D8580') {
+            throw "unexpected windows Rust crate SHA-256: $windowsRsSha256"
+          }
+          New-Item -ItemType Directory -Force -Path $windowsRsParent | Out-Null
+          tar.exe -xf $windowsRsArchive -C $windowsRsParent
+          if ($LASTEXITCODE -ne 0) { throw 'windows Rust crate extraction failed' }
+          $windowsRsDir = Join-Path $windowsRsParent 'windows-0.62.2'
+          if (-not (Test-Path (Join-Path $windowsRsDir 'Cargo.toml'))) {
+            throw 'windows Rust crate is incomplete'
+          }
+          "MOZ_WINDOWS_RS_DIR=$windowsRsDir" | Out-File `
+            -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Build and stage the Windows product
+        shell: bash
+        run: |
+          set -euo pipefail
+          export MOZILLABUILD='C:\mozilla-build'
+          export MOZCONFIG=netwerk/naivefox/mozconfig-windows-x86_64
+          printf '\nac_add_options --disable-bootstrap\n' >> "$MOZCONFIG"
+          runner_temp="${RUNNER_TEMP//\\//}"
+          export NAIVEFOX_OBJDIR="$runner_temp/obj-naivefox-windows"
+          mkdir -p "$NAIVEFOX_OBJDIR/package"
+          python3 - "$PWD/mach" <<'PY'
+          import subprocess
+          import sys
+
+          subprocess.run(
+              [sys.executable, sys.argv[1], "configure"],
+              check=True,
+              timeout=600,
+          )
+          PY
+          ./netwerk/naivefox/tools/build-product.sh windows \
+            --objdir "$NAIVEFOX_OBJDIR"
+
+      - name: Set up pinned Go toolchain
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.12'
+
+      - name: Build matching native Caddy fixture
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $versionLine = Get-Content `
+            'netwerk/naivefox/test/integration/versions.env' |
+            Where-Object { $_.StartsWith('NAIVEFOX_TRANSPORT_COMMIT=') }
+          if ($versionLine.Count -ne 1) { throw 'transport revision is missing' }
+          $transportSha = $versionLine.Split('=', 2)[1]
+          $env:GOBIN = Join-Path $env:RUNNER_TEMP 'go-bin'
+          New-Item -ItemType Directory -Force -Path $env:GOBIN | Out-Null
+          go install github.com/caddyserver/xcaddy/cmd/xcaddy@v0.4.6
+          if ($LASTEXITCODE -ne 0) { throw 'xcaddy build failed' }
+          $xcaddy = Join-Path $env:GOBIN 'xcaddy.exe'
+          $caddy = Join-Path $env:RUNNER_TEMP 'caddy.exe'
+          & $xcaddy build v2.11.2 --output $caddy `
+            --with "github.com/incident201/naivefox-transport@$transportSha"
+          if ($LASTEXITCODE -ne 0) { throw 'Caddy module build failed' }
+          $modules = & $caddy list-modules
+          if ($LASTEXITCODE -ne 0 -or
+              $modules -notcontains 'http.handlers.naivefox_transport') {
+            throw 'matching Caddy transport module is missing'
+          }
+
+      - name: Verify native packet, H2 and H3 runtime
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $gitTools = 'C:\Program Files\Git\usr\bin'
+          if (-not (Get-Command openssl -ErrorAction SilentlyContinue)) {
+            $env:PATH = "$gitTools;$env:PATH"
+          }
+          if (-not (Get-Command openssl -ErrorAction SilentlyContinue)) {
+            throw 'OpenSSL is required for the certificate fixture'
+          }
+          $python = (Get-Command python).Source
+          $objdir = Join-Path $env:RUNNER_TEMP 'obj-naivefox-windows'
+          $runtime = Join-Path $objdir `
+            'package\naivefox-windows-x86_64\naivefox.exe'
+          $caddy = Join-Path $env:RUNNER_TEMP 'caddy.exe'
+          $work = Join-Path $objdir 'native-runtime-gate'
+          & $python netwerk/naivefox/test/integration/run-windows-runtime-tests.py `
+            --objdir $objdir --runtime $runtime --caddy $caddy `
+            --windows-python $python --work-dir $work --protocol all
+          if ($LASTEXITCODE -ne 0) { throw 'native Windows runtime gate failed' }
