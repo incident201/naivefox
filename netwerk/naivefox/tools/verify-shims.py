@@ -138,7 +138,47 @@ def test_necko_channel_params(topsrcdir):
     assert "HttpConnectionInfoCloneArgs" in hdr_text
     assert "CookieStruct" in hdr_text
     assert "HttpActivityArgs" in hdr_text
+    upstream = (
+        Path(topsrcdir) / "netwerk" / "ipc" / "NeckoChannelParams.ipdlh"
+    ).read_text(encoding="utf-8")
+    upstream_fields = upstream.split("struct HttpConnectionInfoCloneArgs", 1)[1].split(
+        "};", 1
+    )[0]
+    shim_fields = hdr_text.split("class HttpConnectionInfoCloneArgs", 1)[1].split(
+        "private:", 1
+    )[0]
+    upstream_names = set(
+        re.findall(r"^\s*[\w<>?,\[\] ]+\s+(\w+);", upstream_fields, re.M)
+    )
+    shim_names = set(re.findall(r"^\s*NF_FIELD\([^,]+,\s*(\w+)\)", shim_fields, re.M))
+    assert upstream_names == shim_names, (
+        f"HTTP connection clone schema differs: missing={upstream_names - shim_names}, "
+        f"extra={shim_names - upstream_names}"
+    )
     print("  PASS: In-process Necko parameter records verified.")
+    return True
+
+
+def test_webtransport_stats_shim(topsrcdir):
+    print("[SHIM TEST 8] Verifying lean WebTransport statistics schema...")
+    schema = (
+        Path(topsrcdir) / "dom" / "webtransport" / "shared" / "PWebTransport.ipdl"
+    ).read_text(encoding="utf-8")
+    shim = (Path(topsrcdir) / "netwerk" / "naivefox" / "PWebTransport.h").read_text(
+        encoding="utf-8"
+    )
+    for name in ("WebTransportDatagramStatsData", "WebTransportStatsData"):
+        upstream_body = schema.split(f"struct {name}", 1)[1].split("};", 1)[0]
+        shim_body = shim.split(f"class {name} final", 1)[1].split("private:", 1)[0]
+        upstream_names = set(
+            re.findall(r"^\s*[\w ]+\s+(\w+);", upstream_body, re.M)
+        )
+        shim_names = set(re.findall(r"\b(\w+)\(\)\s*\{", shim_body))
+        assert upstream_names == shim_names, (
+            f"{name} schema differs: missing={upstream_names - shim_names}, "
+            f"extra={shim_names - upstream_names}"
+        )
+    print("  PASS: WebTransport stats accessors match upstream IPDL fields.")
     return True
 
 
@@ -218,6 +258,8 @@ def main():
     if not test_cache_crypto_boundary(topsrcdir):
         all_passed = False
     if not test_rust_allocator_boundary(topsrcdir):
+        all_passed = False
+    if not test_webtransport_stats_shim(topsrcdir):
         all_passed = False
 
     print("=" * 65)

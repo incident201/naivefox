@@ -15,8 +15,8 @@
 #include "CacheIndex.h"
 #include "CacheLog.h"
 #include "mozilla/DebugOnly.h"
-#include "mozilla/TelemetryHistogramEnums.h"
 #ifndef MOZ_NAIVEFOX
+#  include "mozilla/TelemetryHistogramEnums.h"
 #  include "mozilla/glean/NetwerkCache2Metrics.h"
 #endif
 #include "nsCRTGlue.h"

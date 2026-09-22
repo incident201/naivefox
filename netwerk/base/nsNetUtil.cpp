@@ -4411,6 +4411,9 @@ nsresult AddExtraHeaders(nsIHttpChannel* aHttpChannel,
 nsILoadInfo::IPAddressSpace GetParentIPAddressSpace(nsILoadInfo* aLoadInfo) {
   MOZ_ASSERT(aLoadInfo);
 
+#ifdef MOZ_NAIVEFOX
+  return aLoadInfo->GetParentIpAddressSpace();
+#else
   RefPtr<mozilla::dom::BrowsingContext> bc;
   aLoadInfo->GetBrowsingContext(getter_AddRefs(bc));
   if (bc) {
@@ -4431,6 +4434,7 @@ nsILoadInfo::IPAddressSpace GetParentIPAddressSpace(nsILoadInfo* aLoadInfo) {
   }
 
   return aLoadInfo->GetParentIpAddressSpace();
+#endif
 }
 
 bool IsLocalHostAccess(

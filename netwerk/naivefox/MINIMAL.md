@@ -137,17 +137,47 @@ python3 netwerk/naivefox/test/integration/run-android-runtime-tests.py \
   --work-dir /absolute/path/to/obj-naivefox-android-aarch64/native-tests
 ```
 
-The WSL gate executes the ARM64 runtime on a Linux emulator. The managed SDK
-and AVD live under $XDG_DATA_HOME/naivefox (or $HOME/.local/share/naivefox).
-The launcher selects the existing naivefox-arm64-api27-raw AVD, supplies the
-QEMU virt machine override and checks both boot completion and the guest clock.
-No KVM is required for ARM64 software emulation.
+On an x86_64 Linux host, use the API 30 Google APIs x86_64 image with Android's
+ARM64 native bridge. This is an accepted online ARM64 runtime gate when
+`ro.product.cpu.abilist` contains `arm64-v8a`,
+`ro.dalvik.vm.native.bridge` names a loaded translation library, and the
+runner actually executes the staged `lib/arm64-v8a` harness and runtime. The
+runner records the primary ABI, supported ABI list, native bridge and H2/H3
+results. The primary ABI may be `x86_64`; package inspection alone is not
+runtime acceptance.
 
-Start the emulator in WSL before the runner. The runner owns its isolated
-server fixture and relays native device traffic to it. Static package verification
+Provision the AVD once, with an installed JDK and Android command-line tools.
+On CachyOS/Arch, `sudo pacman -S --needed jdk17-openjdk` and
+`export JAVA_HOME=/usr/lib/jvm/java-17-openjdk` provide the JDK when absent.
+Set `ANDROID_SDK_ROOT` to the SDK being used:
+
+```bash
+export ANDROID_SDK_ROOT="$HOME/Android/Sdk"
+export PATH="$ANDROID_SDK_ROOT/platform-tools:$PATH"
+"$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" \
+  --sdk_root="$ANDROID_SDK_ROOT" --licenses
+"$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" \
+  --sdk_root="$ANDROID_SDK_ROOT" \
+  'platform-tools' 'emulator' 'system-images;android-30;google_apis;x86_64'
+printf 'no\n' | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/avdmanager" \
+  create avd --name naivefox-googleapis-api30-arm64 \
+  --package 'system-images;android-30;google_apis;x86_64'
+./netwerk/naivefox/tools/start-android-emulator.sh
+```
+
+The launcher also finds an SDK under `$HOME/Android/Sdk` or
+`$XDG_DATA_HOME/naivefox/android-sdk` and resolves AVD paths from their `.ini`
+files, including custom `avdmanager --path` locations. It chooses hardware
+acceleration automatically for the x86_64 image, checks boot and guest clock,
+then disables guest Wi-Fi so the fixture's host alias `10.0.2.2` routes through
+`eth0`. `--avd` selects a different AVD; the old raw ARM64 image remains an
+optional software-emulated path where the installed emulator supports it.
+
+Start the emulator before the runner. The runner owns its isolated server
+fixture and relays native device traffic to it. Static package verification
 does not execute Gecko; the online runner builds the native harness and probe,
-then checks the H2/H3 workload and lifecycle on the device.
-Keep the managed SDK and AVD when cleaning temporary object directories.
+then checks packet, H2 and H3 workloads and lifecycle on the device. Keep the
+SDK and AVD when cleaning temporary object directories.
 
 Run the integration suites in test/integration/README.md. Linux, Windows and
 Android must execute the staged runtime with strict H2 and H3, both local

@@ -9,6 +9,7 @@
 #include "mozilla/BasePrincipal.h"
 #include "mozilla/NeverDestroyed.h"
 #include "mozilla/NullPrincipal.h"
+#include "mozilla/ResultVariant.h"
 #include "nsIURI.h"
 #include "nsNetUtil.h"
 #include "nsPrintfCString.h"
@@ -305,6 +306,9 @@ Result<Ok, const char*> RemoteType::CheckValidity() const {
   }
 
   if (HasOrigin()) {
+#ifdef MOZ_NAIVEFOX
+    return Err("Invalid RemoteType: origin is unavailable in NaiveFox");
+#else
     nsCOMPtr<nsIURI> uri;
     if (NS_FAILED(NS_NewURI(getter_AddRefs(uri), mOriginNoSuffix))) {
       return Err("Invalid RemoteType: Invalid OriginNoSuffix URI");
@@ -346,6 +350,7 @@ Result<Ok, const char*> RemoteType::CheckValidity() const {
     if (origin != siteOrigin) {
       return Err("Invalid RemoteType: Non-site OriginNoSuffix");
     }
+#endif
   } else if (IsWebCoopCoep() || IsWebServiceWorker()) {
     // These remote types require a URI specified.
     return Err(

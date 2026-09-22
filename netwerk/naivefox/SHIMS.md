@@ -82,8 +82,9 @@ python3 netwerk/naivefox/tools/verify-shims.py \
 
 Android fallback changes additionally require a clean
 `mozconfig-android-aarch64` build, staged dependency/export verification, and
-the static NDK harness check. An online ARM64 device/emulator H2/H3 run remains
-the runtime acceptance gate; the static check is not a substitute.
+the static NDK harness check. An online run of the staged ARM64 runtime remains
+the acceptance gate, including an x86_64 emulator with a verified ARM64 native
+bridge as documented in `MINIMAL.md`; the static check is not a substitute.
 
 Then run staged startup/shutdown and the networking suites relevant to the
 changed shim. Security-manager, channel-parameter, profiler, binding, or IPDL

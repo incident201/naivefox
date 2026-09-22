@@ -131,6 +131,15 @@ int Run(int aArgc, char* aArgv[]) {
     return 2;
   }
 
+  for (const char* dependency : {"libmozglue.so", "libnss3.so",
+                                 "libfreebl3.so", "libsoftokn3.so"}) {
+    std::string path = std::string(aArgv[4]) + "/" + dependency;
+    if (!dlopen(path.c_str(), RTLD_NOW | RTLD_GLOBAL)) {
+      fprintf(stderr, "cannot load %s: %s\n", dependency, dlerror());
+      return 1;
+    }
+  }
+
   void* library = dlopen(aArgv[1], RTLD_NOW | RTLD_GLOBAL);
   if (!library) {
     fprintf(stderr, "cannot load libxul: %s\n", dlerror());

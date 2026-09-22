@@ -29,6 +29,7 @@ available, and remove the downstream guard instead of preserving it by habit.
 | `NF-UPSTREAM-020` | Export SpiderMonkey public headers needed by retained types while suppressing the JS engine and satisfying only the narrow compatibility ABI. | `js/src/moz.build`, `js/src/frontend/Stencil.cpp`, `SpiderMonkeyCompat.cpp`, JS public headers | Closure contains no `js_static`, frontend, Wasm, or execution objects; startup and networking suites pass. |
 | `NF-UPSTREAM-021` | Let the test-enabled NaiveFox graph use Mozilla gtest without linking browser FOG/XRE startup. Ordinary Firefox gtest remains unchanged. | `testing/gtest/mozilla/GTestRunner.cpp`, `NaiveFoxRunner.cpp`, `core/moz.build` | `mach gtest 'NaiveFoxTunnelSessionLifecycle.*'` on the test-enabled minimal graph. |
 | `NF-UPSTREAM-022` | Retain the native NDK/Bionic pieces needed by the Android ARM64 NaiveFox product while excluding GeckoView, JNI/Java application services, and browser/mobile graph edges. | Exact existing-Firefox file set below. | Clean Android configure/build/stage; dependency and four-symbol export audit; static harness; online-device H2/H3 embedded startup, traffic, stop, and XPCOM shutdown. |
+| `NF-UPSTREAM-026` | Keep upstream Necko, NSS and XPCOM changes buildable in the lean process without enabling DOM actors or browser services. | Firefox files and in-process IPDL records listed in `UPSTREAM-PATCHES.md`; product `PWebTransport.h`; `app.mozbuild` exports. | Schema checks in `verify-shims.py`; three-target product builds and closure; staged Linux, H2/H3 and certificate checks; native Windows and Android runtime. |
 
 ## Profile-keystore exclusion
 
@@ -93,8 +94,9 @@ Refresh obligations:
 - clean Android configure/build/stage, resolved ELF `DT_NEEDED`, and the exact
   four-symbol C ABI are mandatory. The static NDK harness is a build gate, not
   device acceptance; H2 and H3 traffic plus cross-thread stop and crash-free
-  XPCOM shutdown must run on an online ARM64 device/emulator when accepting the
-  target;
+  XPCOM shutdown must run with the staged ARM64 runtime on an online device;
+  an x86_64 emulator with a verified ARM64 native bridge is accepted as
+  documented in `MINIMAL.md`;
 - Linux and Windows product builds, integration suites, and staged-runtime
   verification remain unchanged.
 

@@ -127,8 +127,11 @@ netwerk/naivefox/tools/build-product.sh android \
 
 The Android build must stage and verify the relocatable native package and
 construct the static NDK harness. H2/H3 traffic and cross-thread embedded stop
-remain an online ARM64 device/emulator gate; static validation on a machine
-without `adb` or KVM is not device acceptance.
+remain an online ARM64 runtime gate. An x86_64 Google APIs emulator with
+`arm64-v8a` in its ABI list and an active ARM64 native bridge is accepted when
+the staged ARM64 harness and runtime execute on it; record the primary ABI,
+native bridge and traffic results. See `MINIMAL.md` for provisioning and launch.
+Static validation without an online `adb` device is not device acceptance.
 
 If the upstream refresh passes source review but the minimized graph fails,
 treat the failure as a minimization integration defect. Do not weaken shared

@@ -501,7 +501,21 @@ def main():
     abi = subprocess.check_output(
         adb + ["shell", "getprop", "ro.product.cpu.abi"], text=True
     ).strip()
-    suite.require(abi == "arm64-v8a", "selected Android device must be ARM64")
+    supported_abis = subprocess.check_output(
+        adb + ["shell", "getprop", "ro.product.cpu.abilist"], text=True
+    ).strip().split(",")
+    suite.require(
+        "arm64-v8a" in supported_abis,
+        "selected Android device must support the arm64-v8a ABI",
+    )
+    native_bridge = subprocess.check_output(
+        adb + ["shell", "getprop", "ro.dalvik.vm.native.bridge"], text=True
+    ).strip()
+    if abi != "arm64-v8a":
+        suite.require(
+            native_bridge not in ("", "0"),
+            "translated ARM64 device must report an active native bridge",
+        )
     root = (args.work_dir or args.objdir / "naivefox-fixture").resolve()
     suite.require(
         root.is_relative_to(args.objdir), "work directory must stay below objdir"
@@ -528,7 +542,16 @@ def main():
         fixture = None
         suite.private_json(
             work / "result.json",
-            {"platform": "android-arm64", "status": "PASS", "targets": results},
+            {
+                "platform": "android-arm64",
+                "status": "PASS",
+                "device": {
+                    "primary_abi": abi,
+                    "supported_abis": supported_abis,
+                    "native_bridge": native_bridge,
+                },
+                "targets": results,
+            },
         )
         print(f"PASS Android ARM64 NaiveFox matrix: {work}", flush=True)
         return 0

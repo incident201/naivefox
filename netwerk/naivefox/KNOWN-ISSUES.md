@@ -68,8 +68,11 @@ provide that policy later, but it is intentionally outside this repository.
 
 The static package verifier and NDK harness build do not prove device loader,
 network, or shutdown behavior. Acceptance still requires the Android embedded
-runner on an online ARM64 API-26+ device or emulator. A host without an `adb`
-device or KVM cannot claim that device gate.
+runner on an online API-26+ device that executes the ARM64 libraries. An x86_64
+Google APIs emulator with `arm64-v8a` in its ABI list and an active native
+bridge is accepted after the staged ARM64 harness completes the traffic and
+shutdown tests. The runner records the primary ABI and bridge. A host without
+an online `adb` device cannot claim that gate.
 
 ## No Android VPN integration
 

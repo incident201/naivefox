@@ -27,7 +27,7 @@
 #include "nsString.h"
 #include "nsTArray.h"
 
-#ifdef MOZ_DIAGNOSTIC_ASSERT_ENABLED
+#if defined(MOZ_DIAGNOSTIC_ASSERT_ENABLED) && !defined(MOZ_NAIVEFOX)
 #  define NS_THREAD_SHUTDOWN_ANNOTATIONS_ENABLED
 #  include "mozilla/StaticMutex.h"
 #endif

@@ -1190,6 +1190,11 @@ static nsresult GetCertsSync(nsTArray<RefPtr<nsIX509Cert>>& certs) {
 NS_IMETHODIMP
 nsNSSCertificateDB::GetCerts(JSContext* aCx, mozilla::dom::Promise** aPromise) {
   NS_ENSURE_ARG_POINTER(aCx);
+#ifdef MOZ_NAIVEFOX
+  NS_ENSURE_ARG_POINTER(aPromise);
+  *aPromise = nullptr;
+  return NS_ERROR_NOT_IMPLEMENTED;
+#else
 
   nsIGlobalObject* globalObject = xpc::CurrentNativeGlobal(aCx);
   if (!globalObject) {
@@ -1224,6 +1229,7 @@ nsNSSCertificateDB::GetCerts(JSContext* aCx, mozilla::dom::Promise** aPromise) {
   }
   promise.forget(aPromise);
   return NS_OK;
+#endif
 }
 
 static mozilla::Result<VerifyUsage, nsresult> MapX509UsageToVerifierUsage(

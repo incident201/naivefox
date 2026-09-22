@@ -22,6 +22,7 @@ class nsIURI;
 namespace mozilla {
 
 namespace dom {
+class BrowsingContext;
 class Document;
 }
 

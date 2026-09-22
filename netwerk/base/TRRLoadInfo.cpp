@@ -10,7 +10,9 @@
 #else
 #  include "mozilla/dom/ClientSource.h"
 #endif
-#include "mozilla/dom/DOMTypes.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/dom/DOMTypes.h"
+#endif
 #ifdef MOZ_NAIVEFOX
 #  include "../naivefox/FeaturePolicy.h"
 #  include "../naivefox/nsContentUtils.h"

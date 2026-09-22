@@ -239,6 +239,8 @@ def relay(host_pid, target_pid, port, protocol):
 
 
 def winpath(path):
+    if os.name == "nt":
+        return str(path)
     return subprocess.check_output(["wslpath", "-w", str(path)], text=True).strip()
 
 
@@ -305,7 +307,8 @@ def stop_relay(bridge):
 
 def run_inside(args):
     module = fixture_module()
-    subprocess.run(["ip", "link", "set", "lo", "up"], check=True)
+    if os.name != "nt":
+        subprocess.run(["ip", "link", "set", "lo", "up"], check=True)
     root = (args.work_dir or args.objdir / "naivefox-fixture").resolve()
     module.require(
         root.is_relative_to(args.objdir), "work directory must stay below objdir"
@@ -389,6 +392,8 @@ def run_inside(args):
 
     def start_caddy(*arguments):
         process, port = original_start(*arguments)
+        if os.name == "nt":
+            return process, port
         protocol = arguments[2]
         current_relays = []
         original_stop = process.stop
@@ -476,7 +481,7 @@ def main():
     if len(sys.argv) == 6 and sys.argv[1] == "--relay":
         return relay(int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4]), sys.argv[5])
     parser = argparse.ArgumentParser(
-        description="Run the shared NaiveFox fixture against native Windows NaiveFox from WSL."
+        description="Run the shared NaiveFox fixture against native Windows NaiveFox."
     )
     parser.add_argument("--objdir", required=True, type=Path)
     parser.add_argument("--runtime", required=True, type=Path)
@@ -513,7 +518,7 @@ def main():
                 "Windows runtime and fixture paths must be on a Windows drive, not a WSL UNC share"
             )
     os.umask(0o077)
-    if args.host_pid is None:
+    if args.host_pid is None and os.name != "nt":
         command = [
             "unshare",
             "--net",

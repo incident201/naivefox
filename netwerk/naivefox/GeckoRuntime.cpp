@@ -576,7 +576,7 @@ bool XRE_IsE10sParentProcess() { return false; }
     bool XRE_Is##proc_typename##Process() {                                    \
       return XRE_GetProcessType() == GeckoProcessType_##enum_name;             \
     }
-#  include "mozilla/GeckoProcessTypes.h"
+#  include "mozilla/GeckoProcessTypes.inc"
 #  undef GECKO_PROCESS_TYPE
 
 bool XRE_UseNativeEventProcessing() { return false; }

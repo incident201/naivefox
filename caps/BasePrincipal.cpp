@@ -1231,6 +1231,10 @@ BasePrincipal::GetIsLoopbackHost(bool* aRes) {
 
 NS_IMETHODIMP
 BasePrincipal::GetIsSecureContextAllowlistedHost(bool* aRes) {
+#ifdef MOZ_NAIVEFOX
+  *aRes = false;
+  return NS_OK;
+#else
   AssertIsOnMainThread();
   *aRes = false;
 
@@ -1251,6 +1255,7 @@ BasePrincipal::GetIsSecureContextAllowlistedHost(bool* aRes) {
 
   *aRes = nsMixedContentBlocker::IsPotentiallyTrustworthyAllowlistedHost(host);
   return NS_OK;
+#endif
 }
 
 NS_IMETHODIMP

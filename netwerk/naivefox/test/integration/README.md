@@ -110,6 +110,10 @@ NaiveFoxRunEmbedded API. Their platform runners adapt process ownership and
 host/device routing to the shared fixture; they do not select another transport.
 Cross-compilation and static package checks do not establish device runtime
 behavior. Record native device/host verification separately.
+For the ARM64 Android package, the online runner also accepts the API 30
+Google APIs x86_64 emulator when its ARM64 native bridge is active and the
+staged ARM64 harness completes the workload. [MINIMAL.md](../../MINIMAL.md) records the AVD
+provisioning, launch command and `10.0.2.2` route requirement.
 
 Export minimal source only with current build/configuration/link evidence.
 The normal product and exported product must remain free of browser execution,

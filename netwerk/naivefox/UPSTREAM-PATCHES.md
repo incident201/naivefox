@@ -398,6 +398,35 @@ payload; EOF must not emit a duplicate. Cover both coalesced tails and an
 uncoalesced frame, then exercise native HTTPS uploads under socket backpressure
 and retain WSS/QUIC correctness.
 
+## NF-UPSTREAM-026: retain the lean single-process graph across Necko refreshes
+
+Files:
+
+- caps/BasePrincipal.cpp
+- dom/ipc/RemoteType.cpp
+- netwerk/base/TRRLoadInfo.cpp
+- netwerk/base/nsNetUtil.cpp
+- netwerk/cache2/CacheFile.cpp
+- netwerk/cookie/CookieCommons.h and moz.build
+- security/manager/ssl/components.conf and nsNSSCertificateDB.cpp
+- xpcom/threads/nsThread.h
+- netwerk/naivefox/PWebTransport.h, NeckoChannelParams.h and tools/verify-shims.py
+
+The single-process product retains native H2/H3 and NSS while omitting DOM
+actors, browser policy containers, crash reporting, CTAP cable services and
+the profile cookie store. New upstream references to these browser services
+must be excluded only under MOZ_NAIVEFOX. Remote origin process types and the
+DOM certificate Promise fail closed in the lean build. The product's in-process
+HTTP connection record and WebTransport statistics record track the upstream
+IPDL field schemas without compiling their actor protocols. Ordinary Firefox
+builds keep the upstream paths and behavior.
+
+Review obligations: compare both value records to their IPDL schemas with
+verify-shims.py, run all three product builds and closure checks, verify staged
+startup and strict H2/H3 routing, and test certificate rejection and local
+listener lifecycle. Keep cache encryption fail closed and exclude only the
+unused browser service registrations and cookie write queue.
+
 ## Adding or removing an entry
 
 Use the next stable identifier and record:
