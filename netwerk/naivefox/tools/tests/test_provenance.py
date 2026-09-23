@@ -328,6 +328,15 @@ class ProvenanceTest(unittest.TestCase):
         module.write_plan(plan, second)
         self.assertEqual(first.read_bytes(), second.read_bytes())
 
+    def test_native_windows_linker_batch_entrypoints_are_exported(self) -> None:
+        module = load_script(
+            "minimal_source_plan_windows_linker", TOOLS_DIR / "minimal-source-plan.py"
+        )
+        self.assertEqual(
+            set(module.WINDOWS_RUST_LINKER_SCRIPTS),
+            {"build/cargo-host-linker.bat", "build/cargo-linker.bat"},
+        )
+
     def test_evidence_objdirs_must_be_distinct(self) -> None:
         linux = self.make_objdir("linux-x86_64")
         android = self.make_objdir("android-aarch64")

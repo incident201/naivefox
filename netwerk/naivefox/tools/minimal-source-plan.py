@@ -87,6 +87,13 @@ WINDOWS_MACH_BOOTSTRAP_PREFIXES = (
     "third_party/python/jinxed/",
     "third_party/python/platformdirs/platformdirs/windows.py",
 )
+# The native Windows Rust build invokes these batch wrappers directly.  A
+# Linux cross-build follows the extensionless scripts, so its trace alone
+# cannot retain the batch entrypoints needed by GitHub's Windows runner.
+WINDOWS_RUST_LINKER_SCRIPTS = (
+    "build/cargo-host-linker.bat",
+    "build/cargo-linker.bat",
+)
 ABSOLUTE_TEXT = re.compile(
     r"(?<![A-Za-z0-9_])/(?:home|mnt|workspaces)/[^\s\"']*/"
     r"(?:naivefox|obj-[^/\s\"']*)(?:/|\s|$)|"
@@ -557,6 +564,9 @@ def main() -> int:
         path for path in tracked if path.startswith(WINDOWS_MACH_BOOTSTRAP_PREFIXES)
     ):
         add(value, "explicit:mach-windows-bootstrap")
+
+    for value in WINDOWS_RUST_LINKER_SCRIPTS:
+        add(value, "explicit:windows-rust-linker")
 
     for value in sorted(
         path for path in tracked if path.startswith("config/") and path.endswith(".mk")

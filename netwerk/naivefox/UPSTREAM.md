@@ -177,6 +177,10 @@ If `naivefox-full-source` passes but the isolated export fails, fix the
 allowlist, exporter, or source closure on `naivefox-full-source`; never patch
 the product tree manually. Only the workflow control-plane overlay is edited
 directly on `naivefox-minimal-source`.
+Native Windows release runners also require the tracked
+`build/cargo-linker.bat` and `build/cargo-host-linker.bat` wrappers. Keep them
+in the explicit minimal-source allowlist: Linux cross-build traces follow the
+extensionless scripts and do not discover these Windows entrypoints.
 
 ## Provenance without SHA churn
 
