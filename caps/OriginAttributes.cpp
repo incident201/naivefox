@@ -10,6 +10,7 @@
 #  include "mozilla/dom/BlobURLProtocolHandler.h"
 #  include "mozilla/dom/quota/QuotaManager.h"
 #endif
+#include "nsCharSeparatedTokenizer.h"
 #include "nsIEffectiveTLDService.h"
 #include "nsIURI.h"
 #include "nsNetCID.h"

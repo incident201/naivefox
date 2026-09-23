@@ -10,11 +10,14 @@
 #else
 #  include "mozilla/dom/ClientSource.h"
 #endif
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/dom/DOMTypes.h"
+#endif
 #ifdef MOZ_NAIVEFOX
 #  include "../naivefox/FeaturePolicy.h"
 #  include "../naivefox/nsContentUtils.h"
 #else
-#  include "mozilla/dom/FeaturePolicy.h"
+#  include "mozilla/dom/PermissionsPolicy.h"
 #  include "nsContentUtils.h"
 #endif
 #include "nsIRedirectHistoryEntry.h"
@@ -69,6 +72,13 @@ TRRLoadInfo::SetPrincipalToInherit(nsIPrincipal* aPrincipalToInherit) {
 }
 
 NS_IMETHODIMP
+TRRLoadInfo::SetTrustedPrincipalToInherit(nsIPrincipal* aPrincipalToInherit) {
+  return NS_ERROR_NOT_IMPLEMENTED;
+}
+
+bool TRRLoadInfo::IsPrincipalToInheritTrusted() { return false; }
+
+NS_IMETHODIMP
 TRRLoadInfo::GetUserNavigationInvolvement(uint8_t* aUserNavigationInvolvement) {
   return NS_ERROR_NOT_IMPLEMENTED;
 }
@@ -93,12 +103,17 @@ void TRRLoadInfo::ResetSandboxedNullPrincipalID() {}
 nsIPrincipal* TRRLoadInfo::GetTopLevelPrincipal() { return nullptr; }
 
 NS_IMETHODIMP
-TRRLoadInfo::GetTriggeringRemoteType(nsACString& aTriggeringRemoteType) {
+TRRLoadInfo::GetXPCOMTriggeringRemoteType(nsACString& aTriggeringRemoteType) {
   return NS_ERROR_NOT_IMPLEMENTED;
 }
 
 NS_IMETHODIMP
-TRRLoadInfo::SetTriggeringRemoteType(const nsACString& aTriggeringRemoteType) {
+TRRLoadInfo::GetTriggeringRemoteType(RemoteType& aTriggeringRemoteType) {
+  return NS_ERROR_NOT_IMPLEMENTED;
+}
+
+NS_IMETHODIMP
+TRRLoadInfo::SetTriggeringRemoteType(const RemoteType& aTriggeringRemoteType) {
   return NS_ERROR_NOT_IMPLEMENTED;
 }
 
@@ -493,12 +508,12 @@ TRRLoadInfo::GetPolicyContainerToInherit() {
   return nullptr;
 }
 
-Maybe<FeaturePolicyInfo> TRRLoadInfo::GetContainerFeaturePolicyInfo() {
+Maybe<PermissionsPolicyInfo> TRRLoadInfo::GetContainerPermissionsPolicyInfo() {
   return Nothing();
 }
 
-void TRRLoadInfo::SetContainerFeaturePolicyInfo(
-    const FeaturePolicyInfo& aContainerFeaturePolicyInfo) {}
+void TRRLoadInfo::SetContainerPermissionsPolicyInfo(
+    const PermissionsPolicyInfo& aContainerPermissionsPolicyInfo) {}
 
 NS_IMETHODIMP
 TRRLoadInfo::GetIsSameDocumentNavigation(bool* aTextDirectiveUserActivation) {

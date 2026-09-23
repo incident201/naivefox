@@ -72,6 +72,7 @@ EXPORTS.harfbuzz += [
 # The preference store uses this header-only compact string table even in the
 # parent-only runtime.  Exporting it does not add dom/ipc actors or sources.
 EXPORTS.mozilla.dom.ipc += ["/dom/ipc/StringTable.h"]
+EXPORTS.mozilla.dom += ["/dom/ipc/RemoteType.h"]
 
 # SpiderMonkey links no-op standalone metric methods even when the browser
 # telemetry service is absent.  Export only their small ABI header set instead

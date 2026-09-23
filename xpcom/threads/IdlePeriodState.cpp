@@ -265,8 +265,7 @@ bool IdlePeriodState::ShouldGetIdleToken() {
 #ifdef MOZ_NAIVEFOX
   return false;
 #else
-  return StaticPrefs::idle_period_cross_process_scheduling() &&
-         dom::ContentChild::GetSingleton() &&
+  return dom::ContentChild::GetSingleton() &&
          dom::ContentChild::GetSingleton()->GetProcessPriority() <
              hal::ProcessPriority::PROCESS_PRIORITY_FOREGROUND;
 #endif

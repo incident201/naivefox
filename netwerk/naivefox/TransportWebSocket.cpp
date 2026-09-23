@@ -89,7 +89,7 @@ nsresult TransportWebSocket::Start(const TransportConfig& aConfig,
       host, port, "http/1.1"_ns, EmptyCString(), nullptr, OriginAttributes(),
       routedHost, port, false);
   connection->SetNoSpdy(true);
-  connection->SetHttp3Disabled(true);
+  connection->SetHttp3Policy(net::Http3Policy::Disabled);
   connection->SetAnonymous(true);
   internal->SetConnectionInfo(connection);
   nsAutoCString cookie;

@@ -74,8 +74,7 @@ class CrashReporterHelper {
       nsCOMPtr<nsIAppStartup> appService =
           do_GetService("@mozilla.org/toolkit/app-startup;1");
       if (appService) {
-        bool userAllowedQuit = true;
-        appService->Quit(nsIAppStartup::eForceQuit, 1, &userAllowedQuit);
+        appService->Quit(nsIAppStartup::eForceQuit, 1);
       }
     }
   }

@@ -110,6 +110,26 @@ NaiveFoxRunEmbedded API. Their platform runners adapt process ownership and
 host/device routing to the shared fixture; they do not select another transport.
 Cross-compilation and static package checks do not establish device runtime
 behavior. Record native device/host verification separately.
+For the ARM64 Android package, the online runner also accepts the API 30
+Google APIs x86_64 emulator when its ARM64 native bridge is active and the
+staged ARM64 harness completes the workload. With JDK 17 and the Android SDK
+command-line tools installed, provision and launch the default AVD with:
+
+~~~sh
+export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-$HOME/Android/Sdk}"
+"$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --licenses
+"$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" \
+  'platform-tools' 'emulator' 'system-images;android-30;google_apis;x86_64'
+printf 'no\n' | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/avdmanager" \
+  create avd --name naivefox-googleapis-api30-arm64 \
+  --package 'system-images;android-30;google_apis;x86_64'
+./netwerk/naivefox/tools/start-android-emulator.sh
+~~~
+
+The [launcher](../../tools/start-android-emulator.sh) checks the guest ABI and
+native bridge, disables guest Wi-Fi, and verifies that `10.0.2.2` routes
+through `eth0`. Full-source maintainers can use `MINIMAL.md` for the complete
+provisioning guide.
 
 Export minimal source only with current build/configuration/link evidence.
 The normal product and exported product must remain free of browser execution,

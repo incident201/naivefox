@@ -8,7 +8,7 @@ import os
 import sys
 import time
 import traceback
-from collections import OrderedDict, defaultdict
+from collections import defaultdict
 
 import mozinfo
 import mozpack.path as mozpath
@@ -28,6 +28,8 @@ from .data import (
     ChromeManifestEntry,
     ComputedFlags,
     ConfigFileSubstitution,
+    DeclaredLicensedPaths,
+    DeclaredLicenseNotice,
     Defines,
     DirectoryTraversal,
     Exports,
@@ -50,6 +52,7 @@ from .data import (
     JsShellArchive,
     LegacyRunTests,
     Library,
+    LicenseError,
     Linkable,
     LocalInclude,
     LocalizedFiles,
@@ -100,7 +103,7 @@ class TreeMetadataEmitter(LoggingMixin):
         self.info = dict(mozinfo.info)
 
         self._libs = defaultdict(list)
-        self._binaries = OrderedDict()
+        self._binaries = dict()
         self._compile_dirs = set()
         self._host_compile_dirs = set()
         self._wasm_compile_dirs = set()
@@ -629,7 +632,15 @@ class TreeMetadataEmitter(LoggingMixin):
                 )
 
     def _rust_library(
-        self, context, libname, static_args, is_gkrust=False, cls=RustLibrary
+        self,
+        context,
+        libname,
+        static_args,
+        is_gkrust=False,
+        cargo_profile_suffix="",
+        cargo_crate_type="",
+        no_lto=False,
+        cls=RustLibrary,
     ):
         # We need to note any Rust library for linking purposes.
         config, cargo_file = self._parse_and_check_cargo_file(context)
@@ -661,6 +672,13 @@ class TreeMetadataEmitter(LoggingMixin):
                 context,
             )
 
+        if cargo_crate_type and cargo_crate_type != "staticlib":
+            raise SandboxValidationError(
+                f"cargo_crate_type {cargo_crate_type} for {libname} must be "
+                "'staticlib'",
+                context,
+            )
+
         crate_type = "staticlib"
 
         dependencies = set(config.get("dependencies", {}).keys())
@@ -682,6 +700,9 @@ class TreeMetadataEmitter(LoggingMixin):
             dependencies,
             features,
             is_gkrust,
+            cargo_profile_suffix=cargo_profile_suffix,
+            cargo_crate_type=cargo_crate_type,
+            no_lto=no_lto,
             **static_args,
         )
 
@@ -997,6 +1018,13 @@ class TreeMetadataEmitter(LoggingMixin):
                         libname,
                         static_args,
                         is_gkrust=bool(context.get("IS_GKRUST")),
+                        cargo_profile_suffix=context.get(
+                            "RUST_LIBRARY_CARGO_PROFILE_SUFFIX", ""
+                        ),
+                        cargo_crate_type=context.get(
+                            "RUST_LIBRARY_CARGO_CRATE_TYPE", ""
+                        ),
+                        no_lto=bool(context.get("RUST_LIBRARY_NO_LTO")),
                     )
                 else:
                     lib = StaticLibrary(context, libname, **static_args)
@@ -1420,6 +1448,8 @@ class TreeMetadataEmitter(LoggingMixin):
 
         generated_files = set()
         localized_generated_files = set()
+        yield from self._process_licenses(context)
+
         for obj in self._process_generated_files(context):
             for f in obj.outputs:
                 generated_files.add(f)
@@ -1811,7 +1841,45 @@ class TreeMetadataEmitter(LoggingMixin):
 
         yield XPIDLModule(context, xpidl_module, context["XPIDL_SOURCES"])
 
+    def _process_licenses(self, context):
+        licensed_under = context.get("LICENSED_UNDER")
+        for license_id in licensed_under or []:
+            paths = [
+                mozpath.normpath(mozpath.join(context.relsrcdir, path))
+                for path in licensed_under[license_id].paths
+            ]
+            yield DeclaredLicensedPaths(context, license_id, paths)
+
+        for license_id in context.get("LICENSES") or []:
+            fields = context["LICENSES"][license_id]
+            try:
+                yield DeclaredLicenseNotice(
+                    context,
+                    license_id,
+                    fields.title,
+                    SourcePath(context, fields.text).full_path if fields.text else None,
+                    notice=fields.notice or None,
+                    spdx=fields.spdx or None,
+                    url=fields.url or None,
+                    paths=fields.paths or (),
+                )
+            except LicenseError as error:
+                raise SandboxValidationError(str(error), context)
+
     def _process_generated_files(self, context):
+        # The link reads whatever EXTRA_LINK_DEPS names, so a generated file
+        # among them has to be written before the link rather than alongside
+        # the other generated files.
+        link_deps = {
+            mozpath.normpath(dep.full_path)
+            for dep in context.get("EXTRA_LINK_DEPS") or ()
+            if isinstance(dep, ObjDirPath)
+        }
+
+        def links_against(output):
+            path = ObjDirPath(context, "!" + output)
+            return mozpath.normpath(path.full_path) in link_deps
+
         for path in context["CONFIGURE_DEFINE_FILES"]:
             script = mozpath.join(
                 mozpath.dirname(mozpath.dirname(__file__)),
@@ -1893,6 +1961,11 @@ class TreeMetadataEmitter(LoggingMixin):
                     localized=localized,
                     force=flags.force,
                     extra_deps=extra_deps,
+                    required_during_compile=sorted(
+                        f
+                        for f in (outputs if isinstance(outputs, tuple) else (outputs,))
+                        if links_against(f)
+                    ),
                 )
 
     def _process_test_manifests(self, context):
@@ -1998,9 +2071,9 @@ class TreeMetadataEmitter(LoggingMixin):
             # We also copy manifests into the output directory,
             # including manifests from [include:foo] directives.
             for mpath in mpmanifest.manifests():
-                mpath = mozpath.normpath(mpath)
-                out_path = mozpath.join(out_dir, mozpath.basename(mpath))
-                obj.installs[mpath] = (out_path, False)
+                norm_path = mozpath.normpath(mpath)
+                out_path = mozpath.join(out_dir, mozpath.basename(norm_path))
+                obj.installs[norm_path] = (out_path, False)
 
             # Some manifests reference files that are auto generated as
             # part of the build or shouldn't be installed for some

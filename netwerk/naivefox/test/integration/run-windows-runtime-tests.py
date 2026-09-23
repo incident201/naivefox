@@ -239,7 +239,28 @@ def relay(host_pid, target_pid, port, protocol):
 
 
 def winpath(path):
+    if os.name == "nt":
+        return str(path)
     return subprocess.check_output(["wslpath", "-w", str(path)], text=True).strip()
+
+
+def windows_socket_listeners(port, udp=False):
+    protocol = "UDP" if udp else "TCP"
+    result = subprocess.run(
+        ["netstat", "-ano", "-p", protocol],
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    for line in result.stdout.splitlines():
+        fields = line.split()
+        if len(fields) < 4 or fields[0].upper() != protocol:
+            continue
+        if fields[1] != f"127.0.0.1:{port}":
+            continue
+        if udp or (len(fields) >= 5 and fields[3].upper() == "LISTENING"):
+            return True
+    return False
 
 
 class NativeClient:
@@ -305,7 +326,10 @@ def stop_relay(bridge):
 
 def run_inside(args):
     module = fixture_module()
-    subprocess.run(["ip", "link", "set", "lo", "up"], check=True)
+    if os.name == "nt":
+        module.socket_listeners = windows_socket_listeners
+    else:
+        subprocess.run(["ip", "link", "set", "lo", "up"], check=True)
     root = (args.work_dir or args.objdir / "naivefox-fixture").resolve()
     module.require(
         root.is_relative_to(args.objdir), "work directory must stay below objdir"
@@ -388,7 +412,37 @@ def run_inside(args):
     original_start = module.start_caddy
 
     def start_caddy(*arguments):
+        admin_port = None
+        if os.name == "nt":
+            admin_port = module.free_port()
+            arguments[0].caddy_admin_port = admin_port
         process, port = original_start(*arguments)
+        if os.name == "nt":
+            original_stop = process.stop
+
+            def stop_caddy():
+                if process.process.poll() is None:
+                    try:
+                        subprocess.run(
+                            [
+                                str(args.caddy),
+                                "stop",
+                                "--address",
+                                f"127.0.0.1:{admin_port}",
+                            ],
+                            check=True,
+                            capture_output=True,
+                            text=True,
+                            timeout=15,
+                        )
+                        process.process.wait(timeout=15)
+                    except (OSError, subprocess.SubprocessError):
+                        original_stop()
+                        raise
+                process.log.close()
+
+            process.stop = stop_caddy
+            return process, port
         protocol = arguments[2]
         current_relays = []
         original_stop = process.stop
@@ -476,7 +530,7 @@ def main():
     if len(sys.argv) == 6 and sys.argv[1] == "--relay":
         return relay(int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4]), sys.argv[5])
     parser = argparse.ArgumentParser(
-        description="Run the shared NaiveFox fixture against native Windows NaiveFox from WSL."
+        description="Run the shared NaiveFox fixture against native Windows NaiveFox."
     )
     parser.add_argument("--objdir", required=True, type=Path)
     parser.add_argument("--runtime", required=True, type=Path)
@@ -513,7 +567,7 @@ def main():
                 "Windows runtime and fixture paths must be on a Windows drive, not a WSL UNC share"
             )
     os.umask(0o077)
-    if args.host_pid is None:
+    if args.host_pid is None and os.name != "nt":
         command = [
             "unshare",
             "--net",

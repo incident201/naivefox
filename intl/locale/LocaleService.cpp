@@ -26,6 +26,7 @@
 #endif
 #include "nsXULAppAPI.h"
 #include "nsZipArchive.h"
+#include "nsCharSeparatedTokenizer.h"
 #if defined(XP_WIN) && !defined(MOZ_NAIVEFOX)
 #  include "WinUtils.h"
 #endif

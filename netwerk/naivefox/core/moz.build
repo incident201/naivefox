@@ -29,6 +29,7 @@ SOURCES += [
 ]
 
 SOURCES += [
+    "/dom/ipc/RemoteType.cpp",
     "/dom/security/ReferrerInfo.cpp",
     "/dom/security/SecFetch.cpp",
 ]
@@ -56,6 +57,7 @@ EXPORTS.mozilla.net += ["../UnknownProtocolHandler.h"]
 EXPORTS += ["../nsContentUtils.h"]
 
 LOCAL_INCLUDES += ["/dom/security"]
+LOCAL_INCLUDES += ["/caps"]
 LOCAL_INCLUDES += ["/layout/style"]
 LOCAL_INCLUDES += ["/netwerk/base"]
 LOCAL_INCLUDES += ["/netwerk/naivefox"]

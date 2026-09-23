@@ -2367,6 +2367,7 @@ def main():
         "SSLKEYLOGFILE",
         "DISPLAY",
         "WAYLAND_DISPLAY",
+        "XAUTHORITY",
         "MOZ_LOG",
         "MOZ_LOG_FILE",
     ):

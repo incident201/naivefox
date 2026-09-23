@@ -107,6 +107,7 @@ class TargetServer(socketserver.ThreadingTCPServer):
     allow_reuse_address = True
     daemon_threads = True
     block_on_close = False
+    request_queue_size = 128
 
     def __init__(self, host="127.0.0.1"):
         super().__init__((host, 0), Target)
@@ -272,17 +273,21 @@ def fixture_credentials():
     return "fixture user@" + secrets.token_hex(8), "p:/" + secrets.token_hex(24) + " %"
 
 
-def caddyfile_text(allowed_ports=()):
+def caddyfile_text(allowed_ports=(), admin_port=None):
     require(
         all(type(port) is int and 1 <= port <= 65535 for port in allowed_ports),
         "invalid fixture destination port",
+    )
+    require(
+        admin_port is None or (type(admin_port) is int and 1 <= admin_port <= 65535),
+        "invalid fixture admin port",
     )
     ports = (
         "            ports " + " ".join(map(str, allowed_ports)) + "\n"
         if allowed_ports
         else ""
     )
-    return (
+    config = (
         """{
     admin off
     auto_https disable_redirects
@@ -311,6 +316,11 @@ https://:{$NF_PORT} {
 }
 """
     )
+    if admin_port is not None:
+        config = config.replace(
+            "    admin off\n", f"    admin 127.0.0.1:{admin_port}\n", 1
+        )
+    return config
 
 
 def prepare_application(run):
@@ -348,7 +358,12 @@ def start_caddy(args, run, protocol, target_port, user, password):
         identity, args.packet_server_pin = packet_identity(run)
     port = free_port(udp=protocol == "h3", dual=True)
     caddyfile = run / "Caddyfile"
-    caddyfile.write_text(caddyfile_text(getattr(args, "allowed_ports", ())))
+    caddyfile.write_text(
+        caddyfile_text(
+            getattr(args, "allowed_ports", ()),
+            getattr(args, "caddy_admin_port", None),
+        )
+    )
     env = dict(
         os.environ,
         NF_PROTOCOL=outer_protocol,
@@ -577,6 +592,7 @@ def open_tunnel(
     )
     sock.settimeout(timeout)
     try:
+        failure_detail = "local CONNECT failed"
         if listener == "socks":
             sock.sendall(b"\x05\x01\x00")
             require(receive(sock, 2) == b"\x05\x00", "SOCKS negotiation failed")
@@ -590,6 +606,7 @@ def open_tunnel(
             head = receive(sock, 4)
             require(head[0] == 5 and head[2] == 0, "invalid SOCKS reply")
             success = head[1] == 0
+            failure_detail = f"local CONNECT failed (SOCKS status 0x{head[1]:02x})"
             if head[3] == 1:
                 receive(sock, 6)
             elif head[3] == 4:
@@ -610,7 +627,7 @@ def open_tunnel(
             success = bytes(header).split(b" ", 2)[1] == b"200"
         require(
             success != rejected,
-            "unexpected local CONNECT success" if rejected else "local CONNECT failed",
+            "unexpected local CONNECT success" if rejected else failure_detail,
         )
         if rejected:
             sock.close()

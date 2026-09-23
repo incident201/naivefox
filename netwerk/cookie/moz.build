@@ -41,6 +41,7 @@ EXPORTS.mozilla.net = [
 UNIFIED_SOURCES += [
     "Cookie.cpp",
     "CookieCommons.cpp",
+    "CookieDBWriteQueue.cpp",
     "CookieJarSettings.cpp",
     "CookieLogging.cpp",
     "CookieNotification.cpp",
@@ -73,6 +74,7 @@ if CONFIG["MOZ_NAIVEFOX"]:
     for source in (
         "Cookie.cpp",
         "CookieCommons.cpp",
+        "CookieDBWriteQueue.cpp",
         "CookieLogging.cpp",
         "CookieNotification.cpp",
         "CookieParser.cpp",

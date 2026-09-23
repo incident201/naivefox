@@ -119,6 +119,8 @@ EXPORTS.mozilla += [
     "AvailableMemoryTracker.h",
     "AvailableMemoryWatcher.h",
     "ClearOnShutdown.h",
+    "CollectorLogAnalyzer.h",
+    "CollectorLogAnalyzerBackground.h",
     "CountingAllocatorBase.h",
     "CycleCollectedJSContext.h",
     "CycleCollectedJSRuntime.h",
@@ -165,6 +167,16 @@ SOURCES["nsDebugImpl.cpp"].no_pgo = True
 UNIFIED_SOURCES += [
     "AppShutdown.cpp",
     "ClearOnShutdown.cpp",
+]
+
+if not CONFIG["MOZ_NAIVEFOX"]:
+    UNIFIED_SOURCES += [
+        "CollectorLogAnalyzer.cpp",
+        "CycleCollectedJSContext.cpp",
+        "CycleCollectedJSRuntime.cpp",
+    ]
+
+UNIFIED_SOURCES += [
     "CycleCollectorStats.cpp",
     "Debug.cpp",
     "ErrorNames.cpp",

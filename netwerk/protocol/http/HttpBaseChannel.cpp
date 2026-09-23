@@ -585,15 +585,14 @@ HttpBaseChannel::SetDocshellUserAgentOverride() {
     return NS_OK;
   }
 
-  nsAutoString customUserAgent;
+  nsAutoCString customUserAgent;
   bc->GetCustomUserAgent(customUserAgent);
   if (customUserAgent.IsEmpty() || customUserAgent.IsVoid()) {
     return NS_OK;
   }
 
-  NS_ConvertUTF16toUTF8 utf8CustomUserAgent(customUserAgent);
   nsresult rv = SetRequestHeaderInternal(
-      "User-Agent"_ns, utf8CustomUserAgent, false,
+      "User-Agent"_ns, customUserAgent, false,
       nsHttpHeaderArray::eVarietyRequestEnforceDefault);
   if (NS_FAILED(rv)) {
     return rv;
@@ -1259,6 +1258,13 @@ HttpBaseChannel::CloneUploadStream(int64_t* aContentLength,
     return NS_OK;
   }
 
+  // Teeing an async pipe would buffer an upload of unbounded size in memory,
+  // so report no clone; a service worker therefore sees a null request body.
+  if (LoadUploadStreamIsStreaming()) {
+    *aContentLength = -1;
+    return NS_OK;
+  }
+
   nsCOMPtr<nsIInputStream> clonedStream;
   nsresult rv =
       NS_CloneInputStream(mUploadStream, getter_AddRefs(clonedStream));
@@ -1317,6 +1323,18 @@ nsresult HttpBaseChannel::InternalSetUploadStream(
 
     mUploadStream = aUploadStream;
     ExplicitSetUploadStreamLength(aContentLength, aSetContentLengthHeader);
+    return NS_OK;
+  }
+
+  // For streaming uploads (JS ReadableStream body), the stream is an async
+  // pipe fed by FetchStreamReader. It cannot be normalized (buffered into a
+  // StorageStream) because it's consumed incrementally. Skip normalization
+  // entirely and use the pipe as-is.
+  if (LoadUploadStreamIsStreaming()) {
+    mUploadStream = aUploadStream;
+    // mReqContentLength stays 0: the length genuinely is not known yet.
+    // nsHttpTransaction::Init consults RequestBodyIsStreaming() so that it
+    // does not mistake that for "no body".
     return NS_OK;
   }
 
@@ -2279,6 +2297,12 @@ HttpBaseChannel::GetAllowSTS(bool* value) {
 
 NS_IMETHODIMP
 HttpBaseChannel::SetAllowSTS(bool value) {
+  // This controls whether the parent process honors HSTS for this channel, so
+  // it must not be settable from a content process.
+  if (!XRE_IsParentProcess()) {
+    MOZ_ASSERT(value == true, "allowSTS = false is parent process only");
+    return NS_OK;
+  }
   ENSURE_CALLED_BEFORE_CONNECT();
   StoreAllowSTS(value);
   return NS_OK;
@@ -3514,12 +3538,6 @@ bool HttpBaseChannel::ShouldBlockOpaqueResponse() const {
     return false;
   }
 
-  // Ignore the request from object or embed elements
-  if (mLoadInfo->GetIsFromObjectOrEmbed()) {
-    LOGORB("No block: Request From <object> or <embed>");
-    return false;
-  }
-
   // Exclude no_cors System XHR
   if (extContentPolicyType == ExtContentPolicy::TYPE_XMLHTTPREQUEST) {
     if (securityMode ==
@@ -3870,8 +3888,8 @@ void HttpBaseChannel::SetChannelBlockedByOpaqueResponse() {
 #endif
 }
 
-NS_IMETHODIMP
-HttpBaseChannel::SetCookieHeaders(const nsTArray<nsCString>& aCookieHeaders) {
+nsresult HttpBaseChannel::SetCookieHeaders(
+    const nsTArray<nsCString>& aCookieHeaders) {
   if (mLoadFlags & LOAD_ANONYMOUS) return NS_OK;
 
   // The loadGroup of the channel in the parent process could be null in the
@@ -4726,7 +4744,7 @@ already_AddRefed<nsILoadInfo> HttpBaseChannel::CloneLoadInfoForRedirect(
         this, getter_AddRefs(redirectPrincipal));
     nsCOMPtr<nsIPrincipal> nullPrincipalToInherit =
         NullPrincipal::CreateWithInheritedAttributes(redirectPrincipal);
-    newLoadInfo->SetPrincipalToInherit(nullPrincipalToInherit);
+    newLoadInfo->SetTrustedPrincipalToInherit(nullPrincipalToInherit);
 #endif
   }
 
@@ -5154,6 +5172,7 @@ HttpBaseChannel::CloneReplacementChannelConfig(bool aPreserveMethod,
       config.uploadStream = mUploadStream;
     }
     config.uploadStreamLength = mReqContentLength;
+    config.uploadStreamIsStreaming = LoadUploadStreamIsStreaming();
 
     nsAutoCString contentType;
     nsresult rv = mRequestHead.GetHeader(nsHttp::Content_Type, contentType);
@@ -5302,6 +5321,12 @@ HttpBaseChannel::CloneReplacementChannelConfig(bool aPreserveMethod,
       // because ExplicitSetUploadStream treats the former as "no header" and
       // the latter as "header with empty string value".
       const nsACString& method = config.method ? *config.method : VoidCString();
+      if (config.uploadStreamIsStreaming) {
+        RefPtr<HttpBaseChannel> baseChan = do_QueryObject(httpChannel);
+        if (baseChan) {
+          baseChan->SetUploadStreamIsStreaming(true);
+        }
+      }
       uploadChannel2->ExplicitSetUploadStream(
           config.uploadStream, ctype, config.uploadStreamLength, method);
     } else if (nsCOMPtr<nsIUploadChannel> uploadChannel =
@@ -5334,6 +5359,7 @@ HttpBaseChannel::ReplacementChannelConfig::ReplacementChannelConfig(
   timedChannelInfo = aInit.timedChannelInfo();
   uploadStream = aInit.uploadStream();
   uploadStreamLength = aInit.uploadStreamLength();
+  uploadStreamIsStreaming = aInit.uploadStreamIsStreaming();
   contentType = aInit.contentType();
   contentLength = aInit.contentLength();
 }
@@ -5350,6 +5376,7 @@ HttpBaseChannel::ReplacementChannelConfig::Serialize() {
   config.uploadStream() =
       uploadStream ? RemoteLazyInputStream::WrapStream(uploadStream) : nullptr;
   config.uploadStreamLength() = uploadStreamLength;
+  config.uploadStreamIsStreaming() = uploadStreamIsStreaming;
   config.contentType() = contentType;
   config.contentLength() = contentLength;
 
@@ -5452,7 +5479,6 @@ nsresult HttpBaseChannel::SetupReplacementChannel(nsIURI* newURI,
     }
   }
 
-  // convey the LoadAllowSTS() flags
   rv = httpChannel->SetAllowSTS(LoadAllowSTS());
   MOZ_ASSERT(NS_SUCCEEDED(rv));
 

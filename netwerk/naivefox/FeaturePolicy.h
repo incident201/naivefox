@@ -24,7 +24,7 @@ enum class NoCorsMediaRequestState : uint8_t {
 // LoadInfo retains this value as passive request metadata.  NaiveFox never
 // creates documents or iframe feature policies, so the DOM object itself is
 // deliberately outside the standalone networking build.
-struct FeaturePolicyInfo final {
+struct PermissionsPolicyInfo final {
   CopyableTArray<nsString> mInheritedDeniedFeatureNames;
   CopyableTArray<nsString> mAttributeEnabledFeatureNames;
   nsString mDeclaredString;
@@ -33,7 +33,7 @@ struct FeaturePolicyInfo final {
   nsCOMPtr<nsIPrincipal> mSrcOrigin;
 };
 
-using MaybeFeaturePolicyInfo = Maybe<FeaturePolicyInfo>;
+using MaybePermissionsPolicyInfo = Maybe<PermissionsPolicyInfo>;
 
 }  // namespace mozilla::dom
 

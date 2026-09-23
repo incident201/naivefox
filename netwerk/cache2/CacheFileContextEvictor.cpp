@@ -15,6 +15,10 @@
 #include "mozilla/Base64.h"
 #include "mozilla/Components.h"
 #include "mozilla/IntegerPrintfMacros.h"
+#include "nsCharSeparatedTokenizer.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsContentUtils.h"
+#endif
 #include "nsIDirectoryEnumerator.h"
 #include "nsIEffectiveTLDService.h"
 #include "nsIFile.h"

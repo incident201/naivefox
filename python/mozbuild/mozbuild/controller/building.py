@@ -9,10 +9,11 @@ import json
 import logging
 import os
 import re
+import shutil
 import subprocess
 import sys
 import time
-from collections import Counter, OrderedDict, namedtuple
+from collections import Counter, namedtuple
 from itertools import dropwhile, islice, takewhile
 from pathlib import Path
 from textwrap import TextWrapper
@@ -59,6 +60,7 @@ RE_BUILD_OUTPUT = re.compile(
     |(?P<info_cargo>^\s{3,}(?:Compiling|Downloading|Building|Finished|Fresh|Running|Documenting)\s)
     |(?P<warning_summary>^\d+\s+(?:compiler\s+)?warnings?\s+(?:generated|present)\.)
     |(?P<error_summary>^\d+\s+errors?\s+generated\.)
+    |(?P<python_traceback>^Traceback\ \(most\ recent\ call\ last\):)
     |(?P<make_error>make(?:\[\d+\])?\s*:\s*\*\*\*)
     |(?P<nsis_warning_block>^\d+\s+warnings?:)
     |(?P<error_block>^error(?:\[e\d+\])?:\s?)
@@ -133,8 +135,8 @@ class TierStatus:
 
     def __init__(self, resources, metrics):
         """Accepts a SystemResourceMonitor to record results against."""
-        self.tiers = OrderedDict()
-        self.tier_status = OrderedDict()
+        self.tiers = {}
+        self.tier_status = {}
         self.resources = resources
         self.metrics = metrics
 
@@ -816,6 +818,7 @@ class BuildOutputManager(OutputManager):
                             self._active_log_level = None
                         elif match_type in (
                             "error_summary",
+                            "python_traceback",
                             "make_error",
                             "error_block",
                         ):
@@ -1484,22 +1487,6 @@ class BuildDriver(MozbuildObject):
                     if make_dir is None and make_target is None:
                         return 1
 
-                    if (
-                        config.is_artifact_build
-                        and target.startswith("installers-")
-                        and config.substs.get("MOZ_USE_LEGACY_L10N")
-                    ):
-                        # See https://bugzilla.mozilla.org/show_bug.cgi?id=1387485
-                        self.log(
-                            logging.ERROR,
-                            "build_error",
-                            {},
-                            "Localized Builds are not supported with Artifact Builds enabled.\n"
-                            "You should disable Artifact Builds (Use --disable-compile-environment "
-                            "in your mozconfig instead) then re-build to proceed.",
-                        )
-                        return 1
-
                     # See bug 886162 - we don't want to "accidentally" build
                     # the entire tree (if that's really the intent, it's
                     # unlikely they would have specified a directory.)
@@ -1876,6 +1863,16 @@ class BuildDriver(MozbuildObject):
             status = process.wait()
         if buildstatus_messages:
             line_handler("BUILDSTATUS TIER_FINISH configure")
+        # config.log is written in the objdir, which automation doesn't upload.
+        if upload_path := os.environ.get("UPLOAD_PATH"):
+            try:
+                mkdir(upload_path)
+                shutil.copy2(
+                    Path(self.topobjdir) / "config.log",
+                    Path(upload_path) / "config.log",
+                )
+            except OSError:
+                pass
         if status:
             self.log(
                 BUILD_ERROR,

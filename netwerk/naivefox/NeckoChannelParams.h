@@ -119,13 +119,12 @@ class HttpConnectionInfoCloneArgs final {
   NF_FIELD(uint8_t, trrMode)
   NF_FIELD(bool, isIPv4Disabled)
   NF_FIELD(bool, isIPv6Disabled)
-  NF_FIELD(bool, isHttp3Disabled)
+  NF_FIELD(uint8_t, http3Policy)
   NF_FIELD(nsCString, topWindowOrigin)
   NF_FIELD(bool, isHttp3)
   NF_FIELD(bool, webTransport)
   NF_FIELD(uint64_t, webTransportId)
   NF_FIELD(bool, hasIPHintAddress)
-  NF_FIELD(bool, http3Only)
   NF_FIELD(nsCString, echConfig)
   NF_FIELD(bool, happyEyeballsEnabled)
   NF_FIELD(nsTArray<ProxyInfoCloneArgs>, proxyInfo)
@@ -154,13 +153,12 @@ class HttpConnectionInfoCloneArgs final {
   uint8_t m_trrMode = 0;
   bool m_isIPv4Disabled = false;
   bool m_isIPv6Disabled = false;
-  bool m_isHttp3Disabled = false;
+  uint8_t m_http3Policy = 0;
   nsCString m_topWindowOrigin;
   bool m_isHttp3 = false;
   bool m_webTransport = false;
   uint64_t m_webTransportId = 0;
   bool m_hasIPHintAddress = false;
-  bool m_http3Only = false;
   nsCString m_echConfig;
   bool m_happyEyeballsEnabled = false;
   nsTArray<ProxyInfoCloneArgs> m_proxyInfo;

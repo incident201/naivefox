@@ -110,7 +110,6 @@ struct EndpointProcInfo {
   GeckoChildID mChildID = kInvalidGeckoChildID;
 
   bool operator==(const EndpointProcInfo& aOther) const = default;
-  bool operator!=(const EndpointProcInfo& aOther) const = default;
 
   static EndpointProcInfo Invalid() { return {}; }
   static EndpointProcInfo Current();
@@ -743,14 +742,14 @@ class WeakActorLifecycleProxy final {
   // Safe to call on any thread.
   nsISerialEventTarget* ActorEventTarget() const { return mActorEventTarget; }
 
+  WeakActorLifecycleProxy(const WeakActorLifecycleProxy&) = delete;
+  WeakActorLifecycleProxy& operator=(const WeakActorLifecycleProxy&) = delete;
+
  private:
   friend class ActorLifecycleProxy;
 
   explicit WeakActorLifecycleProxy(ActorLifecycleProxy* aProxy);
   ~WeakActorLifecycleProxy();
-
-  WeakActorLifecycleProxy(const WeakActorLifecycleProxy&) = delete;
-  WeakActorLifecycleProxy& operator=(const WeakActorLifecycleProxy&) = delete;
 
   // This field may only be accessed on the actor's thread, and will be
   // automatically cleared when the ActorLifecycleProxy is destroyed.
