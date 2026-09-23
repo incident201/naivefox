@@ -1,10 +1,10 @@
 {
   "report_provenance": {
     "provenance_version": 2,
-    "source_commit_sha": "96f35f0dac12de7a2d1e0efe7b172c248b7bd131",
+    "source_commit_sha": "2c28b7ebcad4b4af98be690fc76b9f3e4739b0a3",
     "source_worktree_clean": true,
     "firefox_base_sha": "f9a73919fe039381777330403e5f94918735a5e7",
-    "naivefox_reference_sha": "96f35f0dac12de7a2d1e0efe7b172c248b7bd131",
+    "naivefox_reference_sha": "2c28b7ebcad4b4af98be690fc76b9f3e4739b0a3",
     "analyzer_sha256": "8375712b7523f4da690b5424d983f9cc080e51ac88505c4709736187578d889a",
     "provenance_sha256": "642a32e90aaf870224f1831b2e932e08fb3153ed75765607f2112852f668e3fb",
     "evidence_collector_sha256": "9008a1958274d02004fafbe29866ce8f8f168755b52c5042e6f73b988ad40f3b",
@@ -7067,12 +7067,12 @@
       {
         "path": "runtime-manifest.json",
         "size_bytes": 3082,
-        "sha256": "d2b3f10d8f018b1105f101cb55e68d74ca200c52d11a5f49f6962bf2a98e4abc"
+        "sha256": "4a9fd91a7717bd664de56e2366a7ba9cfbbd181ce4258f21f45867f3adbd5a4b"
       },
       {
         "path": "runtime/application.ini",
         "size_bytes": 354,
-        "sha256": "852d5fe83c06a24f8a81e43835abc48717ff728058bf7036c8a7a11cbbb94e5e"
+        "sha256": "d8bd6ec80a562b51a07e6d8bf9146d01885673b603be5d2c2168d8eb72338c6e"
       },
       {
         "path": "runtime/chrome.manifest",
