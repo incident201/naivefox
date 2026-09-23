@@ -23,7 +23,7 @@ concurrency:
 
 env:
   PRODUCT_BRANCH: naivefox-minimal-source
-  ANDROID_NDK_REVISION: "29.0.14206865"
+  ANDROID_NDK_REVISION: "30.0.16248370"
   MACH_NO_TERMINAL_FOOTER: "1"
   PYTHONUNBUFFERED: "1"
 
@@ -173,6 +173,12 @@ jobs:
             nasm \
             ripgrep
           ndk_dir="${ANDROID_HOME:?}/ndk/${ANDROID_NDK_REVISION}"
+          if [[ ! -f "${ndk_dir}/source.properties" ]]; then
+            yes | sdkmanager --sdk_root="${ANDROID_HOME}" --licenses \
+              >/dev/null || true
+            sdkmanager --sdk_root="${ANDROID_HOME}" \
+              "ndk;${ANDROID_NDK_REVISION}"
+          fi
           test -f "${ndk_dir}/source.properties"
           grep -Fqx \
             "Pkg.Revision = ${ANDROID_NDK_REVISION}" \
