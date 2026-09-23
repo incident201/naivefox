@@ -1,10 +1,10 @@
 {
   "counts": {
     "executable_files": 133,
-    "files": 22315
+    "files": 22317
   },
-  "evidence_commit": "4a9076df5dc78e60a241f77bf75c0caa1b8e51fb",
-  "evidence_source_commit": "96f35f0dac12de7a2d1e0efe7b172c248b7bd131",
+  "evidence_commit": "41eed53f81d33d3734f23dc18b6ea3070b024527",
+  "evidence_source_commit": "2c28b7ebcad4b4af98be690fc76b9f3e4739b0a3",
   "files": [
     {
       "mode": "0644",
@@ -267,9 +267,19 @@
       "sha256": "a963dcd81256357bfdfb95be282fa7f0a3f166a2dcc44ffd98966fb9c4b2d072"
     },
     {
+      "mode": "0644",
+      "path": "build/cargo-host-linker.bat",
+      "sha256": "dd94e2664498a15faf4d03da941436cba0f6fc03b87adab37bb87b3c7b699394"
+    },
+    {
       "mode": "0755",
       "path": "build/cargo-linker",
       "sha256": "7a9ff6eaf0686568659a1c07e5229176a15fe80e31cf87bf337004ba1e8d710a"
+    },
+    {
+      "mode": "0644",
+      "path": "build/cargo-linker.bat",
+      "sha256": "d8b4444f0349027553342392fa0a3d88c58b28e89da506dd701a267b9d0404b8"
     },
     {
       "mode": "0644",
@@ -111583,8 +111593,8 @@
     }
   ],
   "firefox_base_commit": "f9a73919fe039381777330403e5f94918735a5e7",
-  "manifest_sha256": "459e3a3337310996be82a1e504c6c1a4d2799329c1d802e2df3e4e89109dfbc3",
+  "manifest_sha256": "485eea83965c7f1937ebfadfabaad50bb55e287a89932c71b8e9b884f1e0787b",
   "manifest_version": 2,
-  "minimal_export_commit": "4a9076df5dc78e60a241f77bf75c0caa1b8e51fb",
-  "naivefox_reference_commit": "96f35f0dac12de7a2d1e0efe7b172c248b7bd131"
+  "minimal_export_commit": "41eed53f81d33d3734f23dc18b6ea3070b024527",
+  "naivefox_reference_commit": "2c28b7ebcad4b4af98be690fc76b9f3e4739b0a3"
 }
