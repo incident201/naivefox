@@ -23,14 +23,19 @@ def main():
     parser.add_argument("--runtime", type=Path, required=True)
     parser.add_argument("--caddy", type=Path, required=True)
     parser.add_argument("--work-dir", type=Path, required=True)
-    parser.add_argument("--wine-root", type=Path, default=Path.home() / ".mozbuild/wine")
+    parser.add_argument(
+        "--wine-root", type=Path,
+        default=Path(os.environ.get("NAIVEFOX_WINE_ROOT", Path.home() / ".mozbuild/naivefox-wine-9.0")),
+    )
     parser.add_argument("--wine-prefix", type=Path)
+    parser.add_argument("--slow-download-repeats", type=int, default=8)
     args = parser.parse_args()
     args.objdir = args.objdir.resolve(strict=True)
     args.runtime = args.runtime.resolve(strict=True)
     args.caddy = args.caddy.resolve(strict=True)
     args.work_dir = args.work_dir.resolve()
     fixture.require(sys.platform == "linux", "Wine acceptance requires Linux")
+    fixture.require(args.slow_download_repeats > 0, "slow download repetitions must be positive")
     fixture.require(
         args.work_dir.is_relative_to(args.objdir) and not args.work_dir.exists(),
         "Wine artifacts require a new directory below the object directory",
@@ -56,11 +61,21 @@ def main():
         str(wine_root / "lib/wine" / suffix)
         for suffix in ("x86_64-unix", "i386-unix", "x86_64-windows", "i386-windows")
     )
+    wine_env = dict(
+        os.environ, WINEPREFIX=str(prefix), WINEARCH="win64", WINEDEBUG="-all",
+        WINEDLLPATH=library_paths, DISPLAY="", WAYLAND_DISPLAY="",
+    )
+    if not (prefix / "system.reg").is_file():
+        with (args.work_dir / "wine-setup.log").open("wb") as log:
+            for command in ([str(wine_root / "bin/wineboot"), "--init"],
+                            [str(wine), "cmd", "/c", "exit"]):
+                subprocess.run(command, env=wine_env, stdout=log,
+                               stderr=subprocess.STDOUT, timeout=120, check=True)
     wrapper = args.work_dir / "wine-naivefox.sh"
     wrapper.write_text(
         "#!/usr/bin/env bash\nset -euo pipefail\n"
         + f"export WINEPREFIX={shlex.quote(str(prefix))}\n"
-        + "export WINEARCH=win64 WINEDEBUG=-all\n"
+        + "export WINEARCH=win64 WINEDEBUG=-all DISPLAY= WAYLAND_DISPLAY=\n"
         + f"export WINEDLLPATH={shlex.quote(library_paths)}\n"
         + f"winepath={shlex.quote(str(winepath))}\n"
         + 'for key in SSL_CERT_FILE NAIVEFOX_PROFILE; do\n'
@@ -85,6 +100,7 @@ def main():
     suite = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(suite)
     original_exit = fixture.Process.exited_cleanly
+    original_exercise = fixture.exercise
 
     def checked_exit(process):
         if str(process.process.args[0]) != str(wrapper):
@@ -94,6 +110,14 @@ def main():
         return True
 
     fixture.Process.exited_cleanly = checked_exit
+    def repeated_exercise(ports, target_port, label, *arguments, **keywords):
+        original_exercise(ports, target_port, label, *arguments, **keywords)
+        for _ in range(args.slow_download_repeats):
+            for listener in ("socks", "http"):
+                fixture.download(ports, listener, target_port, slow=True)
+        print(f"PASS {label}: repeated slow download and FIN ({2 * args.slow_download_repeats} transfers)", flush=True)
+
+    fixture.exercise = repeated_exercise
     try:
         output = args.work_dir / "network"
         output.mkdir(mode=0o700)
@@ -105,6 +129,7 @@ def main():
         fixture.private_json(args.work_dir / "results.json", rows)
     finally:
         fixture.Process.exited_cleanly = original_exit
+        fixture.exercise = original_exercise
     print("PASS Windows package under Wine: startup, CLI, packet, WSS, strict H3", flush=True)
 
 

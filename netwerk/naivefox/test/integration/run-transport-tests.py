@@ -146,6 +146,7 @@ def run_protocol(args, protocol):
         }
         f.private_json(run / "result.json", result)
         print(json.dumps(result), flush=True)
+        return result
     finally:
         if capture and capture.poll() is None:
             capture.send_signal(signal.SIGINT)

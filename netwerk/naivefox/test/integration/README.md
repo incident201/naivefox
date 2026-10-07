@@ -119,12 +119,18 @@ unshare -r -p -f --mount-proc -- bash -c '
 ~~~
 
 The runner relocates the package and checks natural bounded shutdown, CLI,
-both listeners, byte integrity, half-close, concurrency and cancellation.
+both listeners, byte integrity, repeated slow downloads, half-close, concurrency and cancellation.
 Captures require H3 to use UDP with no TCP fallback, including blocked UDP.
 Wine reports Unix SIGTERM for explicitly terminated fixture clients; natural
-startup/shutdown verification still requires exit zero. The managed Wine
-installation defaults to ~/.mozbuild/wine; --wine-root and --wine-prefix select
-another installation or a reusable prefix. A separate GitHub Windows runtime
+startup/shutdown verification still requires exit zero. Acceptance defaults to
+the separate Wine 9.0 installation at ~/.mozbuild/naivefox-wine-9.0;
+--wine-root (or NAIVEFOX_WINE_ROOT) and --wine-prefix select another installation
+or a reusable prefix. Wine 11.0 and 11.17 can truncate pending nonblocking writes
+when the local socket closes; repeated slow-reader transfers detect this failure.
+Initialize new prefixes inside the same network namespace as the test; a Wine
+server started outside it creates sockets in the wrong namespace. The runner
+prepares a new prefix before timing product startup. Build toolchains continue
+to use their own managed Wine. A separate GitHub Windows runtime
 workflow is not part of the ordinary refresh gate.
 
 Windows and Android use the same current configuration and three-argument
