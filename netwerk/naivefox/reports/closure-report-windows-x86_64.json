@@ -1,10 +1,10 @@
 {
   "report_provenance": {
     "provenance_version": 2,
-    "source_commit_sha": "dd63cb06d0d7125e876a3164d77301d303d58ac6",
+    "source_commit_sha": "9ae1f47fb6b060fad2afe724f773abd3f5413cf9",
     "source_worktree_clean": true,
     "firefox_base_sha": "2a69ca0225f0a240c61f23f055e4b9b82cc018c4",
-    "naivefox_reference_sha": "dd63cb06d0d7125e876a3164d77301d303d58ac6",
+    "naivefox_reference_sha": "9ae1f47fb6b060fad2afe724f773abd3f5413cf9",
     "analyzer_sha256": "ea4dfecf21065ed75d9a2fa2b9696360bc1bcd976e57b8e743e44788df432912",
     "provenance_sha256": "642a32e90aaf870224f1831b2e932e08fb3153ed75765607f2112852f668e3fb",
     "evidence_collector_sha256": "9008a1958274d02004fafbe29866ce8f8f168755b52c5042e6f73b988ad40f3b",
@@ -9407,7 +9407,7 @@
       {
         "path": "application.ini",
         "size_bytes": 354,
-        "sha256": "f28199fb1bd13d2485890d5f4758aea6207180d4e80224306c732c4d045b2352"
+        "sha256": "89cd8398a734c22ff1a431cf0f1a4ed20ec85e9a54af49508004a663e5648744"
       },
       {
         "path": "chrome.manifest",
@@ -9457,7 +9457,7 @@
       {
         "path": "xul.dll",
         "size_bytes": 13708800,
-        "sha256": "6bcb309d60af02dd8db683ea50eb5f0ea5f07be94f80b73c50c0e8a08c20502a"
+        "sha256": "dba5310831203eaec9ce6470971cd19f66d7e7bbf67e5ef673e19deb45d9acf0"
       },
       {
         "path": "localization/en-US/security/certificates/certManager.ftl",
