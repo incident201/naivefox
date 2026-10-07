@@ -2072,6 +2072,7 @@ void AndroidDoSign(size_t certLen, const uint8_t* cert, size_t dataLen,
 }
 #endif  // MOZ_WIDGET_ANDROID
 
+#ifndef MOZ_NAIVEFOX
 // Similar to `DoFindObjects`, this function implements searching for
 // certificates stored on remote PKCS#11 tokens.
 void RemoteCertsDoFindObjects(SearchingFor searchingFor, FindObjectsCallback cb,
@@ -2201,4 +2202,5 @@ void RemoteCertsDoSign(size_t certLen, const uint8_t* cert, size_t dataLen,
   cb(signature.Length(), signature.Elements(), ctx);
 #endif  // NIGHTLY_BUILD && !MOZ_NO_SMART_CARDS
 }
+#endif  // !MOZ_NAIVEFOX
 }  // extern "C"

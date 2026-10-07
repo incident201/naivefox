@@ -242,12 +242,12 @@ void SetCustomElementRegistry(
 #endif
 
 #ifdef MOZ_NAIVEFOX
-bool sanitizerRedirectsClone(nsIContentHandle*, nsIContentHandle*) {
-  return false;
-}
-void sanitizerRedirectFurthestBlock(nsIContentHandle*, nsIContentHandle*) {}
-void sanitizerRedirectFurthestBlockToFosterParent(
-    nsIContentHandle*, nsIContentHandle*, nsIContentHandle*) {}
+bool sanitizerRedirectsClone(nsIContentHandle*) { return false; }
+void sanitizerDeferRedirect(nsIContentHandle*) {}
+void sanitizerRedirectPending(nsIContentHandle*) {}
+void sanitizerRedirectPendingToFosterParent(nsIContentHandle*,
+                                            nsIContentHandle*) {}
+void sanitizerRedirectBelowFormattingClone(int32_t) {}
 bool sanitizerDropsTemplateToken(nsHtml5HtmlAttributes*) { return false; }
 #else
 /**

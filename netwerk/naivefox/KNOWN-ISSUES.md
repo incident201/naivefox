@@ -48,6 +48,13 @@ resource caching remains available, but explicitly enabling
 cache handling rejects affected disk entries instead of persisting plaintext.
 This does not change NSS transport encryption or certificate validation.
 
+## IDN limited-use script allowance
+
+The product builds Unicode data with ICU4X and without ICU4C, and ICU4X has no
+Identifier_Type property. `network.idn.allowed_limited_use_scripts` therefore
+has no effect: restricted code points stay restricted. This only affects the
+display-safety check of IDN labels, which the NaiveFox runtime does not use.
+
 ## Embedded Gecko lifecycle is one-shot
 
 `NaiveFoxRunEmbedded()` is blocking and supports one process-wide runtime.

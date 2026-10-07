@@ -501,12 +501,16 @@ class UnicodeProperties final {
   // C string. Returns Script::UNKNOWN if the string cannot be mapped to a
   // Script code.
   static inline Script GetScriptCodeFromString(const char* aStr) {
+#ifdef MOZ_NAIVEFOX
+    return Script::UNKNOWN;
+#else
     UScriptCode icu_script;
     UErrorCode status = U_ZERO_ERROR;
     if (uscript_getCode(aStr, &icu_script, 1, &status) == 1) {
       return Script(icu_script);
     }
     return Script::UNKNOWN;
+#endif
   }
 
   // Return true if aChar belongs to a SEAsian script that is written without
@@ -610,6 +614,20 @@ class UnicodeProperties final {
    * https://www.unicode.org/reports/tr39/#Identifier_Status_and_Type.
    */
   enum class IdentifierType {
+#ifdef MOZ_NAIVEFOX
+    NotCharacter,
+    Deprecated,
+    DefaultIgnorable,
+    NotNFKC,
+    NotXID,
+    Exclusion,
+    Obsolete,
+    Technical,
+    UncommonUse,
+    LimitedUse,
+    Inclusion,
+    Recommended,
+#else
     NotCharacter = U_ID_TYPE_NOT_CHARACTER,
     Deprecated = U_ID_TYPE_DEPRECATED,
     DefaultIgnorable = U_ID_TYPE_DEFAULT_IGNORABLE,
@@ -622,6 +640,7 @@ class UnicodeProperties final {
     LimitedUse = U_ID_TYPE_LIMITED_USE,
     Inclusion = U_ID_TYPE_INCLUSION,
     Recommended = U_ID_TYPE_RECOMMENDED,
+#endif
   };
 
   /**
@@ -630,10 +649,14 @@ class UnicodeProperties final {
    */
   static bool HasSingleIdentifierType(char32_t aCodePoint,
                                       IdentifierType aType) {
+#ifdef MOZ_NAIVEFOX
+    return false;
+#else
     UErrorCode status = U_ZERO_ERROR;
     UIdentifierType type;
     return u_getIDTypes(aCodePoint, &type, 1, &status) == 1 &&
            IdentifierType(type) == aType;
+#endif
   }
 };
 

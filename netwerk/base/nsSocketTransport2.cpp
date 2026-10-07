@@ -25,6 +25,7 @@
 #include "mozilla/glean/NetwerkMetrics.h"
 #include "mozilla/net/SSLTokensCache.h"
 #include "nsCOMPtr.h"
+#include "nsCharSeparatedTokenizer.h"
 #include "nsICancelable.h"
 #include "nsIClassInfoImpl.h"
 #include "nsIDNSByTypeRecord.h"
