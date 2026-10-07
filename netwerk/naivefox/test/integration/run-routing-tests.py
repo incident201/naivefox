@@ -100,35 +100,48 @@ def run_protocol(args, protocol):
         for listener in ("socks", "http"):
             fixture.download(ports, listener, target.server_address[1], 2 * 1024 * 1024)
             fixture.upload(ports, listener, target.server_address[1], 1024 * 1024)
+        milestone = (
+            "NaiveFox HTTP/3 stream ready startup=20"
+            if protocol == "h3"
+            else "NaiveFox websocket ready startup=20"
+        )
         fixture.require(
-            "NaiveFox websocket ready startup=20" in client.log_path.read_text(),
-            "mapped WSS did not reach the application milestone",
+            milestone in client.log_path.read_text(),
+            "mapped carrier did not reach the application milestone",
         )
         client.exited_cleanly()
         caddy.stop()
         stats = json.loads((run / "server-stats.json").read_text())
-        startup_protocol = "HTTP/2.0" if protocol == "h2" else "HTTP/3.0"
-        fixture.require(
-            stats.get("protocols") == {startup_protocol: 47, "HTTP/1.1": 1},
-            "mapped carrier negotiated an unexpected route",
-        )
-        fixture.require(
-            stats.get("ws_opened") == 1 and stats.get("ws_closed") == 1,
-            "mapped carrier did not preserve one WebSocket",
-        )
-        fixture.require(
-            stats.get("ws_startup_min_up") == 20
-            and stats.get("ws_startup_min_down") == 20,
-            "mapped WebSocket opened before startup completion",
-        )
-        fixture.require(
-            stats.get("ws_messages_in", 0) > 0 and stats.get("ws_messages_out", 0) > 0,
-            "mapped WebSocket did not carry bidirectional cells",
-        )
-        fixture.require(
-            stats.get("connect") == 0 and stats.get("rejected") == 0,
-            "mapped carrier leaked CONNECT or rejected valid traffic",
-        )
+        fixture.require(stats.get("opens") == 4, "mapped transfers missed a target")
+        if protocol == "h3":
+            fixture.require(
+                set(stats.get("protocols", {})) == {"HTTP/3.0"}
+                and stats.get("h3_opened") == 1
+                and stats.get("h3_closed") == 1
+                and stats.get("ws_opened") == 0
+                and stats.get("h3_uploads", 0) > 0
+                and stats.get("h3_downloads", 0) > 0,
+                "mapped H3 did not preserve its native bidirectional carrier",
+            )
+        else:
+            fixture.require(
+                stats.get("protocols") == {"HTTP/2.0": 47, "HTTP/1.1": 1}
+                and stats.get("ws_opened") == 1
+                and stats.get("ws_closed") == 1
+                and stats.get("h3_opened") == 0,
+                "mapped WSS did not preserve its native carrier",
+            )
+            fixture.require(
+                stats.get("ws_startup_min_up") == 20
+                and stats.get("ws_startup_min_down") == 20,
+                "mapped WebSocket opened before startup completion",
+            )
+            fixture.require(
+                stats.get("ws_messages_in", 0) > 0
+                and stats.get("ws_messages_out", 0) > 0
+                and stats.get("rejected") == 0,
+                "mapped WebSocket did not carry valid bidirectional cells",
+            )
         fixture.require(not target.failures, "mapped carrier truncated target data")
         requests = fixture.access_requests(run)
         fixture.require(
@@ -144,12 +157,12 @@ def run_protocol(args, protocol):
             frontends=["socks", "http"],
             download_bytes_per_frontend=2 * 1024 * 1024,
             upload_bytes_per_frontend=1024 * 1024,
-            ws_opened=1,
+            carrier="h3" if protocol == "h3" else "wss",
             startup_exchanges=20,
             logical_authority_preserved=True,
         )
         print(
-            f"PASS {protocol}: nonresolving logical authority, mapped WSS, both frontends, byte-exact transfer",
+            f"PASS {protocol}: nonresolving logical authority, mapped native carrier, both frontends, byte-exact transfer",
             flush=True,
         )
         return result

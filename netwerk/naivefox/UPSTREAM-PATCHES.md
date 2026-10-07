@@ -431,6 +431,21 @@ startup and strict H2/H3 routing, and test certificate rejection and local
 listener lifecycle. Keep cache encryption fail closed and exclude only the
 unused browser service registrations and cookie write queue.
 
+## NF-UPSTREAM-028: query IPv6 socket options only on IPv6 sockets
+
+Files: third_party/rust/quinn-udp/src/windows.rs and .cargo-checksum.json.
+
+Quinn owns initialization of Neqo's native Winsock socket. Its IPV6_V6ONLY
+query must run only for AF_INET6: querying an AF_INET socket fails with
+WSAEOPNOTSUPP under Wine before any HTTP/3 traffic. Project-level routing
+cannot repair an error inside this dependency. Preserve IPv6-only and
+dual-stack detection and all existing packet-info, ECN and offload handling.
+
+Acceptance: execute the staged Windows package under Wine against the shared
+packet, WSS and strict H3 fixture, including IPv4 UDP traffic, both listeners,
+byte-exact transfers, concurrent streams, rejection and half-close. Native
+Windows socket semantics remain unchanged for IPv6 and dual-stack sockets.
+
 ## Adding or removing an entry
 
 Use the next stable identifier and record:

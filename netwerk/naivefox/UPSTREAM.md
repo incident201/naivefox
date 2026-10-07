@@ -58,8 +58,9 @@ generated minimal-source tree. The single NaiveFox protocol and its HTTPS, WSS a
 maintained on naivefox-full-source. Client and server are
 updated together; old transports and wire versions are not supported.
 
-Complete native runtime tests on Linux, Windows and Android and the
-five-window comparisons before minimal-source export. Export is the final
+Complete runtime tests on Linux, Windows under Wine, and Android and the
+five-window comparisons before minimal-source export. The local Wine runner
+checks the actual Windows package; a separate GitHub Windows gate is optional. Export is the final
 step; cross-compilation alone does not satisfy platform runtime acceptance.
 
 ## Ordinary refresh workflow

@@ -98,8 +98,9 @@ naivefox-full-source -> generated naivefox-minimal-source, with isolated build
 and lean closure validation. Run applicable focused gtests/integration tests.
 Downstream networking hooks need focused lifecycle regressions.
 
-Complete runtime tests on Linux, Windows and Android and the five-window
-comparisons before exporting minimal source. A successful cross-build is not a
+Complete runtime tests on Linux, Windows under Wine, and Android and the
+five-window comparisons before exporting minimal source. Use the local
+run-wine-runtime-tests.py runner; a separate GitHub Windows gate is not required. A successful cross-build is not a
 runtime test. Minimal-source export is the final step after those checks.
 
 Correctness, native H3 proof and short performance screens precede long capture
