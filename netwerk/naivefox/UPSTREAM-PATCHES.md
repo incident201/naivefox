@@ -74,7 +74,9 @@ routes to HTTPS/H2. Unflagged Firefox H3 proxy behavior is unchanged.
 
 Review obligations: the flag survives clone and IPC serialization, strict H3
 cannot put fallback TCP traffic on the wire, and existing unflagged fallback
-tests remain enabled.
+tests remain enabled. nsHttpConnectionInfo is immutable upstream; the strict
+transaction disables Happy Eyeballs through `Mutate()` before the connection
+info is shared.
 
 
 

@@ -247,19 +247,22 @@ nsresult nsHttpTransaction::Init(
 
   if (NS_FAILED(rv)) return rv;
 
-  mConnInfo = cinfo;
+  RefPtr<nsHttpConnectionInfo> connInfo = cinfo;
+  if (connInfo->DisablesHttp3ProxyFallback()) {
+    connInfo = connInfo->Mutate().SetHappyEyeballsEnabled(false).Finalize();
+  }
+  mConnInfo = connInfo;
   // No lock needed: the transaction is initialized on the main thread only,
   // so there is no possibility of a race at this point.
   MOZ_PUSH_IGNORE_THREAD_SAFETY
-  mFinalizedConnInfo = cinfo;
+  mFinalizedConnInfo = connInfo;
   mCallbacks = callbacks;
   mEarlyHintObserver = do_QueryInterface(eventsink);
   MOZ_POP_THREAD_SAFETY
   mConsumerTarget = target;
   mCaps = caps;
-  if (mConnInfo->DisablesHttp3ProxyFallback()) {
+  if (connInfo->DisablesHttp3ProxyFallback()) {
     mCaps &= ~NS_HTTP_USE_HAPPY_EYEBALLS;
-    mConnInfo->SetHappyEyeballsEnabled(false);
   }
 
   mParentIPAddressSpace = aParentIpAddressSpace;

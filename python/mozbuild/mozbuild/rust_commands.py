@@ -98,6 +98,7 @@ CARGO_CONFIG_KEYS = {
     "MOZ_LIBCLANG_PATH": _as_str,
     "MOZ_LTO_LDFLAGS": _as_list,
     "MOZ_LTO_OBJECT_PATH": _bool,
+    "MOZ_NAIVEFOX": _bool,
     "MOZ_RUSTC_BOOTSTRAP_DEFAULT": _as_str,
     "MOZ_RUSTC_BOOTSTRAP_FORCE": _as_str,
     "MOZ_RUSTC_WRAPPER": _as_str,
@@ -601,9 +602,13 @@ def compose_env(
     return env
 
 
-def _features_arg(cmd):
-    feat = ",".join([*cmd.features, "mozilla-central-workspace-hack"])
-    return ["--features", feat]
+def _features_arg(cmd, substs):
+    features = list(cmd.features)
+    # The NaiveFox product has one isolated Rust closure, so there is no
+    # cross-invocation feature unification for the workspace hack to provide.
+    if not substs.get("MOZ_NAIVEFOX"):
+        features.append("mozilla-central-workspace-hack")
+    return ["--features", ",".join(features)]
 
 
 def compose_cargo_build_edge_argv(
@@ -622,7 +627,7 @@ def compose_cargo_build_edge_argv(
         # Don't stop at the first failure. We want to list all failures together.
         argv.append("--no-fail-fast")
         argv.extend(_subcommand_args(cmd))
-        argv.extend(_features_arg(cmd))
+        argv.extend(_features_arg(cmd, substs))
         argv.extend(build_flags)
         argv.extend(extra)
         return argv
@@ -645,7 +650,7 @@ def compose_cargo_build_edge_argv(
         argv += ["--crate-type", cmd.cargo_crate_type]
 
     argv.extend(_target_args(cmd, substs))
-    argv.extend(_features_arg(cmd))
+    argv.extend(_features_arg(cmd, substs))
 
     if cmd.kind in ("library", "program"):
         argv.append("--")
@@ -688,6 +693,6 @@ def compose_mach_cargo_argv(
         else:
             argv.extend(_subcommand_args(cmd))
         argv.extend(_target_args(cmd, substs))
-        argv.extend(_features_arg(cmd))
+        argv.extend(_features_arg(cmd, substs))
 
     return argv
