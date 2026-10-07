@@ -673,7 +673,7 @@ def main() -> int:
         ):
             license_coverage = ["LICENSE"]
         elif package.get("license"):
-            license_coverage = ["toolkit/content/license.html"]
+            license_coverage = ["toolkit/content/license.html.mako"]
         else:
             license_coverage = []
         cargo_packages.append({

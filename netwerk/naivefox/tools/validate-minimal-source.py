@@ -371,7 +371,8 @@ def validate(root: pathlib.Path) -> int:
 
     if (
         not (root / "LICENSE").is_file()
-        or not (root / "toolkit/content/license.html").is_file()
+        or not (root / "toolkit/content/license.html.mako").is_file()
+        or not (root / "toolkit/content/licenses").is_dir()
     ):
         fail("root or consolidated third-party license is missing")
 

@@ -556,7 +556,8 @@ def get_source_and_build_inputs(
     ]
 
     licenses = [
-        "toolkit/content/license.html",
+        "toolkit/content/license.html.mako",
+        "toolkit/content/gen_license_html.py",
         "LEGAL",
         "LICENSE",
     ]

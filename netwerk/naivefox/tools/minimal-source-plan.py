@@ -585,12 +585,19 @@ def main() -> int:
         "CLOBBER",
         ".gitattributes",
         "LICENSE",
-        "toolkit/content/license.html",
+        "toolkit/content/license.html.mako",
+        "toolkit/content/gen_license_html.py",
         "browser/config/version.txt",
         "browser/config/version_display.txt",
         "toolkit/mozapps/installer/upload-files.mk",
     ):
         add(value, "explicit:bootstrap-license")
+
+    # The consolidated third-party notice is rendered from these license texts
+    # and the LICENSES declarations in the exported moz.build files.
+    for value in sorted(tracked):
+        if value.startswith("toolkit/content/licenses/") and (repo / value).is_file():
+            add(value, "explicit:bootstrap-license")
 
     for directory in sorted(directory_contracts):
         directory = safe_path(directory).rstrip("/")
