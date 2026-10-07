@@ -9,7 +9,7 @@ fn main() {
     build.cpp(true);
     // For js-confdefs.h and mozilla-config.h, see wrappers.cpp.
     if mozbuild::config::MOZ_NAIVEFOX {
-        build.include(mozbuild::TOPOBJDIR);
+        build.include(mozbuild::TOPOBJDIR.as_path());
         build.define("MOZ_NAIVEFOX", None);
     } else {
         build.include(mozbuild::TOPOBJDIR.join("js").join("src"));

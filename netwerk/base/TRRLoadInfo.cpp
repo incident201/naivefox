@@ -508,6 +508,9 @@ TRRLoadInfo::GetPolicyContainerToInherit() {
   return nullptr;
 }
 
+void TRRLoadInfo::SetPolicyContainerToInherit(
+    nsIPolicyContainer* aPolicyContainerToInherit) {}
+
 Maybe<PermissionsPolicyInfo> TRRLoadInfo::GetContainerPermissionsPolicyInfo() {
   return Nothing();
 }

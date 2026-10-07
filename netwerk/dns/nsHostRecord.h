@@ -50,9 +50,15 @@ class nsResolveHostCallback
    *        the host record containing the results of the lookup
    * @param status
    *        if successful, |record| contains non-null results
+   * @param aFromStaleCache
+   *        true when this specific answer was served from a stale
+   *        (past-TTL, grace-period) cache entry. Captured per delivered answer
+   *        rather than read from the shared record, so it always describes the
+   *        result handed to this callback.
    */
   virtual void OnResolveHostComplete(nsHostResolver* resolver,
-                                     nsHostRecord* record, nsresult status) = 0;
+                                     nsHostRecord* record, nsresult status,
+                                     bool aFromStaleCache) = 0;
   /**
    * EqualsAsyncListener
    *
@@ -122,8 +128,6 @@ class nsHostRecord : public mozilla::LinkedListElement<RefPtr<nsHostRecord>>,
     DNS_PRIORITY_MEDIUM = nsIDNSService::RESOLVE_PRIORITY_MEDIUM,
     DNS_PRIORITY_HIGH,
   };
-
-  nsresult GetFromStaleCache(bool* aResult);
 
  protected:
   friend class nsHostResolver;
@@ -233,12 +237,6 @@ class nsHostRecord : public mozilla::LinkedListElement<RefPtr<nsHostRecord>>,
   // entries are valid just like any other (though never for more than 60
   // seconds), but a use of that negative entry forces an asynchronous refresh.
   bool negative = false;
-
-  // Whether the answer handed to the current consumer came from a stale
-  // (past-TTL, grace-period) cache entry. Captured at serve time: true only
-  // when a grace-period cache hit is returned, and cleared on every fresh
-  // resolution.
-  mozilla::Atomic<bool, mozilla::Relaxed> mFromStaleCache{false};
 
   // Explicitly expired
   bool mDoomed = false;

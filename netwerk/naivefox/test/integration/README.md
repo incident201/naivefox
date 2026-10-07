@@ -105,6 +105,34 @@ tools/verify-staged-runtime.sh checks a relocated Linux package, its libraries,
 strict CLI and bounded runtime lifecycle. Supply --caddy for the network gate.
 NAIVEFOX_VERIFY_WORK_DIR places its temporary files beneath the chosen objdir.
 
+Windows acceptance runs locally under Wine with the shared network fixture:
+
+~~~sh
+unshare -r -p -f --mount-proc -- bash -c '
+  NAIVEFOX_CAPTURE_ISOLATED_NETWORK=1 unshare -n -- \
+    bash netwerk/naivefox/test/integration/run-camouflage-isolated-network.sh \
+    python3 netwerk/naivefox/test/integration/run-wine-runtime-tests.py \
+      --objdir /absolute/objdir --runtime /absolute/package/naivefox.exe \
+      --caddy /absolute/caddy --work-dir /absolute/objdir/wine-acceptance
+  rc=$?; exit "$rc"
+'
+~~~
+
+The runner relocates the package and checks natural bounded shutdown, CLI,
+both listeners, byte integrity, repeated slow downloads, half-close, concurrency and cancellation.
+Captures require H3 to use UDP with no TCP fallback, including blocked UDP.
+Wine reports Unix SIGTERM for explicitly terminated fixture clients; natural
+startup/shutdown verification still requires exit zero. Acceptance defaults to
+the separate Wine 9.0 installation at ~/.mozbuild/naivefox-wine-9.0;
+--wine-root (or NAIVEFOX_WINE_ROOT) and --wine-prefix select another installation
+or a reusable prefix. Wine 11.0 and 11.17 can truncate pending nonblocking writes
+when the local socket closes; repeated slow-reader transfers detect this failure.
+Initialize new prefixes inside the same network namespace as the test; a Wine
+server started outside it creates sockets in the wrong namespace. The runner
+prepares a new prefix before timing product startup. Build toolchains continue
+to use their own managed Wine. A separate GitHub Windows runtime
+workflow is not part of the ordinary refresh gate.
+
 Windows and Android use the same current configuration and three-argument
 NaiveFoxRunEmbedded API. Their platform runners adapt process ownership and
 host/device routing to the shared fixture; they do not select another transport.

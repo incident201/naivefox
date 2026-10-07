@@ -755,6 +755,13 @@ nsresult nsHttpChannel::PrepareToConnect() {
                     }
                     return;
                   }
+                  if (!self->mDictDecompress) {
+                    // The request already completed and released the dictionary
+                    // (SetDecompressDictionary(nullptr) from the compress
+                    // converter's OnStopRequest) before this async prefetch
+                    // callback ran. Nothing left to resume.
+                    return;
+                  }
                   MOZ_ASSERT(self->mDictDecompress->DictionaryReady());
                   if (self->mSuspendedForDictionary) {
                     LOG(
@@ -1323,21 +1330,24 @@ nsresult nsHttpChannel::ContinueOnBeforeConnect(bool aShouldUpgrade,
   mCaps |= NS_HTTP_TRR_FLAGS_FROM_MODE(nsIRequest::GetTRRMode());
 
   // Finalize ConnectionInfo flags before SpeculativeConnect
-  mConnectionInfo->SetAnonymous((mLoadFlags & LOAD_ANONYMOUS) != 0);
-  mConnectionInfo->SetPrivate(mPrivateBrowsing);
-  mConnectionInfo->SetNoSpdy(mCaps & NS_HTTP_DISALLOW_SPDY);
-  mConnectionInfo->SetBeConservative((mCaps & NS_HTTP_BE_CONSERVATIVE) ||
-                                     LoadBeConservative());
-  mConnectionInfo->SetTlsFlags(mTlsFlags);
-  mConnectionInfo->SetIsTrrServiceChannel(LoadIsTRRServiceChannel());
-  mConnectionInfo->SetTRRMode(nsIRequest::GetTRRMode());
-  mConnectionInfo->SetIPv4Disabled(mCaps & NS_HTTP_DISABLE_IPV4);
-  mConnectionInfo->SetIPv6Disabled(mCaps & NS_HTTP_DISABLE_IPV6);
-  mConnectionInfo->SetHttp3Policy((mCaps & NS_HTTP_DISALLOW_HTTP3)
-                                      ? Http3Policy::Disabled
-                                      : Http3Policy::Allowed);
-  mConnectionInfo->SetAnonymousAllowClientCert(
-      (mLoadFlags & LOAD_ANONYMOUS_ALLOW_CLIENT_CERT) != 0);
+  mConnectionInfo =
+      mConnectionInfo->Mutate()
+          .SetAnonymous((mLoadFlags & LOAD_ANONYMOUS) != 0)
+          .SetPrivate(mPrivateBrowsing)
+          .SetNoSpdy(mCaps & NS_HTTP_DISALLOW_SPDY)
+          .SetBeConservative((mCaps & NS_HTTP_BE_CONSERVATIVE) ||
+                             LoadBeConservative())
+          .SetTlsFlags(mTlsFlags)
+          .SetIsTrrServiceChannel(LoadIsTRRServiceChannel())
+          .SetTRRMode(nsIRequest::GetTRRMode())
+          .SetIPv4Disabled(mCaps & NS_HTTP_DISABLE_IPV4)
+          .SetIPv6Disabled(mCaps & NS_HTTP_DISABLE_IPV6)
+          .SetHttp3Policy((mCaps & NS_HTTP_DISALLOW_HTTP3)
+                              ? Http3Policy::Disabled
+                              : Http3Policy::Allowed)
+          .SetAnonymousAllowClientCert(
+              (mLoadFlags & LOAD_ANONYMOUS_ALLOW_CLIENT_CERT) != 0)
+          .Finalize();
 
   if (mWebTransportSessionEventListener) {
     nsTArray<RefPtr<nsIWebTransportHash>> aServerCertHashes;
@@ -4441,7 +4451,7 @@ nsresult nsHttpChannel::RedirectToNewChannelForAuthRetry() {
   }
 
   MOZ_ASSERT(mConnectionInfo);
-  httpChannelImpl->mConnectionInfo = mConnectionInfo->Clone();
+  httpChannelImpl->mConnectionInfo = mConnectionInfo;
 
   // we need to store the state to skip unnecessary checks in the new channel
   httpChannelImpl->StoreAuthRedirectedChannel(true);
@@ -5696,6 +5706,17 @@ nsHttpChannel::OnCacheEntryCheck(nsICacheEntry* entry, uint32_t* aResult) {
         LoadAllowStaleCacheContent(), LoadForceValidateCacheContent(),
         isImmutable, LoadCustomConditionalRequest(), mRequestHead, entry,
         cacheControlRequest, fromPreviousSession, &doBackgroundValidation);
+
+    // A navigation activated from a completed speculation-rules prefetch record
+    // must serve the prefetched response as-is (spec: "create navigation params
+    // from a prefetch record"), so skip freshness/no-store revalidation of the
+    // entry we just found.
+    if (doValidation && mLoadInfo->GetActivatedFromNavigationalPrefetch()) {
+      LOG(
+          ("  serving speculation-rules prefetch from cache without "
+           "validation"));
+      doValidation = false;
+    }
   }
 
   nsAutoCString requestedETag;
@@ -6147,6 +6168,24 @@ nsresult nsHttpChannel::OpenCacheInputStream(nsICacheEntry* cacheEntry,
 
   nsAutoCString contentType;
   mCachedResponseHead->ContentType(contentType);
+
+  // Alt-data written by a content process (bytecode cache) may only be
+  // consumed by a load whose principal matches the one that produced it.
+  if (altDataFromChild && !altDataType.IsEmpty()) {
+    nsAutoCString storedOrigin;
+    cacheEntry->GetMetaDataElement("alt-data-principal",
+                                   getter_Copies(storedOrigin));
+    nsAutoCString currentOrigin;
+    GetAltDataBindingOrigin(currentOrigin);
+    if (storedOrigin.IsEmpty() || currentOrigin.IsEmpty() ||
+        !storedOrigin.Equals(currentOrigin)) {
+      LOG(
+          ("Rejecting child-written alt-data due to principal mismatch "
+           "[channel=%p, stored='%s', current='%s']",
+           this, storedOrigin.get(), currentOrigin.get()));
+      altDataType.Truncate();
+    }
+  }
 
   bool foundAltData = false;
   bool deliverAltData = true;
@@ -8444,8 +8483,10 @@ nsresult nsHttpChannel::BeginConnect() {
       }
       wtconSettings->GetDedicated(&dedicated);
       if (dedicated) {
-        connInfo->SetWebTransportId(
-            nsHttpConnectionInfo::GenerateNewWebTransportId());
+        connInfo = connInfo->Mutate()
+                       .SetWebTransportId(
+                           nsHttpConnectionInfo::GenerateNewWebTransportId())
+                       .Finalize();
       }
     } else {
       connInfo = new nsHttpConnectionInfo(host, port, ""_ns, mUsername,
@@ -8604,7 +8645,8 @@ nsresult nsHttpChannel::BeginConnect() {
     LOG(("%p NS_HTTP_USE_HAPPY_EYEBALLS ", this));
     mCaps |= NS_HTTP_USE_HAPPY_EYEBALLS;
     mCaps &= ~NS_HTTP_FORCE_WAIT_HTTP_RR;
-    mConnectionInfo->SetHappyEyeballsEnabled(true);
+    mConnectionInfo =
+        mConnectionInfo->Mutate().SetHappyEyeballsEnabled(true).Finalize();
   }
 
   // No need to lookup HTTPSSVC record if mHTTPSSVCRecord already contains a
@@ -8618,7 +8660,7 @@ nsresult nsHttpChannel::BeginConnect() {
       gHttpHandler->IsHttp2Excluded(mConnectionInfo)) {
     StoreAllowSpdy(0);
     mCaps |= NS_HTTP_DISALLOW_SPDY;
-    mConnectionInfo->SetNoSpdy(true);
+    mConnectionInfo = mConnectionInfo->Mutate().SetNoSpdy(true).Finalize();
   }
 
   // We can be passed with the auth provider if this channel was
@@ -8803,14 +8845,23 @@ void nsHttpChannel::MaybeStartDNSPrefetch() {
                                         });
     }
 
-    // Issue per-family prefetches (A and AAAA) so Happy Eyeballs can reuse
-    // them instead of starting its own lookups. Skip a family that won't be
-    // queried; with IPv6 disabled the AAAA request collapses to A, so skip it
-    // to avoid a duplicate.
-    bool skipIPv4 = mCaps & NS_HTTP_DISABLE_IPV4;
-    bool skipIPv6 = (mCaps & NS_HTTP_DISABLE_IPV6) ||
-                    StaticPrefs::network_dns_disableIPv6();
-    (void)mDNSPrefetch->PrefetchHighPerFamily(dnsFlags, skipIPv4, skipIPv6);
+    if (StaticPrefs::network_http_happy_eyeballs_enabled()) {
+      // Happy Eyeballs connects per-family, so issue per-family prefetches
+      // (A and AAAA) that it can reuse instead of starting its own lookups.
+      // Skip a family that won't be queried; with IPv6 disabled the AAAA
+      // request collapses to A, so skip it to avoid a duplicate.
+      bool skipIPv4 = mCaps & NS_HTTP_DISABLE_IPV4;
+      bool skipIPv6 = (mCaps & NS_HTTP_DISABLE_IPV6) ||
+                      StaticPrefs::network_dns_disableIPv6();
+      (void)mDNSPrefetch->PrefetchHighPerFamily(dnsFlags, skipIPv4, skipIPv6);
+    } else {
+      if (mCaps & NS_HTTP_DISABLE_IPV4) {
+        dnsFlags |= nsIDNSService::RESOLVE_DISABLE_IPV4;
+      } else if (mCaps & NS_HTTP_DISABLE_IPV6) {
+        dnsFlags |= nsIDNSService::RESOLVE_DISABLE_IPV6;
+      }
+      (void)mDNSPrefetch->PrefetchHigh(dnsFlags);
+    }
   }
 }
 

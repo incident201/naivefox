@@ -61,13 +61,22 @@ TRR::GetPriority(uint32_t* aPriority) {
   return NS_OK;
 }
 
+// static
+already_AddRefed<nsIEventTarget> TRR::DefaultTarget() {
+  if (!TRRService::Get()) {
+    return nullptr;
+  }
+  return TRRService::Get()->MainThreadOrTRRTarget();
+}
+
 // when firing off a normal A or AAAA query
 TRR::TRR(AHostResolver* aResolver, nsHostRecord* aRec, enum TrrType aType)
     : mozilla::Runnable("TRR"),
       mRec(aRec),
       mHostResolver(aResolver),
       mType(aType),
-      mOriginSuffix(aRec->originSuffix) {
+      mOriginSuffix(aRec->originSuffix),
+      mTarget(DefaultTarget()) {
   mHost = aRec->host;
   mPB = aRec->pb;
   MOZ_DIAGNOSTIC_ASSERT(XRE_IsParentProcess() || XRE_IsSocketProcess(),
@@ -84,14 +93,16 @@ TRR::TRR(AHostResolver* aResolver, nsHostRecord* aRec, nsCString& aHost,
       mType(aType),
       mPB(aPB),
       mCnameLoop(aLoopCount),
-      mOriginSuffix(aRec ? aRec->originSuffix : ""_ns) {
+      mOriginSuffix(aRec ? aRec->originSuffix : ""_ns),
+      mTarget(DefaultTarget()) {
   MOZ_DIAGNOSTIC_ASSERT(XRE_IsParentProcess() || XRE_IsSocketProcess(),
                         "TRR must be in parent or socket process");
 }
 
 // to verify a domain
 TRR::TRR(AHostResolver* aResolver, nsACString& aHost, enum TrrType aType,
-         const nsACString& aOriginSuffix, bool aPB, bool aUseFreshConnection)
+         const nsACString& aOriginSuffix, bool aPB, bool aUseFreshConnection,
+         nsIEventTarget* aTarget)
     : mozilla::Runnable("TRR"),
       mHost(aHost),
       mRec(nullptr),
@@ -99,7 +110,8 @@ TRR::TRR(AHostResolver* aResolver, nsACString& aHost, enum TrrType aType,
       mType(aType),
       mPB(aPB),
       mOriginSuffix(aOriginSuffix),
-      mUseFreshConnection(aUseFreshConnection) {
+      mUseFreshConnection(aUseFreshConnection),
+      mTarget(aTarget) {
   MOZ_DIAGNOSTIC_ASSERT(XRE_IsParentProcess() || XRE_IsSocketProcess(),
                         "TRR must be in parent or socket process");
 }
@@ -972,42 +984,13 @@ TRR::OnDataAvailable(nsIRequest* aRequest, nsIInputStream* aInputStream,
 }
 
 void TRR::Cancel(nsresult aStatus) {
-  bool isTRRServiceChannel = false;
-  nsCOMPtr<nsIHttpChannelInternal> httpChannelInternal(
-      do_QueryInterface(mChannel));
-  if (httpChannelInternal) {
-    nsresult rv =
-        httpChannelInternal->GetIsTRRServiceChannel(&isTRRServiceChannel);
-    if (NS_FAILED(rv)) {
-      isTRRServiceChannel = false;
-    }
-  }
-  // nsHttpChannel can be only canceled on the main thread.
-#ifdef MOZ_NAIVEFOX
-  // NaiveFox is parent-only.  Its generic channels use the main-thread
-  // cancellation rule, so no concrete nsHttpChannel RTTI is needed here.
-  constexpr bool hasHttpChannel = true;
-#else
-  RefPtr<nsHttpChannel> httpChannel = do_QueryObject(mChannel);
-  const bool hasHttpChannel = !!httpChannel;
-#endif
-  if (isTRRServiceChannel && !XRE_IsSocketProcess() && !hasHttpChannel) {
-    if (TRRService::Get()) {
-      nsCOMPtr<nsIThread> thread = TRRService::Get()->TRRThread();
-      if (thread && !thread->IsOnCurrentThread()) {
-        thread->Dispatch(NS_NewRunnableFunction(
-            "TRR::Cancel",
-            [self = RefPtr(this), aStatus]() { self->Cancel(aStatus); }));
-        return;
-      }
-    }
-  } else {
-    if (!NS_IsMainThread()) {
-      NS_DispatchToMainThread(NS_NewRunnableFunction(
-          "TRR::Cancel",
-          [self = RefPtr(this), aStatus]() { self->Cancel(aStatus); }));
-      return;
-    }
+  // mChannel is only accessed on mTarget, so it must not be touched before we
+  // get there.
+  if (mTarget && !mTarget->IsOnCurrentThread()) {
+    mTarget->Dispatch(NS_NewRunnableFunction(
+        "TRR::Cancel",
+        [self = RefPtr(this), aStatus]() { self->Cancel(aStatus); }));
+    return;
   }
 
   if (mCancelled) {

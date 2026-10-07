@@ -300,7 +300,6 @@ class HttpBaseChannel : public nsHashPropertyBag,
   NS_IMETHOD SetIsOCSP(bool value) override;
   NS_IMETHOD GetTlsFlags(uint32_t* aTlsFlags) override;
   NS_IMETHOD SetTlsFlags(uint32_t aTlsFlags) override;
-  NS_IMETHOD GetApiRedirectToURI(nsIURI** aApiRedirectToURI) override;
   [[nodiscard]] virtual nsresult AddSecurityMessage(
       const nsAString& aMessageTag, const nsAString& aMessageCategory);
   NS_IMETHOD TakeAllSecurityMessages(
@@ -512,6 +511,10 @@ class HttpBaseChannel : public nsHashPropertyBag,
 
   bool IsDeliveringAltData() const { return LoadDeliveringAltData(); }
 
+  // Computes the origin used to bind alternative (bytecode) cache data to the
+  // principal that produced it.
+  nsresult GetAltDataBindingOrigin(nsACString& aOrigin);
+
   static void PropagateReferenceIfNeeded(nsIURI* aURI,
                                          nsCOMPtr<nsIURI>& aRedirectURI);
 
@@ -541,6 +544,7 @@ class HttpBaseChannel : public nsHashPropertyBag,
   void SetUploadStreamIsStreaming(bool aIsStreaming) {
     StoreUploadStreamIsStreaming(aIsStreaming);
   }
+  bool UploadStreamIsStreaming() const { return LoadUploadStreamIsStreaming(); }
 
   virtual nsresult SetReferrerHeader(const nsACString& aReferrer,
                                      bool aRespectBeforeConnect = true) {

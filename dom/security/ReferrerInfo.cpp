@@ -5,6 +5,7 @@
 #include "ReferrerInfo.h"
 
 #include "mozilla/RefPtr.h"
+#include "mozilla/StaticPrefs_mathml.h"
 #include "mozilla/StaticPrefs_network.h"
 #ifdef MOZ_NAIVEFOX
 #  include "ReferrerPolicyBinding.h"
@@ -1330,7 +1331,9 @@ static ReferrerPolicy ReferrerPolicyFromAttribute(const Element& aElement) {
   if (!aElement.IsAnyOfHTMLElements(nsGkAtoms::a, nsGkAtoms::area,
                                     nsGkAtoms::script, nsGkAtoms::iframe,
                                     nsGkAtoms::link, nsGkAtoms::img) &&
-      !aElement.IsAnyOfSVGElements(nsGkAtoms::a)) {
+      !aElement.IsSVGElement(nsGkAtoms::a) &&
+      !(aElement.IsMathMLElement(nsGkAtoms::a) &&
+        StaticPrefs::mathml_a_element_enabled())) {
     return ReferrerPolicy::_empty;
   }
   return aElement.GetReferrerPolicyAsEnum();

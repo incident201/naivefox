@@ -176,8 +176,8 @@ int sqlite3_T_blob(sqlite3_context* aCtx, const void* aData, int aSize) {
   return SQLITE_OK;
 }
 
-int sqlite3_T_array(sqlite3_context* aCtx, const void* aData, int aSize,
-                    int aType) {
+int sqlite3_T_array(sqlite3_context* /*aCtx*/, const void* /*aData*/,
+                    int /*aSize*/, int /*aType*/) {
   // Not supported for now.
   return SQLITE_MISUSE;
 }
@@ -715,7 +715,7 @@ class AsyncBackupDatabaseFile final : public Runnable, public nsITimerCallback {
   }
 
   NS_IMETHOD
-  Notify(nsITimer* aTimer) override { return DoStep(); }
+  Notify(nsITimer* /*aTimer*/) override { return DoStep(); }
 
  private:
   nsresult DoStep() {
@@ -1278,20 +1278,20 @@ nsresult Connection::initialize(nsIFileURL* aFileURL) {
   // through a plaintext VFS.
   bool mustEncrypt = false;
 
-  MOZ_ALWAYS_TRUE(
-      URLParams::Parse(query, true,
-                       [&hasKey, &hasDirectoryLockId](
-                           const nsACString& aName, const nsACString& aValue) {
-                         if (aName.EqualsLiteral("key")) {
-                           hasKey = true;
-                           return true;
-                         }
-                         if (aName.EqualsLiteral("directoryLockId")) {
-                           hasDirectoryLockId = true;
-                           return true;
-                         }
-                         return true;
-                       }));
+  MOZ_ALWAYS_TRUE(URLParams::Parse(
+      query, true,
+      [&hasKey, &hasDirectoryLockId](const nsACString& aName,
+                                     const nsACString& /*aValue*/) {
+        if (aName.EqualsLiteral("key")) {
+          hasKey = true;
+          return true;
+        }
+        if (aName.EqualsLiteral("directoryLockId")) {
+          hasDirectoryLockId = true;
+          return true;
+        }
+        return true;
+      }));
 
 #ifndef MOZ_NAIVEFOX
   if (StaticPrefs::security_storage_encryption_sqlite_enabled()) {
@@ -1657,7 +1657,7 @@ bool Connection::isClosed() {
   return mConnectionClosed;
 }
 
-bool Connection::isClosed(MutexAutoLock& lock) { return mConnectionClosed; }
+bool Connection::isClosed(MutexAutoLock& /*lock*/) { return mConnectionClosed; }
 
 bool Connection::isAsyncExecutionThreadAvailable() {
   MOZ_ASSERT(IsOnCurrentSerialEventTarget(eventTargetOpenedOn));
@@ -3250,17 +3250,17 @@ Connection::GetQuotaObjects(QuotaObject** aDatabaseQuotaObject,
 SQLiteMutex& Connection::GetSharedDBMutex() { return sharedDBMutex; }
 
 uint32_t Connection::GetTransactionNestingLevel(
-    const mozilla::storage::SQLiteMutexAutoLock& aProofOfLock) {
+    const mozilla::storage::SQLiteMutexAutoLock& /*aProofOfLock*/) {
   return mTransactionNestingLevel;
 }
 
 uint32_t Connection::IncreaseTransactionNestingLevel(
-    const mozilla::storage::SQLiteMutexAutoLock& aProofOfLock) {
+    const mozilla::storage::SQLiteMutexAutoLock& /*aProofOfLock*/) {
   return ++mTransactionNestingLevel;
 }
 
 uint32_t Connection::DecreaseTransactionNestingLevel(
-    const mozilla::storage::SQLiteMutexAutoLock& aProofOfLock) {
+    const mozilla::storage::SQLiteMutexAutoLock& /*aProofOfLock*/) {
   return --mTransactionNestingLevel;
 }
 

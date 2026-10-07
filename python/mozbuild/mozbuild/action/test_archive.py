@@ -316,6 +316,11 @@ ARCHIVE_FILES = {
         {
             "source": buildconfig.topsrcdir,
             "base": "",
+            "pattern": "testing/performance/common/performance-artifact-schema.json",
+        },
+        {
+            "source": buildconfig.topsrcdir,
+            "base": "",
             "pattern": "third_party/python/_venv/**",
         },
         {

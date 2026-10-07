@@ -94,3 +94,12 @@ LOCAL_INCLUDES += [
 ]
 
 include("/ipc/chromium/chromium-config.mozbuild")
+
+LICENSED_UNDER += [
+    "chromium",
+]
+
+LICENSED_UNDER += ["vtune"]
+LICENSED_UNDER["vtune"].paths = [
+    "core/vtune",
+]

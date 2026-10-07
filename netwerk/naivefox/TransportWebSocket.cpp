@@ -88,9 +88,11 @@ nsresult TransportWebSocket::Start(const TransportConfig& aConfig,
   RefPtr<net::nsHttpConnectionInfo> connection = new net::nsHttpConnectionInfo(
       host, port, "http/1.1"_ns, EmptyCString(), nullptr, OriginAttributes(),
       routedHost, port, false);
-  connection->SetNoSpdy(true);
-  connection->SetHttp3Policy(net::Http3Policy::Disabled);
-  connection->SetAnonymous(true);
+  connection = connection->Mutate()
+                   .SetNoSpdy(true)
+                   .SetHttp3Policy(net::Http3Policy::Disabled)
+                   .SetAnonymous(true)
+                   .Finalize();
   internal->SetConnectionInfo(connection);
   nsAutoCString cookie;
   MOZ_TRY(aCookies->RequestHeader(uri, cookie));

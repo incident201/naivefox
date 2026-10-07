@@ -127,10 +127,6 @@ if CONFIG["OS_TARGET"] == "WINNT":
         "/toolkit/xre/dllservices/mozglue/interceptor/VMSharingPolicies.h",
     ]
 
-DIRS += [
-    "/xpcom/xpidl",
-]
-
 if CONFIG["COMPILE_ENVIRONMENT"]:
     DIRS += [
         "/config/external/sqlite",

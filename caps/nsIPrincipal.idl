@@ -87,7 +87,8 @@ interface nsIPrincipal : nsISupports
     %}
 
     /*
-     * Returns whether the Principals URI is equal to the other URI
+     * Returns whether the Principals URI is equal to the other URI.
+     * The ref doesn't affect equality with the principal.
      *
      * May be called from any thread.
      */
