@@ -692,8 +692,9 @@ class JSONWriter;
 
 // This class collects all the information necessary to stream the JSON schema
 // that informs the front-end how to display a type of markers.
-// It will be created and populated in `MarkerTypeDisplay()` functions in each
-// marker type definition, see Add/Set functions.
+// It is created and populated by `BaseMarkerType::MarkerTypeDisplay()` from
+// the static members of each marker type definition, and by Rust marker types
+// through the Add/Set functions.
 class MarkerSchema {
  public:
   // This is used to describe a C++ type that is expected to be specified to
@@ -922,6 +923,17 @@ class MarkerSchema {
     Red,
     Teal,
     Yellow
+  };
+
+  // This describes a timeline track graph built from one payload field.
+  struct GraphField {
+    // Key of the payload field to graph.
+    // Must be set.
+    const char* Key = nullptr;
+    GraphType Type = GraphType::Line;
+    // When left as `Nothing`, the front-end uses its default track color.
+    // Optional.
+    Maybe<GraphColor> Color;
   };
 
   // Marker schema, with a non-empty list of locations where markers should be
@@ -1287,6 +1299,8 @@ struct BaseMarkerType {
 
   static constexpr MarkerSchema::PayloadField PayloadFields[0] = {};
 
+  static constexpr MarkerSchema::GraphField GraphFields[0] = {};
+
   // A marker type either declares a non-empty `Locations` array or sets
   // `UseSpecialFrontendLocation` to true (for types with special frontend
   // handling); the two are mutually exclusive.
@@ -1300,6 +1314,10 @@ struct BaseMarkerType {
           "PayloadField requires a non-null Key and an InputTy other than "
           "Undefined");
     }
+    if constexpr (std::extent_v<decltype(T::GraphFields)>) {
+      static_assert(CheckGraphFields(T::GraphFields),
+                    "GraphField requires a non-null Key");
+    }
     if constexpr (T::UseSpecialFrontendLocation) {
       static_assert(!MarkerHasLocations<T>::value,
                     "Set either Locations or UseSpecialFrontendLocation, not "
@@ -1309,10 +1327,12 @@ struct BaseMarkerType {
       // also drives payload serialization and ETW.
       static_assert(!T::AllLabels && !T::ChartLabel && !T::TableLabel &&
                         !T::TooltipLabel && !T::ColorField &&
-                        !T::IsStackBased && !T::Description,
+                        !T::IsStackBased && !T::Description &&
+                        !std::extent_v<decltype(T::GraphFields)>,
                     "UseSpecialFrontendLocation ignores the display schema, so "
                     "do not set AllLabels, ChartLabel, TableLabel, "
-                    "TooltipLabel, ColorField, IsStackBased or Description");
+                    "TooltipLabel, ColorField, IsStackBased, Description or "
+                    "GraphFields");
       return MS{MS::SpecialFrontendLocation{}};
     } else {
       static_assert(MarkerHasLocations<T>::value,
@@ -1342,6 +1362,13 @@ struct BaseMarkerType {
                                    field.Flags);
         } else {
           schema.AddKeyFormat(field.Key, field.Fmt, field.Flags);
+        }
+      }
+      for (const MS::GraphField& graph : T::GraphFields) {
+        if (graph.Color) {
+          schema.AddChartColor(graph.Key, graph.Type, *graph.Color);
+        } else {
+          schema.AddChart(graph.Key, graph.Type);
         }
       }
       if constexpr (T::Description) {
@@ -1389,6 +1416,17 @@ struct BaseMarkerType {
         return false;
       }
       if (field.InputTy == MarkerSchema::InputType::Undefined) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  template <std::size_t N>
+  static constexpr bool CheckGraphFields(
+      const MarkerSchema::GraphField (&aGraphFields)[N]) {
+    for (const auto& field : aGraphFields) {
+      if (field.Key == nullptr) {
         return false;
       }
     }

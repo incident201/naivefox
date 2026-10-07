@@ -25,6 +25,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, UNIX_EPOCH};
 use std::{fmt, fs};
 
+use chrono::{DateTime, Utc};
 use crossbeam_channel::unbounded;
 use log::LevelFilter;
 use malloc_size_of_derive::MallocSizeOf;
@@ -68,6 +69,7 @@ mod fd_logger;
 pub use crate::common_metric_data::{CommonMetricData, Lifetime, MetricLabel};
 pub use crate::core::Glean;
 pub use crate::core_metrics::{AttributionMetrics, ClientInfoMetrics, DistributionMetrics};
+use crate::database::StoredSubmittedPingHandler;
 use crate::dispatcher::is_test_mode;
 pub use crate::error::{Error, ErrorKind, Result};
 pub use crate::error_recording::{test_get_num_recorded_errors, ErrorType};
@@ -796,6 +798,7 @@ pub fn shutdown() {
             log::info!("Can't persist ping lifetime data: {:?}", e);
         }
 
+        #[cfg(feature = "sqlite")]
         if let Some(database) = &glean.data_store {
             if let Err(e) = database.cleanup_submitted_pings(None) {
                 log::info!("Could not clean up submitted_pings table: {:?}", e);
@@ -982,6 +985,7 @@ pub fn glean_set_store_submitted_pings_enabled(enabled: bool) {
 }
 
 /// A submitted ping that has been stored by Glean.
+#[derive(Clone)]
 pub struct SubmittedPing {
     /// The document ID (unique identifier)
     pub document_id: String,
@@ -997,6 +1001,34 @@ pub struct SubmittedPing {
     pub payload: Option<JsonValue>,
 }
 
+impl SubmittedPing {
+    /// Returns the submitted date as a UTC DateTime.
+    pub fn submitted_date(&self) -> DateTime<Utc> {
+        DateTime::parse_from_rfc3339(&self.submitted_date)
+            .map(|d| d.to_utc())
+            .unwrap()
+    }
+
+    /// Returns the uploaded date as an optional UTC DateTime.
+    pub fn uploaded_date(&self) -> Option<DateTime<Utc>> {
+        self.uploaded_date.as_ref().map(|uploaded_date| {
+            DateTime::parse_from_rfc3339(uploaded_date)
+                .map(|d| d.to_utc())
+                .unwrap()
+        })
+    }
+
+    /// Returns the upload failed date as an optional UTC DateTime.
+    pub fn upload_failed(&self) -> Option<DateTime<Utc>> {
+        self.upload_failed.as_ref().map(|upload_failed| {
+            DateTime::parse_from_rfc3339(upload_failed)
+                .map(|d| d.to_utc())
+                .unwrap()
+        })
+    }
+}
+
+#[cfg(feature = "sqlite")]
 impl From<database::sqlite::SubmittedPing> for SubmittedPing {
     fn from(value: database::sqlite::SubmittedPing) -> Self {
         SubmittedPing {
@@ -1010,24 +1042,20 @@ impl From<database::sqlite::SubmittedPing> for SubmittedPing {
     }
 }
 
-/// Returns a `Vec` containing all stored submitted pings.
+/// Blocks and awaits the Glean Dispatcher before returning a Vec containing the stored pings.
 pub fn glean_get_all_stored_submitted_pings() -> Vec<SubmittedPing> {
+    block_on_dispatcher();
     core::with_glean(|glean| glean.storage().get_all_submitted_pings())
-        .into_iter()
-        .map(|p| p.into())
-        .collect()
 }
 
-/// Returns a `Vec` containing all stored submitted pings with the supplied name.
+/// Blocks and awaits the Glean Dispatcher before returning a Vec containing the stored pings with the supplied name.
 ///
 /// # Arguments
 ///
 /// * `ping` - The name of the pings that should be returned.
 pub fn glean_get_stored_submitted_pings_by_name(ping: String) -> Vec<SubmittedPing> {
+    block_on_dispatcher();
     core::with_glean(|glean| glean.storage().get_submitted_pings_by_name(&ping))
-        .into_iter()
-        .map(|p| p.into())
-        .collect()
 }
 
 /// Clears the stored submitted pings.

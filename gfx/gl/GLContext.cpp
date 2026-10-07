@@ -94,6 +94,7 @@ static const char* const sExtensionNames[] = {
     "GL_APPLE_vertex_array_object",
     "GL_ARB_ES2_compatibility",
     "GL_ARB_ES3_compatibility",
+    "GL_ARB_clip_control",
     "GL_ARB_color_buffer_float",
     "GL_ARB_compatibility",
     "GL_ARB_copy_buffer",
@@ -137,6 +138,7 @@ static const char* const sExtensionNames[] = {
     "GL_CHROMIUM_color_buffer_float_rgba",
     "GL_EXT_bgra",
     "GL_EXT_blend_minmax",
+    "GL_EXT_clip_control",
     "GL_EXT_color_buffer_float",
     "GL_EXT_color_buffer_half_float",
     "GL_EXT_copy_texture",
@@ -533,7 +535,7 @@ bool GLContext::InitImpl() {
   }
 
   const std::string versionStr = versionRawStr;
-  if (versionStr.find("OpenGL ES") == 0) {
+  if (versionStr.starts_with("OpenGL ES")) {
     mProfile = ContextProfile::OpenGLES;
   }
 
@@ -685,6 +687,7 @@ bool GLContext::InitImpl() {
       "Gallium 0.4 on llvmpipe",
       "Microsoft Basic Render Driver",
       "Samsung Xclipse",
+      "AMD Radeon HD GFX10",
       "Unknown"};
 
   mRenderer = GLRenderer::Other;
@@ -1555,6 +1558,13 @@ void GLContext::LoadMoreSymbols(const SymbolLoader& loader) {
          {{"glPolygonOffsetClamp", "glPolygonOffsetClampEXT"}}},
         END_SYMBOLS};
     fnLoadForFeature(symbols, GLFeature::polygon_offset_clamp);
+  }
+
+  if (IsSupported(GLFeature::clip_control)) {
+    const SymLoadStruct symbols[] = {{(PRFuncPtr*)&mSymbols.fClipControl,
+                                      {{"glClipControl", "glClipControlEXT"}}},
+                                     END_SYMBOLS};
+    fnLoadForFeature(symbols, GLFeature::clip_control);
   }
 
   if (IsExtensionSupported(EXT_semaphore)) {

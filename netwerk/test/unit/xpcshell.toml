@@ -73,6 +73,8 @@ prefs = ["network.xhr.block_sync_system_requests=false"] # Bug 721336
 
 ["test_aboutblank.js"]
 
+["test_activity_observer_remove.js"]
+
 ["test_addr_in_use_error.js"]
 
 ["test_alt-data_closeWithStatus.js"]
@@ -134,6 +136,8 @@ firefox-appdir = "browser"
 ["test_bhttp.js"]
 
 ["test_blob_channelname.js"]
+
+["test_blocked_local_ports.js"]
 
 ["test_brotli_decoding.js"]
 
@@ -521,9 +525,9 @@ prefs = ["browser.cache.disk.encryption.enabled=true"]
 
 ["test_cache2-44-no-rewrite-unchanged-metadata.js"]
 
-["test_cache2-45-clear-base-domain-context-evictor.js"]
-
 ["test_cache2-44-no_cache_revalidating_hang.js"]
+
+["test_cache2-45-clear-base-domain-context-evictor.js"]
 
 ["test_cache2_clear_with_principal.js"]
 run-sequentially = ["true"] # httpd server
@@ -693,6 +697,12 @@ skip-if = [
 
 ["test_dns_localredirect.js"]
 
+["test_dns_negative_grace.js"]
+skip-if = [
+  "os == 'android'",
+  "os == 'win' && msix",
+]
+
 ["test_dns_negative_refresh_on_use.js"]
 
 ["test_dns_offline.js"]
@@ -704,6 +714,8 @@ skip-if = [
 ["test_dns_override.js"]
 
 ["test_dns_override_for_localhost.js"]
+
+["test_dns_prefetch_family.js"]
 
 ["test_dns_proxy_bypass.js"]
 
@@ -908,6 +920,8 @@ skip-if = [
   "os == 'win' && msix",
 ]
 
+["test_happy_eyeballs_negative_optimistic_dns.js"]
+
 ["test_happy_eyeballs_optimistic_dns.js"]
 run-sequentially = ["true"] # node server exceptions dont replay well
 skip-if = [
@@ -1100,7 +1114,6 @@ run-if = [
 ]
 skip-if = [
   "os == 'android' && os_version == '14' && arch == 'x86_64'",
-  "os == 'mac' && os_version == '15.30' && arch == 'aarch64'", # Bug 1866067
   "os == 'win' && os_version == '10.2009' && arch == 'x86_64'", # Bug 1808049
   "os == 'win' && os_version == '11.26100' && arch == 'x86'", # Bug 1808049
   "os == 'win' && os_version == '11.26100' && arch == 'x86_64'", # Bug 1808049
@@ -1247,6 +1260,12 @@ skip-if = [
 run-sequentially = ["true"] # http3server
 skip-if = [
   "true", # Will be reenabled in bug 1865394
+]
+
+["test_http3_protocol_error_fallback.js"]
+skip-if = [
+  "os == 'android'",
+  "os == 'win' && msix",
 ]
 
 ["test_http3_proxy.js"]
@@ -1619,7 +1638,7 @@ skip-if = [
 
 ["test_protocolproxyservice.js"]
 skip-if = [
-  "os == 'mac' && os_version == '15.30' && arch == 'aarch64'", # Bug 1707738
+  "macos_vm", # Bug 2076510
 ]
 
 ["test_proxy-failover_canceled.js"]

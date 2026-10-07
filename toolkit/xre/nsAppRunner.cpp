@@ -3038,6 +3038,7 @@ static ReturnAbortOnError ProfileLockedDialog(nsIFile* aProfileDir,
   }
 }
 
+MOZ_CAN_RUN_SCRIPT
 static ReturnAbortOnError ShowProfileDialog(
     nsIToolkitProfileService* aProfileSvc, nsINativeAppSupport* aNative,
     const char* aDialogURL, const char* aTelemetryEnvVar) {
@@ -3165,6 +3166,7 @@ static ReturnAbortOnError ShowProfileDialog(
   return LaunchChild(false, true);
 }
 
+MOZ_CAN_RUN_SCRIPT
 static ReturnAbortOnError ShowProfileManager(
     nsIToolkitProfileService* aProfileSvc, nsINativeAppSupport* aNative) {
   static const char kProfileManagerURL[] =
@@ -3175,6 +3177,7 @@ static ReturnAbortOnError ShowProfileManager(
                            kTelemetryEnv);
 }
 
+MOZ_CAN_RUN_SCRIPT
 static ReturnAbortOnError ShowProfileSelector(
     nsIToolkitProfileService* aProfileSvc, nsINativeAppSupport* aNative) {
   static const char kProfileSelectorURL[] = "about:profilemanager";
@@ -3240,6 +3243,7 @@ static nsresult LockProfile(nsINativeAppSupport* aNative, nsIFile* aRootDir,
 // 4) use the default profile, if there is one
 // 5) if there are *no* profiles, set up profile-migration
 // 6) display the profile-manager UI
+MOZ_CAN_RUN_SCRIPT
 static nsresult SelectProfile(nsToolkitProfileService* aProfileSvc,
                               nsINativeAppSupport* aNative, nsIFile** aRootDir,
                               nsIFile** aLocalDir, nsIToolkitProfile** aProfile,
@@ -3675,6 +3679,7 @@ static void SubmitDowngradeTelemetry(const nsACString& aProfileSelectionReason,
 static const char kProfileDowngradeURL[] =
     "chrome://mozapps/content/profile/profileDowngrade.xhtml";
 
+MOZ_CAN_RUN_SCRIPT
 static ReturnAbortOnError HandleDetectedDowngrade(
     nsIFile* aProfileDir, nsINativeAppSupport* aNative,
     nsToolkitProfileService* aProfileSvc, nsIProfileLock* aProfileLock,
@@ -4264,8 +4269,10 @@ class XREMain {
     mAppData = nullptr;
   }
 
+  MOZ_CAN_RUN_SCRIPT
   int XRE_main(int argc, char* argv[], const BootstrapConfig& aConfig);
   int XRE_mainInit(bool* aExitFlag);
+  MOZ_CAN_RUN_SCRIPT
   int XRE_mainStartup(bool* aExitFlag);
   MOZ_CAN_RUN_SCRIPT_BOUNDARY nsresult XRE_mainRun();
 
@@ -5524,7 +5531,9 @@ int XREMain::XRE_mainStartup(bool* aExitFlag) {
 
   bool wasDefaultSelection;
   nsCOMPtr<nsIToolkitProfile> profile;
-  rv = SelectProfile(mProfileSvc, mNativeApp, getter_AddRefs(mProfD),
+  RefPtr profileSvc = mProfileSvc;
+  nsCOMPtr nativeApp = mNativeApp;
+  rv = SelectProfile(profileSvc, nativeApp, getter_AddRefs(mProfD),
                      getter_AddRefs(mProfLD), getter_AddRefs(profile),
                      &wasDefaultSelection);
   if (rv == NS_ERROR_LAUNCHED_CHILD_PROCESS || rv == NS_ERROR_ABORT) {
@@ -5700,10 +5709,10 @@ int XREMain::XRE_mainStartup(bool* aExitFlag) {
       rv = NS_OK;
     } else if (!mProfileSvc->GetStartWithLastProfile()) {
       // First check the old style profile manager
-      rv = ShowProfileManager(mProfileSvc, mNativeApp);
+      rv = ShowProfileManager(profileSvc, nativeApp);
     } else if (profile && profile->GetShowProfileSelector()) {
       // Now check the new profile group selector
-      rv = ShowProfileSelector(mProfileSvc, mNativeApp);
+      rv = ShowProfileSelector(profileSvc, nativeApp);
     } else {
       rv = NS_OK;
     }
@@ -5859,7 +5868,9 @@ int XREMain::XRE_mainStartup(bool* aExitFlag) {
 #  ifdef XP_MACOSX
     InitializeMacApp();
 #  endif
-    rv = HandleDetectedDowngrade(mProfD, mNativeApp, mProfileSvc, mProfileLock,
+    nsCOMPtr profD = mProfD;
+    nsCOMPtr profileLock = mProfileLock;
+    rv = HandleDetectedDowngrade(profD, nativeApp, profileSvc, profileLock,
                                  compatResult.lastVersion,
                                  compatResult.isDifferentInstall);
     if (rv == NS_ERROR_LAUNCHED_CHILD_PROCESS || rv == NS_ERROR_ABORT) {

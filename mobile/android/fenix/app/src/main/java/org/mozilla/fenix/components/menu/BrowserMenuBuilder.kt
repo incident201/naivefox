@@ -16,19 +16,27 @@ import mozilla.components.compose.menu.data.StandardMenuItem
 import org.mozilla.fenix.components.menu.FenixMenuItem.AddToHomeScreen
 import org.mozilla.fenix.components.menu.FenixMenuItem.Back
 import org.mozilla.fenix.components.menu.FenixMenuItem.Bookmark
+import org.mozilla.fenix.components.menu.FenixMenuItem.Bookmarks
 import org.mozilla.fenix.components.menu.FenixMenuItem.CustomizeReaderView
 import org.mozilla.fenix.components.menu.FenixMenuItem.DesktopSite
+import org.mozilla.fenix.components.menu.FenixMenuItem.Downloads
+import org.mozilla.fenix.components.menu.FenixMenuItem.Extensions
 import org.mozilla.fenix.components.menu.FenixMenuItem.FindInPage
 import org.mozilla.fenix.components.menu.FenixMenuItem.Forward
+import org.mozilla.fenix.components.menu.FenixMenuItem.History
 import org.mozilla.fenix.components.menu.FenixMenuItem.IPProtection
 import org.mozilla.fenix.components.menu.FenixMenuItem.More
 import org.mozilla.fenix.components.menu.FenixMenuItem.MoveToNormalTabs
+import org.mozilla.fenix.components.menu.FenixMenuItem.MozillaAccount
 import org.mozilla.fenix.components.menu.FenixMenuItem.OpenInApp
+import org.mozilla.fenix.components.menu.FenixMenuItem.Passwords
 import org.mozilla.fenix.components.menu.FenixMenuItem.Print
+import org.mozilla.fenix.components.menu.FenixMenuItem.Quit
 import org.mozilla.fenix.components.menu.FenixMenuItem.Refresh
 import org.mozilla.fenix.components.menu.FenixMenuItem.ReportBrokenSite
 import org.mozilla.fenix.components.menu.FenixMenuItem.SaveAsPdf
 import org.mozilla.fenix.components.menu.FenixMenuItem.SaveToCollection
+import org.mozilla.fenix.components.menu.FenixMenuItem.Settings
 import org.mozilla.fenix.components.menu.FenixMenuItem.Share
 import org.mozilla.fenix.components.menu.FenixMenuItem.Shortcut
 import org.mozilla.fenix.components.menu.FenixMenuItem.SummarizePage
@@ -42,23 +50,12 @@ import org.mozilla.fenix.components.menu.MenuPresentationMode.Row
  * This only knows which items may be shown, in what order and grouped how. What any one of them looks like is left to
  * its [MenuItemProvider].
  *
- * @param providerResolver Pure function for getting the [MenuItemProvider] for a given [FenixMenuItem].
- * @param configuration The sections of the menu, in the order they should be shown in.
+ * @param registry [MenuItemsRegistry] with the sections of the menu and the provider of each item in them.
  */
-class BrowserMenuBuilder(
-    private val providerResolver: (FenixMenuItem) -> MenuItemProvider,
-    private val configuration: List<MenuSectionConfiguration>,
-) {
-    constructor(
-        providerResolver: (FenixMenuItem) -> MenuItemProvider,
-        isToolbarAtBottom: Boolean = false,
-        isExpandedToolbarEnabled: Boolean = false,
-    ) : this(
-        providerResolver = providerResolver,
-        configuration = buildDefaultConfiguration(isToolbarAtBottom, isExpandedToolbarEnabled),
-    )
+class BrowserMenuBuilder(private val registry: MenuItemsRegistry) {
+    private val configuration = registry.configuration
 
-    private val orderedItems = configuration.flatMap { section -> section.items.flatMap { it.withSubItems() } }
+    private val orderedItems = registry.providers.keys.toList()
 
     /** The menu to show, re-emitted whenever any of the items in it changes. */
     val menuStructure: Flow<List<MenuItemsGroup>> =
@@ -70,7 +67,7 @@ class BrowserMenuBuilder(
      * not be shown rather than that it has not decided yet.
      */
     private fun List<FenixMenuItem>.itemsFromProviders(): Flow<Map<FenixMenuItem, ShownMenuItem?>> =
-        combine(map { providerResolver(it).itemFlow }) { provided -> zip(provided).toMap() }
+        combine(map { registry[it].itemFlow }) { provided -> zip(provided).toMap() }
 
     /**
      * A [MenuItemsGroup] for each of these sections, laid out the way the section asks for and holding only the items
@@ -80,13 +77,6 @@ class BrowserMenuBuilder(
         section.toGroup(shownItems = section.items.mapNotNull { it.getMenuItemToShow(items) })
     }
         .filterNot { it.items.isEmpty() }
-
-    /** This item and the ones it expands to, since each of them is configured by a provider of its own. */
-    private fun FenixMenuItem.withSubItems(): List<FenixMenuItem> =
-        when (this) {
-            is FenixExpandableMenuItem -> listOf(this) + subMenuItems
-            else -> listOf(this)
-        }
 
     /**
      * Get the menu item configuration to show for this or `null` if it isn't available
@@ -101,7 +91,7 @@ class BrowserMenuBuilder(
         val children = subMenuItems.mapNotNull { items[it] as? StandardMenuItem }
         if (children.isEmpty()) return null
 
-        val provider = providerResolver(this) as? ExpandableMenuItemProvider
+        val provider = registry[this] as? ExpandableMenuItemProvider
         return provider?.updateWithSubMenuItems(header, children)
     }
 
@@ -116,8 +106,11 @@ class BrowserMenuBuilder(
         @VisibleForTesting internal val BROWSER_MENU_GROUP_1_ID = "browser_group_1"
         @VisibleForTesting internal val BROWSER_MENU_GROUP_2_ID = "browser_group_2"
         @VisibleForTesting internal val BROWSER_MENU_GROUP_3_ID = "browser_group_3"
+        @VisibleForTesting internal val BROWSER_MENU_GROUP_4_ID = "browser_group_4"
+        @VisibleForTesting internal val BROWSER_MENU_GROUP_5_ID = "browser_group_5"
+        @VisibleForTesting internal val BROWSER_MENU_GROUP_6_ID = "browser_group_6"
 
-        @VisibleForTesting
+        /** The default menu structure while browsing. */
         internal fun buildDefaultConfiguration(
             isToolbarAtBottom: Boolean,
             isExpandedToolbarEnabled: Boolean,
@@ -149,6 +142,7 @@ class BrowserMenuBuilder(
                                 Bookmark,
                                 FindInPage,
                                 DesktopSite,
+                                Extensions,
                                 More(
                                     listOf(
                                         Translate,
@@ -164,6 +158,21 @@ class BrowserMenuBuilder(
                                     )
                                 ),
                             ),
+                    ),
+                    MenuSectionConfiguration(
+                        id = BROWSER_MENU_GROUP_4_ID,
+                        presentationMode = Grid,
+                        items = listOf(History, Bookmarks, Downloads, Passwords),
+                    ),
+                    MenuSectionConfiguration(
+                        id = BROWSER_MENU_GROUP_5_ID,
+                        presentationMode = Row,
+                        items = listOf(MozillaAccount, Settings),
+                    ),
+                    MenuSectionConfiguration(
+                        id = BROWSER_MENU_GROUP_6_ID,
+                        presentationMode = Row,
+                        items = listOf(Quit),
                     ),
                 )
             return if (isToolbarAtBottom || isExpandedToolbarEnabled) rest + navSection else listOf(navSection) + rest

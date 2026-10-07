@@ -544,6 +544,7 @@ export class AITasks extends MozLitElement {
                 .monitors=${this.monitors}
                 .scheduleTypes=${this._constants.SCHEDULE_TYPES}
                 .weekdays=${WEEKDAYS}
+                .canResume=${!this.isMaxMonitorsReached}
               ></monitors-display>
             </div>
           </div>`}

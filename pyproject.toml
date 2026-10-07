@@ -68,6 +68,7 @@ lint.exclude = [
   "python/l10n/fluent_migrations/**",
   "security/manager/ssl/tests/unit/**",
   "servo/components/style/**",
+  "taskcluster/scripts/robustcheckout.py",
   "testing/condprofile/condprof/android.py",
   "testing/condprofile/condprof/creator.py",
   "testing/condprofile/condprof/desktop.py",

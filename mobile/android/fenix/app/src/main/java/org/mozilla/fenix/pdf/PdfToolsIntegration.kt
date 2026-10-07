@@ -4,6 +4,7 @@
 
 package org.mozilla.fenix.pdf
 
+import android.view.View
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
 import androidx.compose.foundation.text.input.TextFieldState
@@ -14,6 +15,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.ComposeView
 import androidx.coordinatorlayout.widget.CoordinatorLayout
+import androidx.core.view.children
+import androidx.core.view.isVisible
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -29,7 +32,8 @@ import mozilla.components.compose.base.theme.layout.AcornWindowSize
 import mozilla.components.support.base.feature.LifecycleAwareFeature
 import mozilla.telemetry.glean.private.NoExtras
 import org.mozilla.fenix.GleanMetrics.PdfViewer
-import org.mozilla.fenix.components.share.createPdfShareAction
+import org.mozilla.fenix.R
+import org.mozilla.fenix.components.share.tryDispatchPdfShareAction
 import org.mozilla.fenix.pdf.ui.PdfTools
 import org.mozilla.fenix.pdf.ui.PdfToolsContent
 import org.mozilla.fenix.pdf.ui.SignatureDialogContent
@@ -119,6 +123,7 @@ class PdfToolsIntegration(
         container.post {
             if (overlays === created) {
                 created.forEach(container::addView)
+                orderForAccessibility(tools, dialog)
             }
         }
     }
@@ -127,6 +132,7 @@ class PdfToolsIntegration(
         scope?.cancel()
         scope = null
 
+        container.pageContent?.accessibilityTraversalAfter = View.NO_ID
         overlays.forEach(container::removeView)
         overlays = emptyList()
     }
@@ -139,11 +145,27 @@ class PdfToolsIntegration(
      */
     private fun createOverlay(overlayBehavior: PdfOverlayBehavior, content: @Composable () -> Unit) =
         ComposeView(container.context).apply {
+            id = View.generateViewId()
             layoutParams =
                 CoordinatorLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { behavior = overlayBehavior }
 
             setContent { FirefoxTheme(content = content) }
         }
+
+    /**
+     * Ensures the screenreader focus order shows the PDF tools before the content.
+     *
+     * @param tools The PDF tools overlay.
+     * @param dialog The signature dialog overlay.
+     */
+    private fun orderForAccessibility(tools: View, dialog: View) {
+        val addressBar = container.addressBar ?: return
+        val pageContent = container.pageContent ?: return
+
+        tools.accessibilityTraversalAfter = addressBar.id
+        dialog.accessibilityTraversalAfter = tools.id
+        pageContent.accessibilityTraversalAfter = dialog.id
+    }
 
     /** Opens the dialog for adding a signature to the PDF. */
     internal fun handleSignClick() {
@@ -238,11 +260,15 @@ class PdfToolsIntegration(
     internal fun handleShareClick() {
         PdfViewer.shareTapped.record(NoExtras())
         val tab = browserStore.state.selectedTab ?: return
-        browserStore.createPdfShareAction(tabId = tab.id, url = tab.content.url)?.let {
-            browserStore.dispatch(it)
-        }
+        browserStore.tryDispatchPdfShareAction(tabId = tab.id, url = tab.content.url)
     }
 }
+
+private val CoordinatorLayout.addressBar: View?
+    get() = children.firstOrNull { it.isVisible && it.id in listOf(R.id.toolbar, R.id.composable_toolbar) }
+
+private val CoordinatorLayout.pageContent: View?
+    get() = findViewById(R.id.engineView)
 
 private val BrowserState.selectedPdfTabId: String?
     get() = selectedTab?.takeIf { it.content.isPdf }?.id

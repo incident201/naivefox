@@ -88,6 +88,12 @@ the global scope.
 .. js:autofunction:: test_driver.bless
 ```
 
+### Browsing Context ###
+```eval_rst
+.. js:autofunction:: test_driver.create_window
+.. js:autofunction:: test_driver.navigate
+```
+
 ### Window State ###
 ```eval_rst
 .. js:autofunction:: test_driver.minimize_window

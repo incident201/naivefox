@@ -40,6 +40,7 @@
 #include "mozilla/StaticPrefs_docshell.h"
 #include "mozilla/StaticPrefs_dom.h"
 #include "mozilla/StaticPrefs_extensions.h"
+#include "mozilla/StaticPrefs_mathml.h"
 #include "mozilla/StaticPrefs_network.h"
 #include "mozilla/StaticPrefs_privacy.h"
 #include "mozilla/StaticPrefs_security.h"
@@ -1051,11 +1052,12 @@ bool nsDocShell::MaybeHandleSubframeHistory(
           auto resolve =
               [currentLoadIdentifier, browsingContext, parentDoc, loadState,
                isNavigating, loadGroup, stopDetector](
-                  mozilla::Maybe<LoadingSessionHistoryInfo>&& aResult) {
-                RefPtr<nsDocShell> docShell =
-                    static_cast<nsDocShell*>(browsingContext->GetDocShell());
-                auto unblockParent = MakeScopeExit(
-                    [loadGroup, stopDetector, parentDoc, docShell]() {
+                  mozilla::Maybe<LoadingSessionHistoryInfo>&& aResult)
+                  MOZ_CAN_RUN_SCRIPT {
+                    RefPtr<nsDocShell> docShell = static_cast<nsDocShell*>(
+                        browsingContext->GetDocShell());
+                    auto unblockParent = MakeScopeExit([loadGroup, stopDetector,
+                                                        parentDoc, docShell]() {
                       if (docShell) {
                         docShell->mCheckingSessionHistory = false;
                       }
@@ -1063,26 +1065,26 @@ bool nsDocShell::MaybeHandleSubframeHistory(
                       parentDoc->UnblockOnload(false);
                     });
 
-                if (!docShell || !docShell->mCheckingSessionHistory) {
-                  return;
-                }
+                    if (!docShell || !docShell->mCheckingSessionHistory) {
+                      return;
+                    }
 
-                if (stopDetector->Canceled()) {
-                  return;
-                }
-                if (currentLoadIdentifier ==
-                        browsingContext->GetCurrentLoadIdentifier() &&
-                    aResult.isSome()) {
-                  loadState->SetLoadingSessionHistoryInfo(aResult.value());
-                  // This is an initial subframe load from the session
-                  // history, index doesn't need to be updated.
-                  loadState->SetLoadIsFromSessionHistory(0, false);
-                }
+                    if (stopDetector->Canceled()) {
+                      return;
+                    }
+                    if (currentLoadIdentifier ==
+                            browsingContext->GetCurrentLoadIdentifier() &&
+                        aResult.isSome()) {
+                      loadState->SetLoadingSessionHistoryInfo(aResult.value());
+                      // This is an initial subframe load from the session
+                      // history, index doesn't need to be updated.
+                      loadState->SetLoadIsFromSessionHistory(0, false);
+                    }
 
-                // We got the results back from the parent process, call
-                // LoadURI again with the possibly updated data.
-                docShell->LoadURI(loadState, isNavigating, true);
-              };
+                    // We got the results back from the parent process, call
+                    // LoadURI again with the possibly updated data.
+                    docShell->LoadURI(loadState, isNavigating, true);
+                  };
           auto reject = [loadGroup, stopDetector, browsingContext,
                          parentDoc](mozilla::ipc::ResponseRejectReason) {
             RefPtr<nsDocShell> docShell =
@@ -4031,7 +4033,7 @@ nsresult nsDocShell::ReloadNavigable(
         [docShell, doc, loadType, browsingContext, currentURI, referrerInfo,
          loadGroup, stopDetector](
             std::tuple<bool, Maybe<NotNull<RefPtr<nsDocShellLoadState>>>,
-                       Maybe<bool>>&& aResult) {
+                       Maybe<bool>>&& aResult) MOZ_CAN_RUN_SCRIPT {
           auto scopeExit = MakeScopeExit([loadGroup, stopDetector]() {
             if (loadGroup) {
               loadGroup->RemoveRequest(stopDetector, nullptr, NS_OK);
@@ -4061,8 +4063,8 @@ nsresult nsDocShell::ReloadNavigable(
                 gSHLog, LogLevel::Debug,
                 ("nsDocShell %p Reload - LoadHistoryEntry", docShell.get()));
             loadState.ref()->SetNotifiedBeforeUnloadListeners(true);
-            docShell->LoadHistoryEntry(loadState.ref(), loadType,
-                                       reloadingActiveEntry.ref());
+            docShell->LoadHistoryEntry(MOZ_KnownLive(loadState.ref().get()),
+                                       loadType, reloadingActiveEntry.ref());
           } else {
             MOZ_LOG(gSHLog, LogLevel::Debug,
                     ("nsDocShell %p ReloadDocument", docShell.get()));
@@ -4085,7 +4087,8 @@ nsresult nsDocShell::ReloadNavigable(
       if (loadState.isSome()) {
         MOZ_LOG(gSHLog, LogLevel::Debug,
                 ("nsDocShell %p Reload - LoadHistoryEntry", this));
-        LoadHistoryEntry(loadState.ref(), loadType, reloadingActiveEntry.ref());
+        LoadHistoryEntry(MOZ_KnownLive(loadState.ref().get()), loadType,
+                         reloadingActiveEntry.ref());
       } else {
         MOZ_LOG(gSHLog, LogLevel::Debug,
                 ("nsDocShell %p ReloadDocument", this));
@@ -8594,7 +8597,7 @@ nsresult nsDocShell::InternalLoad(nsDocShellLoadState* aLoadState,
   // available in the process triggering the load, and we don't want the target
   // process to have to trust the triggering process to do the appropriate
   // checks for the BrowsingContext's sandbox flags.
-  MOZ_TRY(mBrowsingContext->CheckSandboxFlags(aLoadState));
+  MOZ_TRY(mBrowsingContext->EnsureSourceSandboxAllowsNavigation(aLoadState));
   MOZ_TRY(mBrowsingContext->CheckFramebusting(aLoadState));
 
   NS_ENSURE_STATE(!HasUnloadedParent());
@@ -10587,13 +10590,13 @@ nsresult nsDocShell::ScrollToAnchor(bool aCurHasRef, bool aNewHasRef,
   // https://html.spec.whatwg.org/#scroll-to-fragid:~:text=This%20algorithm%20will%20be%20called%20twice
 
   const RefPtr fragmentDirective = GetDocument()->FragmentDirective();
-  const nsTArray<RefPtr<nsRange>> textDirectiveRanges =
+  const nsTArray<RefPtr<dom::Range>> textDirectiveRanges =
       fragmentDirective->FindTextFragmentsInDocument();
   fragmentDirective->HighlightTextDirectives(textDirectiveRanges);
   const bool scrollToTextDirective =
       !textDirectiveRanges.IsEmpty() &&
       fragmentDirective->IsTextDirectiveAllowedToBeScrolledTo();
-  const RefPtr<nsRange> textDirectiveToScroll =
+  const RefPtr<dom::Range> textDirectiveToScroll =
       scrollToTextDirective ? textDirectiveRanges[0] : nullptr;
 
   // If we have no new anchor, we do not want to scroll, unless there is a
@@ -12388,11 +12391,11 @@ bool nsDocShell::ShouldOpenInBlankTarget(const nsAString& aOriginalTarget,
 }
 
 static bool ElementCanHaveNoopener(nsIContent* aContent) {
-  // Make sure we are dealing with either an <A>, <AREA>, or <FORM> element in
-  // the HTML, XHTML, or SVG namespace.
   return aContent->IsAnyOfHTMLElements(nsGkAtoms::a, nsGkAtoms::area,
                                        nsGkAtoms::form) ||
-         aContent->IsSVGElement(nsGkAtoms::a);
+         aContent->IsSVGElement(nsGkAtoms::a) ||
+         (aContent->IsMathMLElement(nsGkAtoms::a) &&
+          StaticPrefs::mathml_a_element_enabled());
 }
 
 nsresult nsDocShell::OnLinkClickSync(nsIContent* aContent,
@@ -12456,7 +12459,6 @@ nsresult nsDocShell::OnLinkClickSync(nsIContent* aContent,
   bool triggeringPrincipalIsSystemPrincipal =
       aLoadState->TriggeringPrincipal()->IsSystemPrincipal();
   if (elementCanHaveNoopener) {
-    MOZ_ASSERT(aContent->IsHTMLElement() || aContent->IsSVGElement());
     nsAutoString relString;
     aContent->AsElement()->GetAttr(nsGkAtoms::rel, relString);
     nsWhitespaceTokenizerTemplate<nsContentUtils::IsHTMLWhitespace> tok(

@@ -32,7 +32,7 @@ const MAX_LOGINS_TO_RESTORE = 10000;
 
 // Continues the rust mirror's telemetry version sequence (last was 8); the
 // rust_migration_status event is shared with the former mirror.
-const telemetryVersion = "9";
+const telemetryVersion = "10";
 
 // Replace an origin's scheme with `moz-pwmngr-fixed-<prefix extracted from
 // login guid>://`.
@@ -186,7 +186,7 @@ export class LoginStorageMigrator {
   async #executeMigration() {
     this.#logger.log("Starting migration...");
 
-    const t0 = Date.now();
+    const t0 = ChromeUtils.now();
     const runId = Services.uuid.generateUUID();
     const attempt = Services.prefs.getIntPref(PREFS.MIGRATION_ATTEMPTS, 0);
     const primaryPasswordSet = lazy.LoginHelper.isPrimaryPasswordSet();
@@ -280,7 +280,7 @@ export class LoginStorageMigrator {
     } finally {
       recordMigrationStatus({
         runId,
-        duration: Date.now() - t0,
+        duration: Math.round(ChromeUtils.now() - t0),
         numberOfLoginsToMigrate,
         numberOfLoginsMigrated,
         numberOfLoginsQuarantined,

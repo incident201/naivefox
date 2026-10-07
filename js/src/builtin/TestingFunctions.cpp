@@ -82,7 +82,8 @@
 #include "js/experimental/TypedData.h"         // JS_GetObjectAsUint8Array
 #include "js/friend/DumpFunctions.h"  // js::Dump{Backtrace,Heap,Object}, JS::FormatStackDump, js::IgnoreNurseryObjects
 #include "js/friend/ErrorMessages.h"  // js::GetErrorMessage, JSMSG_*
-#include "js/friend/WindowProxy.h"    // js::ToWindowProxyIfWindow
+#include "js/friend/PerformanceHint.h"  // js::SetRealmIsDyingHint
+#include "js/friend/WindowProxy.h"      // js::ToWindowProxyIfWindow
 #include "js/GlobalObject.h"
 #include "js/HashTable.h"
 #include "js/Interrupt.h"
@@ -104,6 +105,7 @@
 #include "js/Vector.h"
 #include "js/Wrapper.h"
 #include "threading/CpuCount.h"
+#include "util/Denormals.h"
 #include "util/DifferentialTesting.h"
 #include "util/LanguageId.h"
 #include "util/StringBuilder.h"
@@ -600,14 +602,9 @@ static bool GetBuildConfiguration(JSContext* cx, unsigned argc, Value* vp) {
     return false;
   }
 
-#if (defined(__GNUC__) && defined(__SSE__) && defined(__x86_64__)) || \
-    defined(__arm__) || defined(__aarch64__)
-  // See js.cpp "disable-main-thread-denormals" command line option.
-  value = BooleanValue(true);
-#else
-  value = BooleanValue(false);
-#endif
-  if (!JS_SetProperty(cx, info, "can-disable-main-thread-denormals", value)) {
+  value = BooleanValue(CanDisableDenormals());
+  if (!JS_SetProperty(cx, info, "can-disable-main-thread-wasm-denormals",
+                      value)) {
     return false;
   }
 
@@ -2343,7 +2340,12 @@ static bool WasmDumpIon(JSContext* cx, unsigned argc, Value* vp) {
   return true;
 }
 
-enum class Flag { Tier2Complete, Deserialized, ParsedBranchHints };
+enum class Flag {
+  Tier2Complete,
+  Deserialized,
+  ParsedBranchHints,
+  ParsedNameSection
+};
 
 static bool WasmReturnFlag(JSContext* cx, unsigned argc, Value* vp, Flag flag) {
   CallArgs args = CallArgsFromVp(argc, vp);
@@ -2370,6 +2372,9 @@ static bool WasmReturnFlag(JSContext* cx, unsigned argc, Value* vp, Flag flag) {
       break;
     case Flag::ParsedBranchHints:
       b = !module->module().codeMeta().branchHints.failedParse();
+      break;
+    case Flag::ParsedNameSection:
+      b = module->module().codeMeta().nameSection.isSome();
       break;
   }
 
@@ -2447,6 +2452,10 @@ static bool WasmParsedBranchHints(JSContext* cx, unsigned argc, Value* vp) {
   return WasmReturnFlag(cx, argc, vp, Flag::ParsedBranchHints);
 }
 #endif  // ENABLE_WASM_BRANCH_HINTING
+
+static bool WasmParsedNameSection(JSContext* cx, unsigned argc, Value* vp) {
+  return WasmReturnFlag(cx, argc, vp, Flag::ParsedNameSection);
+}
 
 static bool WasmBuiltinI8VecMul(JSContext* cx, unsigned argc, Value* vp) {
   if (!wasm::HasSupport(cx)) {
@@ -2768,6 +2777,15 @@ static bool InternalConst(JSContext* cx, unsigned argc, Value* vp) {
     JS_ReportErrorASCII(cx, "unknown const name");
     return false;
   }
+  return true;
+}
+
+static bool SetRealmIsDyingHint(JSContext* cx, unsigned argc, Value* vp) {
+  CallArgs args = CallArgsFromVp(argc, vp);
+
+  js::SetRealmIsDyingHint(cx->global());
+
+  args.rval().setUndefined();
   return true;
 }
 
@@ -3712,6 +3730,57 @@ static bool SetTestFilenameValidationCallback(JSContext* cx, unsigned argc,
   JS::SetFilenameValidationCallback(testCb);
 
   args.rval().setUndefined();
+  return true;
+}
+
+// A forwarding proxy whose [[OwnPropertyKeys]] reports every key of its target
+// twice. Scripted proxies can't do this because the spec rejects duplicate
+// keys.
+class DuplicateOwnKeysProxyHandler final : public ForwardingProxyHandler {
+ public:
+  static const DuplicateOwnKeysProxyHandler singleton;
+  static const char family;
+
+  constexpr DuplicateOwnKeysProxyHandler() : ForwardingProxyHandler(&family) {}
+
+  bool ownPropertyKeys(JSContext* cx, HandleObject proxy,
+                       MutableHandleIdVector props) const override {
+    if (!ForwardingProxyHandler::ownPropertyKeys(cx, proxy, props)) {
+      return false;
+    }
+    size_t length = props.length();
+    for (size_t i = 0; i < length; i++) {
+      RootedId id(cx, props[i]);
+      if (!props.append(id)) {
+        return false;
+      }
+    }
+    return true;
+  }
+};
+
+const DuplicateOwnKeysProxyHandler DuplicateOwnKeysProxyHandler::singleton;
+const char DuplicateOwnKeysProxyHandler::family = 0;
+
+static bool NewProxyWithDuplicateOwnKeys(JSContext* cx, unsigned argc,
+                                         Value* vp) {
+  CallArgs args = CallArgsFromVp(argc, vp);
+  if (!args.requireAtLeast(cx, "newProxyWithDuplicateOwnKeys", 1)) {
+    return false;
+  }
+  if (!args[0].isObject()) {
+    JS_ReportErrorASCII(cx, "target must be an object");
+    return false;
+  }
+
+  RootedValue target(cx, args[0]);
+  JSObject* proxy = NewProxyObject(cx, &DuplicateOwnKeysProxyHandler::singleton,
+                                   target, nullptr);
+  if (!proxy) {
+    return false;
+  }
+
+  args.rval().setObject(*proxy);
   return true;
 }
 
@@ -5056,7 +5125,6 @@ static bool ResolvePromise(JSContext* cx, unsigned argc, Value* vp) {
   return result;
 }
 
-#ifdef NIGHTLY_BUILD
 static bool SafeResolvePromise(JSContext* cx, unsigned argc, Value* vp) {
   CallArgs args = CallArgsFromVp(argc, vp);
   if (!args.requireAtLeast(cx, "safeResolvePromise", 2)) {
@@ -5082,7 +5150,6 @@ static bool SafeResolvePromise(JSContext* cx, unsigned argc, Value* vp) {
   args.rval().setUndefined();
   return JS::SafeResolve(cx, promise, resolution);
 }
-#endif  // NIGHTLY_BUILD
 
 static bool RejectPromise(JSContext* cx, unsigned argc, Value* vp) {
   CallArgs args = CallArgsFromVp(argc, vp);
@@ -5545,6 +5612,12 @@ const ShellAllocationMetadataBuilder
 static bool EnableShellAllocationMetadataBuilder(JSContext* cx, unsigned argc,
                                                  Value* vp) {
   CallArgs args = CallArgsFromVp(argc, vp);
+
+  // ShellAllocationMetadataBuilder::build constructs arrays. Ensure the
+  // Array constructor is already resolved.
+  if (!GlobalObject::ensureConstructor(cx, cx->global(), JSProto_Array)) {
+    return false;
+  }
 
   SetAllocationMetadataBuilder(
       cx, &ShellAllocationMetadataBuilder::metadataBuilder);
@@ -10495,6 +10568,11 @@ static const JSFunctionSpecWithHelp TestingFunctions[] = {
 "  Set the filename validation callback to a callback that accepts only\n"
 "  filenames starting with 'safe' or (only in system realms) 'system'."),
 
+    JS_FN_HELP("newProxyWithDuplicateOwnKeys", NewProxyWithDuplicateOwnKeys, 1, 0,
+"newProxyWithDuplicateOwnKeys(target)",
+"  Returns a proxy that forwards to |target| but reports each of its own keys\n"
+"  twice from [[OwnPropertyKeys]]."),
+
     JS_FN_HELP("newObjectWithAddPropertyHook", NewObjectWithAddPropertyHook, 0, 0,
 "newObjectWithAddPropertyHook()",
 "  Returns a new object with an addProperty JSClass hook. This hook\n"
@@ -10666,13 +10744,11 @@ static const JSFunctionSpecWithHelp TestingFunctions[] = {
 JS_FN_HELP("resolvePromise", ResolvePromise, 2, 0,
 "resolvePromise(promise, resolution)",
 "  Resolve a Promise by calling the JSAPI function JS::ResolvePromise."),
-#ifdef NIGHTLY_BUILD
 JS_FN_HELP("safeResolvePromise", SafeResolvePromise, 2, 0,
 "safeResolvePromise(promise, resolution)",
 "  Resolve a Promise by calling the JSAPI function JS::SafeResolve, which\n"
 "  implements the SafePromiseResolve abstract operation from the\n"
 "  thenable-curtailment proposal."),
-#endif  // NIGHTLY_BUILD
 JS_FN_HELP("rejectPromise", RejectPromise, 2, 0,
 "rejectPromise(promise, reason)",
 "  Reject a Promise by calling the JSAPI function JS::RejectPromise."),
@@ -10694,6 +10770,11 @@ JS_FN_HELP("rejectPromise", RejectPromise, 2, 0,
     JS_FN_HELP("gcPreserveCode", GCPreserveCode, 0, 0,
 "gcPreserveCode()",
 "  Preserve JIT code during garbage collections."),
+
+    JS_FN_HELP("setRealmIsDyingHint", SetRealmIsDyingHint, 0, 0,
+"setRealmIsDyingHint()",
+"  Hint that the current realm is dying, like the browser does when a window\n"
+"  goes away. The GC then no longer preserves JIT code for it."),
 
 #ifdef JS_GC_ZEAL
     JS_FN_HELP("gczeal", GCZeal, 2, 0,
@@ -11021,6 +11102,11 @@ JS_FOR_WASM_FEATURES(WASM_FEATURE)
 "  custom branch hinting section."),
 
 #endif // ENABLE_WASM_BRANCH_HINTING
+
+    JS_FN_HELP("wasmParsedNameSection", WasmParsedNameSection, 1, 0,
+"wasmParsedNameSection(module)",
+"  Returns a boolean indicating whether a given module has successfully parsed a\n"
+"  custom name section."),
 
     JS_FN_HELP("largeArrayBufferSupported", LargeArrayBufferSupported, 0, 0,
 "largeArrayBufferSupported()",

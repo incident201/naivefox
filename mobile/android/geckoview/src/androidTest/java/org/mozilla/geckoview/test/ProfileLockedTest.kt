@@ -4,7 +4,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.MediumTest
 import androidx.test.platform.app.InstrumentationRegistry
 import org.hamcrest.CoreMatchers.equalTo
-import org.junit.Assume.assumeThat
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mozilla.geckoview.test.TestRuntimeService.RuntimeInstance
@@ -19,8 +18,6 @@ class ProfileLockedTest : BaseSessionTest() {
     @Test
     @ClosedSessionAtStart
     fun profileLocked() {
-        assumeThat(sessionRule.env.isCoverageBuild, equalTo(false))
-
         val runtime0 =
             RuntimeInstance.start(
                 targetContext,

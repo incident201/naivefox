@@ -4286,23 +4286,27 @@ Result<Ok, nsresult> QuotaManager::InitializeOriginDirectory(
     PersistenceType aPersistenceType,
     nsTArray<RenameAndInitInfo>& aRenameAndInitInfos, OriginFunc&& aOriginFunc,
     OriginCacheMap& aCacheMap) {
-  QM_TRY_UNWRAP(auto maybeMetadata,
-                QM_OR_ELSE_WARN_IF(
-                    // Expression
-                    LoadFullOriginMetadataWithRestore(aChildDirectory)
-                        .map([](FullOriginMetadata&& metadata)
-                                 -> Maybe<FullOriginMetadata> {
-                          return Some(std::move(metadata));
-                        }),
-                    // Predicate.
-                    IsSpecificError<NS_ERROR_MALFORMED_URI>,
-                    // Fallback.
-                    ErrToDefaultOk<Maybe<FullOriginMetadata>>));
+  QM_TRY_UNWRAP(
+      auto maybeMetadata,
+      QM_OR_ELSE_WARN_IF(
+          // Expression
+          LoadFullOriginMetadataWithRestore(aChildDirectory)
+              .map([](FullOriginMetadata&& metadata)
+                       -> Maybe<FullOriginMetadata> {
+                return Some(std::move(metadata));
+              }),
+          // Predicate.
+          IsSpecificError<NS_ERROR_MALFORMED_URI>,
+          // Fallback. The origin is permanently unresolvable
+          // (e.g. an orphaned moz-extension directory whose
+          // extension has been uninstalled), so remove it.
+          ([&aChildDirectory](
+               const nsresult) -> Result<Maybe<FullOriginMetadata>, nsresult> {
+            QM_TRY(MOZ_TO_RESULT(aChildDirectory->Remove(true)));
+            return Maybe<FullOriginMetadata>{};
+          })));
 
   if (!maybeMetadata) {
-    // Unknown directories during initialization are
-    // allowed. Just warn if we find them.
-    UNKNOWN_FILE_WARNING(aLeafName);
     return Ok{};
   }
 
@@ -6976,8 +6980,6 @@ QuotaManager::EnsurePersistentOriginIsInitializedInternal(
           QM_TRY_INSPECT(const auto& metadata,
                          LoadFullOriginMetadataWithRestore(directory));
 
-          MOZ_ASSERT(metadata.mLastAccessTime <= PR_Now());
-
           return metadata;
         }()));
 
@@ -8399,7 +8401,8 @@ std::pair<uint64_t, uint64_t> QuotaManager::GetUsageAndLimitForEstimate(
     const OriginMetadata& aOriginMetadata) {
   AssertIsOnIOThread();
 
-  int64_t totalGroupUsage = 0;
+  int64_t originUsage = 0;
+  bool persisted = false;
 
   {
     MutexAutoLock lock(mQuotaMutex);
@@ -8408,31 +8411,83 @@ std::pair<uint64_t, uint64_t> QuotaManager::GetUsageAndLimitForEstimate(
     if (mGroupInfoPairs.Get(aOriginMetadata.mGroup, &pair)) {
       for (const PersistenceType type : kBestEffortPersistenceTypes) {
         RefPtr<GroupInfo> groupInfo = pair->LockedGetGroupInfo(type);
-        if (groupInfo) {
-          if (type == PERSISTENCE_TYPE_DEFAULT) {
-            RefPtr<OriginInfo> originInfo =
-                groupInfo->LockedGetOriginInfo(aOriginMetadata.mOrigin);
+        if (!groupInfo) {
+          continue;
+        }
 
-            // A persisted origin is exempt from group-limit eviction and is
-            // bound by the global temporary storage limit instead, so it
-            // reports its own origin usage against that limit.
-            if (originInfo && originInfo->LockedPersisted()) {
-              // This is exposed to content via navigator.storage.estimate() so
-              // clamp it to 0.
-              return std::pair(QM_CLAMP_TO_ZERO(originInfo->LockedUsage()),
-                               mTemporaryStorageLimit);
-            }
-          }
+        RefPtr<OriginInfo> originInfo =
+            groupInfo->LockedGetOriginInfo(aOriginMetadata.mOrigin);
+        if (!originInfo) {
+          continue;
+        }
 
-          AssertNoOverflow(totalGroupUsage, groupInfo->mUsage);
-          totalGroupUsage += groupInfo->mUsage;
+        // The estimate covers everything the origin stores, so the usage of
+        // all best-effort repositories is summed up, like GetOriginUsage does:
+        // the private repository holds the origin's data in private browsing
+        // and the temporary repository holds data stored with the "temporary"
+        // persistence type. Only the default repository can be persisted, so
+        // this also includes the non-persisted temporary usage of a persisted
+        // origin (which used to report its default repository usage only).
+        AssertNoOverflow(originUsage, originInfo->LockedUsage());
+        originUsage += originInfo->LockedUsage();
+
+        if (type == PERSISTENCE_TYPE_DEFAULT && originInfo->LockedPersisted()) {
+          persisted = true;
         }
       }
     }
   }
 
-  // Also exposed to content via navigator.storage.estimate().
-  return std::pair(QM_CLAMP_TO_ZERO(totalGroupUsage), GetGroupLimit());
+  // The usage is the origin's own usage as required by
+  // https://storage.spec.whatwg.org/#storage-usage, while the limit is still
+  // tracked per group (bug 1305665). A persisted origin is exempt from
+  // group-limit eviction and is bound by the global temporary storage limit
+  // instead. Both values are exposed to content via
+  // navigator.storage.estimate() so the usage is clamped to 0.
+  return std::pair(QM_CLAMP_TO_ZERO(originUsage),
+                   persisted ? mTemporaryStorageLimit : GetGroupLimit());
+}
+
+std::pair<uint64_t, uint64_t> QuotaManager::GetGroupUsageAndLimitForEstimate(
+    const OriginMetadata& aOriginMetadata) {
+  AssertIsOnIOThread();
+
+  int64_t groupUsage = 0;
+
+  {
+    MutexAutoLock lock(mQuotaMutex);
+
+    GroupInfoPair* pair;
+    if (mGroupInfoPairs.Get(aOriginMetadata.mGroup, &pair)) {
+      for (const PersistenceType type : kBestEffortPersistenceTypes) {
+        RefPtr<GroupInfo> groupInfo = pair->LockedGetGroupInfo(type);
+        if (!groupInfo) {
+          continue;
+        }
+
+        if (type == PERSISTENCE_TYPE_DEFAULT) {
+          RefPtr<OriginInfo> originInfo =
+              groupInfo->LockedGetOriginInfo(aOriginMetadata.mOrigin);
+
+          // A persisted origin is exempt from the group limit (its usage is
+          // not part of the group usage) and is bound by the global temporary
+          // storage limit instead, so it reports its own usage as the total
+          // group usage and also against that the temporary storage limit.
+          if (originInfo && originInfo->LockedPersisted()) {
+            return std::pair(QM_CLAMP_TO_ZERO(originInfo->LockedUsage()),
+                             mTemporaryStorageLimit);
+          }
+        }
+
+        AssertNoOverflow(groupUsage, groupInfo->mUsage);
+        groupUsage += groupInfo->mUsage;
+      }
+    }
+  }
+
+  // This is only handed out to the parent process (see
+  // nsIQuotaManagerService::estimateGroupUsage).
+  return std::pair(QM_CLAMP_TO_ZERO(groupUsage), GetGroupLimit());
 }
 
 uint64_t QuotaManager::GetOriginUsage(

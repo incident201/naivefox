@@ -169,6 +169,10 @@ const WEEKDAYS = [
  *  (defaults to true). A self-contained card draws its own frame and states its
  *  own title. Hosts that already frame and title it - a panel with a header, say
  *  - set this to false and get just the contents.
+ * @property {boolean} canResume - Whether a paused monitor may be resumed
+ *  (defaults to true). Hosts that cap how many monitors run at once set this to
+ *  false once the cap is reached, so Resume reads as unavailable rather than
+ *  failing after the user presses it. Pausing is never blocked.
  */
 export class AgentMonitorItem extends MozLitElement {
   static properties = {
@@ -184,6 +188,7 @@ export class AgentMonitorItem extends MozLitElement {
       reflect: true,
       attribute: "self-contained",
     },
+    canResume: { type: Boolean },
     checkFrequency: { type: String, state: true },
     scheduleTime: { type: String, state: true },
     scheduleWeekday: { type: Number, state: true },
@@ -204,6 +209,7 @@ export class AgentMonitorItem extends MozLitElement {
     this.showLastResult = false;
     this.maxWatchUrls = DEFAULT_MAX_WATCH_URLS;
     this.selfContained = true;
+    this.canResume = true;
     this.checkFrequency = SCHEDULE_TYPES.DAILY;
     this.scheduleTime = nextTimeOption();
     this.scheduleWeekday = 1;
@@ -1109,7 +1115,10 @@ export class AgentMonitorItem extends MozLitElement {
                   data-l10n-attrs="label"
                 ></moz-button>
                 <moz-button
+                  id="pause-button"
                   type="default"
+                  ?disabled=${agent.status?.kind === "paused" &&
+                  !this.canResume}
                   @click=${() => {
                     const isPaused = agent.status?.kind === "paused";
                     this.#dispatch("agent-monitor-item:pause", {

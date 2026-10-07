@@ -281,7 +281,7 @@ void AbsoluteContainingBlock::DrainPushedChildList(
 
 void AbsoluteContainingBlock::PullAbsoluteFramesFrom(
     nsContainerFrame* aDelegatingFrame, nsIFrame* aContinuation,
-    OnlyFirstInFlows aOnlyFirstInFlows) {
+    PullKind aPullKind) {
   AbsoluteContainingBlock* absCB = aContinuation->GetAbsoluteContainingBlock();
   MOZ_ASSERT(absCB,
              "If this delegating frame has an absCB, aContinuation must "
@@ -293,10 +293,33 @@ void AbsoluteContainingBlock::PullAbsoluteFramesFrom(
        iter != absCB->GetChildList().end();) {
     // Advance the iterator first, so it's safe to move |child|.
     nsIFrame* const child = *iter++;
-    if (aOnlyFirstInFlows == OnlyFirstInFlows::No || !child->GetPrevInFlow()) {
-      absCB->StealFrame(child);
+    nsIFrame* const childPrevInFlow = child->GetPrevInFlow();
+    if (aPullKind == PullKind::FirstInFlows && childPrevInFlow) {
+      continue;
+    }
+    absCB->StealFrame(child);
+    if (childPrevInFlow && childPrevInFlow->GetParent() == aDelegatingFrame) {
+      // We already hold child's prev-in-flow, so child should be appended
+      // into our pushed child list to keep the continuations in order.
+      mPushedAbsoluteFrames.AppendFrame(aDelegatingFrame, child);
+    } else {
+      // Either child is a first-in-flow or its prev-in-flow lives in another
+      // absolute containing block, so it moves into our child list to be
+      // reflowed.
       mAbsoluteFrames.AppendFrame(aDelegatingFrame, child);
-      child->RemoveStateBits(NS_FRAME_IS_PUSHED_OUT_OF_FLOW);
+      if (!childPrevInFlow) {
+        child->RemoveStateBits(NS_FRAME_IS_PUSHED_OUT_OF_FLOW);
+      }
+    }
+  }
+
+  if (aPullKind == PullKind::All) {
+    // We are told to pull every frame from aContinuation. Move aContinuation's
+    // pushed child list by appending into our pushed child list.
+    nsFrameList pushedFrames = absCB->StealPushedChildList();
+    if (pushedFrames.NotEmpty()) {
+      mPushedAbsoluteFrames.AppendFrames(aDelegatingFrame,
+                                         std::move(pushedFrames));
     }
   }
 }
@@ -347,7 +370,7 @@ bool AbsoluteContainingBlock::PrepareAbsoluteFrames(
         // Reached a continuation in a later fragmentainer.
         break;
       }
-      PullAbsoluteFramesFrom(aDelegatingFrame, next, OnlyFirstInFlows::No);
+      PullAbsoluteFramesFrom(aDelegatingFrame, next, PullKind::All);
     }
   }
 
@@ -356,7 +379,7 @@ bool AbsoluteContainingBlock::PrepareAbsoluteFrames(
   for (nsIFrame* next =
            GetFirstContinuationInNextFragmentainer(aDelegatingFrame);
        next; next = GetFirstContinuationInNextFragmentainer(next)) {
-    PullAbsoluteFramesFrom(aDelegatingFrame, next, OnlyFirstInFlows::Yes);
+    PullAbsoluteFramesFrom(aDelegatingFrame, next, PullKind::FirstInFlows);
   }
 
   // The steps above may leave more than one continuation of the same abspos
@@ -888,7 +911,6 @@ void AbsoluteContainingBlock::Reflow(nsContainerFrame* aDelegatingFrame,
         }
       }
 
-      OverflowAreas kidOverflowAreas;
       nsReflowStatus kidStatus;
       if (!kidFrameNeedsPush) {
         ReflowAbsoluteFrame(aDelegatingFrame, aPresContext, aReflowInput,
@@ -1729,8 +1751,8 @@ void AbsoluteContainingBlock::ReflowAbsoluteFrame(
   if (nsBlockFrame::gNoisyReflow) {
     nsIFrame::IndentBy(stdout, nsBlockFrame::gNoiseIndent);
     fmt::println("abspos {}: begin reflow: availSize={}, orig cbRect={}",
-                 aKidFrame->ListTag(), ToString(aReflowInput.AvailableSize()),
-                 ToString(aContainingBlockRects.mLocal));
+                 aKidFrame->ListTag(), aReflowInput.AvailableSize(),
+                 aContainingBlockRects.mLocal);
   }
   AutoNoisyIndenter indent(nsBlockFrame::gNoisy);
 #endif  // DEBUG
@@ -2363,8 +2385,8 @@ void AbsoluteContainingBlock::ReflowAbsoluteFrame(
 #ifdef DEBUG
   if (nsBlockFrame::gNoisyReflow) {
     nsIFrame::IndentBy(stdout, nsBlockFrame::gNoiseIndent - 1);
-    fmt::println("abspos {}: rect {}", aKidFrame->ListTag().get(),
-                 ToString(aKidFrame->GetRect()));
+    fmt::println("abspos {}: rect {}", aKidFrame->ListTag(),
+                 aKidFrame->GetRect());
   }
 #endif
   // If author asked for `position-visibility: no-overflow` and we overflow

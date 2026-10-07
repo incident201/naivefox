@@ -117,6 +117,24 @@ RefPtr<layers::ImageContainer> OffscreenCanvasDisplayHelper::GetImageContainer()
   return mImageContainer;
 }
 
+bool OffscreenCanvasDisplayHelper::MayUpdateContext(WorkerPrivate* aWorker,
+                                                    ErrorResult& aRv) {
+  MutexAutoLock lock(mMutex);
+  if (!mOffscreenCanvas) {
+    return true;
+  }
+  if (aWorker) {
+    if (mWorkerRef && mWorkerRef->Private() == aWorker) {
+      return true;
+    }
+  } else if (!mWorkerRef) {
+    return true;
+  }
+  aRv.ThrowInvalidStateError(
+      "Cannot update created context to different thread");
+  return false;
+}
+
 void OffscreenCanvasDisplayHelper::UpdateContext(
     OffscreenCanvas* aOffscreenCanvas, RefPtr<ThreadSafeWorkerRef>&& aWorkerRef,
     CanvasContextType aType, const Maybe<mozilla::ipc::ActorId>& aChildId) {
@@ -199,6 +217,25 @@ void OffscreenCanvasDisplayHelper::FlushForDisplay() {
   task->Dispatch(mWorkerRef->Private());
 }
 
+void OffscreenCanvasDisplayHelper::SetPresentationEnabled(bool aEnabled) {
+  MOZ_ASSERT(NS_IsMainThread());
+
+  bool needsFlush;
+  {
+    MutexAutoLock lock(mMutex);
+    if (mPresentationEnabled == aEnabled) {
+      return;
+    }
+    mPresentationEnabled = aEnabled;
+    needsFlush = aEnabled && mPendingPresent;
+    mPendingPresent = false;
+  }
+
+  if (needsFlush) {
+    FlushForDisplay();
+  }
+}
+
 bool OffscreenCanvasDisplayHelper::CommitFrameToCompositor(
     nsICanvasRenderingContextInternal* aContext,
     const Maybe<OffscreenCanvasDisplayData>& aData) {
@@ -225,6 +262,15 @@ bool OffscreenCanvasDisplayHelper::CommitFrameToCompositor(
   }
 
   if (!mImageContainer) {
+    return false;
+  }
+
+  if (!mPresentationEnabled) {
+    // Nothing on the other end is going to composite what we produce, so
+    // presenting the front buffer would just pile up textures the compositor
+    // never consumes. The context keeps the drawn content in its own buffers
+    // and we present the latest of it once we are visible again.
+    mPendingPresent = true;
     return false;
   }
 

@@ -32,6 +32,8 @@ import mozilla.components.browser.state.state.content.ShareResourceState
 import mozilla.components.browser.state.state.createTab
 import mozilla.components.browser.state.store.BrowserStore
 import mozilla.components.concept.engine.EngineSession
+import mozilla.components.concept.fetch.MutableHeaders
+import mozilla.components.concept.fetch.Response
 import mozilla.components.support.test.middleware.CaptureActionsMiddleware
 import mozilla.components.support.test.robolectric.testContext
 import org.junit.Assert.assertEquals
@@ -198,17 +200,33 @@ class PdfToolsIntegrationTest {
 
     @Test
     fun `WHEN share is activated THEN the selected tab's PDF is shared`() {
-        integration().handleShareClick()
+        val response =
+            Response(
+                url = pdfTab.content.url,
+                status = 200,
+                headers = MutableHeaders(),
+                body = Response.Body.empty(),
+            )
+        val engineSession = mockk<EngineSession>()
+        every { engineSession.requestPdfToShare(any(), any()) } answers
+            {
+                firstArg<(Response) -> Unit>().invoke(response)
+            }
+
+        integration(store = storeOf(pdfTabWith(engineSession))).handleShareClick()
 
         captureActionsMiddleware.assertFirstAction(ShareResourceAction.AddShareAction::class) {
             assertEquals(tabId, it.tabId)
-            assertIs<ShareResourceState.InternetResource>(it.resource)
+            assertIs<ShareResourceState.DirectResource>(it.resource)
         }
     }
 
     @Test
     fun `GIVEN a PDF opened from a local file WHEN share is activated THEN the local file is shared`() {
-        val localTab = createTab(url = "content://downloads/document.pdf", id = tabId)
+        val localTab =
+            createTab(url = "content://downloads/document.pdf", id = tabId).let {
+                it.copy(content = it.content.copy(isPdf = true))
+            }
 
         integration(store = storeOf(localTab)).handleShareClick()
 
@@ -269,6 +287,24 @@ class PdfToolsIntegrationTest {
         browserStore.dispatch(ContentAction.ExitedPdfViewer(tabId))
 
         assertFalse(integration.signatureState.isSigning)
+    }
+
+    @Test
+    fun `WHEN the feature is started THEN the overlays are traversed between the address bar and the page`() {
+        // Test for Bug 2066197
+        val addressBar = View(activity).apply { id = R.id.composable_toolbar }
+        val content = View(activity).apply { id = R.id.engineView }
+        container.addView(addressBar)
+        container.addView(content)
+
+        integration().start()
+        shadowOf(Looper.getMainLooper()).idle()
+
+        val tools = container.children.elementAt(2)
+        val dialog = container.children.elementAt(3)
+        assertEquals(addressBar.id, tools.accessibilityTraversalAfter)
+        assertEquals(tools.id, dialog.accessibilityTraversalAfter)
+        assertEquals(dialog.id, content.accessibilityTraversalAfter)
     }
 
     /** Stands in for the browser toolbar, which removes the navigation bar as its composition is created. */

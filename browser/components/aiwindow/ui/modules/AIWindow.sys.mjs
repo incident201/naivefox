@@ -462,15 +462,16 @@ export const AIWindow = {
 
   /**
    * Whether the monitor toolbar button is enabled. It is the toolbar surface of
-   * the Smart Window agent, so it needs the agent feature as well as its own
-   * gate, both default-off, and the same region gate the rest of the feature
-   * uses. Somewhere the button cannot create a monitor it should not appear,
-   * not even in the customize palette.
+   * the Smart Window agent, so it needs Smart Window to be enabled, the
+   * agent feature and its own toolbar gate, and the same region gate the rest of
+   * the feature uses. Where the button cannot create a monitor
+   * it should not appear
    *
    * @returns {boolean}
    */
   get monitorButtonEnabled() {
     return (
+      this.isAIWindowEnabled() &&
       lazy.agentEnabled &&
       lazy.agentToolbarEnabled &&
       lazy.MonitorUIUtils.isMonitorRegionSupported()
@@ -701,12 +702,14 @@ export const AIWindow = {
    *
    * @param {object} options Used in BrowserWindowTracker.openWindow
    * @param {object} options.openerWindow Window making the BrowserWindowTracker.openWindow call
-   * @param {object} options.args Array of arguments to pass to new window
+   * @param {nsIMutableArray} [options.args] Array of arguments to pass to new window
    * @param {boolean} [options.aiWindow] Should new window be AI Window (true), Classic Window (false), or inherited from opener (undefined, default)
    * @param {boolean} [options.private] Should new window be Private Window
    * @param {string} [options.restoreSessionURL] URL of the selected tab being restored
    *
-   * @returns {object} Modified arguments appended to the options object
+   * @returns {nsIMutableArray}
+   *   Updated arguments array with additional `extraOptions` added for
+   *   the AI Window.
    */
   handleAIWindowOptions({
     openerWindow,
@@ -1470,7 +1473,7 @@ export const AIWindow = {
 
     lazy.CustomizableUI.createWidget({
       id: "ai-window-toggle",
-      l10nId: "toolbar-switcher-customizable-label",
+      l10nId: "toolbar-switcher-customizable-label-v2",
       type: "view",
       viewId: "ai-window-toggle-view",
       defaultArea: lazy.CustomizableUI.AREA_TABSTRIP,

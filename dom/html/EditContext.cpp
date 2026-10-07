@@ -63,7 +63,8 @@ already_AddRefed<EditContext> EditContext::Constructor(
     aRv.Throw(NS_ERROR_FAILURE);
     return nullptr;
   }
-  RefPtr<EditContext> context = new EditContext(global, aInit, aRv);
+  RefPtr<EditContext> context = new EditContext(global);
+  context->Init(aInit, aRv);
   if (aRv.Failed()) {
     return nullptr;
   }
@@ -140,16 +141,18 @@ bool EditContext::IsAnyAttached() {
   return sEditContextHashMap && !sEditContextHashMap->IsEmpty();
 }
 
-EditContext::EditContext(nsIGlobalObject* aGlobalObject,
-                         const EditContextInit& aInit, ErrorResult& aRv)
-    : DOMEventTargetHelper(aGlobalObject) {
-  auto window = aGlobalObject->GetAsInnerWindow();
+EditContext::EditContext(nsIGlobalObject* aGlobalObject)
+    : DOMEventTargetHelper(aGlobalObject) {}
+
+void EditContext::Init(const EditContextInit& aInit, ErrorResult& aRv) {
+  nsPIDOMWindowInner* window = GetParentObject()->GetAsInnerWindow();
   MOZ_ASSERT(window);
-  auto* document = window->GetDoc();
+  RefPtr<Document> document = window->GetDoc();
   MOZ_ASSERT(document);
   RefPtr<AnonymousContent> anonymousContent =
       document->InsertAnonymousContent(aRv);
   if (NS_WARN_IF(!anonymousContent)) {
+    aRv.Throw(NS_ERROR_FAILURE);
     return;
   }
   RefPtr<Element> textContainer =

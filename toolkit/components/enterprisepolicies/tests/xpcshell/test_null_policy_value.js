@@ -7,7 +7,7 @@ add_task(async function test_null_policy_value() {
   await setupPolicyEngineWithJson({
     policies: {
       DisableAppUpdate: null,
-      DisableTelemetry: true,
+      DisableSystemAddonUpdate: true,
     },
   });
 
@@ -19,7 +19,7 @@ add_task(async function test_null_policy_value() {
 
   let activePolicies = Services.policies.getActivePolicies();
   ok(
-    "DisableTelemetry" in activePolicies,
+    "DisableSystemAddonUpdate" in activePolicies,
     "The policy next to the null-valued one was still applied"
   );
   ok(

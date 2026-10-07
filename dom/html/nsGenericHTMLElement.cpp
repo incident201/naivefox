@@ -58,6 +58,7 @@
 #include "mozilla/dom/Link.h"
 #include "mozilla/dom/MouseEventBinding.h"
 #include "mozilla/dom/PerformanceContainerTiming.h"
+#include "mozilla/dom/Range.h"
 #include "mozilla/dom/ScriptLoader.h"
 #include "mozilla/dom/ShadowIncludingTreeIterator.h"
 #include "mozilla/dom/ToggleEvent.h"
@@ -92,7 +93,6 @@
 #include "nsPIDOMWindow.h"
 #include "nsPresContext.h"
 #include "nsQueryObject.h"
-#include "nsRange.h"
 #include "nsString.h"
 #include "nsStyleUtil.h"
 #include "nsTableCellFrame.h"
@@ -848,13 +848,15 @@ void nsGenericHTMLElement::AfterSetAttr(int32_t aNamespaceID, nsAtom* aName,
         }
         if (IsInUncomposedDoc()) {
           RecomputeContainerTimingRootForSubtree();
-          // Removing containertiming unregisters this element as a container
-          // root; drop its accumulated painted region so the record can't
-          // outlive the registration (and dangle), or be inherited if the
-          // attribute is added back later.
-          if (aName == nsGkAtoms::containertiming && !aValue) {
-            ContainerTimingHelpers::DropRecordForContainerRoot(this);
-          }
+        }
+        // Removing containertiming unregisters this element as a container
+        // root; drop its accumulated painted region so the record can't
+        // outlive the registration (and dangle), or be inherited if the
+        // attribute is added back later. This must run even when detached or
+        // in a shadow tree, where the record would otherwise linger with a
+        // dangling key until the element is freed.
+        if (aName == nsGkAtoms::containertiming && !aValue) {
+          ContainerTimingHelpers::DropRecordForContainerRoot(this);
         }
       }
     } else if (aName == nsGkAtoms::dir) {
@@ -3325,7 +3327,7 @@ void nsGenericHTMLElement::GetInnerText(mozilla::dom::DOMString& aValue,
   if (!IsRendered()) {
     GetTextContentInternal(aValue, aError);
   } else {
-    nsRange::GetInnerTextNoFlush(aValue, aError, this);
+    dom::Range::GetInnerTextNoFlush(aValue, aError, this);
   }
 }
 

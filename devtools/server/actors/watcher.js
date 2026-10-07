@@ -332,10 +332,12 @@ exports.WatcherActor = class WatcherActor extends Actor {
     }
     // Automatically flag any meaningful new top level BrowsingContext being created
     // when we are using the browser toolbox, or web extension toolbox.
+    const isTopLevelBrowsingContext = !subject.parent;
     if (
-      this.sessionContext.type == SESSION_TYPES.ALL ||
-      (this.sessionContext.type == SESSION_TYPES.WEBEXTENSION &&
-        isBrowsingContextPartOfContext(subject, this.sessionContext))
+      isTopLevelBrowsingContext &&
+      (this.sessionContext.type == SESSION_TYPES.ALL ||
+        (this.sessionContext.type == SESSION_TYPES.WEBEXTENSION &&
+          isBrowsingContextPartOfContext(subject, this.sessionContext)))
     ) {
       subject.watchedByDevTools = true;
     }

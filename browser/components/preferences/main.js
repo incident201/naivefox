@@ -49,7 +49,8 @@ ChromeUtils.defineESModuleGetters(this, {
   BackgroundUpdate: "resource://gre/modules/BackgroundUpdate.sys.mjs",
   UpdateListener: "resource://gre/modules/UpdateListener.sys.mjs",
   LinkPreview: "moz-src:///browser/components/genai/LinkPreview.sys.mjs",
-  MigrationUtils: "resource:///modules/MigrationUtils.sys.mjs",
+  MigrationUtils:
+    "moz-src:///browser/components/migration/MigrationUtils.sys.mjs",
   TranslationsParent: "resource://gre/actors/TranslationsParent.sys.mjs",
   TranslationsUtils:
     "chrome://global/content/translations/TranslationsUtils.mjs",
@@ -121,6 +122,7 @@ Preferences.addAll([
   { id: "browser.ai.control.speechRecognition", type: "string" },
   { id: "browser.ai.control.sidebarChatbot", type: "string" },
   { id: "browser.ai.control.smartWindow", type: "string" },
+  { id: "browser.ml.chat.provider", type: "string" },
 
   // Update
   { id: "browser.preferences.advanced.selectedTabIndex", type: "int" },
@@ -454,6 +456,10 @@ Preferences.addSetting({
 Preferences.addSetting({
   id: "aiControlSmartWindow",
   pref: "browser.ai.control.smartWindow",
+});
+Preferences.addSetting({
+  id: "chatbotProvider",
+  pref: "browser.ml.chat.provider",
 });
 
 function createDefaultBrowserConfig({

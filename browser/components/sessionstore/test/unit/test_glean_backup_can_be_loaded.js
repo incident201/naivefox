@@ -156,8 +156,8 @@ add_task(async function test_incompatible_file_recorded_once() {
   );
   Assert.deepEqual(
     corruptFileCounts(),
-    { corrupt: null, notCorrupt: 2 },
-    "An incompatible file is counted as not corrupt, like the file that loaded."
+    { corrupt: 1, notCorrupt: 1 },
+    "An incompatible file is counted as corrupt, and only the file that loaded is counted as not corrupt."
   );
 });
 

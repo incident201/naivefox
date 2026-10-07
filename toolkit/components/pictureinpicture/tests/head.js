@@ -1183,7 +1183,12 @@ async function withPipWindow(
 }
 
 /**
- * Waits for a player window control to be laid out and interactive.
+ * Waits for the player window to make a control usable by clearing its hidden and
+ * disabled attributes. Note that controls can have display: none at some
+ * window sizes, but this function does not wait on visibility. This function
+ * can still resolve when a control is visibly missing from the window.
+ *
+ * To know if a control is actually rendered, use checkVisibility() instead.
  *
  * @param {Element} button the control to wait for.
  */

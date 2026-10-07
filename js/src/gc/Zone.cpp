@@ -349,6 +349,8 @@ void Zone::discardJitCode(JS::GCContext* gcx,
     return;
   }
 
+  const bool anyRealmPreservingCode = numDiscardedRealms != numRealms;
+
 #ifdef DEBUG
   // Assert no ICScripts are marked as active.
   jitZone()->forEachJitScript([](jit::JitScript* jitScript) {
@@ -364,8 +366,15 @@ void Zone::discardJitCode(JS::GCContext* gcx,
 
   jitZone()->forEachJitScript<jit::IncludeDyingScripts>(
       [&](jit::JitScript* jitScript) {
+        // Note: if we're currently sweeping, |script| may be dying and we
+        // shouldn't call script->realm() because it goes through the
+        // ScriptSourceObject. |anyRealmPreservingCode| is only true at the
+        // start of a GC so we check that first.
         JSScript* script = jitScript->owningScript();
-        if (script->realm()->jitRealm().isPreservingCode()) {
+        MOZ_ASSERT_IF(anyRealmPreservingCode,
+                      !gc::IsAboutToBeFinalizedUnbarriered(script));
+        if (anyRealmPreservingCode &&
+            script->realm()->jitRealm().isPreservingCode()) {
           // We're not discarding this realm's JIT code, but we may still have
           // to reset allocation sites.
           if (resetAllocSites &&
@@ -437,7 +446,7 @@ void Zone::discardJitCode(JS::GCContext* gcx,
   // with a realm, so we only do this when discarding JIT code for all realms.
   // Do not discard if an interrupted regexp is currently on the stack.
   const bool discardRegExpJitCode =
-      numDiscardedRealms == numRealms && !jitZone()->keepRegExpJitCode();
+      !anyRealmPreservingCode && !jitZone()->keepRegExpJitCode();
   if (discardRegExpJitCode) {
     for (auto regExp = cellIterUnsafe<RegExpShared>(); !regExp.done();
          regExp.next()) {

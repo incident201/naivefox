@@ -187,6 +187,10 @@ size_t Cookie::SizeOfIncludingThis(mozilla::MallocSizeOf aMallocSizeOf) const {
          mData.path().SizeOfExcludingThisIfUnshared(MallocSizeOf);
 }
 
+bool Cookie::IsExpired() const {
+  return IsExpired(PR_Now() / PR_USEC_PER_MSEC);
+}
+
 bool Cookie::IsStale() const {
   int64_t currentTimeInUsec = PR_Now();
 

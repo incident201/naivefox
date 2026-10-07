@@ -65,7 +65,6 @@ EXPORTS.mozilla.ipc += [
     "TaskFactory.h",
     "TransportSecurityInfoUtils.h",
     "URIUtils.h",
-    "WindowsMessageLoop.h",
 ]
 
 if not CONFIG["MOZ_NAIVEFOX"]:
@@ -83,6 +82,9 @@ if not CONFIG["MOZ_NAIVEFOX"]:
 
 if CONFIG["OS_ARCH"] == "WINNT":
     SOURCES += ["WindowsMessageLoop.cpp"]
+    EXPORTS.mozilla.ipc += [
+        "WindowsMessageLoop.h",
+    ]
 
 if CONFIG["OS_ARCH"] == "WINNT":
     SOURCES += [

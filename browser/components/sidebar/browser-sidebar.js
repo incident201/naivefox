@@ -424,7 +424,8 @@ var SidebarController = {
   get inSingleTabWindow() {
     return (
       !window.toolbar.visible ||
-      window.document.documentElement.hasAttribute("taskbartab")
+      window.document.documentElement.hasAttribute("taskbartab") ||
+      window.document.documentElement.hasAttribute("mini-window")
     );
   },
 
@@ -2090,6 +2091,7 @@ var SidebarController = {
         `url("${sidebar.iconUrl}")`
       );
       el.setAttribute("label", sidebar.label);
+      el.toggleAttribute("auto-accesskey", true);
     };
 
     updateAttributes(document.getElementById(sidebar.menuId), sidebar);

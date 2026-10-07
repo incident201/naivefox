@@ -49,6 +49,7 @@ import mozilla.components.support.base.feature.ViewBoundFeatureWrapper
 import mozilla.components.support.ktx.kotlin.isContentUrl
 import org.mozilla.fenix.GleanMetrics.Translations
 import org.mozilla.fenix.R
+import org.mozilla.fenix.browser.readermode.PowerSavingModeReaderViewBinding
 import org.mozilla.fenix.browser.store.BrowserScreenAction.ReaderModeStatusUpdated
 import org.mozilla.fenix.components.Components
 import org.mozilla.fenix.components.LensFeature
@@ -76,6 +77,7 @@ import org.mozilla.fenix.ext.requireComponents
 import org.mozilla.fenix.ext.runIfFragmentIsAttached
 import org.mozilla.fenix.home.HomeFragment
 import org.mozilla.fenix.ipprotection.store.Surface as IPProtectionSurface
+import org.mozilla.fenix.ipprotection.ui.IPProtectionBottomSheetFragment
 import org.mozilla.fenix.listentopage.ListenSheetIntegration
 import org.mozilla.fenix.nimbus.FxNimbus
 import org.mozilla.fenix.onboarding.OnboardingFragmentDirections
@@ -97,6 +99,7 @@ class BrowserFragment : BaseBrowserFragment(), UserInteractionHandler, SystemIns
     private val translationsBannerIntegration = ViewBoundFeatureWrapper<TranslationsBannerIntegration>()
     private val pdfToolsIntegration = ViewBoundFeatureWrapper<PdfToolsIntegration>()
     private val listenSheetIntegration = ViewBoundFeatureWrapper<ListenSheetIntegration>()
+    private val powerSavingModeReaderViewBinding = ViewBoundFeatureWrapper<PowerSavingModeReaderViewBinding>()
     private val continuousOnboardingFeature = ViewBoundFeatureWrapper<ContinuousOnboardingFeature>()
     private var qrScanFenixFeature: ViewBoundFeatureWrapper<QrScanFenixFeature>? =
         ViewBoundFeatureWrapper<QrScanFenixFeature>()
@@ -297,6 +300,17 @@ class BrowserFragment : BaseBrowserFragment(), UserInteractionHandler, SystemIns
             owner = this,
             view = view,
         )
+
+        powerSavingModeReaderViewBinding.set(
+            feature =
+                PowerSavingModeReaderViewBinding(
+                    browserStore = context.components.core.store,
+                    appStore = context.components.appStore,
+                    readerModeController = readerMenuController,
+                ),
+            owner = this,
+            view = view,
+        )
     }
 
     private fun initTranslationsUpdates(context: Context, rootView: View) {
@@ -367,7 +381,10 @@ class BrowserFragment : BaseBrowserFragment(), UserInteractionHandler, SystemIns
                     onListenClicked = {
                         context.components.core.store.state.selectedTab?.let { tab ->
                             context.components.listenToPage.store.dispatch(
-                                ListenAction.Session.ListenRequested(tabId = tab.id, url = tab.content.url)
+                                ListenAction.Session.ListenRequested(
+                                    tabId = tab.id,
+                                    url = tab.readerState.activeUrl ?: tab.content.url,
+                                )
                             )
                         }
                     },
@@ -397,8 +414,7 @@ class BrowserFragment : BaseBrowserFragment(), UserInteractionHandler, SystemIns
                     )
             },
             navigateToIpProtection = {
-                findNavController()
-                    .navigate(BrowserFragmentDirections.actionGlobalIpProtectionDialog(IPProtectionSurface.BROWSER))
+                IPProtectionBottomSheetFragment.showPrompt(fragment = this, surface = IPProtectionSurface.BROWSER)
             },
         )
     }

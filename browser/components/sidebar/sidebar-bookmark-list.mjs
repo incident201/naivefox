@@ -231,7 +231,12 @@ export class SidebarBookmarkList extends SidebarTabList {
           @mouseenter=${e => this.#updateFolderTooltip(e, title)}
           .guid=${tabItem.guid}
         >
-          ${title}
+          <span
+            class="bookmark-folder-title text-truncated-ellipsis"
+            dir="auto"
+          >
+            ${title}
+          </span>
         </div>`;
       }
       return html`
@@ -249,7 +254,12 @@ export class SidebarBookmarkList extends SidebarTabList {
             @auxclick=${e => this.#onFolderAuxClick(e, tabItem.guid)}
             @mouseenter=${e => this.#updateFolderTooltip(e, title)}
           >
-            ${title}
+            <span
+              class="bookmark-folder-title text-truncated-ellipsis"
+              dir="auto"
+            >
+              ${title}
+            </span>
           </summary>
           <div id="content">
             <sidebar-bookmark-list

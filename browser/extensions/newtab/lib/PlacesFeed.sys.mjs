@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+/** @import {Store} from "resource://newtab/lib/Store.sys.mjs" */
+
 import {
   actionCreators as ac,
   actionTypes as at,
@@ -127,6 +129,9 @@ class PlacesObserver {
 }
 
 export class PlacesFeed {
+  /** @type {Store} */
+  store = null;
+
   constructor() {
     this.placesChangedTimer = null;
     this.customDispatch = this.customDispatch.bind(this);
@@ -145,8 +150,8 @@ export class PlacesFeed {
   /**
    * setTimeout - A custom function that creates an nsITimer that can be cancelled
    *
-   * @param {func} callback       A function to be executed after the timer expires
-   * @param {int}  delay          The time (in ms) the timer should wait before the function is executed
+   * @param {() => void} callback    A function to be executed after the timer expires
+   * @param {number}  delay          The time (in ms) the timer should wait before the function is executed
    */
   setTimeout(callback, delay) {
     let timer = Cc["@mozilla.org/timer;1"].createInstance(Ci.nsITimer);
@@ -195,8 +200,8 @@ export class PlacesFeed {
    *           on such a generic level.
    *
    * @param  {null} subject
-   * @param  {str} topic   The name of the event
-   * @param  {str} value   The data associated with the event
+   * @param  {string} topic   The name of the event
+   * @param  {string} value   The data associated with the event
    */
   observe(subject, topic, value) {
     if (topic === LINK_BLOCKED_EVENT) {
@@ -323,7 +328,7 @@ export class PlacesFeed {
    * to send back to the ads service when requesting new topsite ads
    * from the unified ads service
    *
-   * @param {Array} block_key
+   * @param {Array} keysArray
    *   An array of the (string) keys
    */
   addToUnifiedAdsBlockedAdsList(keysArray) {

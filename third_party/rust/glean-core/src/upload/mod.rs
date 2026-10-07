@@ -32,6 +32,7 @@ use directory::{PingDirectoryManager, PingPayloadsByDirectory};
 use policy::Policy;
 use request::create_date_header_value;
 
+use crate::database::StoredSubmittedPingHandler;
 pub use directory::{PingMetadata, PingPayload};
 pub use request::{HeaderMap, PingRequest};
 pub use result::{UploadResult, UploadTaskAction};
@@ -2163,7 +2164,7 @@ mod test {
         let pings = glean.storage().get_all_submitted_pings();
         assert_eq!(pings.len(), 1);
         let ping = pings.first().unwrap();
-        assert!(ping.submitted_date.0 <= Utc::now());
+        assert!(ping.submitted_date() <= Utc::now());
         assert!(ping.uploaded_date.is_none());
 
         // Get the submitted PingRequest
@@ -2179,7 +2180,7 @@ mod test {
         let pings = glean.storage().get_all_submitted_pings();
         assert_eq!(pings.len(), 1);
         let ping = pings.first().unwrap();
-        assert!(ping.submitted_date.0 <= Utc::now());
+        assert!(ping.submitted_date() <= Utc::now());
         assert!(ping.uploaded_date.is_some());
 
         // Verify that after request is returned, none are left
@@ -2212,7 +2213,7 @@ mod test {
         let pings = glean.storage().get_all_submitted_pings();
         assert_eq!(pings.len(), 1);
         let ping = pings.first().unwrap();
-        assert!(ping.submitted_date.0 <= Utc::now());
+        assert!(ping.submitted_date() <= Utc::now());
         assert!(ping.uploaded_date.is_none());
 
         // Get the submitted PingRequest
@@ -2228,7 +2229,7 @@ mod test {
         let pings = glean.storage().get_all_submitted_pings();
         assert_eq!(pings.len(), 1);
         let ping = pings.first().unwrap();
-        assert!(ping.submitted_date.0 <= Utc::now());
+        assert!(ping.submitted_date() <= Utc::now());
         assert!(ping.upload_failed.is_some());
         assert!(ping.uploaded_date.is_none());
 

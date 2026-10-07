@@ -992,8 +992,8 @@ class SVGFilterObserverListForCSSProp final : public SVGFilterObserverList {
   }
 
  protected:
-  SVGFilterObserverListForCSSProp(const SVGFilterObserverListForCSSProp& aOther)
-      : SVGFilterObserverList(aOther) {}
+  SVGFilterObserverListForCSSProp(const SVGFilterObserverListForCSSProp&) =
+      default;
 
   void OnRenderingChange(Element* aObservingElement) override;
 };
@@ -1039,10 +1039,7 @@ class SVGFilterObserverListForCanvasContext final
 
  private:
   SVGFilterObserverListForCanvasContext(
-      const SVGFilterObserverListForCanvasContext& aOther)
-      : SVGFilterObserverList(aOther),
-        mContext(aOther.mContext),
-        mActive(aOther.mActive) {}
+      const SVGFilterObserverListForCanvasContext&) = default;
 
   CanvasRenderingContext2D* mContext;
   bool mActive = true;
@@ -1330,6 +1327,9 @@ NS_DECLARE_FRAME_PROPERTY_RELEASABLE(OffsetPathProperty,
 template <class T>
 static T* GetEffectProperty(SVGReference* aReference, nsIFrame* aFrame,
                             const FramePropertyDescriptor<T>* aProperty) {
+  // Continuations can come and go during reflow, and we don't need to observe
+  // the referenced element more than once for a given node.
+  aFrame = aFrame->FirstContinuation();
   if (!aReference) {
     return nullptr;
   }
@@ -1392,6 +1392,7 @@ static SVGFilterObserverListForCSSProp* GetOrCreateFilterObserverListForCSS(
     nsIFrame* aFrame, bool aHasFilters,
     FrameProperties::Descriptor<P> aProperty,
     Span<const StyleFilter> aFilters) {
+  MOZ_ASSERT(!aFrame->GetPrevContinuation(), "Require first continuation");
   if (!aHasFilters) {
     return nullptr;
   }
@@ -1729,6 +1730,9 @@ void SVGObserverUtils::RemoveTemplateObserver(nsIFrame* aFrame) {
 
 Element* SVGObserverUtils::GetAndObserveBackgroundImage(nsIFrame* aFrame,
                                                         const nsAtom* aHref) {
+  // Continuations can come and go during reflow, and we don't need to observe
+  // the referenced element more than once for a given node.
+  aFrame = aFrame->FirstContinuation();
   URIObserverHashtable* hashtable =
       aFrame->GetOrCreateDeletableProperty(BackgroundImageProperty());
   nsAutoString localRef = u"#"_ns + nsDependentAtomString(aHref);
@@ -1750,6 +1754,9 @@ Element* SVGObserverUtils::GetAndObserveBackgroundImage(nsIFrame* aFrame,
 }
 
 Element* SVGObserverUtils::GetAndObserveBackgroundClip(nsIFrame* aFrame) {
+  // Continuations can come and go during reflow, and we don't need to observe
+  // the referenced element more than once for a given node.
+  aFrame = aFrame->FirstContinuation();
   BackgroundClipRenderingObserver* obs = aFrame->GetOrCreateReleasableProperty(
       BackgroundClipObserverProperty(), aFrame);
   return obs->GetAndObserveReferencedElement();

@@ -30,10 +30,24 @@ from mozharness.base.script import (
     ScriptMixin,
 )
 
-external_tools_path = os.path.join(
-    os.path.abspath(os.path.dirname(os.path.dirname(mozharness.__file__))),
-    "external_tools",
+PERFHERDER_SCHEMA_RELPATH = os.path.join(
+    "testing",
+    "performance",
+    "common",
+    "performance-artifact-schema.json",
 )
+
+
+def perfherder_schema_path():
+    mozharness_root = os.path.abspath(
+        os.path.dirname(os.path.dirname(mozharness.__file__))
+    )
+    topsrcdir = os.path.dirname(os.path.dirname(mozharness_root))
+    for root in (topsrcdir, mozharness_root):
+        path = os.path.join(root, PERFHERDER_SCHEMA_RELPATH)
+        if os.path.exists(path):
+            return path
+    return os.path.join(topsrcdir, PERFHERDER_SCHEMA_RELPATH)
 
 
 class MultipleWheelMatchError(Exception):
@@ -991,9 +1005,7 @@ class ResourceMonitoringMixin(PerfherderResourceOptionsMixin):
                 "suites": suites,
             }
 
-            schema_path = os.path.join(
-                external_tools_path, "performance-artifact-schema.json"
-            )
+            schema_path = perfherder_schema_path()
             with open(schema_path, "rb") as fh:
                 schema = json.load(fh)
 

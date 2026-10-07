@@ -9,7 +9,7 @@
 use api::{CrashAnnotator, ExternalTextureHandle, ImageBufferKind, ImageFormat, ImageRendering, MixBlendMode, VoidPtrToSizeFn};
 use api::units::*;
 use crate::composite::NativeSurfaceHandle;
-use crate::internal_types::{FastHashMap, Swizzle};
+use crate::internal_types::{FastHashMap, RenderTargetInfo, Swizzle};
 use std::{
     cell::{Cell, RefCell},
     mem,
@@ -270,6 +270,9 @@ bitflags! {
 pub struct Texture {
     /// Backend-defined identifier of the texture.
     pub(super) id: u32,
+    /// Unique identifier naming this texture as a render target. Unlike `id`,
+    /// never reused, even when the backend hands out repeated names.
+    pub(super) target_id: TextureId,
     pub(super) target: ImageBufferKind,
     pub(super) format: ImageFormat,
     pub(super) size: DeviceIntSize,
@@ -277,28 +280,9 @@ pub struct Texture {
     pub(super) flags: TextureFlags,
     /// An internally mutable swizzling state that may change between batches.
     pub(super) active_swizzle: Cell<Swizzle>,
-    /// Backend-defined handle for rendering to this texture.
-    ///
-    /// Empty if this texture is not used as a render target or if a depth buffer is needed.
-    pub(super) fbo: Option<FBOId>,
-    /// Same as the above, but with a depth buffer attached.
-    ///
-    /// FBOs are cheap to create but expensive to reconfigure (since doing so
-    /// invalidates framebuffer completeness caching). Moreover, rendering with
-    /// a depth buffer attached but the depth write+test disabled relies on the
-    /// driver to optimize it out of the rendering pass, which most drivers
-    /// probably do but, according to jgilbert, is best not to rely on.
-    ///
-    /// So we lazily generate a second list of FBOs with depth. This list is
-    /// empty if this texture is not used as a render target _or_ if it is, but
-    /// the depth buffer has never been requested.
-    ///
-    /// Note that we always fill fbo, and then lazily create fbo_with_depth
-    /// when needed. We could make both lazy (i.e. render targets would have one
-    /// or the other, but not both, unless they were actually used in both
-    /// configurations). But that would complicate a lot of logic in this module,
-    /// and FBOs are cheap enough to create.
-    pub(super) fbo_with_depth: Option<FBOId>,
+    /// Set if this texture can be rendered to, and whether a depth buffer has
+    /// been requested for it. The backend owns whatever attaches the two.
+    pub(super) render_target: Option<RenderTargetInfo>,
     pub(super) last_frame_used: GpuFrameId,
 }
 
@@ -320,7 +304,7 @@ impl Texture {
     }
 
     pub fn supports_depth(&self) -> bool {
-        self.fbo_with_depth.is_some()
+        self.render_target.map_or(false, |info| info.has_depth)
     }
 
     pub fn last_frame_used(&self) -> GpuFrameId {
@@ -403,29 +387,55 @@ impl Drop for Program {
     }
 }
 
-pub struct VAO {
-    /// Backend-defined identifier of the vertex array.
-    pub(super) id: u32,
-    pub(super) ibo_id: IBOId,
-    pub(super) main_vbo_id: VBOId,
-    pub(super) instance_vbo_id: VBOId,
-    pub(super) instance_stride: usize,
-    pub(super) instance_divisor: u32,
-    pub(super) owns_vertices_and_indices: bool,
-    pub(super) owns_instances: bool,
+/// What a buffer holds, which decides how a backend places it.
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum BufferKind {
+    Vertex,
+    Index,
 }
 
-impl VAO {
+/// A GPU buffer of vertex, instance or index data. Its storage is allocated
+/// by the first write or reallocation.
+#[derive(Debug)]
+pub struct Buffer {
+    /// Backend-defined identifier of the buffer.
+    pub(super) id: u32,
+    pub(super) kind: BufferKind,
+    /// Size of the current storage in bytes.
+    pub(super) size: usize,
+}
+
+impl Drop for Buffer {
+    fn drop(&mut self) {
+        debug_assert!(
+            thread::panicking() || self.id == 0,
+            "renderer::deinit not called"
+        );
+    }
+}
+
+/// Backend-defined identifier of a buffer, for naming one a vertex array reads.
+#[derive(PartialEq, Eq, Hash, Debug, Copy, Clone)]
+pub struct BufferId(pub(super) u32);
+
+/// A vertex layout together with the buffers its attributes and indices are
+/// read from, bound as a unit for drawing.
+pub struct VertexArray {
+    /// Backend-defined identifier of the vertex array.
+    pub(super) id: u32,
+    pub(super) vertices: BufferId,
+    pub(super) instances: Option<BufferId>,
+    pub(super) indices: Option<BufferId>,
+    pub(super) instance_stride: usize,
+}
+
+impl VertexArray {
     pub fn instance_stride(&self) -> usize {
         self.instance_stride
     }
-
-    pub fn instance_vbo_id(&self) -> VBOId {
-        self.instance_vbo_id
-    }
 }
 
-impl Drop for VAO {
+impl Drop for VertexArray {
     fn drop(&mut self) {
         debug_assert!(
             thread::panicking() || self.id == 0,
@@ -505,18 +515,9 @@ impl<'a> Drop for MappedTransferBuffer<'a> {
     }
 }
 
-/// Backend-defined identifier of a framebuffer, i.e. a set of attachments
-/// that can be drawn to or read from.
+/// Backend-defined identifier of a texture, for naming one as a target.
 #[derive(PartialEq, Eq, Hash, Debug, Copy, Clone)]
-pub struct FBOId(pub(super) u32);
-
-/// Backend-defined identifier of a vertex buffer.
-#[derive(PartialEq, Eq, Hash, Debug, Copy, Clone)]
-pub struct VBOId(pub(super) u32);
-
-/// Backend-defined identifier of an index buffer.
-#[derive(PartialEq, Eq, Hash, Debug, Copy, Clone)]
-pub struct IBOId(pub(super) u32);
+pub struct TextureId(pub(super) u64);
 
 #[derive(Clone, Debug)]
 pub(super) enum ProgramSourceType {
@@ -685,14 +686,16 @@ pub enum BlendMode {
     ShowOverdraw,
 }
 
-/// How the existing contents of a color attachment are treated when a
-/// render pass begins.
+/// How the existing contents of an attachment are treated when a render
+/// pass begins. Applies to the whole attachment.
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub enum LoadOp {
+pub enum LoadOp<T> {
     Load,
     /// The pass overwrites everything it later reads, so tiled GPUs need not
     /// load the previous contents.
     DontCare,
+    /// The attachment starts out cleared to the given value.
+    Clear(T),
 }
 
 /// What happens to an attachment's contents when a render pass ends.
@@ -734,7 +737,9 @@ pub struct RenderPassDescriptor {
     /// The region of the target this pass writes to, if known. Tiled GPUs
     /// only need to load and store this region.
     pub render_area: Option<DeviceIntRect>,
-    pub color_load: LoadOp,
+    pub color_load: LoadOp<[f32; 4]>,
+    /// May only be `Clear` when the target has a depth attachment.
+    pub depth_load: LoadOp<f32>,
 }
 
 /// Describes the graphics API and driver a device is running on.
@@ -753,21 +758,17 @@ pub struct DeviceOptions {
     pub upload_method: UploadMethod,
     pub batched_upload_threshold: i32,
     pub cached_programs: Option<Rc<ProgramCache>>,
-    pub allow_texture_storage_support: bool,
     pub allow_texture_swizzling: bool,
     pub dump_shader_source: Option<String>,
     pub surface_origin_is_top_left: bool,
-    pub panic_on_gl_error: bool,
 }
 
 #[derive(Debug)]
 pub struct Capabilities {
     /// Whether multisampled render targets are supported.
     pub supports_multisampling: bool,
-    /// Whether the function `glCopyImageSubData` is available.
-    pub supports_copy_image_sub_data: bool,
-    /// Whether the device supports persistently mapped buffers, via glBufferStorage.
-    pub supports_buffer_storage: bool,
+    /// Whether upload buffers can stay mapped while the GPU reads from them.
+    pub supports_persistent_upload_buffers: bool,
     /// Whether advanced blend equations are supported.
     pub supports_advanced_blend_equation: bool,
     /// Whether advanced blend equations are coherent, meaning no barrier is
@@ -775,23 +776,13 @@ pub struct Capabilities {
     pub supports_advanced_blend_equation_coherent: bool,
     /// Whether dual-source blending is supported.
     pub supports_dual_source_blending: bool,
-    /// Whether KHR_debug is supported for getting debug messages from
-    /// the driver.
-    pub supports_khr_debug: bool,
-    /// Whether we can configure texture units to do swizzling on sampling.
-    pub supports_texture_swizzle: bool,
-    /// Whether the driver supports uploading to textures from a non-zero
-    /// offset within a PBO.
-    pub supports_nonzero_pbo_offsets: bool,
-    /// Whether the driver supports specifying the texture usage up front.
-    pub supports_texture_usage: bool,
+    /// Whether a texture can be uploaded from an offset other than zero
+    /// within an upload buffer.
+    pub supports_upload_buffer_offsets: bool,
     /// Whether offscreen render targets can be partially updated.
     pub supports_render_target_partial_update: bool,
     /// Whether we can use SSBOs.
     pub supports_shader_storage_object: bool,
-    /// Whether to enforce that texture uploads be batched regardless of what
-    /// the pref says.
-    pub requires_batched_texture_uploads: Option<bool>,
     /// Whether we are able to ue glClear to clear regions of an alpha render target.
     /// If false, we must use a shader to clear instead.
     pub supports_alpha_target_clears: bool,
@@ -801,23 +792,18 @@ pub struct Capabilities {
     /// Whether clearing a render target (immediately after binding it) is faster using a scissor
     /// rect to clear just the required area, or clearing the entire target without a scissor rect.
     pub prefers_clear_scissor: bool,
-    /// Whether the driver can correctly invalidate render targets. This can be
-    /// a worthwhile optimization, but is buggy on some devices.
-    pub supports_render_target_invalidate: bool,
     /// Whether the driver can reliably upload data to R8 format textures.
     pub supports_r8_texture_upload: bool,
-    /// Whether the extension QCOM_tiled_rendering is supported.
-    pub supports_qcom_tiled_rendering: bool,
     /// Whether clip-masking is supported natively by the GL implementation
     /// rather than emulated in shaders.
     pub uses_native_clip_mask: bool,
     /// Whether anti-aliasing is supported natively by the GL implementation
     /// rather than emulated in shaders.
     pub uses_native_antialiasing: bool,
-    /// Whether the extension GL_OES_EGL_image_external_essl3 is supported. If true, external
-    /// textures can be used as normal. If false, external textures can only be rendered with
-    /// certain shaders, and must first be copied in to regular textures for others.
-    pub supports_image_external_essl3: bool,
+    /// If true, external textures can be used as normal. If false, external
+    /// textures can only be rendered with certain shaders, and must first be
+    /// copied in to regular textures for others.
+    pub supports_external_textures_in_all_shaders: bool,
     /// Whether rectangle textures (GL_TEXTURE_RECTANGLE) can be sampled.
     pub supports_texture_rect: bool,
     /// Whether external textures (GL_TEXTURE_EXTERNAL_OES) can be sampled.
@@ -827,8 +813,6 @@ pub struct Capabilities {
     /// Whether pixels read back from the default framebuffer arrive with the
     /// top row first.
     pub readback_rows_top_down: bool,
-    /// Whether the VAO must be rebound after an attached VBO has been orphaned.
-    pub requires_vao_rebind_after_orphaning: bool,
     /// Whether glReadPixels can read back BGRA directly (e.g. on GLES this
     /// requires GL_EXT_read_format_bgra). If false, callers must read RGBA
     /// instead and swap the red and blue channels themselves.
@@ -910,8 +894,7 @@ pub enum DrawTarget {
         dimensions: DeviceIntSize,
         /// Whether to draw with the texture's associated depth target
         with_depth: bool,
-        /// FBO that corresponds to the selected layer / depth mode
-        fbo_id: FBOId,
+        texture: TextureId,
     },
     /// An OS compositor surface
     NativeSurface {
@@ -943,15 +926,12 @@ impl DrawTarget {
         texture: &Texture,
         with_depth: bool,
     ) -> Self {
-        let fbo_id = if with_depth {
-            texture.fbo_with_depth.unwrap()
-        } else {
-            texture.fbo.unwrap()
-        };
+        assert!(texture.render_target.is_some(), "drawing to a non-render-target texture");
+        assert!(!with_depth || texture.supports_depth(), "drawing with depth to a texture without it");
 
         DrawTarget::Texture {
             dimensions: texture.get_dimensions(),
-            fbo_id,
+            texture: texture.target_id,
             with_depth,
         }
     }
@@ -1038,14 +1018,13 @@ impl DrawTarget {
 pub enum ReadTarget {
     /// Use the device's default draw target.
     Default,
-    /// Use the provided texture,
+    /// Use the provided texture, which must be a render target.
     Texture {
-        /// ID of the FBO to read from.
-        fbo_id: FBOId,
+        texture: TextureId,
     },
-    /// An FBO bound to a native (OS compositor) surface
+    /// A native (OS compositor) surface
     NativeSurface {
-        fbo_id: FBOId,
+        handle: NativeSurfaceHandle,
         offset: DeviceIntPoint,
     },
 }
@@ -1054,8 +1033,9 @@ impl ReadTarget {
     pub fn from_texture(
         texture: &Texture,
     ) -> Self {
+        assert!(texture.render_target.is_some(), "reading from a non-render-target texture");
         ReadTarget::Texture {
-            fbo_id: texture.fbo.unwrap(),
+            texture: texture.target_id,
         }
     }
 
@@ -1080,13 +1060,10 @@ impl From<DrawTarget> for ReadTarget {
                 ReadTarget::Default
             }
             DrawTarget::NativeSurface { handle, offset, .. } => {
-                ReadTarget::NativeSurface {
-                    fbo_id: FBOId(handle.0 as u32),
-                    offset,
-                }
+                ReadTarget::NativeSurface { handle, offset }
             }
-            DrawTarget::Texture { fbo_id, .. } => {
-                ReadTarget::Texture { fbo_id }
+            DrawTarget::Texture { texture, .. } => {
+                ReadTarget::Texture { texture }
             }
         }
     }

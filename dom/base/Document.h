@@ -175,7 +175,6 @@ class nsIVariant;
 class nsNodeInfoManager;
 class nsPIWindowRoot;
 class nsPresContext;
-class nsRange;
 class nsTextNode;
 class nsViewManager;
 class nsViewportInfo;
@@ -273,6 +272,7 @@ enum class SkipTransitionReason : uint8_t;
 class ProcessingInstruction;
 class Promise;
 struct PropertyDefinition;
+class Range;
 class ScriptLoader;
 class Selection;
 class ServiceWorkerDescriptor;
@@ -1658,6 +1658,7 @@ class Document : public nsINode,
   nsresult InitCSP(nsIChannel* aChannel);
   nsresult InitIntegrityPolicy(nsIChannel* aChannel);
   nsresult InitIntegrityPolicyWAICT(nsIChannel* aChannel);
+  nsresult InitConnectionAllowlists(nsIChannel* aChannel);
   nsresult InitCOEP(nsIChannel* aChannel);
   nsresult InitDocPolicy(nsIChannel* aChannel);
   nsresult InitTLSCertificateBinding(nsIChannel* aChannel);
@@ -3616,7 +3617,7 @@ class Document : public nsINode,
   already_AddRefed<Event> CreateEvent(const nsAString& aEventType,
                                       CallerType aCallerType,
                                       ErrorResult& rv) const;
-  already_AddRefed<nsRange> CreateRange(ErrorResult& rv);
+  already_AddRefed<Range> CreateRange(ErrorResult& rv);
   already_AddRefed<NodeIterator> CreateNodeIterator(nsINode& aRoot,
                                                     uint32_t aWhatToShow,
                                                     NodeFilter* aFilter,
@@ -3661,6 +3662,7 @@ class Document : public nsINode,
   Document* Open(const mozilla::dom::Optional<nsAString>& /* unused */,
                  const mozilla::dom::Optional<nsAString>& /* unused */,
                  mozilla::ErrorResult& aError);
+  MOZ_CAN_RUN_SCRIPT
   mozilla::dom::Nullable<mozilla::dom::WindowProxyHolder> Open(
       const nsACString& aURL, const nsAString& aName,
       const nsAString& aFeatures, mozilla::ErrorResult& rv);
@@ -3872,7 +3874,7 @@ class Document : public nsINode,
    * Wrapper around CaretPositionFromPoint that returns Range instead of
    * CaretPosition.
    */
-  already_AddRefed<nsRange> CaretRangeFromPoint(int32_t aX, int32_t aY);
+  already_AddRefed<Range> CaretRangeFromPoint(int32_t aX, int32_t aY);
 
   MOZ_CAN_RUN_SCRIPT Element* GetScrollingElement();
   // Like GetScrollingElement, but does not flush pending layout. Callers get
@@ -4012,12 +4014,6 @@ class Document : public nsINode,
   // Reports document use counters via telemetry.  This method only has an
   // effect once per document, and so is called during document destruction.
   void ReportDocumentUseCounters();
-
-  // Report the names of the HTMLDocument properties that had
-  // been shadowed using ID/name, and which were subsequently accessed
-  // ("DOM clobbering"). This data is collected by the corresponding NamedGetter
-  // method and limited to 10 unique entries.
-  void ReportShadowedProperties();
 
   // Reports largest contentful paint via telemetry. We want the most up to
   // date value for LCP and so this is called during document destruction.
@@ -4526,7 +4522,7 @@ class Document : public nsINode,
 
   dom::XPathEvaluator* XPathEvaluator();
 
-  void MaybeInitializeFinalizeFrameLoaders();
+  MOZ_CAN_RUN_SCRIPT void MaybeInitializeFinalizeFrameLoaders();
 
   void SetDelayFrameLoaderInitialization(bool aDelayFrameLoaderInitialization) {
     mDelayFrameLoaderInitialization = aDelayFrameLoaderInitialization;
@@ -4944,7 +4940,8 @@ class Document : public nsINode,
   Element* GetScrollingElementImpl(Flush);
   bool IsPotentiallyScrollableImpl(HTMLBodyElement* aBody, Flush);
 
-  void MaybeAllowStorageForOpenerAfterUserInteraction();
+  void MaybeAllowStorageForOpenerAfterUserInteraction(
+      bool aHadPriorUserInteraction);
 
   void MaybeStoreUserInteractionAsPermission();
 
@@ -5818,7 +5815,7 @@ class Document : public nsINode,
 
   nsTArray<RefPtr<nsFrameLoader>> mInitializableFrameLoaders;
   nsTArray<nsCOMPtr<nsIRunnable>> mFrameLoaderFinalizers;
-  RefPtr<nsRunnableMethod<Document>> mFrameLoaderRunner;
+  RefPtr<nsIRunnable> mFrameLoaderRunner;
 
   nsTArray<PendingFrameStaticClone> mPendingFrameStaticClones;
 
@@ -5966,14 +5963,28 @@ class Document : public nsINode,
   // See SetNotifyFormOrPasswordRemoved and ShouldNotifyFormOrPasswordRemoved.
   bool mShouldNotifyFormOrPasswordRemoved;
 
-  // Used by the shadowed_html_document_property_access telemetry probe to
-  // collected shadowed HTMLDocument properties. (Limited to 10 entries)
-  nsTArray<nsString> mShadowedHTMLDocumentProperties;
-
   // Collection of data used by the pageload event.
   PageloadEventData mPageloadEventData;
 
-  // Submit the page load event at the end of the document's lifetime.
+  // Whether AccumulatePageLoadTelemetry() collected metrics, and whether the
+  // tab was foreground when the load event started. Background loads are still
+  // reported, but are left out of the paint and load timing histograms, as is
+  // a load whose load event never fired.
+  bool mPageLoadMetricsAccumulated = false;
+  bool mPageLoadWasForeground = false;
+
+  // Whether the load event fired. Tracked separately from loadTime, which is
+  // only set for a strictly positive duration.
+  bool mPageLoadCompleted = false;
+
+  // Whether ReportPageLoadTelemetry() has already run for this document.
+  bool mPageLoadTelemetryReported = false;
+
+  // Submit the page load event and the LCP histograms, once the document is
+  // hidden or at the end of its lifetime if it never was. ReportPageLoadEvent
+  // must run first: ReportLCP skips its histogram when the event carried the
+  // same LCP value.
+  void ReportPageLoadTelemetry();
   void ReportPageLoadEvent();
 
   // Accumulate JS telemetry collected

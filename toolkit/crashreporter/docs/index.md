@@ -237,7 +237,11 @@ testing but quite a few have only internal users.
 - `MOZ_CRASHREPORTER_SHUTDOWN` - Save the minidump and then force the
   application to close. This is useful for content crashes that don't normally
   close the chrome (main application) processes. This variable would cause the
-  application to close as well.
+  application to close as well. A utility or socket process crash only closes
+  the application if a minidump was saved. A child the OS killed leaves none,
+  so it does not take the application down with it. With the crash reporter
+  disabled no minidump is ever saved, and any such crash closes the
+  application.
 - `MOZ_CRASHREPORTER_URL` - Sets the URL that the crash reporter will submit
   reports to.
 

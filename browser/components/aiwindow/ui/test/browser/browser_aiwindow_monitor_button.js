@@ -47,6 +47,7 @@ add_setup(async function setup() {
       ["browser.urlbar.suggest.searches", false],
       ["browser.smartwindow.endpoint", "http://localhost:0/v1"],
       ["browser.smartwindow.firstrun.hasCompleted", true],
+      ["browser.smartwindow.enabled", true],
       ["browser.smartwindow.agent.enabled", true],
       ["browser.smartwindow.agent.toolbar.enabled", true],
       ["browser.smartwindow.agent.supportedRegions", TEST_REGION],

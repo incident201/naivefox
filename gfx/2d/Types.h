@@ -737,7 +737,7 @@ inline ColorSpace2 ToColorSpace2(const YUVColorSpace in) {
     case YUVColorSpace::Identity:
       return ColorSpace2::SRGB;
   }
-  MOZ_ASSERT_UNREACHABLE();
+  MOZ_CRASH("bad YUVColorSpace");
 }
 
 inline YUVColorSpace ToYUVColorSpace(const ColorSpace2 in) {
@@ -755,7 +755,7 @@ inline YUVColorSpace ToYUVColorSpace(const ColorSpace2 in) {
     case ColorSpace2::DISPLAY_P3:
       MOZ_CRASH("Bad ColorSpace2 for ToYUVColorSpace");
   }
-  MOZ_ASSERT_UNREACHABLE();
+  MOZ_CRASH("bad ColorSpace2");
 }
 
 struct FromYUVRangedColorSpaceT final {

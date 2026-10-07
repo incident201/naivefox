@@ -9,6 +9,7 @@
 #include "mozilla/EventForwards.h"
 #include "mozilla/WeakPtr.h"
 #include "mozilla/dom/EditContextBinding.h"
+#include "nsGenericHTMLElement.h"
 
 class nsTextNode;
 
@@ -165,8 +166,8 @@ class EditContext final : public DOMEventTargetHelper, public SupportsWeakPtr {
                               nsTArray<LayoutDeviceIntRect>& aRects) const;
 
  private:
-  EditContext(nsIGlobalObject* aGlobalObject, const EditContextInit& aInit,
-              ErrorResult& aRv);
+  explicit EditContext(nsIGlobalObject* aGlobalObject);
+  void Init(const EditContextInit& aInit, ErrorResult& aRv);
   ~EditContext() = default;
 
   enum class IsFromFocus : bool { No, Yes };

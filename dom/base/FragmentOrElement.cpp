@@ -61,7 +61,7 @@
 #include "nsString.h"
 #include "nsXULElement.h"
 #ifdef DEBUG
-#  include "nsRange.h"
+#  include "mozilla/dom/Range.h"
 #endif
 
 #include "ChildIterator.h"
@@ -1440,7 +1440,7 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(FragmentOrElement)
     if (MOZ_UNLIKELY(element->HasFlag(ELEMENT_HAS_EDIT_CONTEXT))) {
       element->ClearEditContext();
     }
-    Element::UnlinkCustomElementRegistry(element);
+    CustomElementRegistry::RemoveScopedRegistry(*element);
   }
 
 NS_IMPL_CYCLE_COLLECTION_UNLINK_END

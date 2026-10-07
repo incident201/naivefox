@@ -96,6 +96,7 @@ class SwipeTracker final : public nsARefreshObserver {
   bool mEventsAreControllingSwipe = true;
   bool mEventsHaveStartedNewGesture = false;
   bool mRegisteredWithRefreshDriver = false;
+  bool mLastComputedSwipeSuccess = false;
 };
 
 struct SwipeEventQueue {

@@ -90,6 +90,7 @@
 #include "mozilla/AppShutdown.h"
 #include "mozilla/AutoRestore.h"
 #include "mozilla/Components.h"
+#include "mozilla/DynamicallyLinkedFunctionPtr.h"
 #include "mozilla/Likely.h"
 #include "mozilla/Logging.h"
 #include "mozilla/MathAlgorithms.h"
@@ -904,12 +905,8 @@ void nsWindow::SendAnAPZEvent(InputData& aEvent) {
   if (aEvent.mInputType == PANGESTURE_INPUT) {
     PanGestureInput& panInput = aEvent.AsPanGestureInput();
     WidgetWheelEvent event = panInput.ToWidgetEvent(this);
-    if (!mAPZC) {
-      if (MayStartSwipeForNonAPZ(panInput)) {
-        return;
-      }
-    } else {
-      event = MayStartSwipeForAPZ(panInput, result);
+    if (mAPZC) {
+      event = MayStartSwipe(panInput, result);
     }
 
     ProcessUntransformedAPZEvent(&event, result);
@@ -3494,6 +3491,9 @@ void nsWindow::OnFullscreenChanged(nsSizeMode aOldSizeMode, bool aFullScreen) {
       mFrameState->GetSizeMode() == nsSizeMode_Minimized ||
       aOldSizeMode == nsSizeMode_Minimized;
   if (!toOrFromMinimized) {
+    if (aFullScreen) {
+      TaskbarConcealer::OnFullscreenWillBeEntered(this);
+    }
     InfallibleMakeFullScreen(aFullScreen);
   }
 
@@ -6476,8 +6476,10 @@ void nsWindow::OnWindowPosChanged(WINDOWPOS* wp) {
     }
   }
 
-  // Recompute tiled state.
-  SetIsTiled(mWnd && ::IsWindowArranged(mWnd));
+  // Recompute tiled state. IsWindowArranged is missing before Windows 10 1903.
+  static const StaticDynamicallyLinkedFunctionPtr<decltype(&::IsWindowArranged)>
+      pIsWindowArranged(L"user32.dll", "IsWindowArranged");
+  SetIsTiled(mWnd && pIsWindowArranged && pIsWindowArranged(mWnd));
 
   // Notify visibility change when window is activated.
   if (!(wp->flags & SWP_NOACTIVATE) && NeedsToTrackWindowOcclusionState()) {

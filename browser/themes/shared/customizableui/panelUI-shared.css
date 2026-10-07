@@ -1897,6 +1897,7 @@ panelview .toolbarbutton-1 {
 ) {
   color: var(--button-text-color-menu);
   background-color: var(--button-background-color-menu);
+  fill: currentColor;
 
   &:focus-visible {
     outline: var(--focus-outline);
@@ -2221,8 +2222,10 @@ radiogroup:focus-visible > .subviewradio[focused="true"] {
 
   &:hover {
     background-color: var(--button-background-color-hover);
+    color: var(--button-text-color-hover);
     &:active {
       background-color: var(--button-background-color-active);
+      color: var(--button-text-color-active);
     }
   }
 }
@@ -2509,8 +2512,10 @@ radiogroup:focus-visible > .subviewradio[focused="true"] {
 
   &:hover {
     background-color: var(--button-background-color-hover);
+    color: var(--button-text-color-hover);
     &:active {
       background-color: var(--button-background-color-active);
+      color: var(--button-text-color-active);
     }
   }
 

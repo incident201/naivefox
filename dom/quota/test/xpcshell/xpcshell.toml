@@ -87,6 +87,8 @@ prefs = [
 
 ["test_createLocalStorage.js"]
 
+["test_estimateGroupUsage.js"]
+
 ["test_estimateOrigin.js"]
 
 ["test_getCachedUsageForPrincipal.js"]

@@ -3772,7 +3772,10 @@ nsCSSBorderImageRenderer::nsCSSBorderImageRenderer(
     if (value > imgDimension && imgDimension > 0) {
       value = imgDimension;
     }
-    mSlice.Side(s) = value;
+    // Round rather than truncate so that two percentages that add up to
+    // exactly 100% of an odd dimension cannot leave a 1 app unit middle band,
+    // which would otherwise be stretched into phantom edge segments.
+    mSlice.Side(s) = NSToCoordRound(value);
 
     const auto& width = aStyleBorder.mBorderImageWidth.Get(s);
     switch (width.tag) {

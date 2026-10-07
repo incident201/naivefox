@@ -64,6 +64,7 @@
 #include "mozilla/StaticAnalysisFunctions.h"
 #include "mozilla/StaticPrefs_dom.h"
 #include "mozilla/StaticPrefs_full_screen_api.h"
+#include "mozilla/StaticPrefs_mathml.h"
 #include "mozilla/StaticString.h"
 #include "mozilla/TextControlElement.h"
 #include "mozilla/TextEditor.h"
@@ -211,7 +212,7 @@
 #include "nsXULElement.h"
 
 #ifdef DEBUG
-#  include "nsRange.h"
+#  include "mozilla/dom/Range.h"
 #endif
 
 #ifdef ACCESSIBILITY
@@ -518,15 +519,6 @@ void Element::TraverseCustomElementRegistry(
   }
 }
 
-/* static */
-void Element::UnlinkCustomElementRegistry(Element* aElement) {
-  if (aElement->GetCustomElementRegistryState() ==
-      CustomElementRegistryState::Scoped) {
-    CustomElementRegistry::RemoveScopedRegistry(*aElement);
-    aElement->SetCustomElementRegistryState(CustomElementRegistryState::Global);
-  }
-}
-
 void Element::Focus(const FocusOptions& aOptions, CallerType aCallerType,
                     ErrorResult& aError) {
   const RefPtr<nsFocusManager> fm = nsFocusManager::GetFocusManager();
@@ -576,7 +568,6 @@ void Element::SetCustomElementRegistry(
       "We shouldn't override an already assigned scoped registry");
 
   if (aCustomElementRegistry->IsScoped()) {
-    SetCustomElementRegistryState(CustomElementRegistryState::Scoped);
     CustomElementRegistry::SetScopedRegistry(*this, *aCustomElementRegistry);
     // https://html.spec.whatwg.org/#scoped-document-set
     // Append element's node document to the registry's scoped document set.
@@ -1593,9 +1584,9 @@ already_AddRefed<ShadowRoot> Element::AttachShadowWithoutNameChecks(
   if (ranges) {
     for (const AbstractRange* range : *ranges) {
       if (range->MayCrossShadowBoundary()) {
-        MOZ_ASSERT(range->IsDynamicRange());
+        MOZ_ASSERT(range->IsRange());
         CrossShadowBoundaryRange* crossBoundaryRange =
-            range->AsDynamicRange()->GetCrossShadowBoundaryRange();
+            range->AsRange()->GetCrossShadowBoundaryRange();
         MOZ_ASSERT(crossBoundaryRange);
         // We may have previously selected this node before it
         // becomes a shadow host, so we need to reset the values
@@ -6086,7 +6077,12 @@ Element* Element::GetPseudoElement(const PseudoStyleRequest& aRequest) const {
 }
 
 ReferrerPolicy Element::GetReferrerPolicyAsEnum() const {
-  if (IsHTMLElement() || IsSVGElement()) {
+  // Currently, referrerpolicy attribute is supported on HTML elements (a, area,
+  // img, iframe, script, link) as well as SVG and MathML <a> elements.
+  // TODO: Restrict to elements specified above for HTML.
+  if (IsHTMLElement() || IsSVGElement(nsGkAtoms::a) ||
+      (IsMathMLElement(nsGkAtoms::a) &&
+       StaticPrefs::mathml_a_element_enabled())) {
     return ReferrerPolicyFromAttr(GetParsedAttr(nsGkAtoms::referrerpolicy));
   }
   return ReferrerPolicy::_empty;

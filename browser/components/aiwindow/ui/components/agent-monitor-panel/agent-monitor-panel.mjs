@@ -15,6 +15,11 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "moz-src:///browser/components/aiwindow/ui/modules/MonitorUIUtils.sys.mjs",
 });
 
+// The panel is a summary rather than the whole list, which lives behind
+// "Manage and view all tasks". New matches take these slots first: they are
+// what pulled the user to the panel.
+const MAX_VISIBLE_ROWS = 5;
+
 /**
  * Contents of the "Tasks" toolbar panel: the monitors the user is watching and,
  * once they ask for one, the create form.
@@ -46,7 +51,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
  * to show the user the newly created monitor task
  * @property {string[]} attentionIds - Ids of monitors that newly matched since
  *   the user last opened the panel. They are listed together under a "New
- *   matches" section above the rest.
+ *   matches" section above the rest, and fill the panel's limited rows first.
  */
 export class AgentMonitorPanel extends MozLitElement {
   static properties = {
@@ -196,10 +201,12 @@ export class AgentMonitorPanel extends MozLitElement {
 
   #renderList() {
     const attention = new Set(this.attentionIds ?? []);
-    const newMatches = this.monitors.filter(monitor =>
-      attention.has(monitor.id)
-    );
-    const recent = this.monitors.filter(monitor => !attention.has(monitor.id));
+    const newMatches = this.monitors
+      .filter(monitor => attention.has(monitor.id))
+      .slice(0, MAX_VISIBLE_ROWS);
+    const recent = this.monitors
+      .filter(monitor => !attention.has(monitor.id))
+      .slice(0, MAX_VISIBLE_ROWS - newMatches.length);
     return html`
       <div class="monitor-list-view">
         ${this.monitors.length

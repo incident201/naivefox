@@ -194,12 +194,13 @@ formautofill:
       - https://bugzilla.mozilla.org/show_bug.cgi?id=1969173
       - https://bugzilla.mozilla.org/show_bug.cgi?id=1999871
       - https://bugzilla.mozilla.org/show_bug.cgi?id=2041172
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2072820
     data_reviews:
       - https://bugzilla.mozilla.org/show_bug.cgi?id=1874829#c4
     notification_emails:
       - autofill@lists.mozilla.org
       - passwords-dev@mozilla.org
-    expires: 160
+    expires: 166
 
   iframe_layout_detection:
     type: event

@@ -37,6 +37,8 @@ support-files = [
 
 ["test_extensions.js"]
 
+["test_extensions_uninstall.js"]
+
 ["test_extensionsettings.js"]
 
 ["test_extensionsettings_blocked_permissions.js"]

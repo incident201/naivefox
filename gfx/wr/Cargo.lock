@@ -1119,31 +1119,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "compositor"
-version = "0.1.0"
-dependencies = [
- "compositor-wayland",
- "compositor-windows",
- "gleam",
- "webrender",
-]
-
-[[package]]
-name = "compositor-wayland"
-version = "0.1.0"
-dependencies = [
- "cc",
- "pkg-config",
-]
-
-[[package]]
-name = "compositor-windows"
-version = "0.1.0"
-dependencies = [
- "cc",
-]
-
-[[package]]
 name = "concurrent-queue"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1948,18 +1923,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "fallible-iterator"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2acce4a10f12dc2fb14a218589d4f1f62ef011b2d0cc4b3cb1bba8e94da14649"
-
-[[package]]
-name = "fallible-streaming-iterator"
-version = "0.1.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7360491ce676a36bf9bb3c56c1aa791658183a54d2744120f27285738d90465a"
-
-[[package]]
 name = "fastrand"
 version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2282,17 +2245,18 @@ dependencies = [
 
 [[package]]
 name = "gleam"
-version = "0.15.1"
-source = "git+https://github.com/jamienicol/gleam?rev=68ca4e5cc31135b843af07ff213a94b9ddce64cf#68ca4e5cc31135b843af07ff213a94b9ddce64cf"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8265d389bd9817de31d5ee7e783f288ff94d5007b51474332b61015eb346c8e1"
 dependencies = [
  "gl_generator",
 ]
 
 [[package]]
 name = "glean"
-version = "70.1.0"
+version = "70.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1a8d3b7999f1b6d8c5a7dd8edeb45ec8d2e47d3ac0fd5b458b2d2fb2b12b1349"
+checksum = "1a75a8cfc27ecee273cf19b4aaf8b50e916b137f6a3d2b4f1c13c59eae0e21ee"
 dependencies = [
  "crossbeam-channel",
  "glean-core",
@@ -2305,9 +2269,9 @@ dependencies = [
 
 [[package]]
 name = "glean-core"
-version = "70.1.0"
+version = "70.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4b6f031fcdaff63672e075f3e0fa7299a68ecfb9847750b4a06506288c5e398f"
+checksum = "a9fb076df739ce5d2eff3a2cc723cc23e1f90d9d9f07dc46365962745cb3c286"
 dependencies = [
  "android_logger 0.12.0",
  "bincode",
@@ -2321,7 +2285,6 @@ dependencies = [
  "oslog",
  "rkv",
  "rmp-serde",
- "rusqlite",
  "serde",
  "serde_json",
  "thiserror 2.0.20",
@@ -3291,17 +3254,6 @@ dependencies = [
  "libc",
  "plain",
  "redox_syscall 0.7.3",
-]
-
-[[package]]
-name = "libsqlite3-sys"
-version = "0.35.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "133c182a6a2c87864fe97778797e46c7e999672690dc9fa3ee8e241aa4a9c13f"
-dependencies = [
- "cc",
- "pkg-config",
- "vcpkg",
 ]
 
 [[package]]
@@ -4734,20 +4686,6 @@ dependencies = [
  "memoffset 0.6.5",
  "rustc-hash 1.1.0",
  "text-size",
-]
-
-[[package]]
-name = "rusqlite"
-version = "0.37.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "165ca6e57b20e1351573e3729b958bc62f0e48025386970b6e4d29e7a7e71f3f"
-dependencies = [
- "bitflags 2.11.0",
- "fallible-iterator",
- "fallible-streaming-iterator",
- "hashlink",
- "libsqlite3-sys",
- "smallvec",
 ]
 
 [[package]]
@@ -6338,6 +6276,7 @@ name = "webrender_api"
 version = "0.62.0"
 dependencies = [
  "app_units",
+ "bincode",
  "bitflags 2.11.0",
  "byteorder",
  "crossbeam-channel",

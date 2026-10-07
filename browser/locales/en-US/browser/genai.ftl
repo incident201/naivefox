@@ -27,6 +27,9 @@ genai-prompt-prefix-selection = I’m on page “{ $tabTitle }” with “{ $sel
 genai-prompts-summarize =
     .label = Summarize
     .value = Please summarize the selection using precise and concise language. Use headers and bulleted lists in the summary, to make it scannable. Maintain the meaning and factual accuracy.
+# Prompt purpose: help users understand what a webpage covers at a glance
+# $url (string) - address of the webpage to summarize
+genai-prompts-summarize-page = Please summarize the webpage at { $url } using precise and concise language. Use headers and bulleted lists in the summary, to make it scannable. Maintain the meaning and factual accuracy.
 # Prompt purpose: make a selection easier to read
 genai-prompts-simplify =
     .label = Simplify language
@@ -73,10 +76,9 @@ genai-menu-remove-provider =
     .label = Remove { $provider }
 genai-menu-remove-sidebar =
     .label = Remove from Sidebar
-# $provider (string) - name of the AI chat provider
-genai-shortcut-button-2 =
-    .tooltiptext = Ask { $provider }
-    .aria-label = Ask { $provider }
+genai-shortcut-button-3 =
+    .tooltiptext = Ask about this text
+    .aria-label = Ask about this text
 # $engine (string) - name of the search engine
 # $selection (string) - the selected text, truncated
 genai-shortcut-search-button =
@@ -141,11 +143,6 @@ genai-options-hide-shortcut =
     .label = Hide shortcut when selecting text
 genai-options-about-chatbot =
     .label = About AI chatbots in { -brand-short-name }
-
-## Chatbot message
-
-genai-page-warning =
-    .message = Since the page is long, this is a partial summary.
 
 ## Chatbot footer
 
@@ -239,6 +236,15 @@ link-preview-settings-key-points =
     .label = Allow AI to read the beginning of the page and generate key points
 link-preview-settings-long-press =
     .label = Shortcut: Click and hold the link for 1 second (long press)
+
+highlight-to-search-settings-enable =
+    .label = Show actions menu when selecting text
+    .description = Get quick access to helpful actions when you select content.
+# $provider (string) - name of the AI chatbot provider
+highlight-to-search-settings-ask-provider =
+    .label = Ask { $provider }
+highlight-to-search-settings-ask-generic =
+    .label = Ask AI
 
 # Title that appears when user is shown the opt-in flow for link previews
 link-preview-optin-title = See more with AI?

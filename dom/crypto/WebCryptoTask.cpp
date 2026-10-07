@@ -142,8 +142,9 @@ inline nsresult GetKeyLengthForAlgorithmIfSpecified(
       aAlgName.EqualsLiteral(WEBCRYPTO_ALG_AES_GCM) ||
       aAlgName.EqualsLiteral(WEBCRYPTO_ALG_AES_KW)) {
     RootedDictionary<AesDerivedKeyParams> params(aCx);
-    if (NS_FAILED(Coerce(aCx, params, aAlgorithm))) {
-      return NS_ERROR_DOM_SYNTAX_ERR;
+    nsresult rv = Coerce(aCx, params, aAlgorithm);
+    if (NS_FAILED(rv)) {
+      return rv;
     }
 
     if (params.mLength != 128 && params.mLength != 192 &&
@@ -159,8 +160,9 @@ inline nsresult GetKeyLengthForAlgorithmIfSpecified(
   // determine key length as the block size of the given hash.
   if (aAlgName.EqualsLiteral(WEBCRYPTO_ALG_HMAC)) {
     RootedDictionary<HmacDerivedKeyParams> params(aCx);
-    if (NS_FAILED(Coerce(aCx, params, aAlgorithm))) {
-      return NS_ERROR_DOM_SYNTAX_ERR;
+    nsresult rv = Coerce(aCx, params, aAlgorithm);
+    if (NS_FAILED(rv)) {
+      return rv;
     }
 
     // Return the passed length, if any.
@@ -2386,7 +2388,6 @@ class GenerateSymmetricKeyTask : public WebCryptoTask {
       RootedDictionary<HmacKeyGenParams> params(aCx);
       mEarlyRv = Coerce(aCx, params, aAlgorithm);
       if (NS_FAILED(mEarlyRv)) {
-        mEarlyRv = NS_ERROR_DOM_SYNTAX_ERR;
         return;
       }
 
@@ -2631,7 +2632,6 @@ void GenerateAsymmetricKeyTask::Init(nsIGlobalObject* aGlobal, JSContext* aCx,
     RootedDictionary<RsaHashedKeyGenParams> params(aCx);
     mEarlyRv = Coerce(aCx, params, aAlgorithm);
     if (NS_FAILED(mEarlyRv)) {
-      mEarlyRv = NS_ERROR_DOM_SYNTAX_ERR;
       return;
     }
 

@@ -1,5 +1,6 @@
 [DEFAULT]
 prefs = [
+  # Bug 2077709
   "dom.navigation.navigationRateLimit.count=0",
   "gfx.omta.background-color=true",
   "gfx.font_loader.delay=0",
@@ -11,7 +12,6 @@ prefs = [
   "layout.css.webkit-fill-available.all-size-properties.enabled=true",
   "layout.css.basic-shape-shape.enabled=true",
   "layout.css.field-sizing.enabled=true",
-  "layout.css.attr.enabled=true",
   "layout.css.scroll-state.enabled=true",
   "layout.css.style-queries.enabled=true",
   "layout.css.text-box.enabled=true",

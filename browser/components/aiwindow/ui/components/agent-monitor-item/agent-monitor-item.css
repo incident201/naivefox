@@ -400,6 +400,7 @@ hr.rule {
 
 .task-content {
   color: var(--text-color);
+  overflow-wrap: anywhere;
 }
 
 .url-section {
@@ -426,5 +427,5 @@ hr.rule {
 }
 
 .monitor-condition-input {
-  --input-text-min-height: 90px;
+  --input-min-height: 90px;
 }

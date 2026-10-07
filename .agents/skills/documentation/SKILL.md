@@ -164,17 +164,28 @@ Link to the **source file**, not to the generated URL:
 -   Bad: a full `https://firefox-source-docs.mozilla.org/...` URL for in-tree
     documentation -- it bypasses link validation and breaks when pages move.
 
-The path is rooted at the documentation tree (leading `/`), and the extension
-must match the actual source file (always `.md`). To link to a section, append
-the anchor: `/mots/index.md#desktop-theme`.
+The path is rooted at the documentation tree (leading `/`), which is the built
+tree, not the source checkout: `browser/components/urlbar/docs/index.md` is
+`/browser/urlbar/index.md`. The extension must match the actual source file
+(always `.md`). To link to a section, append the anchor:
+`/mots/index.md#desktop-theme`.
 
 A `{doc}` role with no link text renders the target page's *title*, so a noun
 after it reads twice: ``in the {doc}`api` reference`` comes out as "in the
 SessionStore API reference reference". Give the role its own text where the
 sentence already names the thing.
 
-A `{doc}` or `{ref}` target is a doc path *without* the extension -- the
-opposite of the markdown form -- and a directory needs its `/index` spelled out.
+A `{doc}` target is the same path *without* the extension -- the opposite of
+the markdown form -- and a directory needs its `/index` spelled out.
+
+A `{ref}` target is an explicit label, never a page title: page titles are not
+labels, so `{ref}`Address Bar`` fails with `undefined label`. Link a page with
+`{doc}` or the markdown form.
+
+Explicit labels share one namespace across the whole tree, so a short one claims
+its name for every page: a `(telemetry)=` in one guide takes `{ref}`telemetry``
+away from the Telemetry docs, with no warning. Prefix a label with its page's
+subject, and use `{doc}` when the link means the whole page.
 
 ### Anchors
 
@@ -275,7 +286,18 @@ they do not agree:
 
 `sphinxcontrib.mermaid` is enabled, so a fenced `mermaid` block becomes a
 diagram. Sphinx only writes the diagram source into the page and mermaid renders
-it in the browser from a CDN, which is what makes these worth knowing:
+it in the browser from a CDN. `tools/moztreedocs/docs/mermaid-integration.md`
+describes the directive and how a diagram renders.
+
+Besides mermaid's own diagram types, a block that starts with `zenuml` draws a
+ZenUML sequence diagram. It suits a call flow whose calls nest, such as a method
+that calls into other objects before it returns: the source is written like
+code, `A->B.method(arg) { B->C.other() return value }`, and a nested call is
+drawn inside the activation of the call that made it, where `sequenceDiagram`
+lists messages one after another and leaves the nesting to the reader. That page
+has a rendered example.
+
+Worth knowing:
 
 -   **A mermaid block always builds.** `./mach doc` succeeding says nothing about
     the diagram, since nothing has drawn it yet -- every failure below is
@@ -297,9 +319,11 @@ it in the browser from a CDN, which is what makes these worth knowing:
 -   **A diagram follows the page's color scheme.** A `classDef` or `style` that
     hardcodes a `fill` keeps that color in both schemes, so it needs an explicit
     `color:` as well, or the theme's label color lands on it and comes out grey on
-    a light fill in dark mode. `tools/moztreedocs/docs/mermaid-integration.md` has
-    the color rules, including what the unstyled default fill means for prose that
-    points at a node by color.
+    a light fill in dark mode. That page has the color rules, including what the
+    unstyled default fill means for prose that points at a node by color.
+-   **A ZenUML diagram is inverted in the dark scheme**, because its plugin
+    ignores the theme and draws black on transparent. Avoid colors a
+    light-to-dark inversion would misrepresent.
 -   **Do not distinguish two kinds of node by fill color alone**: it fails for
     readers with a color vision deficiency and on poor displays. Vary the shape as
     well -- a stadium `(["text"])` reads clearly against a plain `["text"]`,

@@ -1398,7 +1398,8 @@ static void FinishRestore(CanonicalBrowsingContext* aBrowsingContext,
     // browser.navigation.requireUserInteraction is still
     // disabled everywhere.
 
-    frameLoaderOwner->RestoreFrameLoaderFromBFCache(aFrameLoader);
+    bool layersChanged =
+        frameLoaderOwner->RestoreFrameLoaderFromBFCache(aFrameLoader);
     // EvictOutOfRangeDocumentViewers is called here explicitly to
     // possibly evict the now in the bfcache document.
     // HistoryCommitIndexAndLength might not have evicted that before the
@@ -1412,6 +1413,10 @@ static void FinishRestore(CanonicalBrowsingContext* aBrowsingContext,
     }
 
     loadingBC->ReactivateDocuments(aEntry, currentSHEntry);
+
+    if (layersChanged) {
+      frameLoaderOwner->DispatchLayerTreeEvent();
+    }
 
     // We need to call this after we've restored the page from BFCache (see
     // ReactivateDocuments above), so that the page is not frozen anymore and
@@ -1763,6 +1768,11 @@ nsresult nsSHistory::Reload(uint32_t aReloadFlags,
   MOZ_ALWAYS_SUCCEEDS(NotifyOnHistoryReload(&canNavigate));
   if (!canNavigate) {
     return NS_OK;
+  }
+
+  if (mIndex < 0) {
+    // We can't reload if we don't have entries, see bug 2074418.
+    return NS_ERROR_FAILURE;
   }
 
   uint32_t loadType = PrepareReloadEntry(mEntries[mIndex], aReloadFlags);

@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+/** @import {Store} from "resource://newtab/lib/Store.sys.mjs" */
+
 // We use importESModule here instead of static import so that
 // the Karma test environment won't choke on this module. This
 // is because the Karma test environment already stubs out
@@ -982,6 +984,9 @@ ContileIntegration.prototype.PersistentCache = (...args) => {
 };
 
 export class TopSitesFeed {
+  /** @type {Store} */
+  store = null;
+
   constructor() {
     this._telemetryUtility = new TopSitesTelemetry();
     this._contile = new ContileIntegration(this);
@@ -989,6 +994,7 @@ export class TopSitesFeed {
     this._refreshGeneration = 0;
     this._broadcastPending = false;
     this._latestRefreshPromise = Promise.resolve();
+    this._uninitialized = false;
     ChromeUtils.defineLazyGetter(
       this,
       "_currentSearchHostname",
@@ -1046,6 +1052,7 @@ export class TopSitesFeed {
   }
 
   uninit() {
+    this._uninitialized = true;
     lazy.PageThumbs.removeExpirationFilter(this);
     Services.obs.removeObserver(this, "browser-search-engine-modified");
     Services.obs.removeObserver(this, "browser-region-updated");
@@ -1118,7 +1125,6 @@ export class TopSitesFeed {
         isDefault: true,
         url: site.url,
         hostname,
-        sendAttributionRequest: false,
         label: site.name,
         show_sponsored_label: hostname !== "yandex",
         sponsored_position: contilePositions[contilePositionIndex++],
@@ -1221,7 +1227,6 @@ export class TopSitesFeed {
         isDefault: true,
         url: siteData.url,
         hostname,
-        sendAttributionRequest: !!siteData.send_attribution_request,
       };
       if (siteData.url_urlbar_override) {
         link.url_urlbar = siteData.url_urlbar_override;
@@ -1431,7 +1436,7 @@ export class TopSitesFeed {
    * shouldFilterSearchTile - is default filtering enabled and does a given hostname match the user's default search engine?
    *
    * @param {string} hostname a top site hostname, such as "amazon" or "foo"
-   * @returns {bool}
+   * @returns {boolean}
    */
   shouldFilterSearchTile(hostname) {
     if (
@@ -1449,7 +1454,7 @@ export class TopSitesFeed {
    * needed.
    *
    * @param {Array} plainPinnedSites (from the pinnedSitesCache)
-   * @returns {boolean} Did we insert any search shortcuts?
+   * @returns {Promise<boolean>} Did we insert any search shortcuts?
    */
   async _maybeInsertSearchShortcuts(plainPinnedSites) {
     // Only insert shortcuts if the experiment is running
@@ -1540,7 +1545,7 @@ export class TopSitesFeed {
   /**
    * Fetch topsites spocs that are frecency boosted.
    *
-   * @returns {Array} An array of sponsored tile objects.
+   * @returns {Promise<Array>} An array of sponsored tile objects.
    */
   async fetchFrecencyBoostedSpocs() {
     let candidates = [];
@@ -2091,10 +2096,16 @@ export class TopSitesFeed {
   /**
    * Refresh the top sites data for content.
    *
-   * @param {bool} options.broadcast Should the update be broadcasted.
-   * @param {bool} options.isStartup Being called while TopSitesFeed is initting.
+   * @param {object} [options]
+   * @param {boolean} [options.broadcast] Should the update be broadcasted.
+   * @param {boolean} [options.isStartup] Being called while TopSitesFeed is initting.
    */
   async refresh(options = {}) {
+    if (this._uninitialized) {
+      // The store has already dropped this feed, and may hold a newer instance.
+      // An in-flight Contile fetch can still get here, through _readDefaults().
+      return;
+    }
     if (!this._startedUp && !options.isStartup) {
       // Initial refresh still pending.
       return;
@@ -2116,7 +2127,7 @@ export class TopSitesFeed {
         },
         refreshId
       );
-      if (refreshId !== this._refreshGeneration) {
+      if (this._uninitialized || refreshId !== this._refreshGeneration) {
         return;
       }
 

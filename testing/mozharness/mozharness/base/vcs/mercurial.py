@@ -23,9 +23,10 @@ from mozharness.base.script import ScriptMixin
 sys.path.insert(1, os.path.dirname(os.path.dirname(os.path.dirname(sys.path[0]))))
 
 
-external_tools_path = os.path.join(
-    os.path.abspath(os.path.dirname(os.path.dirname(mozharness.__file__))),
-    "external_tools",
+topsrcdir = os.path.dirname(
+    os.path.dirname(
+        os.path.abspath(os.path.dirname(os.path.dirname(mozharness.__file__)))
+    )
 )
 
 
@@ -342,7 +343,7 @@ class MercurialVCS(ScriptMixin, LogMixin):
     @property
     def robustcheckout_path(self):
         """Path to the robustcheckout extension."""
-        ext = os.path.join(external_tools_path, "robustcheckout.py")
+        ext = os.path.join(topsrcdir, "taskcluster", "scripts", "robustcheckout.py")
         if os.path.exists(ext):
             return ext
 
