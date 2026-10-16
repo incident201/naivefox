@@ -77,9 +77,10 @@
     "midir",
     "objc",
     "ohttp",
+    "simdutf8",
     "unicode-bidi"
   ],
-  "cargo_manifest_parse_package_count": 339,
+  "cargo_manifest_parse_package_count": 344,
   "cargo_manifest_parse_packages": [
     {
       "manifest_path": "security/manager/ssl/abridged_certs/Cargo.toml",
@@ -530,7 +531,7 @@
     {
       "manifest_path": "third_party/rust/cssparser/Cargo.toml",
       "name": "cssparser",
-      "source": "git+https://github.com/servo/rust-cssparser?rev=ddccc070a0261cb94195ed0f74095c67b86a8550#ddccc070a0261cb94195ed0f74095c67b86a8550",
+      "source": "git+https://github.com/servo/rust-cssparser?rev=9f3ceddf398f5ce4ab76fdad1b42ccb6c578a926#9f3ceddf398f5ce4ab76fdad1b42ccb6c578a926",
       "target_entry_points": [
         "third_party/rust/cssparser/src/lib.rs"
       ],
@@ -539,11 +540,11 @@
     {
       "manifest_path": "third_party/rust/cssparser-macros/Cargo.toml",
       "name": "cssparser-macros",
-      "source": "git+https://github.com/servo/rust-cssparser?rev=ddccc070a0261cb94195ed0f74095c67b86a8550#ddccc070a0261cb94195ed0f74095c67b86a8550",
+      "source": "git+https://github.com/servo/rust-cssparser?rev=9f3ceddf398f5ce4ab76fdad1b42ccb6c578a926#9f3ceddf398f5ce4ab76fdad1b42ccb6c578a926",
       "target_entry_points": [
         "third_party/rust/cssparser-macros/lib.rs"
       ],
-      "version": "0.7.0"
+      "version": "0.7.1"
     },
     {
       "manifest_path": "third_party/rust/cstr/Cargo.toml",
@@ -787,6 +788,7 @@
       "name": "error-support",
       "source": null,
       "target_entry_points": [
+        "third_party/application-services/components/support/error/build.rs",
         "third_party/application-services/components/support/error/src/lib.rs"
       ],
       "version": "0.1.0"
@@ -992,6 +994,15 @@
       "version": "70.2.1"
     },
     {
+      "manifest_path": "third_party/rust/glean-build/Cargo.toml",
+      "name": "glean-build",
+      "source": "git+https://github.com/mozilla/glean?tag=v70.2.0#9d987fd33e1dc3f2a89e5f5c4565ae696245f6eb",
+      "target_entry_points": [
+        "third_party/rust/glean-build/src/lib.rs"
+      ],
+      "version": "20.1.0"
+    },
+    {
       "manifest_path": "third_party/rust/glean-core/Cargo.toml",
       "name": "glean-core",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
@@ -1108,6 +1119,15 @@
         "netwerk/base/http-sfv/src/lib.rs"
       ],
       "version": "0.1.0"
+    },
+    {
+      "manifest_path": "third_party/rust/humantime/Cargo.toml",
+      "name": "humantime",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "target_entry_points": [
+        "third_party/rust/humantime/src/lib.rs"
+      ],
+      "version": "2.4.0"
     },
     {
       "manifest_path": "intl/icu4x_unicode_glue/Cargo.toml",
@@ -1556,7 +1576,7 @@
     {
       "manifest_path": "third_party/rust/mtu/Cargo.toml",
       "name": "mtu",
-      "source": "git+https://github.com/mozilla/neqo?tag=v0.32.0#28cacc8ea2b035779ae504d837e3e25331264347",
+      "source": "git+https://github.com/mozilla/neqo?tag=v0.33.0#1ec4c2a3ccd7ada264112d1b70b070381557d844",
       "target_entry_points": [
         "third_party/rust/mtu/build.rs",
         "third_party/rust/mtu/src/bin/mtu-lookup.rs",
@@ -1594,49 +1614,49 @@
     {
       "manifest_path": "third_party/rust/neqo-common/Cargo.toml",
       "name": "neqo-common",
-      "source": "git+https://github.com/mozilla/neqo?tag=v0.32.0#28cacc8ea2b035779ae504d837e3e25331264347",
+      "source": "git+https://github.com/mozilla/neqo?tag=v0.33.0#1ec4c2a3ccd7ada264112d1b70b070381557d844",
       "target_entry_points": [
         "third_party/rust/neqo-common/build.rs",
         "third_party/rust/neqo-common/src/lib.rs"
       ],
-      "version": "0.32.0"
+      "version": "0.33.0"
     },
     {
       "manifest_path": "third_party/rust/neqo-http3/Cargo.toml",
       "name": "neqo-http3",
-      "source": "git+https://github.com/mozilla/neqo?tag=v0.32.0#28cacc8ea2b035779ae504d837e3e25331264347",
+      "source": "git+https://github.com/mozilla/neqo?tag=v0.33.0#1ec4c2a3ccd7ada264112d1b70b070381557d844",
       "target_entry_points": [
         "third_party/rust/neqo-http3/src/lib.rs"
       ],
-      "version": "0.32.0"
+      "version": "0.33.0"
     },
     {
       "manifest_path": "third_party/rust/neqo-qpack/Cargo.toml",
       "name": "neqo-qpack",
-      "source": "git+https://github.com/mozilla/neqo?tag=v0.32.0#28cacc8ea2b035779ae504d837e3e25331264347",
+      "source": "git+https://github.com/mozilla/neqo?tag=v0.33.0#1ec4c2a3ccd7ada264112d1b70b070381557d844",
       "target_entry_points": [
         "third_party/rust/neqo-qpack/src/lib.rs"
       ],
-      "version": "0.32.0"
+      "version": "0.33.0"
     },
     {
       "manifest_path": "third_party/rust/neqo-transport/Cargo.toml",
       "name": "neqo-transport",
-      "source": "git+https://github.com/mozilla/neqo?tag=v0.32.0#28cacc8ea2b035779ae504d837e3e25331264347",
+      "source": "git+https://github.com/mozilla/neqo?tag=v0.33.0#1ec4c2a3ccd7ada264112d1b70b070381557d844",
       "target_entry_points": [
         "third_party/rust/neqo-transport/src/lib.rs"
       ],
-      "version": "0.32.0"
+      "version": "0.33.0"
     },
     {
       "manifest_path": "third_party/rust/neqo-udp/Cargo.toml",
       "name": "neqo-udp",
-      "source": "git+https://github.com/mozilla/neqo?tag=v0.32.0#28cacc8ea2b035779ae504d837e3e25331264347",
+      "source": "git+https://github.com/mozilla/neqo?tag=v0.33.0#1ec4c2a3ccd7ada264112d1b70b070381557d844",
       "target_entry_points": [
         "third_party/rust/neqo-udp/build.rs",
         "third_party/rust/neqo-udp/src/lib.rs"
       ],
-      "version": "0.32.0"
+      "version": "0.33.0"
     },
     {
       "manifest_path": "netwerk/socket/neqo_glue/Cargo.toml",
@@ -1931,7 +1951,7 @@
       "target_entry_points": [
         "third_party/rust/qlog/src/lib.rs"
       ],
-      "version": "0.16.0"
+      "version": "0.18.1"
     },
     {
       "manifest_path": "third_party/rust/quinn-udp/Cargo.toml",
@@ -1941,7 +1961,7 @@
         "third_party/rust/quinn-udp/build.rs",
         "third_party/rust/quinn-udp/src/lib.rs"
       ],
-      "version": "0.6.2"
+      "version": "0.6.3"
     },
     {
       "manifest_path": "third_party/rust/quote/Cargo.toml",
@@ -2268,7 +2288,7 @@
     {
       "manifest_path": "third_party/rust/simdutf8/Cargo.toml",
       "name": "simdutf8",
-      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "source": "git+https://github.com/hsivonen/simdutf8?rev=9c38ac5d3761ebf53578a92bd90a76cdc08c162b#9c38ac5d3761ebf53578a92bd90a76cdc08c162b",
       "target_entry_points": [
         "third_party/rust/simdutf8/src/lib.rs"
       ],
@@ -3077,6 +3097,33 @@
       "version": "0.1.0"
     },
     {
+      "manifest_path": "third_party/rust/xshell/Cargo.toml",
+      "name": "xshell",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "target_entry_points": [
+        "third_party/rust/xshell/src/lib.rs"
+      ],
+      "version": "0.2.7"
+    },
+    {
+      "manifest_path": "third_party/rust/xshell-macros/Cargo.toml",
+      "name": "xshell-macros",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "target_entry_points": [
+        "third_party/rust/xshell-macros/src/lib.rs"
+      ],
+      "version": "0.2.7"
+    },
+    {
+      "manifest_path": "third_party/rust/xshell-venv/Cargo.toml",
+      "name": "xshell-venv",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "target_entry_points": [
+        "third_party/rust/xshell-venv/src/lib.rs"
+      ],
+      "version": "2.0.0"
+    },
+    {
       "manifest_path": "third_party/rust/yoke/Cargo.toml",
       "name": "yoke",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
@@ -3186,7 +3233,7 @@
       "version": "1.0.20"
     }
   ],
-  "cargo_package_count": 322,
+  "cargo_package_count": 327,
   "cargo_packages": [
     {
       "license": "MPL-2.0",
@@ -3859,7 +3906,7 @@
       "license_file": null,
       "manifest_path": "third_party/rust/cssparser/Cargo.toml",
       "name": "cssparser",
-      "source": "git+https://github.com/servo/rust-cssparser?rev=ddccc070a0261cb94195ed0f74095c67b86a8550#ddccc070a0261cb94195ed0f74095c67b86a8550",
+      "source": "git+https://github.com/servo/rust-cssparser?rev=9f3ceddf398f5ce4ab76fdad1b42ccb6c578a926#9f3ceddf398f5ce4ab76fdad1b42ccb6c578a926",
       "version": "0.38.0"
     },
     {
@@ -3873,8 +3920,8 @@
       "license_file": null,
       "manifest_path": "third_party/rust/cssparser-macros/Cargo.toml",
       "name": "cssparser-macros",
-      "source": "git+https://github.com/servo/rust-cssparser?rev=ddccc070a0261cb94195ed0f74095c67b86a8550#ddccc070a0261cb94195ed0f74095c67b86a8550",
-      "version": "0.7.0"
+      "source": "git+https://github.com/servo/rust-cssparser?rev=9f3ceddf398f5ce4ab76fdad1b42ccb6c578a926#9f3ceddf398f5ce4ab76fdad1b42ccb6c578a926",
+      "version": "0.7.1"
     },
     {
       "license": "MIT",
@@ -4525,6 +4572,20 @@
       "version": "0.1.0"
     },
     {
+      "license": "MPL-2.0",
+      "license_candidates": [
+        "third_party/rust/glean-build/LICENSE"
+      ],
+      "license_coverage": [
+        "third_party/rust/glean-build/LICENSE"
+      ],
+      "license_file": null,
+      "manifest_path": "third_party/rust/glean-build/Cargo.toml",
+      "name": "glean-build",
+      "source": "git+https://github.com/mozilla/glean?tag=v70.2.0#9d987fd33e1dc3f2a89e5f5c4565ae696245f6eb",
+      "version": "20.1.0"
+    },
+    {
       "license": "MIT OR Apache-2.0",
       "license_candidates": [
         "third_party/rust/glob/LICENSE-APACHE",
@@ -4697,6 +4758,22 @@
       "name": "http_sfv",
       "source": null,
       "version": "0.1.0"
+    },
+    {
+      "license": "MIT OR Apache-2.0",
+      "license_candidates": [
+        "third_party/rust/humantime/LICENSE-APACHE",
+        "third_party/rust/humantime/LICENSE-MIT"
+      ],
+      "license_coverage": [
+        "third_party/rust/humantime/LICENSE-APACHE",
+        "third_party/rust/humantime/LICENSE-MIT"
+      ],
+      "license_file": null,
+      "manifest_path": "third_party/rust/humantime/Cargo.toml",
+      "name": "humantime",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "version": "2.4.0"
     },
     {
       "license": "MPL-2.0",
@@ -5371,7 +5448,7 @@
       "license_file": null,
       "manifest_path": "third_party/rust/mtu/Cargo.toml",
       "name": "mtu",
-      "source": "git+https://github.com/mozilla/neqo?tag=v0.32.0#28cacc8ea2b035779ae504d837e3e25331264347",
+      "source": "git+https://github.com/mozilla/neqo?tag=v0.33.0#1ec4c2a3ccd7ada264112d1b70b070381557d844",
       "version": "0.4.1"
     },
     {
@@ -5431,8 +5508,8 @@
       "license_file": null,
       "manifest_path": "third_party/rust/neqo-common/Cargo.toml",
       "name": "neqo-common",
-      "source": "git+https://github.com/mozilla/neqo?tag=v0.32.0#28cacc8ea2b035779ae504d837e3e25331264347",
-      "version": "0.32.0"
+      "source": "git+https://github.com/mozilla/neqo?tag=v0.33.0#1ec4c2a3ccd7ada264112d1b70b070381557d844",
+      "version": "0.33.0"
     },
     {
       "license": "MIT OR Apache-2.0",
@@ -5443,8 +5520,8 @@
       "license_file": null,
       "manifest_path": "third_party/rust/neqo-http3/Cargo.toml",
       "name": "neqo-http3",
-      "source": "git+https://github.com/mozilla/neqo?tag=v0.32.0#28cacc8ea2b035779ae504d837e3e25331264347",
-      "version": "0.32.0"
+      "source": "git+https://github.com/mozilla/neqo?tag=v0.33.0#1ec4c2a3ccd7ada264112d1b70b070381557d844",
+      "version": "0.33.0"
     },
     {
       "license": "MIT OR Apache-2.0",
@@ -5455,8 +5532,8 @@
       "license_file": null,
       "manifest_path": "third_party/rust/neqo-qpack/Cargo.toml",
       "name": "neqo-qpack",
-      "source": "git+https://github.com/mozilla/neqo?tag=v0.32.0#28cacc8ea2b035779ae504d837e3e25331264347",
-      "version": "0.32.0"
+      "source": "git+https://github.com/mozilla/neqo?tag=v0.33.0#1ec4c2a3ccd7ada264112d1b70b070381557d844",
+      "version": "0.33.0"
     },
     {
       "license": "MIT OR Apache-2.0",
@@ -5467,8 +5544,8 @@
       "license_file": null,
       "manifest_path": "third_party/rust/neqo-transport/Cargo.toml",
       "name": "neqo-transport",
-      "source": "git+https://github.com/mozilla/neqo?tag=v0.32.0#28cacc8ea2b035779ae504d837e3e25331264347",
-      "version": "0.32.0"
+      "source": "git+https://github.com/mozilla/neqo?tag=v0.33.0#1ec4c2a3ccd7ada264112d1b70b070381557d844",
+      "version": "0.33.0"
     },
     {
       "license": "MIT OR Apache-2.0",
@@ -5479,8 +5556,8 @@
       "license_file": null,
       "manifest_path": "third_party/rust/neqo-udp/Cargo.toml",
       "name": "neqo-udp",
-      "source": "git+https://github.com/mozilla/neqo?tag=v0.32.0#28cacc8ea2b035779ae504d837e3e25331264347",
-      "version": "0.32.0"
+      "source": "git+https://github.com/mozilla/neqo?tag=v0.33.0#1ec4c2a3ccd7ada264112d1b70b070381557d844",
+      "version": "0.33.0"
     },
     {
       "license": "MPL-2.0",
@@ -5924,7 +6001,7 @@
       "manifest_path": "third_party/rust/qlog/Cargo.toml",
       "name": "qlog",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
-      "version": "0.16.0"
+      "version": "0.18.1"
     },
     {
       "license": "MIT OR Apache-2.0",
@@ -5940,7 +6017,7 @@
       "manifest_path": "third_party/rust/quinn-udp/Cargo.toml",
       "name": "quinn-udp",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
-      "version": "0.6.2"
+      "version": "0.6.3"
     },
     {
       "license": "MIT OR Apache-2.0",
@@ -6447,7 +6524,7 @@
       "license_file": null,
       "manifest_path": "third_party/rust/simdutf8/Cargo.toml",
       "name": "simdutf8",
-      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "source": "git+https://github.com/hsivonen/simdutf8?rev=9c38ac5d3761ebf53578a92bd90a76cdc08c162b#9c38ac5d3761ebf53578a92bd90a76cdc08c162b",
       "version": "0.1.5"
     },
     {
@@ -7715,6 +7792,48 @@
       "version": "0.1.0"
     },
     {
+      "license": "MIT OR Apache-2.0",
+      "license_candidates": [
+        "third_party/rust/xshell/LICENSE-APACHE",
+        "third_party/rust/xshell/LICENSE-MIT"
+      ],
+      "license_coverage": [
+        "third_party/rust/xshell/LICENSE-APACHE",
+        "third_party/rust/xshell/LICENSE-MIT"
+      ],
+      "license_file": null,
+      "manifest_path": "third_party/rust/xshell/Cargo.toml",
+      "name": "xshell",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "version": "0.2.7"
+    },
+    {
+      "license": "MIT OR Apache-2.0",
+      "license_candidates": [],
+      "license_coverage": [
+        "toolkit/content/license.html.mako"
+      ],
+      "license_file": null,
+      "manifest_path": "third_party/rust/xshell-macros/Cargo.toml",
+      "name": "xshell-macros",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "version": "0.2.7"
+    },
+    {
+      "license": "MIT",
+      "license_candidates": [
+        "third_party/rust/xshell-venv/LICENSE"
+      ],
+      "license_coverage": [
+        "third_party/rust/xshell-venv/LICENSE"
+      ],
+      "license_file": null,
+      "manifest_path": "third_party/rust/xshell-venv/Cargo.toml",
+      "name": "xshell-venv",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "version": "2.0.0"
+    },
+    {
       "license": "Unicode-3.0",
       "license_candidates": [
         "third_party/rust/yoke/LICENSE"
@@ -7876,35 +7995,35 @@
   "cargo_target": "x86_64-pc-windows-msvc",
   "cargo_workspace_member_count": 44,
   "category_counts": {
-    "cargo:cbindgen-manifest-parse-closure": 358,
-    "cargo:cbindgen-manifest-parse-entry": 417,
-    "cargo:git-patch-entry": 24,
-    "cargo:git-patch-manifest": 12,
+    "cargo:cbindgen-manifest-parse-closure": 363,
+    "cargo:cbindgen-manifest-parse-entry": 423,
+    "cargo:git-patch-entry": 27,
+    "cargo:git-patch-manifest": 13,
     "cargo:local-patch-metadata": 86,
-    "cargo:local-patch-target-entry": 125,
-    "cargo:target-build-closure": 10167,
-    "cargo:target-manifest-parse-closure": 339,
-    "cargo:target-manifest-parse-entry": 393,
-    "cargo:vendor-checksum-index": 634,
+    "cargo:local-patch-target-entry": 126,
+    "cargo:target-build-closure": 10221,
+    "cargo:target-manifest-parse-closure": 344,
+    "cargo:target-manifest-parse-entry": 399,
+    "cargo:vendor-checksum-index": 635,
     "make:active-jar-manifest": 3,
     "make:active-jar-source": 12,
     "make:active-python-action": 14,
     "make:active-source-fragment-input": 31,
     "make:core-build-infrastructure": 15,
     "mozbuild:active-gyp-entry": 1,
-    "objdir:backend.RecursiveMakeBackend.in": 509,
+    "objdir:backend.RecursiveMakeBackend.in": 428,
     "objdir:component-manifest": 16,
     "objdir:config_status_deps.in": 188,
-    "objdir:generated-action-depfile": 5544,
-    "objdir:generated-action-relative-depfile": 1426,
-    "objdir:generated-make-fragment-source": 902,
-    "objdir:generated-make-prerequisite": 890,
+    "objdir:generated-action-depfile": 5944,
+    "objdir:generated-action-relative-depfile": 1425,
+    "objdir:generated-make-fragment-source": 903,
+    "objdir:generated-make-prerequisite": 891,
     "objdir:install-manifest-pattern": 516,
-    "objdir:install-manifest-source": 1809,
+    "objdir:install-manifest-source": 1811,
     "python:build-site-manifest": 1,
     "python:build-site-package": 1393
   },
-  "cbindgen_manifest_parse_package_count": 358,
+  "cbindgen_manifest_parse_package_count": 363,
   "cbindgen_manifest_parse_packages": [
     {
       "manifest_path": "security/manager/ssl/abridged_certs/Cargo.toml",
@@ -8401,7 +8520,7 @@
     {
       "manifest_path": "third_party/rust/cssparser/Cargo.toml",
       "name": "cssparser",
-      "source": "git+https://github.com/servo/rust-cssparser?rev=ddccc070a0261cb94195ed0f74095c67b86a8550#ddccc070a0261cb94195ed0f74095c67b86a8550",
+      "source": "git+https://github.com/servo/rust-cssparser?rev=9f3ceddf398f5ce4ab76fdad1b42ccb6c578a926#9f3ceddf398f5ce4ab76fdad1b42ccb6c578a926",
       "target_entry_points": [
         "third_party/rust/cssparser/src/lib.rs"
       ],
@@ -8410,11 +8529,11 @@
     {
       "manifest_path": "third_party/rust/cssparser-macros/Cargo.toml",
       "name": "cssparser-macros",
-      "source": "git+https://github.com/servo/rust-cssparser?rev=ddccc070a0261cb94195ed0f74095c67b86a8550#ddccc070a0261cb94195ed0f74095c67b86a8550",
+      "source": "git+https://github.com/servo/rust-cssparser?rev=9f3ceddf398f5ce4ab76fdad1b42ccb6c578a926#9f3ceddf398f5ce4ab76fdad1b42ccb6c578a926",
       "target_entry_points": [
         "third_party/rust/cssparser-macros/lib.rs"
       ],
-      "version": "0.7.0"
+      "version": "0.7.1"
     },
     {
       "manifest_path": "third_party/rust/cstr/Cargo.toml",
@@ -8658,6 +8777,7 @@
       "name": "error-support",
       "source": null,
       "target_entry_points": [
+        "third_party/application-services/components/support/error/build.rs",
         "third_party/application-services/components/support/error/src/lib.rs"
       ],
       "version": "0.1.0"
@@ -8863,6 +8983,15 @@
       "version": "70.2.1"
     },
     {
+      "manifest_path": "third_party/rust/glean-build/Cargo.toml",
+      "name": "glean-build",
+      "source": "git+https://github.com/mozilla/glean?tag=v70.2.0#9d987fd33e1dc3f2a89e5f5c4565ae696245f6eb",
+      "target_entry_points": [
+        "third_party/rust/glean-build/src/lib.rs"
+      ],
+      "version": "20.1.0"
+    },
+    {
       "manifest_path": "third_party/rust/glean-core/Cargo.toml",
       "name": "glean-core",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
@@ -8979,6 +9108,15 @@
         "netwerk/base/http-sfv/src/lib.rs"
       ],
       "version": "0.1.0"
+    },
+    {
+      "manifest_path": "third_party/rust/humantime/Cargo.toml",
+      "name": "humantime",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "target_entry_points": [
+        "third_party/rust/humantime/src/lib.rs"
+      ],
+      "version": "2.4.0"
     },
     {
       "manifest_path": "third_party/rust/iana-time-zone/Cargo.toml",
@@ -9482,7 +9620,7 @@
     {
       "manifest_path": "third_party/rust/mtu/Cargo.toml",
       "name": "mtu",
-      "source": "git+https://github.com/mozilla/neqo?tag=v0.32.0#28cacc8ea2b035779ae504d837e3e25331264347",
+      "source": "git+https://github.com/mozilla/neqo?tag=v0.33.0#1ec4c2a3ccd7ada264112d1b70b070381557d844",
       "target_entry_points": [
         "third_party/rust/mtu/build.rs",
         "third_party/rust/mtu/src/bin/mtu-lookup.rs",
@@ -9520,49 +9658,49 @@
     {
       "manifest_path": "third_party/rust/neqo-common/Cargo.toml",
       "name": "neqo-common",
-      "source": "git+https://github.com/mozilla/neqo?tag=v0.32.0#28cacc8ea2b035779ae504d837e3e25331264347",
+      "source": "git+https://github.com/mozilla/neqo?tag=v0.33.0#1ec4c2a3ccd7ada264112d1b70b070381557d844",
       "target_entry_points": [
         "third_party/rust/neqo-common/build.rs",
         "third_party/rust/neqo-common/src/lib.rs"
       ],
-      "version": "0.32.0"
+      "version": "0.33.0"
     },
     {
       "manifest_path": "third_party/rust/neqo-http3/Cargo.toml",
       "name": "neqo-http3",
-      "source": "git+https://github.com/mozilla/neqo?tag=v0.32.0#28cacc8ea2b035779ae504d837e3e25331264347",
+      "source": "git+https://github.com/mozilla/neqo?tag=v0.33.0#1ec4c2a3ccd7ada264112d1b70b070381557d844",
       "target_entry_points": [
         "third_party/rust/neqo-http3/src/lib.rs"
       ],
-      "version": "0.32.0"
+      "version": "0.33.0"
     },
     {
       "manifest_path": "third_party/rust/neqo-qpack/Cargo.toml",
       "name": "neqo-qpack",
-      "source": "git+https://github.com/mozilla/neqo?tag=v0.32.0#28cacc8ea2b035779ae504d837e3e25331264347",
+      "source": "git+https://github.com/mozilla/neqo?tag=v0.33.0#1ec4c2a3ccd7ada264112d1b70b070381557d844",
       "target_entry_points": [
         "third_party/rust/neqo-qpack/src/lib.rs"
       ],
-      "version": "0.32.0"
+      "version": "0.33.0"
     },
     {
       "manifest_path": "third_party/rust/neqo-transport/Cargo.toml",
       "name": "neqo-transport",
-      "source": "git+https://github.com/mozilla/neqo?tag=v0.32.0#28cacc8ea2b035779ae504d837e3e25331264347",
+      "source": "git+https://github.com/mozilla/neqo?tag=v0.33.0#1ec4c2a3ccd7ada264112d1b70b070381557d844",
       "target_entry_points": [
         "third_party/rust/neqo-transport/src/lib.rs"
       ],
-      "version": "0.32.0"
+      "version": "0.33.0"
     },
     {
       "manifest_path": "third_party/rust/neqo-udp/Cargo.toml",
       "name": "neqo-udp",
-      "source": "git+https://github.com/mozilla/neqo?tag=v0.32.0#28cacc8ea2b035779ae504d837e3e25331264347",
+      "source": "git+https://github.com/mozilla/neqo?tag=v0.33.0#1ec4c2a3ccd7ada264112d1b70b070381557d844",
       "target_entry_points": [
         "third_party/rust/neqo-udp/build.rs",
         "third_party/rust/neqo-udp/src/lib.rs"
       ],
-      "version": "0.32.0"
+      "version": "0.33.0"
     },
     {
       "manifest_path": "netwerk/socket/neqo_glue/Cargo.toml",
@@ -9866,7 +10004,7 @@
       "target_entry_points": [
         "third_party/rust/qlog/src/lib.rs"
       ],
-      "version": "0.16.0"
+      "version": "0.18.1"
     },
     {
       "manifest_path": "third_party/rust/quinn-udp/Cargo.toml",
@@ -9876,7 +10014,7 @@
         "third_party/rust/quinn-udp/build.rs",
         "third_party/rust/quinn-udp/src/lib.rs"
       ],
-      "version": "0.6.2"
+      "version": "0.6.3"
     },
     {
       "manifest_path": "third_party/rust/quote/Cargo.toml",
@@ -10221,7 +10359,7 @@
     {
       "manifest_path": "third_party/rust/simdutf8/Cargo.toml",
       "name": "simdutf8",
-      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "source": "git+https://github.com/hsivonen/simdutf8?rev=9c38ac5d3761ebf53578a92bd90a76cdc08c162b#9c38ac5d3761ebf53578a92bd90a76cdc08c162b",
       "target_entry_points": [
         "third_party/rust/simdutf8/src/lib.rs"
       ],
@@ -11078,6 +11216,33 @@
       "version": "0.1.0"
     },
     {
+      "manifest_path": "third_party/rust/xshell/Cargo.toml",
+      "name": "xshell",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "target_entry_points": [
+        "third_party/rust/xshell/src/lib.rs"
+      ],
+      "version": "0.2.7"
+    },
+    {
+      "manifest_path": "third_party/rust/xshell-macros/Cargo.toml",
+      "name": "xshell-macros",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "target_entry_points": [
+        "third_party/rust/xshell-macros/src/lib.rs"
+      ],
+      "version": "0.2.7"
+    },
+    {
+      "manifest_path": "third_party/rust/xshell-venv/Cargo.toml",
+      "name": "xshell-venv",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "target_entry_points": [
+        "third_party/rust/xshell-venv/src/lib.rs"
+      ],
+      "version": "2.0.0"
+    },
+    {
       "manifest_path": "third_party/rust/yoke/Cargo.toml",
       "name": "yoke",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
@@ -11190,9 +11355,9 @@
   "collector_sha256": "31bf245320f62a88ea4b42d1aadde6d050e0c14948ae6ba6d0f10799b68c61d1",
   "counts": {
     "directory_contracts": 36,
-    "files": 17677
+    "files": 17732
   },
-  "depfile_count": 1452,
+  "depfile_count": 1555,
   "directory_contracts": [
     "config/tests/ref-simple",
     "config/tests/src-simple/l10n",
@@ -13880,6 +14045,7 @@
     "modules/libpref/test/unit_ipc/test_update_prefs.js",
     "modules/libpref/test/unit_ipc/test_user_default_prefs.js",
     "modules/libpref/test/unit_ipc/xpcshell.toml",
+    "modules/zlib/LICENSE",
     "modules/zlib/moz.build",
     "modules/zlib/src/adler32.c",
     "modules/zlib/src/compress.c",
@@ -14473,6 +14639,7 @@
     "netwerk/cookie/test/browser/browser_3pcb_expection.js",
     "netwerk/cookie/test/browser/browser_broadcastChannel.js",
     "netwerk/cookie/test/browser/browser_chips_partition_cap_child.js",
+    "netwerk/cookie/test/browser/browser_cookieStore_bfcache_leak.js",
     "netwerk/cookie/test/browser/browser_cookieStore_ip_domain.js",
     "netwerk/cookie/test/browser/browser_cookieStore_serviceWorker.js",
     "netwerk/cookie/test/browser/browser_cookie_chips.js",
@@ -14721,6 +14888,7 @@
     "netwerk/naivefox/core/generate_version_source.py",
     "netwerk/naivefox/core/moz.build",
     "netwerk/naivefox/glean/bindings/MetricTypes.h",
+    "netwerk/naivefox/glean/bindings/Ping.h",
     "netwerk/naivefox/idl/PrefsTypes.ipdlh",
     "netwerk/naivefox/idl/RandomAccessStreamParams.ipdlh",
     "netwerk/naivefox/idl/moz.build",
@@ -16463,6 +16631,7 @@
     "storage/mozStorageStatementData.h",
     "storage/mozStorageStatementParams.h",
     "storage/mozStorageStatementRow.h",
+    "storage/pings.yaml",
     "storage/rust/Cargo.toml",
     "storage/rust/src/lib.rs",
     "storage/storage.h",
@@ -17053,6 +17222,7 @@
     "third_party/application-services/components/support/error/android/build.gradle",
     "third_party/application-services/components/support/error/android/src/main/AndroidManifest.xml",
     "third_party/application-services/components/support/error/android/src/main/java/mozilla/appservices/errorsupport/RustComponentsErrorTelemetry.kt",
+    "third_party/application-services/components/support/error/build.rs",
     "third_party/application-services/components/support/error/macros/Cargo.toml",
     "third_party/application-services/components/support/error/macros/src/lib.rs",
     "third_party/application-services/components/support/error/metrics.yaml",
@@ -19085,7 +19255,6 @@
     "third_party/rust/audioipc2-client/.cargo-checksum.json",
     "third_party/rust/audioipc2-server/.cargo-checksum.json",
     "third_party/rust/audioipc2/.cargo-checksum.json",
-    "third_party/rust/authenticator/.cargo-checksum.json",
     "third_party/rust/autocfg/.cargo-checksum.json",
     "third_party/rust/autocfg/Cargo.lock",
     "third_party/rust/autocfg/Cargo.toml",
@@ -19771,6 +19940,7 @@
     "third_party/rust/clubcard/src/equation.rs",
     "third_party/rust/clubcard/src/lib.rs",
     "third_party/rust/clubcard/src/query.rs",
+    "third_party/rust/cobs/.cargo-checksum.json",
     "third_party/rust/codespan-reporting/.cargo-checksum.json",
     "third_party/rust/comedy/.cargo-checksum.json",
     "third_party/rust/cookie/.cargo-checksum.json",
@@ -20975,6 +21145,10 @@
     "third_party/rust/gl_generator/lib.rs",
     "third_party/rust/gleam/.cargo-checksum.json",
     "third_party/rust/glean-build/.cargo-checksum.json",
+    "third_party/rust/glean-build/Cargo.toml",
+    "third_party/rust/glean-build/LICENSE",
+    "third_party/rust/glean-build/README.md",
+    "third_party/rust/glean-build/src/lib.rs",
     "third_party/rust/glean-core/.cargo-checksum.json",
     "third_party/rust/glean-core/Cargo.toml",
     "third_party/rust/glean-core/build.rs",
@@ -21240,6 +21414,23 @@
     "third_party/rust/http/tests/status_code.rs",
     "third_party/rust/httparse/.cargo-checksum.json",
     "third_party/rust/httpdate/.cargo-checksum.json",
+    "third_party/rust/humantime/.cargo-checksum.json",
+    "third_party/rust/humantime/.cargo_vcs_info.json",
+    "third_party/rust/humantime/.github/dependabot.yml",
+    "third_party/rust/humantime/.github/workflows/rust.yml",
+    "third_party/rust/humantime/Cargo.lock",
+    "third_party/rust/humantime/Cargo.toml",
+    "third_party/rust/humantime/Cargo.toml.orig",
+    "third_party/rust/humantime/LICENSE-APACHE",
+    "third_party/rust/humantime/LICENSE-MIT",
+    "third_party/rust/humantime/README.md",
+    "third_party/rust/humantime/benches/datetime_format.rs",
+    "third_party/rust/humantime/benches/datetime_parse.rs",
+    "third_party/rust/humantime/deny.toml",
+    "third_party/rust/humantime/src/date.rs",
+    "third_party/rust/humantime/src/duration.rs",
+    "third_party/rust/humantime/src/lib.rs",
+    "third_party/rust/humantime/src/wrapper.rs",
     "third_party/rust/hyper-util/.cargo-checksum.json",
     "third_party/rust/hyper/.cargo-checksum.json",
     "third_party/rust/iana-time-zone-haiku/.cargo-checksum.json",
@@ -23083,7 +23274,6 @@
     "third_party/rust/neqo-qpack/src/huffman_table.rs",
     "third_party/rust/neqo-qpack/src/lib.rs",
     "third_party/rust/neqo-qpack/src/prefix.rs",
-    "third_party/rust/neqo-qpack/src/qlog.rs",
     "third_party/rust/neqo-qpack/src/qpack_send_buf.rs",
     "third_party/rust/neqo-qpack/src/reader.rs",
     "third_party/rust/neqo-qpack/src/static_table.rs",
@@ -23142,6 +23332,7 @@
     "third_party/rust/neqo-transport/src/connection/tests/vn.rs",
     "third_party/rust/neqo-transport/src/connection/tests/zerortt.rs",
     "third_party/rust/neqo-transport/src/crypto.rs",
+    "third_party/rust/neqo-transport/src/datagram_queue.rs",
     "third_party/rust/neqo-transport/src/ecn.rs",
     "third_party/rust/neqo-transport/src/events.rs",
     "third_party/rust/neqo-transport/src/fc.rs",
@@ -23670,6 +23861,7 @@
     "third_party/rust/plane-split/.cargo-checksum.json",
     "third_party/rust/plist/.cargo-checksum.json",
     "third_party/rust/pollster/.cargo-checksum.json",
+    "third_party/rust/postcard/.cargo-checksum.json",
     "third_party/rust/potential_utf/.cargo-checksum.json",
     "third_party/rust/potential_utf/.cargo_vcs_info.json",
     "third_party/rust/potential_utf/Cargo.lock",
@@ -23745,23 +23937,23 @@
     "third_party/rust/pulse/.cargo-checksum.json",
     "third_party/rust/qlog/.cargo-checksum.json",
     "third_party/rust/qlog/.cargo_vcs_info.json",
+    "third_party/rust/qlog/AGENTS.md",
     "third_party/rust/qlog/COPYING",
     "third_party/rust/qlog/Cargo.lock",
     "third_party/rust/qlog/Cargo.toml",
     "third_party/rust/qlog/Cargo.toml.orig",
     "third_party/rust/qlog/README.md",
-    "third_party/rust/qlog/src/events/connectivity.rs",
-    "third_party/rust/qlog/src/events/h3.rs",
+    "third_party/rust/qlog/src/events/http3.rs",
     "third_party/rust/qlog/src/events/mod.rs",
-    "third_party/rust/qlog/src/events/qpack.rs",
     "third_party/rust/qlog/src/events/quic.rs",
-    "third_party/rust/qlog/src/events/security.rs",
     "third_party/rust/qlog/src/lib.rs",
     "third_party/rust/qlog/src/reader.rs",
     "third_party/rust/qlog/src/streamer.rs",
     "third_party/rust/qlog/src/testing/event_tests.rs",
     "third_party/rust/qlog/src/testing/mod.rs",
     "third_party/rust/qlog/src/testing/trace_tests.rs",
+    "third_party/rust/qlog/src/writer.rs",
+    "third_party/rust/qlog/tests/writer_roundtrip.rs",
     "third_party/rust/quick-error/.cargo-checksum.json",
     "third_party/rust/quick-xml/.cargo-checksum.json",
     "third_party/rust/quinn-udp/.cargo-checksum.json",
@@ -25065,11 +25257,8 @@
     "third_party/rust/simd-adler32/Cargo.toml",
     "third_party/rust/simd-adler32/src/lib.rs",
     "third_party/rust/simdutf8/.cargo-checksum.json",
-    "third_party/rust/simdutf8/.cargo_vcs_info.json",
     "third_party/rust/simdutf8/CHANGELOG.md",
-    "third_party/rust/simdutf8/Cargo.lock",
     "third_party/rust/simdutf8/Cargo.toml",
-    "third_party/rust/simdutf8/Cargo.toml.orig",
     "third_party/rust/simdutf8/LICENSE-Apache",
     "third_party/rust/simdutf8/LICENSE-MIT",
     "third_party/rust/simdutf8/README.md",
@@ -25904,7 +26093,6 @@
     "third_party/rust/toml_writer/src/string.rs",
     "third_party/rust/toml_writer/src/value.rs",
     "third_party/rust/toml_writer/src/write.rs",
-    "third_party/rust/topological-sort/.cargo-checksum.json",
     "third_party/rust/tower-service/.cargo-checksum.json",
     "third_party/rust/tracing-attributes/.cargo-checksum.json",
     "third_party/rust/tracing-attributes/.cargo_vcs_info.json",
@@ -27785,8 +27973,39 @@
     "third_party/rust/xmldecl/README.md",
     "third_party/rust/xmldecl/src/lib.rs",
     "third_party/rust/xshell-macros/.cargo-checksum.json",
+    "third_party/rust/xshell-macros/.cargo_vcs_info.json",
+    "third_party/rust/xshell-macros/Cargo.toml",
+    "third_party/rust/xshell-macros/Cargo.toml.orig",
+    "third_party/rust/xshell-macros/src/lib.rs",
     "third_party/rust/xshell-venv/.cargo-checksum.json",
+    "third_party/rust/xshell-venv/.cargo_vcs_info.json",
+    "third_party/rust/xshell-venv/.github/workflows/test.yml",
+    "third_party/rust/xshell-venv/Cargo.lock",
+    "third_party/rust/xshell-venv/Cargo.toml",
+    "third_party/rust/xshell-venv/Cargo.toml.orig",
+    "third_party/rust/xshell-venv/LICENSE",
+    "third_party/rust/xshell-venv/README.md",
+    "third_party/rust/xshell-venv/src/error.rs",
+    "third_party/rust/xshell-venv/src/lib.rs",
     "third_party/rust/xshell/.cargo-checksum.json",
+    "third_party/rust/xshell/.cargo_vcs_info.json",
+    "third_party/rust/xshell/CHANGELOG.md",
+    "third_party/rust/xshell/Cargo.lock",
+    "third_party/rust/xshell/Cargo.toml",
+    "third_party/rust/xshell/Cargo.toml.orig",
+    "third_party/rust/xshell/LICENSE-APACHE",
+    "third_party/rust/xshell/LICENSE-MIT",
+    "third_party/rust/xshell/README.md",
+    "third_party/rust/xshell/examples/ci.rs",
+    "third_party/rust/xshell/examples/clone_and_publish.rs",
+    "third_party/rust/xshell/src/error.rs",
+    "third_party/rust/xshell/src/lib.rs",
+    "third_party/rust/xshell/tests/compile_time.rs",
+    "third_party/rust/xshell/tests/data/xecho.rs",
+    "third_party/rust/xshell/tests/it/compile_failures.rs",
+    "third_party/rust/xshell/tests/it/env.rs",
+    "third_party/rust/xshell/tests/it/main.rs",
+    "third_party/rust/xshell/tests/it/tidy.rs",
     "third_party/rust/yaml-rust2/.cargo-checksum.json",
     "third_party/rust/yoke-derive/.cargo-checksum.json",
     "third_party/rust/yoke-derive/.cargo_vcs_info.json",
@@ -28061,6 +28280,7 @@
     "third_party/sqlite3/ext/sqlite-vec/sqlite-vec.c",
     "third_party/sqlite3/ext/sqlite-vec/sqlite-vec.h",
     "third_party/sqlite3/ext/sqlite3ext.h",
+    "third_party/sqlite3/src/LICENSE.md",
     "third_party/sqlite3/src/moz.build",
     "third_party/sqlite3/src/sqlite.symbols",
     "third_party/sqlite3/src/sqlite3.c",
@@ -28911,9 +29131,9 @@
     "xpcom/threads/nsTimerImpl.cpp",
     "xpcom/threads/nsTimerImpl.h"
   ],
-  "firefox_base_commit": "2a69ca0225f0a240c61f23f055e4b9b82cc018c4",
+  "firefox_base_commit": "8014960797439064c025f6bbc6a236558bd4f35f",
   "generated_makefile_count": 364,
-  "generated_makefiles_sha256": "9e836e9bc4ecab7c004b0927363240abcc684b0621818f6a73cf7bc733a82f20",
+  "generated_makefiles_sha256": "3fc03bdc32458a67e70c824714395acaf3a802bb025e41be52969696a6c94492",
   "install_manifest_count": 7,
   "install_manifest_names": [
     "_test_files",
@@ -28924,19 +29144,19 @@
     "dist_public",
     "xpidl"
   ],
-  "install_manifest_record_count": 2525,
-  "install_manifests_sha256": "afce7e8517883f5c61a861793cacc7a764ea9619d38caa1c5fefeb112284fd39",
+  "install_manifest_record_count": 2527,
+  "install_manifests_sha256": "5ccfc8cd2944ead72002a85f00d1fd78495c9ed446be50f42dc94b4e4b4a16b0",
   "mozconfig": "netwerk/naivefox/mozconfig-windows-x86_64",
   "mozconfig_sha256": "594d077dd74eb589b3904dbc005781f3f0ec6e058a4cd7aac5fcc954c8a6fb5b",
-  "naivefox_reference_commit": "9ae1f47fb6b060fad2afe724f773abd3f5413cf9",
+  "naivefox_reference_commit": "711adae4770a6ee017356e3e74c0c4004cc90b1e",
   "objdir_evidence_sha256": {
-    "backend.RecursiveMakeBackend.in": "37dae3677c77c4a384a9da74ad058d27a4947af351ccab8e607932669520a83b",
+    "backend.RecursiveMakeBackend.in": "b1c1ca41f01d233e1a31ca28d2d3156f370712f25b20c21f22d9bb898228b288",
     "config_status_deps.in": "68395b83cbe2be61f3b0d266310675612bcf50f8690ec6e9dce9607901cf5d72"
   },
   "provenance_sha256": "642a32e90aaf870224f1831b2e932e08fb3153ed75765607f2112852f668e3fb",
   "provenance_version": 2,
   "report_version": 1,
-  "source_commit": "9ae1f47fb6b060fad2afe724f773abd3f5413cf9",
+  "source_commit": "711adae4770a6ee017356e3e74c0c4004cc90b1e",
   "source_tree_kind": "repository",
   "source_worktree_clean": true,
   "source_worktree_status": [],
