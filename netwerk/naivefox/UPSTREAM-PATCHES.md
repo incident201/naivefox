@@ -446,6 +446,23 @@ packet, WSS and strict H3 fixture, including IPv4 UDP traffic, both listeners,
 byte-exact transfers, concurrent streams, rejection and half-close. Native
 Windows socket semantics remain unchanged for IPv6 and dual-stack sockets.
 
+## NF-UPSTREAM-029: SSL_CERT_FILE roots as third-party trust anchors
+
+Files: security/manager/ssl/nsNSSComponent.h, nsNSSComponent.cpp and
+netwerk/naivefox/TemporaryTrustStore.cpp.
+
+PSM reads NSS trust with CERT_GetDERCertTrust, which only sees token trust
+objects, and refuses to change the trust of temporary certificates. The
+runtime therefore cannot mark SSL_CERT_FILE roots trusted in memory, and
+writing them into the profile token would persist them in NAIVEFOX_PROFILE.
+Under MOZ_NAIVEFOX the component keeps a separate process-lifetime list of
+runtime-supplied roots and passes it, together with the enterprise certificates,
+to the certificate verifier as third-party trust anchors. Enterprise-root
+imports cannot replace that list, and ordinary Firefox builds are unchanged.
+
+Acceptance: the staged Linux, Wine and Android runtime gates trust only the
+fixture CA supplied through SSL_CERT_FILE and still reject an untrusted origin.
+
 ## Adding or removing an entry
 
 Use the next stable identifier and record:

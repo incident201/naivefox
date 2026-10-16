@@ -26,8 +26,8 @@
 #include "mozIStorageCompletionCallback.h"
 #include "mozIStoragePendingStatement.h"
 #include "mozilla/glean/GleanPings.h"
+#include "mozilla/glean/StorageMetrics.h"
 #ifndef MOZ_NAIVEFOX
-#  include "mozilla/glean/StorageMetrics.h"
 #  include "mozilla/intl/Collator.h"
 #endif
 #include "mozilla/StaticPrefs_security.h"

@@ -61,7 +61,6 @@ using DenominatorMetric = NoopMetric;
 using DualLabeledCounterMetricBase = NoopMetric;
 using MemoryDistributionMetric = NoopMetric;
 using NumeratorMetric = NoopMetric;
-using ObjectMetric = NoopMetric;
 using QuantityMetric = NoopMetric;
 using RateMetric = NoopMetric;
 using StringListMetric = NoopMetric;
@@ -86,6 +85,19 @@ class DualLabeledCounterMetric final : public NoopMetric {
   constexpr CounterMetric<> Get(Args&&...) const {
     return {};
   }
+};
+
+// Generated headers specialize Set() for typed objects and finish in SetStr().
+template <typename T, typename Tag>
+class ObjectMetric final {
+ public:
+  constexpr explicit ObjectMetric(uint32_t = 0) {}
+
+  void Set(const T&) const;
+
+ private:
+  template <typename S>
+  constexpr void SetStr(const S&) const {}
 };
 
 template <typename Extra = NoExtraKeys>

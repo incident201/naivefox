@@ -480,7 +480,10 @@ def assert_closure(report_path, topsrcdir):
     }
     for field in ("metrics_yaml_inputs", "pings_yaml_inputs"):
         for path in glean.get(field, []):
-            if path not in allowed_metrics and path != "netwerk/pings.yaml":
+            if path not in allowed_metrics and path not in (
+                "netwerk/pings.yaml",
+                "storage/pings.yaml",
+            ):
                 violations.append(
                     f"Global/non-allowlisted Glean schema in {field}: {path}"
                 )

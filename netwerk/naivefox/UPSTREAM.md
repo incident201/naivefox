@@ -182,6 +182,11 @@ Native Windows release runners also require the tracked
 `build/cargo-linker.bat` and `build/cargo-host-linker.bat` wrappers. Keep them
 in the explicit minimal-source allowlist: Linux cross-build traces follow the
 extensionless scripts and do not discover these Windows entrypoints.
+Likewise, Cargo build scripts run outside the configure trace and compiler
+depfiles: the `glean_parser` CLI and its `click` dependency used by
+`glean-build` are an explicit class. Covering `moz.yaml` manifests observed
+above an active build directory are exported because `LICENSES` notices read
+their license file from them.
 
 ## Provenance without SHA churn
 

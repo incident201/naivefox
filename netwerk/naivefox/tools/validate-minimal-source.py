@@ -55,6 +55,10 @@ FORBIDDEN_BASENAMES = {
     "key4.db",
     "pkcs11.txt",
 }
+# Upstream crate documents covered by the vendored .cargo-checksum.json.
+VENDORED_CRATE_DOCUMENTS = {
+    pathlib.PurePosixPath("third_party/rust/qlog/AGENTS.md"),
+}
 PRODUCT_DOCS = {
     pathlib.PurePosixPath("netwerk/naivefox/README.md"),
     pathlib.PurePosixPath("netwerk/naivefox/ARCHITECTURE.md"),
@@ -132,7 +136,9 @@ def safe_relative(value: str) -> pathlib.PurePosixPath:
         or ".." in path.parts
     ):
         fail(f"unsafe or non-canonical path: {value}")
-    if any(part in FORBIDDEN_BASENAMES for part in path.parts):
+    if path not in VENDORED_CRATE_DOCUMENTS and any(
+        part in FORBIDDEN_BASENAMES for part in path.parts
+    ):
         fail(f"agent/maintenance/private file leaked into export: {value}")
     if any(part in FORBIDDEN_COMPONENTS for part in path.parts):
         fail(f"forbidden path component: {value}")

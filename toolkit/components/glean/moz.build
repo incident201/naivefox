@@ -17,6 +17,7 @@ if not CONFIG["MOZ_NAIVEFOX"]:
 if CONFIG["MOZ_NAIVEFOX"]:
     EXPORTS.mozilla.glean.bindings += [
         "/netwerk/naivefox/glean/bindings/MetricTypes.h",
+        "/netwerk/naivefox/glean/bindings/Ping.h",
     ]
 else:
     EXPORTS.mozilla.glean += [
@@ -129,7 +130,7 @@ if CONFIG["MOZ_NAIVEFOX"]:
         "toolkit/xre/metrics.yaml",
         "xpcom/metrics.yaml",
     ]
-    pings_yamls = ["netwerk/pings.yaml"]
+    pings_yamls = ["netwerk/pings.yaml", "storage/pings.yaml"]
     # The shared tag vocabulary is required for glinter validation but does
     # not generate any product metric/ping output by itself.
     tags_yamls = ["toolkit/components/glean/tags.yaml"]

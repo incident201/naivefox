@@ -18,7 +18,7 @@
 #include "nsString.h"
 #include "prio.h"
 
-#include "nsNSSCertificateDB.h"
+#include "nsNSSComponent.h"
 
 namespace mozilla::naivefox {
 
@@ -182,9 +182,7 @@ nsresult TemporaryTrustStore::LoadFromEnvironment(nsACString& aError) {
     return NS_ERROR_FAILURE;
   }
 
-  CERTCertTrust trust{CERTDB_VALID_CA | CERTDB_TRUSTED_CA |
-                          CERTDB_TRUSTED_CLIENT_CA,
-                      0, 0};
+  nsTArray<nsTArray<uint8_t>> anchors;
   for (const nsTArray<uint8_t>& der : package.mCertificates) {
     SECItem item{siDERCertBuffer, const_cast<unsigned char*>(der.Elements()),
                  static_cast<unsigned int>(der.Length())};
@@ -206,15 +204,21 @@ nsresult TemporaryTrustStore::LoadFromEnvironment(nsACString& aError) {
       continue;
     }
 
-    if (ChangeCertTrustWithPossibleAuthentication(certificate, trust,
-                                                  nullptr) != SECSuccess) {
-      aError.AssignLiteral("cannot trust SSL_CERT_FILE certificate");
-      return NS_ERROR_FAILURE;
-    }
-    if (!mCertificates.AppendElement(std::move(certificate), fallible)) {
+    if (!anchors.AppendElement(der.Clone(), fallible) ||
+        !mCertificates.AppendElement(std::move(certificate), fallible)) {
       aError.AssignLiteral("cannot retain SSL_CERT_FILE certificate");
       return NS_ERROR_OUT_OF_MEMORY;
     }
+  }
+
+  // PSM reads NSS trust only from token objects. Supply these roots as
+  // process-lifetime third-party trust anchors instead of writing the profile.
+  nsCOMPtr<nsINSSComponent> component(do_GetService(PSM_COMPONENT_CONTRACTID));
+  if (!component ||
+      NS_FAILED(static_cast<nsNSSComponent*>(component.get())
+                    ->AddNaiveFoxTrustAnchors(anchors))) {
+    aError.AssignLiteral("cannot trust SSL_CERT_FILE certificate");
+    return NS_ERROR_FAILURE;
   }
 
   mConfigured = true;

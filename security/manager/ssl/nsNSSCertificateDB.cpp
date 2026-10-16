@@ -94,6 +94,11 @@ nsNSSCertificateDB::AsyncFindCertByDBKey(const nsACString& aDBKey,
                                          JSContext* aCx,
                                          mozilla::dom::Promise** aPromise) {
   NS_ENSURE_ARG_POINTER(aCx);
+#ifdef MOZ_NAIVEFOX
+  NS_ENSURE_ARG_POINTER(aPromise);
+  *aPromise = nullptr;
+  return NS_ERROR_NOT_IMPLEMENTED;
+#else
 
   nsIGlobalObject* globalObject = xpc::CurrentNativeGlobal(aCx);
   if (!globalObject) {
@@ -133,6 +138,7 @@ nsNSSCertificateDB::AsyncFindCertByDBKey(const nsACString& aDBKey,
   }
   promise.forget(aPromise);
   return NS_OK;
+#endif
 }
 
 nsresult nsNSSCertificateDB::FindCertByDBKey(const nsACString& aDBKey,

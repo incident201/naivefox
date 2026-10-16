@@ -62,6 +62,9 @@ FORBIDDEN_BASENAMES = {
     "MINIMISATION-TASK.MD",
 }
 FORBIDDEN_COMPONENTS = {".git", "artifacts", "captures", "logs", "profiles"}
+# Upstream crate documents covered by the vendored .cargo-checksum.json; Cargo
+# rejects the crate if they are missing.
+VENDORED_CRATE_DOCUMENTS = {"third_party/rust/qlog/AGENTS.md"}
 FORBIDDEN_SUFFIXES = (
     ".keylog",
     ".log",
@@ -86,6 +89,14 @@ WINDOWS_MACH_BOOTSTRAP_PREFIXES = (
     "third_party/python/blessed/",
     "third_party/python/jinxed/",
     "third_party/python/platformdirs/platformdirs/windows.py",
+)
+# glean-build, a Cargo build dependency of application-services error-support,
+# runs `python -m glean_parser` from Mach's build virtualenv.  Build-script
+# subprocesses are not part of the configure trace or compiler depfiles, so
+# export the parser CLI and its click dependency as one bounded class.
+CARGO_BUILD_SCRIPT_PYTHON_PREFIXES = (
+    "third_party/python/click/",
+    "third_party/python/glean_parser/",
 )
 # The native Windows Rust build invokes these batch wrappers directly.  A
 # Linux cross-build follows the extensionless scripts, so its trace alone
@@ -113,7 +124,9 @@ def safe_path(value: str) -> str:
     path = PurePosixPath(value)
     if not value or path.is_absolute() or ".." in path.parts:
         raise SystemExit(f"unsafe repository path: {value!r}")
-    if any(part in FORBIDDEN_BASENAMES for part in path.parts):
+    if path.as_posix() not in VENDORED_CRATE_DOCUMENTS and any(
+        part in FORBIDDEN_BASENAMES for part in path.parts
+    ):
         raise SystemExit(f"agent/task document in source plan: {value}")
     if any(part in FORBIDDEN_COMPONENTS for part in path.parts):
         raise SystemExit(f"generated/private path in source plan: {value}")
@@ -508,6 +521,14 @@ def main() -> int:
                 for root in active_gyp_roots
             ):
                 add(value, f"configure:{target}:active-gyp-input")
+            elif Path(value).name == "moz.yaml" and any(
+                directory == Path(value).parent.as_posix()
+                or directory.startswith(f"{Path(value).parent.as_posix()}/")
+                for directory in active_build_definition_dirs
+            ):
+                # LICENSES declarations take their notice text from the
+                # nearest moz.yaml at or above the declaring directory.
+                add(value, f"configure:{target}:license-manifest")
             elif Path(value).parent.as_posix() in active_build_definition_dirs:
                 # Backend evaluation can validate target-specific auxiliary
                 # files (for example a Windows DEFFILE) without emitting them
@@ -564,6 +585,11 @@ def main() -> int:
         path for path in tracked if path.startswith(WINDOWS_MACH_BOOTSTRAP_PREFIXES)
     ):
         add(value, "explicit:mach-windows-bootstrap")
+
+    for value in sorted(
+        path for path in tracked if path.startswith(CARGO_BUILD_SCRIPT_PYTHON_PREFIXES)
+    ):
+        add(value, "explicit:cargo-build-script-python")
 
     for value in WINDOWS_RUST_LINKER_SCRIPTS:
         add(value, "explicit:windows-rust-linker")

@@ -62,7 +62,16 @@ namespace mozilla::psm {
 void CollectThirdPartyPKCS11ModuleTelemetry(bool) {}
 void ShowProtectedAuthDialog(const nsCString&, const nsString&) {}
 
+// The product runs in one process and has no PKCS#11 utility process.
+bool PKCS11ModuleDB::UtilityProcessEnabled() { return false; }
+
 }  // namespace mozilla::psm
+
+// MockNetworkLayerController is test-only and not compiled into the product.
+extern "C" bool moz_mock_network_udp_send_would_block(uint16_t, const uint8_t*,
+                                                      uint16_t) {
+  return false;
+}
 
 NS_IMETHODIMP nsNSSCertificateDB::OpenSignedAppFileAsync(
     AppTrustedRoot, nsIFile*, nsIOpenSignedAppFileCallback*) {

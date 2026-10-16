@@ -101,6 +101,11 @@ class nsNSSComponent final : public nsINSSComponent, public nsIObserver {
 
   static nsresult SetEnabledTLSVersions();
 
+#ifdef MOZ_NAIVEFOX
+  // Adds process-lifetime trust anchors supplied by the NaiveFox runtime.
+  nsresult AddNaiveFoxTrustAnchors(const nsTArray<nsTArray<uint8_t>>& aRoots);
+#endif
+
  protected:
   ~nsNSSComponent();
 
@@ -143,6 +148,9 @@ class nsNSSComponent final : public nsINSSComponent, public nsIObserver {
   nsString mMitmCanaryIssuer MOZ_GUARDED_BY(mMutex);
   bool mMitmDetecionEnabled MOZ_GUARDED_BY(mMutex);
   nsTArray<EnterpriseCert> mEnterpriseCerts MOZ_GUARDED_BY(mMutex);
+#ifdef MOZ_NAIVEFOX
+  nsTArray<EnterpriseCert> mNaiveFoxTrustAnchors MOZ_GUARDED_BY(mMutex);
+#endif
 
   // The following members are accessed only on the main thread:
   static int mInstanceCount;
