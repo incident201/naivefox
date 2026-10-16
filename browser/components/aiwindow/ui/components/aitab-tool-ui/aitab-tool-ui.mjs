@@ -15,6 +15,7 @@ export class AITabToolUI extends MozLitElement {
   static properties = {
     state: { type: String },
     title: { type: String },
+    viewerURL: { type: String },
     completeStateOpen: { type: Boolean },
   };
 
@@ -22,7 +23,14 @@ export class AITabToolUI extends MozLitElement {
     super();
     this.state = "creating";
     this.title = "";
+    this.viewerURL = "";
     this.completeStateOpen = true;
+  }
+
+  #handleTitleClick(event) {
+    event.preventDefault();
+
+    this.#requestOpen("new");
   }
 
   #handleKeyboardActivation(event) {
@@ -82,6 +90,27 @@ export class AITabToolUI extends MozLitElement {
     </div>`;
   }
 
+  #renderTitle() {
+    const title = html`
+      <img
+        src="chrome://browser/skin/smart-window-mono-32.svg"
+        alt=""
+        width="16"
+        height="16"
+      />
+      ${this.title}
+    `;
+
+    return this.viewerURL
+      ? html`<a
+          href=${this.viewerURL}
+          class="title"
+          @click=${this.#handleTitleClick}
+          >${title}</a
+        >`
+      : html`<p class="title">${title}</p>`;
+  }
+
   #renderComplete() {
     const arrow = this.completeStateOpen
       ? "chrome://global/skin/icons/arrow-up-12.svg"
@@ -99,19 +128,7 @@ export class AITabToolUI extends MozLitElement {
         <span data-l10n-id="smartwindow-aitab-created-an-aitab"></span>
       </div>
 
-      ${this.completeStateOpen
-        ? html`
-            <p class="title">
-              <img
-                src="chrome://browser/skin/smart-window-mono-32.svg"
-                alt=""
-                width="16"
-                height="16"
-              />
-              ${this.title}
-            </p>
-          `
-        : nothing}
+      ${this.completeStateOpen ? this.#renderTitle() : nothing}
     </div>`;
   }
 

@@ -14,6 +14,7 @@ import {
   isSettingsURL,
   isSmartPageURL,
 } from "chrome://browser/content/aiwindow/modules/TrustedInternalURLs.mjs";
+import { parseTabGroupMentionId } from "chrome://browser/content/urlbar/SmartbarMentionUtils.mjs";
 // eslint-disable-next-line import/no-unassigned-import
 import "chrome://browser/content/aiwindow/components/ai-chat-card.mjs";
 // eslint-disable-next-line import/no-unassigned-import
@@ -273,6 +274,7 @@ export class AIChatMessage extends MozLitElement {
       if (isTabGroup) {
         chip.isTabGroup = true;
         chip.tabGroupColor = color ?? "";
+        chip.tabGroupId = parseTabGroupMentionId(linkHref) ?? "";
       } else {
         chip.iconSrc = this.#getIconSrc(linkHref);
         chip.href = linkHref;

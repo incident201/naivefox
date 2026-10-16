@@ -53,6 +53,7 @@ import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.scene.DialogSceneStrategy
 import androidx.navigation3.ui.NavDisplay
+import com.google.android.material.R as materialR
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -990,12 +991,12 @@ class TabManagementFragment : Fragment() {
                         shouldWidthMatchParent = true,
                         positiveButtonBackgroundColor =
                             ThemeManager.resolveAttribute(
-                                R.attr.accent,
+                                materialR.attr.colorTertiary,
                                 requireContext(),
                             ),
                         positiveButtonTextColor =
                             ThemeManager.resolveAttribute(
-                                R.attr.textOnColorPrimary,
+                                materialR.attr.colorOnTertiary,
                                 requireContext(),
                             ),
                         positiveButtonRadius = pixelSizeFor(R.dimen.tab_corner_radius).toFloat(),

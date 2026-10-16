@@ -1022,7 +1022,6 @@ option(
     help="Disable tracing of real-time audio callbacks",
 )
 
-set_config("MOZ_REAL_TIME_TRACING", True, when="--enable-real-time-tracing")
 set_define("MOZ_REAL_TIME_TRACING", True, when="--enable-real-time-tracing")
 
 # OpenMAX IL Decoding Support
@@ -1572,11 +1571,9 @@ set_define("MOZ_WEBRTC", webrtc)
 set_config("MOZ_SCTP", webrtc)
 set_config("MOZ_SRTP", webrtc)
 set_config("MOZ_WEBRTC_SIGNALING", webrtc)
-set_config("MOZ_PEERCONNECTION", webrtc)
 set_define("MOZ_PEERCONNECTION", webrtc)
 # MOZ_WEBRTC_ASSERT_ALWAYS turns on a number of safety asserts in
 # opt/production builds (via MOZ_CRASH())
-set_config("MOZ_WEBRTC_ASSERT_ALWAYS", webrtc)
 set_define("MOZ_WEBRTC_ASSERT_ALWAYS", webrtc)
 
 # RAW media
@@ -1976,7 +1973,6 @@ def proxy_bypass_protection(_):
     return True
 
 
-set_config("MOZ_PROXY_BYPASS_PROTECTION", proxy_bypass_protection)
 set_define("MOZ_PROXY_BYPASS_PROTECTION", proxy_bypass_protection)
 
 # Proxy direct failover
@@ -1994,7 +1990,6 @@ def proxy_direct_failover(value):
         return True
 
 
-set_config("MOZ_PROXY_DIRECT_FAILOVER", proxy_direct_failover)
 set_define("MOZ_PROXY_DIRECT_FAILOVER", proxy_direct_failover)
 
 # MIDL
@@ -2754,9 +2749,6 @@ set_config("NASM_ASFLAGS", nasm_asflags)
 # ANGLE renderer
 # ==============================================================
 
-with only_when(compile_environment & (target_is_windows | target_is_osx)):
-    set_config("MOZ_ANGLE_RENDERER", True)
-
 with only_when(target_is_windows):
     # We only produce dxc builds for x86_64 and aarch64.
     @depends(target)
@@ -2937,8 +2929,6 @@ with only_when(requires_wasm_sandboxing & compile_environment):
             return ["--sysroot=%s" % wasi_sysroot]
         return []
 
-    set_config("WASI_SYSROOT", wasi_sysroot)
-
     def wasm_compiler_with_flags(compiler, sysroot_flags):
         if compiler:
             return (
@@ -3005,9 +2995,10 @@ with only_when(requires_wasm_sandboxing & compile_environment):
     option(env="WASM_CFLAGS", nargs=1, help="Options to pass to WASM_CC")
 
     @depends("WASM_CFLAGS", wasm_compile_flags)
+    @imports(_from="mozshellutil", _import="split")
     def wasm_cflags(value, wasm_compile_flags):
         if value:
-            return wasm_compile_flags + value
+            return wasm_compile_flags + split(value[0])
         else:
             return wasm_compile_flags
 
@@ -3016,9 +3007,10 @@ with only_when(requires_wasm_sandboxing & compile_environment):
     option(env="WASM_CXXFLAGS", nargs=1, help="Options to pass to WASM_CXX")
 
     @depends("WASM_CXXFLAGS", wasm_compile_flags)
+    @imports(_from="mozshellutil", _import="split")
     def wasm_cxxflags(value, wasm_compile_flags):
         if value:
-            return wasm_compile_flags + value
+            return wasm_compile_flags + split(value[0])
         else:
             return wasm_compile_flags
 
@@ -3432,7 +3424,6 @@ set_config(
 )
 
 with only_when(target_is_osx):
-    set_config("MOZ_CHILD_PROCESS_BUNDLE", "plugin-container.app/Contents/MacOS/")
     set_config(
         "MOZ_CHILD_PROCESS_BUNDLEID",
         depends("--with-distribution-id")(lambda v: f"{v[0]}.plugincontainer"),
@@ -4444,7 +4435,6 @@ option(
     help="Disable reading preferences from /etc/firefox",
 )
 
-set_config("MOZ_SYSTEM_PREFERENCES", True, when="--enable-system-preferences")
 set_define("MOZ_SYSTEM_PREFERENCES", True, when="--enable-system-preferences")
 
 # Allow disabling the creation a legacy profile

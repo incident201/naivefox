@@ -5,7 +5,7 @@
 // META: script=/notifications/resources/helpers.js
 // META: script=/_mozilla/notifications/resources/MockAlertsService.js
 
-import { encrypt } from "/push-api/resources/helpers.js"
+import { pushMessageAndWait } from "./resources/helpers.js"
 
 // Tests for Declarative Web Push
 // https://w3c.github.io/push-api/#declarative-push-message
@@ -17,67 +17,52 @@ let subscription;
 
 promise_setup(async () => {
   await trySettingPermission("granted");
-  registration = await prepareActiveServiceWorker("push-sw.js");
+  registration = await prepareActiveServiceWorker("push-sw.js", {scope: "/"});
   subscription = await registration.pushManager.subscribe();
+  add_completion_callback(() => subscription.unsubscribe());
 });
 
 async function sendPush(t, message, actionToClick) {
-  await MockAlertsService.register(t);
-  await MockAlertsService.enableAutoClick(actionToClick);
-
   const {promise, resolve} = Promise.withResolvers();
   const signal = t.get_signal();
 
-  new BroadcastChannel("broadcast-when-opened").addEventListener("message", async e => {
-    const notifications = await MockAlertsService.getNotificationData();
-    assert_equals(notifications.length, 1,
-                  "Should have exactly one notification.");
-    const notificationData = notifications[0];
-    assert_equals(e.data, "opened");
-    const swrNotifications = await registration.getNotifications();
-    assert_equals(swrNotifications.length, 1,
-                  "ServiceWorkerRegistration.getNotifications() should return exactly 1 notification.");
-    const swrNotification = swrNotifications[0];
-    // (Not checking tag here since it's not exposed to nsIAlertNotification.
-    //  There's a separate test that tag does the expected thing below.)
-    for (let property of ["title", "dir", "lang", "silent", "requireInteraction", "body"]) {
-      let got = swrNotification[property];
-      let expected = notificationData[property];
-      assert_equals(got, expected,
-                    `${property} given in ServiceWorkerRegistration.getNotifications() should be consistent with alert data.`);
-    }
-    assert_object_equals(swrNotification.actions,
-                         Array.from(notificationData.actions).map(action => ({
-                           action: action.action,
-                           title: action.title,
-                           navigate: action.navigate,
-                         })),
-                         "Actions in ServiceWorkerRegistration.getNotifications() should be consistent with alert data.");
-    resolve({dwp: swrNotification});
-  }, {signal});
-  navigator.serviceWorker.addEventListener("message", e => {
-    if (e.data.data) {
-      resolve({swPush: true});
-    }
-  }, {signal});
+  const pushResult = await pushMessageAndWait(t, subscription, { message, actionToClick });
+  if (pushResult.swPush) {
+    return pushResult;
+  }
+  assert_true(pushResult.dwp, "pushMessageAndWait should return either swPush or dwp.");
 
-
-  const result = await encrypt(
-    message instanceof Uint8Array ? message : new TextEncoder().encode(message),
-    subscription.getKey("p256dh"),
-    subscription.getKey("auth")
-  );
-
-  await fetch(subscription.endpoint, {
-    method: "post",
-    ...result
-  });
-  return promise;
+  const notifications = await MockAlertsService.getNotificationData();
+  assert_equals(notifications.length, 1,
+                "Should have exactly one notification.");
+  const notificationData = notifications[0];
+  const swrNotifications = await registration.getNotifications();
+  assert_equals(swrNotifications.length, 1,
+                "ServiceWorkerRegistration.getNotifications() should return exactly 1 notification.");
+  const swrNotification = swrNotifications[0];
+  // (Not checking tag here since it's not exposed to nsIAlertNotification.
+  //  There's a separate test that tag does the expected thing below.)
+  for (let property of ["title", "dir", "lang", "silent", "requireInteraction", "body"]) {
+    let got = swrNotification[property];
+    let expected = notificationData[property];
+    assert_equals(got, expected,
+                  `${property} given in ServiceWorkerRegistration.getNotifications() should be consistent with alert data.`);
+  }
+  assert_equals(swrNotification.icon, notificationData.imageURL,
+                "Icon URL given in ServiceWorkerRegistration.getNotifications() should be consistent with alert data.");
+  assert_object_equals(swrNotification.actions,
+                       Array.from(notificationData.actions).map(action => ({
+                         action: action.action,
+                         title: action.title,
+                         navigate: action.navigate,
+                       })),
+                       "Actions in ServiceWorkerRegistration.getNotifications() should be consistent with alert data.");
+  return { dwp: swrNotification };
 }
 
 async function testNonDWP(t, message) {
   const result = await sendPush(t, message);
-  assert_true(result.swPush, "Should receive a service worker push event.");
+  assert_true(!!result.swPush, "Should receive a service worker push event.");
 }
 
 // Array of [option name, expected default value, value for testing]
@@ -89,6 +74,9 @@ const kNotificationOptions = [
   ["body", "", "Body text"],
   ["tag", "", "test-tag"],
   ["data", null, {foo: ["test", 1, false, null]}],
+  // Even if icon URL does not give an image (such as with about:blank),
+  // the icon property of the notification should be set correctly.
+  ["icon", "", "about:blank"],
 ];
 
 async function testDWP(t, pushData, actionToClick) {
@@ -103,6 +91,15 @@ async function testDWP(t, pushData, actionToClick) {
     // If option is not set or has the wrong type, the default value should be used.
     if (expected === undefined || typeof expected !== typeof defaultValue) {
       expected = defaultValue;
+    }
+    if (option === "icon" && expected) {
+      try {
+        // Icon URL should be resolved
+        expected = new URL(expected, location).href;
+      } catch (e) {
+        // If icon URL is invalid, the notification's icon URL is not set.
+        expected = "";
+      }
     }
     (typeof expected === "object" && expected !== null
         ? assert_object_equals : assert_equals)(
@@ -198,6 +195,26 @@ promise_test(async t => {
   // This will assert that there's only 1 notification.
   await testDWP(t, pushData);
 }, "DWP with same tag replaces old notification.");
+
+promise_test(async t => {
+  const pushData = structuredClone(SIMPLE_DWP);
+  // ?intercept is here to test that the icon fetch doesn't go
+  // through the service worker (the fetch handler in push-sw.js
+  // would reject it if it did).
+  pushData.notification.icon = "/media/1x1-green.png?intercept";
+  await testDWP(t, pushData);
+  const ids = await MockAlertsService.getNotificationIds();
+  assert_equals(ids.length, 1, "Should have exactly 1 notification.");
+  const imageData = await MockAlertsService.getIconImage(ids[0]);
+  assert_array_equals(imageData, [0,128,0,255],
+    "Should load image data from icon URL.");
+}, "DWP with icon image.");
+
+promise_test(async t => {
+  const pushData = structuredClone(SIMPLE_DWP);
+  pushData.notification.icon = "http://999.999";
+  await testDWP(t, pushData);
+}, "Invalid icon URL should be ignored.");
 
 promise_test(async t => {
   await testNonDWP(t, JSON.stringify(SIMPLE_DWP).slice(1));

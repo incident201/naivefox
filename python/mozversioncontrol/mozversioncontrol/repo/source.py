@@ -189,5 +189,10 @@ class SrcRepository(Repository):
         """Return last modified in VCS time for the specified file."""
         raise MissingVCSTool
 
-    def configure(self, state_dir: Path, update_only: bool = False):
+    def configure(
+        self,
+        state_dir: Path,
+        update_only: bool = False,
+        no_system_changes: bool = False,
+    ):
         pass

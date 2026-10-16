@@ -83,6 +83,8 @@ head = "head_addressComponent.js"
 
 ["test_migrateRecords.js"]
 
+["test_ml_regex_hint.js"]
+
 ["test_nameUtils.js"]
 
 ["test_parseAddressFormat.js"]
@@ -104,6 +106,12 @@ head = "head_addressComponent.js"
 ["test_rust_autofill_address_adapter.js"]
 
 ["test_rust_autofill_address_bridged_engine.js"]
+# The dry runs start on the storage singleton when the add-on starts, before
+# the test body runs, and can still be in flight when the test shuts down.
+prefs = [
+  "extensions.formautofill.addresses.storage.rust.runMigrationTest=false",
+  "extensions.formautofill.creditCards.storage.rust.runMigrationTest=false",
+]
 
 ["test_rust_autofill_address_migration.js"]
 

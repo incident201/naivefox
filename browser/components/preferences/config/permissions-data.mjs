@@ -13,6 +13,7 @@ const lazy = XPCOMUtils.declareLazy({
   AppConstants: "resource://gre/modules/AppConstants.sys.mjs",
   SelectableProfileService:
     "resource:///modules/profiles/SelectableProfileService.sys.mjs",
+  SitePermissions: "resource:///modules/SitePermissions.sys.mjs",
   AlertsServiceDND: () => {
     try {
       let alertsService = Cc["@mozilla.org/alerts-service;1"]
@@ -42,6 +43,8 @@ Preferences.addAll([
 
   // Permissions
   { id: "media.setsinkid.enabled", type: "bool" },
+
+  { id: "permissions.default.register-protocol-handler", type: "int" },
 
   // Popups
   { id: "dom.disable_open_during_load", type: "bool" },
@@ -195,6 +198,22 @@ Preferences.addSetting({
 Preferences.addSetting({
   id: "xrSettingsButton",
   onUserClick: () => showPermissionExceptions({ permissionType: "xr" }),
+});
+Preferences.addSetting({
+  id: "allowAppLinkRequests",
+  pref: "permissions.default.register-protocol-handler",
+  get: prefVal => prefVal != lazy.SitePermissions.BLOCK,
+  set: checked =>
+    checked ? lazy.SitePermissions.UNKNOWN : lazy.SitePermissions.BLOCK,
+});
+/**
+ * Displays the dialog listing sites blocked from asking to register a
+ * protocol handler.
+ */
+Preferences.addSetting({
+  id: "registerProtocolHandlerSettingsButton",
+  onUserClick: () =>
+    showPermissionExceptions({ permissionType: "register-protocol-handler" }),
 });
 Preferences.addSetting({
   id: "popupPolicy",
@@ -636,6 +655,22 @@ SettingGroupManager.registerGroups({
             controlAttrs: {
               "search-l10n-ids":
                 "permissions-address,permissions-allow.label,permissions-remove.label,permissions-remove-all.label,permissions-exceptions-addons-window2.title,permissions-exceptions-addons-desc",
+            },
+          },
+        ],
+      },
+      {
+        id: "allowAppLinkRequests",
+        l10nId: "permissions-allow-app-links",
+        supportPage: "change-program-used-open-email-links",
+        items: [
+          {
+            id: "registerProtocolHandlerSettingsButton",
+            l10nId: "permissions-app-links-manage-button",
+            control: "moz-box-button",
+            controlAttrs: {
+              "search-l10n-ids":
+                "permissions-remove.label,permissions-remove-all.label,permissions-site-app-links-window.title,permissions-site-app-links-desc",
             },
           },
         ],

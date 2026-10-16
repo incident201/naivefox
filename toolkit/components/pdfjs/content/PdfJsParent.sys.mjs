@@ -255,14 +255,16 @@ export class PdfJsParent extends JSWindowActorParent {
   }
 
   _openAboutPdfFeatures() {
-    // Do not let an embedded viewer navigate the top-level tab.
+    // Ignore embedded viewers.
     if (this.browsingContext !== this.browsingContext.top) {
       return;
     }
-    const browser = this.browser;
-    browser?.documentGlobal.openTrustedLinkIn("about:pdf#features", "current", {
-      targetBrowser: browser,
-    });
+    // Keep the PDF and unsaved edits open.
+    this.browser?.documentGlobal.openTrustedLinkIn(
+      "about:pdf#features",
+      "tab",
+      { inBackground: false, relatedToCurrent: true }
+    );
   }
 
   _claimFeaturesNotification() {
@@ -763,7 +765,7 @@ export class PdfJsParent extends JSWindowActorParent {
           engineId: lazy.PdfJsGuessAltTextFeature.engineId,
           featureId: lazy.PdfJsGuessAltTextFeature.id,
           taskName,
-          backend: "onnx-native",
+          backend: "best-onnx",
         },
         aggregator?.aggregateCallback.bind(aggregator) || null
       );
@@ -774,7 +776,7 @@ export class PdfJsParent extends JSWindowActorParent {
   }
 
   _saveURL(aMsg) {
-    const { blobUrl, originalUrl, filename } = aMsg.data;
+    const { blobUrl, originalUrl, filename, isModified } = aMsg.data;
     this.browser.documentGlobal.saveURL(
       blobUrl /* aURL */,
       originalUrl /* aOriginalURL */,
@@ -794,7 +796,8 @@ export class PdfJsParent extends JSWindowActorParent {
           URL.revokeObjectURL(blobUrl);
         }
         Services.obs.notifyObservers(null, "pdfjs:saveComplete");
-      }
+      } /* aSaveCompleteCallback */,
+      isModified /* aPreferSourceDirectory */
     );
   }
 

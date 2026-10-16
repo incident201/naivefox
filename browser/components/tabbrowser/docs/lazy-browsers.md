@@ -192,11 +192,16 @@ created the tab, undefined for every later insertion.
 
 ## Discarding a browser
 
-`gBrowser.discardBrowser(tab, forceDiscard)` takes a loaded tab back to lazy. It
+`gBrowser.discardBrowser(tab, options)` takes a loaded tab back to lazy. It
 returns false without doing anything for a tab that is selected, closing,
 already lazy or not remote, for a window that is closing, and when
 `permitUnload` says no. A tab with an open dialog is also refused unless
-`forceDiscard` is set, since a discard dismisses dialogs.
+`options.forceDiscard` is true, since a discard dismisses dialogs.
+
+The `options` object accepts the following properties:
+
+- `forceDiscard` (default: `false`): Allows discarding a tab with an open dialog.
+- `renderDiscarded` (default: `forceDiscard`): Controls whether to render the tab as discarded.
 
 Flush the tab's state first. `await gBrowser.prepareDiscardBrowser(tab)` hands
 session store the latest data, and it is safe to call even if the discard is

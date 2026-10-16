@@ -480,6 +480,7 @@ tabgroup:
       - save
       - reopen
       - open_tabmenu
+      - open_appmenu_list
       - open_recent
       - open_suggest
       - delete

@@ -256,6 +256,7 @@ EXPORTS.mozilla.dom += [
     "PrefetchCandidates.h",
     "ProcessMessageManager.h",
     "ProfilerCounter.h",
+    "QuotaExceededError.h",
     "RadioGroupContainer.h",
     "Range.h",
     "RequestCallbackManager.h",
@@ -435,6 +436,7 @@ UNIFIED_SOURCES += [
     "nsFrameLoaderOwner.cpp",
     "nsGlobalWindowCommands.cpp",
     "nsHistory.cpp",
+    "nsIContent.cpp",
     "nsIGlobalObject.cpp",
     "nsINode.cpp",
     "nsJSEnvironment.cpp",
@@ -444,6 +446,7 @@ UNIFIED_SOURCES += [
     "nsNameSpaceManager.cpp",
     "nsNoDataProtocolContentPolicy.cpp",
     "nsNodeInfoManager.cpp",
+    "nsNodeSupportsWeakRefTearoff.cpp",
     "nsOpenURIInFrameParams.cpp",
     "nsPropertyTable.cpp",
     "nsQueryContentEventResult.cpp",
@@ -470,6 +473,7 @@ UNIFIED_SOURCES += [
     "PrefetchCandidates.cpp",
     "ProcessMessageManager.cpp",
     "ProfilerCounter.cpp",
+    "QuotaExceededError.cpp",
     "RadioGroupContainer.cpp",
     "Range.cpp",
     "RangeUtils.cpp",
@@ -566,6 +570,12 @@ if CONFIG["TARGET_CPU"].startswith("ppc"):
     SOURCES += ["CharacterDataBufferVMX.cpp"]
     SOURCES["CharacterDataBufferVMX.cpp"].flags += CONFIG["PPC_VMX_FLAGS"]
 
+# Are we targeting LoongArch64? If so, we can enable a SIMD version for
+# CharacterDataBuffer.cpp as well.
+if CONFIG["TARGET_CPU"] == "loongarch64":
+    SOURCES += ["CharacterDataBufferLSX.cpp"]
+    SOURCES["CharacterDataBufferLSX.cpp"].flags += CONFIG["LSX_FLAGS"]
+
 MOZ_SRC_FILES += [
     "ContentAreaDropListener.sys.mjs",
     "IndexedDBHelper.sys.mjs",
@@ -657,3 +667,38 @@ GeneratedFile(
         "/servo/components/style/properties/counted_unknown_properties.py",
     ],
 )
+
+SOURCE_HEADERS += [
+    "CharacterDataBufferGeneric.h",
+    "CharacterDataBufferGenericFwd.h",
+    "CharacterDataBufferImpl.h",
+    "InProcessBrowserChildMessageManager.h",
+    "nsAttrValueOrString.h",
+    "nsCCUncollectableMarker.h",
+    "nsContentAreaDragDrop.h",
+    "nsContentPolicy.h",
+    "nsDataDocumentContentPolicy.h",
+    "nsDOMCaretPosition.h",
+    "nsDOMWindowUtils.h",
+    "nsGlobalWindowCommands.h",
+    "nsHistory.h",
+    "nsISizeOfEventTarget.h",
+    "nsMimeTypeArray.h",
+    "nsNoDataProtocolContentPolicy.h",
+    "nsNodeSupportsWeakRefTearoff.h",
+    "nsObjectLoadingContent.h",
+    "nsOpenURIInFrameParams.h",
+    "nsPluginArray.h",
+    "nsQueryContentEventResult.h",
+    "nsScreen.h",
+    "nsSyncLoadService.h",
+    "nsWindowRoot.h",
+    "StorageAccessPermissionRequest.h",
+    "TextDirectiveCreator.h",
+    "TextDirectiveFinder.h",
+    "TextDirectiveUtil.h",
+    "ThirdPartyUtil.h",
+    "TimeoutExecutor.h",
+    "WindowDestroyedEvent.h",
+    "WindowNamedPropertiesHandler.h",
+]

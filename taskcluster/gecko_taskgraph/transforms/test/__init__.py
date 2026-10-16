@@ -29,6 +29,7 @@ from taskgraph.util.schema import (
     optionally_keyed_by,
     resolve_keyed_by,
 )
+from taskgraph.util.taskcluster import get_artifact_url
 
 from gecko_taskgraph.optimize.schema import (
     OptimizationSchema,
@@ -235,6 +236,9 @@ class TestDescriptionSchema(Schema, kw_only=True):
     # The different configurations that should be run against this task, defined
     # in the TEST_VARIANTS object in the variant.py transforms.
     variants: TOptional[list[str]] = None
+    # Keep variants in the treeherder group and put their suffix on the symbol
+    # instead of on the group name.
+    treeherder_group_variants: TOptional[bool] = None
     # Whether to run this task without any variants applied.
     run_without_variant: optionally_keyed_by("test-platform", bool, use_msgspec=True)  # type: ignore
     # The EC2 instance size to run these tests on.
@@ -650,7 +654,19 @@ def make_job_description(config, tasks):
             jobdesc["fetches"] = task["fetches"]
 
         if task["mozharness"]["requires-signed-builds"] is True:
-            jobdesc["dependencies"]["build-signing"] = task["build-signing-label"]
+            signing_label = task["build-signing-label"]
+            existing_signing_task_id = config.params.get("existing_tasks", {}).get(
+                signing_label
+            )
+            # If the signed build was reused from another push, e.g. with
+            # --use-indexed-tasks, install it directly: the optimizer can't
+            # replace the signing task while the build it depends on still runs.
+            if existing_signing_task_id and "installer-url" not in task["mozharness"]:
+                task["mozharness"]["installer-url"] = get_artifact_url(
+                    existing_signing_task_id, task["mozharness"]["build-artifact-name"]
+                )
+            else:
+                jobdesc["dependencies"]["build-signing"] = signing_label
 
         if "dependencies" in task:
             jobdesc["dependencies"].update(task["dependencies"])

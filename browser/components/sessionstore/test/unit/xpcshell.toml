@@ -16,6 +16,13 @@ skip-if = [
   "condprof", # Bug 1769154
 ]
 
+["test_encryption.js"]
+skip-if = [
+  "condprof",
+]
+
+["test_encryption_pref_locked.js"]
+
 ["test_final_write_cleanup.js"]
 
 ["test_format_tab_state_for_saved_group.js"]
@@ -29,7 +36,13 @@ skip-if = [
   "condprof", # Bug 1769154
 ]
 
+["test_restore_session_suggestion_count.js"]
+
 ["test_session_availability.js"]
+
+["test_session_migration_encryption.js"]
+
+["test_session_migration_show_reason.js"]
 
 ["test_session_schema.js"]
 support-files = [
@@ -49,3 +62,5 @@ skip-if = [
 ["test_startup_session_async.js"]
 
 ["test_tab_group_state.js"]
+
+["test_write_outcome.js"]

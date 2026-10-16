@@ -69,7 +69,7 @@ async function startAITabGeneration(win, mockEngine) {
       {
         id: "aitab-call",
         function: {
-          name: "generate_aitab",
+          name: "generate_page",
           arguments: JSON.stringify({
             url_list: [SOURCE_URL],
             focus: "Lisbon hotels",
@@ -158,6 +158,17 @@ async function clickReadyAITabAction(browser, buttonIndex) {
   });
 }
 
+async function clickCompletedAITabTitle(browser) {
+  const chatBrowser = await getAichatBrowser(browser);
+  await SpecialPowers.spawn(chatBrowser, [], async () => {
+    const chatContent = content.document.querySelector("ai-chat-content");
+    const card = chatContent.shadowRoot.querySelector("aitab-tool-ui");
+    await card.wrappedJSObject.updateComplete;
+    const link = card.shadowRoot.querySelector("a.title");
+    content.setTimeout(() => link.click());
+  });
+}
+
 describe("AITab ToolUI", () => {
   let win;
   let mockEngine;
@@ -220,7 +231,7 @@ describe("AITab ToolUI", () => {
 
     await TestUtils.waitForCondition(
       () => conversation.securityProperties.untrustedInput,
-      "Wait for generate_aitab to commit the staged security flags"
+      "Wait for generate_page to commit the staged security flags"
     );
     Assert.equal(
       conversation.securityProperties.privateData,
@@ -360,9 +371,74 @@ describe("AITab ToolUI", () => {
       Assert.equal(win.gBrowser.selectedTab, newTab);
       Assert.equal(newTab.linkedBrowser.currentURI.spec, viewerURL);
     });
+
+    it("opens a new tab from the completed title when the page is closed", async () => {
+      const opened = BrowserTestUtils.waitForNewTab(
+        win.gBrowser,
+        viewerURL,
+        true
+      );
+      await clickReadyAITabAction(
+        chatTab.linkedBrowser,
+        OPEN_NEW_TAB_BUTTON_INDEX
+      );
+      const pageTab = await opened;
+
+      await BrowserTestUtils.switchTab(win.gBrowser, chatTab);
+      await waitForAITabCardState(chatTab.linkedBrowser, "complete");
+      BrowserTestUtils.removeTab(pageTab);
+
+      const reopened = BrowserTestUtils.waitForNewTab(
+        win.gBrowser,
+        viewerURL,
+        true
+      );
+      await clickCompletedAITabTitle(chatTab.linkedBrowser);
+      const newTab = await reopened;
+
+      Assert.equal(win.gBrowser.tabs.length, initialTabCount + 1);
+      Assert.equal(win.gBrowser.selectedTab, newTab);
+    });
+
+    it("focuses the matching tab from the completed title when the page is open", async () => {
+      const opened = BrowserTestUtils.waitForNewTab(
+        win.gBrowser,
+        viewerURL,
+        true
+      );
+      await clickReadyAITabAction(
+        chatTab.linkedBrowser,
+        OPEN_NEW_TAB_BUTTON_INDEX
+      );
+      const pageTab = await opened;
+
+      await BrowserTestUtils.switchTab(win.gBrowser, chatTab);
+      await waitForAITabCardState(chatTab.linkedBrowser, "complete");
+      const selected = BrowserTestUtils.waitForEvent(
+        win.gBrowser.tabContainer,
+        "TabSelect",
+        false,
+        event => event.target === pageTab
+      );
+
+      await clickCompletedAITabTitle(chatTab.linkedBrowser);
+      await selected;
+
+      Assert.equal(
+        win.gBrowser.tabs.length,
+        initialTabCount + 1,
+        "No duplicate page tab is opened"
+      );
+      Assert.equal(
+        win.gBrowser.selectedTab,
+        pageTab,
+        "The existing tab is focused"
+      );
+    });
   });
 
   it("keeps the complete state after returning to the chat tab", async () => {
+    Services.fog.testResetFOG();
     const generationRequest = await startAITabGeneration(win, mockEngine);
     generationRequest.respond(JSON.stringify(SURFACE));
     const chatTab = win.gBrowser.selectedTab;
@@ -386,6 +462,32 @@ describe("AITab ToolUI", () => {
     const newTab = win.gBrowser.selectedTab;
     win.gBrowser.selectedTab = chatTab;
     await waitForAITabCardState(chatTab.linkedBrowser, "complete");
+    const opened = Glean.smartWindow.aitabOpen.testGetValue();
+    Assert.equal(
+      opened?.length,
+      1,
+      "Opening the page from the card is recorded"
+    );
+    Assert.equal(opened[0].extra.open_target, "new");
+    Assert.equal(opened[0].extra.card_state, "choose");
+    Assert.ok(opened[0].extra.chat_id, "The open shares the chat id");
+
+    const selected = BrowserTestUtils.waitForEvent(
+      win.gBrowser.tabContainer,
+      "TabSelect",
+      false,
+      event => event.target === newTab
+    );
+    await clickCompletedAITabTitle(chatTab.linkedBrowser);
+    await selected;
+    const revisited = Glean.smartWindow.aitabOpen.testGetValue();
+    Assert.equal(
+      revisited.length,
+      2,
+      "A later open from the finished card is recorded"
+    );
+    Assert.equal(revisited[1].extra.card_state, "complete");
+    Assert.equal(revisited[1].extra.open_target, "new");
     BrowserTestUtils.removeTab(newTab);
   });
 });

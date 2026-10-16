@@ -20,6 +20,7 @@ import mozilla.components.browser.state.state.BrowserState
 import mozilla.components.browser.state.state.createTab
 import mozilla.components.browser.state.store.BrowserStore
 import mozilla.components.compose.base.text.Text
+import mozilla.components.compose.menu.data.MenuItemTitle
 import mozilla.components.compose.menu.data.StandardMenuItem
 import mozilla.components.compose.menu.ui.MenuItemIconRes
 import mozilla.components.feature.pwa.WebAppUseCases
@@ -27,6 +28,7 @@ import mozilla.components.ui.icons.R as iconsR
 import org.junit.Test
 import org.mozilla.fenix.R
 import org.mozilla.fenix.components.menu.MenuFragmentDirections
+import org.mozilla.fenix.components.menu.MenuTarget
 import org.mozilla.fenix.components.menu.fake.FakeMenuHost
 import org.mozilla.fenix.components.menu.fake.reachableEvents
 import org.mozilla.fenix.components.menu.store.MenuAction
@@ -101,9 +103,11 @@ class AddToHomeScreenMenuItemProviderTest {
     private fun TestScope.provider(
         browserStore: BrowserStore = browserStoreWithSelectedTab(),
         webAppUseCases: WebAppUseCases,
+        target: MenuTarget = MenuTarget.BrowserTab,
     ) =
         AddToHomeScreenMenuItemProvider(
             browserStore = browserStore,
+            target = target,
             webAppUseCases = webAppUseCases,
             settings = settings,
             scope = backgroundScope,
@@ -129,11 +133,13 @@ class AddToHomeScreenMenuItemProviderTest {
     private fun expectedItem(isInstallable: Boolean) =
         StandardMenuItem(
             title =
-                Text.Resource(
-                    when (isInstallable) {
-                        true -> R.string.browser_menu_add_app_to_homescreen
-                        else -> R.string.browser_menu_add_to_homescreen
-                    }
+                MenuItemTitle(
+                    Text.Resource(
+                        when (isInstallable) {
+                            true -> R.string.browser_menu_add_app_to_homescreen
+                            else -> R.string.browser_menu_add_to_homescreen
+                        }
+                    )
                 ),
             icon = MenuItemIconRes(iconsR.drawable.mozac_ic_add_to_homescreen_24),
             onClickEvent = MenuAction.Navigate.AddToHomeScreen,

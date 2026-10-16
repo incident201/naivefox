@@ -6331,6 +6331,10 @@ void ScrollContainerFrame::UpdateMinimumScaleSize(
 
   Document* doc = pc->Document();
   MOZ_ASSERT(doc, "The document should be valid");
+  if (doc->HasViewportSizeOverrideForMiniWindow()) {
+    // The override fixes the layout viewport size, so don't grow it.
+    return;
+  }
   if (doc->GetFullscreenElement()) {
     // Don't use the minimum scale size in the case of fullscreen state.
     // FIXME: 1508177: We will no longer need this.
@@ -6888,11 +6892,17 @@ void ScrollContainerFrame::LayoutScrollbars(ScrollReflowInput& aState,
 
     nsRect r;
     r.width = std::max(std::max(r.width, scrollbarSize), resizerMinSize.width);
-    r.x = scrollbarOnLeft ? aInsideBorderArea.x
-                          : aInsideBorderArea.XMost() - r.width;
     r.height =
         std::max(std::max(r.height, scrollbarSize), resizerMinSize.height);
-    r.y = aInsideBorderArea.YMost() - r.height;
+
+    // Get scrollbar insets specified via -moz-scrollbar-inset-{inline,block}.
+    // These are used to position the resizer within rounded corners.
+    const nsMargin scrollbarInset = ScrollbarInsets();
+
+    r.x = scrollbarOnLeft
+              ? aInsideBorderArea.x + scrollbarInset.left
+              : aInsideBorderArea.XMost() - r.width - scrollbarInset.right;
+    r.y = aInsideBorderArea.YMost() - r.height - scrollbarInset.bottom;
 
     LayoutScrollbarPartAtRect(aState, resizerRI, r);
   }
@@ -7561,6 +7571,8 @@ void ScrollContainerFrame::FireScrolledAreaEvent() {
   nsIContent* content = GetContent();
 
   event.mArea = mScrolledFrame->ScrollableOverflowRectRelativeToParent();
+  event.mFlags.mOnlyChromeDispatch =
+      !StaticPrefs::layout_scrolled_area_changed_content_enabled();
   if (RefPtr<Document> doc = content->GetUncomposedDoc()) {
     EventDispatcher::Dispatch(doc, presContext, &event, nullptr);
   }

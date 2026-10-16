@@ -130,6 +130,21 @@ export class PrefsFeed {
   /** @type {Store} */
   store = null;
 
+  /**
+   * The activation window variant, or "" outside the window. A lazy getter for
+   * ACTIVATION_WINDOW_VARIANT_PREF replaces this in the constructor.
+   *
+   * @type {string}
+   */
+  inActivationWindowState;
+
+  /**
+   * Space prefs whose default this profile was given by the train-hop config.
+   *
+   * @type {Set<string>}
+   */
+  _wroteSpaceDefaults;
+
   constructor(prefMap) {
     this._prefMap = prefMap;
     this._prefs = new Prefs();
@@ -525,7 +540,10 @@ export class PrefsFeed {
         // profile was actually given gets put back.
         Services.prefs
           .getDefaultBranch(this._prefs._branchStr)
-          .setBoolPref(userPref, PREFS_CONFIG.get(userPref).value);
+          .setBoolPref(
+            userPref,
+            /** @type {boolean} */ (PREFS_CONFIG.get(userPref).value)
+          );
         this._wroteSpaceDefaults.delete(userPref);
       }
     }

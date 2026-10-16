@@ -164,6 +164,10 @@ public class GeckoSession {
   private TranslationsController.SessionTranslation mTranslations =
       new TranslationsController.SessionTranslation(this);
 
+  @OptIn(markerClass = ExperimentalGeckoViewApi.class)
+  private final PictureInPictureController.SessionPictureInPicture mPictureInPicture =
+      new PictureInPictureController.SessionPictureInPicture(this);
+
   /** Session page extractor. Initialized once, in {@link #getSessionPageExtractor()} */
   @OptIn(markerClass = ExperimentalGeckoViewApi.class)
   private PageExtractionController.SessionPageExtractor mPageExtractor;
@@ -1301,6 +1305,10 @@ public class GeckoSession {
   private final TranslationsController.SessionTranslation.Handler mTranslationsHandler =
       mTranslations.getHandler();
 
+  @OptIn(markerClass = ExperimentalGeckoViewApi.class)
+  private final PictureInPictureController.SessionPictureInPicture.Handler
+      mPictureInPictureHandler = mPictureInPicture.getHandler();
+
   /* package */ int handlersCount;
 
   private final GeckoSessionHandler<?>[] mSessionHandlers =
@@ -1316,6 +1324,7 @@ public class GeckoSession {
         mScrollHandler,
         mSelectionActionDelegate,
         mTranslationsHandler,
+        mPictureInPictureHandler,
         mContentBlockingHandler,
         mMediaSessionHandler,
         mExperimentHandler
@@ -2894,6 +2903,24 @@ public class GeckoSession {
   }
 
   /**
+   * Set this GeckoSession as active or inactive, same as {@link #setActive}, except that going
+   * inactive is skipped while {@link
+   * PictureInPictureController.SessionPictureInPicture#setKeepActive} is set. Once the embedder
+   * clears the flag, it must call {@link #setActive} with {@code false} if the session is no longer
+   * showing anywhere.
+   *
+   * @param active A boolean determining whether the GeckoSession is active.
+   */
+  @UiThread
+  @OptIn(markerClass = ExperimentalGeckoViewApi.class)
+  /* package */ void maybeSetActive(final boolean active) {
+    if (!active && mPictureInPicture.keepsActive()) {
+      return;
+    }
+    setActive(active);
+  }
+
+  /**
    * Move focus to this session or away from this session. Only one session has focus at a given
    * time. Note that a session can be unfocused but still active (i.e. visible).
    *
@@ -3504,6 +3531,42 @@ public class GeckoSession {
   @AnyThread
   public void exitFullScreen() {
     mEventDispatcher.dispatch("GeckoViewContent:ExitFullScreen", null);
+  }
+
+  /**
+   * Returns the picture-in-picture for this session, which drives the picture-in-picture window for
+   * the video this session is playing.
+   *
+   * @return The {@link PictureInPictureController.SessionPictureInPicture} for this session.
+   */
+  @AnyThread
+  @ExperimentalGeckoViewApi
+  public @NonNull PictureInPictureController.SessionPictureInPicture getSessionPictureInPicture() {
+    return mPictureInPicture;
+  }
+
+  /**
+   * Sets the delegate that is asked to open and close picture-in-picture windows for this session.
+   *
+   * @param delegate The delegate, or {@code null} to unset it.
+   */
+  @UiThread
+  @ExperimentalGeckoViewApi
+  public void setPictureInPictureDelegate(
+      final @Nullable PictureInPictureController.SessionPictureInPicture.Delegate delegate) {
+    mPictureInPictureHandler.setDelegate(delegate, this);
+  }
+
+  /**
+   * Returns the picture-in-picture delegate set on this session.
+   *
+   * @return The delegate, or {@code null} if none is set.
+   */
+  @UiThread
+  @ExperimentalGeckoViewApi
+  public @Nullable PictureInPictureController.SessionPictureInPicture.Delegate
+      getPictureInPictureDelegate() {
+    return mPictureInPictureHandler.getDelegate();
   }
 
   /**

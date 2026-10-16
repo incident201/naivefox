@@ -3464,6 +3464,17 @@ pub extern "C" fn wr_dp_define_rect_clip(
 }
 
 #[no_mangle]
+pub extern "C" fn wr_dp_get_accumulated_scroll_offset(
+    state: &mut WrState,
+    space: WrSpatialId,
+) -> LayoutVector2D {
+    debug_assert!(unsafe { is_in_main_thread() });
+
+    let space = space.to_webrender(state.pipeline_id);
+    state.frame_builder.dl_builder.accumulated_scroll_offset_px(space)
+}
+
+#[no_mangle]
 pub extern "C" fn wr_dp_define_sticky_frame(
     state: &mut WrState,
     parent_spatial_id: WrSpatialId,
@@ -4187,6 +4198,7 @@ pub extern "C" fn wr_dp_push_border(
     rect: LayoutRect,
     clip: LayoutRect,
     is_backface_visible: bool,
+    force_antialiasing: bool,
     parent: &WrSpaceAndClipChain,
     do_aa: AntialiasBorder,
     widths: LayoutSideOffsets,
@@ -4211,12 +4223,15 @@ pub extern "C" fn wr_dp_push_border(
 
     let space_and_clip = parent.to_webrender(state.pipeline_id);
 
-    let prim_info = CommonItemProperties {
+    let mut prim_info = CommonItemProperties {
         clip_rect: clip,
         clip_chain_id: space_and_clip.clip_chain_id,
         spatial_id: space_and_clip.spatial_id,
         flags: prim_flags(is_backface_visible, /* prefer_compositor_surface */ false),
     };
+    if force_antialiasing {
+        prim_info.flags |= PrimitiveFlags::ANTIALISED;
+    }
 
     state
         .frame_builder
@@ -4298,7 +4313,7 @@ pub extern "C" fn wr_dp_push_border_gradient(
         state
             .frame_builder
             .dl_builder
-            .create_gradient(start_point, end_point, stops_vector, extend_mode);
+            .create_gradient(start_point, end_point, stops_vector, extend_mode, AlphaMode::Premultiplied);
 
     let border_details = BorderDetails::NinePatch(NinePatchBorder {
         source: NinePatchBorderSource::Gradient(gradient),
@@ -4356,7 +4371,7 @@ pub extern "C" fn wr_dp_push_border_radial_gradient(
         state
             .frame_builder
             .dl_builder
-            .create_radial_gradient(center, radius, stops_vector, extend_mode);
+            .create_radial_gradient(center, radius, stops_vector, extend_mode, AlphaMode::Premultiplied);
 
     let border_details = BorderDetails::NinePatch(NinePatchBorder {
         source: NinePatchBorderSource::RadialGradient(gradient),
@@ -4414,7 +4429,7 @@ pub extern "C" fn wr_dp_push_border_conic_gradient(
         state
             .frame_builder
             .dl_builder
-            .create_conic_gradient(center, angle, stops_vector, extend_mode);
+            .create_conic_gradient(center, angle, stops_vector, extend_mode, AlphaMode::Premultiplied);
 
     let border_details = BorderDetails::NinePatch(NinePatchBorder {
         source: NinePatchBorderSource::ConicGradient(gradient),
@@ -4447,12 +4462,14 @@ pub extern "C" fn wr_dp_push_linear_gradient(
     rect: LayoutRect,
     clip: LayoutRect,
     is_backface_visible: bool,
+    force_antialiasing: bool,
     parent: &WrSpaceAndClipChain,
     start: LayoutVector2D,
     end: LayoutVector2D,
     stops: *const GradientStop,
     stops_count: usize,
     extend_mode: ExtendMode,
+    alpha_mode: AlphaMode,
     tile_size: LayoutSize,
     tile_spacing: LayoutSize,
 ) {
@@ -4465,16 +4482,19 @@ pub extern "C" fn wr_dp_push_linear_gradient(
         state
             .frame_builder
             .dl_builder
-            .create_gradient(start, end, stops_vector, extend_mode);
+            .create_gradient(start, end, stops_vector, extend_mode, alpha_mode);
 
     let space_and_clip = parent.to_webrender(state.pipeline_id);
 
-    let prim_info = CommonItemProperties {
+    let mut prim_info = CommonItemProperties {
         clip_rect: clip,
         clip_chain_id: space_and_clip.clip_chain_id,
         spatial_id: space_and_clip.spatial_id,
         flags: prim_flags(is_backface_visible, /* prefer_compositor_surface */ false),
     };
+    if force_antialiasing {
+        prim_info.flags |= PrimitiveFlags::ANTIALISED;
+    }
 
     state
         .frame_builder
@@ -4488,12 +4508,14 @@ pub extern "C" fn wr_dp_push_radial_gradient(
     rect: LayoutRect,
     clip: LayoutRect,
     is_backface_visible: bool,
+    force_antialiasing: bool,
     parent: &WrSpaceAndClipChain,
     center: LayoutVector2D,
     radius: LayoutSize,
     stops: *const GradientStop,
     stops_count: usize,
     extend_mode: ExtendMode,
+    alpha_mode: AlphaMode,
     tile_size: LayoutSize,
     tile_spacing: LayoutSize,
 ) {
@@ -4506,16 +4528,19 @@ pub extern "C" fn wr_dp_push_radial_gradient(
         state
             .frame_builder
             .dl_builder
-            .create_radial_gradient(center, radius, stops_vector, extend_mode);
+            .create_radial_gradient(center, radius, stops_vector, extend_mode, alpha_mode);
 
     let space_and_clip = parent.to_webrender(state.pipeline_id);
 
-    let prim_info = CommonItemProperties {
+    let mut prim_info = CommonItemProperties {
         clip_rect: clip,
         clip_chain_id: space_and_clip.clip_chain_id,
         spatial_id: space_and_clip.spatial_id,
         flags: prim_flags(is_backface_visible, /* prefer_compositor_surface */ false),
     };
+    if force_antialiasing {
+        prim_info.flags |= PrimitiveFlags::ANTIALISED;
+    }
 
     state.frame_builder.dl_builder.push_radial_gradient(
         &prim_info,
@@ -4539,6 +4564,7 @@ pub extern "C" fn wr_dp_push_conic_gradient(
     stops: *const GradientStop,
     stops_count: usize,
     extend_mode: ExtendMode,
+    alpha_mode: AlphaMode,
     tile_size: LayoutSize,
     tile_spacing: LayoutSize,
 ) {
@@ -4551,7 +4577,7 @@ pub extern "C" fn wr_dp_push_conic_gradient(
         state
             .frame_builder
             .dl_builder
-            .create_conic_gradient(center, angle, stops_vector, extend_mode);
+            .create_conic_gradient(center, angle, stops_vector, extend_mode, alpha_mode);
 
     let space_and_clip = parent.to_webrender(state.pipeline_id);
 

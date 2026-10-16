@@ -695,6 +695,16 @@ pub enum ExtendMode {
     Repeat,
 }
 
+/// Whether the colors of gradient stops are interpolated with premultiplied
+/// alpha (as CSS gradients require) or with unpremultiplied alpha (as SVG
+/// gradients require).
+#[repr(u8)]
+#[derive(Debug, Copy, Clone, Hash, Eq, MallocSizeOf, PartialEq, Serialize, Deserialize, PeekPoke)]
+pub enum AlphaMode {
+    Premultiplied,
+    Unpremultiplied,
+}
+
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Serialize, PeekPoke)]
 pub struct Gradient {
     /// Relative to the primitive bounds.
@@ -702,6 +712,7 @@ pub struct Gradient {
     /// Relative to the primitive bounds.
     pub end: LayoutVector2D,
     pub extend_mode: ExtendMode,
+    pub alpha_mode: AlphaMode,
 } // IMPLICIT: stops: Vec<GradientStop>
 
 impl Gradient {
@@ -744,6 +755,7 @@ pub struct RadialGradient {
     pub start_offset: f32,
     pub end_offset: f32,
     pub extend_mode: ExtendMode,
+    pub alpha_mode: AlphaMode,
 } // IMPLICIT stops: Vec<GradientStop>
 
 impl RadialGradient {
@@ -763,6 +775,7 @@ pub struct ConicGradient {
     pub start_offset: f32,
     pub end_offset: f32,
     pub extend_mode: ExtendMode,
+    pub alpha_mode: AlphaMode,
 } // IMPLICIT stops: Vec<GradientStop>
 
 impl ConicGradient {
@@ -971,6 +984,10 @@ pub struct StackingContext {
     /// than two that have to agree.
     pub raster_space: RasterSpace,
     pub flags: StackingContextFlags,
+    /// Non-zero for a shadow emitted by the display list builder's shadow
+    /// desugaring: the offset its contents were translated by relative to the
+    /// shadowed content, so they can be snapped relative to it.
+    pub shadow_offset: LayoutVector2D,
 }
 // IMPLICIT: filters: Vec<FilterOp>, filter_datas: Vec<FilterData>, filter_primitives: Vec<FilterPrimitive>
 
@@ -1651,11 +1668,11 @@ pub enum FilterOp {
         limiting_cone_angle: f32 },
     /// calculate a distorted version of first input image using offset values
     /// from second input image at specified intensity
-    /// parameters: FilterOpGraphNode, scale, xChannelSelector, yChannelSelector
+    /// parameters: FilterOpGraphNode, scale_x, scale_y, xChannelSelector, yChannelSelector
     /// SVG filter semantics - selectable input(s), selectable between linear
     /// (default) and sRGB color space for calculations
     /// Spec: https://www.w3.org/TR/filter-effects-1/#InterfaceSVGFEDisplacementMapElement
-    SVGFEDisplacementMap { node: FilterOpGraphNode, scale: f32,
+    SVGFEDisplacementMap { node: FilterOpGraphNode, scale_x: f32, scale_y: f32,
         x_channel_selector: u32, y_channel_selector: u32 },
     /// create and merge a dropshadow version of the specified image's alpha
     /// channel with specified offset and blur radius
@@ -2472,6 +2489,7 @@ impl_default_for_enums! {
     BorderStyle => None,
     BoxShadowClipMode => Outset,
     ExtendMode => Clamp,
+    AlphaMode => Premultiplied,
     FilterOp => Identity,
     ComponentTransferFuncType => Identity,
     ClipMode => Clip,

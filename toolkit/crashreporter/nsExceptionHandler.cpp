@@ -257,6 +257,7 @@ static nsCString* notesField = nullptr;
 static bool isGarbageCollecting;
 static uint32_t eventloopNestingLevel = 0;
 static time_t inactiveStateStart = 0;
+static uint64_t inactiveStateDuration = 0;
 
 // Avoid a race during application termination.
 static Mutex* dumpSafetyLock;
@@ -1455,11 +1456,6 @@ static void WriteAnnotationsForMainProcessCrash(PlatformWriter& pw,
                  uuidString.Length());
   }
 
-  if (inactiveStateStart) {
-    writer.Write(Annotation::LastInteractionDuration,
-                 static_cast<uint64_t>(crashTime - inactiveStateStart));
-  }
-
   // ToSeconds preserves the full precision of the TimeDuration. It is assumed
   // that visualizations of this value will format/truncate it to their needs.
   double uptimeTS =
@@ -1783,7 +1779,16 @@ static bool IsCrashingException(EXCEPTION_POINTERS* exinfo) {
 
 #endif  // XP_WIN
 
-// Do various actions to prepare the child process for minidump generation.
+// Prepares annotations that require runtime processing at the point of crash.
+// This runs in an exception handler and should be moved out to the crash
+// helper when possible.
+static void PrepareCrashTimeAnnotations() {
+  if (inactiveStateStart) {
+    inactiveStateDuration = GetCurrentTimeForCrashTime() - inactiveStateStart;
+  }
+}
+
+// Do various actions to prepare the process for minidump generation.
 // This includes disabling the I/O interposer and DLL blocklist which both
 // would get in the way. We also free the resources we have reserved, such as
 // address space on 32-bit Windows builds, so that they're available to the
@@ -1791,6 +1796,7 @@ static bool IsCrashingException(EXCEPTION_POINTERS* exinfo) {
 static void PrepareForMinidump(bool isChildProcess = true) {
   mozilla::IOInterposer::Disable();
   ReleaseResources();
+  PrepareCrashTimeAnnotations();
 
   if (isChildProcess) {
     crash_helper_wait_for_rendezvous();
@@ -1947,6 +1953,9 @@ static void RegisterAnnotations() {
   mozannotation_register_bytebuffer(
       static_cast<uint32_t>(Annotation::TextureUsage), &gTexturesSize,
       sizeof(size_t));
+  mozannotation_register_bytebuffer(
+      static_cast<uint32_t>(Annotation::LastInteractionDuration),
+      &inactiveStateDuration, sizeof(uint64_t));
 #if defined(XP_WIN) && defined(HAS_DLL_BLOCKLIST)
   mozannotation_register_bytebuffer(
       static_cast<uint32_t>(Annotation::BlocklistInitFailed),
@@ -2590,21 +2599,8 @@ void MergeCrashAnnotations(AnnotationTable& aDst, const AnnotationTable& aSrc) {
   }
 }
 
-// Adds crash time, uptime, and last interaction duration annotations
+// Adds the uptime annotations
 static void AddCommonAnnotations(AnnotationTable& aAnnotations) {
-  const time_t crashTime = time(nullptr);
-  nsAutoCString crashTimeStr;
-  crashTimeStr.AppendInt(static_cast<uint64_t>(crashTime));
-  aAnnotations[Annotation::CrashTime] = std::move(crashTimeStr);
-
-  if (inactiveStateStart) {
-    nsAutoCString inactiveDuration;
-    inactiveDuration.AppendInt(
-        static_cast<uint64_t>(crashTime - inactiveStateStart));
-    aAnnotations[Annotation::LastInteractionDuration] =
-        std::move(inactiveDuration);
-  }
-
   // ToSeconds preserves the full precision of the TimeDuration. It is assumed
   // that visualizations of this value will format/truncate it to their needs.
   double uptimeTS =
@@ -2642,28 +2638,6 @@ nsresult AppendAppNotesToCrashReport(const nsACString& data) {
   MutexAutoLock lock(*notesFieldLock);
   notesField->Append(data);
   return NS_OK;
-}
-
-nsresult RegisterAppMemory(void* ptr, size_t length) {
-  if (!GetEnabled()) return NS_ERROR_NOT_INITIALIZED;
-
-#if defined(XP_LINUX) || defined(XP_WIN)
-  gExceptionHandler->RegisterAppMemory(ptr, length);
-  return NS_OK;
-#else
-  return NS_ERROR_NOT_IMPLEMENTED;
-#endif
-}
-
-nsresult UnregisterAppMemory(void* ptr) {
-  if (!GetEnabled()) return NS_ERROR_NOT_INITIALIZED;
-
-#if defined(XP_LINUX) || defined(XP_WIN)
-  gExceptionHandler->UnregisterAppMemory(ptr);
-  return NS_OK;
-#else
-  return NS_ERROR_NOT_IMPLEMENTED;
-#endif
 }
 
 void SetIncludeContextHeap(bool aValue) {
@@ -3264,8 +3238,9 @@ nsresult OOPInit(nsIFile* aXREDirectory, bool force /*=false*/) {
   // value of sIncludeContextHeap. Also pass the release channel so we can set
   // the appropriate type of minidump in the crash helper.
   crashHelperClient = crash_helper_launch(
-      (const BreakpadChar*)crashHelperPath.c_str(),
-      (const BreakpadChar*)NS_ConvertUTF8toUTF16(childCrashNotifyPipe).getW(),
+      mozilla::BitwiseCast<const BreakpadChar*>(crashHelperPath.c_str()),
+      mozilla::BitwiseCast<const BreakpadChar*>(
+          NS_ConvertUTF8toUTF16(childCrashNotifyPipe).getW()),
       mozilla::BitwiseCast<const BreakpadChar*>(tempPath.get()),
       gToolkitBuildID);
 #elif defined(XP_LINUX)

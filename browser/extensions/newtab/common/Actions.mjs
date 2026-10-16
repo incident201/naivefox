@@ -37,6 +37,7 @@ for (const type of [
   "BLOCK_SECTION",
   "BLOCK_URL",
   "BOOKMARK_URL",
+  "BROWSER_LINK_OPEN_INTENT",
   "CARD_SECTIONS_ORDER",
   "CARD_SECTION_IMPRESSION",
   "CAROUSEL_NAVIGATE",
@@ -87,6 +88,7 @@ for (const type of [
   "DISCOVERY_STREAM_TOPICS_LOADING",
   "DISCOVERY_STREAM_USER_EVENT",
   "DOWNLOAD_CHANGED",
+  "DWELL_LINK_OPENED",
   "FILL_SEARCH_TERM",
   "FOLLOW_SECTION",
   "HIDE_PERSONALIZE",
@@ -250,6 +252,7 @@ for (const type of [
   "WIDGETS_CONTAINER_ACTION",
   "WIDGETS_ENABLED",
   "WIDGETS_ERROR",
+  "WIDGETS_EXTENSIONS_UPDATE",
   "WIDGETS_HIDE_ALL",
   "WIDGETS_IMPRESSION",
   "WIDGETS_LISTS_CHANGE_SELECTED",
@@ -282,6 +285,7 @@ for (const type of [
   "WIDGETS_TIMER_SET_TYPE",
   "WIDGETS_TIMER_USER_EVENT",
   "WIDGETS_TIMER_USER_IMPRESSION",
+  "WIDGETS_TRAVEL_UPDATE",
   "WIDGETS_USER_EVENT",
 ]) {
   actionTypes[type] = type;
@@ -359,7 +363,7 @@ function BroadcastToContent(action, options) {
  *
  * @param  {object} action Any redux action (required)
  * @param  {string} target The id of a content port
- * @param  {boolean} skipMain Used by OnlyToOneContent to skip the main process
+ * @param  {boolean} [skipMain] Used by OnlyToOneContent to skip the main process
  * @return {object} An action with added .meta properties
  */
 function AlsoToOneContent(action, target, skipMain) {

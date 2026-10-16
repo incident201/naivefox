@@ -374,3 +374,7 @@ if not CONFIG["MOZ_NAIVEFOX"] and CONFIG["JS_HAS_INTL_API"]:
         ]
 
     USE_LIBS += ["intlcomponents"]
+
+SOURCE_HEADERS += [
+    "NamespaceImports.h",
+]

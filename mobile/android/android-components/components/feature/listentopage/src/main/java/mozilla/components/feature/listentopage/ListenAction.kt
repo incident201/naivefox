@@ -21,8 +21,21 @@ sealed interface ListenAction : Action {
             val url: String,
         ) : Session
 
-        /** The listening session is over. It resets to the initial state. */
-        data object StopRequested : Session
+        /**
+         * The listening session is over. It resets to the initial state.
+         *
+         * @property source What ended the session.
+         */
+        data class StopRequested(val source: StopSource = StopSource.CloseButton) : Session
+
+        /** What ended a listening session. */
+        enum class StopSource {
+            /** The user tapped the player's close button. */
+            CloseButton,
+
+            /** The listened tab was closed or user navigated elsewhere. */
+            TabClosed,
+        }
     }
 
     /** Actions reporting the article the session reads out. */
@@ -50,8 +63,21 @@ sealed interface ListenAction : Action {
          * The voice was changed.
          *
          * @property voice The voice selected for the article.
+         * @property source Source for voice selection.
          */
-        data class VoiceSelected(val voice: Voice) : Voices
+        data class VoiceSelected(
+            val voice: Voice,
+            val source: VoiceSource = VoiceSource.UserSelected,
+        ) : Voices
+
+        /** What chose a voice. */
+        enum class VoiceSource {
+            /** The user picked the voice from the list. */
+            UserSelected,
+
+            /** The voice was chosen automatically after the saved one became unavailable. */
+            Fallback,
+        }
 
         /** Available voices were loaded from the engine. */
         data class AvailableVoicesLoaded(val voices: List<Voice>, val selectedVoice: Voice) : Voices
@@ -77,8 +103,21 @@ sealed interface ListenAction : Action {
         /** The user asked for the voices to pick from. */
         data object VoicesClicked : Controls
 
-        /** The user asked to change the playback speed. */
+        /** The user asked for the speeds to pick from. */
         data object PlaybackSpeedClicked : Controls
+
+        /**
+         * The user picked a playback speed.
+         *
+         * @property playbackSpeed The speed to read the article out at.
+         */
+        data class PlaybackSpeedSelected(val playbackSpeed: PlaybackSpeed) : Controls
+
+        /** The user dismissed the voices list without picking one. */
+        data object VoicesDismissed : Controls
+
+        /** The user dismissed the speeds list without picking one. */
+        data object PlaybackSpeedDismissed : Controls
     }
 
     /** Actions reporting what the player is doing. */
@@ -114,10 +153,9 @@ sealed interface ListenAction : Action {
         /**
          * The reader chose a place in the article to carry on from.
          *
-         * @property positionMs How far into the article to move to, measured against the lengths in
-         *   [ArticleProgress.chunkDurationsMs].
+         * @property fraction How far into the article to move to.
          */
-        data class SeekRequested(val positionMs: Long) : Playback
+        data class SeekRequested(val fraction: Float) : Playback
 
         /** The player read out every chunk it had been given and the article has more to come. */
         data object PlaybackWaiting : Playback
@@ -134,6 +172,13 @@ sealed interface ListenAction : Action {
         /** The engine could not turn the article into audio. */
         data object SynthesisFailed : Synthesis
     }
+
+    /**
+     * The player was expanded or collapsed.
+     *
+     * @property mode What the player shows.
+     */
+    data class ModeChanged(val mode: PlayerMode) : ListenAction
 
     /** The error that needs to be cleared it is shown. */
     data object ErrorDismissed : ListenAction

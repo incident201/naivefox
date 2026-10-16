@@ -26,6 +26,7 @@
 #include "mozilla/ScopeExit.h"
 #include "mozilla/StaticPrefs_webgl.h"
 #include "mozilla/dom/BufferSourceBinding.h"
+#include "mozilla/dom/CanvasRenderingContextHelper.h"
 #include "mozilla/dom/Document.h"
 #include "mozilla/dom/GeneratePlaceholderCanvasData.h"
 #include "mozilla/dom/ToJSValue.h"
@@ -1051,16 +1052,12 @@ void ClientWebGLContext::OnMemoryPressure() {
 }
 
 NS_IMETHODIMP
-ClientWebGLContext::SetContextOptions(JSContext* cx,
-                                      JS::Handle<JS::Value> options,
-                                      ErrorResult& aRvForDictionaryInit) {
-  if (mInitialOptions && options.isNullOrUndefined()) return NS_OK;
-
-  dom::WebGLContextAttributes attributes;
-  if (!attributes.Init(cx, options)) {
-    aRvForDictionaryInit.Throw(NS_ERROR_UNEXPECTED);
+ClientWebGLContext::SetContextOptions(
+    const dom::CanvasRenderingContextOptions& aOptions) {
+  if (!aOptions.is<dom::WebGLContextAttributes>()) {
     return NS_ERROR_UNEXPECTED;
   }
+  const auto& attributes = aOptions.as<dom::WebGLContextAttributes>();
 
   WebGLContextOptions newOpts;
 
@@ -3498,6 +3495,21 @@ Maybe<webgl::ErrorInfo> CheckBindBufferRange(
       const auto info =
           nsPrintfCString("Unrecognized `target`: 0x%04x", target);
       return fnSome(LOCAL_GL_INVALID_ENUM, info);
+    }
+  }
+
+  // The driver rejects a range that does not fit GLintptr/GLsizeiptr and keeps
+  // its previous binding, so we must not record such a range as bound.
+  if (isBuffer) {
+    if (!CheckedInt<GLintptr>(offset).isValid()) {
+      const auto info = nsPrintfCString(
+          "`offset` (%" PRIu64 ") must fit in GLintptr.", offset);
+      return fnSome(LOCAL_GL_INVALID_VALUE, info);
+    }
+    if (!CheckedInt<GLsizeiptr>(size).isValid()) {
+      const auto info =
+          nsPrintfCString("`size` (%" PRIu64 ") must fit in GLsizeiptr.", size);
+      return fnSome(LOCAL_GL_INVALID_VALUE, info);
     }
   }
 

@@ -3,6 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 import { AITabStore } from "moz-src:///browser/components/aiwindow/ui/modules/AITabStore.sys.mjs";
+import { getHeadingFont } from "moz-src:///browser/components/aiwindow/ui/modules/AITabHeadingFont.sys.mjs";
 import { ConversationStore } from "moz-src:///browser/components/aiwindow/ui/modules/ConversationStore.sys.mjs";
 import { getSmartPageName } from "chrome://browser/content/aiwindow/modules/TrustedInternalURLs.mjs";
 import { A2UI } from "../modules/A2UI.mjs";
@@ -12,6 +13,8 @@ const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
   AIWINDOW_URL:
     "moz-src:///browser/components/aiwindow/ui/modules/AIWindow.sys.mjs",
+  AITab: "moz-src:///browser/components/aiwindow/models/aitab/AITab.sys.mjs",
+  PlacesUtils: "resource://gre/modules/PlacesUtils.sys.mjs",
   URILoadingHelper: "resource:///modules/URILoadingHelper.sys.mjs",
 });
 
@@ -58,6 +61,12 @@ export function formatCreatedAt(createdAt, now = Date.now()) {
  * actions the page offers.
  */
 export class AITabParent extends JSWindowActorParent {
+  #headingFontPromise = null;
+
+  actorCreated() {
+    this.#headingFontPromise = this.#loadHeadingFont();
+  }
+
   async receiveMessage({ data, name }) {
     switch (name) {
       case "AITab:GetPage":
@@ -67,6 +76,9 @@ export class AITabParent extends JSWindowActorParent {
       case "AITab:OpenLink":
         this.#handleOpenLink(data);
         return null;
+      case "AITab:RecordView":
+        this.#recordView(data);
+        return null;
       default:
         console.warn(`AITabParent received unknown message: ${name}`);
         return null;
@@ -74,30 +86,43 @@ export class AITabParent extends JSWindowActorParent {
   }
 
   /**
-   * The page this tab is showing, read from the tab's own URL rather than
-   * taken from the child. Content is a lower-trust process, so a page name it
-   * supplied could name a page other than the one on screen; anything
-   * destructive would then act on the wrong one.
+   * The slug and URL of the page this tab is showing, read from the tab's URL.
+   * The URL is kept so deleting the page also removes that exact URL from
+   * history.
    *
-   * @returns {?string} Null when the URL carries no usable page name.
+   * Read this as soon as a message from the page arrives. The tab can close
+   * while a store call is pending, and reading browsingContext after that
+   * throws.
+   *
+   * @returns {?{pageName: string, url: string}} Null when the URL carries no
+   *   usable page name.
    */
-  get #pageName() {
-    const spec = this.browsingContext?.currentURI?.spec;
-    if (!spec) {
-      return null;
-    }
-
-    return getSmartPageName(URL.parse(spec));
+  get #currentPage() {
+    const url = this.browsingContext?.currentURI?.spec;
+    const pageName = url && getSmartPageName(URL.parse(url));
+    return pageName ? { pageName, url } : null;
   }
 
   async #handleGetPage() {
-    const pageName = this.#pageName;
-    if (!pageName) {
+    const currentPage = this.#currentPage;
+    if (!currentPage) {
       return { success: false, error: "Invalid page name" };
     }
+    const { pageName, url } = currentPage;
 
     try {
       const pageData = await AITabStore.getBySlug(pageName);
+      if (!pageData) {
+        // Leftover slugs from deleted pages should not keep coming back as a
+        // history or address bar result.
+        this.#removeFromHistory(pageName, url).catch(error => {
+          console.error(
+            "Could not remove a missing AI Tab page from history",
+            error
+          );
+        });
+      }
+
       const surface = pageData?.components?.surface;
       if (!surface) {
         return { success: true, page: null };
@@ -108,6 +133,7 @@ export class AITabParent extends JSWindowActorParent {
 
       return {
         success: true,
+        font: await this.#headingFontPromise,
         page: pageData &&
           page && {
             ...pageData,
@@ -123,6 +149,21 @@ export class AITabParent extends JSWindowActorParent {
   }
 
   /**
+   * Started when the actor is created and sent with the page, so content can
+   * install the font before it renders.
+   *
+   * @returns {Promise<?ArrayBuffer>} Null when the font is unavailable.
+   */
+  async #loadHeadingFont() {
+    try {
+      return await getHeadingFont();
+    } catch (error) {
+      console.error("Failed to download the AI Tab heading font:", error);
+      return null;
+    }
+  }
+
+  /**
    * Deletes a generated page and the conversation that produced it. Every
    * page comes from its own conversation, so the two are removed together.
    *
@@ -133,10 +174,11 @@ export class AITabParent extends JSWindowActorParent {
    * @returns {Promise<object>}
    */
   async #handleDeletePage() {
-    const pageName = this.#pageName;
-    if (!pageName) {
+    const currentPage = this.#currentPage;
+    if (!currentPage) {
       return { success: false, error: "Invalid page name" };
     }
+    const { pageName, url } = currentPage;
 
     try {
       const page = await AITabStore.getBySlug(pageName);
@@ -146,15 +188,32 @@ export class AITabParent extends JSWindowActorParent {
       // stranded on the unavailable state with nowhere to go.
       if (page) {
         await AITabStore.deleteBySlug(page.slug);
+        Glean.smartWindow.aitabDelete.record();
 
         // The page is gone from here on. If clearing the conversation fails,
         // the delete the reader asked for still happened, so say so and log
         // the leftover rather than reporting a failure that did not happen.
+        //
+        // The generation conversation holds the text extracted from every
+        // source page, so it is the one that has to go; `convId` names the
+        // chat the page was requested in, which outlives it. Pages stored
+        // before that id was recorded have nothing to clear.
+        if (page.toolConvId) {
+          try {
+            await ConversationStore.deleteConversationById(page.toolConvId);
+          } catch (error) {
+            console.error(
+              "Deleted an AI Tab page but could not delete its conversation",
+              error
+            );
+          }
+        }
+
         try {
-          await ConversationStore.deleteConversationById(page.convId);
+          await this.#removeFromHistory(page.slug, url);
         } catch (error) {
           console.error(
-            "Deleted an AI Tab page but could not delete its conversation",
+            "Deleted an AI Tab page but could not remove it from history",
             error
           );
         }
@@ -171,15 +230,30 @@ export class AITabParent extends JSWindowActorParent {
   }
 
   /**
+   * Removes the history entry for a generated page, plus the tab's own URL
+   * when it names the same page under a different spelling.
+   *
+   * @param {string} slug
+   * @param {string} tabURL - The tab URL the slug was read from.
+   */
+  async #removeFromHistory(slug, tabURL) {
+    const urls = new Set([lazy.AITab.buildViewerURL(slug), tabURL]);
+    await lazy.PlacesUtils.history.remove([...urls]);
+  }
+
+  /**
    * Opens a link from anywhere on a generated page. Kept separate from
    * AIChatContentParent's handler so AI Tab clicks stay out of chat's
-   * recordUriLoad() metric.
+   * recordUriLoad() metric. The click is recorded after the attempt, with
+   * a result of "switch", "new", or "error".
    *
    * @param {object} data
    * @param {string} data.url
    * @param {boolean} [data.preferSwitchToTab]
+   * @param {string} [data.component_type] - Catalog component the link was
+   *   in, the same name creation telemetry records, or "unknown".
    */
-  #handleOpenLink({ url, preferSwitchToTab } = {}) {
+  #handleOpenLink({ url, preferSwitchToTab, component_type } = {}) {
     // Links come from model output, so only http and https are opened.
     // file:, data: and javascript: URLs are dropped, as is a missing or
     // unparseable url: URL.parse returns null for those.
@@ -193,22 +267,49 @@ export class AITabParent extends JSWindowActorParent {
       return;
     }
 
-    if (
-      preferSwitchToTab &&
-      lazy.URILoadingHelper.switchToTabHavingURI(window, url, false, {})
-    ) {
-      return;
+    // The click is the user's choice to open the link, so it is recorded
+    // whether the tab switch or the new load succeeds.
+    let result = "new";
+    try {
+      if (
+        preferSwitchToTab &&
+        lazy.URILoadingHelper.switchToTabHavingURI(window, url, false, {})
+      ) {
+        result = "switch";
+      } else {
+        const { userContextId } =
+          window.gBrowser.selectedBrowser.browsingContext.originAttributes;
+        lazy.URILoadingHelper.openWebLinkIn(window, url, "tab", {
+          triggeringPrincipal:
+            Services.scriptSecurityManager.createNullPrincipal({
+              userContextId,
+            }),
+          userContextId,
+          forceForeground: false,
+        });
+      }
+    } catch (error) {
+      console.error("Could not open an AI Tab link", error);
+      result = "error";
     }
 
-    const { userContextId } =
-      window.gBrowser.selectedBrowser.browsingContext.originAttributes;
-    lazy.URILoadingHelper.openWebLinkIn(window, url, "tab", {
-      triggeringPrincipal: Services.scriptSecurityManager.createNullPrincipal({
-        userContextId,
-      }),
-      userContextId,
-      forceForeground: false,
-    });
+    Glean.smartWindow.aitabLinkClick.record({ component_type, result });
+  }
+
+  /**
+   * Records the status the page settled on, and whether the heading font
+   * installed. Content is untrusted, so anything other than the three
+   * statuses the page sets is recorded as an error.
+   *
+   * @param {object} data
+   * @param {string} [data.outcome]
+   * @param {string} [data.font]
+   */
+  #recordView(data) {
+    const known = ["ready", "unavailable", "error"];
+    const outcome = known.includes(data?.outcome) ? data.outcome : "error";
+    const font = known.includes(data?.font) ? data.font : "error";
+    Glean.smartWindow.aitabView.record({ outcome, font });
   }
 
   /**

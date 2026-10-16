@@ -26,7 +26,7 @@ async function selectAndYield(tab) {
 async function discardTab(tab, loadedPromise) {
   await loadedPromise;
   await gBrowser.prepareDiscardBrowser(tab);
-  gBrowser.discardBrowser(tab, true);
+  gBrowser.discardBrowser(tab, { forceDiscard: true });
   ok(
     tab.hasAttribute("discarded"),
     "tab should be marked discarded after being explicitly unloaded"

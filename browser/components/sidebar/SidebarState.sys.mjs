@@ -650,10 +650,10 @@ export class SidebarState {
         this.#pinnedTabsContainerEl
       ).height;
     if (!active) {
-      this.pinnedTabsHeight = Math.min(
-        pinnedTabsContainerHeight,
-        itemsWrapperHeight
-      );
+      // Dragging to the full content height resets to auto-sizing rather than
+      // storing a height that only reflects the current layout.
+      const atMaxHeight = itemsWrapperHeight - pinnedTabsContainerHeight < 1;
+      this.pinnedTabsHeight = atMaxHeight ? 0 : pinnedTabsContainerHeight;
       // Store the user-preferred pinned tabs height.
       if (this.#props.launcherExpanded) {
         this.expandedPinnedTabsHeight = this.pinnedTabsHeight;

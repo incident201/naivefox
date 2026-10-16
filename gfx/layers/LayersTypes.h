@@ -141,7 +141,6 @@ enum class TextureType : int8_t {
   Unknown = 0,
   D3D11,
   MacIOSurface,
-  AndroidNativeWindow,
   AndroidHardwareBuffer,
   DMABUF,
   EGLImage,

@@ -594,7 +594,7 @@ export async function runSearchTheWeb(toolParams, conversation, signal, mode) {
   conversation.securityProperties.setPrivateData();
   conversation.securityProperties.setUntrustedInput();
 
-  switch (selectSearchTheWebPath()) {
+  switch (selectSearchTheWebPath(conversation)) {
     case SEARCH_THE_WEB_PATH.ANSWERS:
       return runAnswersSearch(toolParams, conversation, signal);
     case SEARCH_THE_WEB_PATH.FAST:

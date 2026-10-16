@@ -3320,7 +3320,7 @@ static bool AddImport(Decoder& d, CacheableName& moduleName,
       if (codeMeta->funcs.length() >= MaxFuncs) {
         return d.fail("too many functions");
       }
-      if (!codeMeta->funcs.append(FuncDesc(importType.asFunc()))) {
+      if (!codeMeta->funcs.emplaceBack(importType.asFunc())) {
         return false;
       }
       break;
@@ -3350,8 +3350,8 @@ static bool AddImport(Decoder& d, CacheableName& moduleName,
       if (codeMeta->globals.length() >= MaxGlobals) {
         return d.fail("too many globals");
       }
-      if (!codeMeta->globals.append(
-              GlobalDesc(importType.asGlobal(), codeMeta->globals.length()))) {
+      if (!codeMeta->globals.emplaceBack(importType.asGlobal(),
+                                         codeMeta->globals.length())) {
         return false;
       }
       break;
@@ -3736,8 +3736,8 @@ static bool DecodeTableSection(Decoder& d, CodeMetadata* codeMeta) {
       initExpr = mozilla::Some(std::move(initializer));
     }
 
-    codeMeta->tables.infallibleAppend(TableDesc(tableType, std::move(initExpr),
-                                                /*isImported=*/false));
+    codeMeta->tables.infallibleEmplaceBack(tableType, std::move(initExpr),
+                                           /*isImported=*/false);
   }
 
   return d.finishSection(*range, "table");
@@ -3772,7 +3772,7 @@ static bool DecodeMemorySection(Decoder& d, CodeMetadata* codeMeta) {
     if (!DecodeMemoryType(d, codeMeta, &limits)) {
       return false;
     }
-    codeMeta->memories.infallibleAppend(MemoryDesc(limits));
+    codeMeta->memories.infallibleEmplaceBack(limits);
   }
 
   return d.finishSection(*range, "memory");
@@ -3813,8 +3813,8 @@ static bool DecodeGlobalSection(Decoder& d, CodeMetadata* codeMeta) {
       return false;
     }
 
-    codeMeta->globals.infallibleAppend(
-        GlobalDesc(std::move(initializer), type.isMutable));
+    codeMeta->globals.infallibleEmplaceBack(std::move(initializer),
+                                            type.isMutable);
   }
 
   return d.finishSection(*range, "global");
@@ -3853,7 +3853,7 @@ static bool DecodeTagSection(Decoder& d, CodeMetadata* codeMeta) {
     if (!tagType || !tagType->initialize(&(*codeMeta->types)[funcTypeIndex])) {
       return false;
     }
-    codeMeta->tags.infallibleAppend(TagDesc(TagKind::Exception, tagType));
+    codeMeta->tags.infallibleEmplaceBack(TagKind::Exception, tagType);
   }
 
   return d.finishSection(*range, "tag");
@@ -5308,7 +5308,7 @@ enum class ComponentTypeKindRaw : uint8_t {
           return d.failf("record field name \"%.*s\" is not strongly-unique",
                          ComponentName_Printf(name));
         }
-        fields.infallibleAppend(ComponentRecordField(std::move(name), type));
+        fields.infallibleEmplaceBack(std::move(name), type);
       }
 
       if (!ComponentType::record(std::move(fields), &t)) {

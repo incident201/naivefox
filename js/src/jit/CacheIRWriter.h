@@ -198,7 +198,7 @@ class MOZ_RAII CacheIRWriter : public JS::CustomAutoRooter {
             stubFields_.append(StubField(0, StubField::Type::RawInt32)));
       }
 #endif
-      buffer_.propagateOOM(stubFields_.append(StubField(value, fieldType)));
+      buffer_.propagateOOM(stubFields_.emplaceBack(value, fieldType));
       MOZ_ASSERT((fieldOffset % sizeof(uintptr_t)) == 0);
       buffer_.writeByte(fieldOffset / sizeof(uintptr_t));
       stubDataSize_ = newStubDataSize;
@@ -352,9 +352,6 @@ class MOZ_RAII CacheIRWriter : public JS::CustomAutoRooter {
 
   uint32_t newOperandId() { return nextOperandId_++; }
 
-  CacheIRWriter(const CacheIRWriter&) = delete;
-  CacheIRWriter& operator=(const CacheIRWriter&) = delete;
-
  public:
   explicit CacheIRWriter(JSContext* cx)
       : CustomAutoRooter(cx),
@@ -373,6 +370,9 @@ class MOZ_RAII CacheIRWriter : public JS::CustomAutoRooter {
 #ifdef ENABLE_JS_AOT_ICS
   CacheIRWriter(JSContext* cx, const CacheIRAOTStub& aot);
 #endif
+
+  CacheIRWriter(const CacheIRWriter&) = delete;
+  CacheIRWriter& operator=(const CacheIRWriter&) = delete;
 
   bool tooLarge() const { return tooLarge_; }
   bool oom() const { return buffer_.oom(); }
@@ -477,11 +477,6 @@ class MOZ_RAII CacheIRWriter : public JS::CustomAutoRooter {
   NumberOperandId guardIsNumber(ValOperandId input) {
     guardIsNumber_(input);
     return NumberOperandId(input.id());
-  }
-
-  StringOperandId stringToAtom(StringOperandId input) {
-    stringToAtom_(input);
-    return input;
   }
 
   ValOperandId boxObject(ObjOperandId input) {

@@ -17,6 +17,10 @@ const { IPPProxyManager, IPPProxyStates } = ChromeUtils.importESModule(
   "moz-src:///toolkit/components/ipprotection/IPPProxyManager.sys.mjs"
 );
 
+const { IPPMode } = ChromeUtils.importESModule(
+  "moz-src:///toolkit/components/ipprotection/IPPChannelFilter.sys.mjs"
+);
+
 const { IPPPermissionRules, IPPPrincipalRules, IPPSiteRuleManager } =
   ChromeUtils.importESModule(
     "moz-src:///toolkit/components/ipprotection/IPPSiteRuleManager.sys.mjs"
@@ -366,9 +370,6 @@ add_setup(async function setupVPN() {
       "browser.ipProtection.bandwidthWarningDismissedThreshold"
     );
     Services.prefs.clearUserPref("browser.ipProtection.userEnabled");
-    Services.prefs.clearUserPref(
-      "browser.ipProtection.locationButtonBadgeDismissed"
-    );
     Services.perms.removeByType("ipp-vpn");
   });
 });

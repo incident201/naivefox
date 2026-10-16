@@ -153,7 +153,17 @@ WasmFrameIter::WasmFrameIter(JitActivation* activation, wasm::Frame* fp)
 
     // The debugEnabled() relies on valid value of resumePCinCurrentFrame_
     // to identify DebugFrame. Normally this field is updated at popFrame().
-    resumePCinCurrentFrame_ = (uint8_t*)trapData.resumePC;
+    // The only case when this can happend is during IndirectCallBadSig
+    // trapping and stack unwinding. The top frame will never be at ReturnStub
+    // callsite, except during IndirectCallBadSig unwinding.
+    CallSite site;
+    if (code_->lookupCallSite(unwoundPC, &site) &&
+        site.kind() == CallSiteKind::ReturnStub) {
+      MOZ_ASSERT(trapData.trap == Trap::IndirectCallBadSig);
+      resumePCinCurrentFrame_ = (uint8_t*)unwoundPC;
+    } else {
+      resumePCinCurrentFrame_ = (uint8_t*)trapData.resumePC;
+    }
 
     MOZ_ASSERT(!done());
     return;
@@ -305,7 +315,6 @@ void WasmFrameIter::popFrame(bool isLeavingFrame) {
   // Clearing unwound continuation stack here.
   unwoundContStack_ = nullptr;
 #endif
-  skippedReturnCallTrampoline_ = false;
 
   // If we're visiting inlined frames, see if this frame was inlined.
   if (enableInlinedFrames_ && inlinedCallerOffsets_.size() > 0) {
@@ -351,20 +360,6 @@ void WasmFrameIter::popFrame(bool isLeavingFrame) {
     if (activation_->isWasmTrapping()) {
       activation_->finishWasmTrap();
     }
-  }
-
-  // A return address into the return_call trampoline denotes a hidden frame
-  // that only restores the caller instance and returns to the real caller. Skip
-  // it by following the hidden frame's stored return address to the real
-  // caller.
-  Frame* returnCallOriginalFP = fp_;
-  if (!code_ && wasm::IsReturnCallTrampolineReturnAddress(returnAddress)) {
-    fp_ = fp_->wasmCaller();
-    returnAddress = fp_->returnAddress();
-    code_ = LookupCode(returnAddress, &codeRange);
-    skippedReturnCallTrampoline_ = true;
-    MOZ_RELEASE_ASSERT(
-        !wasm::IsReturnCallTrampolineReturnAddress(returnAddress));
   }
 
   if (!code_) {
@@ -483,13 +478,7 @@ void WasmFrameIter::popFrame(bool isLeavingFrame) {
   CallSite site;
   MOZ_ALWAYS_TRUE(code_->lookupCallSite(returnAddress, &site));
 
-  if (skippedReturnCallTrampoline_) {
-    // The call site of the frame the hidden frame returned to may not be
-    // cross-instance, but the return_call callee's caller instance slot holds
-    // its instance.
-    instance_ =
-        ExtractCallerInstanceFromFrameWithInstances(returnCallOriginalFP);
-  } else if (site.mightBeCrossInstance()) {
+  if (site.mightBeCrossInstance()) {
     instance_ = ExtractCallerInstanceFromFrameWithInstances(prevFP);
   }
 
@@ -587,7 +576,10 @@ bool WasmFrameIter::debugEnabled() const {
     return false;
   }
 
-  return true;
+  // Debug frame is not present at the return stub.
+  CallSite site;
+  return !(code_->lookupCallSite((void*)resumePCinCurrentFrame_, &site) &&
+           site.kind() == CallSiteKind::ReturnStub);
 }
 
 DebugFrame* WasmFrameIter::debugFrame() const {
@@ -1689,11 +1681,7 @@ static inline void AssertMatchesCallSite(void* callerPC, uint8_t* callerFP) {
   const Code* code = LookupCode(callerPC, &callerCodeRange);
 
   if (!code) {
-    // No code means this is either a direct JIT call, or the return_call
-    // trampoline, which has no exit frame.
-    if (!wasm::IsReturnCallTrampolineReturnAddress(callerPC)) {
-      AssertDirectJitCall(callerFP);
-    }
+    AssertDirectJitCall(callerFP);
     return;
   }
 
@@ -1793,7 +1781,6 @@ void ProfilingFrameIterator::initFromExitFP(const Frame* fp) {
     case CodeRange::DebugStub:
     case CodeRange::RequestTierUpStub:
     case CodeRange::UpdateCallRefMetricsStub:
-    case CodeRange::ReturnCallTrampoline:
     case CodeRange::Throw:
     case CodeRange::FarJumpIsland:
       MOZ_CRASH("Unexpected CodeRange kind");
@@ -1847,18 +1834,8 @@ const Instance* js::wasm::GetNearestEffectiveInstance(const Frame* fp) {
     const Code* code = LookupCode(returnAddress, &codeRange);
 
     if (!code) {
-      // No code means this is either a direct JIT call, or the return_call
-      // trampoline. Assert this is the case.
-      //
-      // A return_call trampoline return address means this frame was reached
-      // via a cross-instance return_call. Its effective instance is the callee
-      // instance.
-      //
-      // A direct JIT call also stores the effective instance in a callee
-      // instance slot.
-      if (!wasm::IsReturnCallTrampolineReturnAddress(returnAddress)) {
-        AssertDirectJitCall(fp->jitEntryCaller());
-      }
+      // It is a direct call from JIT.
+      AssertDirectJitCall(fp->jitEntryCaller());
       return ExtractCalleeInstanceFromFrameWithInstances(fp);
     }
 
@@ -2187,27 +2164,6 @@ bool js::wasm::StartUnwinding(const RegisterState& registers,
       }
       fixedPC = nullptr;
       break;
-    case CodeRange::ReturnCallTrampoline:
-      // The trampoline runs on the hidden frame of a cross-instance
-      // return_call; see GenerateReturnCallTrampoline. Until FP is restored,
-      // the hidden frame holds the caller's return address and FP. After that,
-      // fp is the caller's FP and the return address is in the link register
-      // or on top of the stack.
-      if (offsetInCode < codeRange->ret()) {
-        const auto* frame = Frame::fromUntaggedWasmExitFP(fp);
-        fixedPC = frame->returnAddress();
-        fixedFP = frame->rawCaller();
-      } else {
-        fixedFP = fp;
-#if defined(JS_CODEGEN_ARM64) || defined(JS_CODEGEN_MIPS64) || \
-    defined(JS_CODEGEN_LOONG64) || defined(JS_CODEGEN_RISCV64)
-        fixedPC = (uint8_t*)registers.lr;
-#else
-        fixedPC = sp[0];
-#endif
-      }
-      AssertMatchesCallSite(fixedPC, fixedFP);
-      break;
     case CodeRange::Throw:
       // The throw stub executes a small number of instructions before popping
       // the entire activation. To simplify testing, we simply pretend throw
@@ -2310,19 +2266,6 @@ void ProfilingFrameIterator::operator++() {
   const CodeBlock* codeBlock = LookupCodeBlock(callerPC_, &codeRange_);
   code_ = codeBlock ? codeBlock->code : nullptr;
 
-  // Skip the hidden return_call trampoline frame: callerPC_ points into the
-  // trampoline, whose frame just returns to the real caller; follow it there.
-  if (!code_ && wasm::IsReturnCallTrampolineReturnAddress(callerPC_)) {
-    const auto* hidden = Frame::fromUntaggedWasmExitFP(callerFP_);
-    callerPC_ = hidden->returnAddress();
-    callerFP_ = hidden->rawCaller();
-    stackAddress_ = callerFP_;
-    codeBlock = LookupCodeBlock(callerPC_, &codeRange_);
-    code_ = codeBlock ? codeBlock->code : nullptr;
-    // At most one trampoline frame; see popFrame.
-    MOZ_RELEASE_ASSERT(!wasm::IsReturnCallTrampolineReturnAddress(callerPC_));
-  }
-
   if (!code_) {
     category_ = Category::Other;
     // The parent frame is an inlined wasm call, callerFP_ points to the fake
@@ -2404,7 +2347,6 @@ void ProfilingFrameIterator::operator++() {
 #endif
     case CodeRange::InterpEntry:
     case CodeRange::JitEntry:
-    case CodeRange::ReturnCallTrampoline:
       MOZ_CRASH("should have been guarded above");
     case CodeRange::Throw:
       MOZ_CRASH("code range doesn't have frame");
@@ -2593,7 +2535,6 @@ const char* wasm::ThunkedNativeToDescription(SymbolicAddress func) {
       return "call to native cont.unwind function";
 #endif
     case SymbolicAddress::SlotsToAllocKindBytesTable:
-    case SymbolicAddress::ReturnCallTrampoline:
       MOZ_CRASH(
           "symbolic address was not code and should not have appeared here");
 #define VISIT_BUILTIN_FUNC(op, export, sa_name, ...) \
@@ -2630,8 +2571,6 @@ const char* ProfilingFrameIterator::label() const {
   static const char requestTierUpDescription[] = "tier-up request (in wasm)";
   static const char updateCallRefMetricsDescription[] =
       "update call_ref metrics (in wasm)";
-  static const char returnCallTrampolineDescription[] =
-      "return_call trampoline (in wasm)";
 
   if (!exitReason_.isFixed()) {
     return ThunkedNativeToDescription(exitReason_.symbolic());
@@ -2675,8 +2614,6 @@ const char* ProfilingFrameIterator::label() const {
       return requestTierUpDescription;
     case CodeRange::UpdateCallRefMetricsStub:
       return updateCallRefMetricsDescription;
-    case CodeRange::ReturnCallTrampoline:
-      return returnCallTrampolineDescription;
 #ifdef ENABLE_WASM_JSPI
     case CodeRange::ContBaseFrame:
       return "cont base frame";

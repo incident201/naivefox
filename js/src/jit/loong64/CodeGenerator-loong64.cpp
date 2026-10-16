@@ -306,7 +306,7 @@ bool CodeGeneratorLOONG64::generateOutOfLineCode() {
     return false;
   }
 
-  if (deoptLabel_.used()) {
+  if (needsDeoptLabel()) {
     // All non-table-based bailouts will go here.
     masm.bind(&deoptLabel_);
 
@@ -3723,6 +3723,39 @@ void CodeGenerator::visitWasmReplaceLaneSimd128(LWasmReplaceLaneSimd128* ins) {
       break;
     default:
       MOZ_CRASH("ReplaceLane SimdOp not implemented");
+  }
+#else
+  MOZ_CRASH("No SIMD");
+#endif
+}
+
+void CodeGenerator::visitWasmMoveLaneSimd128(LWasmMoveLaneSimd128* ins) {
+#ifdef ENABLE_JIT_SIMD
+  MOZ_ASSERT(ToFloatRegister(ins->lhs()) == ToFloatRegister(ins->output()));
+  const FloatRegister lhsDest = ToFloatRegister(ins->lhs());
+  const FloatRegister src = ToFloatRegister(ins->rhs());
+  const uint32_t laneIndex = ins->mir()->laneIndex();
+  const uint32_t srcLaneIndex = ins->mir()->srcLaneIndex();
+
+  // High ui4: dest lane selection. Low ui4: src lane selection.
+  // <https://jia.je/unofficial-loongarch-intrinsics-guide/lsx/misc/#__m128i-__lsx_vextrins_d-__m128i-a-__m128i-b-imm0_255-imm>
+  const uint32_t imm = (laneIndex << 4) | srcLaneIndex;
+
+  switch (ins->mir()->simdOp()) {
+    case wasm::SimdOp::I8x16ReplaceLane:
+      masm.as_vextrins_b(lhsDest, src, imm);
+      break;
+    case wasm::SimdOp::I16x8ReplaceLane:
+      masm.as_vextrins_h(lhsDest, src, imm);
+      break;
+    case wasm::SimdOp::I32x4ReplaceLane:
+      masm.as_vextrins_w(lhsDest, src, imm);
+      break;
+    case wasm::SimdOp::I64x2ReplaceLane:
+      masm.as_vextrins_d(lhsDest, src, imm);
+      break;
+    default:
+      MOZ_CRASH("MoveLane SimdOp not implemented");
   }
 #else
   MOZ_CRASH("No SIMD");

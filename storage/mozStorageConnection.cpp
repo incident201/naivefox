@@ -973,8 +973,11 @@ nsIEventTarget* Connection::getAsyncExecutionTarget() {
   NS_ENSURE_TRUE(IsOnCurrentSerialEventTarget(eventTargetOpenedOn), nullptr);
 
   // Don't return the asynchronous event target if we are shutting down.
-  if (mAsyncExecutionThreadShuttingDown) {
-    return nullptr;
+  {
+    MutexAutoLock lockedScope(sharedAsyncExecutionMutex);
+    if (mAsyncExecutionThreadShuttingDown) {
+      return nullptr;
+    }
   }
 
   // Create the async event target if there's none yet.
@@ -1100,6 +1103,10 @@ nsresult Connection::initialize(const nsACString& aStorageKey,
   int srv = ::sqlite3_open_v2(path.get(), &mDBConn, mFlags,
                               basevfs::GetVFSName(true));
   if (srv != SQLITE_OK) {
+    {
+      MutexAutoLock lockedScope(sharedAsyncExecutionMutex);
+      mConnectionClosed = true;
+    }
     ::sqlite3_close(mDBConn);
     mDBConn = nullptr;
     nsresult rv = convertResultCode(srv);
@@ -1129,6 +1136,11 @@ nsresult Connection::initialize(nsIFile* aDatabaseFile) {
   NS_ASSERTION(!connectionReady(),
                "Initialize called on already opened database!");
   AUTO_PROFILER_LABEL("Connection::initialize", OTHER);
+
+  auto failGuard = MakeScopeExit([&]() {
+    MutexAutoLock lockedScope(sharedAsyncExecutionMutex);
+    mConnectionClosed = true;
+  });
 
   // Do not set mFileURL here since this is database does not have an associated
   // URL.
@@ -1245,6 +1257,7 @@ nsresult Connection::initialize(nsIFile* aDatabaseFile) {
   RecordOpenStatus(rv);
   NS_ENSURE_SUCCESS(rv, rv);
 
+  failGuard.release();
   return NS_OK;
 }
 
@@ -1253,6 +1266,11 @@ nsresult Connection::initialize(nsIFileURL* aFileURL) {
   NS_ASSERTION(!connectionReady(),
                "Initialize called on already opened database!");
   AUTO_PROFILER_LABEL("Connection::initialize", OTHER);
+
+  auto failGuard = MakeScopeExit([&]() {
+    MutexAutoLock lockedScope(sharedAsyncExecutionMutex);
+    mConnectionClosed = true;
+  });
 
   nsCOMPtr<nsIFile> databaseFile;
   nsresult rv = aFileURL->GetFile(getter_AddRefs(databaseFile));
@@ -1374,6 +1392,7 @@ nsresult Connection::initialize(nsIFileURL* aFileURL) {
   RecordOpenStatus(rv);
   NS_ENSURE_SUCCESS(rv, rv);
 
+  failGuard.release();
   return NS_OK;
 }
 
@@ -1381,7 +1400,10 @@ nsresult Connection::initializeInternal() {
   MOZ_ASSERT(mDBConn);
   auto guard = MakeScopeExit([&]() { initializeFailed(); });
 
-  mConnectionClosed = false;
+  {
+    MutexAutoLock lockedScope(sharedAsyncExecutionMutex);
+    mConnectionClosed = false;
+  }
 
 #ifdef MOZ_SQLITE_FTS3_TOKENIZER
   DebugOnly<int> srv2 =
@@ -1640,7 +1662,12 @@ nsresult Connection::ensureOperationSupported(
 }
 
 bool Connection::isConnectionReadyOnThisThread() {
-  MOZ_ASSERT_IF(connectionReady(), !mConnectionClosed);
+#ifdef DEBUG
+  {
+    MutexAutoLock lockedScope(sharedAsyncExecutionMutex);
+    MOZ_ASSERT_IF(connectionReady(), !mConnectionClosed);
+  }
+#endif
   if (mAsyncExecutionThread && mAsyncExecutionThread->IsOnCurrentThread()) {
     return true;
   }
@@ -1657,17 +1684,26 @@ bool Connection::isClosed() {
   return mConnectionClosed;
 }
 
-bool Connection::isClosed(MutexAutoLock& /*lock*/) { return mConnectionClosed; }
+bool Connection::isClosed(MutexAutoLock& /*lock*/) {
+  sharedAsyncExecutionMutex.AssertCurrentThreadOwns();
+  return mConnectionClosed;
+}
 
 bool Connection::isAsyncExecutionThreadAvailable() {
   MOZ_ASSERT(IsOnCurrentSerialEventTarget(eventTargetOpenedOn));
+  MutexAutoLock lockedScope(sharedAsyncExecutionMutex);
   return mAsyncExecutionThread && !mAsyncExecutionThreadShuttingDown;
 }
 
 void Connection::shutdownAsyncThread() {
   MOZ_ASSERT(IsOnCurrentSerialEventTarget(eventTargetOpenedOn));
   MOZ_ASSERT(mAsyncExecutionThread);
-  MOZ_ASSERT(mAsyncExecutionThreadShuttingDown);
+#ifdef DEBUG
+  {
+    MutexAutoLock lockedScope(sharedAsyncExecutionMutex);
+    MOZ_ASSERT(mAsyncExecutionThreadShuttingDown);
+  }
+#endif
 
   MOZ_ALWAYS_SUCCEEDS(mAsyncExecutionThread->Shutdown());
   mAsyncExecutionThread = nullptr;
@@ -1801,6 +1837,11 @@ int Connection::stepStatement(sqlite3* aNativeConnection,
     Telemetry::RecordSlowSQLStatement(
         statementString, mTelemetryFilename,
         static_cast<uint32_t>(duration.ToMilliseconds()));
+
+#ifdef NIGHTLY_BUILD
+    mStorageService->RecordSlowStatement(aStatement, duration,
+                                         mTelemetryFilename);
+#endif  // NIGHTLY_BUILD
   }
 #endif
 

@@ -578,7 +578,7 @@ add_task(async function tabWireframeTests() {
 
   // Discard the first tab so it can't provide a thumbnail image
   await TabStateFlusher.flush(tab1.linkedBrowser);
-  gBrowser.discardBrowser(tab1, true);
+  gBrowser.discardBrowser(tab1, { forceDiscard: true });
 
   const previewPanel = document.getElementById(TAB_PREVIEW_PANEL_ID);
 

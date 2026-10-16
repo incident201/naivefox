@@ -11,7 +11,8 @@ import {
   DSSource,
   PlaceholderDSCard,
 } from "content-src/components/DiscoveryStreamComponents/DSCard/DSCard";
-import { actionCreators as ac } from "common/Actions.mjs";
+import { SafeAnchor } from "content-src/components/DiscoveryStreamComponents/SafeAnchor/SafeAnchor";
+import { actionCreators as ac, actionTypes as at } from "common/Actions.mjs";
 import { INITIAL_STATE } from "common/Reducers.sys.mjs";
 import React from "react";
 
@@ -73,6 +74,26 @@ describe("<DSCard>", () => {
     const anchor = container.querySelector("a.ds-card-link");
     expect(anchor).toBeInTheDocument();
     expect(anchor).toHaveAttribute("href", "https://foo.com");
+  });
+
+  it("should label an organic card link for dwell time", () => {
+    const renderSpy = jest.spyOn(SafeAnchor.prototype, "render");
+    act(() => cardRef.current.forceUpdate());
+    expect(renderSpy.mock.contexts.at(-1).props).toHaveProperty(
+      "dwellLabel",
+      "story_organic"
+    );
+    renderSpy.mockRestore();
+  });
+
+  it("should label a sponsored card link for dwell time", () => {
+    const renderSpy = jest.spyOn(SafeAnchor.prototype, "render");
+    setProps({ flightId: "12345" });
+    expect(renderSpy.mock.contexts.at(-1).props).toHaveProperty(
+      "dwellLabel",
+      "story_sponsored"
+    );
+    renderSpy.mockRestore();
   });
 
   it("should pass onLinkClick prop", () => {
@@ -288,6 +309,29 @@ describe("<DSCard>", () => {
           },
         })
       );
+    });
+
+    it("should send the click payload as an open intent", () => {
+      setProps({ id: "fooidx", pos: 9, type: "foo" });
+      jest
+        .spyOn(cardRef.current, "doesLinkTopicMatchSelectedTopic")
+        .mockReturnValue(undefined);
+
+      cardRef.current.onLinkOpenIntent({
+        currentTarget: { href: "https://example.com/" },
+      });
+
+      expect(dispatch).toHaveBeenCalledTimes(1);
+      expect(dispatch).toHaveBeenCalledWith(
+        ac.OnlyToMain({
+          type: at.BROWSER_LINK_OPEN_INTENT,
+          data: {
+            url: "https://example.com/",
+            userEvent: cardRef.current.getClickEventData(),
+          },
+        })
+      );
+      expect(dispatch.mock.calls[0][0].data.userEvent.action_position).toBe(9);
     });
 
     it("should set the right card_type on spocs", () => {

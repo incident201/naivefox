@@ -46,12 +46,45 @@ from mozlog.formatters import TestSummaryFormatter
             id="assertion_count_dropped",
         ),
         pytest.param(
-            {"action": "lsan_leak", "frames": []}, False, id="lsan_leak_dropped"
+            {
+                "action": "lsan_leak",
+                "frames": ["Ensure", "nsFoo::Bar"],
+                "kind": "Direct",
+                "bytes": 168,
+                "objects": 1,
+                "scope": "browser.toml",
+                "allowed_match": None,
+            },
+            True,
+            id="lsan_leak_kept",
         ),
         pytest.param(
-            {"action": "lsan_summary", "allocated_bytes": 10},
+            {
+                "action": "lsan_leak",
+                "frames": ["PR_LoadLibrary", "nsFoo::Bar"],
+                "kind": "Direct",
+                "bytes": 64,
+                "objects": 1,
+                "scope": "browser.toml",
+                "allowed_match": "PR_LoadLibrary",
+            },
             False,
-            id="lsan_summary_dropped",
+            id="lsan_leak_allowed_match_dropped",
+        ),
+        pytest.param(
+            {
+                "action": "lsan_summary",
+                "bytes": 488,
+                "allocations": 3,
+                "allowed": False,
+            },
+            True,
+            id="lsan_summary_kept",
+        ),
+        pytest.param(
+            {"action": "lsan_summary", "bytes": 64, "allocations": 1, "allowed": True},
+            False,
+            id="lsan_summary_allowed_dropped",
         ),
         pytest.param(
             {"action": "process_exit", "process": 1234, "exitcode": 0},
@@ -319,6 +352,62 @@ def test_testsummary_mozleak_total_keeps_the_leak_fields():
         "scope": scope,
         "induced_crash": False,
         "ignore_missing": False,
+    }
+
+
+def test_testsummary_lsan_summary_keeps_the_counts():
+    fmt = TestSummaryFormatter()
+    record = {
+        "action": "lsan_summary",
+        "time": 1791156513865,
+        "thread": "MainThread",
+        "pid": 1652,
+        "source": "mochitest",
+        "bytes": 488,
+        "allocations": 3,
+    }
+    out = fmt(record)
+    result = json.loads(out)
+    assert result == {
+        "action": "lsan_summary",
+        "time": 1791156513865,
+        "bytes": 488,
+        "allocations": 3,
+    }
+
+
+def test_testsummary_lsan_leak_strips_the_stack():
+    fmt = TestSummaryFormatter()
+    frames = [
+        "Ensure",
+        "mozilla::dom::FileSystemBackgroundRequestHandler::CreateFileSystemManagerChild",
+        "mozilla::dom::FileSystemManager::BeginRequest",
+        "mozilla::dom::fs::FileSystemRequestHandler::GetRootHandle",
+    ]
+    scope = "browser/components/aiwindow/ui/test/browser/browser_smartwindow.toml"
+    record = {
+        "action": "lsan_leak",
+        "time": 1791156513878,
+        "thread": "MainThread",
+        "pid": 1652,
+        "source": "mochitest",
+        "frames": frames,
+        "kind": "Direct",
+        "bytes": 168,
+        "objects": 1,
+        "stack": [{"function": "Ensure", "file": "MozPromise.h", "line": 1550}],
+        "scope": scope,
+    }
+    out = fmt(record)
+    result = json.loads(out)
+    assert result == {
+        "action": "lsan_leak",
+        "time": 1791156513878,
+        "frames": frames,
+        "kind": "Direct",
+        "bytes": 168,
+        "objects": 1,
+        "scope": scope,
     }
 
 

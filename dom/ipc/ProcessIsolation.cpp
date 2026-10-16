@@ -641,7 +641,8 @@ Result<NavigationIsolationOptions, nsresult> IsolationOptionsForNavigation(
   }
 
   NavigationIsolationOptions options;
-  options.mReplaceBrowsingContext = aHasCOOPMismatch;
+  // Replace the new tab's context to match the response's isolation.
+  options.mReplaceBrowsingContext = aHasCOOPMismatch || aForNewTab;
   options.mShouldCrossOriginIsolate =
       ShouldCrossOriginIsolate(aChannel, aParentWindow);
 
@@ -893,9 +894,8 @@ Result<NavigationIsolationOptions, nsresult> IsolationOptionsForNavigation(
   // where we may have multiple documents with the same principal in different
   // processes. Those have been handled above, and will not be reaching here.
   //
-  // If we're doing a replace load or opening a new tab, we won't be staying in
-  // the same BrowsingContextGroup, so ignore this step.
-  if (!options.mReplaceBrowsingContext && !aForNewTab) {
+  // When replacing the BrowsingContext, ignore the old group's processes.
+  if (!options.mReplaceBrowsingContext) {
     // Helper for efficiently determining if a given origin is same-site. This
     // will attempt to do a fast equality check, and will only fall back to
     // computing the site-origin for content principals.

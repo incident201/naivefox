@@ -6,6 +6,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Localized } from "./MSLocalized";
 import { MultiStageUtils } from "../lib/multistage-utils.mjs";
 import { MultiStageProtonScreen } from "./MultiStageProtonScreen";
+import { getTileImpressionContext } from "./ContentTiles";
 import { useLanguageSwitcher } from "./LanguageSwitcher";
 import { SubmenuButton } from "./SubmenuButton";
 import { BASE_PARAMS, addUtmParams } from "../lib/addUtmParams.mjs";
@@ -101,6 +102,7 @@ export const MultiStageAboutWelcome = props => {
             screen_index: order,
             screen_id: screen.id,
             screen_initials: screenInitials,
+            ...getTileImpressionContext(screen.content?.tiles),
           });
 
           // Impression actions should be fired before recording the
@@ -420,6 +422,7 @@ export const MultiStageAboutWelcome = props => {
               content={currentScreen.content}
               navigate={handleTransition}
               autoAdvance={currentScreen.auto_advance}
+              autoDismiss={currentScreen.auto_dismiss}
               advanceOnExperimentLoad={currentScreen.advance_on_experiment_load}
               messageId={`${props.message_id}_${order}_${currentScreen.id}`}
               UTMTerm={props.utm_term}
@@ -1087,6 +1090,7 @@ export class WelcomeScreen extends React.PureComponent {
         isSingleScreen={this.props.isSingleScreen}
         startsWithCorner={this.props.startsWithCorner}
         autoAdvance={this.props.autoAdvance}
+        autoDismiss={this.props.autoDismiss}
         advanceOnExperimentLoad={this.props.advanceOnExperimentLoad}
         navigate={this.props.navigate}
         forceHideStepsIndicator={this.props.forceHideStepsIndicator}

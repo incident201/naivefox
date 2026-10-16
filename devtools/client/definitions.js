@@ -170,8 +170,8 @@ Tools.options = {
     if (this.url === NEW_SETTINGS_PANEL_URL) {
       const {
         SettingsPanel,
-      } = require("resource://devtools/client/settings/panel.js");
-      return new SettingsPanel();
+      } = require("resource://devtools/client/settings/panel.mjs");
+      return new SettingsPanel(iframeWindow, toolbox);
     }
     return new OptionsPanel(iframeWindow, toolbox, commands);
   },

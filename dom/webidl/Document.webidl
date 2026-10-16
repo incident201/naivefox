@@ -598,6 +598,16 @@ partial interface Document {
   boolean consumeTransientUserGestureActivation();
 };
 
+// Lets chrome JS lay out a top-level document at a fixed viewport size,
+// independent of its browser's size, while the visual viewport keeps following
+// the browser.
+partial interface Document {
+  [ChromeOnly]
+  undefined setViewportSizeOverrideForMiniWindow(float width, float height);
+  [ChromeOnly]
+  undefined clearViewportSizeOverrideForMiniWindow();
+};
+
 // Extension to give chrome JS the ability to set an event handler which is
 // called with certain events that happened while events were suppressed in the
 // document or one of its subdocuments.

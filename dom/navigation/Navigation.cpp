@@ -319,7 +319,7 @@ NavigationActivation* Navigation::GetActivation() const { return mActivation; }
 template <typename I>
 bool SupportsInterface(nsISupports* aSupports) {
   nsCOMPtr<I> ptr = do_QueryInterface(aSupports);
-  return ptr;
+  return ptr != nullptr;
 }
 
 static bool IsNonBlankAboutPage(Document* aDocument) {

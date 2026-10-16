@@ -25,6 +25,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Assume.assumeThat
 import org.junit.Before
+import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mozilla.geckoview.AllowOrDeny
@@ -989,13 +990,13 @@ class WebExtensionTest : BaseSessionTest() {
             { delegate -> controller.setAddonManagerDelegate(delegate) },
             { controller.setAddonManagerDelegate(null) },
             object : WebExtensionController.AddonManagerDelegate {
-                @AssertCalled(count = 3) override fun onEnabling(extension: WebExtension) {}
+                @AssertCalled(count = 2) override fun onEnabling(extension: WebExtension) {}
 
-                @AssertCalled(count = 3) override fun onEnabled(extension: WebExtension) {}
+                @AssertCalled(count = 2) override fun onEnabled(extension: WebExtension) {}
 
-                @AssertCalled(count = 3) override fun onDisabling(extension: WebExtension) {}
+                @AssertCalled(count = 2) override fun onDisabling(extension: WebExtension) {}
 
-                @AssertCalled(count = 3) override fun onDisabled(extension: WebExtension) {}
+                @AssertCalled(count = 2) override fun onDisabled(extension: WebExtension) {}
 
                 @AssertCalled(count = 1) override fun onUninstalling(extension: WebExtension) {}
 
@@ -1551,6 +1552,7 @@ class WebExtensionTest : BaseSessionTest() {
             }
         )
 
+        val installationFailed = GeckoResult<Void>()
         sessionRule.addExternalDelegateUntilTestEnd(
             WebExtensionController.AddonManagerDelegate::class,
             { delegate -> controller.setAddonManagerDelegate(delegate) },
@@ -1566,6 +1568,7 @@ class WebExtensionTest : BaseSessionTest() {
                     assertEquals(expectedExtensionID, extension?.id)
                     assertEquals(expectedError, installException.code)
                     assertEquals(expectedExtensionID, installException.extensionId)
+                    installationFailed.complete(null)
                 }
             },
         )
@@ -1586,6 +1589,7 @@ class WebExtensionTest : BaseSessionTest() {
                     },
                 )
         )
+        sessionRule.waitForResult(installationFailed)
     }
 
     private fun extensionsMap(extensionList: List<WebExtension>): Map<String, WebExtension> {
@@ -2033,7 +2037,6 @@ class WebExtensionTest : BaseSessionTest() {
     // - Verify that close request came from right extension and targeted session
     @Test
     fun testSetTabActive() {
-        val onCloseRequestResult = GeckoResult<Void>()
         val tabsExtension = sessionRule.waitForResult(controller.installBuiltIn(TABS_ACTIVATE_REMOVE_BACKGROUND))
         val newTabSession = sessionRule.createOpenSession(mainSession.settings)
 
@@ -2042,11 +2045,10 @@ class WebExtensionTest : BaseSessionTest() {
             { delegate -> newTabSession.webExtensionController.setTabDelegate(tabsExtension, delegate) },
             { newTabSession.webExtensionController.setTabDelegate(tabsExtension, null) },
             object : WebExtension.SessionTabDelegate {
-
+                @AssertCalled(count = 1)
                 override fun onCloseTab(source: WebExtension?, session: GeckoSession): GeckoResult<AllowOrDeny> {
                     assertEquals(tabsExtension.id, source?.id)
                     assertEquals(newTabSession, session)
-                    onCloseRequestResult.complete(null)
                     return GeckoResult.allow()
                 }
             },
@@ -2055,7 +2057,7 @@ class WebExtensionTest : BaseSessionTest() {
         controller.setTabActive(mainSession, false)
         controller.setTabActive(newTabSession, true)
 
-        sessionRule.waitForResult(onCloseRequestResult)
+        sessionRule.waitUntilCalled(WebExtension.SessionTabDelegate::class, "onCloseTab")
         sessionRule.waitForResult(controller.uninstall(tabsExtension))
     }
 
@@ -2758,7 +2760,6 @@ class WebExtensionTest : BaseSessionTest() {
     // - Verify that request targets previously created GeckoSession
     @Test
     fun testBrowserTabsRemove() {
-        val onCloseRequestResult = GeckoResult<Void>()
         val existingSession = sessionRule.createOpenSession()
 
         existingSession.loadTestPath("$HELLO_HTML_PATH?tabToClose")
@@ -2771,9 +2772,9 @@ class WebExtensionTest : BaseSessionTest() {
             { delegate -> existingSession.webExtensionController.setTabDelegate(tabsExtension, delegate) },
             { existingSession.webExtensionController.setTabDelegate(tabsExtension, null) },
             object : WebExtension.SessionTabDelegate {
+                @AssertCalled(count = 1)
                 override fun onCloseTab(source: WebExtension?, session: GeckoSession): GeckoResult<AllowOrDeny> {
                     assertEquals(existingSession, session)
-                    onCloseRequestResult.complete(null)
                     return GeckoResult.allow()
                 }
             },
@@ -2790,7 +2791,7 @@ class WebExtensionTest : BaseSessionTest() {
         )
         sessionRule.waitForResult(portResult).postMessage(JSONObject())
 
-        sessionRule.waitForResult(onCloseRequestResult)
+        sessionRule.waitUntilCalled(WebExtension.SessionTabDelegate::class, "onCloseTab")
         sessionRule.waitForResult(controller.uninstall(tabsExtension))
     }
 
@@ -4055,6 +4056,7 @@ class WebExtensionTest : BaseSessionTest() {
             }
         )
 
+        val uninstalled = GeckoResult<Void>()
         sessionRule.addExternalDelegateUntilTestEnd(
             WebExtensionController.AddonManagerDelegate::class,
             { delegate -> controller.setAddonManagerDelegate(delegate) },
@@ -4070,7 +4072,10 @@ class WebExtensionTest : BaseSessionTest() {
 
                 @AssertCalled(count = 1) override fun onUninstalling(extension: WebExtension) {}
 
-                @AssertCalled(count = 1) override fun onUninstalled(extension: WebExtension) {}
+                @AssertCalled(count = 1)
+                override fun onUninstalled(extension: WebExtension) {
+                    uninstalled.complete(null)
+                }
 
                 // We expect onInstalling/onInstalled to be invoked twice
                 // because we first install the extension and then we update
@@ -4105,6 +4110,7 @@ class WebExtensionTest : BaseSessionTest() {
         sessionRule.waitForPageStop()
 
         sessionRule.waitForResult(controller.uninstall(updatedWebExtension))
+        sessionRule.waitForResult(uninstalled)
     }
 
     @Test
@@ -4745,6 +4751,7 @@ class WebExtensionTest : BaseSessionTest() {
         )
     }
 
+    @Ignore("https://bugzilla.mozilla.org/show_bug.cgi?id=2080467")
     @Test
     fun testExtensionProcessCrash() {
         sessionRule.setPrefsUntilTestEnd(

@@ -35,7 +35,7 @@
 //! - Push potentially multiple commands to command buffers.
 //!
 
-use api::{ColorF, DebugFlags, ExtendMode, ExternalImageData, ExternalImageType, GradientStop, ImageBufferKind};
+use api::{AlphaMode, ColorF, DebugFlags, ExtendMode, ExternalImageData, ExternalImageType, GradientStop, ImageBufferKind, PrimitiveFlags};
 use crate::border_image::prepare_border_image_nine_patch;
 use crate::pattern::cutout::Cutout;
 use crate::render_task_graph::RenderTaskId;
@@ -66,8 +66,7 @@ use crate::frame_builder::{FrameBuildingContext, FrameBuildingState, PictureCont
 use crate::gpu_types::UvRectKind;
 
 use crate::internal_types::{FastHashMap, PlaneSplitAnchor};
-use crate::picture::{ClusterFlags, PictureScratch};
-use crate::picture::{PrimitiveList, PrimitiveCluster};
+use crate::picture::PictureScratch;
 use crate::surface::{SubpixelMode, SurfaceIndex};
 use crate::tile_cache::{SliceId, TileCacheInstance};
 use crate::prim_store::*;
@@ -107,7 +106,7 @@ pub fn prepare_picture(
     }
 
     let pic = &mut store.pictures[pic_index.0 as usize];
-    let Some((pic_context, mut pic_state, mut prim_list, scratch_handle)) = pic.take_context(
+    let Some((pic_context, mut pic_state, scratch_handle)) = pic.take_context(
         pic_index,
         surface_index,
         subpixel_mode,
@@ -125,7 +124,6 @@ pub fn prepare_picture(
 
     prepare_primitives(
         store,
-        &mut prim_list,
         &pic_context,
         &mut pic_state,
         frame_context,
@@ -136,10 +134,8 @@ pub fn prepare_picture(
         prim_instances,
     );
 
-    // Restore the dependencies (borrow check dance)
     store.pictures[pic_context.pic_index.0 as usize].restore_context(
         pic_context.pic_index,
-        prim_list,
         pic_context,
         frame_context,
         frame_state,
@@ -151,7 +147,6 @@ pub fn prepare_picture(
 
 fn prepare_primitives(
     store: &mut PrimitiveStore,
-    prim_list: &mut PrimitiveList,
     pic_context: &PictureContext,
     pic_state: &mut PictureState,
     frame_context: &FrameBuildingContext,
@@ -167,97 +162,89 @@ fn prepare_primitives(
     let mut quad_transform = QuadTransformState::new();
     let mut quad_clips = QuadClipStack::new();
 
-    for cluster in &mut prim_list.clusters {
-        if !cluster.flags.contains(ClusterFlags::IS_VISIBLE) {
-            continue;
-        }
-        tracy_rs::profile_scope!("cluster");
-        frame_state.num_visited_primitives += cluster.prim_range().len() as u32;
+    let device_pixel_scale = frame_state.surfaces[pic_context.surface_index.0].device_pixel_scale;
 
-        pic_state.map_local_to_pic.set_target_spatial_node(
-            cluster.spatial_node_index,
-            frame_context.spatial_tree,
-        );
+    let draw_range = scratch.frame.picture_draw_range(pic_context.pic_index);
+    frame_state.num_visited_primitives += draw_range.len() as u32;
 
-        let device_pixel_scale = frame_state.surfaces[pic_context.surface_index.0].device_pixel_scale;
+    for position in draw_range {
+        let draw_index = scratch.frame.picture_draw(position);
+        let draw = scratch.frame.draw(draw_index);
+        let prim_instance_index = draw.prim_instance_index.0 as usize;
+        let spatial_node_index = draw.spatial_node_index;
+
         quad_transform.set(
-            cluster.spatial_node_index,
+            spatial_node_index,
             pic_context.raster_spatial_node_index,
             frame_context.spatial_tree,
             device_pixel_scale,
         );
 
-        for prim_instance_index in cluster.prim_range() {
-            // Primitives the visibility pass culled have no draw at all.
-            let Some(draw_index) = scratch
-                .frame
-                .draw_index_for_instance(PrimitiveInstanceIndex(prim_instance_index as u32))
-            else {
-                continue;
-            };
+        if frame_state.surface_builder.get_cmd_buffer_targets_for_prim(
+            draw,
+            &mut cmd_buffer_targets,
+        ) {
+            let plane_split_anchor = PlaneSplitAnchor::new(
+                spatial_node_index,
+                draw_index,
+            );
 
-            if frame_state.surface_builder.get_cmd_buffer_targets_for_prim(
-                scratch.frame.draw(draw_index),
-                &mut cmd_buffer_targets,
-            ) {
-                let plane_split_anchor = PlaneSplitAnchor::new(
-                    cluster.spatial_node_index,
-                    draw_index,
-                );
+            prepare_prim_for_render(
+                store,
+                prim_instance_index,
+                draw_index,
+                spatial_node_index,
+                &mut quad_transform,
+                &mut quad_clips,
+                pic_context,
+                pic_state,
+                frame_context,
+                frame_state,
+                plane_split_anchor,
+                data_stores,
+                scratch,
+                tile_caches,
+                prim_instances,
+                &cmd_buffer_targets,
+            );
 
-                prepare_prim_for_render(
-                    store,
-                    prim_instance_index,
-                    draw_index,
-                    cluster,
-                    &mut quad_transform,
-                    &mut quad_clips,
-                    pic_context,
-                    pic_state,
-                    frame_context,
-                    frame_state,
-                    plane_split_anchor,
-                    data_stores,
-                    scratch,
-                    tile_caches,
-                    prim_instances,
-                    &cmd_buffer_targets,
-                );
-
-                frame_state.num_visible_primitives += 1;
-                frame_state.num_cmd_targets += cmd_buffer_targets.len() as u32;
-                continue;
-            }
-
-            // A draw that reached no command buffer is simply never referenced
-            // by one, so there is nothing to clear here.
+            frame_state.num_visible_primitives += 1;
+            frame_state.num_cmd_targets += cmd_buffer_targets.len() as u32;
         }
+
+        // A draw that reached no command buffer is simply never referenced
+        // by one, so there is nothing to clear here.
     }
 }
 
 /// Returns the texture sampler kind used by a YUV image's planes, which selects
-/// the matching ps_quad_yuv shader variant. All planes are expected to share the
-/// same kind. Texture-cache backed images (raw/blob/buffer) are always Texture2D.
+/// the matching ps_quad_yuv shader variant. Texture-cache backed images
+/// (raw/blob/buffer) are always Texture2D. Returns None if the planes do not all
+/// share the same kind: every plane is sampled through the one sampler type of
+/// the selected shader variant, so such an image cannot be drawn.
 fn yuv_planes_sampler_kind(
     yuv_image_data: &crate::prim_store::image::YuvImageData,
     resource_cache: &crate::resource_cache::ResourceCache,
-) -> ImageBufferKind {
+) -> Option<ImageBufferKind> {
     let plane_count = yuv_image_data.format.get_plane_num();
+    let mut sampler_kind = None;
     for key in &yuv_image_data.yuv_key[.. plane_count] {
-        if let Some(ExternalImageData { image_type: ExternalImageType::TextureHandle(kind), .. }) =
-            resource_cache.get_image_properties(*key).and_then(|props| props.external_image)
-        {
-            return kind;
+        let kind = match resource_cache.get_image_properties(*key).and_then(|props| props.external_image) {
+            Some(ExternalImageData { image_type: ExternalImageType::TextureHandle(kind), .. }) => kind,
+            _ => ImageBufferKind::Texture2D,
+        };
+        if *sampler_kind.get_or_insert(kind) != kind {
+            return None;
         }
     }
-    ImageBufferKind::Texture2D
+    sampler_kind
 }
 
 fn prepare_prim_for_render(
     store: &mut PrimitiveStore,
     prim_instance_index: usize,
     draw_index: PrimitiveDrawIndex,
-    cluster: &mut PrimitiveCluster,
+    prim_spatial_node_index: SpatialNodeIndex,
     mut quad_transform: &mut QuadTransformState,
     quad_clips: &mut QuadClipStack,
     pic_context: &PictureContext,
@@ -318,7 +305,7 @@ fn prepare_prim_for_render(
             let local_rect = scratch.frame.draw(draw_index).clip_chain.local_coverage_rect;
             let world_rect = frame_context
                 .spatial_tree
-                .get_world_transform(cluster.spatial_node_index)
+                .get_world_transform(prim_spatial_node_index)
                 .into_transform()
                 .outer_transformed_box2d(&local_rect);
 
@@ -384,7 +371,7 @@ fn prepare_prim_for_render(
             if !update_clip_task(
                 draw_index,
                 prim_rect,
-                cluster.spatial_node_index,
+                prim_spatial_node_index,
                 pic_context.raster_spatial_node_index,
                 pic_context,
                 frame_context,
@@ -397,7 +384,6 @@ fn prepare_prim_for_render(
         }
     }
 
-    let prim_spatial_node_index = cluster.spatial_node_index;
     let device_pixel_scale = frame_state.surfaces[pic_context.surface_index.0].device_pixel_scale;
     // Snapshot of the per-frame draw header for this prim. Copy is fine here
     // because the only field this function writes (clip_task_index, in the
@@ -553,6 +539,7 @@ fn prepare_prim_for_render(
                 &transform.to_transform().with_destination::<_>(),
                 surface,
                 prim_spatial_node_index,
+                pic_context.shadow_offset,
                 allow_subpixel,
                 frame_context.fb_config.low_quality_pinch_zoom,
                 frame_state.resource_cache,
@@ -579,6 +566,7 @@ fn prepare_prim_for_render(
                 },
                 quad_clips,
                 quad_transform,
+                !prim_data.common.flags.contains(PrimitiveFlags::ANTIALISED),
                 frame_context,
                 targets,
                 frame_state,
@@ -679,6 +667,11 @@ fn prepare_prim_for_render(
                 return;
             }
 
+            let sampler_kind = match yuv_planes_sampler_kind(yuv_image_data, frame_state.resource_cache) {
+                Some(sampler_kind) => sampler_kind,
+                None => return,
+            };
+
             // Non-composited: draw the YUV image directly through the quad path.
             let planes = yuv_image_data.update(
                 prim_info.compositor_surface_kind.is_composited(),
@@ -690,7 +683,7 @@ fn prepare_prim_for_render(
                 format: yuv_image_data.format,
                 color_space: yuv_image_data.color_space.with_range(yuv_image_data.color_range),
                 channel_bit_depth: yuv_image_data.color_depth.bit_depth(),
-                sampler_kind: yuv_planes_sampler_kind(yuv_image_data, frame_state.resource_cache),
+                sampler_kind,
             };
 
             quad::prepare_quad(
@@ -830,6 +823,7 @@ fn prepare_prim_for_render(
                         let pattern = LinearGradientSegmentPattern {
                             start: seg_start,
                             end: seg_end,
+                            alpha_mode: prim_data.alpha_mode,
                             stops: seg_stops,
                         };
                         quad::prepare_quad(
@@ -837,8 +831,8 @@ fn prepare_prim_for_render(
                             &QuadDescriptor {
                                 pattern_rect: *seg_rect,
                                 bounds: *seg_rect,
-                                aligned_aa_edges: EdgeMask::empty(),
-                                transformed_aa_edges: edge_aa_mask,
+                                aligned_aa_edges: prim_data.common.aligned_aa_edges & edge_aa_mask,
+                                transformed_aa_edges: prim_data.common.transformed_aa_edges & edge_aa_mask,
                             },
                             &None,
                             quad_clips,
@@ -1351,6 +1345,7 @@ fn adjust_mask_scale_for_max_size(device_rect: DeviceIntRect, device_pixel_scale
 struct LinearGradientSegmentPattern {
     start: LayoutVector2D,
     end: LayoutVector2D,
+    alpha_mode: AlphaMode,
     stops: [GradientStop; 2],
 }
 
@@ -1364,6 +1359,7 @@ impl PatternBuilder for LinearGradientSegmentPattern {
             pattern_rect.min + self.start,
             pattern_rect.min + self.end,
             ExtendMode::Clamp,
+            self.alpha_mode,
             &self.stops,
             state.frame_gpu_data,
         )

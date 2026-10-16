@@ -9,7 +9,7 @@ import { INITIAL_STATE, reducers } from "common/Reducers.sys.mjs";
 import { WIDGET_REGISTRY } from "common/WidgetsRegistry.mjs";
 import { WidgetsManagementPanel } from "content-src/components/Nova/CustomizeMenu/WidgetsManagementPanel/WidgetsManagementPanel";
 
-// The nine active widgets in registry order, kept as literals so a renamed
+// The active widgets in registry order, kept as literals so a renamed
 // string, id or telemetry source fails here. The rendered order is pinned by
 // EN_US_ORDER and the other order constants below.
 const WIDGETS = [
@@ -85,6 +85,22 @@ const WIDGETS = [
     preference: "widgets.recentSearches.enabled",
     widgetSize: "medium",
   },
+  {
+    id: "horoscopes",
+    l10nId: "newtab-custom-widget-horoscopes-toggle",
+    source: "WIDGET_HOROSCOPES",
+    widget_name: "horoscopes",
+    preference: "widgets.horoscopes.enabled",
+    widgetSize: "medium",
+  },
+  {
+    id: "travel",
+    l10nId: "newtab-custom-widget-travel-toggle",
+    source: "WIDGET_TRAVEL",
+    widget_name: "travel",
+    preference: "widgets.travel.enabled",
+    widgetSize: "medium",
+  },
 ];
 
 // The minimum entry the panel renders from; the registry helpers tolerate the
@@ -104,28 +120,32 @@ const FIXTURE_WIDGET = {
 const PANEL_LABELS = {
   "newtab-custom-widget-clock-toggle": "Clock",
   "newtab-custom-widget-crossword-toggle": "Crossword",
+  "newtab-custom-widget-horoscopes-toggle": "Horoscopes",
   "newtab-custom-widget-lists-toggle": "Lists",
   "newtab-custom-widget-picture-toggle": "Picture of the day",
   "newtab-custom-widget-privacy-toggle": "Privacy",
   "newtab-custom-widget-search-toggle": "Search",
   "newtab-custom-widget-stocks-toggle2": "Finance",
   "newtab-custom-widget-timer-toggle": "Timer",
+  "newtab-custom-widget-travel-toggle": "Travel",
   "newtab-custom-widget-weather-toggle": "Weather",
   "newtab-custom-widget-fixture-toggle": "Fixture widget",
 };
 
 // The German, Greek and Japanese labels are Firefox's own translations, apart
-// from the fixture widget's and the Japanese Search label. The Finance fixtures
-// reuse the Stocks translations as stand-ins until the renamed message is
-// translated.
+// from the fixture widget's, the Japanese Search label, and the Horoscopes and
+// Travel labels, which have no translations yet. The Finance fixtures reuse the Stocks
+// translations as stand-ins until the renamed message is translated.
 // Übersicht sorts before Uhr only under locale-aware collation; a code point
 // comparison would put it after Wetter.
 const GERMAN_PANEL_LABELS = {
   "newtab-custom-widget-stocks-toggle2": "Aktien",
   "newtab-custom-widget-picture-toggle": "Bild des Tages",
   "newtab-custom-widget-privacy-toggle": "Datenschutz",
+  "newtab-custom-widget-horoscopes-toggle": "Horoskope",
   "newtab-custom-widget-crossword-toggle": "Kreuzworträtsel",
   "newtab-custom-widget-lists-toggle": "Listen",
+  "newtab-custom-widget-travel-toggle": "Reisen",
   "newtab-custom-widget-search-toggle": "Suche",
   "newtab-custom-widget-timer-toggle": "Timer",
   "newtab-custom-widget-fixture-toggle": "Übersicht",
@@ -143,6 +163,8 @@ const GREEK_PANEL_LABELS = {
   "newtab-custom-widget-stocks-toggle2": "Μετοχές",
   "newtab-custom-widget-clock-toggle": "Ρολόι",
   "newtab-custom-widget-crossword-toggle": "Σταυρόλεξο",
+  "newtab-custom-widget-travel-toggle": "Ταξίδια",
+  "newtab-custom-widget-horoscopes-toggle": "Ωροσκόπια",
 };
 
 // Latin letters sort before kana and kana before kanji under the default
@@ -151,7 +173,9 @@ const JAPANESE_PANEL_LABELS = {
   "newtab-custom-widget-lists-toggle": "ToDo リスト",
   "newtab-custom-widget-crossword-toggle": "クロスワードパズル",
   "newtab-custom-widget-timer-toggle": "タイマー",
+  "newtab-custom-widget-travel-toggle": "トラベル",
   "newtab-custom-widget-privacy-toggle": "プライバシー",
+  "newtab-custom-widget-horoscopes-toggle": "ホロスコープ",
   "newtab-custom-widget-picture-toggle": "今日の一枚",
   "newtab-custom-widget-search-toggle": "最近の検索",
   "newtab-custom-widget-weather-toggle": "天気予報",
@@ -164,11 +188,13 @@ const EN_US_ORDER = [
   "clocks",
   "crossword",
   "stocks",
+  "horoscopes",
   "lists",
   "pictureOfTheDay",
   "privacy",
   "recentSearches",
   "focusTimer",
+  "travel",
   "weather",
 ];
 
@@ -178,11 +204,13 @@ const EN_US_ORDER_WITH_FIXTURE = [
   "crossword",
   "stocks",
   "fixtureWidget",
+  "horoscopes",
   "lists",
   "pictureOfTheDay",
   "privacy",
   "recentSearches",
   "focusTimer",
+  "travel",
   "weather",
 ];
 
@@ -190,8 +218,10 @@ const GERMAN_ORDER = [
   "stocks",
   "pictureOfTheDay",
   "privacy",
+  "horoscopes",
   "crossword",
   "lists",
+  "travel",
   "recentSearches",
   "focusTimer",
   "fixtureWidget",
@@ -209,13 +239,17 @@ const GREEK_ORDER = [
   "stocks",
   "clocks",
   "crossword",
+  "travel",
+  "horoscopes",
 ];
 
 const JAPANESE_ORDER = [
   "lists",
   "crossword",
   "focusTimer",
+  "travel",
   "privacy",
+  "horoscopes",
   "pictureOfTheDay",
   "recentSearches",
   "weather",
@@ -230,10 +264,12 @@ const TIMER_ID_SORT_ORDER = [
   "crossword",
   "stocks",
   "focusTimer",
+  "horoscopes",
   "lists",
   "pictureOfTheDay",
   "privacy",
   "recentSearches",
+  "travel",
   "weather",
 ];
 
@@ -242,11 +278,13 @@ const ID_ORDER = [
   "clocks",
   "crossword",
   "focusTimer",
+  "horoscopes",
   "lists",
   "pictureOfTheDay",
   "privacy",
   "recentSearches",
   "stocks",
+  "travel",
   "weather",
 ];
 
@@ -275,9 +313,10 @@ describe("<WidgetsManagementPanel>", () => {
     return { ...prefs, ...extra };
   }
 
-  async function renderPanel(overrides = {}, prefValues = {}) {
+  async function renderPanel(overrides = {}, prefValues = {}, state = {}) {
     const store = createStore(combineReducers(reducers), {
       ...INITIAL_STATE,
+      ...state,
       Prefs: {
         ...INITIAL_STATE.Prefs,
         values: { ...INITIAL_STATE.Prefs.values, ...prefValues },
@@ -393,6 +432,20 @@ describe("<WidgetsManagementPanel>", () => {
       );
     });
 
+    it("disables the toggle of a widget whose pref is locked", async () => {
+      const { container } = await renderPanel(
+        {},
+        allWidgetsVisible({ lockedPrefs: ["widgets.lists.enabled"] })
+      );
+
+      expect(container.querySelector("#lists-toggle")).toHaveAttribute(
+        "disabled"
+      );
+      expect(container.querySelector("#clocks-toggle")).not.toHaveAttribute(
+        "disabled"
+      );
+    });
+
     it.each(WIDGETS)(
       "labels the $id toggle with $l10nId and points it at $preference",
       async ({ id, l10nId, preference }) => {
@@ -460,6 +513,45 @@ describe("<WidgetsManagementPanel>", () => {
       );
       expect(toggleIds(container)).toEqual(
         EN_US_ORDER_WITH_FIXTURE.map(id => `${id}-toggle`)
+      );
+    });
+
+    it("labels an extension widget's toggle with its extension's name", async () => {
+      withFixtureWidget({
+        extensionID: "fixture-widget@mozilla.org",
+        customizeL10nId: undefined,
+      });
+
+      const { container } = await renderPanel({}, allWidgetsVisible(), {
+        ExtensionWidgets: {
+          "fixture-widget@mozilla.org": { src: "", name: "Tally" },
+        },
+      });
+
+      expect(container.querySelector("#fixtureWidget-toggle")).toHaveAttribute(
+        "label",
+        "Tally"
+      );
+    });
+
+    it("labels an extension widget's toggle with its extension's Fluent id", async () => {
+      const fixture = withFixtureWidget({
+        extensionID: "fixture-widget@mozilla.org",
+      });
+      delete fixture.customizeL10nId;
+
+      const { container } = await renderPanel({}, allWidgetsVisible(), {
+        ExtensionWidgets: {
+          "fixture-widget@mozilla.org": {
+            src: "",
+            customizeL10nId: "fixture-widget-name",
+          },
+        },
+      });
+
+      expect(container.querySelector("#fixtureWidget-toggle")).toHaveAttribute(
+        "data-l10n-id",
+        "fixture-widget-name"
       );
     });
 
@@ -569,9 +661,11 @@ describe("<WidgetsManagementPanel>", () => {
       const { container } = await renderPanel({}, prefs);
 
       expect(toggleIds(container)).toEqual([
+        "horoscopes-toggle",
         "pictureOfTheDay-toggle",
         "recentSearches-toggle",
         "focusTimer-toggle",
+        "travel-toggle",
         "weather-toggle",
       ]);
     });

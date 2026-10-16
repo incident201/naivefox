@@ -2151,11 +2151,18 @@ void DrawTargetSkia::PushClipRect(const Rect& aRect) {
 }
 
 void DrawTargetSkia::PopClip() {
+  if (!mPushedLayers.empty() &&
+      mCanvas->getSaveCount() <= mPushedLayers.back().mSaveCount) {
+    return;
+  }
   mCanvas->restore();
   SetTransform(GetTransform());
 }
 
 bool DrawTargetSkia::RemoveAllClips() {
+  if (!mPushedLayers.empty()) {
+    return false;
+  }
   mCanvas->restoreToCount(1);
   SetTransform(GetTransform());
   return true;
@@ -2272,6 +2279,7 @@ void DrawTargetSkia::PushLayerWithBlend(bool aOpaque, Float aOpacity,
           (aCopyBackground ? SkCanvas::kInitWithPrevious_SaveLayerFlag : 0));
 
   mCanvas->saveLayer(saveRec);
+  mPushedLayers.back().mSaveCount = mCanvas->getSaveCount();
 
   SetPermitSubpixelAA(aOpaque);
 
@@ -2307,6 +2315,10 @@ void DrawTargetSkia::PopLayer() {
     }
   }
 
+  // Remove any unbalanced saves before the layer restore.
+  if (mCanvas->getSaveCount() > layer.mSaveCount) {
+    mCanvas->restoreToCount(layer.mSaveCount);
+  }
   // Restore the layer itself, and the clip we pushed for the mask bounds.
   mCanvas->restore();
   if (layer.mMask) {
@@ -2348,6 +2360,13 @@ void DrawTargetSkia::DetachAllSnapshots() {
   if (mSnapshot) {
     if (mSnapshot->hasOneRef()) {
       // No owners outside of this DrawTarget's own reference. Just dump it.
+      // Raster snapshot images borrow our pixels, which we're about to change,
+      // so nothing may hold on to them past the lock GetSkImageForSurface
+      // hands out either.
+      SkPixmap pixmap;
+      MOZ_DIAGNOSTIC_ASSERT(!mSnapshot->mImage || mSnapshot->mImage->unique() ||
+                                !mSnapshot->mImage->peekPixels(&pixmap),
+                            "Snapshot image outlived its lock");
       mSnapshot = nullptr;
       return;
     }

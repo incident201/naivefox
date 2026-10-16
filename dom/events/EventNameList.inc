@@ -362,9 +362,6 @@ DOCUMENT_ONLY_EVENT(visibilitychange, eVisibilityChange, EventNameType_XUL,
 NON_IDL_EVENT(MozMouseHittest, eMouseHitTest, EventNameType_None,
               eMouseEventClass)
 
-NON_IDL_EVENT(MozMouseExploreByTouch, eMouseExploreByTouch, EventNameType_None,
-              eMouseEventClass)
-
 NON_IDL_EVENT(DOMActivate, eLegacyDOMActivate, EventNameType_HTMLXUL,
               eUIEventClass)
 NON_IDL_EVENT(DOMFocusIn, eLegacyDOMFocusIn, EventNameType_HTMLXUL,

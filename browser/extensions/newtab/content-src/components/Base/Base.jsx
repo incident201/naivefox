@@ -315,6 +315,21 @@ export class BaseContent extends React.PureComponent {
         if (hash === "#customize-topics") {
           this.toggleSectionsMgmtPanel();
         }
+      } else if (hash === "#customize-widgets") {
+        const currentPrefs = this.props.Prefs.values;
+        // The widgets subpanel only exists with Nova and a visible widgets
+        // container. Opening it in any other state leaves the main view
+        // unscrollable, so open the main view, where the widget toggles are
+        // without Nova.
+        // @nova-cleanup(remove-conditional): Remove the novaEnabled check; keep the isWidgetsContainerVisible check and both branches
+        if (
+          currentPrefs[PREF_NOVA_ENABLED] &&
+          isWidgetsContainerVisible(currentPrefs)
+        ) {
+          this.openWidgetsPanel();
+        } else {
+          this.openCustomizationMenu();
+        }
       } else if (this.props.App.customizeMenuVisible) {
         this.closeCustomizationMenu();
       }

@@ -3191,23 +3191,29 @@ CodeOffset MacroAssembler::call(Label* label) {
 }
 
 CodeOffset MacroAssembler::callWithPatch() {
-  as_bl(JOffImm26(1 * sizeof(uint32_t)));
+  UseScratchRegisterScope temps(asMasm());
+  const Register scratch = temps.Acquire();
+  ma_call36(0, scratch);
   return CodeOffset(currentOffset());
 }
 
 void MacroAssembler::patchCall(uint32_t callerOffset, uint32_t calleeOffset) {
-  BufferOffset call(callerOffset - 1 * sizeof(uint32_t));
+  BufferOffset pcaddu18iOffset(callerOffset - 2 * sizeof(uint32_t));
+  BufferOffset jirlOffset(callerOffset - 1 * sizeof(uint32_t));
 
-  JOffImm26 offset = BufferOffset(calleeOffset).diffB<JOffImm26>(call);
-  if (!offset.isInvalid()) {
-    InstJump* bal = (InstJump*)editSrc(call);
-    bal->setJOffImm26(offset);
-  } else {
-    uint32_t u32Offset = callerOffset - 4 * sizeof(uint32_t);
-    uint32_t* u32 =
-        reinterpret_cast<uint32_t*>(editSrc(BufferOffset(u32Offset)));
-    *u32 = calleeOffset - callerOffset;
-  }
+  InstImm* const inst0 = reinterpret_cast<InstImm*>(editSrc(pcaddu18iOffset));
+  InstImm* const inst1 = reinterpret_cast<InstImm*>(editSrc(jirlOffset));
+  MOZ_ASSERT(inst0->extractBitField(31, 25) == ((uint32_t)op_pcaddu18i) >> 25);
+  MOZ_ASSERT(inst1->extractBitField(31, 26) == ((uint32_t)op_jirl) >> 26);
+
+  const Register scratch = Register::FromCode(inst0->extractRD());
+  MOZ_ASSERT(scratch == Register::FromCode(inst1->extractRJ()));
+
+  const int64_t offset = static_cast<int64_t>(calleeOffset) -
+                         static_cast<int64_t>(pcaddu18iOffset.getOffset());
+  const auto [si20, offs16] = SplitJump36Offset(offset);
+  *inst0 = InstImm(op_pcaddu18i, si20, scratch, false);
+  *inst1 = InstImm(op_jirl, BOffImm16(offs16), scratch, ra);
 }
 
 CodeOffset MacroAssembler::farJumpWithPatch() {

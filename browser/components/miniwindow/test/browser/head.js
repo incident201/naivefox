@@ -119,20 +119,6 @@ function removeTestTabs(urlPrefix = "https://example.com/") {
 }
 
 /**
- * Parse the x/y out of a CSS "translate(Xpx, Ypx)" transform. CSS serializes
- * translate(0px, 0px) down to translate(0px), so the second value is optional
- * and defaults to 0.
- *
- * @param {string} transform
- */
-function parseTranslate(transform) {
-  let m = /translate\(([-\d.]+)px(?:,\s*([-\d.]+)px)?\)/.exec(transform);
-  return m
-    ? { x: parseFloat(m[1]), y: m[2] !== undefined ? parseFloat(m[2]) : 0 }
-    : null;
-}
-
-/**
  * Pop the whole `tab` into a full-tab mini window and resolve to the mini
  * window once framed.
  *

@@ -4,6 +4,8 @@
 
 #include "WebTransport.h"
 
+#include <memory>
+
 #include "WebTransportBidirectionalStream.h"
 #include "mozilla/Assertions.h"
 #include "mozilla/RefPtr.h"
@@ -121,8 +123,8 @@ void WebTransport::NewBidirectionalStream(
   // IncomingBidirectionalStreams stream. Must be added to the ReceiveStreams
   // and SendStreams arrays
 
-  UniquePtr<BidirectionalPair> streams(
-      new BidirectionalPair(aIncoming, aOutgoing));
+  UniquePtr<BidirectionalPair> streams =
+      std::make_unique<BidirectionalPair>(aIncoming, aOutgoing);
   auto tuple = std::tuple<uint64_t, UniquePtr<BidirectionalPair>>(
       aStreamId, std::move(streams));
   mBidirectionalStreams.AppendElement(std::move(tuple));

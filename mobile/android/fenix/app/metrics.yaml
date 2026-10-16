@@ -8498,6 +8498,47 @@ collections:
       tags:
         - Collections
 
+collections_migration:
+  promo_impression:
+    type: event
+    description: |
+      The Collections to Tab Groups migration promo card was shown to the user.
+    extra_keys:
+      source:
+        description: |
+          Where the promo card was shown. Possible values are: `homepage` or
+          `tabs_tray`.
+        type: string
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2078663
+    data_reviews:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2078663
+    data_sensitivity:
+      - interaction
+    notification_emails:
+      - android-probes@mozilla.com
+    expires: 163
+    metadata:
+      tags:
+        - Collections
+  promo_click:
+    type: event
+    description: |
+      The user clicked the "View my tab groups" link on the Collections to Tab
+      Groups migration promo card on the homepage.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2078663
+    data_reviews:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2078663
+    data_sensitivity:
+      - interaction
+    notification_emails:
+      - android-probes@mozilla.com
+    expires: 163
+    metadata:
+      tags:
+        - Collections
+
 search_widget:
   new_tab_button:
     type: event
@@ -8666,6 +8707,9 @@ tracking_protection:
     notification_emails:
       - android-probes@mozilla.com
     expires: never
+    send_in_pings:
+      - events
+      - privacy-report-notification
     metadata:
       tags:
         - TrackingProtection
@@ -8683,6 +8727,9 @@ tracking_protection:
     notification_emails:
       - android-probes@mozilla.com
     expires: never
+    send_in_pings:
+      - events
+      - privacy-report-notification
     metadata:
       tags:
         - TrackingProtection
@@ -8702,11 +8749,15 @@ tracking_protection:
       - https://bugzilla.mozilla.org/show_bug.cgi?id=2065488
     data_reviews:
       - https://phabricator.services.mozilla.com/D323764
+      - https://phabricator.services.mozilla.com/D323768
     data_sensitivity:
       - technical
     notification_emails:
       - android-probes@mozilla.com
     expires: never
+    send_in_pings:
+      - events
+      - privacy-report-notification
     metadata:
       tags:
         - TrackingProtection
@@ -8723,6 +8774,81 @@ tracking_protection:
       - https://bugzilla.mozilla.org/show_bug.cgi?id=2065488
     data_reviews:
       - https://phabricator.services.mozilla.com/D323764
+    data_sensitivity:
+      - technical
+    notification_emails:
+      - android-probes@mozilla.com
+    expires: never
+    metadata:
+      tags:
+        - TrackingProtection
+  privacy_report_notification_worker_ran:
+    type: event
+    description: |
+      The background worker for the weekly privacy report notification ran.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2065488
+    data_reviews:
+      - https://phabricator.services.mozilla.com/D323768
+    data_sensitivity:
+      - technical
+    notification_emails:
+      - android-probes@mozilla.com
+    expires: never
+    send_in_pings:
+      - events
+      - privacy-report-notification
+    metadata:
+      tags:
+        - TrackingProtection
+  privacy_report_notification_worker_scheduled:
+    type: boolean
+    lifetime: user
+    description: |
+      Whether the worker for the weekly privacy report notification is currently scheduled.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2065488
+    data_reviews:
+      - https://phabricator.services.mozilla.com/D323768
+    data_sensitivity:
+      - technical
+    notification_emails:
+      - android-probes@mozilla.com
+    expires: never
+    metadata:
+      tags:
+        - TrackingProtection
+  privacy_report_notification_worker_run_count:
+    type: counter
+    lifetime: user
+    description: |
+      How many times the worker for the weekly privacy report notification has run
+      since it was first scheduled, including the runs that did not end in a notification.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2065488
+    data_reviews:
+      - https://phabricator.services.mozilla.com/D323768
+    data_sensitivity:
+      - technical
+    notification_emails:
+      - android-probes@mozilla.com
+    expires: never
+    send_in_pings:
+      - privacy-report-notification
+    metadata:
+      tags:
+        - TrackingProtection
+  privacy_report_notification_scheduled_at:
+    type: datetime
+    lifetime: user
+    time_unit: day
+    description: |
+      The most recent day on which the app confirmed that the worker for the weekly privacy
+      report notification is scheduled.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2065488
+    data_reviews:
+      - https://phabricator.services.mozilla.com/D323768
     data_sensitivity:
       - technical
     notification_emails:
@@ -9170,6 +9296,304 @@ media_state:
     metadata:
       tags:
         - Media
+
+listen_to_page:
+  play_pressed:
+    type: event
+    description: |
+      The user pressed the play button to start or resume.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2064878
+    data_reviews:
+      - https://phabricator.services.mozilla.com/D331404
+    data_sensitivity:
+      - interaction
+    notification_emails:
+      - android-probes@mozilla.com
+    expires: never
+  pause_pressed:
+    type: event
+    description: |
+      The user pressed the pause button.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2064878
+    data_reviews:
+      - https://phabricator.services.mozilla.com/D331404
+    data_sensitivity:
+      - interaction
+    notification_emails:
+      - android-probes@mozilla.com
+    expires: never
+  skip_back_pressed:
+    type: event
+    description: |
+      The user pressed the skip-back button to jump backward.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2064878
+    data_reviews:
+      - https://phabricator.services.mozilla.com/D331404
+    data_sensitivity:
+      - interaction
+    notification_emails:
+      - android-probes@mozilla.com
+    expires: never
+  skip_forward_pressed:
+    type: event
+    description: |
+      The user pressed the skip-forward button to jump forward.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2064878
+    data_reviews:
+      - https://phabricator.services.mozilla.com/D331404
+    data_sensitivity:
+      - interaction
+    notification_emails:
+      - android-probes@mozilla.com
+    expires: never
+  seek_performed:
+    type: event
+    description: |
+      The user dragged the progress bar to a different position.
+    extra_keys:
+      direction:
+        description: |
+          Whether the seek moved the position `forward` or `backward`.
+        type: string
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2064878
+    data_reviews:
+      - https://phabricator.services.mozilla.com/D331404
+    data_sensitivity:
+      - interaction
+    notification_emails:
+      - android-probes@mozilla.com
+    expires: never
+  voice_list_opened:
+    type: event
+    description: |
+      The user opened the voice list.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2064878
+    data_reviews:
+      - https://phabricator.services.mozilla.com/D331404
+    data_sensitivity:
+      - interaction
+    notification_emails:
+      - android-probes@mozilla.com
+    expires: never
+  voice_list_dismissed:
+    type: event
+    description: |
+      The user dismissed the voice list without picking a voice.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2064878
+    data_reviews:
+      - https://phabricator.services.mozilla.com/D331404
+    data_sensitivity:
+      - interaction
+    notification_emails:
+      - android-probes@mozilla.com
+    expires: never
+  voice_selected:
+    type: event
+    description: |
+      A voice was selected.
+    extra_keys:
+      is_default:
+        description: |
+          Whether the picked voice is the default voice.
+        type: boolean
+      source:
+        description: |
+          Source for the voice selection, either `user_selected` or `fallback`
+          (it was chosen automatically after the saved voice became unavailable).
+        type: string
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2064878
+    data_reviews:
+      - https://phabricator.services.mozilla.com/D331404
+    data_sensitivity:
+      - interaction
+    notification_emails:
+      - android-probes@mozilla.com
+    expires: never
+  speed_list_opened:
+    type: event
+    description: |
+      The user opened the playback speed list.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2064878
+    data_reviews:
+      - https://phabricator.services.mozilla.com/D331404
+    data_sensitivity:
+      - interaction
+    notification_emails:
+      - android-probes@mozilla.com
+    expires: never
+  speed_list_dismissed:
+    type: event
+    description: |
+      The user dismissed the playback speed list without picking a speed.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2064878
+    data_reviews:
+      - https://phabricator.services.mozilla.com/D331404
+    data_sensitivity:
+      - interaction
+    notification_emails:
+      - android-probes@mozilla.com
+    expires: never
+  speed_selected:
+    type: event
+    description: |
+      A playback speed was selected.
+    extra_keys:
+      speed:
+        description: |
+          The selected speed as a multiple of the normal reading speed.
+        type: string
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2064878
+    data_reviews:
+      - https://phabricator.services.mozilla.com/D331404
+    data_sensitivity:
+      - interaction
+    notification_emails:
+      - android-probes@mozilla.com
+    expires: never
+  requested:
+    type: event
+    description: |
+      The user requested to listen to the page.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2064878
+    data_reviews:
+      - https://phabricator.services.mozilla.com/D331404
+    data_sensitivity:
+      - interaction
+    notification_emails:
+      - android-probes@mozilla.com
+    expires: never
+  content_ready:
+    type: event
+    description: |
+      The page was extracted and is ready to read.
+    extra_keys:
+      language:
+        description: |
+          The BCP 47 language the page is read in.
+        type: string
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2064878
+    data_reviews:
+      - https://phabricator.services.mozilla.com/D331404
+    data_sensitivity:
+      - interaction
+    notification_emails:
+      - android-probes@mozilla.com
+    expires: never
+  playback_started:
+    type: event
+    description: |
+      Audio playback started.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2064878
+    data_reviews:
+      - https://phabricator.services.mozilla.com/D331404
+    data_sensitivity:
+      - interaction
+    notification_emails:
+      - android-probes@mozilla.com
+    expires: never
+  playback_ended:
+    type: event
+    description: |
+      Audio playback ended.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2064878
+    data_reviews:
+      - https://phabricator.services.mozilla.com/D331404
+    data_sensitivity:
+      - interaction
+    notification_emails:
+      - android-probes@mozilla.com
+    expires: never
+  stopped:
+    type: event
+    description: |
+      The listening session was stopped.
+    extra_keys:
+      source:
+        description: |
+          Session ended due to either the `close_button` or `tab_closed`
+          (the listened tab was closed or user navigated elsewhere).
+        type: string
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2064878
+    data_reviews:
+      - https://phabricator.services.mozilla.com/D331404
+    data_sensitivity:
+      - interaction
+    notification_emails:
+      - android-probes@mozilla.com
+    expires: never
+  no_offline_voice:
+    type: event
+    description: |
+      No offline voice is available for the page's language.
+    extra_keys:
+      language:
+        description: |
+          The BCP 47 language of the page.
+        type: string
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2064878
+    data_reviews:
+      - https://phabricator.services.mozilla.com/D331404
+    data_sensitivity:
+      - interaction
+    notification_emails:
+      - android-probes@mozilla.com
+    expires: never
+  content_unavailable:
+    type: event
+    description: |
+      The page had no readable content.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2064878
+    data_reviews:
+      - https://phabricator.services.mozilla.com/D331404
+    data_sensitivity:
+      - interaction
+    notification_emails:
+      - android-probes@mozilla.com
+    expires: never
+  synthesis_failed:
+    type: event
+    description: |
+      The speech engine failed to produce audio.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2064878
+    data_reviews:
+      - https://phabricator.services.mozilla.com/D331404
+    data_sensitivity:
+      - interaction
+    notification_emails:
+      - android-probes@mozilla.com
+    expires: never
+  playback_failed:
+    type: event
+    description: |
+      The player failed to read the page.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2064878
+    data_reviews:
+      - https://phabricator.services.mozilla.com/D331404
+    data_sensitivity:
+      - interaction
+    notification_emails:
+      - android-probes@mozilla.com
+    expires: never
 
 logins:
   password_detected:
@@ -16184,7 +16608,8 @@ toolbar:
           add_new_tab, add_new_tab_long_press, add_new_private_tab, tab_counter, tab_counter_long_press,
           menu, share, clear, refresh, stop, add_bookmark, edit_bookmark, security_indicator, qr_code,
           home, reader_mode, microphone, open_in_fenix, close, site_custom, search_engine_selector,
-          search_engine_selected, translate, summarize, lens, shortcut_long_press, shortcut_edit_clicked.
+          search_engine_selected, translate, summarize, lens, lens_qr, shortcut_long_press,
+          shortcut_edit_clicked.
         type: string
       extra:
         description: |
@@ -16204,9 +16629,11 @@ toolbar:
     bugs:
       - https://bugzilla.mozilla.org/show_bug.cgi?id=1971857
       - https://bugzilla.mozilla.org/show_bug.cgi?id=2043252
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2075000
     data_reviews:
       - https://phabricator.services.mozilla.com/D264134
       - https://phabricator.services.mozilla.com/D303181
+      - https://phabricator.services.mozilla.com/D328944
     data_sensitivity:
       - interaction
     notification_emails:
@@ -17326,7 +17753,72 @@ native_share_sheet:
     metadata:
       tags:
         - Sharing
-
+share_sheet:
+  share_file_resource_success:
+    type: event
+    description: |
+      Firefox showed the share sheet for a resource that required obtaining resource bytes to share.
+      Unsuccessful shares will be recorded in the share_file_resource_fail metric.
+    extra_keys:
+      share_type:
+        type: string
+        description: |
+          The way the bytes for the shared item was obtained. Possible values are: `direct` when the bytes
+          were already available (such as from the PDF viewer), `internet` when the bytes were
+          downloaded from a URL, and `local` when the bytes were available on device.
+      content_type:
+        type: string
+        description: |
+          The content type of the resource shared. Possible values are: `pdf` and `other`.
+      duration_ms:
+        type: quantity
+        description: |
+          The duration of time from when the resource began sharing until the share sheet was ready to appear.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2075336
+    data_reviews:
+      - https://phabricator.services.mozilla.com/D332123
+    notification_emails:
+      - android-probes@mozilla.com
+    data_sensitivity:
+      - technical
+    expires: never
+    metadata:
+      tags:
+        - Sharing
+  share_file_resource_fail:
+    type: event
+    description: |
+      Firefox could not show the share sheet for a resource that required obtaining resource bytes to share.
+    extra_keys:
+      share_type:
+        type: string
+        description: |
+          The way the bytes for the shared item was obtained. Possible values are: `direct` when the bytes
+          were already available (such as from the PDF viewer), `internet` when the bytes were
+          downloaded from a URL, and `local` when the bytes were available on device.
+      content_type:
+        type: string
+        description: |
+          The content type of the resource shared. Possible values are: `pdf` and `other`.
+      failure_reason:
+        type: string
+        description: |
+          Why sharing did not complete. Possible reasons are: `timeout` when obtaining the bytes took longer
+          than allowed, `cancelled` when sharing was cancelled, and `error`
+          when sharing failed with an error.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2075336
+    data_reviews:
+      - https://phabricator.services.mozilla.com/D332123
+    notification_emails:
+      - android-probes@mozilla.com
+    data_sensitivity:
+      - technical
+    expires: never
+    metadata:
+      tags:
+        - Sharing
 pdf_viewer:
   download_tapped:
     type: event

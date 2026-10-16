@@ -2844,15 +2844,28 @@ static bool GenerateTrapExit(MacroAssembler& masm, Label* throwLabel,
   // Otherwise, the return value is the TrapData::resumePC we must jump to.
   // We must restore register state before jumping, which will clobber
   // ReturnReg, so store ReturnReg in the above-reserved stack slot which we
-  // use to jump to via ret.
+  // use to jump to below.
   masm.storePtr(ReturnReg, Address(masm.getStackPointer(), offsetOfReturnWord));
   masm.PopRegsInMask(RegsToPreserve);
 
-#ifdef JS_CODEGEN_ARM64
-  WasmPop(masm, lr);
-  masm.abiret();
-#else
+  // TrapData::resumePC is now at the top of the stack. We use an architecture
+  // specific mechanism to jump to the resume point while preserving the
+  // assumption that registers in the surrounding code are not clobbered:
+  // - On arm: ret() pops the target directly into PC.
+  // - On arm64, riscv64, mips64 and loong64: the link-register is clobbered to
+  // perform an indirect jump to the resume point.
+  // - On x86 and x64: the indirect jump directly uses the address on the stack.
+  // The resume point is responsible for cleaning up the stack slot.
+#if defined(JS_CODEGEN_ARM)
   masm.ret();
+#elif defined(JS_USE_LINK_REGISTER)
+  WasmPop(masm, LinkRegister);
+#  ifdef JS_CODEGEN_ARM64
+  masm.syncStackPtr();
+#  endif
+  masm.jump(LinkRegister);
+#else
+  masm.jump(Address(masm.getStackPointer(), 0));
 #endif
 
   return FinishOffsets(masm, offsets);
@@ -3030,12 +3043,31 @@ bool wasm::GenerateContBaseFrameStub(jit::MacroAssembler& masm,
     }
   }
 
-  wasm::CallSiteDesc callSite(CallSiteKind::FuncRef);
-  wasm::CalleeDesc callee = wasm::CalleeDesc::wasmFuncRef();
-  CodeOffset fastCallOffset;
-  CodeOffset slowCallOffset;
-  masm.wasmCallRef(callSite, callee, &fastCallOffset, &slowCallOffset, nullptr,
-                   nullptr);
+  // InstanceReg, the pinned registers and the realm already belong to the
+  // funcref's instance (see ContStack::prepare), so call it directly. Nothing
+  // below uses the instance after the call, so the call is marked slow without
+  // restoring it: a cross-instance return_call from the callee then collapses
+  // its frame without a hidden return_call trampoline frame.
+#  ifdef DEBUG
+  Label sameInstance;
+  masm.branchPtr(
+      Assembler::Equal,
+      Address(WasmCallRefReg, FunctionExtended::offsetOfExtendedSlot(
+                                  FunctionExtended::WASM_INSTANCE_SLOT)),
+      InstanceReg, &sameInstance);
+  masm.breakpoint();
+  masm.bind(&sameInstance);
+#  endif
+  masm.storePtr(InstanceReg, Address(masm.getStackPointer(),
+                                     WasmCallerInstanceOffsetBeforeCall));
+  masm.storePtr(InstanceReg, Address(masm.getStackPointer(),
+                                     WasmCalleeInstanceOffsetBeforeCall));
+  masm.loadPtr(Address(WasmCallRefReg,
+                       FunctionExtended::offsetOfExtendedSlot(
+                           FunctionExtended::WASM_FUNC_UNCHECKED_ENTRY_SLOT)),
+               WasmCallRefCallScratchReg0);
+  masm.wasmMarkedSlowCall(wasm::CallSiteDesc(CallSiteKind::FuncRef),
+                          WasmCallRefCallScratchReg0);
 
   // The current stack pointer might not match the one before the call if the
   // callee performed a tail call, so recover it from FP before reading the
@@ -3703,73 +3735,6 @@ bool wasm::GenerateProvisionalLazyJitEntryStub(MacroAssembler& masm,
   masm.SetStackPointer64(sp);
 #endif
 
-  return FinishOffsets(masm, offsets);
-}
-
-// Generates the trampoline that a cross-instance return_call returns through
-// when the caller's call site does not restore the instance and realm; see
-// CollapseWasmFrameSlow. It restores them and returns to the caller through the
-// hidden frame. ret() is the offset right after FP is restored.
-//
-// The hidden frame is a FrameWithInstances whose wasm::Frame and instance
-// fields are each padded to WasmStackAlignment. Its callee instance slot holds
-// the caller's instance.
-bool wasm::GenerateReturnCallTrampoline(MacroAssembler& masm,
-                                        CallableOffsets* offsets) {
-  AutoCreatedBy acb(masm, "GenerateReturnCallTrampoline");
-
-  uint32_t savedPushed = masm.framePushed();
-
-  offsets->begin = masm.currentOffset();
-
-  {
-#if defined(JS_CODEGEN_ARM) || defined(JS_CODEGEN_ARM64) || \
-    defined(JS_CODEGEN_RISCV64)
-    AutoForbidPoolsAndNops afp(&masm, 1);
-#endif
-    masm.setFramePushed(
-        AlignBytes(FrameWithInstances::sizeOfInstanceFieldsAndShadowStack(),
-                   WasmStackAlignment));
-    masm.wasmMarkCallAsSlow();
-  }
-
-  masm.loadPtr(
-      Address(masm.getStackPointer(), WasmCallerInstanceOffsetBeforeCall),
-      InstanceReg);
-  masm.loadWasmPinnedRegsFromInstance();
-  masm.switchToWasmInstanceRealm(ABINonArgReturnReg0, ABINonArgReturnReg1);
-  masm.moveToStackPtr(FramePointer);
-
-#ifdef JS_CODEGEN_ARM64
-  masm.pop(FramePointer, lr);
-  offsets->ret = masm.currentOffset();
-  masm.Mov(PseudoStackPointer64, vixl::sp);
-  masm.abiret();
-#elif defined(JS_CODEGEN_MIPS64) || defined(JS_CODEGEN_LOONG64)
-  masm.loadPtr(Address(FramePointer, Frame::returnAddressOffset()), ra);
-  masm.loadPtr(Address(FramePointer, Frame::callerFPOffset()), FramePointer);
-  offsets->ret = masm.currentOffset();
-  masm.addToStackPtr(Imm32(sizeof(Frame)));
-  masm.abiret();
-#elif defined(JS_CODEGEN_RISCV64)
-  {
-    // This should be 4 instructions, but make room for 5 (25% slack) to be
-    // safe.
-    AutoForbidPoolsAndNops afp(&masm, 5);
-
-    masm.loadPtr(Address(FramePointer, Frame::returnAddressOffset()), ra);
-    masm.loadPtr(Address(FramePointer, Frame::callerFPOffset()), FramePointer);
-    offsets->ret = masm.currentOffset();
-    masm.addToStackPtr(Imm32(sizeof(Frame)));
-    masm.abiret();
-  }
-#else
-  masm.pop(FramePointer);
-  offsets->ret = masm.currentOffset();
-  masm.ret();
-#endif
-
-  masm.setFramePushed(savedPushed);
   return FinishOffsets(masm, offsets);
 }
 

@@ -19,6 +19,16 @@ const { MockRegistrar } = ChromeUtils.importESModule(
   "resource://testing-common/MockRegistrar.sys.mjs"
 );
 
+const { PAGE_SETTLE_DELAY_MS, setPageSettleDelayForTesting } =
+  ChromeUtils.importESModule(
+    "moz-src:///browser/components/aiwindow/models/agents/Monitor.sys.mjs"
+  );
+
+setPageSettleDelayForTesting(0);
+registerCleanupFunction(() =>
+  setPageSettleDelayForTesting(PAGE_SETTLE_DELAY_MS)
+);
+
 /**
  * Start an HTTP server that serves HTML content.
  *

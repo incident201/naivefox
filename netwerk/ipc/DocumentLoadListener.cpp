@@ -576,7 +576,8 @@ WindowGlobalParent* DocumentLoadListener::GetParentWindowContext() const {
   return mParentWindowContext;
 }
 
-void DocumentLoadListener::TryActivateFromPrefetch(nsIURI* aURI) {
+RefPtr<dom::PrefetchMatchPromise> DocumentLoadListener::TryActivateFromPrefetch(
+    nsIURI* aURI) {
   // Approximates "create navigation params from a prefetch record" by
   // reusing the prefetch's HTTP cache entry instead of literally
   // reconstructing navigation params from record's stored response (the
@@ -592,25 +593,27 @@ void DocumentLoadListener::TryActivateFromPrefetch(nsIURI* aURI) {
   // site TryActivateFromPrefetch needs.
   auto* documentContext = GetDocumentBrowsingContext();
   if (!documentContext) {
-    return;
+    return nullptr;
   }
 
   // source WGP = the document that currently occupies the BC being navigated.
   // For browser-initiated navigation (address bar), this is null.
   auto* sourceWGP = documentContext->GetCurrentWindowGlobal();
   if (!sourceWGP) {
-    return;
+    return nullptr;
   }
 
-  dom::PrefetchRecordParent* rec = sourceWGP->FindMatchingPrefetchRecord(aURI);
-  if (!rec) {
-    return;
+  if (dom::PrefetchRecordParent* rec =
+          sourceWGP->FindMatchingPrefetchRecord(aURI)) {
+    ActivateFromPrefetch(rec);
+    return nullptr;
   }
+  return sourceWGP->WaitForMatchingPrefetchRecord(aURI);
+}
 
-  LOG_SPECRULES(
-      ("DocumentLoadListener::TryActivateFromPrefetch: [%p] found rec=%p "
-       "for url=%s",
-       this, rec, aURI->GetSpecOrDefault().get()));
+void DocumentLoadListener::ActivateFromPrefetch(
+    dom::PrefetchRecordParent* aRec) {
+  auto* sourceWGP = static_cast<WindowGlobalParent*>(aRec->Manager());
 
   // "Copy prefetch cookies": copy cookies from the isolated partition to the
   // destination partition.
@@ -618,7 +621,7 @@ void DocumentLoadListener::TryActivateFromPrefetch(nsIURI* aURI) {
   // https://wicg.github.io/nav-speculation/prefetch.html#copy-prefetch-cookies
   // No-op for same-origin (M1): isolated key == document partition.
   net::CopyPrefetchCookies(
-      rec->IsolatedPartitionKey(),
+      aRec->IsolatedPartitionKey(),
       sourceWGP->DocumentPrincipal()->OriginAttributesRef());
 
   if (mTiming) {
@@ -629,9 +632,48 @@ void DocumentLoadListener::TryActivateFromPrefetch(nsIURI* aURI) {
   loadInfo->SetActivatedFromNavigationalPrefetch(true);
 
   LOG_SPECRULES(
-      ("DocumentLoadListener::TryActivateFromPrefetch: [%p] activated from "
+      ("DocumentLoadListener::ActivateFromPrefetch: [%p] activated from "
        "prefetch cache for rec=%p",
-       this, rec));
+       this, aRec));
+}
+
+void DocumentLoadListener::AsyncOpenAfterPrefetchWait(
+    dom::PrefetchMatchPromise* aPromise, nsIStreamListener* aListener) {
+  LOG_SPECRULES(
+      ("DocumentLoadListener::AsyncOpenAfterPrefetchWait: [%p] delaying "
+       "AsyncOpen for an in-flight prefetch",
+       this));
+  RefPtr<DocumentLoadListener> self = this;
+  nsCOMPtr<nsIStreamListener> listener = aListener;
+  aPromise->Then(
+      GetCurrentSerialEventTarget(), __func__,
+      [self, listener](
+          const dom::PrefetchMatchPromise::ResolveOrRejectValue& aValue) {
+        // Cancelled while waiting. The channel never opens, so break the
+        // ParentChannelListener cycle here instead of in OnStopRequest.
+        if (self->mOpenPromiseResolved) {
+          self->mParentChannelListener = nullptr;
+          return;
+        }
+        dom::PrefetchRecordParent* rec =
+            aValue.IsResolve() ? aValue.ResolveValue().get() : nullptr;
+        LOG_SPECRULES(
+            ("DocumentLoadListener::AsyncOpenAfterPrefetchWait: [%p] wait "
+             "over, rec=%p",
+             self.get(), rec));
+        if (rec) {
+          self->ActivateFromPrefetch(rec);
+        }
+        nsresult rv = self->mChannel->AsyncOpen(listener);
+        if (NS_FAILED(rv)) {
+          LOG(
+              ("DocumentLoadListener::AsyncOpenAfterPrefetchWait failed "
+               "AsyncOpen [this=%p rv=%" PRIx32 "]",
+               self.get(), static_cast<uint32_t>(rv)));
+          self->DisconnectListeners(rv, rv);
+          self->mParentChannelListener = nullptr;
+        }
+      });
 }
 
 bool CheckRecursiveLoad(CanonicalBrowsingContext* aLoadingContext,
@@ -1116,14 +1158,20 @@ auto DocumentLoadListener::Open(nsDocShellLoadState* aLoadState,
   // Set before TryActivateFromPrefetch, which flags the activation on it.
   mTiming = aTiming;
 
-  // Check for a matching completed speculation rules prefetch; see
-  // TryActivateFromPrefetch. Only for document (navigational) loads; skipped
-  // for <object>/<embed>. Runs on all platforms before AsyncOpen.
-  if (mIsDocumentLoad) {
+  // Activate from, or wait for, a matching speculation rules prefetch; see
+  // TryActivateFromPrefetch. Per "create a navigation request" only top-level
+  // GET document loads qualify. Check the channel's method, since any post
+  // data has already moved from aLoadState onto the channel.
+  RefPtr<dom::PrefetchMatchPromise> prefetchPromise;
+  if (mIsDocumentLoad && documentContext && documentContext->IsTop()) {
+    nsCOMPtr<nsIHttpChannel> httpChannel = do_QueryInterface(mChannel);
+    nsAutoCString method;
     nsCOMPtr<nsIURI> channelURI;
-    if (NS_SUCCEEDED(mChannel->GetURI(getter_AddRefs(channelURI))) &&
+    if (httpChannel && NS_SUCCEEDED(httpChannel->GetRequestMethod(method)) &&
+        method.EqualsLiteral("GET") &&
+        NS_SUCCEEDED(mChannel->GetURI(getter_AddRefs(channelURI))) &&
         channelURI) {
-      TryActivateFromPrefetch(channelURI);
+      prefetchPromise = TryActivateFromPrefetch(channelURI);
     }
   }
 
@@ -1158,6 +1206,8 @@ auto DocumentLoadListener::Open(nsDocShellLoadState* aLoadState,
             if (handled) {
               self->DisconnectListeners(NS_ERROR_ABORT, NS_ERROR_ABORT);
               self->mParentChannelListener = nullptr;
+            } else if (prefetchPromise) {
+              self->AsyncOpenAfterPrefetchWait(prefetchPromise, openInfo);
             } else {
               nsresult rv = self->mChannel->AsyncOpen(openInfo);
               if (NS_FAILED(rv)) {
@@ -1170,16 +1220,20 @@ auto DocumentLoadListener::Open(nsDocShellLoadState* aLoadState,
   } else
 #endif /* ANDROID */
   {
-    *aRv = mChannel->AsyncOpen(openInfo);
-    if (NS_FAILED(*aRv)) {
-      LOG(("DocumentLoadListener::Open failed AsyncOpen [this=%p rv=%" PRIx32
-           "]",
-           this, static_cast<uint32_t>(*aRv)));
-      if (documentContext) {
-        documentContext->EndDocumentLoad(false);
+    if (prefetchPromise) {
+      AsyncOpenAfterPrefetchWait(prefetchPromise, openInfo);
+    } else {
+      *aRv = mChannel->AsyncOpen(openInfo);
+      if (NS_FAILED(*aRv)) {
+        LOG(("DocumentLoadListener::Open failed AsyncOpen [this=%p rv=%" PRIx32
+             "]",
+             this, static_cast<uint32_t>(*aRv)));
+        if (documentContext) {
+          documentContext->EndDocumentLoad(false);
+        }
+        mParentChannelListener = nullptr;
+        return nullptr;
       }
-      mParentChannelListener = nullptr;
-      return nullptr;
     }
   }
 
@@ -2244,7 +2298,7 @@ bool DocumentLoadListener::MaybeTriggerProcessSwitch(
 
   // Check if a process switch is needed.
   if (currentRemoteType == options.mRemoteType &&
-      !options.mReplaceBrowsingContext && !switchToNewTab) {
+      !options.mReplaceBrowsingContext) {
     MOZ_LOG(gProcessIsolationLog, LogLevel::Info,
             ("Process Switch Abort: type (%s) is compatible",
              options.mRemoteType.Stringify().get()));

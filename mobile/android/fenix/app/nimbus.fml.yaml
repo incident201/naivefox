@@ -693,7 +693,7 @@ features:
         description: >
           Whether or not to enable the universal edge-to-edge wallpaper treatment.
         type: Boolean
-        default: false
+        default: true
 
   homepage-hide-frecent-top-sites:
     description: Hides frecent top sites on the homepage.
@@ -852,6 +852,10 @@ features:
           Controls the network.android_doh.autoselect_enabled pref and automatically chooses a DoH provider when Default Protection mode is selected.
         type: Boolean
         default: false
+    defaults:
+      - channel: nightly
+        value:
+          autoselect-enabled: true
 
   private-browsing-lock:
     description: Allows enabling and disabling the private browsing mode lock via an authentication screen.
@@ -982,7 +986,7 @@ features:
         description: >
           Whether or not to block LNA requests
         type: Boolean
-        default: false
+        default: true
       block-trackers:
         description: >
           Whether or not to block trackers
@@ -992,7 +996,7 @@ features:
         description: >
           Whether or not to turn on local network / device access blocking
         type: Boolean
-        default: false
+        default: true
       block-insecure-contexts:
         description: >
           Whether or not LNA requests coming from insecure contexts should be
@@ -1097,29 +1101,6 @@ features:
       - channel: developer
         value:
           allowed-regions: ["XX"]
-
-  native-share-sheet:
-    description: Feature to enable the Native Share Sheet for users on Firefox on Android.
-    variables:
-      enabled:
-        description: If true, Native Share Sheet is enabled.
-        type: Boolean
-        default: true
-    defaults:
-      - channel: developer
-        value:
-          enabled: true
-      - channel: nightly
-        value:
-          enabled: true
-
-  add-shortcuts-improvement:
-    description: Feature to enable Add Shortcuts improvement for users on Firefox on Android.
-    variables:
-      enabled:
-        description: If true, Add Shortcuts improvement is enabled.
-        type: Boolean
-        default: true
 
   show-more-shortcuts:
     description: Feature to show expand/collapse buttons for shortcuts on the homepage.
@@ -1298,10 +1279,12 @@ features:
         default: false
 
   pairing-signin-prompt:
-    description: Controls the day 1 sign-in prompt for users who installed Firefox through a pairing link.
+    description: >
+      Controls the Sync sign-in card shown during initial onboarding to users who installed Firefox
+      through a pairing link.
     variables:
       enabled:
-        description: Whether the day 1 sign-in prompt can be shown.
+        description: Whether the Sync sign-in card can be shown during initial onboarding.
         type: Boolean
         default: false
       campaign-utm-content:
@@ -1345,6 +1328,16 @@ features:
       - channel: developer
         value:
           enabled: true
+
+  wayback-machine:
+    description: >
+      Feature that shows a "Check Archived Version" button on eligible error pages, linking to the
+      Wayback Machine.
+    variables:
+      enabled:
+        description: If true, the "Check Archived Version" button is shown on eligible error pages.
+        type: Boolean
+        default: false
 
 types:
   objects:

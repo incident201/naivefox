@@ -336,6 +336,10 @@ newtab-custom-widget-search-toggle =
   .label = Search
 newtab-custom-widget-horoscopes-toggle =
   .label = Horoscopes
+# Travel (noun) is a widget on New Tab for searching hotels, flights
+# and car rentals.
+newtab-custom-widget-travel-toggle =
+  .label = Travel
 newtab-custom-widget-section-title = Widgets
 newtab-custom-widget-section-toggle =
     .label = Widgets
@@ -1257,48 +1261,14 @@ home-prefs-stories-header2 =
 home-prefs-widgets-header =
     .label = Widgets
 
-# Lists is a widget on New Tab, similar to a to-do widget
-home-prefs-lists-header =
-    .label = Lists
-
-# Timer is a widget on New Tab, similar to the Pomodoro timer.
-home-prefs-timer-header =
-    .label = Timer
-
-# Clock is a widget on New Tab that displays time zones around the world.
-home-prefs-clocks-header =
-    .label = Clock
-
-# Privacy is a widget on New Tab that shows tracking protection activity.
-home-prefs-privacy-header =
-    .label = Privacy
-
-# Crossword is a widget on New Tab that shows a daily crossword puzzle.
-home-prefs-crossword-widget-header =
-    .label = Crossword
-
-# Finance is a widget on New Tab that shows stock ticker prices.
-home-prefs-stocks-header2 =
-    .label = Finance
-
-# Picture of the day is a widget on New Tab that shows a daily Wikimedia Commons image.
-home-prefs-picture-header =
-    .label = Picture of the day
-
-# Search is a widget on New Tab that shows the user's recent and trending
-# searches.
-home-prefs-search-widget-header =
-    .label = Search
-
-# Horoscopes is a widget on New Tab that shows daily horoscopes.
-home-prefs-horoscopes-header =
-    .label = Horoscopes
-
 home-prefs-mission-message2 =
     .message = Our sponsors support our mission to build a better web.
 
 home-prefs-manage-topics-link2 =
     .label = Manage topics
+
+home-prefs-manage-widgets-link =
+    .label = Manage widgets
 
 home-prefs-choose-wallpaper-link2 =
     .label = Choose a wallpaper
@@ -1783,12 +1753,29 @@ newtab-recent-searches-empty-trending = Trending searches are not available righ
 # Widget heading; also the widget's accessible name.
 newtab-horoscopes-widget-title = Horoscopes
 
-# Screen reader label for the widget's icon-only menu button.
-newtab-horoscopes-widget-menu-button =
-    .aria-label = Horoscopes options
+# Tooltip and screen reader label for the icon-only button that opens the
+# widget's menu.
+newtab-horoscopes-widget-open-menu-button =
+    .title = Open horoscopes menu
+    .aria-label = Open horoscopes menu
 
 # Context menu item linking to more information about the widget.
 newtab-horoscopes-menu-learn-more = Learn more
+
+## Strings for the Travel widget
+
+# Widget heading; also the widget's accessible name. Travel (noun) is a
+# widget on New Tab for searching hotels, flights and car rentals.
+newtab-travel-widget-title = Travel
+
+# Tooltip and screen reader label for the icon-only button that opens the
+# widget's menu.
+newtab-travel-widget-open-menu-button =
+    .title = Open travel menu
+    .aria-label = Open travel menu
+
+# Context menu item linking to more information about the widget.
+newtab-travel-menu-learn-more = Learn more
 
 ## Strings for the navigable panels that new tab content area can be
 ## split into.

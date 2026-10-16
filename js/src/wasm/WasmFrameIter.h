@@ -88,9 +88,6 @@ class WasmFrameIter {
   bool failedUnwindSignatureMismatch_ = false;
   // Whether the current frame is on a different stack from the previous stack.
   bool currentFrameStackSwitched_ = false;
-  // Whether reaching the current frame skipped the hidden frame of a
-  // cross-instance return_call. See GenerateReturnCallTrampoline.
-  bool skippedReturnCallTrampoline_ = false;
 #ifdef ENABLE_WASM_JSPI
   ContStack* contStack_ = nullptr;
   // A continuation stack that the trap occurred on but which has no frame in
@@ -206,12 +203,6 @@ class WasmFrameIter {
   bool currentFrameStackSwitched() const {
     MOZ_ASSERT(!done());
     return currentFrameStackSwitched_;
-  }
-
-  // Whether reaching the current frame skipped the hidden frame of a
-  // cross-instance return_call. See skippedReturnCallTrampoline_.
-  bool skippedReturnCallTrampoline() const {
-    return skippedReturnCallTrampoline_;
   }
 
 #ifdef ENABLE_WASM_JSPI

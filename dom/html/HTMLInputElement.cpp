@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <memory>
 
 #include "HTMLDataListElement.h"
 #include "HTMLFormSubmissionConstants.h"
@@ -1213,7 +1214,15 @@ void HTMLInputElement::FreeData(TextControlStateDisposition aStateDisposition) {
 void HTMLInputElement::EnsureEditorState() {
   MOZ_ASSERT(IsSingleLineTextControl(false));
   if (!mInputData.mState) {
-    mInputData.mState = TextControlState::Construct(this);
+    nsAutoString value;
+    GetAttr(nsGkAtoms::value, value);
+    // Skip sanitization before DoneCreatingElement; Clone() can call
+    // SetValueInternal (and thus EnsureEditorState) before mDoneCreating
+    // is true, and DoneCreatingElement will sanitize the value later.
+    if (mDoneCreating) {
+      SanitizeValue(value, SanitizationKind::ForValueGetter);
+    }
+    mInputData.mState = TextControlState::Construct(this, value);
   }
 }
 
@@ -1374,7 +1383,9 @@ void HTMLInputElement::AfterSetAttr(int32_t aNameSpaceID, nsAtom* aName,
       // is the default value. So if the elements value didn't change from the
       // default, we have to re-set it.
       if (!mValueChanged && GetValueMode() == VALUE_MODE_VALUE) {
-        SetDefaultValueAsValue();
+        if (mDoneCreating) {
+          SetDefaultValueAsValue();
+        }
       } else if (GetValueMode() == VALUE_MODE_DEFAULT) {
         ResetDirFormAssociatedElement(this, aNotify, HasDirAuto());
       }
@@ -1764,8 +1775,10 @@ void HTMLInputElement::GetNonFileValueInternal(nsAString& aValue) const {
         if (mInputData.mState) {
           mInputData.mState->GetValue(aValue, /* aForDisplay = */ false);
         } else {
-          // Value hasn't been set yet.
-          aValue.Truncate();
+          GetAttr(nsGkAtoms::value, aValue);
+          if (mDoneCreating) {
+            SanitizeValue(aValue, SanitizationKind::ForValueGetter);
+          }
         }
       } else if (!aValue.Assign(mInputData.mValue, fallible)) {
         aValue.Truncate();
@@ -4728,7 +4741,7 @@ void HTMLInputElement::HandleTypeChange(FormControlType aNewType,
   if (aNewType == FormControlType::InputFile ||
       oldType == FormControlType::InputFile) {
     if (aNewType == FormControlType::InputFile) {
-      mFileData.reset(new FileData());
+      mFileData = std::make_unique<FileData>();
     } else {
       mFileData->Unlink();
       mFileData = nullptr;
@@ -6394,16 +6407,26 @@ void HTMLInputElement::DoneCreatingElement() {
   // Sanitize the value and potentially set mFocusedValue.
   if (GetValueMode() == VALUE_MODE_VALUE) {
     nsAutoString value;
-    GetValue(value, CallerType::System);
-    // TODO: What should we do if SetValueInternal fails?  (The allocation
-    // may potentially be big, but most likely we've failed to allocate
-    // before the type change.)
-    SetValueInternal(value, ValueSetterOption::ByInternalAPI);
+    if (mValueChanged) {
+      GetValue(value, CallerType::System);
+      SetValueInternal(value, ValueSetterOption::ByInternalAPI);
+    } else {
+      GetDefaultValue(value);
+      if (mType == FormControlType::InputText && !mInputData.mState) {
+        SanitizeValue(value, SanitizationKind::ForValueSetter);
+        OnValueChanged(ValueChangeKind::Internal, value.IsEmpty(), &value);
+      } else {
+        // TODO: What should we do if SetValueInternal fails?  (The allocation
+        // may potentially be big, but most likely we've failed to allocate
+        // before the type change.)
+        SetValueInternal(value, ValueSetterOption::ByInternalAPI);
+      }
+    }
 
     if (CreatesDateTimeWidget()) {
       // mFocusedValue has to be set here, so that `FireChangeEventIfNeeded` can
       // fire a change event if necessary.
-      mFocusedValue = value;
+      GetValue(mFocusedValue, CallerType::System);
     }
   }
 

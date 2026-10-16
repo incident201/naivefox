@@ -434,14 +434,11 @@ struct JS_PUBLIC_API JSContext : public JS::RootingContext,
   js::gc::AtomRefRuntime& atomReferences() {
     return runtime_->gc.atomReferences;
   }
-  void recordRef(JSAtom* atom) { atomReferences().recordRef(this, atom); }
-  void recordRef(JS::Symbol* symbol) {
-    atomReferences().recordRef(this, symbol);
-  }
-  void recordRefToId(jsid id) { atomReferences().recordRefToId(this, id); }
-  void recordRefToValue(const js::Value& value) {
-    atomReferences().recordRefToValue(this, value);
-  }
+
+  void recordRef(JSAtom* atom);
+  bool wrapOrRecordRef(JS::MutableHandle<JS::Symbol*> symbol);
+  bool wrapOrRecordRefToId(JS::MutableHandle<jsid> id);
+  bool wrapOrRecordRefToValue(JS::MutableHandle<JS::Value> value);
 
   // Interface for recording telemetry metrics.
   js::Metrics metrics() { return js::Metrics(runtime_); }

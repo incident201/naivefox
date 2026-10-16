@@ -16,6 +16,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <memory>
 
 #include "AnchorPositioningUtils.h"
 #include "Attr.h"
@@ -42,6 +43,7 @@
 #include "mozAutoDocUpdate.h"
 #include "mozIDOMWindow.h"
 #include "mozIThirdPartyUtil.h"
+#include "mozilla/AntiTrackingOpenerHeuristics.h"
 #include "mozilla/AntiTrackingUtils.h"
 #include "mozilla/ArrayIterator.h"
 #include "mozilla/AsyncEventDispatcher.h"
@@ -6660,6 +6662,13 @@ nsresult Document::EditingStateChanged() {
   bool spellRecheckAll = false;
   bool putOffToRemoveScriptBlockerUntilModifyingEditingState = false;
 
+  if (makeWindowEditable && NS_WARN_IF(!IsHTMLOrXHTML())) {
+    // Don't allow editing on non-HTML/XHTML documents.
+    // Return NS_OK so that the setter of designMode on non-HTML documents
+    // does not fail.
+    return NS_OK;
+  }
+
   RefPtr<HTMLEditor> htmlEditor;
   {
     nsAutoEditingState push(this, EditingState::eSettingUp);
@@ -6728,14 +6737,8 @@ nsresult Document::EditingStateChanged() {
 
     // XXX Need to call TearDownEditorOnWindow for all failures.
     htmlEditor = docshell->GetHTMLEditor();
-    if (!htmlEditor) {
-      // Return NS_OK even though we've failed to create an editor here.  This
-      // is so that the setter of designMode on non-HTML documents does not
-      // fail.
-      // This is OK to do because in nsEditingSession::SetupEditorOnWindow() we
-      // would detect that we can't support the mimetype if appropriate and
-      // would fall onto the eEditorErrorCantEditMimeType path.
-      return NS_OK;
+    if (NS_WARN_IF(!htmlEditor)) {
+      return NS_ERROR_FAILURE;
     }
 
     if (collapseSelectionAtBeginningOfDocument) {
@@ -6758,19 +6761,6 @@ nsresult Document::EditingStateChanged() {
   }
 
   if (makeWindowEditable) {
-    // TODO: We should do this earlier in this method.
-    //       Previously, we called `ExecCommand` with `insertBrOnReturn` command
-    //       whose argument is false here.  Then, if it returns error, we
-    //       stopped making it editable.  However, after bug 1697078 fixed,
-    //       `ExecCommand` returns error only when the document is not XHTML's
-    //       nor HTML's.  Therefore, we use same error handling for now.
-    if (MOZ_UNLIKELY(NS_WARN_IF(!IsHTMLOrXHTML()))) {
-      // Editor setup failed. Editing is not on after all.
-      // XXX Should we reset the editable flag on nodes?
-      editSession->TearDownEditorOnWindow(window);
-      mEditingState = EditingState::eOff;
-      return NS_ERROR_DOM_INVALID_STATE_ERR;
-    }
     // Set the editor to not insert <br> elements on return when in <p> elements
     // by default.
     htmlEditor->SetReturnInParagraphCreatesNewParagraph(true);
@@ -11532,6 +11522,23 @@ nsViewportInfo Document::GetViewportInfo(const ScreenIntSize& aDisplaySize) {
   CSSToScreenScale defaultScale =
       layoutDeviceScale * LayoutDeviceToScreenScale(1.0);
 
+  if (HasViewportSizeOverrideForMiniWindow()) {
+    // Lay out at exactly the overridden size, ignoring any meta viewport. Start
+    // unzoomed; chrome sets the zoom it wants.
+    //
+    // Use a much lower minimum, or a window narrower than the content at
+    // minimum zoom makes the MobileViewportManager stop scaling the zoom with
+    // the window.
+    CSSToScreenScale minZoom =
+        layoutDeviceScale * LayoutDeviceToScreenScale(0.01f);
+    CSSToScreenScale maxZoom = layoutDeviceScale * ViewportMaxScale();
+    return nsViewportInfo(
+        defaultScale, minZoom, maxZoom, mViewportSizeOverrideForMiniWindow,
+        nsViewportInfo::AutoSizeFlag::FixedSize,
+        nsViewportInfo::AutoScaleFlag::FixedScale,
+        nsViewportInfo::ZoomFlag::AllowZoom, ViewportFitType::Auto);
+  }
+
   auto* bc = GetBrowsingContext();
   const bool inRDM = bc && bc->InRDMPane();
   const bool ignoreMetaTag = [&] {
@@ -11913,6 +11920,24 @@ static InteractiveWidget ParseInteractiveWidget(
     return InteractiveWidget::OverlaysContent;
   }
   return InteractiveWidgetUtils::DefaultInteractiveWidgetMode();
+}
+
+void Document::SetViewportSizeOverrideForMiniWindow(float aWidth,
+                                                    float aHeight) {
+  MOZ_ASSERT(IsTopLevelContentDocument(),
+             "Restricted to top-level content documents");
+  CSSSize size(aWidth, aHeight);
+  if (size == mViewportSizeOverrideForMiniWindow) {
+    return;
+  }
+  mViewportSizeOverrideForMiniWindow = size;
+
+  // Switch to (or back from) a MobileViewportManager that sizes layout from
+  // GetViewportInfo.
+  if (RefPtr<PresShell> presShell = GetPresShell()) {
+    presShell->MaybeRecreateMobileViewportManager(
+        PresShell::MobileViewportManagerUpdate::LayoutViewportSizeMayChange);
+  }
 }
 
 void Document::SetMetaViewportData(UniquePtr<ViewportMetaData> aData) {
@@ -15225,12 +15250,9 @@ already_AddRefed<nsDOMCaretPosition> Document::CaretPositionFromPoint(
     float aX, float aY, const CaretPositionFromPointOptions& aOptions) {
   using FrameForPointOption = nsLayoutUtils::FrameForPointOption;
 
-  nscoord x = nsPresContext::CSSPixelsToAppUnits(aX);
-  nscoord y = nsPresContext::CSSPixelsToAppUnits(aY);
-  nsPoint pt(x, y);
-
   FlushPendingNotifications(FlushType::Layout);
 
+  const nsPoint pt(CSSPixel::ToAppUnits(CSSPoint(aX, aY)));
   PresShell* presShell = GetPresShell();
   if (!presShell) {
     return nullptr;
@@ -15238,7 +15260,7 @@ already_AddRefed<nsDOMCaretPosition> Document::CaretPositionFromPoint(
 
   nsIFrame* rootFrame = presShell->GetRootFrame();
 
-  // XUL docs, unlike HTML, have no frame tree until everything's done loading
+  // XUL docs, unlike HTML, have no frame tree until everything's done loading.
   if (!rootFrame) {
     return nullptr;
   }
@@ -15278,8 +15300,11 @@ already_AddRefed<nsDOMCaretPosition> Document::CaretPositionFromPoint(
     // If the anonymous content node has a child, then we need to make sure
     // that we get the appropriate child, as otherwise the offset may not be
     // correct when we construct a range for it.
+    // TODO(emilio): The code here only works if `anonNode` is either the text
+    // or the editor root, should probably deal with other cases, or bail out...
     if (nsINode* firstChild = anonNode->GetFirstChild()) {
       anonNode = firstChild;
+      offset = offset == 0 ? 0 : firstChild->Length();
     }
     node = nonChrome;
   }
@@ -15347,12 +15372,7 @@ already_AddRefed<Range> Document::CaretRangeFromPoint(int32_t aX, int32_t aY) {
   return range.forget();
 }
 
-bool Document::IsPotentiallyScrollableImpl(HTMLBodyElement* aBody,
-                                           Flush aFlush) {
-  if (aFlush == Flush::Yes) {
-    FlushPendingNotifications(FlushType::Frames);
-  }
-
+bool Document::IsPotentiallyScrollableImpl(HTMLBodyElement* aBody) {
   // An element that is the HTML body element is potentially scrollable if all
   // of the following conditions are true:
 
@@ -15381,15 +15401,21 @@ Element* Document::GetScrollingElementImpl(Flush aFlush) {
   if (GetCompatibilityMode() != eCompatibility_NavQuirks) {
     return GetRootElement();
   }
+
+  if (aFlush == Flush::Yes) {
+    FlushPendingNotifications(FlushType::Frames);
+  }
+  // Get the body element after we flush to make sure it is up-to-date.
   RefPtr<HTMLBodyElement> body = GetBodyElement();
-  if (body && !IsPotentiallyScrollableImpl(body, aFlush)) {
+  if (body && !IsPotentiallyScrollableImpl(body)) {
     return body;
   }
   return nullptr;
 }
 
 bool Document::IsPotentiallyScrollable(HTMLBodyElement* aBody) {
-  return IsPotentiallyScrollableImpl(aBody, Flush::Yes);
+  FlushPendingNotifications(FlushType::Frames);
+  return IsPotentiallyScrollableImpl(aBody);
 }
 
 Element* Document::GetScrollingElement() {
@@ -18897,7 +18923,7 @@ void Document::NotifyLayerManagerRecreated() {
 
 XPathEvaluator* Document::XPathEvaluator() {
   if (!mXPathEvaluator) {
-    mXPathEvaluator.reset(new dom::XPathEvaluator(this));
+    mXPathEvaluator = std::make_unique<dom::XPathEvaluator>(this);
   }
   return mXPathEvaluator.get();
 }
@@ -19175,7 +19201,7 @@ void Document::SetUserHasInteracted() {
     wgc->SendUpdateDocumentHasUserInteracted(true);
   }
 
-  MaybeAllowStorageForOpenerAfterUserInteraction(hadPriorUserInteraction);
+  MaybeAllowStorageForOpenerAfterUserInteraction(this, hadPriorUserInteraction);
 }
 
 BrowsingContext* Document::GetBrowsingContext() const {
@@ -19350,104 +19376,6 @@ void Document::SetDocTreeHadMedia() {
   if (topWc && !topWc->IsDiscarded() && !topWc->GetDocTreeHadMedia()) {
     MOZ_ALWAYS_SUCCEEDS(topWc->SetDocTreeHadMedia(true));
   }
-}
-
-void Document::MaybeAllowStorageForOpenerAfterUserInteraction(
-    bool aHadPriorUserInteraction) {
-  if (!CookieJarSettings()->GetRejectThirdPartyContexts()) {
-    return;
-  }
-
-  // This will probably change for project fission, but currently this document
-  // and the opener are on the same process. In the future, we should make this
-  // part async.
-  nsPIDOMWindowInner* inner = GetInnerWindow();
-  if (NS_WARN_IF(!inner)) {
-    return;
-  }
-
-  // Don't trigger navigation heuristic for first-party trackers if the pref
-  // says so.
-  if (StaticPrefs::
-          privacy_restrict3rdpartystorage_heuristic_exclude_third_party_trackers() &&
-      nsContentUtils::IsFirstPartyTrackingResourceWindow(inner)) {
-    return;
-  }
-
-  auto* outer = nsGlobalWindowOuter::Cast(inner->GetOuterWindow());
-  if (NS_WARN_IF(!outer)) {
-    return;
-  }
-
-  RefPtr<BrowsingContext> openerBC = outer->GetOpenerBrowsingContext();
-  if (!openerBC) {
-    // No opener.
-    return;
-  }
-
-  // We want to ensure the following check works for both fission mode and
-  // non-fission mode:
-  // "If the opener is not a 3rd party and if this window is not a 3rd party
-  // with respect to the opener, we should not continue."
-  //
-  // In non-fission mode, the opener and the opened window are in the same
-  // process, we can use AntiTrackingUtils::IsThirdPartyWindow to do the check.
-  // In fission mode, if this window is not a 3rd party with respect to the
-  // opener, they must be in the same process, so we can still use
-  // IsThirdPartyWindow(openerInner) to continue to check if the opener is a 3rd
-  // party.
-  if (openerBC->IsInProcess()) {
-    nsCOMPtr<nsPIDOMWindowOuter> outerOpener = openerBC->GetDOMWindow();
-    if (NS_WARN_IF(!outerOpener)) {
-      return;
-    }
-
-    nsCOMPtr<nsPIDOMWindowInner> openerInner =
-        outerOpener->GetCurrentInnerWindow();
-    if (NS_WARN_IF(!openerInner)) {
-      return;
-    }
-
-    RefPtr<Document> openerDocument = openerInner->GetExtantDoc();
-    if (NS_WARN_IF(!openerDocument)) {
-      return;
-    }
-
-    nsCOMPtr<nsIURI> openerURI = openerDocument->GetDocumentURI();
-    if (NS_WARN_IF(!openerURI)) {
-      return;
-    }
-
-    // If the opener is not a 3rd party and if this window is not
-    // a 3rd party with respect to the opener, we should not continue.
-    if (!AntiTrackingUtils::IsThirdPartyWindow(inner, openerURI) &&
-        !AntiTrackingUtils::IsThirdPartyWindow(openerInner, nullptr)) {
-      return;
-    }
-  }
-
-  RefPtr<Document> self(this);
-  WebIdentityHandler* identityHandler = inner->GetOrCreateWebIdentityHandler();
-  MOZ_ASSERT(identityHandler);
-  identityHandler->IsContinuationWindow()->Then(
-      GetCurrentSerialEventTarget(), __func__,
-      [self, openerBC, aHadPriorUserInteraction](
-          const MozPromise<bool, nsresult, true>::ResolveOrRejectValue&
-              result) {
-        if (!result.IsResolve() || !result.ResolveValue()) {
-          if (XRE_IsParentProcess()) {
-            (void)StorageAccessAPIHelper::AllowAccessForOnParentProcess(
-                self->NodePrincipal(), openerBC,
-                ContentBlockingNotifier::eOpenerAfterUserInteraction, nullptr,
-                Some(aHadPriorUserInteraction));
-          } else {
-            (void)StorageAccessAPIHelper::AllowAccessForOnChildProcess(
-                self->NodePrincipal(), openerBC,
-                ContentBlockingNotifier::eOpenerAfterUserInteraction, nullptr,
-                Some(aHadPriorUserInteraction));
-          }
-        }
-      });
 }
 
 namespace {

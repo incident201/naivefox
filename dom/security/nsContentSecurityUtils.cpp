@@ -1465,6 +1465,11 @@ static nsLiteralCString sFrameSrcHttpsHostAllowList[] = {
     "about:home"_ns,
     "about:newtab"_ns,
 };
+// frame-src moz-extension:
+static nsLiteralCString sFrameSrcMozExtensionAllowList[] = {
+    "about:home"_ns,
+    "about:newtab"_ns,
+};
 
 class DisallowingVisitor : public nsCSPSrcVisitor {
  public:
@@ -1721,6 +1726,19 @@ class FrameSrcVisitor : public AllowBuiltinSrcVisitor {
   FrameSrcVisitor(CSPDirective aDirective, nsACString& aURL)
       : AllowBuiltinSrcVisitor(aDirective, aURL) {
     MOZ_ASSERT(aDirective == CSPDirective::FRAME_SRC_DIRECTIVE);
+  }
+
+  bool visitSchemeSrc(const nsCSPSchemeSrc& src) override {
+    nsAutoString scheme;
+    src.getScheme(scheme);
+
+    if (scheme == u"moz-extension"_ns) {
+      if (CheckAllowList(Span(sFrameSrcMozExtensionAllowList))) {
+        return true;
+      }
+    }
+
+    return AllowBuiltinSrcVisitor::visitSchemeSrc(src);
   }
 
   bool visitHostSrc(const nsCSPHostSrc& src) override {

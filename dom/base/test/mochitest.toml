@@ -542,8 +542,6 @@ skip-if = [
   "headless",
   "os == 'linux' && os_version == '22.04' && arch == 'x86_64' && display == 'wayland'",
   "os == 'linux' && os_version == '24.04' && arch == 'x86_64' && display == 'x11'",
-  "os == 'mac' && os_version == '10.15' && arch == 'x86_64'",
-  "os == 'mac' && os_version == '14.70' && arch == 'x86_64'", # Bug 1929448
   "os == 'mac' && os_version == '15.30' && arch == 'aarch64'", # Bug 2019401
 ]
 
@@ -632,9 +630,6 @@ skip-if = [
 ["test_processing_instruction_update_stylesheet.xhtml"]
 
 ["test_progress_events_for_gzip_data.html"]
-skip-if = [
-  "tsan", # Bug 1621323
-]
 
 ["test_pushState_structuredclone.html"]
 scheme = "https"
@@ -718,7 +713,6 @@ skip-if = [
   "asan",
   "debug",
   "os == 'android'", # The test needs to run reasonably fast.
-  "tsan",
 ]
 
 ["test_text-fragments-create-text-directive-no-reveal.html"]
@@ -831,8 +825,6 @@ skip-if = [
 skip-if = [
   "http2",
   "http3",
-  "os == 'linux' && os_version == '22.04' && arch == 'x86_64' && display == 'wayland' && debug", # Bug 1870499 and other bugs with crashes after this test start
-  "os == 'linux' && os_version == '24.04' && arch == 'x86_64' && display == 'x11' && debug", # Bug 1870499 and other bugs with crashes after this test start
 ]
 
 ["test_ze_srcdoc.html"]

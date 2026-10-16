@@ -1131,26 +1131,40 @@ inline bool HasLineClampAuto(const StyleLineClamp& aLineClamp) {
          !aLineClamp.webkit_legacy;
 }
 
-static bool IsLineClampRoot(const nsBlockFrame* aFrame) {
-  if (!GetLineClampMaxLines(aFrame->StyleDisplay()->mWebkitLineClamp) &&
-      !HasLineClampAuto(aFrame->StyleDisplay()->mWebkitLineClamp)) {
-    return false;
+enum class SetsLineClamp {
+  No,
+  Yes,
+  YesLegacy,
+};
+
+// Does this style set `(-webkit-)line-clamp`?
+static SetsLineClamp IsLineClampStyle(const nsStyleDisplay* aStyleDisplay) {
+  if (!GetLineClampMaxLines(aStyleDisplay->mWebkitLineClamp) &&
+      !HasLineClampAuto(aStyleDisplay->mWebkitLineClamp)) {
+    return SetsLineClamp::No;
   }
 
+  if (!aStyleDisplay->mWebkitLineClamp.webkit_legacy) {
+    return SetsLineClamp::Yes;
+  }
+
+  return SetsLineClamp::YesLegacy;
+}
+
+static bool IsLineClampRoot(const nsBlockFrame* aFrame) {
   if (!aFrame->HasAnyStateBits(NS_BLOCK_BFC)) {
     return false;
   }
+  const auto setsLineClamp = IsLineClampStyle(aFrame->StyleDisplay());
+  if (setsLineClamp != SetsLineClamp::YesLegacy) {
+    return setsLineClamp == SetsLineClamp::Yes;
+  }
 
-  if (!aFrame->StyleDisplay()->mWebkitLineClamp.webkit_legacy ||
-      StaticPrefs::layout_css_webkit_line_clamp_block_enabled() ||
-      aFrame->PresContext()->Document()->ChromeRulesEnabled()) {
+  if (aFrame->PresContext()->Document()->ChromeRulesEnabled()) {
     return true;
   }
 
-  // For now, -webkit-box is the only thing allowed to be a line-clamp root.
-  // Ideally we'd just make this work everywhere, but for now we're carrying
-  // this forward as a limitation on the legacy -webkit-line-clamp feature,
-  // since relaxing this limitation might create webcompat trouble.
+  // -webkit-box is the only thing allowed to be a line-clamp root.
   auto origDisplay = [&] {
     if (aFrame->Style()->GetPseudoType() ==
         PseudoStyleType::MozScrolledContent) {
@@ -4049,6 +4063,7 @@ bool nsBlockFrame::ReflowDirtyLines(BlockReflowState& aState) {
         RemoveFirstLine(nextInFlow->mLines, nextInFlow->mFrames, &pulledLine,
                         &pulledFrames);
         ClearLineCursors();
+        nextInFlow->ClearLineCursors();
       } else {
         // Grab an overflow line if there are any
         FrameLines* overflowLines = nextInFlow->GetOverflowLines();
@@ -4412,6 +4427,7 @@ nsIFrame* nsBlockFrame::PullFrameFrom(nsLineBox* aLine,
     MOZ_ASSERT(aLine == mLines.back());
     MOZ_ASSERT(aFromLine == aFromContainer->mLines.begin(),
                "should only pull from first line");
+    aFromContainer->ClearLineCursors();
     aFromContainer->mFrames.RemoveFrame(frame);
 
     // When pushing and pulling frames we need to check for whether any
@@ -7430,8 +7446,9 @@ void nsBlockFrame::DidSetComputedStyle(ComputedStyle* aOldStyle) {
     return;
   }
 
+  const bool wasBFC = HasAnyStateBits(NS_BLOCK_BFC);
   const bool isBFC = EstablishesBFC(this);
-  if (HasAnyStateBits(NS_BLOCK_BFC) != isBFC) {
+  if (wasBFC != isBFC) {
     if (HasAnyFloats()) {
       // If the frame contains floats, this update may change their float
       // manager. Be safe by dirtying all descendant lines of the nearest
@@ -7439,10 +7456,16 @@ void nsBlockFrame::DidSetComputedStyle(ComputedStyle* aOldStyle) {
       RemoveStateBits(NS_BLOCK_BFC);
       MarkSameFloatManagerLinesDirty(this);
     }
-    if (isBFC && !IsLineClampRoot(this)) {
+    AddOrRemoveStateBits(NS_BLOCK_BFC, isBFC);
+    const bool wasLineClampRoot =
+        wasBFC &&
+        IsLineClampStyle(aOldStyle->StyleDisplay()) != SetsLineClamp::No;
+    // `IsLineClampRoot` checks NS_BLOCK_BFC, so it must be called after
+    // the frame bit is set above.
+    const bool isLineClampRoot = isBFC && IsLineClampRoot(this);
+    if (wasLineClampRoot != isLineClampRoot) {
       ClearLineClampEllipsis();
     }
-    AddOrRemoveStateBits(NS_BLOCK_BFC, isBFC);
   }
 }
 
@@ -8422,6 +8445,22 @@ static void DisplayLine(nsDisplayListBuilder* aBuilder,
   collection.MoveTo(aLists);
 }
 
+// Traverse lines skipped by line-clamp to build marked abspos descendants and
+// their ancestor container items.
+static void DisplayLineClampAbsPosDescendants(
+    nsDisplayListBuilder* aBuilder,
+    nsBlockFrame::LineIterator aFirstSkippedLine,
+    nsBlockFrame::LineIterator aLineEnd, const nsDisplayListSet& aLists,
+    nsBlockFrame* aFrame, int32_t aDepth, int32_t& aDrawnLines) {
+  nsDisplayListBuilder::AutoInLineClampAbsPosTraversal traversal(aBuilder);
+  bool foundClamp = false;
+
+  for (auto line = aFirstSkippedLine; line != aLineEnd; ++line) {
+    DisplayLine(aBuilder, line, line->IsInline(), aLists, aFrame, nullptr, 0,
+                aDepth, aDrawnLines, foundClamp);
+  }
+}
+
 // Walk aFrame's inline descendants and, for each inline that is an absolute
 // containing block, build the display items for its abspos children that are
 // continuations. Note the first continuation of the abspos children is built
@@ -8500,6 +8539,9 @@ void nsBlockFrame::BuildDisplayList(nsDisplayListBuilder* aBuilder,
   if (HidesContent()) {
     return;
   }
+
+  const bool skipClampedContent =
+      StaticPrefs::layout_css_webkit_line_clamp_skip_paint();
 
   if (GetPrevInFlow()) {
     DisplayOverflowContainers(aBuilder, aLists);
@@ -8581,7 +8623,7 @@ void nsBlockFrame::BuildDisplayList(nsDisplayListBuilder* aBuilder,
     }
     if ((HasLineClampEllipsis() || HasLineClampEllipsisDescendant() ||
          LineClampIsClampedToZero()) &&
-        StaticPrefs::layout_css_webkit_line_clamp_skip_paint()) {
+        skipClampedContent) {
       // We can't use the cursor if we're in a line-clamping situation, and
       // we're configured to not paint its clamped content, as we need to know
       // whether we've hit the clamp point which requires iterating over all
@@ -8594,7 +8636,7 @@ void nsBlockFrame::BuildDisplayList(nsDisplayListBuilder* aBuilder,
   nsLineBox* cursor = canUseCursor
                           ? GetFirstLineContaining(aBuilder->GetDirtyRect().y)
                           : nullptr;
-  LineIterator line_end = LinesEnd();
+  const LineIterator line_end = LinesEnd();
 
   TextOverflow* textOverflowPtr = textOverflow.get();
   bool foundClamp = false;
@@ -8613,8 +8655,7 @@ void nsBlockFrame::BuildDisplayList(nsDisplayListBuilder* aBuilder,
         if (ShouldDescendIntoLine(lineArea)) {
           DisplayLine(aBuilder, line, line->IsInline(), aLists, this, nullptr,
                       0, depth, drawnLines, foundClamp);
-          MOZ_ASSERT(!foundClamp ||
-                     !StaticPrefs::layout_css_webkit_line_clamp_skip_paint());
+          MOZ_ASSERT(!foundClamp || !skipClampedContent);
         }
       }
     }
@@ -8639,8 +8680,11 @@ void nsBlockFrame::BuildDisplayList(nsDisplayListBuilder* aBuilder,
           backplateColor.value());
     };
 
-    if (!(LineClampIsClampedToZero() &&
-          StaticPrefs::layout_css_webkit_line_clamp_skip_paint())) {
+    LineIterator firstSkippedLine =
+        LineClampIsClampedToZero() && skipClampedContent ? LinesBegin()
+                                                         : line_end;
+
+    if (firstSkippedLine == line_end) {
       for (LineIterator line = LinesBegin(); line != line_end; ++line) {
         const nsRect lineArea = line->InkOverflowRect();
         const bool lineInLine = line->IsInline();
@@ -8680,12 +8724,20 @@ void nsBlockFrame::BuildDisplayList(nsDisplayListBuilder* aBuilder,
           }
         }
         foundClamp = foundClamp || line->HasLineClampEllipsis();
-        if (foundClamp &&
-            StaticPrefs::layout_css_webkit_line_clamp_skip_paint()) {
+        if (foundClamp && skipClampedContent) {
+          firstSkippedLine = line.next();
           break;
         }
         lineCount++;
       }
+    }
+
+    const bool hasForcedDisplayListDescend =
+        HasAnyStateBits(NS_FRAME_FORCE_DISPLAY_LIST_DESCEND_INTO);
+
+    if (firstSkippedLine != line_end && hasForcedDisplayListDescend) {
+      DisplayLineClampAbsPosDescendants(aBuilder, firstSkippedLine, line_end,
+                                        aLists, this, depth, drawnLines);
     }
 
     if (GetPrevInFlow() || GetNextInFlow()) {

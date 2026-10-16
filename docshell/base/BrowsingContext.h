@@ -175,7 +175,7 @@ struct EmbedderColorSchemes {
    * switched to another browser element this ID will remain the same but      \
    * hosted under the under the new browser element. */                        \
   FIELD(BrowserId, uint64_t, {.mCanSet = CanSet::Custom})                      \
-  FIELD(HistoryID, nsID, {.mCanSet = CanSet::Unrestricted})                    \
+  FIELD(HistoryID, nsID, {.mCanSet = CanSet::ParentOnly})                      \
   FIELD(InRDMPane, bool, {.mTopOnly = true, .mCanSet = CanSet::ParentOnly})    \
   FIELD(Loading, bool, {.mCanSet = CanSet::Unrestricted})                      \
   /* A field only set on top browsing contexts, which indicates that either:   \
@@ -289,6 +289,9 @@ struct EmbedderColorSchemes {
         {.mTopOnly = true, .mCanSet = CanSet::Unrestricted})                   \
   /* DevTools override for forced-colors */                                    \
   FIELD(ForcedColorsOverride, dom::ForcedColorsOverride,                       \
+        {.mTopOnly = true, .mCanSet = CanSet::Unrestricted})                   \
+  /* DevTools override for prefers-contrast */                                 \
+  FIELD(PrefersContrastOverride, dom::PrefersContrastOverride,                 \
         {.mTopOnly = true, .mCanSet = CanSet::Unrestricted})                   \
   /* DevTools multiplier for animations playback rate */                       \
   FIELD(AnimationsPlayBackRateMultiplier, double,                              \
@@ -1179,6 +1182,10 @@ class BrowsingContext : public nsILoadContext, public nsWrapperCache {
     return GetPrefersReducedMotionOverride();
   }
 
+  dom::PrefersContrastOverride PrefersContrastOverride() const {
+    return GetPrefersContrastOverride();
+  }
+
   double AnimationsPlayBackRateMultiplier() const {
     return Top()->GetAnimationsPlayBackRateMultiplier();
   }
@@ -1394,11 +1401,12 @@ class BrowsingContext : public nsILoadContext, public nsWrapperCache {
   void DidSet(FieldIndex<IDX_PrefersReducedMotionOverride>,
               dom::PrefersReducedMotionOverride aOldValue);
 
+  void DidSet(FieldIndex<IDX_PrefersContrastOverride>,
+              dom::PrefersContrastOverride aOldValue);
+
   void DidSet(FieldIndex<IDX_AnimationsPlayBackRateMultiplier>,
               double aOldValue);
 
-  template <typename Callback>
-  void WalkPresContexts(Callback&&);
   void PresContextAffectingFieldChanged();
 
   void DidSet(FieldIndex<IDX_LanguageOverride>, nsCString&& aOldValue);

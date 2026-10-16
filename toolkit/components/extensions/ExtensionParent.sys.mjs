@@ -2622,6 +2622,8 @@ ChromeUtils.defineLazyGetter(ExtensionParent, "PlatformInfo", () => {
         arch = "x86-32";
       } else if (arch == "x86_64") {
         arch = "x86-64";
+      } else if (arch == "aarch64") {
+        arch = "arm64";
       }
       return arch;
     })(),

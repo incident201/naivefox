@@ -607,6 +607,8 @@ dependencies {
     implementation libs.androidx.exifinterface
     implementation libs.androidx.fragment
     implementation libs.androidx.fragment.compose
+    implementation libs.androidx.glance.appwidget
+    implementation libs.androidx.glance.preview
     implementation libs.androidx.lifecycle.common
     implementation libs.androidx.lifecycle.livedata
     implementation libs.androidx.lifecycle.process
@@ -643,7 +645,15 @@ dependencies {
     ksp libs.androidx.room.compiler
 
     debugImplementation libs.androidx.compose.ui.tooling
+    debugImplementation libs.androidx.glance.appwidget.preview
     debugImplementation libs.leakcanary
+
+    // Declares androidx.activity.ComponentActivity in the app under test, which the host-less
+    // Compose rules launch. Only added when building a non-debug variant for UI tests, so that
+    // it never reaches a shipping build.
+    if (project.hasProperty("testBuildType") && project.property("testBuildType") != "debug") {
+        addProvider("${project.property('testBuildType')}Implementation", libs.androidx.compose.ui.test.manifest)
+    }
 
     // Exclude Mockito to prevent classpath conflicts with MockK in tests.
     testImplementation (project(':components:support-test')) {

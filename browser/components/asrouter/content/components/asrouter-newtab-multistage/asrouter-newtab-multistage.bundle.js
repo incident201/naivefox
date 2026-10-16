@@ -3808,9 +3808,8 @@ const PinnableSitesList = ({
     ...prev,
     [id]: state
   }));
-  const handlePin = async (event, item) => {
+  const handlePin = async (event, item, position) => {
     setItemState(item.id, PENDING);
-    MultiStageUtils.sendActionTelemetry(messageId, item.id, "CLICK_BUTTON");
     const result = await handleAction(event, {
       type: "PIN_TASKBAR_TAB",
       needsAwait: true,
@@ -3829,7 +3828,9 @@ const PinnableSitesList = ({
       pinResultLabel = "failure";
     }
     MultiStageUtils.sendActionTelemetry(messageId, item.id, "PIN_SITE", {
-      result: pinResultLabel
+      result: pinResultLabel,
+      position,
+      personalized: !!item.personalized
     });
 
     // Re-enable the button only on explicit failure so the user can retry.
@@ -3843,7 +3844,7 @@ const PinnableSitesList = ({
   };
   return /*#__PURE__*/external_React_default().createElement("ul", {
     className: `pinnable-sites-list${alwaysShow ? " always-visible" : ""}`
-  }, items.map(item => {
+  }, items.map((item, index) => {
     const nameId = `pinnable-site-name-${item.id}`;
     const state = itemStates[item.id] ?? IDLE;
     const isPendingOrPinned = state === PENDING || state === PINNED;
@@ -3867,8 +3868,9 @@ const PinnableSitesList = ({
       className: "pinnable-sites-description"
     }))), /*#__PURE__*/external_React_default().createElement("button", {
       className: "pinnable-sites-pin-button primary",
+      value: item.id,
       disabled: isPendingOrPinned,
-      onClick: e => handlePin(e, item),
+      onClick: e => handlePin(e, item, index + 1),
       "aria-describedby": nameId
     }, pinButtonLabel && /*#__PURE__*/external_React_default().createElement(Localized, {
       text: pinButtonLabel
@@ -3955,6 +3957,21 @@ function ContentTiles_extends() { return ContentTiles_extends = Object.assign ? 
 const HEADER_STYLES = ["backgroundColor", "border", "padding", "margin", "width", "height"];
 const ContentTiles_TILE_STYLES = ["border", "borderRadius", "marginBlock", "marginInline", "paddingBlock", "paddingInline"];
 const CONTAINER_STYLES = ["padding", "margin", "marginBlock", "marginInline", "paddingBlock", "paddingInline", "flexDirection", "flexWrap", "flexFlow", "flexGrow", "flexShrink", "justifyContent", "alignItems", "gap"];
+
+/**
+ * @param {object|object[]} tiles - The tiles of the screen being shown.
+ * @returns {object} Impression context, if any.
+ */
+function getTileImpressionContext(tiles) {
+  const pinnableSites = (Array.isArray(tiles) ? tiles : [tiles]).find(tile => tile?.type === "pinnable_sites" && Array.isArray(tile.data));
+  if (!pinnableSites) {
+    return {};
+  }
+  return {
+    total_sites: pinnableSites.data.length,
+    personalized_sites: pinnableSites.data.filter(item => item?.personalized).length
+  };
+}
 const ContentTiles = props => {
   const {
     content
@@ -4292,6 +4309,7 @@ const ContentTiles = props => {
 
 
 const DEFAULT_AUTO_ADVANCE_MS = 20000;
+const MAX_TIMEOUT_MS = 2 ** 31 - 1;
 const CORNER_IMAGE_POSITIONS = new Set(["bottom-left", "bottom-right", "top-left", "top-right"]);
 const DEFAULT_CORNER_IMAGE_POSITION = "bottom-right";
 const CORNER_IMAGE_ENTRANCE_ANIMATIONS = new Set(["none", "fade", "slide-block", "slide-inline", "slide-corner", "zoom"]);
@@ -4324,6 +4342,38 @@ function resolveDirectionalImage(image) {
     ...image.rtl
   } : image;
 }
+
+/**
+ * Dismisses the message once the screen has been shown for `autoDismiss.after`
+ * milliseconds. The countdown only runs while the page is visible and restarts
+ * when it becomes visible again, so the screen can't time out while invisible
+ * in the background.
+ */
+function useAutoDismiss(autoDismiss, messageId) {
+  const after = autoDismiss?.after;
+  (0,external_React_namespaceObject.useEffect)(() => {
+    if (!Number.isFinite(after) || after < 0 || after > MAX_TIMEOUT_MS) {
+      return undefined;
+    }
+    let timer = null;
+    let dismissed = false;
+    const dismiss = () => {
+      dismissed = true;
+      MultiStageUtils.sendActionTelemetry(messageId, "auto_dismiss", "AUTO_DISMISS");
+      window.AWFinish();
+    };
+    const restartCountdown = () => {
+      clearTimeout(timer);
+      timer = !dismissed && document.visibilityState === "visible" ? setTimeout(dismiss, after) : null;
+    };
+    restartCountdown();
+    document.addEventListener("visibilitychange", restartCountdown);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("visibilitychange", restartCountdown);
+    };
+  }, [after, messageId]);
+}
 const MultiStageProtonScreen = props => {
   const {
     autoAdvance,
@@ -4333,6 +4383,7 @@ const MultiStageProtonScreen = props => {
     navigate,
     order
   } = props;
+  useAutoDismiss(props.autoDismiss, messageId);
   (0,external_React_namespaceObject.useEffect)(() => {
     if (!autoAdvance && !advanceOnExperimentLoad) {
       return () => {};
@@ -5131,7 +5182,9 @@ class ProtonScreen extends (external_React_default()).PureComponent {
         this.mainContentHeader = input;
       },
       "no-rdm": content.no_rdm ? "" : null
-    }, cornerImageAnchor === "screen" ? this.renderCornerImage("screen") : null, isCenterPosition ? null : this.renderSecondarySection(content), /*#__PURE__*/external_React_default().createElement("div", {
+    }, content.position === "card-stack" ? /*#__PURE__*/external_React_default().createElement("div", {
+      className: "card-stack-front"
+    }) : null, cornerImageAnchor === "screen" ? this.renderCornerImage("screen") : null, isCenterPosition ? null : this.renderSecondarySection(content), /*#__PURE__*/external_React_default().createElement("div", {
       className: `section-main ${isEmbeddedMigration ? "embedded-migration" : ""}${isSystemPromptStyleSpotlight ? "system-prompt-spotlight" : ""}`,
       "hide-secondary-section": content.hide_secondary_section ? String(content.hide_secondary_section) : null,
       role: "document",
@@ -5771,6 +5824,7 @@ function addUtmParams(url, utmTerm) {
 
 
 
+
 // Amount of milliseconds for all transitions to complete (including delays).
 const TRANSITION_OUT_TIME = 1000;
 // Keep in sync with --card-stack-duration in _multistage.scss.
@@ -5838,7 +5892,8 @@ const MultiStageAboutWelcome = props => {
             screen_family: props.message_id,
             screen_index: order,
             screen_id: screen.id,
-            screen_initials: screenInitials
+            screen_initials: screenInitials,
+            ...getTileImpressionContext(screen.content?.tiles)
           });
 
           // Impression actions should be fired before recording the
@@ -6110,6 +6165,7 @@ const MultiStageAboutWelcome = props => {
       content: currentScreen.content,
       navigate: handleTransition,
       autoAdvance: currentScreen.auto_advance,
+      autoDismiss: currentScreen.auto_dismiss,
       advanceOnExperimentLoad: currentScreen.advance_on_experiment_load,
       messageId: `${props.message_id}_${order}_${currentScreen.id}`,
       UTMTerm: props.utm_term,
@@ -6664,6 +6720,7 @@ class WelcomeScreen extends (external_React_default()).PureComponent {
       isSingleScreen: this.props.isSingleScreen,
       startsWithCorner: this.props.startsWithCorner,
       autoAdvance: this.props.autoAdvance,
+      autoDismiss: this.props.autoDismiss,
       advanceOnExperimentLoad: this.props.advanceOnExperimentLoad,
       navigate: this.props.navigate,
       forceHideStepsIndicator: this.props.forceHideStepsIndicator,

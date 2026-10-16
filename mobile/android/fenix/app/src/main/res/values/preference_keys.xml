@@ -132,10 +132,12 @@
 
     <!-- Continuous onboarding -->
     <string name="pref_key_continuous_onboarding_enabled" translatable="false">pref_key_continuous_onboarding_enabled</string>
+    <string name="pref_key_is_pairing_sign_in_prompt_enabled" translatable="false">pref_key_is_pairing_sign_in_prompt_enabled</string>
     <string name="pref_key_continuous_onboarding_day_two_completed_timestamp" translatable="false">pref_key_continuous_onboarding_day_two_completed_timestamp</string>
     <string name="pref_key_continuous_onboarding_day_three_completed_timestamp" translatable="false">pref_key_continuous_onboarding_day_three_completed_timestamp</string>
     <string name="pref_key_continuous_onboarding_day_five_completed_timestamp" translatable="false">pref_key_continuous_onboarding_day_five_completed_timestamp</string>
     <string name="pref_key_continuous_onboarding_day_seven_completed_timestamp" translatable="false">pref_key_continuous_onboarding_day_seven_completed_timestamp</string>
+    <string name="pref_key_migrate_onboarding_state_enabled" translatable="false">pref_key_migrate_onboarding_state_enabled</string>
 
     <!-- Data Choices -->
     <string name="pref_key_telemetry" translatable="false">pref_key_telemetry</string>
@@ -157,6 +159,8 @@
     <string name="pref_key_sync_sign_in" translatable="false">pref_key_sync_sign_in</string>
     <string name="pref_key_push_project_id" translatable="false">project_id</string>
     <string name="pref_key_search_widget_installed_2" translatable="false">pref_key_search_widget_installed_2</string>
+    <!-- Key for the app version code that last published the search bar widget previews -->
+    <string name="pref_key_search_bar_widget_previews_version" translatable="false">pref_key_search_bar_widget_previews_version</string>
     <!-- Key for credit cards sync preference in the account settings fragment -->
     <string name="pref_key_sync_credit_cards" translatable="false">pref_key_sync_credit_cards</string>
     <!-- Key for Address sync preference in the account settings fragment -->
@@ -364,6 +368,7 @@
     <string name="pref_key_is_user_moloco_attributed" translatable="false">pref_key_is_user_moloco_attributed</string>
     <string name="pref_key_is_user_rakuten_attributed" translatable="false">pref_key_is_user_rakuten_attributed</string>
     <string name="pref_key_is_user_skyflag_attributed" translatable="false">pref_key_is_user_skyflag_attributed</string>
+    <string name="pref_key_is_user_quora_attributed" translatable="false">pref_key_is_user_quora_attributed</string>
     <string name="pref_key_is_user_pairing_campaign_attributed" translatable="false">pref_key_is_user_pairing_campaign_attributed</string>
     <string name="pref_key_referral_ping_submitted" translatable="false">pref_key_referral_ping_submitted</string>
     <string name="pref_key_referral_code" translatable="false">pref_key_referral_code</string>
@@ -484,7 +489,6 @@
     <string name="pref_key_enable_homepage_as_new_tab" translatable="false">pref_key_enable_homepage_as_new_tab</string>
     <string name="pref_key_enable_universal_edge_to_edge_wallpapers" translatable="false">pref_key_enable_universal_edge_to_edge_wallpapers</string>
     <string name="pref_key_enable_ads_client_for_stories" translatable="false">pref_key_enable_ads_client_for_stories</string>
-    <string name="pref_key_enable_add_shortcuts_improvement" translatable="false">pref_key_enable_add_shortcuts_improvement</string>
     <string name="pref_key_show_more_shortcuts" translatable="false">pref_key_show_more_shortcuts</string>
     <string name="pref_key_enable_homepage_weather_widget" translatable="false">pref_key_enable_homepage_weather_widget</string>
     <string name="pref_key_show_homepage_weather_widget" translatable="false">pref_key_show_homepage_weather_widget</string>
@@ -559,7 +563,6 @@
     <string name="pref_key_ignore_translations_data_saver_warning" translatable="false">pref_key_ignore_translations_data_saver_warning</string>
 
     <!-- Microsurvey -->
-    <string name="pref_key_should_show_microsurvey_prompt" translatable="false">pref_key_should_show_microsurvey_prompt</string>
     <string name="pref_key_microsurvey_feature_enabled" translatable="false">pref_key_microsurvey_feature_enabled</string>
 
     <!--ApplicationExitInfo-->
@@ -644,6 +647,7 @@
     <string name="pref_key_google_lens_integration" translatable="false">pref_key_google_lens_integration</string>
     <string name="pref_key_google_lens_integration_user_enabled" translatable="false">pref_key_google_lens_integration_user_enabled</string>
     <string name="pref_key_has_accepted_google_lens_first_run" translatable="false">pref_key_has_accepted_google_lens_first_run</string>
+    <string name="pref_key_lens_camera_last_mode" translatable="false">pref_key_lens_camera_last_mode</string>
 
     <!-- Voice Search in Display Toolbar -->
     <string name="pref_key_show_voice_search_in_display_toolbar" translatable="false">pref_key_show_voice_search_in_display_toolbar</string>

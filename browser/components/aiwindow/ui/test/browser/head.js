@@ -51,14 +51,8 @@ const { _setRemoteClientForTesting, _clearRemoteClientForTesting } =
     "moz-src:///browser/components/aiwindow/models/Utils.sys.mjs"
   );
 
-// Aliased to avoid colliding with ChatConversation.sys.mjs's own _setLoadPromptForTesting above.
-const {
-  _setLoadPromptForTesting: _setConversationSuggestionsLoadPromptForTesting,
-  _setBuildConversationForTesting,
-  _setGetConversationsByIdForTesting,
-  _clearResumeActivityCacheForTesting,
-} = ChromeUtils.importESModule(
-  "moz-src:///browser/components/aiwindow/models/ConversationSuggestions.sys.mjs"
+const { JourneyManager } = ChromeUtils.importESModule(
+  "moz-src:///browser/components/aiwindow/models/memories/journeys/JourneyManager.sys.mjs"
 );
 
 const {
@@ -110,7 +104,7 @@ let gIntentEngineStub;
 // Minimal RS records returned by the global getRemoteClient stub.
 // Version numbers must match FEATURE_MAJOR_VERSIONS in models/Utils.sys.mjs.
 const MOCK_RS_RECORDS = [
-  ["chat", 11],
+  ["chat", 12],
   ["title-generation", 1],
   ["tab-group-naming", 1],
   ["conversation-starters-sidebar-system", 1],
@@ -211,7 +205,7 @@ const MOCK_RS_RECORDS = [
       version: "v10.0",
     },
     // TODO 2053495
-    // v11 records for mistral release (browser.smartwindow.mistralRelease pref)
+    // v12 records for mistral release (browser.smartwindow.mistralRelease pref)
     {
       kind: "params",
       feature: "chat",
@@ -221,7 +215,7 @@ const MOCK_RS_RECORDS = [
       purpose: "chat",
       parameters: {},
       prompts: "Test system prompt.",
-      version: "v11.0",
+      version: "v12.0",
       is_default: true,
     },
     {
@@ -239,7 +233,7 @@ const MOCK_RS_RECORDS = [
       service_type: "ai",
       purpose: "chat",
       parameters: {},
-      version: "v11.0",
+      version: "v12.0",
     },
     {
       kind: "params",
@@ -257,7 +251,7 @@ const MOCK_RS_RECORDS = [
       purpose: "chat",
       parameters: {},
       prompts: "Test system prompt.",
-      version: "v11.0",
+      version: "v12.0",
     },
     {
       kind: "params",
@@ -274,7 +268,7 @@ const MOCK_RS_RECORDS = [
       service_type: "ai",
       purpose: "chat",
       parameters: {},
-      version: "v11.0",
+      version: "v12.0",
     },
     // The relevant-memories module is loaded for the chat model, so it resolves
     // via the "generic" fallback rather than is_default like the v1 records.
@@ -567,13 +561,13 @@ async function _stubResumeActivityGenerationCore(
   // Keep cached results from being filtered as deleted.
   sb.stub(MemoriesManager, "getAllMemories").resolves(memories);
   // Prevent cached results and dismissals from leaking between tests.
-  _clearResumeActivityCacheForTesting();
+  JourneyManager._clearResumeActivityCacheForTesting();
   _clearDismissedResumeMemoriesForTesting();
-  _setGetConversationsByIdForTesting(async () => []);
-  _setConversationSuggestionsLoadPromptForTesting(async () => ({
+  JourneyManager._setGetConversationsByIdForTesting(async () => []);
+  JourneyManager._setLoadPromptForTesting(async () => ({
     prompt: "Test prompt",
   }));
-  _setBuildConversationForTesting(async () => ({
+  JourneyManager._setBuildConversationForTesting(async () => ({
     setSystemMessage() {},
     addUserMessage() {},
     securityProperties: {
@@ -594,10 +588,10 @@ async function _stubResumeActivityGenerationCore(
     getMemoriesStub,
     memories,
     async cleanup() {
-      _setGetConversationsByIdForTesting(null);
-      _setConversationSuggestionsLoadPromptForTesting(null);
-      _setBuildConversationForTesting(null);
-      _clearResumeActivityCacheForTesting();
+      JourneyManager._setGetConversationsByIdForTesting(null);
+      JourneyManager._setLoadPromptForTesting(null);
+      JourneyManager._setBuildConversationForTesting(null);
+      JourneyManager._clearResumeActivityCacheForTesting();
       _clearDismissedResumeMemoriesForTesting();
       for (const { url } of urls) {
         await PlacesUtils.history.remove(url);
@@ -1229,7 +1223,9 @@ async function promiseSmartbarSuggestionsClose(browser) {
 }
 
 /**
- * Asserts the Smartbar suggestions view position and visibility.
+ * Asserts the Smartbar suggestions view position and visibility. When the
+ * view is visible, also checks that it opens on the expected side of the
+ * input and that the view and the input stay inside the window.
  *
  * @param {MozBrowser} browser - The browser element
  * @param {boolean} shouldBeVisible - Whether the suggestions view should be visible
@@ -1240,8 +1236,8 @@ async function assertSmartbarSuggestionsVisible(
   shouldBeVisible,
   expectedPosition = "bottom"
 ) {
-  const aiWindowElement =
-    browser.contentWindow.document.querySelector("ai-window");
+  const contentWindow = browser.contentWindow;
+  const aiWindowElement = contentWindow.document.querySelector("ai-window");
   const smartbarElement = aiWindowElement.shadowRoot.querySelector(
     "#ai-window-smartbar"
   );
@@ -1256,6 +1252,41 @@ async function assertSmartbarSuggestionsVisible(
     smartbarElement.getAttribute("suggestions-position"),
     expectedPosition,
     `Suggestions position should be: ${expectedPosition}`
+  );
+
+  if (!shouldBeVisible) {
+    return;
+  }
+
+  const viewRect = urlbarView.getBoundingClientRect();
+  const inputRect = smartbarElement.inputField.getBoundingClientRect();
+  if (expectedPosition == "top") {
+    Assert.lessOrEqual(
+      viewRect.bottom,
+      inputRect.top,
+      "Suggestions should open above the input"
+    );
+  } else {
+    Assert.greaterOrEqual(
+      viewRect.top,
+      inputRect.bottom,
+      "Suggestions should open below the input"
+    );
+  }
+  Assert.greaterOrEqual(
+    viewRect.top,
+    0,
+    "Suggestions should not be cut off by the top of the window"
+  );
+  Assert.lessOrEqual(
+    viewRect.bottom,
+    contentWindow.innerHeight,
+    "Suggestions should not be cut off by the bottom of the window"
+  );
+  Assert.lessOrEqual(
+    inputRect.bottom,
+    contentWindow.innerHeight,
+    "Input should stay inside the window when the suggestions open"
   );
 }
 

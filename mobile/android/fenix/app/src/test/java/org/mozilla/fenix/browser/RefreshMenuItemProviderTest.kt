@@ -18,6 +18,7 @@ import mozilla.components.browser.state.state.ContentState
 import mozilla.components.browser.state.state.TabSessionState
 import mozilla.components.browser.state.store.BrowserStore
 import mozilla.components.compose.base.text.Text
+import mozilla.components.compose.menu.data.MenuItemTitle
 import mozilla.components.compose.menu.data.StandardMenuItem
 import mozilla.components.compose.menu.ui.MenuItemIconRes
 import mozilla.components.concept.engine.EngineSession.LoadUrlFlags
@@ -25,6 +26,7 @@ import mozilla.components.feature.session.SessionUseCases
 import mozilla.components.ui.icons.R as iconsR
 import org.junit.Test
 import org.mozilla.fenix.R
+import org.mozilla.fenix.components.menu.MenuTarget
 import org.mozilla.fenix.components.menu.fake.FakeMenuHost
 import org.mozilla.fenix.components.menu.fake.reachableEvents
 import org.mozilla.fenix.components.menu.store.MenuAction
@@ -47,7 +49,7 @@ class RefreshMenuItemProviderTest {
 
         assertEquals(
             StandardMenuItem(
-                title = Text.Resource(R.string.browser_menu_stop),
+                title = MenuItemTitle(Text.Resource(R.string.browser_menu_stop)),
                 icon = MenuItemIconRes(iconsR.drawable.mozac_ic_cross_24),
                 onClickEvent = MenuAction.Navigate.Stop,
             ),
@@ -62,7 +64,7 @@ class RefreshMenuItemProviderTest {
 
             assertEquals(
                 StandardMenuItem(
-                    title = Text.Resource(R.string.browser_menu_refresh),
+                    title = MenuItemTitle(Text.Resource(R.string.browser_menu_refresh)),
                     icon = MenuItemIconRes(iconsR.drawable.mozac_ic_arrow_clockwise_24),
                     onClickEvent = MenuAction.Navigate.Reload(bypassCache = false),
                     onLongClickEvent = MenuAction.Navigate.Reload(bypassCache = true),
@@ -140,9 +142,13 @@ class RefreshMenuItemProviderTest {
         assertFalse(provider.handles(MenuAction.Navigate.Settings))
     }
 
-    private fun TestScope.provider(browserStore: BrowserStore) =
+    private fun TestScope.provider(
+        browserStore: BrowserStore,
+        target: MenuTarget = MenuTarget.BrowserTab,
+    ) =
         RefreshMenuItemProvider(
             browserStore = browserStore,
+            target = target,
             reload = reload,
             stopLoading = stopLoading,
             scope = backgroundScope,

@@ -204,9 +204,9 @@ impl KindScratchHandle {
 ///
 /// Distinct from `PrimitiveInstanceIndex`, which identifies the scene-relative
 /// primitive instance a draw was produced from. Draws are pushed as the
-/// visibility pass finds them, so the two are unrelated numbers; cross between
-/// them with `PrimitiveFrameScratch::draw_index_for_instance` (instance to draw,
-/// fallible) or `PrimitiveDrawHeader::prim_instance_index` (draw to instance).
+/// visibility pass finds them, so the two are unrelated numbers. Go from a draw
+/// to its instance with `PrimitiveDrawHeader::prim_instance_index`; the prepare
+/// pass reaches draws through each picture's draw list.
 pub type PrimitiveDrawIndex = storage::Index<PrimitiveDrawHeader>;
 
 /// Information stored for a visible primitive about the visible
@@ -218,6 +218,9 @@ pub struct PrimitiveDrawHeader {
     /// only way to get from a draw to its instance: consumers reached via the
     /// command stream hold a `PrimitiveDrawIndex`, which is unrelated to it.
     pub prim_instance_index: PrimitiveInstanceIndex,
+
+    /// The spatial node of the cluster the primitive was drawn from.
+    pub spatial_node_index: SpatialNodeIndex,
 
     /// The clip chain instance that was built for this primitive.
     pub clip_chain: ClipChainInstance,
@@ -259,6 +262,7 @@ impl PrimitiveDrawHeader {
     pub fn new() -> Self {
         PrimitiveDrawHeader {
             prim_instance_index: PrimitiveInstanceIndex::INVALID,
+            spatial_node_index: SpatialNodeIndex::INVALID,
             state: DrawState::Unset,
             clip_chain: ClipChainInstance::empty(),
             clip_task_index: ClipTaskIndex::INVALID,
@@ -294,6 +298,7 @@ pub fn update_prim_visibility(
     }
     frame_state.visited_pictures[pic_index.0 as usize] = true;
     let pic = &store.pictures[pic_index.0 as usize];
+    let draws_start = frame_state.scratch.primitive.frame.begin_picture_draws();
 
     let (surface_index, pop_surface) = match pic.raster_config {
         Some(RasterConfig { surface_index, composite_mode: PictureCompositeMode::TileCache { .. }, .. }) => {
@@ -321,9 +326,14 @@ pub fn update_prim_visibility(
                 );
             }
 
-            let surface_local_rect = frame_state.surfaces[raster_config.surface_index.0]
-                .unclipped_local_rect
-                .cast_unit();
+            // Include the inflation of the composite mode (e.g. drop-shadow), so the
+            // sub-slice chosen for the surface's content matches the one the picture
+            // itself is later assigned to, based on its inflated coverage.
+            let surface = &frame_state.surfaces[raster_config.surface_index.0];
+            let surface_local_rect = raster_config.composite_mode.get_coverage(
+                surface,
+                Some(surface.unclipped_local_rect.cast_unit()),
+            );
 
             // Let the picture cache know that we are pushing an off-screen
             // surface, so it can treat dependencies of surface atomically.
@@ -391,6 +401,9 @@ pub fn update_prim_visibility(
     // clip chain.
     let mut snapper = SpaceSnapper::new(surface, frame_context.spatial_tree);
     let mut clip_snapper = snapper.clone();
+    // Only the prims' own rects were translated by the shadow offset, not the
+    // clip chain they share with the shadowed content.
+    snapper.set_shadow_offset(pic.prim_list.shadow_offset);
 
     for cluster in &pic.prim_list.clusters {
         tracy_rs::profile_scope!("cluster");
@@ -445,6 +458,7 @@ pub fn update_prim_visibility(
             // primitive is known to be drawn, so culled primitives cost nothing.
             let mut draw = PrimitiveDrawHeader::new();
             draw.prim_instance_index = PrimitiveInstanceIndex(prim_instance_index as u32);
+            draw.spatial_node_index = cluster.spatial_node_index;
             draw.snapped_pattern_rect = snapped_pattern_rect;
 
             // Snap the prim's own local clip rect against this cluster's
@@ -617,6 +631,8 @@ pub fn update_prim_visibility(
             frame_state.scratch.primitive.frame.draw_mut(draw_index).state = new_state;
         }
     }
+
+    frame_state.scratch.primitive.frame.end_picture_draws(pic_index, draws_start);
 
     if let Some(snapshot) = &pic.snapshot {
         if snapshot.detached {

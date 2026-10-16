@@ -50,6 +50,16 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 // TODO: Move these constants to RS: https://bugzilla.mozilla.org/show_bug.cgi?id=2054153
 export const MAX_HISTORY_ENTRIES = 30;
 const MONITOR_RUN_TIMEOUT_MS = 5 * 60 * 1000;
+// How long monitor checks wait after load for client-rendered content.
+export const PAGE_SETTLE_DELAY_MS = 10 * 1000;
+let pageSettleDelayMs = PAGE_SETTLE_DELAY_MS;
+
+/**
+ * @param {number} delayMs
+ */
+export function setPageSettleDelayForTesting(delayMs) {
+  pageSettleDelayMs = delayMs;
+}
 // Cap on enabled monitors; paused monitors are not counted.
 export const TOTAL_NUM_MONITORS = 15;
 export const TOTAL_NUM_URLS_IN_MONITOR = 5;
@@ -974,7 +984,7 @@ async function extractMonitorPageContent(
   throwIfAborted(signal);
   const results = await withAbortSignal(
     lazy.GetPageContent.getPageContent(
-      { url_list: urls, signal },
+      { url_list: urls, signal, settleDelayMs: pageSettleDelayMs },
       conversation
     ),
     signal

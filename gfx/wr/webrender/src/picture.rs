@@ -136,7 +136,6 @@ use crate::spatial_tree::CoordinateSystemId;
 use crate::surface::{SurfaceDescriptor, SurfaceTileDescriptor, get_surface_rects};
 use crate::surface::{SurfaceIndex, SurfaceInfo, SubpixelMode};
 use smallvec::SmallVec;
-use std::mem;
 use std::ops::Range;
 use crate::picture_textures::PictureCacheTextureHandle;
 use crate::util::{MaxRect, Recycler, ScaleOffset};
@@ -397,13 +396,15 @@ pub struct PrimitiveList {
     /// adding prims to this list, which might be rendered as overlays.
     pub yuv_image_surface_count: usize,
     pub needs_scissor_rect: bool,
+    /// For the contents of a shadow, the offset they were translated by
+    /// relative to the shadowed content (zero otherwise). Their rects are
+    /// snapped relative to the shadowed content's, so the shadow stays a whole
+    /// number of device pixels away from it (bug 2076646).
+    pub shadow_offset: LayoutVector2D,
 }
 
 impl PrimitiveList {
-    /// Construct an empty primitive list. This is
-    /// just used during the take_context / restore_context
-    /// borrow check dance, which will be removed as the
-    /// picture traversal pass is completed.
+    /// Construct an empty primitive list.
     pub fn empty() -> Self {
         PrimitiveList {
             clusters: Vec::new(),
@@ -411,6 +412,7 @@ impl PrimitiveList {
             image_surface_count: 0,
             yuv_image_surface_count: 0,
             needs_scissor_rect: false,
+            shadow_offset: LayoutVector2D::zero(),
         }
     }
 
@@ -585,17 +587,6 @@ pub struct PictureInstance {
     /// composited into the parent picture.
     pub spatial_node_index: SpatialNodeIndex,
 
-    /// Store the state of the previous local rect
-    /// for this picture. We need this in order to know when
-    /// to invalidate segments / drop-shadow gpu cache handles.
-    pub prev_local_rect: LayoutRect,
-
-    /// If false, this picture needs to (re)build segments
-    /// if it supports segment rendering. This can occur
-    /// if the local rect of the picture changes due to
-    /// transform animation and/or scrolling.
-    pub segments_are_valid: bool,
-
     /// Requested raster space for this picture
     pub raster_space: RasterSpace,
 
@@ -690,8 +681,6 @@ impl PictureInstance {
             context_3d,
             is_backface_visible: prim_flags.contains(PrimitiveFlags::IS_BACKFACE_VISIBLE),
             spatial_node_index,
-            prev_local_rect: LayoutRect::zero(),
-            segments_are_valid: false,
             raster_space,
             flags,
             clip_root: None,
@@ -709,7 +698,7 @@ impl PictureInstance {
         data_stores: &DataStores,
         scratch: &mut PrimitiveScratchBuffer,
         tile_caches: &mut FastHashMap<SliceId, Box<TileCacheInstance>>,
-    ) -> Option<(PictureContext, PictureState, PrimitiveList, storage::Index<PictureScratch>)> {
+    ) -> Option<(PictureContext, PictureState, storage::Index<PictureScratch>)> {
         let mut picture_scratch = PictureScratch::empty();
 
         let dbg_flags = DebugFlags::PICTURE_CACHING_DBG | DebugFlags::PICTURE_BORDERS;
@@ -743,18 +732,6 @@ impl PictureInstance {
             frame_context.spatial_tree,
         );
 
-        // TODO: Compute the picture bounds by projecting the parent surface's
-        // culling rect into this surface's raster space, rather than the screen
-        // rect from the root.
-        let pic_bounds = map_pic_to_device
-            .unmap(&map_pic_to_device.bounds)
-            .unwrap_or_else(PictureRect::max_rect);
-
-        let map_local_to_pic = SpaceMapper::new(
-            surface_spatial_node_index,
-            pic_bounds,
-        );
-
         match self.raster_config {
             Some(RasterConfig { surface_index, composite_mode: PictureCompositeMode::TileCache { slice_id }, .. }) => {
                 prepare_tiled_picture_surface(
@@ -768,31 +745,11 @@ impl PictureInstance {
                 );
             }
             Some(ref mut raster_config) => {
-                let (pic_rect, force_scissor_rect) = {
-                    let surface = &frame_state.surfaces[raster_config.surface_index.0];
-                    (surface.clipped_local_rect, surface.force_scissor_rect)
-                };
+                let force_scissor_rect = frame_state
+                    .surfaces[raster_config.surface_index.0]
+                    .force_scissor_rect;
 
                 let parent_surface_index = parent_surface_index.expect("bug: no parent for child surface");
-
-                // Layout space for the picture is picture space from the
-                // perspective of its child primitives.
-                let local_rect = pic_rect * Scale::new(1.0);
-
-                // If the precise rect changed since last frame, we need to invalidate
-                // any segments and gpu cache handles for drop-shadows.
-                // TODO(gw): Requiring storage of the `prev_precise_local_rect` here
-                //           is a total hack. It's required because `prev_precise_local_rect`
-                //           gets written to twice (during initial vis pass and also during
-                //           prepare pass). The proper longer term fix for this is to make
-                //           use of the conservative picture rect for segmenting (which should
-                //           be done during scene building).
-                if local_rect != self.prev_local_rect {
-                    // Invalidate any segments built for this picture, since the local
-                    // rect has changed.
-                    self.segments_are_valid = false;
-                    self.prev_local_rect = local_rect;
-                }
 
                 let max_surface_size = frame_context.max_surface_size() as f32;
 
@@ -847,7 +804,6 @@ impl PictureInstance {
         };
 
         let state = PictureState {
-            map_local_to_pic,
             map_pic_to_device,
         };
 
@@ -875,18 +831,16 @@ impl PictureInstance {
             surface_index,
             dirty_region_count,
             subpixel_mode,
+            shadow_offset: self.prim_list.shadow_offset,
         };
 
-        let prim_list = mem::replace(&mut self.prim_list, PrimitiveList::empty());
-
         let scratch_handle = scratch.frame.pictures.push(picture_scratch);
-        Some((context, state, prim_list, scratch_handle))
+        Some((context, state, scratch_handle))
     }
 
     pub fn restore_context(
         &mut self,
         pic_index: PictureIndex,
-        prim_list: PrimitiveList,
         context: PictureContext,
         frame_context: &FrameBuildingContext,
         frame_state: &mut FrameBuildingState,
@@ -965,8 +919,6 @@ impl PictureInstance {
                 }
             }
         }
-
-        self.prim_list = prim_list;
     }
 
     /// Add a primitive instance to the plane splitter. The function would generate
@@ -1410,6 +1362,7 @@ impl PictureInstance {
         // Snapper into this surface's raster space, reused across all clusters
         // (a no-op for surfaces that don't snap).
         let mut snapper = SpaceSnapper::new(surface, frame_context.spatial_tree);
+        snapper.set_shadow_offset(self.prim_list.shadow_offset);
 
         for cluster in &mut self.prim_list.clusters {
             cluster.flags.remove(ClusterFlags::IS_VISIBLE);
@@ -1749,7 +1702,8 @@ fn prepare_tiled_picture_surface(
                             tile.is_visible = false;
 
                             if frame_context.fb_config.testing {
-                                debug_info.tiles.insert(
+                                debug_info.add_tile(
+                                    sub_slice_index,
                                     tile.tile_offset,
                                     TileDebugInfo::Occluded,
                                 );
@@ -1789,7 +1743,8 @@ fn prepare_tiled_picture_surface(
             // If the tile has been found to be off-screen / clipped, skip any further processing.
             if !tile.is_visible {
                 if frame_context.fb_config.testing {
-                    debug_info.tiles.insert(
+                    debug_info.add_tile(
+                        sub_slice_index,
                         tile.tile_offset,
                         TileDebugInfo::Culled,
                     );
@@ -1858,7 +1813,8 @@ fn prepare_tiled_picture_surface(
 
             if tile.cached_surface.is_valid {
                 if frame_context.fb_config.testing {
-                    debug_info.tiles.insert(
+                    debug_info.add_tile(
+                        sub_slice_index,
                         tile.tile_offset,
                         TileDebugInfo::Valid,
                     );
@@ -2120,7 +2076,8 @@ fn prepare_tiled_picture_surface(
                 }
 
                 if frame_context.fb_config.testing {
-                    debug_info.tiles.insert(
+                    debug_info.add_tile(
+                        sub_slice_index,
                         tile.tile_offset,
                         TileDebugInfo::Dirty(DirtyTileDebugInfo {
                             local_valid_rect: tile.cached_surface.current_descriptor.local_valid_rect,

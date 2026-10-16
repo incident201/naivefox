@@ -15,7 +15,7 @@ prefs = [
 head = "head_enterprise.js"
 prefs = ["browser.ipProtection.override.serverlist=[]"]
 
-["test_IPPAutoRestore.js"]
+["test_IPPAutoActivation.js"]
 
 ["test_IPPChannelFilter.js"]
 

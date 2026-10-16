@@ -106,6 +106,10 @@ export class AIChatContentParent extends JSWindowActorParent {
         this.#handleOpenLink(data);
         break;
 
+      case "AIChatContent:OpenTabGroup":
+        this.#handleOpenTabGroup(data);
+        break;
+
       case "AIChatContent:AccountSignIn":
         this.#handleAccountSignIn();
         break;
@@ -241,6 +245,18 @@ export class AIChatContentParent extends JSWindowActorParent {
     } catch (e) {
       console.warn("Could not open link from AI Window chat", e);
     }
+  }
+
+  #handleOpenTabGroup({ groupId }) {
+    const window = this.browsingContext.topChromeWindow;
+    const tabGroup = window?.gBrowser?.tabGroups.find(
+      group => group.id == groupId
+    );
+    if (!tabGroup) {
+      console.warn("Could not find tab group to open from AI Window chat");
+      return;
+    }
+    tabGroup.select();
   }
 
   async #handleAccountSignIn() {

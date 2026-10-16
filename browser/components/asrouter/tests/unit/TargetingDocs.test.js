@@ -51,7 +51,6 @@ describe("ASRTargeting docs", () => {
       "screenImpressions",
       "browserIsSelected",
       "isAIWindow",
-      "isFirstRun",
       "isFirstStartup",
       "isNonStubFirstRun",
     ];

@@ -18,6 +18,7 @@
 #include "RemoteDecodeUtils.h"
 #include "RemoteImageHolder.h"
 #include "RemoteMediaManagerParent.h"
+#include "mozilla/PRemoteCDMChild.h"
 #include "mozilla/StaticPrefs_media.h"
 #include "mozilla/layers/ImageClient.h"
 #include "mozilla/layers/TextureClient.h"
@@ -138,6 +139,13 @@ MediaResult RemoteVideoDecoderChild::InitIPDL(
       return MediaResult(
           NS_ERROR_DOM_MEDIA_FATAL_ERR,
           RESULT_DETAIL("PRemoteCDMActor is not PRemoteCDMChild."));
+    }
+
+    // If the CDM's process crashed, then the CDM must be recreated by the
+    // caller, and we cannot send it.
+    if (!cdm->CanSend() || cdm->Manager() != manager) {
+      return MediaResult(NS_ERROR_DOM_MEDIA_FATAL_ERR,
+                         RESULT_DETAIL("PRemoteCDMChild is in stale process."));
     }
   }
 

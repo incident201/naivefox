@@ -2287,6 +2287,7 @@ nsStyleDisplay::nsStyleDisplay()
           StyleBlockEllipsis::Ellipsis(),
           false},
       mShapeMargin(LengthPercentage::Zero()),
+      mFitTolerance(StyleFitTolerance::Normal()),
       mShapeOutside(StyleShapeOutside::None()) {
   MOZ_COUNT_CTOR(nsStyleDisplay);
 }
@@ -2346,6 +2347,7 @@ nsStyleDisplay::nsStyleDisplay(const nsStyleDisplay& aSource)
       mWebkitLineClamp(aSource.mWebkitLineClamp),
       mShapeImageThreshold(aSource.mShapeImageThreshold),
       mShapeMargin(aSource.mShapeMargin),
+      mFitTolerance(aSource.mFitTolerance),
       mShapeOutside(aSource.mShapeOutside),
       mAnchorName(aSource.mAnchorName),
       mAnchorScope(aSource.mAnchorScope) {
@@ -2609,6 +2611,10 @@ nsChangeHint nsStyleDisplay::CalcDifference(
     // XXX Can this just be AllReflowHints + RepaintFrame, and be included in
     // the block below?
     hint |= NS_STYLE_HINT_REFLOW;
+  }
+
+  if (mFitTolerance != aNewData.mFitTolerance) {
+    hint |= nsChangeHint_AllReflowHints;
   }
 
   // XXX the following is conservative, for now: changing float breaking
@@ -3707,21 +3713,29 @@ ContainSizeAxes nsStyleDisplay::GetContainSizeAxes(
     return ContainSizeAxes(false, false);
   }
 
+  // Handle cases where size containment does not apply:
   if (PrecludesSizeContainmentOrContentVisibilityWithFrame(aFrame)) {
     return ContainSizeAxes(false, false);
   }
 
+  // Handle two cases where we're size-contained in both axes:
+  // 1. If mEffectiveContainment trivially has size containment in both axes.
+  // 2. If this content skips its content via content-visibility, it always has
+  // size containment in both axes.
   // https://drafts.csswg.org/css-contain-2/#content-visibility
-  // If this content skips its content via content-visibility, it always has
-  // size containment.
-  if (MOZ_LIKELY(!(mEffectiveContainment & StyleContain::SIZE)) &&
+  //
+  // (Note: we check mEffectiveContainment first, because it's trivial to
+  // test that, and less-trivial to call HidesContent(); so it's nice to skip
+  // the HidesContent() invocation when it's not needed.)
+  bool hasContainInlineSize(mEffectiveContainment & StyleContain::INLINE_SIZE);
+  bool hasContainBlockSize(mEffectiveContainment & StyleContain::BLOCK_SIZE);
+  if (MOZ_UNLIKELY(hasContainBlockSize && hasContainInlineSize) ||
       MOZ_UNLIKELY(aFrame.HidesContent())) {
     return ContainSizeAxes(true, true);
   }
 
-  return ContainSizeAxes(
-      static_cast<bool>(mEffectiveContainment & StyleContain::INLINE_SIZE),
-      static_cast<bool>(mEffectiveContainment & StyleContain::BLOCK_SIZE));
+  // This handles cases where we're size-contained in no axes or one axis:
+  return ContainSizeAxes(hasContainInlineSize, hasContainBlockSize);
 }
 
 StyleContentVisibility nsStyleDisplay::ContentVisibility(

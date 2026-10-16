@@ -925,6 +925,7 @@ class BrowserParent final : public PBrowserParent,
     CodeNameIndex mCodeNameIndex;
     Modifiers mModifiers;
     nsID mUUID;
+    CopyableTArray<AlternativeCharCode> mAlternativeCharCodes;
   };
   nsTArray<SentKeyEventData> mWaitingReplyKeyboardEvents;
 

@@ -536,6 +536,26 @@ class IPProtectionReducerTest {
     }
 
     @Test
+    fun `GIVEN no active proxy WHEN the service cannot run THEN no deactivation is requested`() {
+        val actions =
+            listOf(ServiceState.Unauthenticated, ServiceState.OptedOut, ServiceState.Unavailable).map {
+                IPProtectionAction.EngineStateChanged(StateInfo(serviceState = it))
+            }
+
+        listOf(Uninitialized, Authorized.Idle).forEach { proxyStatus ->
+            actions.forEach { action ->
+                val state = buildIPProtectionState(proxyStatus = proxyStatus)
+
+                assertEquals(
+                    "No deactivation expected for $action with a $proxyStatus proxy",
+                    null,
+                    iPProtectionReducer(state, action).pendingActivationRequest,
+                )
+            }
+        }
+    }
+
+    @Test
     fun `WHEN the engine resets to uninitialized THEN a queued activation is cleared so a later request reads as new`() {
         val state = buildIPProtectionState().copy(pendingActivationRequest = PendingActivationRequest.Activate(null))
         val info = StateInfo(serviceState = ServiceState.Uninitialized)
@@ -636,7 +656,6 @@ class IPProtectionReducerTest {
     fun `WHEN AccountManagerStateChanged reports an authoritative account standing THEN it is applied`() {
         // These statuses reflect the account manager's authoritative view of the account.
         listOf(
-                AccountStatus.WarmingUp,
                 AccountStatus.NoAccount,
                 AccountStatus.NeedsAuthentication,
                 AccountStatus.NeedsAuthorization,
@@ -655,6 +674,20 @@ class IPProtectionReducerTest {
                     resultState.accountState.status,
                 )
             }
+    }
+
+    @Test
+    fun `GIVEN any account status WHEN the account manager reports WarmingUp THEN it replaces only Uninitialized`() {
+        AccountStatus.entries.forEach { currentStatus ->
+            val resultState =
+                iPProtectionReducer(
+                    buildIPProtectionState(accountStatus = currentStatus),
+                    InternalAction.AccountManagerStateChanged(AccountStatus.WarmingUp),
+                )
+            val expected = if (currentStatus == AccountStatus.Uninitialized) AccountStatus.WarmingUp else currentStatus
+
+            assertEquals("From $currentStatus", expected, resultState.accountState.status)
+        }
     }
 
     @Test

@@ -8420,9 +8420,65 @@ static Maybe<wr::WrClipChainId> CreateSimpleClipRegion(
   }
 
   const auto& clipPath = style->mClipPath;
-  const auto& shape = *clipPath.AsShape()._0;
-
   auto appUnitsPerDevPixel = frame->PresContext()->AppUnitsPerDevPixel();
+
+  if (clipPath.IsUrl()) {
+    // A trivial <clipPath> whose single child is a simple shape. The shape is
+    // in the clipped frame's user space, which is mapped to the reference
+    // frame the same way SVGIntegrationUtils positions the mask painting.
+    SVGClipPathFrame* clipPathFrame = nullptr;
+    SVGObserverUtils::GetAndObserveClipPath(
+        nsLayoutUtils::FirstContinuationOrIBSplitSibling(frame),
+        &clipPathFrame);
+    CSSRect rect;
+    CSSSize radii;
+    if (!clipPathFrame ||
+        !clipPathFrame->GetSimpleClipShape(frame, &rect, &radii)) {
+      return Nothing();
+    }
+
+    nsPoint offsetToBoundingBox =
+        aDisplayItem.ToReferenceFrame() -
+        SVGIntegrationUtils::GetOffsetToBoundingBox(frame);
+    if (!frame->IsSVGFrame()) {
+      nsPresContext* pc = frame->PresContext();
+      offsetToBoundingBox =
+          nsPoint(pc->RoundAppUnitsToNearestDevPixels(offsetToBoundingBox.x),
+                  pc->RoundAppUnitsToNearestDevPixels(offsetToBoundingBox.y));
+    }
+    const auto cssToDev = frame->PresContext()->CSSToDevPixelScale();
+    LayoutDevicePoint offset =
+        LayoutDevicePoint::FromAppUnits(offsetToBoundingBox,
+                                        appUnitsPerDevPixel) -
+        SVGUtils::FrameSpaceInCSSPxToUserSpaceOffset(frame) * cssToDev;
+
+    LayoutDeviceRect devRect = rect * cssToDev;
+    devRect.MoveBy(offset);
+    LayoutDeviceSize devRadii = radii * cssToDev;
+    wr::LayoutRect wrRect = wr::ToLayoutRect(devRect);
+
+    wr::WrClipId clipId{};
+    if (devRadii.IsEmpty()) {
+      clipId = aBuilder.DefineRectClip(Nothing(), wrRect);
+    } else {
+      wr::ComplexClipRegion region;
+      region.rect = wrRect;
+      region.radii = wr::EmptyBorderRadius();
+      wr::LayoutSize r{devRadii.width, devRadii.height};
+      region.radii.top_left = r;
+      region.radii.top_right = r;
+      region.radii.bottom_left = r;
+      region.radii.bottom_right = r;
+      region.inset = wr::EmptyLayoutSideOffsets();
+      region.mode = wr::ClipMode::Clip;
+      clipId = aBuilder.DefineRoundedRectClip(Nothing(), region);
+    }
+    wr::WrClipChainId clipChainId = aBuilder.DefineClipChain(
+        {&clipId, 1}, aBuilder.CurrentClipChainIdIfNotRoot());
+    return Some(clipChainId);
+  }
+
+  const auto& shape = *clipPath.AsShape()._0;
   const nsRect refBox =
       nsLayoutUtils::ComputeClipPathGeometryBox(frame, clipPath.AsShape()._1);
 

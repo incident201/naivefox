@@ -767,7 +767,6 @@ pref("dom.allow_scripts_to_close_windows",          false);
 
 pref("dom.popup_allowed_events", "change click dblclick auxclick mousedown mouseup pointerdown pointerup notificationclick reset submit touchend contextmenu");
 
-pref("dom.storage.shadow_writes", false);
 pref("dom.storage.snapshot_prefill", 16384);
 pref("dom.storage.snapshot_gradual_prefill", 4096);
 pref("dom.storage.snapshot_reusing", true);
@@ -1361,11 +1360,6 @@ pref("network.negotiate-auth.allow-proxies", true);
 
 // Path to a specific gssapi library
 pref("network.negotiate-auth.gsslib", "");
-
-#ifdef XP_WIN
-  // Default to using the SSPI intead of GSSAPI on windows
-  pref("network.auth.use-sspi", true);
-#endif
 
 // Controls which NTLM authentication implementation we default to. True forces
 // the use of our generic (internal) NTLM authentication implementation vs. any
@@ -3463,6 +3457,12 @@ pref("browser.search.separatePrivateDefault.enabled", false);
 pref("browser.search.separatePrivateDefault.featureGate", false);
 pref("browser.search.removeEngineInfobar.enabled", true);
 
+// Enables a new search configuration style with no functional changes for the
+// user. This is solely intended as a rollout button - it will go away once the
+// new configuration has been rolled out.
+// Whether search-config-v3 is enabled.
+pref("browser.search.configV3.featureGate", false);
+
 // GMPInstallManager prefs
 
 // User-settable override to media.gmp-manager.url for testing purposes.
@@ -4078,6 +4078,10 @@ pref("extensions.formautofill.useml.timeoutMS", 120000);
 // Controlled by the autofill-ml-ignore-field-types Nimbus feature.
 pref("extensions.formautofill.useml.ignoreFieldTypes", "");
 
+// If ML identifies a field as 'other' or cannot identify a field,
+// use the heuristics value instead if assigned.
+pref("extensions.formautofill.useml.useHeuristicsForOther", false);
+
 // Optional AutoFill tokenizer features, as a JSON array of feature keys that
 // change a field's exported mlData:
 //   "select_option"    - "<first>...<last>" option-range token for a <select>.
@@ -4089,6 +4093,14 @@ pref("extensions.formautofill.useml.ignoreFieldTypes", "");
 // Default "[]" (none). Each feature changes the mlData contract, so the consuming
 // model must be trained with the same features enabled.
 pref("extensions.formautofill.useml.features", "[]");
+
+// Field types whose regex-heuristic recommendation is fed to the model as a
+// "**hint<class>" token (the "regex_hint" mlFeature); a regex prediction outside
+// this set becomes "**hintnone". Only takes effect when "regex_hint" is in
+// useml.features. This list is part of the model's input contract and must match
+// the hintable set the shipped model was trained with.
+pref("extensions.formautofill.useml.hint.fields",
+  "[\"email\",\"tel\",\"tel-country-code\",\"street-address\",\"address-line1\",\"address-line2\",\"address-line3\",\"postal-code\",\"address-level1\",\"address-level2\",\"organization\",\"country\",\"name\",\"given-name\",\"family-name\",\"cc-name\",\"cc-type\"]");
 
 // Pin the ML model revision to load (the encoder and head engines share one
 // version). Empty = use the Remote Settings default.
@@ -4118,14 +4130,9 @@ pref("extensions.formautofill.addresses.storage.rust.enabled", false);
 // reading from where its addresses are.
 pref("extensions.formautofill.addresses.storage.rust.active", false);
 // Run the migration purely to measure it, while the pref above is still off.
-// The copy is reported through migrate_to_rust and then wiped. Nightly only,
-// and once per profile per generation: it is what says whether the real move is
-// safe to make.
-#ifdef NIGHTLY_BUILD
-  pref("extensions.formautofill.addresses.storage.rust.runMigrationTest", true);
-#else
-  pref("extensions.formautofill.addresses.storage.rust.runMigrationTest", false);
-#endif
+// The copy is reported through migrate_to_rust and then wiped, once per profile
+// per generation: it is what says whether the real move is safe to make.
+pref("extensions.formautofill.addresses.storage.rust.runMigrationTest", false);
 // Which generation of the dry run above this profile has done, so a build that
 // fixes a migration bug can bump it and measure the same profiles again.
 pref("extensions.formautofill.addresses.storage.rust.migrationTestVersion", 0);
@@ -4142,8 +4149,14 @@ pref("extensions.formautofill.creditCards.storage.rust.enabled", false);
 // reading from where its cards are.
 pref("extensions.formautofill.creditCards.storage.rust.active", false);
 // Run the migration purely to measure it, while the pref above is still off.
-// The copy is reported through migrate_to_rust and then wiped.
-pref("extensions.formautofill.creditCards.storage.rust.runMigrationTest", false);
+// The copy is reported through migrate_to_rust and then wiped. Nightly only,
+// and once per profile per generation: it is what says whether the real move is
+// safe to make.
+#ifdef NIGHTLY_BUILD
+  pref("extensions.formautofill.creditCards.storage.rust.runMigrationTest", true);
+#else
+  pref("extensions.formautofill.creditCards.storage.rust.runMigrationTest", false);
+#endif
 // Which generation of the dry run above this profile has done, so a build that
 // fixes a migration bug can bump it and measure the same profiles again.
 pref("extensions.formautofill.creditCards.storage.rust.migrationTestVersion", 0);

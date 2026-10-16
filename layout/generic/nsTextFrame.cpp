@@ -1467,8 +1467,16 @@ BuildTextRunsScanner::FindBoundaryResult BuildTextRunsScanner::FindBoundaries(
     }
     const CharacterDataBuffer& characterDataBuffer =
         textFrame->CharacterDataBuffer();
-    uint32_t start = textFrame->GetContentOffset();
-    uint32_t length = textFrame->GetContentLength();
+    const int32_t start = textFrame->GetContentOffset();
+    const int32_t end = textFrame->GetContentEnd();
+    const int32_t bufferLength = characterDataBuffer.GetLength();
+
+    if (MOZ_UNLIKELY(start < 0 || end < start || end > bufferLength)) {
+      MOZ_ASSERT_UNREACHABLE("Invalid text-frame content range");
+      return FB_CONTINUE;
+    }
+
+    int32_t length = end - start;
     const void* text;
     const nsAtom* language = textFrame->StyleFont()->GetLangAtom();
     if (characterDataBuffer.Is2b()) {
@@ -10756,7 +10764,7 @@ void nsTextFrame::SetFirstLetterLength(int32_t aLength) {
     next = letterFrame->CreateContinuationForFramesAfter(this);
   }
 
-  next->mContentOffset = GetContentOffset() + aLength;
+  SetLength(aLength, nullptr, 0);
 
   ClearTextRuns();
 }

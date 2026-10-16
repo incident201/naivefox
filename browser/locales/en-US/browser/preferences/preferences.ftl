@@ -195,9 +195,6 @@ always-check-default =
 startup-restore-windows-and-tabs =
     .label = Open previous windows and tabs
     .accesskey = s
-startup-windows-launch-on-login-profile-disabled =
-    .message = Enable this preference by checking “{ profile-manager-use-selected.label }” in the “Choose User Profile” window.
-
 windows-launch-on-login =
     .label = Open { -brand-short-name } automatically when your computer starts up
     .accesskey = O
@@ -1412,6 +1409,8 @@ sync-syncing-across-devices-heading = You are syncing these items across all you
 
 sync-syncing-across-devices-heading-2 = Data synced across devices
 
+sync-syncing-across-devices-heading-3 = Data syncing on this device
+
 sync-syncing-across-devices-empty-state2 =
     .label = Manage synced data
     .description = You aren’t syncing anything… yet. Start syncing to get all of your data on all your devices.
@@ -2108,6 +2107,17 @@ permissions-addon-install-warning3 =
 permissions-addon-exceptions2 =
     .label = Choose which websites can install extensions
     .accesskey = E
+
+# App links are links that a website can ask to open for you, like email
+# (mailto:) links.
+permissions-allow-app-links =
+    .label = Allow sites to ask to open app links.
+    .accesskey = A
+
+# Opens the list of sites that are blocked from asking to open app links.
+permissions-app-links-manage-button =
+    .label = Manage blocked sites
+    .accesskey = M
 
 ## Privacy Section - Data Collection
 

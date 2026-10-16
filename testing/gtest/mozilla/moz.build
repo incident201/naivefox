@@ -26,6 +26,7 @@ if CONFIG["ENABLE_TESTS"]:
         # The minimal product needs only the runner. The remaining Mozilla
         # gtest helpers pull browser/media headers that are outside its graph.
         SOURCES += ["GTestRunner.cpp", "MozAssertions.cpp"]
+        SOURCE_HEADERS += ["GTestRunner.h"]
     else:
         SOURCES += [
             "GTestRunner.cpp",
@@ -33,6 +34,10 @@ if CONFIG["ENABLE_TESTS"]:
             "MozGTestBench.cpp",
             "MozHelpers.cpp",
             "SanityTest.cpp",
+        ]
+        SOURCE_HEADERS += [
+            "GTestRunner.h",
+            "MozGTestBench.h",
         ]
 
     LOCAL_INCLUDES += ["/xpcom/tests"]

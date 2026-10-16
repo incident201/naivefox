@@ -461,22 +461,6 @@ bool Compartment::wrap(JSContext* cx, MutableHandle<GCVector<Value>> vec) {
   return true;
 }
 
-static inline bool ShouldTraceWrapper(JSObject* wrapper,
-                                      gc::EdgeSelector whichEdges) {
-  switch (whichEdges) {
-    case gc::AllEdges:
-      return true;
-    case gc::NonGrayEdges:
-      return !wrapper->isMarkedGray();
-    case gc::GrayEdges:
-      return wrapper->isMarkedGray();
-    case gc::BlackEdges:
-      return wrapper->isMarkedBlack();
-    default:
-      MOZ_CRASH("Unexpected EdgeSelector value");
-  }
-}
-
 void Compartment::traceWrapperTargetsInCollectedZones(
     JSTracer* trc, gc::EdgeSelector whichEdges) {
   // Trace cross compartment wrapper private pointers into collected zones to
@@ -496,7 +480,7 @@ void Compartment::traceWrapperTargetsInCollectedZones(
     for (auto iter = objectWrapperMappingsTo(c); !iter.done(); iter.next()) {
       JSObject* obj = iter.get().value().unbarrieredGet();
       ProxyObject* wrapper = &obj->as<ProxyObject>();
-      if (ShouldTraceWrapper(wrapper, whichEdges)) {
+      if (ShouldTraceEdge(wrapper, whichEdges)) {
         ProxyObject::traceEdgeToTarget(trc, wrapper);
       }
     }

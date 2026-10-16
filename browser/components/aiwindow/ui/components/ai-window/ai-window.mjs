@@ -61,10 +61,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "moz-src:///browser/components/aiwindow/models/ConversationSuggestions.sys.mjs",
   generateConversationStartersSidebar:
     "moz-src:///browser/components/aiwindow/models/ConversationSuggestions.sys.mjs",
-  generateResumeActivityConversationStarters:
-    "moz-src:///browser/components/aiwindow/models/ConversationSuggestions.sys.mjs",
-  constructConversationToResumeActivity:
-    "moz-src:///browser/components/aiwindow/models/ConversationSuggestions.sys.mjs",
+  JourneyManager:
+    "moz-src:///browser/components/aiwindow/models/memories/journeys/JourneyManager.sys.mjs",
   MemoriesManager:
     "moz-src:///browser/components/aiwindow/models/memories/MemoriesManager.sys.mjs",
   getAllModelsData:
@@ -853,6 +851,18 @@ export class AIWindow extends MozLitElement {
     }
   }
 
+  // Show the suggestions above the input when the Smartbar is at the bottom
+  // of the window, so the list is not cut off. The Smartbar is at the bottom
+  // in sidebar mode, and in fullpage mode after a chat starts.
+  #updateSmartbarSuggestionsPosition() {
+    const isAtBottom =
+      this.mode === MODE.SIDEBAR || this.classList.contains("chat-active");
+    this.#smartbar?.setAttribute(
+      "suggestions-position",
+      isAtBottom ? "top" : "bottom"
+    );
+  }
+
   #setupWindowModeObserver() {
     this.#windowModeObserver = (subject, topic) => {
       if (topic === "ai-window-state-changed") {
@@ -1404,8 +1414,7 @@ export class AIWindow extends MozLitElement {
         await this.#refreshHasMemories();
 
         if (this.#resumeActivityMemoriesEnabled) {
-          resumeStartersPromise =
-            lazy.generateResumeActivityConversationStarters();
+          resumeStartersPromise = lazy.JourneyManager.suggestJourneysToResume();
 
           if (this.resumeCardsPref) {
             this.resumeCardsLoading = true;
@@ -1689,17 +1698,35 @@ export class AIWindow extends MozLitElement {
         break;
 
       case "snooze":
-        lazy.ResumeActivity.dismissMemory(journeyId);
-        this.resumeCards = this.resumeCards.filter(
-          ({ memory }) => memory.id !== journeyId
-        );
-        if (!this.resumeCards.length) {
-          this.resumeCardsEmptyReason =
-            RESUME_SECTION_EMPTY_REASON.ALL_DISMISSED;
-        }
+        this.#snoozeResumeCard(journeyId);
         break;
     }
   };
+
+  /**
+   * Handles a resume card's close button by snoozing the card.
+   *
+   * @param {CustomEvent} event - The dismiss event
+   * @private
+   */
+  #handleResumeCardDismiss = event => {
+    this.#snoozeResumeCard(event.detail.journeyId);
+  };
+
+  /**
+   * Dismisses a resume card for the rest of the session.
+   *
+   * @param {string} journeyId - The resume card's journey/memory id
+   */
+  #snoozeResumeCard(journeyId) {
+    lazy.ResumeActivity.dismissMemory(journeyId);
+    this.resumeCards = this.resumeCards.filter(
+      ({ memory }) => memory.id !== journeyId
+    );
+    if (!this.resumeCards.length) {
+      this.resumeCardsEmptyReason = RESUME_SECTION_EMPTY_REASON.ALL_DISMISSED;
+    }
+  }
 
   /**
    * Opens a resume card's preview tabs as a group without the current
@@ -1759,12 +1786,6 @@ export class AIWindow extends MozLitElement {
       smartbarWrapper.appendChild(smartbar);
       this.renderRoot.querySelector("#smartbar-slot").append(smartbarWrapper);
 
-      // Always show the list of suggestions above input in sidebar mode and
-      // below when in fullpage mode.
-      smartbar.setAttribute(
-        "suggestions-position",
-        this.mode === MODE.SIDEBAR ? "top" : "bottom"
-      );
       smartbar.isSidebarMode = this.mode == MODE.SIDEBAR;
 
       smartbar.addEventListener("input", this.#handleSmartbarInput);
@@ -1778,6 +1799,7 @@ export class AIWindow extends MozLitElement {
       );
     }
     this.#smartbar = smartbar;
+    this.#updateSmartbarSuggestionsPosition();
     this.#memoriesButton = smartbar.querySelector("memories-icon-button");
     this.syncSmartbarMemoriesStateFromConversation();
 
@@ -2209,6 +2231,8 @@ export class AIWindow extends MozLitElement {
    *   the conversation's existing system prompt instead of reloading it.
    * @param {object} [options.assistantToolUIData] - Tool UI attached to the
    *   assistant message so it renders alongside the streamed response.
+   * @param {string} [options.aitabSource] - Where an AI Tab page was requested
+   *   from (tab_list or tab_group), for telemetry.
    */
   submitChatMessage({
     text,
@@ -2221,6 +2245,7 @@ export class AIWindow extends MozLitElement {
     skipPromptGeneration = false,
     skipSystemPromptRefresh = false,
     assistantToolUIData,
+    aitabSource = null,
   }) {
     const trimmed = String(text ?? "").trim();
     if (!trimmed) {
@@ -2249,6 +2274,7 @@ export class AIWindow extends MozLitElement {
 
     if (this.#conversation) {
       this.#conversation.lastSubmitType = submitType;
+      this.#conversation.aitabSource = aitabSource;
     }
 
     this.#recordChatInteraction();
@@ -2390,13 +2416,14 @@ export class AIWindow extends MozLitElement {
     try {
       if (this.#resumeActivityMemoriesEnabled) {
         try {
-          conversation = await lazy.constructConversationToResumeActivity(
-            {
-              memory: resumePrompt.memory,
-              content: resumePrompt.content,
-            },
-            conversationAtClick?.id
-          );
+          conversation =
+            await lazy.JourneyManager.constructConversationToResumeJourney(
+              {
+                memory: resumePrompt.memory,
+                content: resumePrompt.content,
+              },
+              conversationAtClick?.id
+            );
           hasBespokeSystemPrompt = !!conversation;
         } catch (e) {
           lazy.log.error(
@@ -2650,6 +2677,7 @@ export class AIWindow extends MozLitElement {
   #resetConversationState() {
     this.classList.remove("chat-active");
     this.#updateBrowserTabbable();
+    this.#updateSmartbarSuggestionsPosition();
     this.#hostBrowser?.setAttribute(
       "data-conversation-id",
       this.#conversation.id
@@ -2661,6 +2689,7 @@ export class AIWindow extends MozLitElement {
     if (isActive) {
       this.classList.add("chat-active");
       this.#updateBrowserTabbable();
+      this.#updateSmartbarSuggestionsPosition();
       this.#smartbar?.suppressStartQuery({ permanent: true });
       this.#smartbar?.view.close();
       if (this.#smartbar?.inputField) {
@@ -2671,6 +2700,7 @@ export class AIWindow extends MozLitElement {
 
     this.classList.remove("chat-active");
     this.#updateBrowserTabbable();
+    this.#updateSmartbarSuggestionsPosition();
     this.#smartbar?.unsuppressStartQuery();
     if (this.#smartbar?.inputField) {
       this.#smartbar.inputField.showPlaceholderAnimation =
@@ -3929,6 +3959,8 @@ export class AIWindow extends MozLitElement {
                       .#handleResumeCardResume}
                     @smartwindow-resume-card:menu-item-selected=${this
                       .#handleResumeCardMenuItemSelected}
+                    @smartwindow-resume-card:dismiss=${this
+                      .#handleResumeCardDismiss}
                     @smartwindow-resume-section:hide=${this
                       .#handleResumeSectionHide}
                   ></smartwindow-resume-section>

@@ -140,6 +140,48 @@ describe("MultiStageAboutWelcome module", () => {
       stub.restore();
     });
 
+    it("should dismiss a screen with auto_dismiss after the configured time", () => {
+      let clock = sinon.useFakeTimers();
+      const screens = [
+        {
+          id: "LAST_CARD",
+          auto_dismiss: { after: 6000 },
+          content: {
+            position: "card-stack",
+            layout: "last-card",
+            title: "test title",
+            subtitle: "test subtitle",
+          },
+        },
+      ];
+      const finishStub = sandbox.stub(global, "AWFinish");
+      const telemetryStub = sandbox.stub(
+        MultiStageUtils,
+        "sendActionTelemetry"
+      );
+      const wrapper = mount(
+        <MultiStageAboutWelcome
+          defaultScreens={screens}
+          message_id="TEST_MESSAGE"
+          startScreen={0}
+        />
+      );
+
+      clock.tick(5999);
+      assert.notCalled(finishStub);
+      clock.tick(1);
+      assert.calledOnce(finishStub);
+      assert.calledOnceWithExactly(
+        telemetryStub,
+        "TEST_MESSAGE_0_LAST_CARD",
+        "auto_dismiss",
+        "AUTO_DISMISS"
+      );
+
+      wrapper.unmount();
+      clock.restore();
+    });
+
     it("should autoAdvance on last screen and send appropriate telemetry", () => {
       let clock = sinon.useFakeTimers();
       const screens = [
@@ -633,6 +675,57 @@ describe("MultiStageAboutWelcome module", () => {
       assert.ok(
         hadImpression,
         "Expected at least one IMPRESSION event after paint"
+      );
+
+      sendEventStub.restore();
+    });
+
+    it("records how a pinnable_sites tile was composed on impression", async () => {
+      const screens = [
+        {
+          id: "TEST_SCREEN_AB",
+          content: {
+            title: "test title",
+            tiles: {
+              type: "pinnable_sites",
+              data: [
+                {
+                  id: "site_1",
+                  url: "https://a.example.com",
+                  personalized: true,
+                },
+                {
+                  id: "site_2",
+                  url: "https://b.example.com",
+                  personalized: true,
+                },
+                { id: "curated-gmail", url: "https://mail.google.com" },
+              ],
+            },
+          },
+        },
+      ];
+      const sendEventStub = sinon.stub(global, "AWSendEventTelemetry");
+
+      mount(
+        <MultiStageAboutWelcome {...DEFAULT_PROPS} defaultScreens={screens} />
+      );
+      await spinEventLoop();
+
+      const impression = sendEventStub
+        .getCalls()
+        .map(c => c.args[0])
+        .find(ping => ping?.event === "IMPRESSION");
+
+      assert.equal(
+        impression.event_context.personalized_sites,
+        2,
+        "the impression records how many rows came from the user's history"
+      );
+      assert.equal(
+        impression.event_context.total_sites,
+        3,
+        "and how many rows there were, so conversion has a per-slot denominator"
       );
 
       sendEventStub.restore();

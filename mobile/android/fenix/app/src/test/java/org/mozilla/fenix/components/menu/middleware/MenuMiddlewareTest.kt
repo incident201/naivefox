@@ -12,6 +12,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
 import mozilla.components.compose.base.text.Text
 import mozilla.components.compose.menu.data.MenuItem
+import mozilla.components.compose.menu.data.MenuItemTitle
 import mozilla.components.compose.menu.data.MenuItemsGroup
 import mozilla.components.compose.menu.data.StandardMenuItem
 import mozilla.components.compose.menu.store.MenuAction as MenuStoreAction
@@ -20,8 +21,8 @@ import mozilla.components.compose.menu.store.MenuState
 import mozilla.components.compose.menu.store.MenuStore
 import mozilla.components.lib.state.Middleware
 import org.junit.Test
-import org.mozilla.fenix.components.menu.BrowserMenuBuilder
 import org.mozilla.fenix.components.menu.FenixMenuItem.CustomizeReaderView
+import org.mozilla.fenix.components.menu.MenuBuilder
 import org.mozilla.fenix.components.menu.MenuHost
 import org.mozilla.fenix.components.menu.MenuItemEventRouter
 import org.mozilla.fenix.components.menu.MenuItemProvider
@@ -124,7 +125,7 @@ class MenuMiddlewareTest {
             middleware =
                 listOf(
                     MenuMiddleware(
-                        browserMenuBuilder = BrowserMenuBuilder(registry),
+                        menuBuilder = MenuBuilder(registry),
                         eventRouter = MenuItemEventRouter(registry = registry, host = FakeMenuHost()),
                         scope = CoroutineScope(testDispatcher),
                     )
@@ -149,7 +150,7 @@ class MenuMiddlewareTest {
 
         val readerViewItem =
             StandardMenuItem(
-                title = Text.String("Customize reader view"),
+                title = MenuItemTitle(Text.String("Customize reader view")),
                 onClickEvent = MenuAction.CustomizeReaderView,
             )
     }

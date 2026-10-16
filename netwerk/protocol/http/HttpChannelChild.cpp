@@ -353,11 +353,13 @@ void HttpChannelChild::ProcessOnStartRequest(
   LOG(("HttpChannelChild::ProcessOnStartRequest [this=%p]\n", this));
   MOZ_ASSERT(OnSocketThread());
 
-  mAltDataInputStream = DeserializeIPCStream(aAltData.altDataInputStream());
+  nsCOMPtr<nsIInputStream> altDataInputStream =
+      DeserializeIPCStream(aAltData.altDataInputStream());
 
   mEventQ->RunOrEnqueue(MakeUnique<NeckoTargetChannelFunctionEvent>(
       this, [self = UnsafePtr<HttpChannelChild>(this), aResponseHead,
-             aUseResponseHead, aRequestHeaders, aArgs]() {
+             aUseResponseHead, aRequestHeaders, aArgs, altDataInputStream]() {
+        self->mAltDataInputStream = altDataInputStream;
         self->OnStartRequest(aResponseHead, aUseResponseHead, aRequestHeaders,
                              aArgs);
       }));
@@ -662,8 +664,10 @@ void HttpChannelChild::OnTransportAndData(const nsresult& aChannelStatus,
                                           const nsACString& aData) {
   LOG(("HttpChannelChild::OnTransportAndData [this=%p]\n", this));
 
-  if (!mCanceled && NS_SUCCEEDED(mStatus)) {
-    mStatus = aChannelStatus;
+  nsresult status = mStatus;
+  while (!mCanceled && NS_SUCCEEDED(status) &&
+         !mStatus.compareExchange(status, aChannelStatus)) {
+    status = mStatus;
   }
 
   if (mCanceled || NS_FAILED(mStatus)) {
@@ -1890,6 +1894,7 @@ void HttpChannelChild::CleanupRedirectingChannel(nsresult rv) {
 
   if (NS_SUCCEEDED(rv)) {
     mLoadInfo->AppendRedirectHistoryEntry(this, false);
+    MaybeReportTimingDataForRedirect(mRedirectChannelChild);
   } else {
     NS_WARNING("CompleteRedirectSetup failed, HttpChannelChild already open?");
   }
@@ -2576,8 +2581,6 @@ nsresult HttpChannelChild::ContinueAsyncOpen() {
   openArgs.dispatchFetchEventEnd() = mDispatchFetchEventEnd;
   openArgs.handleFetchEventStart() = mHandleFetchEventStart;
   openArgs.handleFetchEventEnd() = mHandleFetchEventEnd;
-
-  openArgs.forceMainDocumentChannel() = LoadForceMainDocumentChannel();
 
   openArgs.navigationStartTimeStamp() = navigationStartTimeStamp;
   openArgs.earlyHintPreloaderId() = mEarlyHintPreloaderId;

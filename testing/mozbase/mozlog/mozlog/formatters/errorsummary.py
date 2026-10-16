@@ -187,6 +187,39 @@ class ErrorSummaryFormatter(BaseFormatter):
 
         return self._output_test(test, None, item)
 
+    def assertion_count(self, item):
+        count = item["count"]
+        min_expected = item["min_expected"]
+        max_expected = item["max_expected"]
+        if min_expected <= count <= max_expected:
+            return
+
+        if min_expected != max_expected:
+            expected = f"{min_expected} to {max_expected}"
+        else:
+            expected = str(min_expected)
+        if count < min_expected:
+            status, expected_status = "PASS", "FAIL"
+            comparison = "is less than"
+        else:
+            status, expected_status = "FAIL", "PASS"
+            comparison = "is more than"
+
+        test = self._clean_test_name(item["test"])
+        group = self.test_to_group.get(test)
+        if group:
+            self.groups[group]["status"] = "ERROR"
+
+        return self._output_test(
+            test,
+            None,
+            {
+                "status": status,
+                "expected": expected_status,
+                "message": f"assertion count {count} {comparison} expected {expected} assertions",
+            },
+        )
+
     def log(self, item):
         if item["level"] not in ("ERROR", "CRITICAL"):
             return
@@ -226,7 +259,10 @@ class ErrorSummaryFormatter(BaseFormatter):
                     data["group"] = self._clean_test_name(item["test"])
 
             # unlike test group summary, if we crash expect error unless expected
-            if (
+            # or logged quietly (e.g. the test will be retried)
+            if item.get("quiet"):
+                pass
+            elif (
                 (
                     "expected" in item
                     and "status" in item

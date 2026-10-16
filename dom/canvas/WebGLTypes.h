@@ -102,7 +102,6 @@ class TexUnpackSurface;
 }  // namespace webgl
 
 class ClientWebGLContext;
-struct WebGLTexPboOffset;
 class WebGLTexture;
 class WebGLBuffer;
 class WebGLFramebuffer;
@@ -222,6 +221,7 @@ enum class WebGLExtensionID : uint8_t {
   EXT_texture_compression_bptc,
   EXT_texture_compression_rgtc,
   EXT_texture_filter_anisotropic,
+  EXT_texture_mirror_clamp_to_edge,
   EXT_texture_norm16,
   MOZ_debug,
   OES_draw_buffers_indexed,
@@ -614,15 +614,6 @@ enum class ContextLossReason : uint8_t {
   Guilty,
 };
 
-inline bool ReadContextLossReason(const uint8_t val,
-                                  ContextLossReason* const out) {
-  if (val > static_cast<uint8_t>(ContextLossReason::Guilty)) {
-    return false;
-  }
-  *out = static_cast<ContextLossReason>(val);
-  return true;
-}
-
 // -
 
 struct InitContextDesc final {
@@ -640,6 +631,9 @@ struct InitContextDesc final {
 };
 
 constexpr uint32_t kMaxTransformFeedbackSeparateAttribs = 4;
+
+// This matches ANGLE's IMPLEMENTATION_MAX_UNIFORM_BLOCK_SIZE.
+constexpr uint32_t kMaxUniformBlockSize = 64 * 1024;
 
 struct Limits final {
   ExtensionBits supportedExtensions;

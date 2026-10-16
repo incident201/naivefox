@@ -22,6 +22,7 @@ import { InstallButton } from "./InstallButton";
 import { SubmenuButton } from "./SubmenuButton";
 
 const DEFAULT_AUTO_ADVANCE_MS = 20000;
+const MAX_TIMEOUT_MS = 2 ** 31 - 1;
 const CORNER_IMAGE_POSITIONS = new Set([
   "bottom-left",
   "bottom-right",
@@ -75,6 +76,47 @@ function resolveDirectionalImage(image) {
   return isRTL && image?.rtl ? { ...image, ...image.rtl } : image;
 }
 
+/**
+ * Dismisses the message once the screen has been shown for `autoDismiss.after`
+ * milliseconds. The countdown only runs while the page is visible and restarts
+ * when it becomes visible again, so the screen can't time out while invisible
+ * in the background.
+ */
+function useAutoDismiss(autoDismiss, messageId) {
+  const after = autoDismiss?.after;
+  useEffect(() => {
+    if (!Number.isFinite(after) || after < 0 || after > MAX_TIMEOUT_MS) {
+      return undefined;
+    }
+
+    let timer = null;
+    let dismissed = false;
+    const dismiss = () => {
+      dismissed = true;
+      MultiStageUtils.sendActionTelemetry(
+        messageId,
+        "auto_dismiss",
+        "AUTO_DISMISS"
+      );
+      window.AWFinish();
+    };
+    const restartCountdown = () => {
+      clearTimeout(timer);
+      timer =
+        !dismissed && document.visibilityState === "visible"
+          ? setTimeout(dismiss, after)
+          : null;
+    };
+
+    restartCountdown();
+    document.addEventListener("visibilitychange", restartCountdown);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("visibilitychange", restartCountdown);
+    };
+  }, [after, messageId]);
+}
+
 export const MultiStageProtonScreen = props => {
   const {
     autoAdvance,
@@ -84,6 +126,7 @@ export const MultiStageProtonScreen = props => {
     navigate,
     order,
   } = props;
+  useAutoDismiss(props.autoDismiss, messageId);
   useEffect(() => {
     if (!autoAdvance && !advanceOnExperimentLoad) {
       return () => {};
@@ -1142,6 +1185,9 @@ export class ProtonScreen extends React.PureComponent {
         }}
         no-rdm={content.no_rdm ? "" : null}
       >
+        {content.position === "card-stack" ? (
+          <div className="card-stack-front" />
+        ) : null}
         {cornerImageAnchor === "screen"
           ? this.renderCornerImage("screen")
           : null}

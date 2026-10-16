@@ -308,7 +308,7 @@ nsresult nsXULElement::Clone(mozilla::dom::NodeInfo* aNodeInfo,
 //----------------------------------------------------------------------
 
 EventListenerManager* nsXULElement::GetEventListenerManagerForAttr(
-    nsAtom* aAttrName, bool* aDefer) {
+    nsAtom* aAttrName) {
   // XXXbz sXBL/XBL2 issue: should we instead use GetComposedDoc()
   // here, override BindToTree for those classes and munge event
   // listeners there?
@@ -319,11 +319,10 @@ EventListenerManager* nsXULElement::GetEventListenerManagerForAttr(
   if ((!root || root == this) && (window = doc->GetInnerWindow())) {
     nsCOMPtr<EventTarget> piTarget = do_QueryInterface(window);
 
-    *aDefer = false;
     return piTarget->GetOrCreateListenerManager();
   }
 
-  return nsStyledElement::GetEventListenerManagerForAttr(aAttrName, aDefer);
+  return nsStyledElement::GetEventListenerManagerForAttr(aAttrName);
 }
 
 // returns true if the element is not a list
@@ -501,7 +500,7 @@ void nsXULElement::AddListenerForAttributeIfNeeded(nsAtom* aLocalName) {
   if (nsContentUtils::IsEventAttributeName(aLocalName, EventNameType_XUL)) {
     nsAutoString value;
     GetAttr(aLocalName, value);
-    SetEventHandler(aLocalName, value, true);
+    SetEventHandler(aLocalName, value);
   }
 }
 

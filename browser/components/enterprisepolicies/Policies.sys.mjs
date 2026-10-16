@@ -1509,7 +1509,7 @@ export var Policies = {
         // This policy is meant to change the default behavior, not to force it.
         // If this policy was already applied and the user chose to re-hide the
         // menu bar, do not show it again.
-        lazy.runOncePerModification("displayMenuBar", value, () => {
+        lazy.runOncePerModification("displayMenuBar", String(value), () => {
           Services.xulStore.setValue(
             BROWSER_DOCUMENT_URL,
             "toolbar-menubar",
@@ -2754,16 +2754,16 @@ export var Policies = {
 
   PictureInPicture: {
     onBeforeAddons(manager, param) {
-      if ("Enabled" in param) {
-        lazy.PoliciesUtils.setDefaultPref(
-          "media.videocontrols.picture-in-picture.video-toggle.enabled",
-          param.Enabled
-        );
-      }
-      if (param.Locked) {
-        Services.prefs.lockPref(
-          "media.videocontrols.picture-in-picture.video-toggle.enabled"
-        );
+      for (const pref of [
+        "media.videocontrols.picture-in-picture.enabled",
+        "media.videocontrols.picture-in-picture.video-toggle.enabled",
+      ]) {
+        if ("Enabled" in param) {
+          lazy.PoliciesUtils.setDefaultPref(pref, param.Enabled);
+        }
+        if (param.Locked) {
+          Services.prefs.lockPref(pref);
+        }
       }
     },
   },

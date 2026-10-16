@@ -1373,6 +1373,7 @@ void GCRuntime::updateAtomsBitmap() {
 
 void GCRuntime::sweepCCWrappers() {
   SweepingTracer trc(rt);
+  trc.setAllowSweepingSymbolsEarly(true);
   for (SweepGroupZonesIter zone(this); !zone.done(); zone.next()) {
     zone->traceWeakCCWEdges(&trc);
   }

@@ -20,7 +20,7 @@ private val fullState =
         title = "Match Preview: Wrexham AFC vs Sunderland AFC",
         site = "bbc.co.uk",
         languageTag = "de-DE",
-        mode = ListenMode.Player,
+        mode = PlayerMode.Compact,
         error = ListenError.PlaybackFailed,
         voiceState =
             VoiceState(
@@ -56,7 +56,7 @@ class ListenReducerTest {
         assertNull(state.title)
         assertNull(state.site)
         assertNull(state.error)
-        assertEquals(ListenMode.Player, state.mode)
+        assertEquals(PlayerMode.Expanded, state.mode)
         assertEquals("de-DE", state.languageTag)
         assertEquals(fullState.voiceState, state.voiceState)
         assertEquals(PlaybackState(), state.playbackState)
@@ -74,7 +74,7 @@ class ListenReducerTest {
     fun `test that stopping resets appropriate fields`() {
         assertEquals(
             ListenState(voiceState = fullState.voiceState.copy()),
-            listenReducer(fullState, ListenAction.Session.StopRequested),
+            listenReducer(fullState, ListenAction.Session.StopRequested()),
         )
     }
 
@@ -104,6 +104,15 @@ class ListenReducerTest {
     }
 
     @Test
+    fun `test that changing the mode records it`() {
+        val collapsed = listenReducer(ListenState(), ListenAction.ModeChanged(PlayerMode.Compact))
+        val expanded = listenReducer(collapsed, ListenAction.ModeChanged(PlayerMode.Expanded))
+
+        assertEquals(ListenState(mode = PlayerMode.Compact), collapsed)
+        assertEquals(ListenState(), expanded)
+    }
+
+    @Test
     fun `test that dismissing when there is no error changes nothing`() {
         val noError = fullState.copy(error = null)
 
@@ -119,6 +128,13 @@ class ListenReducerTest {
             )
 
         assertEquals(Voice(id = "en-us-female", locale = Locale.US), state.voiceState.selectedVoice)
+    }
+
+    @Test
+    fun `test that a picked playback speed is recorded`() {
+        val state = listenReducer(ListenState(), ListenAction.Controls.PlaybackSpeedSelected(PlaybackSpeed.X0_5))
+
+        assertEquals(PlaybackSpeed.X0_5, state.playbackState.speed)
     }
 
     @Test
@@ -227,7 +243,7 @@ class ListenReducerTest {
     }
 
     @Test
-    fun `test that a session has no tab, no error and the player mode by default`() {
+    fun `test that a session has no tab, no error and the expanded mode by default`() {
         val initial = ListenState()
 
         assertNull(initial.tabId)
@@ -235,7 +251,7 @@ class ListenReducerTest {
         assertNull(initial.title)
         assertNull(initial.languageTag)
         assertNull(initial.error)
-        assertEquals(ListenMode.Player, initial.mode)
+        assertEquals(PlayerMode.Expanded, initial.mode)
     }
 
     @Test
@@ -352,6 +368,29 @@ class ListenReducerTest {
     }
 
     @Test
+    fun `test that a seek moves the elapsed time to that share of the article`() {
+        val state = listenReducer(fullState, ListenAction.Playback.SeekRequested(0.25f))
+
+        assertEquals(fullState.copy(articleProgress = fullState.articleProgress.copy(positionMs = 150_000)), state)
+    }
+
+    @Test
+    fun `test that a seek past either end of the article stops at that end`() {
+        assertEquals(
+            600_000,
+            listenReducer(fullState, ListenAction.Playback.SeekRequested(1.5f)).articleProgress.positionMs,
+        )
+        assertEquals(0, listenReducer(fullState, ListenAction.Playback.SeekRequested(-0.5f)).articleProgress.positionMs)
+    }
+
+    @Test
+    fun `test that a seek in an article of no length stays at the start`() {
+        val state = listenReducer(ListenState(), ListenAction.Playback.SeekRequested(0.5f))
+
+        assertEquals(ArticleProgress(), state.articleProgress)
+    }
+
+    @Test
     fun `test that a failed player is reported as an error`() {
         val state = listenReducer(ListenState(), ListenAction.Playback.PlaybackFailed)
 
@@ -378,6 +417,15 @@ class ListenReducerTest {
 
         assertEquals(PlaybackPhase.Buffering, state.playbackState.phase)
         assertEquals(playing.playbackState.chunk, state.playbackState.chunk)
+    }
+
+    @Test
+    fun `test that a paused player stays paused while it waits`() {
+        val paused = fullState.copy(playbackState = fullState.playbackState.copy(phase = PlaybackPhase.Paused))
+
+        val state = listenReducer(paused, ListenAction.Playback.PlaybackWaiting)
+
+        assertEquals(PlaybackPhase.Paused, state.playbackState.phase)
     }
 
     @Test

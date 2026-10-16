@@ -115,7 +115,8 @@ struct FFmpegVulkanVideoDecoder {
   nsTArray<PFN_vkVoidFunction> mDeviceFunctions;
   void InitDrmModifiers(VkPhysicalDevice aPhysDev, VkFormat aFormatForModifiers,
                         const nsTArray<uint64_t>* aCompositorMods = nullptr,
-                        VkImageUsageFlags aImageUsages = 0);
+                        VkImageUsageFlags aImageUsages = 0,
+                        AVCodecID aCodecID = AV_CODEC_ID_NONE);
   bool SelectVulkanDecoderPhysicalDevice(
       const StaticMutexAutoLock& aProofOfLock, const nsCString& aRendererNode);
   bool VulkanCanDecodeFormat(AVCodecID aCodecID, unsigned aAvcodecVersion,
@@ -124,6 +125,7 @@ struct FFmpegVulkanVideoDecoder {
                              gfx::ColorDepth aColorDepth) const;
   uint32_t mNegotiatedCompositorDecoderVendorID = 0;
   uint32_t mNegotiatedCompositorDecoderDeviceID = 0;
+  uint32_t mVulkanDriverVersion = 0;
   char mNegotiatedVulkanDeviceName[VK_MAX_PHYSICAL_DEVICE_NAME_SIZE] = {
       '\0',
   };

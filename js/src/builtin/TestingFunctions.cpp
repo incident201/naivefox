@@ -3338,7 +3338,8 @@ static bool IsAtomMarked(JSContext* cx, unsigned argc, Value* vp) {
   Maybe<bool> result;
   gc::GCRuntime* gc = &cx->runtime()->gc;
   if (args[1].isSymbol()) {
-    result = Some(gc->atomReferences.hasRef(zone, args[1].toSymbol()));
+    JS::Symbol* symbol = UnwrapSymbol(args[1].toSymbol());
+    result = Some(gc->atomReferences.hasRef(zone, symbol));
   } else if (args[1].isString()) {
     JSString* str = args[1].toString();
     if (str->isAtom()) {
@@ -3413,8 +3414,8 @@ static bool GetAtomMarkColor(JSContext* cx, unsigned argc, Value* vp) {
   size_t index = args[1].toInt32();
 
   gc::GCRuntime* gc = &cx->runtime()->gc;
-  gc::CellColor color = gc->atomReferences.getRefColorForIndex(zone, index);
-  RootedString name(cx, JS_NewStringCopyZ(cx, gc::CellColorName(color)));
+  bool hasRef = gc->atomReferences.hasRefForIndex(zone, index);
+  RootedString name(cx, JS_NewStringCopyZ(cx, hasRef ? "black" : "white"));
   if (!name) {
     return false;
   }
@@ -3644,6 +3645,13 @@ static bool CaptureFirstSubsumedFrame(JSContext* cx, unsigned argc,
 
   args.rval().setObjectOrNull(capturedStack);
   return true;
+}
+
+static bool CallAfterSettingRval(JSContext* cx, unsigned argc, Value* vp) {
+  CallArgs args = CallArgsFromVp(argc, vp);
+  args.rval().setUndefined();
+  return JS::Call(cx, UndefinedHandleValue, args.get(0),
+                  JS::HandleValueArray::empty(), args.rval());
 }
 
 static bool CallFunctionFromNativeFrame(JSContext* cx, unsigned argc,
@@ -7769,7 +7777,7 @@ static bool ShortestPaths(JSContext* cx, unsigned argc, Value* vp) {
 
     for (size_t i = 0; i < length; i++) {
       if (!values.append(GCVector<GCVector<Value>>(cx)) ||
-          !names.append(Vector<Vector<JS::ubi::EdgeName>>(cx))) {
+          !names.emplaceBack(cx)) {
         return false;
       }
 
@@ -10541,6 +10549,11 @@ static const JSFunctionSpecWithHelp TestingFunctions[] = {
 "  object's compartment's principals. If 'shouldIgnoreSelfHosted' is given,\n"
 "  control whether self-hosted frames are considered when checking principals."),
 
+    JS_FN_HELP("callAfterSettingRval", CallAfterSettingRval, 1, 0,
+"callAfterSettingRval(callback)",
+"  Set the return value to undefined, then call callback with no arguments\n"
+"  and return its result."),
+
     JS_FN_HELP("callFunctionFromNativeFrame", CallFunctionFromNativeFrame, 1, 0,
 "callFunctionFromNativeFrame(function)",
 "  Call 'function' with a (C++-)native frame on stack.\n"
@@ -10866,7 +10879,8 @@ gc::ZealModeHelpText),
 
     JS_FN_HELP("getAtomMarkColor", GetAtomMarkColor, 2, 0,
 "getAtomMarkColor(obj, index)",
-"  Return the atom reference bitmap's color for |index| relative to the zone containing |obj|."),
+"  Return the atom reference bitmap's color for |index| relative to the zone\n"
+"  containing |obj|."),
 
     JS_FN_HELP("setMallocMaxDirtyPageModifier", SetMallocMaxDirtyPageModifier, 1, 0,
 "setMallocMaxDirtyPageModifier(value)",

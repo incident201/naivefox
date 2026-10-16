@@ -113,6 +113,28 @@ add_task(async function test_isEnabled_via_trainhopConfig() {
   Assert.ok(feed.enabled);
 });
 
+add_task(async function test_isEnabled_via_trainhop_namespace() {
+  let feed = new ListsFeed();
+
+  feed.store = {
+    getState() {
+      return this.state;
+    },
+    dispatch: sinon.spy(),
+    state: {
+      Prefs: {
+        values: {
+          [PREF_LISTS_ENABLED]: true,
+          trainhopConfig: { widgetLists: { visible: true } },
+        },
+      },
+    },
+  };
+
+  info("ListsFeed should be enabled via trainhopConfig.widgetLists.visible");
+  Assert.ok(feed.enabled);
+});
+
 add_task(async function test_isEnabled_via_widgetsConfig() {
   let feed = new ListsFeed();
 

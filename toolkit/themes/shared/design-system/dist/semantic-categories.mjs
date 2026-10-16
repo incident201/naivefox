@@ -352,6 +352,10 @@ export const tokensTable = {
       name: "--card-header-background-color-active",
     },
     {
+      value: "var(--popup-background-color)",
+      name: "--dialog-background-color",
+    },
+    {
       value: {
         nativeTheme: "Field",
         platform: {
@@ -1239,6 +1243,7 @@ export const tokensTable = {
       },
       name: "--card-header-border-color-active",
     },
+    { value: "var(--popup-border-color)", name: "--dialog-border-color" },
     {
       value: { default: "var(--border-color-deemphasized)" },
       name: "--info-bar-border-color",
@@ -1248,23 +1253,7 @@ export const tokensTable = {
       value: "var(--border-color-interactive-disabled)",
       name: "--input-border-color-disabled",
     },
-    {
-      value: {
-        light: "rgb(240, 240, 244)",
-        dark: "rgb(82, 82, 94)",
-        nativeTheme: "var(--border-color-deemphasized)",
-        default: "light-dark(rgb(240, 240, 244), rgb(82, 82, 94))",
-        platform: {
-          default: "var(--border-color-deemphasized)",
-          browserTheme: {
-            light: "rgb(240, 240, 244)",
-            dark: "rgb(82, 82, 94)",
-            default: "light-dark(rgb(240, 240, 244), rgb(82, 82, 94))",
-          },
-        },
-      },
-      name: "--panel-border-color",
-    },
+    { value: "var(--popup-border-color)", name: "--panel-border-color" },
     {
       value: {
         light: "rgb(240, 240, 244)",
@@ -1432,10 +1421,13 @@ export const tokensTable = {
       value: "var(--toolbarbutton-outline-color-hover)",
       name: "--tab-border-color-hover",
     },
+    { value: { default: "unset" }, name: "--tab-border-color-accent" },
     {
       value: "var(--toolbarbutton-outline-color-selected)",
       name: "--tab-border-color-selected",
     },
+    { value: "unset", name: "--tab-border-color-selected-leading" },
+    { value: "unset", name: "--tab-border-color-selected-trailing" },
     {
       value: "var(--tab-border-color)",
       name: "--tab-close-button-border-color",
@@ -1461,6 +1453,8 @@ export const tokensTable = {
     { value: "4px", name: "--border-radius-small" },
     { value: "8px", name: "--border-radius-medium" },
     { value: "16px", name: "--border-radius-large" },
+    { value: "0", name: "--border-radius-xlarge" },
+    { value: "0", name: "--border-radius-xxlarge" },
     { value: "var(--border-radius-medium)", name: "--button-border-radius" },
     { value: "var(--border-radius-large)", name: "--card-border-radius" },
     {
@@ -1471,6 +1465,7 @@ export const tokensTable = {
       value: "var(--border-radius-medium)",
       name: "--card-cover-image-border-radius",
     },
+    { value: "var(--popup-border-radius)", name: "--dialog-border-radius" },
     { value: "var(--border-radius-medium)", name: "--input-border-radius" },
     {
       value: { default: "var(--input-border-radius)" },
@@ -1481,7 +1476,7 @@ export const tokensTable = {
       value: "var(--border-radius-small)",
       name: "--panel-menuitem-border-radius",
     },
-    { value: "var(--border-radius-medium)", name: "--panel-border-radius" },
+    { value: "var(--popup-border-radius)", name: "--panel-border-radius" },
     { value: "var(--border-radius-medium)", name: "--popup-border-radius" },
     {
       value: "var(--button-border-radius)",
@@ -1627,6 +1622,7 @@ export const tokensTable = {
     },
     { value: "var(--box-shadow-level-2)", name: "--card-box-shadow" },
     { value: "var(--box-shadow-level-4)", name: "--card-box-shadow-hover" },
+    { value: "var(--popup-box-shadow)", name: "--dialog-box-shadow" },
     {
       value: "0 0 var(--panel-box-shadow-margin) hsla(0, 0%, 0%, 0.2)",
       name: "--panel-box-shadow",
@@ -1640,14 +1636,25 @@ export const tokensTable = {
   ],
   color: [
     { value: "#fbfbfe", name: "--color-gray-0" },
+    { value: "unset", name: "--color-gray-10" },
+    { value: "unset", name: "--color-gray-15" },
     { value: "#f0f0f4", name: "--color-gray-20" },
+    { value: "unset", name: "--color-gray-25" },
     { value: "#bac2ca", name: "--color-gray-30" },
+    { value: "unset", name: "--color-gray-35" },
+    { value: "unset", name: "--color-gray-40" },
+    { value: "unset", name: "--color-gray-45" },
     { value: "#bfbfc9", name: "--color-gray-50" },
+    { value: "unset", name: "--color-gray-55" },
     { value: "#8f8f9d", name: "--color-gray-60" },
+    { value: "unset", name: "--color-gray-65" },
     { value: "#5b5b66", name: "--color-gray-70" },
+    { value: "unset", name: "--color-gray-75" },
     { value: "#23222b", name: "--color-gray-80" },
+    { value: "unset", name: "--color-gray-85" },
     { value: "#1c1b22", name: "--color-gray-90" },
     { value: "#15141a", name: "--color-gray-100" },
+    { value: "unset", name: "--color-gray-05" },
     { value: "oklch(97% 0.05 15)", name: "--color-red-0" },
     { value: "oklch(90% 0.1 15)", name: "--color-red-10" },
     { value: "oklch(83% 0.14 15)", name: "--color-red-20" },
@@ -1776,6 +1783,16 @@ export const tokensTable = {
     { value: "oklch(0 0 0 / 70%)", name: "--color-black-alpha-70" },
     { value: "oklch(0 0 0 / 80%)", name: "--color-black-alpha-80" },
     { value: "oklch(0 0 0 / 90%)", name: "--color-black-alpha-90" },
+    { value: "unset", name: "--color-violet-desaturated-0" },
+    { value: "unset", name: "--color-violet-desaturated-10" },
+    { value: "unset", name: "--color-violet-desaturated-20" },
+    { value: "unset", name: "--color-violet-desaturated-30" },
+    { value: "unset", name: "--color-violet-desaturated-40" },
+    { value: "unset", name: "--color-violet-desaturated-50" },
+    { value: "unset", name: "--color-violet-desaturated-60" },
+    { value: "unset", name: "--color-violet-desaturated-70" },
+    { value: "unset", name: "--color-violet-desaturated-80" },
+    { value: "unset", name: "--color-violet-desaturated-90" },
     {
       value: {
         light: "var(--color-blue-60)",
@@ -2057,6 +2074,7 @@ export const tokensTable = {
     { value: "initial", name: "--panel-width" },
     { value: "14px", name: "--toolbarbutton-badge-min-width" },
     { value: "20px", name: "--toolbarbutton-badge-max-width" },
+    { value: "14px", name: "--toolbarbutton-badge-size" },
     { value: "var(--size-item-medium)", name: "--input-color-swatch-size" },
     {
       value: "var(--size-item-large)",
@@ -2128,6 +2146,7 @@ export const tokensTable = {
     { value: "var(--space-small)", name: "--card-gap-compact" },
     { value: "var(--space-small)", name: "--card-gap-article" },
     { value: "var(--space-small)", name: "--checkbox-margin-inline" },
+    { value: "var(--space-large)", name: "--dialog-padding" },
     { value: { default: "4px" }, name: "--info-bar-margin" },
     { value: { brand: { default: "64px" } }, name: "--page-space-block-start" },
     {
@@ -2282,6 +2301,10 @@ export const tokensTable = {
     {
       value: { default: "0px" },
       name: "--panel-item-button-padding-inline-start-offset",
+    },
+    {
+      value: { default: "var(--panel-padding-block)" },
+      name: "--panel-list-padding-block",
     },
     { value: "6px", name: "--tab-close-button-padding" },
     {
@@ -3022,6 +3045,15 @@ export const tokensTable = {
     { value: "center", name: "--button-content-alignment" },
     { value: "cover", name: "--card-cover-image-object-fit-default" },
     { value: "center", name: "--card-cover-image-object-position-default" },
+    { value: { default: "unset" }, name: "--toolbox-background-gradient" },
+    {
+      value: { default: "unset" },
+      name: "--toolbox-background-gradient-leading",
+    },
+    {
+      value: { default: "unset" },
+      name: "--toolbox-background-gradient-trailing",
+    },
     {
       value: { default: "center" },
       name: "--message-bar-icon-container-align-items",
@@ -3407,6 +3439,7 @@ export const tokensTable = {
       },
       name: "--icon-color",
     },
+    { value: "unset", name: "--icon-color-accent-primary-desaturated" },
     {
       value: {
         light: "var(--color-blue-60)",
@@ -3698,6 +3731,8 @@ export const variableLookupTable = {
   "border-radius-small": "4px",
   "border-radius-medium": "8px",
   "border-radius-large": "16px",
+  "border-radius-xlarge": "0",
+  "border-radius-xxlarge": "0",
   "border-width": "1px",
   "box-shadow-level-1":
     "0 0 1px var(--box-shadow-color-darker-layer-1), 0 1px 2px var(--box-shadow-color-darker-layer-2)",
@@ -3728,14 +3763,25 @@ export const variableLookupTable = {
     default: "light-dark(rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.2))",
   },
   "color-gray-0": "#fbfbfe",
+  "color-gray-10": "unset",
+  "color-gray-15": "unset",
   "color-gray-20": "#f0f0f4",
+  "color-gray-25": "unset",
   "color-gray-30": "#bac2ca",
+  "color-gray-35": "unset",
+  "color-gray-40": "unset",
+  "color-gray-45": "unset",
   "color-gray-50": "#bfbfc9",
+  "color-gray-55": "unset",
   "color-gray-60": "#8f8f9d",
+  "color-gray-65": "unset",
   "color-gray-70": "#5b5b66",
+  "color-gray-75": "unset",
   "color-gray-80": "#23222b",
+  "color-gray-85": "unset",
   "color-gray-90": "#1c1b22",
   "color-gray-100": "#15141a",
+  "color-gray-05": "unset",
   "color-red-0": "oklch(97% 0.05 15)",
   "color-red-10": "oklch(90% 0.1 15)",
   "color-red-20": "oklch(83% 0.14 15)",
@@ -3864,6 +3910,16 @@ export const variableLookupTable = {
   "color-black-alpha-70": "oklch(0 0 0 / 70%)",
   "color-black-alpha-80": "oklch(0 0 0 / 80%)",
   "color-black-alpha-90": "oklch(0 0 0 / 90%)",
+  "color-violet-desaturated-0": "unset",
+  "color-violet-desaturated-10": "unset",
+  "color-violet-desaturated-20": "unset",
+  "color-violet-desaturated-30": "unset",
+  "color-violet-desaturated-40": "unset",
+  "color-violet-desaturated-50": "unset",
+  "color-violet-desaturated-60": "unset",
+  "color-violet-desaturated-70": "unset",
+  "color-violet-desaturated-80": "unset",
+  "color-violet-desaturated-90": "unset",
   "color-accent-primary": {
     light: "var(--color-blue-60)",
     dark: "var(--color-cyan-30)",
@@ -4495,12 +4551,18 @@ export const variableLookupTable = {
   "card-header-text-color-active": "var(--button-text-color-active)",
   "checkbox-margin-inline": "var(--space-small)",
   "checkbox-size": "var(--size-item-small)",
+  "dialog-background-color": "var(--popup-background-color)",
+  "dialog-border-radius": "var(--popup-border-radius)",
+  "dialog-border-color": "var(--popup-border-color)",
+  "dialog-box-shadow": "var(--popup-box-shadow)",
+  "dialog-padding": "var(--space-large)",
   "icon-color": {
     light: "var(--color-gray-70)",
     dark: "var(--color-gray-0)",
     prefersContrast: "var(--text-color)",
     default: "light-dark(var(--color-gray-70), var(--color-gray-0))",
   },
+  "icon-color-accent-primary-desaturated": "unset",
   "icon-color-information": {
     light: "var(--color-blue-60)",
     dark: "var(--color-blue-20)",
@@ -4634,21 +4696,8 @@ export const variableLookupTable = {
       },
     },
   },
-  "panel-border-color": {
-    light: "rgb(240, 240, 244)",
-    dark: "rgb(82, 82, 94)",
-    nativeTheme: "var(--border-color-deemphasized)",
-    default: "light-dark(rgb(240, 240, 244), rgb(82, 82, 94))",
-    platform: {
-      default: "var(--border-color-deemphasized)",
-      browserTheme: {
-        light: "rgb(240, 240, 244)",
-        dark: "rgb(82, 82, 94)",
-        default: "light-dark(rgb(240, 240, 244), rgb(82, 82, 94))",
-      },
-    },
-  },
-  "panel-border-radius": "var(--border-radius-medium)",
+  "panel-border-color": "var(--popup-border-color)",
+  "panel-border-radius": "var(--popup-border-radius)",
   "panel-box-shadow": "0 0 var(--panel-box-shadow-margin) hsla(0, 0%, 0%, 0.2)",
   "panel-box-shadow-margin": "4px",
   "panel-footer-background-color": {
@@ -4896,6 +4945,7 @@ export const variableLookupTable = {
   "toolbarbutton-badge-max-width": "20px",
   "toolbarbutton-badge-padding-inline": "2px",
   "toolbarbutton-badge-padding-block-end": "1px",
+  "toolbarbutton-badge-size": "14px",
   "toolbarbutton-padding-outer": "2px",
   "toolbarbutton-padding-outer-narrow": "1px",
   "toolbarbutton-padding-inner": "8px",
@@ -5033,6 +5083,9 @@ export const variableLookupTable = {
       browserTheme: { default: "var(--toolbox-background-color)" },
     },
   },
+  "toolbox-background-gradient": { default: "unset" },
+  "toolbox-background-gradient-leading": { default: "unset" },
+  "toolbox-background-gradient-trailing": { default: "unset" },
   "toolbox-text-color": {
     light: "var(--color-gray-100)",
     dark: "var(--color-gray-0)",
@@ -5379,6 +5432,7 @@ export const variableLookupTable = {
   "panel-list-border-color": { default: "var(--border-color-deemphasized)" },
   "panel-list-border-radius": "var(--panel-border-radius)",
   "panel-list-box-shadow": { default: "var(--popup-box-shadow)" },
+  "panel-list-padding-block": { default: "var(--panel-padding-block)" },
   "panel-list-text-color": "var(--text-color)",
   "tab-attention-dot-color": "var(--color-accent-attention)",
   "tab-background-color": {
@@ -5414,7 +5468,10 @@ export const variableLookupTable = {
   "tab-border-radius": "var(--toolbarbutton-border-radius)",
   "tab-border-color": "var(--toolbarbutton-outline-color)",
   "tab-border-color-hover": "var(--toolbarbutton-outline-color-hover)",
+  "tab-border-color-accent": { default: "unset" },
   "tab-border-color-selected": "var(--toolbarbutton-outline-color-selected)",
+  "tab-border-color-selected-leading": "unset",
+  "tab-border-color-selected-trailing": "unset",
   "tab-box-shadow-selected": "var(--box-shadow-level-1)",
   "tab-close-button-padding": "6px",
   "tab-close-button-border-color": "var(--tab-border-color)",

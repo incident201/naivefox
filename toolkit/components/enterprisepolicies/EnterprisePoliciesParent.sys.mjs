@@ -494,15 +494,20 @@ EnterprisePoliciesManager.prototype = {
   },
 
   getContainerForURI(uri) {
+    let normalized = lazy.SitePolicyUtils.normalizeURI(uri);
+
     for (let policies of SitePolicies) {
       if (
-        policies.exceptions.matches(uri) ||
+        policies.exceptions.matches(normalized) ||
         policies.exceptions.matchesAllWebUrls
       ) {
         continue;
       }
 
-      if (!policies.match.matches(uri) && !policies.match.matchesAllWebUrls) {
+      if (
+        !policies.match.matches(normalized) &&
+        !policies.match.matchesAllWebUrls
+      ) {
         continue;
       }
 

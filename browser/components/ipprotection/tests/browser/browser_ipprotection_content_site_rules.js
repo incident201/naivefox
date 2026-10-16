@@ -848,7 +848,7 @@ add_task(async function test_has_site_inclusion_defaults_to_false() {
 /**
  * Tests that the panel resolves a site's rule through the SiteRuleManager
  * instead of taking it from injected state, for an inclusion the user holds on
- * the loaded site while the VPN is off.
+ * the loaded site.
  */
 add_task(async function test_site_rule_status_inclusion_from_rule() {
   await pushInclusionsPref(true);
@@ -857,20 +857,21 @@ add_task(async function test_site_rule_status_inclusion_from_rule() {
     isReady: true,
   });
 
-  const principal =
-    Services.scriptSecurityManager.createContentPrincipalFromOrigin(
-      MOCK_SITE_NAME
-    );
-  IPPPermissionRules.setRule(principal, IPPPrincipalRules.INCLUDED);
-
+  // The tab goes first: an inclusion brings the proxy up, and the included
+  // site would then load through it.
   let tab = await BrowserTestUtils.openNewForegroundTab(
     gBrowser,
     MOCK_SITE_NAME
   );
 
-  let content = await openPanel({
-    isProtectionEnabled: false,
-  });
+  const principal =
+    Services.scriptSecurityManager.createContentPrincipalFromOrigin(
+      MOCK_SITE_NAME
+    );
+  IPPPermissionRules.setRule(principal, IPPPrincipalRules.INCLUDED);
+  await waitForProxyState(IPPProxyStates.ACTIVE);
+
+  let content = await openPanel();
 
   Assert.ok(
     content.state.siteData?.hasSiteRule,
@@ -881,15 +882,11 @@ add_task(async function test_site_rule_status_inclusion_from_rule() {
     "The panel should resolve the rule as an inclusion"
   );
 
-  await checkSiteRuleStatus(
-    content,
-    INCLUSION_DESCRIPTION_L10N_ID,
-    VPN_ON_ICON
-  );
-
   await closePanel();
   BrowserTestUtils.removeTab(tab);
+  // The rule goes before the proxy, or stopping it just brings it back.
   IPPPermissionRules.setRule(principal, IPPPrincipalRules.DEFAULT);
+  await waitForProxyState(IPPProxyStates.READY);
   await SpecialPowers.popPrefEnv();
 });
 

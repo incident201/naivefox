@@ -12,9 +12,6 @@ tags = "os_integration"
 # Privacy relevant
 
 ["test_bug343416.xhtml"]
-skip-if = [
-  "os == 'linux' && os_version == '24.04' && arch == 'x86_64' && display == 'x11' && opt", # Bug 1962438
-]
 
 ["test_bug428405.xhtml"]
 run-if = [
@@ -273,6 +270,9 @@ skip-if = [
 
 ["test_wheeltransaction.xhtml"]
 support-files = ["window_wheeltransaction.xhtml"]
+
+["test_window_size_constraints.xhtml"]
+support-files = ["window_size_constraints.xhtml"]
 
 # Windows
 # taskbar_previews.xhtml

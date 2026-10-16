@@ -32,6 +32,9 @@
           "value": "1px"
         }
       }
+    },
+    "size": {
+      "value": "14px"
     }
   },
   "padding": {

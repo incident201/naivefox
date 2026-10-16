@@ -157,8 +157,9 @@ async function handleMinidump(callback) {
 
   Assert.ok(extrafile.exists());
   let extra = await IOUtils.readJSON(extrafile.path);
-  // No matter how we crash, there should always be a crash id
+  // No matter how we crash, there should always be a crash id and crash time
   Assert.ok("CrashEventID" in extra);
+  Assert.ok("CrashTime" in extra);
 
   if (callback) {
     await callback(minidump, extra, extrafile, memoryfile);

@@ -226,6 +226,11 @@
     flex: 1 1 0;
     min-block-size: 0;
     gap: 0;
+
+    // Focused only programmatically on open (tabindex -1), never by Tab.
+    &:focus {
+      outline: none;
+    }
   }
 
   .clocks-edit-item {
@@ -239,7 +244,7 @@
     // room for the future drag handle per the Figma layout.
     padding-inline-start: var(--space-xlarge);
     padding-inline-end: calc(var(--space-medium) * 4);
-    border-radius: var(--button-border-radius);
+    border-radius: var(--border-radius-small);
     transition: background-color 180ms ease;
 
     // Tall enough for a nicknamed row, so plain and nicknamed rows match.
@@ -248,7 +253,6 @@
 
   .clocks-edit-item:hover,
   .clocks-edit-item:focus-within {
-    // stylelint-disable-next-line stylelint-plugin-mozilla/no-base-design-tokens, stylelint-plugin-mozilla/use-design-tokens
     background-color: var(--button-background-color-menu-hover, #E7E1F8);
   }
 
@@ -307,7 +311,7 @@
 
   .clocks-edit-item-button:hover::part(button),
   .clocks-edit-item-button:focus-visible::part(button) {
-    /* stylelint-disable-next-line stylelint-plugin-mozilla/no-base-design-tokens, stylelint-plugin-mozilla/use-design-tokens */
+    /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
     border-color: rgb(255 255 255 / 90%);
   }
 
@@ -368,15 +372,12 @@
     min-block-size: 0;
     transition:
       padding-block-start var(--widget-size-transition-duration) var(--widget-size-transition-easing),
-      gap var(--widget-size-transition-duration) var(--widget-size-transition-easing);
-  }
+      gap var(--widget-size-transition-duration) var(--widget-size-transition-easing),
+      transform var(--widget-size-transition-duration) var(--widget-size-transition-easing);
 
-  &:not(.is-panel-open):hover .clocks-list,
-  &:not(.is-panel-open):focus-within .clocks-list {
-    // Reserve header room for the hover controls so they don't overlap the
-    // first visible clock row.
-    /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens, declaration-property-value-disallowed-list */
-    padding-block-start: 2.25rem;
+    @media (prefers-reduced-motion: reduce) {
+      transition: none;
+    }
   }
 
   // An open panel owns the whole card, so drop the rows instead of leaving
@@ -653,6 +654,7 @@
       flex-direction: column;
       justify-content: center;
       gap: var(--space-small);
+      transform-origin: bottom center;
     }
 
     .clocks-row {
@@ -698,46 +700,8 @@
     }
   }
 
-  &.small-widget:not(.is-panel-open):hover .clocks-list,
-  &.small-widget:not(.is-panel-open):focus-within .clocks-list {
-    justify-content: flex-start;
-    /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens, declaration-property-value-disallowed-list */
-    padding-block-start: 1.5rem;
-  }
-
-  &.small-widget[data-clock-count='2']:not(.is-panel-open):hover .clocks-list,
-  &.small-widget[data-clock-count='2']:not(.is-panel-open):focus-within .clocks-list {
-    /* Two full rows with timezone text need a slightly smaller header lane. */
-    /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens, declaration-property-value-disallowed-list */
-    padding-block-start: 1rem;
-  }
-
-  &.small-widget[data-clock-count='2']:not(.is-panel-open):hover .clocks-row,
-  &.small-widget[data-clock-count='2']:not(.is-panel-open):focus-within .clocks-row {
-    padding-block: var(--space-xsmall);
-  }
-
-  &.small-widget[data-clock-count='4']:not(.is-panel-open):hover .clocks-list,
-  &.small-widget[data-clock-count='4']:not(.is-panel-open):focus-within .clocks-list {
-    /* Only the menu remains at 4 clocks, so reserve less header room. */
-    /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens, declaration-property-value-disallowed-list */
-    padding-block-start: 0.85rem;
-  }
-
-  &.medium-widget:not(.is-panel-open):hover .clocks-list,
-  &.medium-widget:not(.is-panel-open):focus-within .clocks-list {
-    padding-block-start: var(--space-medium);
-  }
-
-  &.medium-widget[data-clock-count='3']:not(.is-panel-open):hover .clocks-list,
-  &.medium-widget[data-clock-count='3']:not(.is-panel-open):focus-within .clocks-list {
-    /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens, declaration-property-value-disallowed-list */
-    padding-block-start: 1.25rem;
-  }
-
-  &.medium-widget[data-clock-count='3']:not(.is-panel-open):hover .clocks-row,
-  &.medium-widget[data-clock-count='3']:not(.is-panel-open):focus-within .clocks-row {
-    padding-block: var(--space-small);
+  &.small-widget:not(.is-panel-open):is(:hover, :focus-within) .clocks-list {
+    transform: scale(0.8);
   }
 
   // 10px inline padding has no --space-* token (scale jumps 0.5->0.75rem).
@@ -795,7 +759,6 @@
     }
 
     &[data-clock-count='3'] .clocks-time {
-      // stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens, declaration-property-value-disallowed-list
       font-size: calc(var(--font-size-heading-large) - 3px);
     }
 
@@ -940,7 +903,7 @@
     &[data-clock-count='4'] {
       .clocks-list {
         gap: var(--space-small);
-        padding-block-start: 0;
+        padding-block-start: var(--space-large);
         transition-property: gap;
       }
 
@@ -1008,15 +971,5 @@
     .clocks-meta:has(.clocks-label-chip) .clocks-timezone {
       font-size: var(--font-size-heading-medium);
     }
-  }
-
-  &.large-widget.is-hero:not(.is-panel-open):hover .clocks-list,
-  &.large-widget.is-hero:not(.is-panel-open):focus-within .clocks-list {
-    padding-block-start: 0;
-  }
-
-  &.large-widget[data-clock-count='2']:not(.is-panel-open):hover .clocks-list,
-  &.large-widget[data-clock-count='2']:not(.is-panel-open):focus-within .clocks-list {
-    padding-block-start: 0;
   }
 }

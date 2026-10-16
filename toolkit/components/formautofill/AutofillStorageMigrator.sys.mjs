@@ -116,8 +116,9 @@ export class AutofillStorageMigrator {
    *
    * @param {object} [options]
    * @param {boolean} [options.dryRun=false] Copy only to measure it: reports
-   *   the run, returns false whatever the outcome, and records _testVersion so
-   *   the same generation never measures twice. Spends no attempt budget.
+   *   the run, empties the target again, returns false whatever the outcome,
+   *   and records _testVersion so the same generation never measures twice.
+   *   Spends no attempt budget.
    * @param {boolean} [options.wipe=true] Empty the target first. See #migrate.
    * @returns {Promise<boolean>} Whether the copy completed. Always false for a
    *   dry run.
@@ -129,6 +130,11 @@ export class AutofillStorageMigrator {
           return false;
         }
         await this.#migrateAndReport({ wipe });
+        // Measured, not read: put the target back the way it was found. Safe to
+        // empty because nothing is serving from it -- the dry run only runs
+        // while rust.enabled is off -- and the run is recorded on its own pref,
+        // so a later real migration still does its own copy.
+        await this.wipe();
         const { testVersionPref, testVersion } = this.config;
         Services.prefs.setIntPref(testVersionPref, testVersion);
         return false;
@@ -301,7 +307,8 @@ export class AutofillStorageMigrator {
       // without one answers a raw read instead and has no tombstones to give --
       // raw because a store may hide a stored field on read, and copying from
       // the filtered read would write that field out of existence here.
-      const raw = source._data ?? (await source.getAll({ rawData: true }));
+      const raw =
+        source._data ?? (await source.getAll({ rawData: true, prompt: false }));
       const records = raw.filter(record => !record.deleted);
       const tombstones = raw
         .filter(record => record.deleted)
@@ -344,7 +351,12 @@ export class AutofillStorageMigrator {
       // What the target already holds decides how each record gets there. A
       // wipe leaves nothing, so everything is an insert.
       const heldRecords = new Map(
-        wipe ? [] : (await target.getAll()).map(record => [record.guid, record])
+        wipe
+          ? []
+          : (await target.getAll({ prompt: false })).map(record => [
+              record.guid,
+              record,
+            ])
       );
       const held = new Set(heldRecords.keys());
       const fresh = exportable.filter(record => !held.has(record.guid));
@@ -425,7 +437,7 @@ export class AutofillStorageMigrator {
 
       // Only a store that caches its count has anything to prime.
       await target.refreshCount?.();
-      const stored = await target.getAll();
+      const stored = await target.getAll({ prompt: false });
       targetTotal = stored.length;
       divergences = await this.#verify(source, target, stored);
 
@@ -510,7 +522,7 @@ export class AutofillStorageMigrator {
     const byGUID = new Map(stored.map(record => [record.guid, record]));
     const divergences = [];
 
-    for (const record of await source.getAll()) {
+    for (const record of await source.getAll({ prompt: false })) {
       const copy = byGUID.get(record.guid);
       if (!copy) {
         // A record that never arrived is a count mismatch, not a divergence.

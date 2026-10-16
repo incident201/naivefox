@@ -26,11 +26,13 @@ import { SLOTS } from "../DiscoveryStreamComponents/FeatureHighlight/OMCHighligh
 import { actionCreators as ac, actionTypes as at } from "common/Actions.mjs";
 import {
   WIDGET_REGISTRY,
+  getWidgets,
   isWidgetAddable,
   isWidgetEnabled,
   resolveWidgetSize,
   resolveWidgetOrder,
   resolveWidgetHasSidebar,
+  resolveWidgetSrc,
   getHideAllTargets,
 } from "common/WidgetsRegistry.mjs";
 import {
@@ -39,6 +41,7 @@ import {
   isSpaceOverridden,
   isSpacesActive,
   resolveAutoMinimizeDelayMs,
+  selectFirstSlotWidget,
   selectWidgetsRowAd,
   SPACE_IDS,
 } from "common/PageLayoutVariants.mjs";
@@ -140,6 +143,8 @@ function renderWeather({
 // eslint-disable-next-line complexity, max-statements
 function Widgets({ widgetIds }) {
   const prefs = useSelector(state => state.Prefs.values);
+  const extensionWidgets = useSelector(state => state.ExtensionWidgets);
+  const widgets = getWidgets(WIDGET_REGISTRY, extensionWidgets);
   const weatherData = useSelector(state => state.Weather);
   const { messageData } = useSelector(state => state.Messages);
   const timerType = useSelector(state => state.TimerWidget.timerType);
@@ -260,41 +265,15 @@ function Widgets({ widgetIds }) {
   // row here instead of disappearing.
   const weatherGoesToSidebar =
     resolveWidgetHasSidebar(weatherWidget, prefs) && weatherSize === "small";
-  const widgetEnabledMap = {
-    lists: listsEnabled,
-    focusTimer: timerEnabled,
-    weather: weatherEnabled && !weatherGoesToSidebar,
-    clocks: isWidgetEnabled(
-      WIDGET_REGISTRY.find(w => w.id === "clocks"),
+  const widgetEnabledMap = {};
+  for (const widget of widgets) {
+    widgetEnabledMap[widget.id] = isWidgetEnabled(
+      widget,
       prefs,
       widgetsEnabled
-    ),
-    privacy: isWidgetEnabled(
-      WIDGET_REGISTRY.find(w => w.id === "privacy"),
-      prefs,
-      widgetsEnabled
-    ),
-    crossword: isWidgetEnabled(
-      WIDGET_REGISTRY.find(w => w.id === "crossword"),
-      prefs,
-      widgetsEnabled
-    ),
-    stocks: isWidgetEnabled(
-      WIDGET_REGISTRY.find(w => w.id === "stocks"),
-      prefs,
-      widgetsEnabled
-    ),
-    pictureOfTheDay: isWidgetEnabled(
-      WIDGET_REGISTRY.find(w => w.id === "pictureOfTheDay"),
-      prefs,
-      widgetsEnabled
-    ),
-    recentSearches: isWidgetEnabled(
-      WIDGET_REGISTRY.find(w => w.id === "recentSearches"),
-      prefs,
-      widgetsEnabled
-    ),
-  };
+    );
+  }
+  widgetEnabledMap.weather = weatherEnabled && !weatherGoesToSidebar;
 
   // Given an explicit list, keep only those. Callers wanting every enabled
   // widget pass none, which is everything but a thematic space. This map is the
@@ -304,6 +283,13 @@ function Widgets({ widgetIds }) {
     for (const id of Object.keys(widgetEnabledMap)) {
       widgetEnabledMap[id] &&= widgetIds.includes(id);
     }
+  }
+
+  // @experiment(remove) { bug 2078816 }
+  // The first stories card slot shows this widget instead.
+  const firstSlotWidget = selectFirstSlotWidget(prefs);
+  if (firstSlotWidget) {
+    widgetEnabledMap[firstSlotWidget] = false;
   }
 
   const widgetOrder = resolveWidgetOrder(prefs);
@@ -324,9 +310,9 @@ function Widgets({ widgetIds }) {
     WIDGET_REGISTRY.some(w => widgetEnabledMap[w.id]) ||
     (!novaEnabled && weatherForecastEnabled);
 
-  const allWidgetsAdded = WIDGET_REGISTRY.filter(w =>
-    isWidgetAddable(w, prefs)
-  ).every(w => prefs[w.enabledPref]);
+  const allWidgetsAdded = widgets
+    .filter(w => isWidgetAddable(w, prefs))
+    .every(w => prefs[w.enabledPref]);
 
   const renderedWidgetSizes = WIDGET_REGISTRY.filter(
     w => widgetEnabledMap[w.id]
@@ -462,6 +448,20 @@ function Widgets({ widgetIds }) {
     // Update the ref to track current state
     prevTimerEnabledRef.current = isTimerEnabled;
   }, [timerEnabled, timerData, dispatch, timerType]);
+
+  const showsMozWidget =
+    novaEnabled &&
+    WIDGET_REGISTRY.some(
+      w => widgetEnabledMap[w.id] && !WIDGET_ROW_COMPONENTS[w.id]
+    );
+
+  useEffect(() => {
+    if (showsMozWidget) {
+      import(
+        /* webpackIgnore: true */ "chrome://browser/content/widgets/moz-widget.mjs"
+      ).catch(() => {});
+    }
+  }, [showsMozWidget]);
 
   function hideAllWidgets() {
     batch(() => {
@@ -804,7 +804,7 @@ function Widgets({ widgetIds }) {
   const enabledWidgetIds = [];
   // Use effectiveOrder (matches the render loop) so optimistic reorders aren't briefly mis-hidden.
   for (const id of effectiveOrder) {
-    if (!WIDGET_ROW_COMPONENTS[id] || !widgetEnabledMap[id]) {
+    if (!widgetEnabledMap[id]) {
       continue;
     }
     enabledWidgetIds.push(id);
@@ -888,10 +888,10 @@ function Widgets({ widgetIds }) {
             effectiveOrder.map(id => {
               if (novaEnabled) {
                 const Component = WIDGET_ROW_COMPONENTS[id];
-                if (!Component || !widgetEnabledMap[id]) {
+                const entry = widgets.find(w => w.id === id);
+                if (!widgetEnabledMap[id]) {
                   return null;
                 }
-                const entry = WIDGET_REGISTRY.find(w => w.id === id);
                 const size = entry ? resolveWidgetSize(entry, prefs) : null;
                 const renderIdx = enabledWidgetIds.indexOf(id);
                 const hiddenAttrs = {
@@ -928,13 +928,22 @@ function Widgets({ widgetIds }) {
                     {/* Contain a crash to this widget's cell so one failing
                       widget can't tear down the whole widgets section. */}
                     <ErrorBoundary className="widget-error-fallback">
-                      <Component
-                        dispatch={dispatch}
-                        handleUserInteraction={handleUserInteraction}
-                        isMaximized={isMaximized}
-                        widgetsMayBeMaximized={widgetsMayBeMaximized}
-                        widgetEnabledMap={widgetEnabledMap}
-                      />
+                      {Component ? (
+                        <Component
+                          dispatch={dispatch}
+                          handleUserInteraction={handleUserInteraction}
+                          isMaximized={isMaximized}
+                          widgetsMayBeMaximized={widgetsMayBeMaximized}
+                          widgetEnabledMap={widgetEnabledMap}
+                        />
+                      ) : (
+                        <moz-widget
+                          widget-id={id}
+                          size={size}
+                          padded={true}
+                          src={resolveWidgetSrc(entry, prefs)}
+                        />
+                      )}
                     </ErrorBoundary>
                   </WidgetWrapper>
                 );

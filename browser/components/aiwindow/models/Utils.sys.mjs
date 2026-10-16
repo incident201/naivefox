@@ -251,9 +251,9 @@ export const PURPOSES = Object.freeze({
  * Keep ui/test/browser/head.js MOCK_RS_RECORDS aligned with this table.
  */
 export const FEATURE_MAJOR_VERSIONS = Object.freeze({
-  // TODO Bug 2053495: remove with mistral release pref (CHAT becomes 11)
+  // TODO Bug 2053495: remove with mistral release pref (CHAT becomes 12)
   get [MODEL_FEATURES.CHAT]() {
-    return Services.prefs.getBoolPref(MISTRAL_RELEASE_PREF, false) ? 11 : 10;
+    return Services.prefs.getBoolPref(MISTRAL_RELEASE_PREF, false) ? 12 : 10;
   },
   [MODEL_FEATURES.SMART_FORM_FILL]: 1,
   [MODEL_FEATURES.TITLE_GENERATION]: 1,
@@ -283,7 +283,9 @@ export const FEATURE_MAJOR_VERSIONS = Object.freeze({
   [MODEL_FEATURES.AGENT_MONITOR]: 2,
   // search agent
   [MODEL_FEATURES.SEARCH_ANSWER_GENERATION]: 1,
-  // aitab structured-page generation
+  // aitab structured-page generation. Paired with the `version` major in
+  // models/aitab/component_schema.json (AITab.loadAssets rejects a mismatch).
+  // Bump both, plus the aitab records in the packaged dump, in one patch.
   [MODEL_FEATURES.AITAB]: 1,
 });
 

@@ -193,6 +193,7 @@ def collapse_unified_builds(config, jobs):
             job.pop("dependencies")
             job["run"] = copy.deepcopy(x64["run"])
             job["fetches"] = copy.deepcopy(x64["fetches"])
+            job["mozconfig"] = copy.deepcopy(x64["mozconfig"])
             job["worker"]["env"].update(copy.deepcopy(x64["worker"]["env"]))
             job["worker"]["max-run-time"] = x64["worker"]["max-run-time"]
 

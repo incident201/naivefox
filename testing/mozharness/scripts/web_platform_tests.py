@@ -28,6 +28,18 @@ from mozharness.mozilla.testing.errors import WptHarnessErrorList
 from mozharness.mozilla.testing.testbase import TestingMixin, testing_config_options
 
 
+def _is_harness_or_mozilla_entry(name):
+    # Keep the manifests, the harness (tests/tools, resources, common) and
+    # web-platform/mozilla/; skip the other upstream tests and their metadata.
+    # Files under four path components deep (e.g. meta/MANIFEST.json) are kept.
+    parts = name.split("/")
+    if len(parts) < 4 or parts[0] != "web-platform":
+        return True
+    if parts[1] == "meta":
+        return False
+    return parts[1] != "tests" or parts[2] in ("tools", "resources", "common")
+
+
 class WebPlatformTest(TestingMixin, MercurialScript, CodeCoverageMixin, AndroidMixin):
     config_options = (
         [
@@ -108,6 +120,16 @@ class WebPlatformTest(TestingMixin, MercurialScript, CodeCoverageMixin, AndroidM
                     "dest": "headless_height",
                     "default": "1200",
                     "help": "Specify headless virtual screen height (default: 1200).",
+                },
+            ],
+            [
+                ["--skip-upstream-tests-extraction"],
+                {
+                    "action": "store_true",
+                    "dest": "skip_upstream_tests_extraction",
+                    "default": False,
+                    "help": "Only extract the harness and the /_mozilla/ tests from the "
+                    "web-platform tests archive, for jobs that run no upstream tests.",
                 },
             ],
             [
@@ -404,16 +426,41 @@ class WebPlatformTest(TestingMixin, MercurialScript, CodeCoverageMixin, AndroidM
             # repeat should repeat the original test, so +1 for first run
             cmd.append("--repeat=%s" % (self.repeat + 1))
 
+        # Only the default testharness jobs: the tag-scoped ones run a
+        # different test selection that hasn't been measured, and the VM pools
+        # have much less memory per guest. The exception is the WebGPU CTS jobs
+        # on the Intel workers, which run one test at a time and leave them
+        # mostly idle.
+        is_parallel_capable_mac = (
+            sys.platform.startswith("darwin")
+            and list(test_types) == ["testharness"]
+            and (
+                (
+                    mozinfo.info.get("arch") == "aarch64"
+                    and not mozinfo.info.get("macos_vm")
+                    and not c["tag"]
+                )
+                or (
+                    mozinfo.info.get("arch") == "x86_64"
+                    and any(tag in ("webgpu", "webgpu-long") for tag in c["tag"])
+                    and not c["backlog"]
+                )
+            )
+        )
         if (
             self.is_android
             or mozinfo.info["tsan"]
             or "wdspec" in test_types
-            or not c["disable_fission"]
+            or (not c["disable_fission"] and not is_parallel_capable_mac)
             # reftest on osx needs to be 1 process
-            or "reftest" in test_types
-            and sys.platform.startswith("darwin")
+            or ("reftest" in test_types and sys.platform.startswith("darwin"))
         ):
             processes = 1
+        elif is_parallel_capable_mac:
+            # Verified by experiment on the 10-core/16GB Apple M4 workers
+            # (Mac16,10) in 2026-09 (bug 2050488) and for WebGPU on the macOS
+            # 14.70 Intel workers in 2026-10 (bug 2078310).
+            processes = 3
         else:
             processes = 2
         cmd.append("--processes=%s" % processes)
@@ -549,6 +596,16 @@ class WebPlatformTest(TestingMixin, MercurialScript, CodeCoverageMixin, AndroidM
             cmd.extend(test_paths)
 
         return cmd
+
+    def download_unpack(
+        self, url, extract_to=".", extract_dirs="*", verbose=False, member_filter=None
+    ):
+        if (
+            self.config.get("skip_upstream_tests_extraction")
+            and "web-platform" in (url.split("/")[-1])
+        ):
+            member_filter = _is_harness_or_mozilla_entry
+        super().download_unpack(url, extract_to, extract_dirs, verbose, member_filter)
 
     def download_and_extract(self):
         super().download_and_extract(

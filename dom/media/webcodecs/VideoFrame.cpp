@@ -7,6 +7,7 @@
 #include <math.h>
 
 #include <limits>
+#include <memory>
 #include <utility>
 
 #include "ImageContainer.h"
@@ -316,11 +317,11 @@ static Result<RefPtr<layers::Image>, MediaResult> CreateYUVImageFromBuffer(
       aFormat.PixelFormat() == VideoPixelFormat::I420A) {
     UniquePtr<I420BufferReader> reader;
     if (aFormat.PixelFormat() == VideoPixelFormat::I420) {
-      reader.reset(
-          new I420BufferReader(aBuffer, aSize.Width(), aSize.Height()));
+      reader = std::make_unique<I420BufferReader>(aBuffer, aSize.Width(),
+                                                  aSize.Height());
     } else {
-      reader.reset(
-          new I420ABufferReader(aBuffer, aSize.Width(), aSize.Height()));
+      reader = std::make_unique<I420ABufferReader>(aBuffer, aSize.Width(),
+                                                   aSize.Height());
     }
 
     layers::PlanarYCbCrData data;

@@ -13,7 +13,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -62,6 +64,7 @@ import mozilla.components.support.ktx.kotlin.stripCommonSubdomains
  * @property ioDispatcher The dispatcher for the work that must not run on the thread the store dispatched on.
  * @property chunker Splits article text into the chunks.
  */
+@Suppress("TooManyFunctions")
 class ListenMiddleware(
     private val browserStore: BrowserStore,
     private val contentProvider: ContentProvider,
@@ -79,6 +82,7 @@ class ListenMiddleware(
     private var contentJob: Job? = null
     private var tabClosureJob: Job? = null
     private var voicesJob: Job? = null
+    private var refreshVoicesJob: Job? = null
     private var playbackStatusJob: Job? = null
 
     // The end of every session so far, chained.
@@ -140,6 +144,8 @@ class ListenMiddleware(
         // Read before the reducer runs, because afterwards the store already holds the voice the action carries and
         // there would be nothing left to compare it against.
         val previousVoice = store.state.voiceState.selectedVoice
+        // Read before the reducer runs, to save the previous article progress before a seek in case the seek fails.
+        val previousProgress = store.state.articleProgress
 
         next(action)
 
@@ -151,7 +157,7 @@ class ListenMiddleware(
                 trackTabClosure(store, action.tabId)
             }
 
-            ListenAction.Session.StopRequested -> endSession(releasePlayback = true)
+            is ListenAction.Session.StopRequested -> endSession(releasePlayback = true)
 
             is ListenAction.Content.ContentReady -> store.loadVoicesAndPlayIfRequested(action.languageTag)
 
@@ -167,18 +173,25 @@ class ListenMiddleware(
                 }
             }
 
-            is ListenAction.Playback.SeekRequested -> store.seekToArticlePosition(action.positionMs)
-
+            is ListenAction.Playback.SeekRequested -> {
+                store.seekToArticlePosition(
+                    positionMs = store.state.articleProgress.positionMs,
+                    revertTo = previousProgress,
+                )
+            }
             ListenAction.Controls.PlayPauseClicked -> store.togglePlayback()
             ListenAction.Controls.RewindClicked -> store.skipBy(-SEEK_BACK_INCREMENT_MS)
             ListenAction.Controls.ForwardClicked -> store.skipBy(SEEK_FORWARD_INCREMENT_MS)
-
-            is ListenAction.Controls -> Unit
+            ListenAction.Controls.VoicesClicked -> store.refreshVoices()
+            is ListenAction.Controls.PlaybackSpeedSelected ->
+                scope.launch { playbackController.setSpeed(action.playbackSpeed) }
             is ListenAction.Playback,
+            is ListenAction.Controls,
             ListenAction.Content.ContentUnavailable,
             is ListenAction.Voices.AvailableVoicesLoaded,
             ListenAction.Voices.NoOfflineVoicesAvailable,
             ListenAction.Synthesis.SynthesisFailed,
+            is ListenAction.ModeChanged,
             ListenAction.ErrorDismissed -> Unit
         }
     }
@@ -241,7 +254,7 @@ class ListenMiddleware(
                     tab.content.url != startingTabUrl && tab.pageUrl != startingTabPageUrl
                 }
                 .let {
-                    store.dispatch(ListenAction.Session.StopRequested)
+                    store.dispatch(ListenAction.Session.StopRequested(ListenAction.Session.StopSource.TabClosed))
                 }
         }
     }
@@ -379,6 +392,48 @@ class ListenMiddleware(
             }
         }
 
+    /**
+     * Refreshes the voices that are loaded for the player. Will select a fallback voice if the selected voice is no
+     * longer available, or the user has not made a selection. Will pause playback and show an error if no voices are
+     * available.
+     */
+    private fun ListenStore.refreshVoices() {
+        val languageTag = state.languageTag ?: return
+        // abandon a refresh before the page has loaded the first time
+        if (state.voiceState.loadState != VoiceLoadState.Loaded) return
+        refreshVoicesJob?.cancel()
+        refreshVoicesJob = scope.launch {
+            val voices = withContext(ioDispatcher) { synthesizer().loadAvailableVoices(languageTag) }
+            val selected = state.voiceState.selectedVoice
+
+            when {
+                voices.isEmpty() -> {
+                    if (
+                        state.playbackState.phase == PlaybackPhase.Playing ||
+                            state.playbackState.phase == PlaybackPhase.Buffering
+                    ) {
+                        playbackController.pause()
+                    }
+                    dispatch(ListenAction.Voices.NoOfflineVoicesAvailable)
+                }
+                selected != null && selected in voices ->
+                    dispatch(
+                        ListenAction.Voices.AvailableVoicesLoaded(
+                            voices = voices,
+                            selectedVoice = selected,
+                        )
+                    )
+                else -> {
+                    val fallback = voices.loadSavedVoiceFor(languageTag)
+                    dispatch(
+                        ListenAction.Voices.AvailableVoicesLoaded(voices = voices, selectedVoice = selected ?: fallback)
+                    )
+                    dispatch(ListenAction.Voices.VoiceSelected(fallback, ListenAction.Voices.VoiceSource.Fallback))
+                }
+            }
+        }
+    }
+
     private suspend fun List<Voice>.loadSavedVoiceFor(langTag: String): Voice {
         val savedId = settings.getSelectedVoiceId(langTag.language)
         // The list is presumed sorted by a useful heuristic so `first()` is best
@@ -455,7 +510,7 @@ class ListenMiddleware(
 
             try {
                 val opening = queue.startReading(article.text, article.languageTag)
-                playbackController.play(file = opening, articleDisplayData = article.displayData)
+                playbackController.play(file = opening, articleDisplayData = article.displayData, tabId = article.tabId)
                 appendedThrough = firstChunkIndex
                 if (resumeAtMs > 0) {
                     playbackController.seekTo(resumeAtMs)
@@ -499,8 +554,10 @@ class ListenMiddleware(
             playbackController.enqueue(file)
             appendedThrough = missing
 
-            // Restart the player once there is synthesized content
-            playbackController.resume()
+            // If the player has ended, there is a non-zero chance that other audio has gained focus while
+            // we synthesize. We call seekTo here to queue a chunk to the player, but it will wait until focus
+            // is returned to the player before playing.
+            playbackController.seekTo(missing - playlistStartChunk, 0)
 
             queue.workAheadOf(missing)
         }
@@ -544,10 +601,15 @@ class ListenMiddleware(
      * reported to the player, so this keeps them in sync even if the queue has been actively synthesizing lengths for
      * other chunks.
      */
-    private fun ListenStore.seekToArticlePosition(positionMs: Long) {
-        val queue = synthesisQueue ?: return
-        val target = state.articleProgress.chunkDurationsMs.chunkPositionAt(positionMs) ?: return
-        val lock = synthesisJobPriorityLock.tryClaim(PlaybackIntent.Seek) ?: return
+    private fun ListenStore.seekToArticlePosition(positionMs: Long, revertTo: ArticleProgress? = null) {
+        val revert: () -> Unit = {
+            if (revertTo != null) {
+                revertProgress(revertTo)
+            }
+        }
+        val queue = synthesisQueue ?: return revert()
+        val target = state.articleProgress.chunkDurationsMs.chunkPositionAt(positionMs) ?: return revert()
+        val lock = synthesisJobPriorityLock.tryClaim(PlaybackIntent.Seek) ?: return revert()
 
         scope.launch {
             if (!lock.isHeld) return@launch
@@ -560,8 +622,18 @@ class ListenMiddleware(
                 return@launch
             }
 
-            remakeAndRestartAt(target, lock, queue)
+            remakeAndRestartAt(target, lock, queue, onFailed = revert)
         }
+    }
+
+    private fun ListenStore.revertProgress(progress: ArticleProgress) {
+        dispatch(
+            ListenAction.Playback.ArticleProgressChanged(
+                positionMs = progress.positionMs,
+                durationMs = progress.durationMs,
+                chunkDurationsMs = progress.chunkDurationsMs,
+            )
+        )
     }
 
     /** Drops the work in flight, makes the audio of [target] and starts the playlist again there. */
@@ -569,12 +641,14 @@ class ListenMiddleware(
         target: ChunkPosition,
         lock: SynthesisJobPriorityLock.Handle,
         queue: SynthesisQueue,
+        onFailed: () -> Unit = {},
     ) {
         dispatch(ListenAction.Playback.PlaybackWaiting)
 
         stopSynthesizing {}
 
         synthesizing(this::dispatch) {
+            var restarted = false
             try {
                 // Ensure another seek has not occurred
                 if (!lock.isHeld) return@synthesizing
@@ -585,11 +659,17 @@ class ListenMiddleware(
                 if (!lock.isHeld) return@synthesizing
 
                 playbackController.restartAt(file, target.positionMs)
+                restarted = true
                 seeked = true
                 playlistStartChunk = target.chunkIndex
                 playingChunk = target.chunkIndex
                 appendedThrough = target.chunkIndex
             } finally {
+                // Do not revert the progress if another seek has occurred or the coroutine is canceled - this is not
+                // a failure, and that seek has written its own progress position
+                if (!restarted && lock.isHeld && currentCoroutineContext().isActive) {
+                    onFailed()
+                }
                 lock.release()
             }
 
@@ -676,6 +756,7 @@ class ListenMiddleware(
     private fun endSession(releasePlayback: Boolean) {
         contentJob?.cancel()
         voicesJob?.cancel()
+        refreshVoicesJob?.cancel()
         tabClosureJob?.cancel()
         article = null
         playRequested = false

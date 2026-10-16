@@ -36,7 +36,6 @@ ChromeUtils.defineESModuleGetters(lazy, {
   ExtensionsUI: "resource:///modules/ExtensionsUI.sys.mjs",
   FormAutofillUtils: "resource://gre/modules/shared/FormAutofillUtils.sys.mjs",
   Interactions: "moz-src:///browser/components/places/Interactions.sys.mjs",
-  LaunchOnLogin: "resource://gre/modules/LaunchOnLogin.sys.mjs",
   LoginBreaches:
     "moz-src:///browser/components/aboutlogins/LoginBreaches.sys.mjs",
   LoginHelper: "resource://gre/modules/LoginHelper.sys.mjs",
@@ -65,8 +64,6 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "moz-src:///browser/components/search/SearchSERPTelemetry.sys.mjs",
   SessionStartup:
     "moz-src:///browser/components/sessionstore/SessionStartup.sys.mjs",
-  SessionWindowUI:
-    "moz-src:///browser/components/sessionstore/SessionWindowUI.sys.mjs",
   ShortcutUtils: "resource://gre/modules/ShortcutUtils.sys.mjs",
   SpecialMessageActions:
     "resource://messaging-system/lib/SpecialMessageActions.sys.mjs",
@@ -330,9 +327,6 @@ BrowserGlue.prototype = {
           "os-autostart",
           false
         );
-        if (lazy.LaunchOnLogin.isSupported()) {
-          lazy.StartupOSIntegration.checkForLaunchOnLogin();
-        }
         break;
       }
     }
@@ -878,7 +872,6 @@ BrowserGlue.prototype = {
     }
 
     lazy.Sanitizer.onStartup();
-    lazy.SessionWindowUI.maybeShowRestoreSessionInfoBar();
     this._scheduleStartupIdleTasks();
     this._lateTasksIdleObserver = (idleService, topic) => {
       if (topic == "idle") {
@@ -1584,7 +1577,10 @@ BrowserGlue.prototype = {
     try {
       const win = browser.documentGlobal;
       const shellService = win.getShellService();
-      const isNowDefault = shellService.isDefaultBrowser(false, false);
+      const isNowDefault = await shellService.isDefaultBrowserAsync(
+        false,
+        false
+      );
       const resultEnum =
         (isNowDefault ? 0 : 1) * 2 +
         (shellService.shouldCheckDefaultBrowser ? 1 : 0);

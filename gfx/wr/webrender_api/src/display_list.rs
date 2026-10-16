@@ -951,6 +951,7 @@ impl<'a, T: Copy + peek_poke::Peek> ::std::iter::ExactSizeIterator for AuxIter<'
 #[derive(Clone, Debug)]
 pub struct SaveState {
     dl_items_len: usize,
+    spatial_tree_len: usize,
     next_clip_index: usize,
     next_spatial_index: usize,
     next_clip_chain_id: u64,
@@ -1238,6 +1239,7 @@ impl DisplayListBuilder {
 
         self.save_state = Some(SaveState {
             dl_items_len: self.payload.items_data.len(),
+            spatial_tree_len: self.payload.spatial_tree.len(),
             next_clip_index: self.next_clip_index,
             next_spatial_index: self.next_spatial_index,
             next_clip_chain_id: self.next_clip_chain_id,
@@ -1252,6 +1254,10 @@ impl DisplayListBuilder {
         let state = self.save_state.take().expect("No save to restore DisplayListBuilder from");
 
         self.payload.items_data.truncate(state.dl_items_len);
+        // Spatial nodes (reference frames, scroll and sticky frames) defined
+        // since the save live in their own buffer and their ids are about to be
+        // reused, so they have to go as well.
+        self.payload.spatial_tree.truncate(state.spatial_tree_len);
         self.next_clip_index = state.next_clip_index;
         self.next_spatial_index = state.next_spatial_index;
         self.next_clip_chain_id = state.next_clip_chain_id;
@@ -1694,9 +1700,10 @@ impl DisplayListBuilder {
         end_point: LayoutVector2D,
         stops: Vec<di::GradientStop>,
         extend_mode: di::ExtendMode,
+        alpha_mode: di::AlphaMode,
     ) -> (di::Gradient, Vec<di::GradientStop>) {
         let mut builder = GradientBuilder::with_stops(stops);
-        let gradient = builder.gradient(start_point, end_point, extend_mode);
+        let gradient = builder.gradient(start_point, end_point, extend_mode, alpha_mode);
         (gradient, builder.into_stops())
     }
 
@@ -1707,9 +1714,10 @@ impl DisplayListBuilder {
         radius: LayoutSize,
         stops: Vec<di::GradientStop>,
         extend_mode: di::ExtendMode,
+        alpha_mode: di::AlphaMode,
     ) -> (di::RadialGradient, Vec<di::GradientStop>) {
         let mut builder = GradientBuilder::with_stops(stops);
-        let gradient = builder.radial_gradient(center, radius, extend_mode);
+        let gradient = builder.radial_gradient(center, radius, extend_mode, alpha_mode);
         (gradient, builder.into_stops())
     }
 
@@ -1720,9 +1728,10 @@ impl DisplayListBuilder {
         angle: f32,
         stops: Vec<di::GradientStop>,
         extend_mode: di::ExtendMode,
+        alpha_mode: di::AlphaMode,
     ) -> (di::ConicGradient, Vec<di::GradientStop>) {
         let mut builder = GradientBuilder::with_stops(stops);
-        let gradient = builder.conic_gradient(center, angle, extend_mode);
+        let gradient = builder.conic_gradient(center, angle, extend_mode, alpha_mode);
         (gradient, builder.into_stops())
     }
 
@@ -2280,6 +2289,35 @@ impl DisplayListBuilder {
         flags: di::StackingContextFlags,
         snapshot: Option<di::SnapshotInfo>
     ) {
+        self.push_stacking_context_impl(
+            spatial_id,
+            prim_flags,
+            clip_chain_id,
+            transform_style,
+            mix_blend_mode,
+            filters,
+            filter_datas,
+            raster_space,
+            flags,
+            snapshot,
+            LayoutVector2D::zero(),
+        );
+    }
+
+    fn push_stacking_context_impl(
+        &mut self,
+        spatial_id: di::SpatialId,
+        prim_flags: di::PrimitiveFlags,
+        clip_chain_id: Option<di::ClipChainId>,
+        transform_style: di::TransformStyle,
+        mix_blend_mode: di::MixBlendMode,
+        filters: &[di::FilterOp],
+        filter_datas: &[di::FilterData],
+        raster_space: di::RasterSpace,
+        flags: di::StackingContextFlags,
+        snapshot: Option<di::SnapshotInfo>,
+        shadow_offset: LayoutVector2D,
+    ) {
         self.push_filters(filters, filter_datas, spatial_id);
 
         // Resolve this context's raster space against its parent: a `Screen`
@@ -2307,6 +2345,7 @@ impl DisplayListBuilder {
                 clip_chain_id,
                 raster_space: resolved_raster_space,
                 flags,
+                shadow_offset,
             },
         });
 
@@ -2468,6 +2507,20 @@ impl DisplayListBuilder {
             .unwrap_or(AuOffset::ZERO);
         self.last_scroll_offset = Some((spatial_id, offset));
         offset
+    }
+
+    /// The accumulated external scroll offset for `spatial_id`, in this list's
+    /// pixels: what `normalize_rect` adds to an item to move it from the
+    /// pre-scrolled coordinates it was authored in to the scroll-invariant ones
+    /// it is snapped in. Lets an embedder that predicts that snapping use the
+    /// same accumulation rather than re-derive it.
+    pub fn accumulated_scroll_offset_px(
+        &mut self,
+        spatial_id: di::SpatialId,
+    ) -> LayoutVector2D {
+        let offset = self.accumulated_scroll_offset(spatial_id);
+        let grid = self.au_grid;
+        LayoutVector2D::new(grid.from_au(offset.x as f64), grid.from_au(offset.y as f64))
     }
 
     /// Record the accumulated external scroll offset for a freshly-defined
@@ -2867,7 +2920,9 @@ impl DisplayListBuilder {
             let sc_clip = shadow.space_and_clip.clip_chain_id;
             let sc_clip = (sc_clip != di::ClipChainId::INVALID).then_some(sc_clip);
 
-            self.push_stacking_context(
+            // The scene builder snaps the copies relative to the original
+            // content using `shadow_offset` (bug 2076646).
+            self.push_stacking_context_impl(
                 shadow.space_and_clip.spatial_id,
                 di::PrimitiveFlags::default(),
                 sc_clip,
@@ -2878,6 +2933,7 @@ impl DisplayListBuilder {
                 di::RasterSpace::Screen,
                 di::StackingContextFlags::empty(),
                 None,
+                s.offset,
             );
 
             // A transparent shadow colour makes every text, rectangle and

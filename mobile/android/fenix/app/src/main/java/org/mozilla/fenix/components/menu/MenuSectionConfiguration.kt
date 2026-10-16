@@ -13,6 +13,9 @@ sealed interface FenixExpandableMenuItem {
 
 /** All items that can be shown in the menu. */
 sealed interface FenixMenuItem {
+    /** A banner allowing to set this application as the default browser. */
+    data object DefaultBrowserBanner : FenixMenuItem
+
     /** A menu item allowing to customize the reader view. */
     data object CustomizeReaderView : FenixMenuItem
 
@@ -62,6 +65,9 @@ sealed interface FenixMenuItem {
     /** A menu item allowing to open the current webpage in the app that handles it. */
     data object OpenInApp : FenixMenuItem
 
+    /** A menu item allowing to open the current custom tab in the main application. */
+    data object OpenInFirefox : FenixMenuItem
+
     /** A menu item allowing to save the current webpage as a PDF. */
     data object SaveAsPdf : FenixMenuItem
 
@@ -70,6 +76,9 @@ sealed interface FenixMenuItem {
 
     /** A menu item allowing to sign in or manage the current Mozilla account. */
     data object MozillaAccount : FenixMenuItem
+
+    /** A menu item allowing to customize what the homepage shows. */
+    data object CustomizeHomepage : FenixMenuItem
 
     /** A menu item allowing to open the application settings. */
     data object Settings : FenixMenuItem

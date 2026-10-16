@@ -70,7 +70,7 @@ browser.engagement:
     notification_emails:
       - csadilek@mozilla.com
       - tlong@mozilla.com
-    expires: 161
+    expires: 184
     send_in_pings:
       - baseline
       - metrics
@@ -112,7 +112,7 @@ browser.engagement:
     notification_emails:
       - csadilek@mozilla.com
       - tlong@mozilla.com
-    expires: 161
+    expires: 184
     labels:
       - active_ticks
       - active_ticks_non_synthesized
@@ -155,7 +155,7 @@ browser.engagement:
     notification_emails:
       - csadilek@mozilla.com
       - tlong@mozilla.com
-    expires: 161
+    expires: 184
     labels:
       - active_ticks
       - active_ticks_non_synthesized
@@ -206,10 +206,10 @@ browser.engagement:
   uri_count_normal_mode:
     type: counter
     description: >
-      The count of the total non-unique http(s) URIs visited in a
-      subsession, including page reloads, after the session has been
-      restored. URIs on minimized or background tabs may also be counted
-      towards this. Private browsing is not included in this count.
+      The count of the total non-unique http(s) URIs visited, including
+      page reloads, after the session has been restored. URIs on minimized
+      or background tabs may also be counted towards this. Private
+      browsing is not included in this count.
       This metric was generated to correspond to the Legacy Telemetry
       scalar browser.engagement.total_uri_count.
     bugs:
@@ -251,9 +251,8 @@ browser.engagement:
   max_concurrent_tab_count:
     type: quantity
     description: >
-      The count of maximum number of tabs open during a subsession, across
-      all windows, including tabs in private windows and restored at
-      startup.
+      The count of maximum number of tabs open, across all windows,
+      including tabs in private windows and restored at startup.
       This metric was generated to correspond to the Legacy Telemetry
       scalar browser.engagement.max_concurrent_tab_count.
     bugs:
@@ -290,9 +289,8 @@ browser.engagement:
   max_concurrent_window_count:
     type: quantity
     description: >
-      The count of maximum number of browser windows open during a
-      subsession. This includes private windows and the ones opened when
-      starting the browser.
+      The count of maximum number of browser windows open. This includes
+      private windows and the ones opened when starting the browser.
       This metric was generated to correspond to the Legacy Telemetry
       scalar browser.engagement.max_concurrent_window_count.
     bugs:
@@ -308,7 +306,7 @@ browser.engagement:
   max_concurrent_tab_pinned_count:
     type: quantity
     description: >
-      The count of maximum number of pinned tabs open during a subsession.
+      The count of maximum number of pinned tabs open.
       This includes private windows and the ones opened when starting the
       browser. Starting Firefox 85 this includes number of restored pinned
       tabs at startup.
@@ -345,7 +343,7 @@ browser.engagement:
   tab_open_event_count:
     type: counter
     description: >
-      The count of tab open events per subsession, across all windows,
+      The count of tab open events, across all windows,
       after the session has been restored. This includes tab open events
       from private windows and from manual session restorations (i.e.
       after crashes and from about:home), but excludes tabs opened vertically.
@@ -383,8 +381,8 @@ browser.engagement:
   window_open_event_count:
     type: counter
     description: >
-      The count of browser window open events per subsession, after the
-      session has been restored. The count includes private windows and
+      The count of browser window open events, after the session has
+      been restored. The count includes private windows and
       the ones from manual session restorations (i.e. after crashes and
       from about:home).
       This metric was generated to correspond to the Legacy Telemetry
@@ -401,7 +399,7 @@ browser.engagement:
   tab_pinned_event_count:
     type: counter
     description: >
-      The count of tab pinned events per subsession, across all windows,
+      The count of tab pinned events, across all windows,
       after the session has been restored. This includes tab pinned events
       from private windows.
       This metric was generated to correspond to the Legacy Telemetry
@@ -434,7 +432,7 @@ browser.engagement:
   unfiltered_uri_count:
     type: counter
     description: >
-      The count of the total non-unique URIs visited in a subsession, not
+      The count of the total non-unique URIs visited, not
       restricted to a specific protocol, including page reloads and
       about:* pages (other than initial pages such as about:blank, ...),
       after the session has been restored. This does not include
@@ -454,8 +452,8 @@ browser.engagement:
   unique_domains_count:
     type: quantity
     description: >
-      The count of the unique domains visited in a subsession, after the
-      session has been restored. Subdomains under eTLD are aggregated
+      The count of the unique domains visited, after the session has
+      been restored. Subdomains under eTLD are aggregated
       after the first level (i.e. test.example.com and other.example.com
       are only counted once). This does not include background page
       requests and domains from embedded pages or private browsing. The

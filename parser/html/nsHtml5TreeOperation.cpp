@@ -807,7 +807,7 @@ nsIContent* nsHtml5TreeOperation::CreateHTMLElement(
     // 9.2. If the JavaScript execution context stack is empty, then perform a
     // microtask checkpoint.
     {
-      nsAutoMicroTask mt;
+      nsAutoMicroTaskForDocument mt(document);
     }
     // 9.3. Push a new element queue onto document's relevant agent's custom
     // element reactions stack.
@@ -1622,7 +1622,7 @@ nsresult nsHtml5TreeOperation::Perform(nsHtml5TreeOpExecutor* aBuilder,
 
     nsresult operator()(const opMicrotaskCheckpoint& aOperation) {
       nsHtml5AutoPauseUpdate autoPauseContentUpdate(mBuilder);
-      nsAutoMicroTask mt;
+      nsAutoMicroTaskForDocument mt(mBuilder->GetDocument());
       return NS_OK;
     }
 

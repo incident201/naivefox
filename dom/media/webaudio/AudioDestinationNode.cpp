@@ -616,7 +616,8 @@ void AudioDestinationNode::FireOfflineCompletionEvent() {
 void AudioDestinationNode::ResolvePromise(AudioBuffer* aRenderedBuffer) {
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(mIsOffline);
-  mOfflineRenderingPromise->MaybeResolve(aRenderedBuffer);
+  RefPtr<Promise> promise = mOfflineRenderingPromise.forget();
+  promise->MaybeResolve(aRenderedBuffer);
 }
 
 uint32_t AudioDestinationNode::MaxChannelCount() const {

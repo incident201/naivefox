@@ -100,8 +100,7 @@ NS_EVENT_MESSAGE(eMouseLongTap)
 // should dispatch this internal event instead of dispatching ePointerRawUpdate
 // directly.
 NS_EVENT_MESSAGE(eMouseRawUpdate)
-NS_EVENT_MESSAGE(eMouseExploreByTouch)
-NS_EVENT_MESSAGE_FIRST_LAST(eMouseEvent, eMouseMove, eMouseExploreByTouch)
+NS_EVENT_MESSAGE_FIRST_LAST(eMouseEvent, eMouseMove, eMouseRawUpdate)
 
 NS_EVENT_MESSAGE(ePointerClick)
 NS_EVENT_MESSAGE(ePointerAuxClick)

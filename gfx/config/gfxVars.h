@@ -137,7 +137,7 @@ class MOZ_STACK_CLASS gfxVarsCollectUpdates;
   _(AdapterVendorID, nsCString, nsCString())                       \
   _(AdapterDeviceID, nsCString, nsCString())                       \
   _(AdapterDriverVersion, nsCString, nsCString())                  \
-  _(UseAImageReaderVideoGpuProcessAndroid, bool, false)            \
+  _(ForceAImageReaderAndroid, bool, false)                         \
   _(AllowMetalAngleWebGL, bool, false)                             \
   _(CanUseVulkanHardwareVideoDecoding, bool, false)                \
   GFX_VARS_LIST_ANDROID(_)                                         \

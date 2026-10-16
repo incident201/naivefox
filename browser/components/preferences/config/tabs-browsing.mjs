@@ -93,6 +93,7 @@ Preferences.addAll([
   // Text selection actions menu
   { id: "browser.highlightToSearch.featureGate", type: "bool" },
   { id: "browser.highlightToSearch.enabled", type: "bool" },
+  { id: "browser.highlightToSearch.search.enabled", type: "bool" },
   { id: "browser.ml.chat.shortcuts", type: "bool" },
 
   // CFR
@@ -465,7 +466,10 @@ Preferences.addSetting({
   id: "linkPreviewLongPress",
   pref: "browser.ml.linkPreview.longPress",
 });
-const HIGHLIGHT_TO_SEARCH_ACTIONS = ["highlightToSearchAskChatbot"];
+const HIGHLIGHT_TO_SEARCH_ACTIONS = [
+  "highlightToSearchAskChatbot",
+  "highlightToSearchSearch",
+];
 
 function availableHighlightToSearchActions() {
   return HIGHLIGHT_TO_SEARCH_ACTIONS.map(id =>
@@ -518,6 +522,18 @@ Preferences.addSetting({
           l10nArgs: { provider },
         }
       : { ...config, l10nId: "highlight-to-search-settings-ask-generic" };
+  },
+});
+Preferences.addSetting({
+  id: "highlightToSearchSearch",
+  pref: "browser.highlightToSearch.search.enabled",
+  onUserChange(checked) {
+    onHighlightToSearchActionChange(checked);
+    Glean.selectionMenu.optionToggled.record({
+      action: "search",
+      enabled: checked,
+      source: "settings",
+    });
   },
 });
 
@@ -775,7 +791,13 @@ SettingGroupManager.registerGroups({
       {
         id: "highlightToSearchEnabled",
         l10nId: "highlight-to-search-settings-enable",
-        items: [{ id: "highlightToSearchAskChatbot" }],
+        items: [
+          { id: "highlightToSearchAskChatbot" },
+          {
+            id: "highlightToSearchSearch",
+            l10nId: "highlight-to-search-settings-search",
+          },
+        ],
       },
     ],
   },
@@ -914,7 +936,13 @@ SettingGroupManager.registerGroups({
       {
         id: "highlightToSearchEnabled",
         l10nId: "highlight-to-search-settings-enable",
-        items: [{ id: "highlightToSearchAskChatbot" }],
+        items: [
+          { id: "highlightToSearchAskChatbot" },
+          {
+            id: "highlightToSearchSearch",
+            l10nId: "highlight-to-search-settings-search",
+          },
+        ],
       },
     ],
   },

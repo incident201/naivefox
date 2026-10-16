@@ -12,7 +12,7 @@
 /* import-globals-from /browser/base/content/utilityOverlay.js */
 /* import-globals-from /toolkit/content/preferencesBindings.js */
 
-/** @import MozButton from "chrome://global/content/elements/moz-button.mjs" */
+/** @import { MozButton } from "chrome://global/content/elements/moz-button.mjs" */
 /** @import {SettingConfig, SettingEmitChange} from "chrome://global/content/preferences/Setting.mjs" */
 /** @import {SettingControlConfig, SettingOptionConfig} from "chrome://browser/content/preferences/widgets/setting-control.mjs" */
 /** @import {SettingGroup} from "chrome://browser/content/preferences/widgets/setting-group.mjs" */
@@ -495,7 +495,7 @@ const CONFIG_PANES = Object.freeze({
   },
   vpnSiteRules: {
     parent: "privacy",
-    l10nId: "ip-protection-site-rules-header",
+    l10nId: "ip-protection-site-rules-header-1",
     groupIds: ["vpnSiteRules"],
     replaces: "privacy",
   },

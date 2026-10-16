@@ -617,7 +617,8 @@ bool FFmpegVideoDecoder<LIBAV_VER>::FFmpegVulkanVideoDecoder::IsLoaded() const {
 
 void FFmpegVideoDecoder<LIBAV_VER>::FFmpegVulkanVideoDecoder::InitDrmModifiers(
     VkPhysicalDevice aPhysDev, VkFormat aFormatForModifiers,
-    const nsTArray<uint64_t>* aCompositorMods, VkImageUsageFlags aImageUsages) {
+    const nsTArray<uint64_t>* aCompositorMods, VkImageUsageFlags aImageUsages,
+    AVCodecID aCodecID) {
   mDrmModifiers.clear();
   mExportRequiresDedicatedByModifier.Clear();
   mForcedNvidiaBlockLinear = false;
@@ -790,6 +791,27 @@ void FFmpegVideoDecoder<LIBAV_VER>::FFmpegVulkanVideoDecoder::InitDrmModifiers(
     }
   }
 
+  // When codec is H264, on Blackwell with driver 610 or older, use DRM
+  // modifiers with height 1 to avoid corruption.
+  const uint32_t driverMajor = (mVulkanDriverVersion >> 22) & 0x3ff;
+  if (aCodecID == AV_CODEC_ID_H264 &&
+      mNegotiatedCompositorDecoderVendorID == 0x10de &&
+      mNegotiatedCompositorDecoderDeviceID >= 0x2B00 && driverMajor > 0 &&
+      driverMajor <= 610) {
+    auto keptEnd = std::stable_partition(
+        mDrmModifiers.begin(), mDrmModifiers.end(), [](uint64_t modifier) {
+          return (modifier >> 56) == DRM_FORMAT_MOD_VENDOR_NVIDIA &&
+                 (modifier & 0xf) == 1;
+        });
+    if (keptEnd != mDrmModifiers.begin()) {
+      mDrmModifiers.erase(keptEnd, mDrmModifiers.end());
+      FFMPEGV_LOG(
+          "[VULKAN] H264 + NVIDIA driver version <= 610 on Blackwell: Kept {} "
+          "modifier(s) with height parameter 1",
+          mDrmModifiers.size());
+    }
+  }
+
   FFMPEGV_LOG("[VULKAN] Using {} modifiers, first=0x{:x}", mDrmModifiers.size(),
               (unsigned long long)mDrmModifiers[0]);
 }
@@ -851,6 +873,7 @@ static uint32_t sCachedRendererDrmMinor = 0;
 static char sCachedVulkanDeviceName[VK_MAX_PHYSICAL_DEVICE_NAME_SIZE] = {};
 static uint32_t sCachedVulkanVendorID = 0;
 static uint32_t sCachedVulkanDeviceID = 0;
+static uint32_t sCachedVulkanDriverVersion = 0;
 static bool sCachedDecoderMatchesCompositor = false;
 
 static bool PhysicalDeviceHasVulkanVideoDecodeStack(
@@ -935,6 +958,7 @@ bool FFmpegVideoDecoder<LIBAV_VER>::FFmpegVulkanVideoDecoder::
            VK_MAX_PHYSICAL_DEVICE_NAME_SIZE);
     mNegotiatedCompositorDecoderVendorID = sCachedVulkanVendorID;
     mNegotiatedCompositorDecoderDeviceID = sCachedVulkanDeviceID;
+    mVulkanDriverVersion = sCachedVulkanDriverVersion;
     mDecoderMatchesCompositor = sCachedDecoderMatchesCompositor;
     FFMPEGV_LOG(
         "Reusing cached Vulkan device for video decoding: {} (vendorID=0x{:x}, "
@@ -1060,11 +1084,13 @@ bool FFmpegVideoDecoder<LIBAV_VER>::FFmpegVulkanVideoDecoder::
          VK_MAX_PHYSICAL_DEVICE_NAME_SIZE);
   mNegotiatedCompositorDecoderVendorID = validDevices[0].first.vendorID;
   mNegotiatedCompositorDecoderDeviceID = validDevices[0].first.deviceID;
+  mVulkanDriverVersion = validDevices[0].first.driverVersion;
   mDecoderMatchesCompositor = validDevices[0].second;
   memcpy(sCachedVulkanDeviceName, mNegotiatedVulkanDeviceName,
          VK_MAX_PHYSICAL_DEVICE_NAME_SIZE);
   sCachedVulkanVendorID = mNegotiatedCompositorDecoderVendorID;
   sCachedVulkanDeviceID = mNegotiatedCompositorDecoderDeviceID;
+  sCachedVulkanDriverVersion = mVulkanDriverVersion;
   sCachedDecoderMatchesCompositor = mDecoderMatchesCompositor;
   sCachedRendererDrmMajor = rendererDrmMajor;
   sCachedRendererDrmMinor = rendererDrmMinor;

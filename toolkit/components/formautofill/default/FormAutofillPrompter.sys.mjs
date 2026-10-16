@@ -1089,9 +1089,15 @@ export class CreditCardSaveDoorhanger extends AutofillDoorhanger {
     }
   }
 
-  // The record to be saved by this doorhanger
+  // The record to be saved by this doorhanger. The security code is left out
+  // when the user unchecks the checkbox, so that an update keeps the stored one.
   recordToSave() {
-    return this.newRecord;
+    if (FormAutofill.isAutofillCreditCardCVVEnabled) {
+      return this.newRecord;
+    }
+    const record = { ...this.newRecord };
+    delete record["cc-csc"];
+    return record;
   }
 }
 

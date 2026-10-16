@@ -1391,6 +1391,18 @@ class Document : public nsINode,
    */
   nsViewportInfo GetViewportInfo(const ScreenIntSize& aDisplaySize);
 
+  /**
+   * Lays this top-level document out at a fixed layout viewport size.
+   */
+  MOZ_CAN_RUN_SCRIPT void SetViewportSizeOverrideForMiniWindow(float aWidth,
+                                                               float aHeight);
+  MOZ_CAN_RUN_SCRIPT void ClearViewportSizeOverrideForMiniWindow() {
+    SetViewportSizeOverrideForMiniWindow(0, 0);
+  }
+  bool HasViewportSizeOverrideForMiniWindow() const {
+    return !mViewportSizeOverrideForMiniWindow.IsEmpty();
+  }
+
   void SetMetaViewportData(UniquePtr<ViewportMetaData> aData);
 
   // Returns a ViewportMetaData for this document.
@@ -1726,9 +1738,7 @@ class Document : public nsINode,
 
   MOZ_CAN_RUN_SCRIPT_BOUNDARY nsresult TurnEditingOff();
 
-  // MOZ_CAN_RUN_SCRIPT_BOUNDARY because this is called from all sorts
-  // of places, and I'm pretty sure the exact ExecCommand call it
-  // makes cannot actually run script.
+  // TODO: Convert this to MOZ_CAN_RUN_SCRIPT
   MOZ_CAN_RUN_SCRIPT_BOUNDARY nsresult EditingStateChanged();
 
   void MaybeEditingStateChanged();
@@ -2864,6 +2874,7 @@ class Document : public nsINode,
                "Display documents should not nest");
     mDisplayDocument = aDisplayDocument;
     mHasDisplayDocument = !!aDisplayDocument;
+    mIsBeingUsedAsImage |= aDisplayDocument->mIsBeingUsedAsImage;
   }
 
   /**
@@ -4934,14 +4945,11 @@ class Document : public nsINode,
   // Helper for GetScrollingElement/IsScrollingElement.
   bool IsPotentiallyScrollable(HTMLBodyElement* aBody);
 
-  // Whether GetScrollingElementImpl / IsPotentiallyScrollableImpl should flush
-  // pending style and frame construction before answering.
+  // Whether GetScrollingElementImpl should flush pending style and frame
+  // construction before answering.
   enum class Flush : bool { No, Yes };
   Element* GetScrollingElementImpl(Flush);
-  bool IsPotentiallyScrollableImpl(HTMLBodyElement* aBody, Flush);
-
-  void MaybeAllowStorageForOpenerAfterUserInteraction(
-      bool aHadPriorUserInteraction);
+  bool IsPotentiallyScrollableImpl(HTMLBodyElement* aBody);
 
   void MaybeStoreUserInteractionAsPermission();
 
@@ -5851,6 +5859,8 @@ class Document : public nsINode,
   CSSCoord mMaxWidth;
   CSSCoord mMinHeight;
   CSSCoord mMaxHeight;
+
+  CSSSize mViewportSizeOverrideForMiniWindow;
 
   RefPtr<EventListenerManager> mListenerManager;
 

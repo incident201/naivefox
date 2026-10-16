@@ -109,6 +109,19 @@ export class SiteRuleManager extends EventTarget {
   }
 
   /**
+   * Whether any provider holds at least one site with the rule.
+   *
+   * @param {?string} rule
+   * @returns {boolean}
+   */
+  hasRule(rule) {
+    if (!this.#inited) {
+      this.init();
+    }
+    return this.#providers.some(provider => provider.count(rule) > 0);
+  }
+
+  /**
    * Whether the user can change the rule for this principal. False when a
    * higher-precedence provider already claims it.
    *

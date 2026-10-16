@@ -34,7 +34,7 @@ type BreakpadInitType = *const u16;
 type NativeProcessId = windows_sys::Win32::Foundation::HANDLE;
 
 #[cfg(target_os = "macos")]
-type BreakpadInitType = *const crate::c_char;
+type BreakpadInitType = *const std::ffi::c_char;
 #[cfg(target_os = "macos")]
 type NativeProcessId = u32;
 

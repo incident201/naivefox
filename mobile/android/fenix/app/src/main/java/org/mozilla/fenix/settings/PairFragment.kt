@@ -46,12 +46,9 @@ class PairFragment : Fragment(R.layout.fragment_pair), UserInteractionHandler, S
                 onScanResult = { pairingUrl ->
                     // By the time we get a scan result, we may not be attached to the context anymore.
                     // See https://github.com/mozilla-mobile/fenix/issues/15812
-                    if (context == null) {
-                        findNavController()
-                            .popBackStack(
-                                R.id.turnOnSyncFragment,
-                                false,
-                            )
+                    // The scanner returns an empty result when the user navigates back.
+                    if (context == null || pairingUrl.isBlank()) {
+                        exitPairing()
                         return@QrFeature
                     }
                     requireComponents.services.accountsAuthFeature.beginPairingAuthentication(
@@ -67,11 +64,7 @@ class PairFragment : Fragment(R.layout.fragment_pair), UserInteractionHandler, S
                             VibrationEffect.DEFAULT_AMPLITUDE,
                         )
                     )
-                    findNavController()
-                        .popBackStack(
-                            R.id.turnOnSyncFragment,
-                            false,
-                        )
+                    exitPairing()
                 },
                 scanMessage = R.string.pair_instructions_2,
             ),
@@ -92,7 +85,7 @@ class PairFragment : Fragment(R.layout.fragment_pair), UserInteractionHandler, S
 
     override fun onBackPressed(): Boolean {
         qrFeature.onBackPressed()
-        findNavController().popBackStack(R.id.turnOnSyncFragment, false)
+        exitPairing()
         return true
     }
 
@@ -119,9 +112,13 @@ class PairFragment : Fragment(R.layout.fragment_pair), UserInteractionHandler, S
                         it.onPermissionsResult(permissions, grantResults)
                     }
                 } else {
-                    findNavController().popBackStack(R.id.turnOnSyncFragment, false)
+                    exitPairing()
                 }
             }
         }
+    }
+
+    private fun exitPairing() {
+        findNavController().popBackStack(R.id.pairFragment, true)
     }
 }

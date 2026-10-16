@@ -82,6 +82,7 @@ open class BaseSessionTest(
         const val TRACKERS_PATH = "/assets/www/trackers.html"
         const val VIDEO_MP4_PATH = "/assets/www/mp4.html"
         const val VIDEO_WEBM_PATH = "/assets/www/webm.html"
+        const val VIDEO_IN_IFRAME_PATH = "/assets/www/video_in_iframe.html"
         const val VIDEO_BAD_PATH = "/assets/www/badVideoPath.html"
         const val UNKNOWN_HOST_URI = "https://www.test.invalid/"
         const val UNKNOWN_PROTOCOL_URI = "htt://invalid"

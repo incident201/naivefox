@@ -6,6 +6,8 @@ description: Use this skill when working with Firefox documentation,
   documentation, or adding new docs.
 ---
 
+# Firefox documentation
+
 ## Overview
 
 Firefox documentation is built using **Sphinx**
@@ -30,6 +32,9 @@ Source Docs**.
 -   Prefer **small targeted builds** while debugging.
 -   Ensure new documentation is **reachable through a toctree**.
 -   Keep documentation **close to the code it describes** when possible.
+-   Check **what the page claims against the code**: look up each name it
+    cites with `searchfox-cli -q` and confirm the code still does what the
+    text says.
 
 ## Recommended Workflow
 
@@ -44,7 +49,7 @@ Common commands:
 
 -   `./mach doc --no-serve --no-open` -- build entire tree
 -   `./mach doc <path> --no-serve --no-open` -- build a specific component (much faster)
--   `./mach doc <path>` -- build and serve with livereload for iterative writing
+-   `./mach doc <path>` -- build and serve with livereload, to preview the pages locally while writing
 
 Useful flags:
 
@@ -175,6 +180,11 @@ after it reads twice: ``in the {doc}`api` reference`` comes out as "in the
 SessionStore API reference reference". Give the role its own text where the
 sentence already names the thing.
 
+An incremental build keeps a retitled page's old title in the `{doc}` links on
+other pages. Check a retitle with
+`./mach doc --no-serve --no-open --outdir <dir>` into a directory that doesn't
+exist yet.
+
 A `{doc}` target is the same path *without* the extension -- the opposite of
 the markdown form -- and a directory needs its `/index` spelled out.
 
@@ -261,15 +271,17 @@ they do not agree:
     the build does not avoid it. `--no-autodoc` builds the page anyway, with the
     generated API pages missing and `js:autoclass` warning as an unknown
     directive.
--   **jsdoc rejects type expressions that TypeScript accepts, and does it
-    quietly.** A type predicate (`{element is MozTabbrowserTab}`), a tuple,
-    indexed access, and a postfix `[]` on a parenthesised union (`{(A|B)[]}`)
-    each log a build ERROR while the member still renders -- without the row for
-    the parameter or return value being documented. Write `{Array<A|B>}` for the
-    last of those, and put a predicate's meaning in the summary line.
-    Indexed access (`{Foo['id']}`) has no spelling jsdoc accepts, whatever the
-    quoting, so a derived type needs a named `@typedef` alias beside the one it
-    derives from.
+-   **Write TypeScript types as TypeScript wants them.**
+    `docs/jsdoc-plugins/accept-typescript-types.mjs` passes predicates,
+    generics, indexed access, tuples, arrow and `import()` types through to the
+    page verbatim, though not as links.
+-   **Prose under an `@type` tag is moved above it** by
+    `docs/jsdoc-plugins/keep-type-descriptions.mjs`, where jsdoc reads it, but
+    only when `@type` is the first tag and the prose has its own lines. A
+    one-line `/** @type {number} Seconds since the epoch. */` loses its text;
+    write it out over several lines.
+-   **Give `@typedef` a type** -- `@typedef {object} Name` -- or jsdoc takes the
+    first `{` in the prose under it as the type and logs a build ERROR.
 -   **A documented default value renders**, so `[options.animate=true]` is a
     claim about the code. Write one only where the signature supplies that
     default, and describe a computed default in the prose instead, where it can
@@ -350,3 +362,6 @@ Worth knowing:
 -   Use `--no-autodoc` for faster iteration when not working on API docs.
 -   If a new warning appears that is expected/acceptable, add a pattern
     to `allowed_warnings` in `docs/config.yml`.
+-   For the user to preview the rendered pages after a push, Reviewbot's
+    comment on the revision links a preview of every documentation file the
+    diff touches, kept for one week.

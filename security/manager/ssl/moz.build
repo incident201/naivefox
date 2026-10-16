@@ -145,6 +145,42 @@ UNIFIED_SOURCES += [
     "X509CertValidity.cpp",
 ]
 
+SOURCE_HEADERS += [
+    "AppSignatureVerification.h",
+    "AppTrustDomain.h",
+    "ContentSignatureVerifier.h",
+    "DataStorageManager.h",
+    "FIPSUtils.h",
+    "md4.h",
+    "nsCertOverrideService.h",
+    "nsCertTree.h",
+    "nsNSSCertHelper.h",
+    "nsNSSCertificateDB.h",
+    "nsNSSCertTrust.h",
+    "nsNSSIOLayer.h",
+    "nsNSSModule.h",
+    "nsNSSVersion.h",
+    "nsNTLMAuthModule.h",
+    "nsPKCS12Blob.h",
+    "nsSiteSecurityService.h",
+    "NSSKeyStore.h",
+    "NSSSocketControl.h",
+    "OSKeyStore.h",
+    "OSReauthenticator.h",
+    "PDFTrustDomain.h",
+    "PKCS11Module.h",
+    "PKCS11ModuleDB.h",
+    "PKCS11Slot.h",
+    "PKCS11Token.h",
+    "PublicKeyPinningService.h",
+    "QWACTrustDomain.h",
+    "SecretDecoderRing.h",
+    "SiteIntegrityService.h",
+    "StaticHPKPins.h",
+    "TLSClientAuthCertSelection.h",
+    "X509CertValidity.h",
+]
+
 if CONFIG["MOZ_NAIVEFOX"]:
     # Browser-facing key-management APIs are not part of the proxy runtime.
     # TLS trust and client connections continue to use nsNSSComponent/PSM.
@@ -195,6 +231,9 @@ if CONFIG["MOZ_WIDGET_TOOLKIT"] == "gtk" and not CONFIG["MOZ_NAIVEFOX"]:
     UNIFIED_SOURCES += [
         "LibSecret.cpp",
     ]
+    SOURCE_HEADERS += [
+        "LibSecret.h",
+    ]
     CFLAGS += CONFIG["GLIB_CFLAGS"]
     CXXFLAGS += CONFIG["GLIB_CFLAGS"]
     CFLAGS += CONFIG["MOZ_GTK3_CFLAGS"]
@@ -204,6 +243,9 @@ if CONFIG["TARGET_KERNEL"] == "Darwin":
     UNIFIED_SOURCES += [
         "KeychainSecret.cpp",
         "OSReauthenticatorDarwin.mm",
+    ]
+    SOURCE_HEADERS += [
+        "KeychainSecret.h",
     ]
     OS_LIBS += [
         "-framework CoreFoundation",
@@ -237,6 +279,9 @@ if CONFIG["OS_ARCH"] == "WINNT":
 
     UNIFIED_SOURCES += [
         "CredentialManagerSecret.cpp",
+    ]
+    SOURCE_HEADERS += [
+        "CredentialManagerSecret.h",
     ]
 
 if CONFIG["NIGHTLY_BUILD"] and not CONFIG["MOZ_NO_SMART_CARDS"]:

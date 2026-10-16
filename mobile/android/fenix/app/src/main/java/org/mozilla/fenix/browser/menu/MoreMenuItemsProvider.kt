@@ -9,10 +9,10 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import mozilla.components.browser.state.selector.selectedTab
 import mozilla.components.browser.state.store.BrowserStore
 import mozilla.components.compose.base.text.Text
 import mozilla.components.compose.menu.data.ExpandableMenuItem
+import mozilla.components.compose.menu.data.MenuItemTitle
 import mozilla.components.compose.menu.data.StandardMenuItem
 import mozilla.components.compose.menu.store.MenuEvent
 import mozilla.components.compose.menu.ui.MenuItemIconRes
@@ -20,6 +20,7 @@ import mozilla.components.ui.icons.R as iconsR
 import org.mozilla.fenix.R
 import org.mozilla.fenix.components.menu.ExpandableMenuItemProvider
 import org.mozilla.fenix.components.menu.MenuHost
+import org.mozilla.fenix.components.menu.MenuTarget
 import org.mozilla.fenix.components.menu.store.MenuAction
 import org.mozilla.fenix.summarization.isSummarizePageMenuItem
 import org.mozilla.fenix.summarization.onboarding.SummarizationFeatureDiscoveryConfiguration
@@ -30,12 +31,14 @@ import org.mozilla.fenix.summarization.onboarding.SummarizeDiscoveryEvent
  * webpage.
  *
  * @param browserStore [BrowserStore] used to know for which webpage the menu is opened.
+ * @param target [MenuTarget] for which this menu item would be shown for.
  * @param summarizationSettings [SummarizationFeatureDiscoveryConfiguration] for checking the summarization feature
  *   status.
  * @param scope [CoroutineScope] used to keep the item up to date for as long as it can be shown.
  */
 class MoreMenuItemsProvider(
     private val browserStore: BrowserStore,
+    private val target: MenuTarget,
     private val summarizationSettings: SummarizationFeatureDiscoveryConfiguration,
     scope: CoroutineScope,
 ) : ExpandableMenuItemProvider {
@@ -45,17 +48,18 @@ class MoreMenuItemsProvider(
     override val itemFlow: StateFlow<ExpandableMenuItem> =
         browserStore.stateFlow
             .map { state ->
-                moreItem(isNormalTab = state.selectedTab?.content?.private == false)
+                moreItem(isNormalTab = target.browserSessionFrom(state)?.content?.private == false)
             }
             .stateIn(
                 scope = scope,
                 started = SharingStarted.Eagerly,
-                initialValue = moreItem(isNormalTab = browserStore.state.selectedTab?.content?.private == false),
+                initialValue =
+                    moreItem(isNormalTab = target.browserSessionFrom(browserStore.state)?.content?.private == false),
             )
 
     private fun moreItem(isNormalTab: Boolean) =
         ExpandableMenuItem(
-            title = Text.Resource(R.string.browser_menu_more_settings),
+            title = MenuItemTitle(Text.Resource(R.string.browser_menu_more_settings)),
             icon = icon(isHighlighted = isNormalTab && summarizationSettings.shouldHighlightOverflowMenuItem),
             subMenuItems = emptyList(),
             onClickEvent = MenuAction.OnMoreMenuClicked,
@@ -95,7 +99,7 @@ class MoreMenuItemsProvider(
     override fun onEvent(event: MenuEvent, menu: MenuHost) {
         if (
             lastSubMenuItems.any { it.isSummarizePageMenuItem() } &&
-                browserStore.state.selectedTab?.content?.private == false &&
+                target.browserSessionFrom(browserStore.state)?.content?.private == false &&
                 summarizationSettings.shouldHighlightOverflowMenuItem
         ) {
             summarizationSettings.cacheDiscoveryEvent(SummarizeDiscoveryEvent.MenuOverflowInteraction)

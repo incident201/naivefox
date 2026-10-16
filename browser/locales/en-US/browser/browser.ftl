@@ -429,8 +429,9 @@ bookmark-panel-remove =
 bookmark-panel-show-editor-checkbox =
     .label = Show editor when saving
     .accesskey = S
-bookmark-panel-save-button =
+bookmark-panel-save-button2 =
     .label = Save
+    .accesskey = a
 
 # Width of the bookmark panel.
 # Should be large enough to fully display the Done and
@@ -1327,19 +1328,13 @@ tabs-toolbar =
 tabs-toolbar-new-tab =
     .label = New Tab
 
-tabs-toolbar-list-all-tabs =
-    .label = List all tabs
-    .tooltiptext = List all tabs
+tabs-toolbar-list-all-tabs-2 =
+    .label = Search and manage tabs
+    .tooltiptext = Search and manage tabs
 
 ## Drop indicator text for pinned tabs when no tabs are pinned.
 
 pinned-tabs-drop-indicator = Drop tab here to pin
-
-## Infobar shown at startup to suggest session-restore
-
-# <img data-l10n-name="icon"/> will be replaced by the application menu icon
-restore-session-startup-suggestion-message = <strong>Open previous tabs?</strong> You can restore your previous session from the { -brand-short-name } application menu <img data-l10n-name="icon"/>, under History.
-restore-session-startup-suggestion-button = Show me how
 
 ## Infobar shown when the user tries to open a file picker and file pickers are blocked by enterprise policy
 
@@ -1351,9 +1346,9 @@ filepicker-blocked-infobar = Your organization has blocked access to local files
 ##   $searchTabsShortcut (String) - The Search Tabs keyboard shortcut, e.g. "Ctrl+Shift+A".
 ##   $addonsShortcut (String) - The Extensions and Themes keyboard shortcut, e.g. "Ctrl+Shift+F".
 
-urlbar-addons-shortcut-moved-title = { $searchTabsShortcut } now searches your tabs
-urlbar-addons-shortcut-moved-description = To open Extensions and Themes, use { $addonsShortcut }.
-urlbar-addons-shortcut-moved-change-shortcuts = Change shortcuts
+urlbar-addons-shortcut-moved-title = { $searchTabsShortcut } now searches tabs
+urlbar-addons-shortcut-moved-description = To open extensions and themes, use { $addonsShortcut }.
+urlbar-addons-shortcut-moved-change-shortcuts = Manage shortcuts
 urlbar-addons-shortcut-moved-dismiss = Got it
 
 ## Mozilla data reporting notification (Telemetry, Firefox Health Report, etc)
@@ -1441,6 +1436,27 @@ reset-pbm-panel-confirm-button2 =
     .label = Clear private session
     .accesskey = l
 reset-pbm-panel-complete = Private session data deleted
+
+## Fire button. Clears the whole browsing session, then closes every window and
+## opens a new one.
+
+fire-button-toolbar-button =
+    .label = Delete some or all of your browsing data
+    .tooltiptext = Delete some or all of your browsing data
+fire-button-panel-heading = Delete all browsing data?
+fire-button-panel-description = This deletes history, cookies, and site data. You’ll be signed out of sites. This window will close, and { -brand-short-name } will open a new one.
+fire-button-panel-choose-description = If you don’t want to delete everything, choose specific data instead.
+# Opens the "Delete browsing data" dialog, where the user picks
+# which kinds of data to delete. The trailing ellipsis marks that a dialog
+# follows rather than the action happening immediately.
+fire-button-panel-choose-link = Choose…
+fire-button-panel-cancel-button =
+    .label = Cancel
+    .accesskey = C
+fire-button-panel-confirm-button =
+    .label = Delete all
+    .accesskey = D
+fire-button-panel-complete = Browsing data deleted
 
 ## Autorefresh blocker
 

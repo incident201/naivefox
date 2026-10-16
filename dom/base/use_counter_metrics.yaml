@@ -108,7 +108,7 @@ use.counter:
     send_in_pings:
       - use-counters
 
-# Total of 2668 use counter metrics (excludes denominators).
+# Total of 2672 use counter metrics (excludes denominators).
 # Total of 435 'page' use counters.
 use.counter.page:
   svgsvgelement_getelementbyid:
@@ -20489,7 +20489,7 @@ use.counter.deprecated_ops.doc:
     send_in_pings:
       - use-counters
 
-# Total of 735 'CSS (page)' use counters.
+# Total of 737 'CSS (page)' use counters.
 use.counter.css.page:
   css_align_items:
     type: counter
@@ -23895,6 +23895,23 @@ use.counter.css.page:
     type: counter
     description: >
       Whether a page used the CSS property filter.
+      Compare against `use.counter.top_level_content_documents_destroyed`
+      to calculate the rate.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1852098
+    data_reviews:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1852098
+    notification_emails:
+      - dom-core@mozilla.com
+      - emilio@mozilla.com
+    expires: never
+    send_in_pings:
+      - use-counters
+
+  css_fit_tolerance:
+    type: counter
+    description: >
+      Whether a page used the CSS property fit-tolerance.
       Compare against `use.counter.top_level_content_documents_destroyed`
       to calculate the rate.
     bugs:
@@ -30011,6 +30028,23 @@ use.counter.css.page:
     send_in_pings:
       - use-counters
 
+  css_flow_tolerance:
+    type: counter
+    description: >
+      Whether a page used the CSS property flow-tolerance.
+      Compare against `use.counter.top_level_content_documents_destroyed`
+      to calculate the rate.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1852098
+    data_reviews:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1852098
+    notification_emails:
+      - dom-core@mozilla.com
+      - emilio@mozilla.com
+    expires: never
+    send_in_pings:
+      - use-counters
+
   css_webkit_justify_content:
     type: counter
     description: >
@@ -32986,7 +33020,7 @@ use.counter.css.page:
     send_in_pings:
       - use-counters
 
-# Total of 735 'CSS (document)' use counters.
+# Total of 737 'CSS (document)' use counters.
 use.counter.css.doc:
   css_align_items:
     type: counter
@@ -36392,6 +36426,23 @@ use.counter.css.doc:
     type: counter
     description: >
       Whether a document used the CSS property filter.
+      Compare against `use.counter.content_documents_destroyed`
+      to calculate the rate.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1852098
+    data_reviews:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1852098
+    notification_emails:
+      - dom-core@mozilla.com
+      - emilio@mozilla.com
+    expires: never
+    send_in_pings:
+      - use-counters
+
+  css_fit_tolerance:
+    type: counter
+    description: >
+      Whether a document used the CSS property fit-tolerance.
       Compare against `use.counter.content_documents_destroyed`
       to calculate the rate.
     bugs:
@@ -42495,6 +42546,23 @@ use.counter.css.doc:
     type: counter
     description: >
       Whether a document used the CSS property font-stretch.
+      Compare against `use.counter.content_documents_destroyed`
+      to calculate the rate.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1852098
+    data_reviews:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=1852098
+    notification_emails:
+      - dom-core@mozilla.com
+      - emilio@mozilla.com
+    expires: never
+    send_in_pings:
+      - use-counters
+
+  css_flow_tolerance:
+    type: counter
+    description: >
+      Whether a document used the CSS property flow-tolerance.
       Compare against `use.counter.content_documents_destroyed`
       to calculate the rate.
     bugs:

@@ -109,9 +109,11 @@ def _validate_tar_member(member, path):
         raise Exception("Attempted setuid or setgid in tar file: " + member.name)
 
 
-def _safe_extract(tar, path=".", *, numeric_owner=False):
+def _safe_extract(tar, path=".", *, numeric_owner=False, member_filter=None):
     def _files(tar, path):
         for member in tar:
+            if member_filter and not member_filter(member.name):
+                continue
             _validate_tar_member(member, path)
             yield member
 
@@ -712,13 +714,17 @@ class ScriptMixin(PlatformMixin):
                 except KeyError:
                     self.warning(f"{entry} was not found in the zip file")
 
-    def deflate(self, compressed_file, mode, extract_to=".", *args, **kwargs):
+    def deflate(
+        self, compressed_file, mode, extract_to=".", member_filter=None, *args, **kwargs
+    ):
         """This method allows to extract a compressed file from a tar{,bz2,gz,xz} files.
 
         Args:
             compressed_file (object): File-like object with the contents of a compressed file.
             mode (str): string of the form 'filemode[:compression]' (e.g. 'r:gz' or 'r:bz2')
             extract_to (str, optional): where to extract the compressed file.
+            member_filter (callable, optional): called with each member name, only
+                                                members it returns True for are extracted.
         """
         if mode == "r|zst":
             import zstandard
@@ -726,12 +732,14 @@ class ScriptMixin(PlatformMixin):
             unzstd = zstandard.ZstdDecompressor()
             with unzstd.stream_reader(compressed_file) as stream:
                 with tarfile.open(mode="r|", fileobj=stream) as t:
-                    _safe_extract(t, path=extract_to)
+                    _safe_extract(t, path=extract_to, member_filter=member_filter)
         else:
             with tarfile.open(fileobj=compressed_file, mode=mode) as t:
-                _safe_extract(t, path=extract_to)
+                _safe_extract(t, path=extract_to, member_filter=member_filter)
 
-    def download_unpack(self, url, extract_to=".", extract_dirs="*", verbose=False):
+    def download_unpack(
+        self, url, extract_to=".", extract_dirs="*", verbose=False, member_filter=None
+    ):
         """Generic method to download and extract a compressed file without writing it
         to disk first.
 
@@ -743,6 +751,7 @@ class ScriptMixin(PlatformMixin):
                                            Defaults to `*`. It currently only applies to zip files.
             verbose (bool, optional): whether or not extracted content should be displayed.
                                       Defaults to False.
+            member_filter (callable, optional): see `deflate`. Only applies to tar files.
 
         """
 
@@ -798,6 +807,8 @@ class ScriptMixin(PlatformMixin):
                 "verbose": verbose,
             }
             kwargs.update(MIMETYPES[mimetype].get("kwargs", {}))
+            if member_filter and function == self.deflate:
+                kwargs["member_filter"] = member_filter
 
             return function, kwargs
 
@@ -2382,6 +2393,7 @@ class BaseScript(ScriptMixin, LogMixin):
             "framework": {"name": "mozharness"},
             "suites": [],
         }
+        extra_options = os.environ.get("PERFHERDER_EXTRA_OPTIONS", "").split()
         try:
             for action in self.all_actions:
                 if action not in self.actions:
@@ -2391,14 +2403,17 @@ class BaseScript(ScriptMixin, LogMixin):
                 start = time.monotonic()
                 self.run_action(action)
                 end = time.monotonic()
-                perfherder_data["suites"].append({
+                suite = {
                     "name": action,
                     "value": end - start,
                     "lowerIsBetter": True,
                     "unit": "s",
                     "shouldAlert": False,
                     "subtests": [],
-                })
+                }
+                if extra_options:
+                    suite["extraOptions"] = extra_options
+                perfherder_data["suites"].append(suite)
         except Exception:
             self.fatal("Uncaught exception: %s" % traceback.format_exc())
         finally:

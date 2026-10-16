@@ -3745,7 +3745,9 @@ class MToNumberInt32 : public MUnaryInstruction, public ToInt32Policy::Data {
 
   bool congruentTo(const MDefinition* ins) const override {
     if (!ins->isToNumberInt32() ||
-        ins->toToNumberInt32()->conversion() != conversion()) {
+        ins->toToNumberInt32()->conversion() != conversion() ||
+        ins->toToNumberInt32()->needsNegativeZeroCheck() !=
+            needsNegativeZeroCheck()) {
       return false;
     }
     return congruentIfOperandsEqual(ins);

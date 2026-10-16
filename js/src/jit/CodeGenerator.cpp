@@ -2625,22 +2625,6 @@ static bool PrepareAndExecuteRegExp(MacroAssembler& masm, Register regexp,
   return true;
 }
 
-// Shift a bit within a 32-bit word from one bit position to another.
-// Both FromBitMask and ToBitMask must have a single bit set.
-template <uint32_t FromBitMask, uint32_t ToBitMask>
-static void ShiftFlag32(MacroAssembler& masm, Register reg) {
-  static_assert(std::has_single_bit(FromBitMask));
-  static_assert(std::has_single_bit(ToBitMask));
-  static_assert(FromBitMask != ToBitMask);
-  constexpr uint32_t fromShift = std::countr_zero(FromBitMask);
-  constexpr uint32_t toShift = std::countr_zero(ToBitMask);
-  if (fromShift < toShift) {
-    masm.lshift32(Imm32(toShift - fromShift), reg);
-  } else {
-    masm.rshift32(Imm32(fromShift - toShift), reg);
-  }
-}
-
 static void EmitInitDependentStringBase(MacroAssembler& masm,
                                         Register dependent, Register base,
                                         Register temp1, Register temp2,
@@ -2669,11 +2653,14 @@ static void EmitInitDependentStringBase(MacroAssembler& masm,
     //   flags |= ~(flags | ~ATOM_BIT) << (DEPENDED_ON_BIT - ATOM_BIT)
     //
     masm.nor32(Imm32(~StringFlags::ATOM_BIT), temp1, temp2);
-    ShiftFlag32<StringFlags::ATOM_BIT, StringFlags::DEPENDED_ON_BIT>(masm,
-                                                                     temp2);
-    masm.or32(temp2, temp1);
+    constexpr uint32_t AtomIndex = std::countr_zero(StringFlags::ATOM_BIT);
+    constexpr uint32_t DependedOnIndex =
+        std::countr_zero(StringFlags::DEPENDED_ON_BIT);
+    static_assert(AtomIndex < DependedOnIndex);
+    constexpr uint32_t ShiftAmount = DependedOnIndex - AtomIndex;
+    masm.lshift32ThenOr(Imm32(ShiftAmount), temp1, temp2);
+    masm.store32(temp2, Address(base, JSString::offsetOfFlags()));
     masm.movePtr(base, temp2);
-    masm.store32(temp1, Address(temp2, JSString::offsetOfFlags()));
   }
   masm.bind(&markedDependedOn);
 
@@ -6293,6 +6280,13 @@ void CodeGenerator::emitCallNative(LCallIns* call, JSNative native,
   masm.loadJSContext(argContextReg);
   masm.moveStackPtrTo(argVpReg);
 
+  // Initialize |NativeExitFrameLayout::savedCallee_|.
+  if constexpr (std::is_same_v<LCallIns, LCallClassHook>) {
+    masm.Push(ToRegister(call->getCallee()));
+  } else {
+    masm.Push(ImmGCPtr(call->mir()->getSingleTarget()->rawNativeJSFunction()));
+  }
+
   // Initialize |NativeExitFrameLayout::argc_|.
   masm.Push(argUintNReg);
 
@@ -6462,6 +6456,11 @@ void CodeGenerator::visitCallDOMNative(LCallDOMNative* call) {
   MOZ_ASSERT(target->hasJitInfo());
   MOZ_ASSERT(call->mir()->isCallDOMNative());
 
+  // CanAttachDOMCall only optimizes DOM calls for same-realm targets. This
+  // means that IonDOMMethod native exit frames don't need a copy of the callee.
+  // See NativeExitFrameLayout::savedCallee_.
+  MOZ_RELEASE_ASSERT(!call->mir()->maybeCrossRealm());
+
   int unusedStack = UnusedStackBytesForCall(call->mir()->paddedNumStackArgs());
 
   // Registers used for callWithABI() argument-passing.
@@ -6520,12 +6519,6 @@ void CodeGenerator::visitCallDOMNative(LCallDOMNative* call) {
   masm.Push(argObj);
   masm.moveStackPtrTo(argObj);
 
-  if (call->mir()->maybeCrossRealm()) {
-    // We use argJSContext as scratch register here.
-    masm.movePtr(ImmGCPtr(target->rawNativeJSFunction()), argJSContext);
-    masm.switchToObjectRealm(argJSContext, argJSContext);
-  }
-
   bool preTenureWrapperAllocation =
       call->mir()->to<MCallDOMNative>()->initialHeap() == gc::Heap::Tenured;
   if (preTenureWrapperAllocation) {
@@ -6575,12 +6568,6 @@ void CodeGenerator::visitCallDOMNative(LCallDOMNative* call) {
 
   static_assert(!JSReturnOperand.aliases(ReturnReg),
                 "Clobbering ReturnReg should not affect the return value");
-
-  // Switch back to the current realm if needed. Note: if the DOM method threw
-  // an exception, the exception handler will do this.
-  if (call->mir()->maybeCrossRealm()) {
-    masm.switchToRealm(gen->realm->realmPtr(), ReturnReg);
-  }
 
   // Wipe out the preTenuring bit from the local alloc site
   // On exception we handle this in C++
@@ -6782,8 +6769,6 @@ void JitRuntime::generateIonGenericCallStub(MacroAssembler& masm,
     masm.branchTestNull(Assembler::Equal, thisAddr, &vmCall);
   }
 
-  masm.switchToObjectRealm(calleeReg, scratch);
-
   // Load jitCodeRaw for callee if it exists.
   masm.branchIfFunctionHasNoJitEntry(calleeReg, &noJitEntry);
 
@@ -6793,6 +6778,7 @@ void JitRuntime::generateIonGenericCallStub(MacroAssembler& masm,
 
   generateIonGenericHandleUnderflow(masm, isConstructing, &vmCall);
 
+  masm.switchToObjectRealm(calleeReg, scratch);
   masm.loadJitCodeRaw(calleeReg, scratch2);
 
   // Construct the JitFrameLayout.
@@ -7064,6 +7050,15 @@ void JitRuntime::generateIonGenericCallNativeFunction(MacroAssembler& masm,
   // Push a value containing the callee, which will become argv[0].
   masm.pushValue(JSVAL_TYPE_OBJECT, calleeReg);
 
+  // Load argv into scratch2.
+  masm.moveStackPtrTo(scratch2);
+
+  // Initialize |NativeExitFrameLayout::savedCallee_|.
+  masm.push(calleeReg);
+
+  // Enter the callee's realm. It's kept alive by |savedCallee_|.
+  masm.switchToObjectRealm(calleeReg, scratch);
+
   // Load the callee address into calleeReg.
 #ifdef JS_SIMULATOR
   masm.movePtr(ImmPtr(RedirectedCallAnyNative()), calleeReg);
@@ -7071,9 +7066,6 @@ void JitRuntime::generateIonGenericCallNativeFunction(MacroAssembler& masm,
   masm.loadPrivate(Address(calleeReg, JSFunction::offsetOfNativeOrEnv()),
                    calleeReg);
 #endif
-
-  // Load argv into scratch2.
-  masm.moveStackPtrTo(scratch2);
 
   // Push argc.
   masm.push(argcReg);
@@ -7126,6 +7118,12 @@ void JitRuntime::generateIonGenericCallFunCall(MacroAssembler& masm,
   masm.branchPtr(Assembler::NotEqual,
                  Address(calleeReg, JSFunction::offsetOfNativeOrEnv()),
                  ImmPtr(js::fun_call), &notFunCall);
+
+  // Only optimize fun_call for the caller's realm. If |this| is a proxy, the
+  // arguments array passed to the proxy's apply trap must be allocated in
+  // fun_call's realm. We can't enter that realm here because fun_call, which
+  // keeps it alive, is about to be removed from the stack. See bug 2082051.
+  masm.guardObjectHasSameRealm(calleeReg, scratch, vmCall);
 
   // In general, we can implement fun_call by replacing calleeReg with
   // |this|, sliding all the other arguments down, and decrementing argc.
@@ -7272,6 +7270,12 @@ void JitRuntime::generateIonGenericCallBoundFunction(MacroAssembler& masm,
 
   // Load the target in calleeReg.
   masm.unboxObject(targetSlot, calleeReg);
+
+  // Bound targets can be nested arbitrarily deep. Check the stack limit before
+  // recursing.
+  const void* limitAddr = masm.runtime()->addressOfJitStackLimit();
+  masm.branchStackPtrRhs(Assembler::AboveOrEqual, AbsoluteAddress(limitAddr),
+                         vmCall);
 
   // At this point, all preconditions for entering the trampoline are met:
   // - calleeReg contains a pointer to the callee object
@@ -17368,12 +17372,11 @@ bool CodeGenerator::generateWasm(wasm::CallIndirectId callIndirectId,
 
       auto* ool = new (alloc()) LambdaOutOfLineCode(
           [this, stackMaps, functionEntryStackMap](OutOfLineCode& ool) {
-            masm.wasmTrap(wasm::Trap::CheckInterrupt, wasm::TrapSiteDesc());
-            CodeOffset trapInsnOffset = CodeOffset(masm.currentOffset());
+            FaultingCodeRange fcr =
+                masm.wasmTrap(wasm::Trap::CheckInterrupt, wasm::TrapSiteDesc());
 
-            if (functionEntryStackMap &&
-                !stackMaps->add(trapInsnOffset.offset(),
-                                functionEntryStackMap)) {
+            if (functionEntryStackMap && fcr.isValid() &&
+                !stackMaps->add(fcr.resumeOffset(), functionEntryStackMap)) {
               masm.setOOM();
             }
             masm.jump(ool.rejoin());
@@ -21545,9 +21548,12 @@ void CodeGenerator::visitWasmHeapReg(LWasmHeapReg* ins) {
 void CodeGenerator::emitResumableWasmTrapOOL(
     LInstruction* lir, size_t framePushed,
     const wasm::TrapSiteDesc& trapSiteDesc, wasm::Trap trap) {
-  masm.wasmTrap(trap, trapSiteDesc);
+  FaultingCodeRange fcr = masm.wasmTrap(trap, trapSiteDesc);
+  if (!fcr.isValid()) {
+    return;
+  }
 
-  markSafepointAt(masm.currentOffset(), lir);
+  markSafepointAt(fcr.resumeOffset(), lir);
 
   // Note that masm.framePushed() doesn't include the register dump area.
   // That will be taken into account when the StackMap is created from the

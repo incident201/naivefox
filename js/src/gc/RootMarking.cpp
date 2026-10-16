@@ -250,6 +250,10 @@ void js::gc::GCRuntime::traceIncomingCrossCompartmentEdgesForZoneGC(
     for (CompartmentsInZoneIter c(zone); !c.done(); c.next()) {
       c->traceWrapperTargetsInCollectedZones(trc, whichEdges);
     }
+
+    if (atomsZone()->isGCMarking()) {
+      zone->traceIncomingSymbolEdgesForZoneGC(trc, whichEdges);
+    }
   }
 
   // Currently we trace all debugger edges as black.

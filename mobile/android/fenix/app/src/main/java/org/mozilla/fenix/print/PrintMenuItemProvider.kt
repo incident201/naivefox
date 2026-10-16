@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.StateFlow
 import mozilla.components.browser.state.store.BrowserStore
 import mozilla.components.compose.base.text.Text
 import mozilla.components.compose.menu.data.MenuItem
+import mozilla.components.compose.menu.data.MenuItemTitle
 import mozilla.components.compose.menu.data.StandardMenuItem
 import mozilla.components.compose.menu.store.MenuEvent
 import mozilla.components.compose.menu.ui.MenuItemIconRes
@@ -17,6 +18,7 @@ import mozilla.components.ui.icons.R as iconsR
 import org.mozilla.fenix.R
 import org.mozilla.fenix.components.menu.MenuHost
 import org.mozilla.fenix.components.menu.MenuItemProvider
+import org.mozilla.fenix.components.menu.MenuTarget
 import org.mozilla.fenix.components.menu.store.MenuAction
 
 /**
@@ -24,11 +26,13 @@ import org.mozilla.fenix.components.menu.store.MenuAction
  *
  * @param isAndroidAutomotiveAvailable Whether the device is running on Android Automotive.
  * @param browserStore [BrowserStore] used to get the current page.
+ * @param target [MenuTarget] for which this menu item would be shown for.
  * @param printContent [SessionUseCases.PrintContentUseCase] for printing the current page.
  */
 class PrintMenuItemProvider(
     isAndroidAutomotiveAvailable: Boolean,
     private val browserStore: BrowserStore,
+    private val target: MenuTarget,
     private val printContent: SessionUseCases.PrintContentUseCase,
 ) : MenuItemProvider {
     override val itemFlow: StateFlow<MenuItem?> =
@@ -37,7 +41,7 @@ class PrintMenuItemProvider(
                 null
             } else {
                 StandardMenuItem(
-                    title = Text.Resource(R.string.browser_menu_print_2),
+                    title = MenuItemTitle(Text.Resource(R.string.browser_menu_print_2)),
                     icon = MenuItemIconRes(iconsR.drawable.mozac_ic_print_24),
                     onClickEvent = MenuAction.PrintRequested,
                 )
@@ -47,7 +51,9 @@ class PrintMenuItemProvider(
     override fun handles(event: MenuEvent) = event == MenuAction.PrintRequested
 
     override fun onEvent(event: MenuEvent, menu: MenuHost) {
+        val tabId = target.browserSessionFrom(browserStore.state)?.id ?: return
+
         menu.dismiss()
-        printContent(tabId = browserStore.state.selectedTabId)
+        printContent(tabId = tabId)
     }
 }

@@ -230,11 +230,13 @@ BOOL WINAPI GetThreadInformation(
 #endif
 
 // Linux/BSD builds use LUL, which uses DWARF info to unwind stacks.
-#if !defined(MOZ_NAIVEFOX) && (defined(GP_PLAT_amd64_linux) || defined(GP_PLAT_x86_linux) || \
-    defined(GP_PLAT_amd64_android) || defined(GP_PLAT_x86_android) ||   \
-    defined(GP_PLAT_mips64_linux) || defined(GP_PLAT_arm64_linux) ||    \
-    defined(GP_PLAT_arm64_android) || defined(GP_PLAT_amd64_freebsd) || \
-    defined(GP_PLAT_arm64_freebsd))
+#if !defined(MOZ_NAIVEFOX) &&                                              \
+    (defined(GP_PLAT_amd64_linux) || defined(GP_PLAT_x86_linux) ||         \
+     defined(GP_PLAT_amd64_android) || defined(GP_PLAT_x86_android) ||     \
+     defined(GP_PLAT_mips64_linux) || defined(GP_PLAT_arm64_linux) ||      \
+     defined(GP_PLAT_arm64_android) || defined(GP_PLAT_amd64_freebsd) ||   \
+     defined(GP_PLAT_arm64_freebsd) || defined(GP_PLAT_loongarch64_linux) || \
+     defined(GP_PLAT_riscv64_linux))
 #  define HAVE_NATIVE_UNWIND
 #  define USE_LUL_STACKWALK
 #  include "lul/LulMain.h"
@@ -2200,6 +2202,8 @@ static const char* const kMainThreadName = "GeckoMain";
     defined(GP_PLAT_arm64_freebsd) || defined(GP_ARCH_arm64) ||         \
     defined(__aarch64__)
 #  define UNWINDING_REGS_HAVE_LR_R11
+#elif defined(GP_PLAT_loongarch64_linux) || defined(GP_PLAT_riscv64_linux)
+#  define UNWINDING_REGS_HAVE_RA_T3
 #endif
 
 // The registers used for stack unwinding and a few other sampling purposes.
@@ -2228,6 +2232,9 @@ class Registers {
 #elif defined(UNWINDING_REGS_HAVE_LR_R11)
   Address mLR{nullptr};   // ARM link register, or temp for return address.
   Address mR11{nullptr};  // Temp for frame pointer.
+#elif defined(UNWINDING_REGS_HAVE_RA_T3)
+  Address mRA{nullptr};  // Return address register.
+  Address mT3{nullptr};  // Temp for frame pointer.
 #endif
 
 #if defined(GP_OS_linux) || defined(GP_OS_android) || defined(GP_OS_freebsd)
@@ -2375,6 +2382,9 @@ static uint32_t ExtractJsFrames(
 #elif defined(UNWINDING_REGS_HAVE_LR_R11)
       registerState.lr = aRegs.mLR;
       registerState.tempFP = aRegs.mR11;
+#elif defined(UNWINDING_REGS_HAVE_RA_T3)
+      registerState.tempRA = aRegs.mRA;
+      registerState.tempFP = aRegs.mT3;
 #endif
 
       // Non-periodic sampling passes Nothing() as the buffer write position to
@@ -2910,6 +2920,17 @@ static void DoLULBacktrace(
   startRegs.pc = lul::TaggedUWord(mc->pc);
   startRegs.sp = lul::TaggedUWord(mc->gregs[29]);
   startRegs.fp = lul::TaggedUWord(mc->gregs[30]);
+#  elif defined(GP_PLAT_loongarch64_linux)
+  startRegs.ra = lul::TaggedUWord(mc->__gregs[1]);
+  startRegs.sp = lul::TaggedUWord(mc->__gregs[3]);
+  startRegs.fp = lul::TaggedUWord(mc->__gregs[22]);
+  startRegs.s0 = lul::TaggedUWord(mc->__gregs[23]);
+  startRegs.pc = lul::TaggedUWord(mc->__pc);
+#  elif defined(GP_PLAT_riscv64_linux)
+  startRegs.ra = lul::TaggedUWord(mc->__gregs[1]);
+  startRegs.sp = lul::TaggedUWord(mc->__gregs[2]);
+  startRegs.fp = lul::TaggedUWord(mc->__gregs[8]);
+  startRegs.pc = lul::TaggedUWord(mc->__gregs[0]);  // REG_PC
 #  else
 #    error "Unknown plat"
 #  endif
@@ -2963,6 +2984,12 @@ static void DoLULBacktrace(
     uintptr_t REDZONE_SIZE = 0;
     uintptr_t start = startRegs.xsp.Value() - REDZONE_SIZE;
 #  elif defined(GP_PLAT_mips64_linux)
+    uintptr_t REDZONE_SIZE = 0;
+    uintptr_t start = startRegs.sp.Value() - REDZONE_SIZE;
+#  elif defined(GP_PLAT_loongarch64_linux)
+    uintptr_t REDZONE_SIZE = 0;
+    uintptr_t start = startRegs.sp.Value() - REDZONE_SIZE;
+#  elif defined(GP_PLAT_riscv64_linux)
     uintptr_t REDZONE_SIZE = 0;
     uintptr_t start = startRegs.sp.Value() - REDZONE_SIZE;
 #  else
@@ -3232,6 +3259,7 @@ static inline void DoPeriodicSample(
 #undef UNWINDING_REGS_HAVE_R10_R12
 #undef UNWINDING_REGS_HAVE_LR_R7
 #undef UNWINDING_REGS_HAVE_LR_R11
+#undef UNWINDING_REGS_HAVE_RA_T3
 
 // END sampling/unwinding code
 ////////////////////////////////////////////////////////////////////////

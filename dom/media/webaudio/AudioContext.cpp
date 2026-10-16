@@ -4,6 +4,8 @@
 
 #include "AudioContext.h"
 
+#include <memory>
+
 #include "AudioBuffer.h"
 #include "AudioBufferSourceNode.h"
 #include "AudioChannelService.h"
@@ -683,8 +685,8 @@ already_AddRefed<Promise> AudioContext::DecodeAudioData(
   if (aSuccessCallback.WasPassed()) {
     successCallback = &aSuccessCallback.Value();
   }
-  UniquePtr<WebAudioDecodeJob> job(
-      new WebAudioDecodeJob(this, promise, successCallback, failureCallback));
+  auto job = std::make_unique<WebAudioDecodeJob>(this, promise, successCallback,
+                                                 failureCallback);
   AsyncDecodeWebAudio(contentType.get(), data, length, *job);
   // Transfer the ownership to mDecodeJobs
   mDecodeJobs.AppendElement(std::move(job));

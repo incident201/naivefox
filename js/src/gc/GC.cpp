@@ -4263,7 +4263,6 @@ GCRuntime::IncrementalResult GCRuntime::resetIncrementalGC(
 void GCRuntime::setGrayBitsInvalid() {
   waitBackgroundSweepEnd();
   grayBitsValid = false;
-  atomReferences.unmarkAllGrayReferences(this);
 }
 
 void GCRuntime::disableIncrementalBarriers() {
@@ -5696,6 +5695,10 @@ MOZ_COLD bool GCRuntime::waitForBackgroundTasksOnAllocFailure() {
   }
 
   if (nursery().joinDecommitTask()) {
+    waited = true;
+  }
+
+  if (unmarkTask.join()) {
     waited = true;
   }
 

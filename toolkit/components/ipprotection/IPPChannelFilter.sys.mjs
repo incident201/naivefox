@@ -24,6 +24,8 @@ const isXpcshell = Services.env.exists("XPCSHELL_TEST_PROFILE_DIR");
 
 /**
  * The IPP Mode the default behavior of Channels
+ *
+ * @typedef {number} IPPProxyMode
  */
 export const IPPMode = Object.freeze({
   /**
@@ -42,6 +44,16 @@ export const IPPMode = Object.freeze({
    * Tunnel No requests by default.
    */
   MODE_INCLUSION: 3,
+
+  from(value) {
+    return Object.values(IPPMode).includes(value) ? value : IPPMode.MODE_FULL;
+  },
+
+  getDefault() {
+    return IPPMode.from(
+      Services.prefs.getIntPref(MODE_PREF, IPPMode.MODE_FULL)
+    );
+  },
 });
 
 const TRACKING_FLAGS =
@@ -71,15 +83,6 @@ export class IPPChannelFilter {
    */
   static create() {
     return new IPPChannelFilter();
-  }
-
-  /**
-   * Sets the IPP Mode.
-   *
-   * @param {IPPMode} [mode] - the new mode
-   */
-  static setMode(mode) {
-    Services.prefs.setIntPref(MODE_PREF, mode);
   }
 
   /**
@@ -203,15 +206,6 @@ export class IPPChannelFilter {
     this.#processPendingChannels();
   }
 
-  constructor() {
-    XPCOMUtils.defineLazyPreferenceGetter(
-      this,
-      "mode",
-      MODE_PREF,
-      IPPMode.MODE_FULL
-    );
-  }
-
   /**
    * This method (which is required by the nsIProtocolProxyService interface)
    * is called to apply proxy filter rules for the given URI and proxy object
@@ -273,10 +267,21 @@ export class IPPChannelFilter {
 
     const principal = this.#principalForChannel(channel);
     const rule = lazy.IPPSiteRuleManager.getRule(principal);
+    const isTopLevelDocument =
+      channel.loadInfo?.externalContentPolicyType ===
+      Ci.nsIContentPolicy.TYPE_DOCUMENT;
     if (rule === lazy.IPPPrincipalRules.INCLUDED) {
+      if (isTopLevelDocument) {
+        Glean.ipprotectionInclusions.ruleApplied.add(1);
+      }
       return true;
     }
     if (rule === lazy.IPPPrincipalRules.EXCLUDED) {
+      // Only the user's own exclusions count, not the built-in ones for
+      // local, non-http(s) and infrastructure traffic.
+      if (isTopLevelDocument && lazy.IPPSiteRuleManager.canManage(principal)) {
+        Glean.ipprotectionExclusions.ruleApplied.add(1);
+      }
       return false;
     }
     return this.#matchMode(channel);
@@ -439,6 +444,9 @@ export class IPPChannelFilter {
       }
     }
   }
+
+  /** @type {IPPProxyMode} Set by IPPProxyManager. */
+  mode = IPPMode.MODE_FULL;
 
   /**
    * Returns true if this filter is active.

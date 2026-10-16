@@ -1590,7 +1590,6 @@ toolbar[inactive="true"] .urlbar,
   > panel-item::part(button) {
     /* The --icon-url variable allows setting an icon in JS. */
     background-image: var(--icon-url, url("chrome://global/skin/icons/search-glass.svg"));
-    /* stylelint-disable-next-line media-query-no-invalid */
     @media not -moz-pref("browser.nova.enabled") {
       /* With Nova, panel-list already has these styles by default; Proton needs
          adjustments to look like a proper menu. panel-item's Proton padding

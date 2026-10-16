@@ -252,7 +252,6 @@ class FFmpegVideoDecoder<LIBAV_VER>
 #endif
 
 #if defined(MOZ_USE_HWDECODE) && defined(MOZ_WIDGET_GTK)
-  bool UploadSWDecodeToDMABuf() const;
   bool IsLinuxHDR() const;
   MediaResult InitVAAPIDecoder();
   MediaResult InitV4L2Decoder();
@@ -299,9 +298,6 @@ class FFmpegVideoDecoder<LIBAV_VER>
   bool mVulkanTilingSettled = false;
 #  endif
   bool mUsingV4L2 = false;
-  // If video overlay is used we want to upload SW decoded frames to
-  // DMABuf and present it as a external texture to rendering pipeline.
-  bool mUploadSWDecodeToDMABuf = false;
   VADisplay mDisplay = nullptr;
   UniquePtr<VideoFramePool<LIBAV_VER>> mVideoFramePool;
   static nsTArray<AVCodecID> mAcceleratedFormats;

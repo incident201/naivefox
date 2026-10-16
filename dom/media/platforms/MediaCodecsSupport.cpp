@@ -4,6 +4,7 @@
 #include "MediaCodecsSupport.h"
 
 #include <array>
+#include <memory>
 
 #include "AOMDecoder.h"
 #include "MP4Decoder.h"
@@ -217,8 +218,9 @@ MCSInfo* MCSInfo::GetInstance(const StaticMutexAutoLock& /* unused */) {
 
 MCSInfo::MCSInfo() {
   // Initialize hash tables
-  mHashTableMCS.reset(new nsTHashMap<MediaCodecsSupport, CodecDefinition>());
-  mHashTableCodec.reset(new nsTHashMap<MediaCodec, CodecDefinition>());
+  mHashTableMCS =
+      std::make_unique<nsTHashMap<MediaCodecsSupport, CodecDefinition>>();
+  mHashTableCodec = std::make_unique<nsTHashMap<MediaCodec, CodecDefinition>>();
 
   for (const auto& it : GetAllCodecDefinitions()) {
     // Insert MediaCodecsSupport values as keys

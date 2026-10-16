@@ -4,6 +4,7 @@
 
 package org.mozilla.fenix.ui.efficiency.selectors
 
+import mozilla.components.compose.menu.R as MozacMenuR
 import org.mozilla.fenix.R
 import org.mozilla.fenix.components.menu.MenuDialogTestTag
 import org.mozilla.fenix.helpers.DataGenerationHelper.getStringResource
@@ -322,7 +323,7 @@ object MainMenuSelectors : SelectorContainer {
     val DEFAULT_BROWSER_BANNER_DISMISS =
         Selector(
             strategy = SelectorStrategy.COMPOSE_BY_CONTENT_DESCRIPTION,
-            value = getStringResource(R.string.browser_menu_default_banner_dismiss_promotion),
+            value = getStringResource(MozacMenuR.string.mozac_menu_banner_dismiss_description),
             description = "Make Firefox your default banner dismiss button",
             groups = setOf(Group.HOME_BANNER, Group.HOME_PAGE_MAIN_MENU_ITEMS),
         )
@@ -416,6 +417,16 @@ object MainMenuSelectors : SelectorContainer {
             value = getStringResource(R.string.browser_menu_add_to_homescreen),
             description = "Main menu add to homescreen button",
             groups = setOf(Group.BROWSER_VIEW_MAIN_MENU_MORE_ITEMS, Group.MORE_MAIN_MENU_SUB_LIST),
+        )
+
+    // Only present in the "More settings" submenu while a private tab is in the foreground; not part of the
+    // MORE_MAIN_MENU_SUB_LIST group, which models the normal-browsing sub-list.
+    val MOVE_TO_NON_PRIVATE_TAB_BUTTON =
+        Selector(
+            strategy = SelectorStrategy.COMPOSE_BY_CONTENT_DESCRIPTION,
+            value = getStringResource(R.string.browser_menu_move_to_non_private_tab),
+            description = "Main menu Move to non-private tab button",
+            groups = setOf(),
         )
 
     val ADD_APP_TO_HOMESCREEN_BUTTON =

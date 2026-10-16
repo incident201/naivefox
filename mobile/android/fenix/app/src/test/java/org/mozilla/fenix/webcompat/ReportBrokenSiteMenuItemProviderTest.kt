@@ -20,6 +20,7 @@ import mozilla.components.browser.state.state.BrowserState
 import mozilla.components.browser.state.state.createTab
 import mozilla.components.browser.state.store.BrowserStore
 import mozilla.components.compose.base.text.Text
+import mozilla.components.compose.menu.data.MenuItemTitle
 import mozilla.components.compose.menu.data.StandardMenuItem
 import mozilla.components.compose.menu.ui.MenuItemIconRes
 import mozilla.components.compose.menu.ui.MenuItemState
@@ -29,6 +30,7 @@ import org.mozilla.fenix.R
 import org.mozilla.fenix.components.AppStore
 import org.mozilla.fenix.components.appstate.AppState
 import org.mozilla.fenix.components.menu.MenuFragmentDirections
+import org.mozilla.fenix.components.menu.MenuTarget
 import org.mozilla.fenix.components.menu.fake.FakeMenuHost
 import org.mozilla.fenix.components.menu.fake.reachableEvents
 import org.mozilla.fenix.components.menu.store.MenuAction
@@ -136,9 +138,13 @@ class ReportBrokenSiteMenuItemProviderTest {
     }
 
     // The item is kept up to date on a scope that runTest cancels at the end of each test.
-    private fun TestScope.provider(browserStore: BrowserStore) =
+    private fun TestScope.provider(
+        browserStore: BrowserStore,
+        target: MenuTarget = MenuTarget.BrowserTab,
+    ) =
         ReportBrokenSiteMenuItemProvider(
             browserStore = browserStore,
+            target = target,
             settings = settings,
             webCompatReporterMoreInfoSender = webCompatReporterMoreInfoSender,
             appStore = appStore,
@@ -156,7 +162,7 @@ class ReportBrokenSiteMenuItemProviderTest {
 
     private fun expectedItem(isEnabled: Boolean) =
         StandardMenuItem(
-            title = Text.Resource(R.string.browser_menu_webcompat_reporter_2),
+            title = MenuItemTitle(Text.Resource(R.string.browser_menu_webcompat_reporter_2)),
             icon = MenuItemIconRes(iconsR.drawable.mozac_ic_lightbulb_24),
             onClickEvent = MenuAction.Navigate.WebCompatReporter,
             state =

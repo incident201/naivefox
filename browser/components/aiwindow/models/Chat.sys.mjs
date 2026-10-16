@@ -258,15 +258,16 @@ function splitDirectAnswerStream(result) {
  * constant, and when no gate applies it is returned by identity.
  *
  * @param {object[]} tools
+ * @param {ChatConversation} conversation
  * @returns {object[]}
  */
-function filterFeatureGatedTools(tools) {
+function filterFeatureGatedTools(tools, conversation) {
   let filtered = tools;
   // The three search_the_web paths return different shapes, so the description
   // and parameters the model sees have to match the path that will run. Both
   // this and runSearchTheWeb's dispatch read the same selectSearchTheWebPath,
   // so they cannot disagree about which one that is.
-  const searchTheWebConfig = searchTheWebToolConfig();
+  const searchTheWebConfig = searchTheWebToolConfig(conversation);
   if (searchTheWebConfig) {
     filtered = filtered.map(t =>
       t.function?.name === SEARCH_THE_WEB ? searchTheWebConfig : t
@@ -438,7 +439,7 @@ Object.assign(Chat, {
      * comment above tool execution for further details.
      */
     const isVerbatimQuery = currentTurn === 0;
-    const chatToolsConfig = filterFeatureGatedTools(toolsConfig);
+    const chatToolsConfig = filterFeatureGatedTools(toolsConfig, conversation);
 
     let fullResponseText = "";
 

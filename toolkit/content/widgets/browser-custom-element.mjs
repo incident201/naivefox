@@ -14,6 +14,10 @@ const { XPCOMUtils } = ChromeUtils.importESModule(
   "resource://gre/modules/XPCOMUtils.sys.mjs"
 );
 
+/**
+ * @import { PopupAndRedirectBlocker } from "moz-src:///toolkit/actors/PopupAndRedirectBlockingParent.sys.mjs";
+ */
+
 let lazy = {};
 
 ChromeUtils.defineESModuleGetters(lazy, {
@@ -140,6 +144,10 @@ export class MozBrowser extends MozElements.MozElementMixin(XULFrameElement) {
     this.mIconURL = null;
     this.lastURI = null;
 
+    /**
+     * @type {PopupAndRedirectBlocker}
+     */
+    this.popupAndRedirectBlocker;
     ChromeUtils.defineLazyGetter(this, "popupAndRedirectBlocker", () => {
       return new lazy.PopupAndRedirectBlocker(this);
     });

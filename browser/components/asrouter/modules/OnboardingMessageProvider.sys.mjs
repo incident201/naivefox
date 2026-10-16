@@ -1817,7 +1817,7 @@ const BASE_MESSAGES = () => [
       lifetime: 12,
     },
     targeting:
-      "'browser.privateWindowRedesign.enabled'|preferenceValue && !isRelayFreeTier && !relayEmailMasksCount",
+      "'browser.privateWindowRedesign.enabled'|preferenceValue && 'signon.firefoxRelay.feature'|preferenceValue != 'enabled' && 'signon.firefoxRelay.feature'|preferenceValue != 'disabled'",
   },
   {
     id: "PRIVATE_WINDOW_BASICS_SPOTLIGHT",
@@ -1836,7 +1836,7 @@ const BASE_MESSAGES = () => [
           force_hide_steps_indicator: true,
           content: {
             position: "center",
-            background: "var(--color-violet-desaturated-60)",
+            background: "var(--color-violet-desaturated-70)",
             zap_border: true,
             zap_shadow: true,
             zap_border_gradient:
@@ -1860,7 +1860,7 @@ const BASE_MESSAGES = () => [
               marginInline: "30px",
               textAlign: "left",
               fontWeight: "200",
-              color: "var(--text-color-deemphasized)",
+              color: "var(--text-color)",
             },
             tiles: {
               type: "single-select",
@@ -1887,7 +1887,7 @@ const BASE_MESSAGES = () => [
                           marginBlockStart: "38px",
                           fontSize: "15px",
                           fontWeight: "600",
-                          color: "var(--text-color-deemphasized)",
+                          color: "var(--text-color)",
                         },
                       },
                       {
@@ -1901,7 +1901,7 @@ const BASE_MESSAGES = () => [
                             "about-private-browsing-spotlight-basics-activity-seen",
                           fontSize: "14px",
                           fontWeight: "200",
-                          color: "var(--text-color-deemphasized)",
+                          color: "var(--text-color)",
                           marginBlockStart: "-10px",
                         },
                       },
@@ -1916,7 +1916,7 @@ const BASE_MESSAGES = () => [
                             "about-private-browsing-spotlight-basics-bookmarks-downloads",
                           fontSize: "14px",
                           fontWeight: "200",
-                          color: "var(--text-color-deemphasized)",
+                          color: "var(--text-color)",
                           marginBlockStart: "-10px",
                           marginBlockEnd: "18px",
                         },
@@ -1927,7 +1927,7 @@ const BASE_MESSAGES = () => [
                             "about-private-browsing-spotlight-basics-more-privacy",
                           fontSize: "15px",
                           fontWeight: "600",
-                          color: "var(--text-color-deemphasized)",
+                          color: "var(--text-color)",
                         },
                       },
                       {
@@ -1941,7 +1941,7 @@ const BASE_MESSAGES = () => [
                             "about-private-browsing-spotlight-basics-malware-alerts",
                           fontSize: "14px",
                           fontWeight: "200",
-                          color: "var(--text-color-deemphasized)",
+                          color: "var(--text-color)",
                           marginBlockStart: "-10px",
                         },
                       },
@@ -1956,7 +1956,7 @@ const BASE_MESSAGES = () => [
                             "about-private-browsing-spotlight-basics-no-sell-data",
                           fontSize: "14px",
                           fontWeight: "200",
-                          color: "var(--text-color-deemphasized)",
+                          color: "var(--text-color)",
                           marginBlockStart: "-10px",
                         },
                       },
@@ -1971,7 +1971,7 @@ const BASE_MESSAGES = () => [
                             "about-private-browsing-spotlight-basics-vpn",
                           fontSize: "14px",
                           fontWeight: "200",
-                          color: "var(--text-color-deemphasized)",
+                          color: "var(--text-color)",
                           marginBlockStart: "-10px",
                         },
                       },
@@ -1986,7 +1986,7 @@ const BASE_MESSAGES = () => [
                             "about-private-browsing-spotlight-basics-strict-tracking",
                           fontSize: "14px",
                           fontWeight: "200",
-                          color: "var(--text-color-deemphasized)",
+                          color: "var(--text-color)",
                           marginBlockStart: "-10px",
                         },
                       },
@@ -2868,6 +2868,45 @@ const BASE_MESSAGES = () => [
       "source == 'startup' && isFirefoxReinstalled && canResetProfile && !'browser.disableResetPrompt'|preferenceValue && !activeNotifications",
   },
   {
+    id: "RESTORE_SESSION_STARTUP_INFOBAR",
+    template: "infobar",
+    content: {
+      type: "tab",
+      priority: 2,
+      text: { string_id: "restore-session-startup-suggestion-message" },
+      inline_icons: {
+        icon: { imageURL: "chrome://browser/skin/menu.svg" },
+      },
+      buttons: [
+        {
+          label: { string_id: "restore-session-startup-suggestion-button" },
+          primary: true,
+          action: {
+            type: "SELECT_AND_MARK_MENU_ITEM",
+            data: {
+              itemIds: ["appMenu-history-button", "appMenu-restoreSession"],
+            },
+          },
+        },
+      ],
+      impression_action: {
+        type: "SET_PREF",
+        data: {
+          pref: {
+            name: "browser.startup.couldRestoreSession.count",
+            value: 2,
+          },
+        },
+      },
+    },
+    trigger: {
+      id: "defaultBrowserCheck",
+    },
+    skip_in_tests: "fires on startup, may interfere with other tests",
+    targeting:
+      "source == 'startup' && canRestoreLastSession && !activeNotifications && 'browser.startup.couldRestoreSession.count'|preferenceValue == 1",
+  },
+  {
     id: "updated-privacy-notice-notification-infobar",
     groups: ["cfr"],
     template: "infobar",
@@ -3638,7 +3677,7 @@ export const OnboardingMessageProvider = {
       "browser.shell.checkDefaultBrowser",
       false
     );
-    let isDefault = await lazy.ShellService.isDefaultBrowser();
+    let isDefault = await lazy.ShellService.isDefaultBrowserAsync();
     return checkDefault && !isDefault;
   },
 

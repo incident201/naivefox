@@ -249,8 +249,11 @@ bool ScriptElement::MaybeProcessScript(const nsAString& aSourceText) {
       // to process. However, we must perform a microtask checkpoint afterwards,
       // as per https://html.spec.whatwg.org/#clean-up-after-running-script
       if (mKind == JS::loader::ScriptKind::eClassic && !mExternal) {
-        nsContentUtils::AddScriptRunner(NS_NewRunnableFunction(
-            "ScriptElement::MaybeProcessScript", []() { nsAutoMicroTask mt; }));
+        nsContentUtils::AddScriptRunner(
+            NS_NewRunnableFunction("ScriptElement::MaybeProcessScript",
+                                   [doc = RefPtr{cont->OwnerDoc()}]() {
+                                     nsAutoMicroTaskForDocument mt(doc);
+                                   }));
       }
       return false;
     }

@@ -210,13 +210,9 @@ impl GrayFormat for GrayAlpha {
 
 #[inline]
 fn clamp_u8(v: f32) -> u8 {
-    if v > 255. {
-        255
-    } else if v < 0. {
-        0
-    } else {
-        (v + 0.5).floor() as u8
-    }
+    // `as u8` saturates (negatives and NaN to 0, large values to 255), and truncation
+    // is floor for v + 0.5 >= 0.
+    (v + 0.5) as u8
 }
 
 // Build a White point, primary chromas transfer matrix from RGB to CIE XYZ

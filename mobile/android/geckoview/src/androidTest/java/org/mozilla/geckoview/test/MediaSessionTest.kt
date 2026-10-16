@@ -3,7 +3,6 @@ http://creativecommons.org/publicdomain/zero/1.0/ */
 
 package org.mozilla.geckoview.test
 
-import android.os.Build
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.MediumTest
 import org.hamcrest.Matchers.closeTo
@@ -11,7 +10,6 @@ import org.hamcrest.Matchers.equalTo
 import org.hamcrest.Matchers.greaterThanOrEqualTo
 import org.hamcrest.Matchers.notNullValue
 import org.junit.After
-import org.junit.Assume.assumeThat
 import org.junit.Before
 import org.junit.Ignore
 import org.junit.Test
@@ -859,10 +857,6 @@ class MediaSessionTest : BaseSessionTest() {
     @Ignore("https://bugzilla.mozilla.org/show_bug.cgi?id=1988041")
     @Test
     fun fullscreenVideoElementMetadata() {
-        // Bug 1981579
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            assumeThat(sessionRule.env.isIsolatedProcess, equalTo(false))
-        }
         sessionRule.setPrefsUntilTestEnd(
             mapOf(
                 "media.autoplay.default" to 0,
@@ -1030,12 +1024,12 @@ class MediaSessionTest : BaseSessionTest() {
 
         val path = VIDEO_WEBM_PATH
         val session = sessionRule.createOpenSession()
-        val resultFullscreen = GeckoResult<Void>()
         session.loadTestPath(path)
         sessionRule.waitForPageStop()
 
         session.delegateDuringNextWait(
             object : MediaSession.Delegate {
+                @AssertCalled(count = 1)
                 override fun onFullscreen(
                     session: GeckoSession,
                     mediaSession: MediaSession,
@@ -1052,22 +1046,17 @@ class MediaSessionTest : BaseSessionTest() {
                         meta,
                         notNullValue(),
                     )
-                    resultFullscreen.complete(null)
                 }
             }
         )
 
         session.evaluateJS("document.querySelector('video').requestFullscreen()")
-        sessionRule.waitForResult(resultFullscreen)
+        session.waitUntilCalled(MediaSession.Delegate::class, "onFullscreen")
     }
 
     @Ignore("https://bugzilla.mozilla.org/show_bug.cgi?id=1988041")
     @Test
     fun switchingProcess() {
-        // Bug 1981579
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            assumeThat(sessionRule.env.isIsolatedProcess, equalTo(false))
-        }
         sessionRule.setPrefsUntilTestEnd(mapOf("media.autoplay.default" to 0))
 
         mainSession.loadUri("about:blank")
@@ -1076,20 +1065,17 @@ class MediaSessionTest : BaseSessionTest() {
         mainSession.loadTestPath(VIDEO_WEBM_PATH)
         sessionRule.waitForPageStop()
 
-        val onPlayCalled = GeckoResult<Void>()
         mainSession.delegateUntilTestEnd(
             object : MediaSession.Delegate {
                 @AssertCalled(count = 1)
                 override fun onPlay(
                     session: GeckoSession,
                     mediaSession: MediaSession,
-                ) {
-                    onPlayCalled.complete(null)
-                }
+                ) {}
             }
         )
 
         mainSession.evaluateJS("document.querySelector('video').play()")
-        sessionRule.waitForResult(onPlayCalled)
+        mainSession.waitUntilCalled(MediaSession.Delegate::class, "onPlay")
     }
 }

@@ -468,6 +468,9 @@ class Http3Session final : public Http3SessionBase,
   RefPtr<nsHttpTransaction> mFirstHttpTransaction;
 
   RefPtr<nsHttpConnectionInfo> mConnInfo;
+  // Copy of mConnInfo->GetIsTrrServiceChannel() that DontReuse can read off
+  // the socket thread.
+  Atomic<bool, Relaxed> mIsTrrServiceChannel{false};
 
   int64_t mTotalBytesRead = 0;     // total data read
   int64_t mTotalBytesWritten = 0;  // total data read

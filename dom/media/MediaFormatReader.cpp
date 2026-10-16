@@ -5,6 +5,7 @@
 #include "MediaFormatReader.h"
 
 #include <algorithm>
+#include <memory>
 
 #include "AOMDecoder.h"
 #include "AllocationPolicy.h"
@@ -2070,7 +2071,8 @@ void MediaFormatReader::RequestDemuxSamples(TrackType aTrack) {
 void MediaFormatReader::DecoderData::StartRecordDecodingPerf(
     const TrackType aTrack, const MediaRawData* aSample) {
   if (!mDecodePerfRecorder) {
-    mDecodePerfRecorder.reset(new PerformanceRecorderMulti<PlaybackStage>());
+    mDecodePerfRecorder =
+        std::make_unique<PerformanceRecorderMulti<PlaybackStage>>();
   }
   const int32_t height = aTrack == TrackInfo::kVideoTrack
                              ? GetCurrentInfo()->GetAsVideoInfo()->mImage.height

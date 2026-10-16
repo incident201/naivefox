@@ -1035,6 +1035,7 @@ class Browsertime(Perftest, metaclass=ABCMeta):
         env["PYTHON"] = sys.executable
         env["MINIDUMP_SAVE_PATH"] = str(self.crash_directory)
         env["MOZ_REMOTE_SETTINGS_DEVTOOLS"] = "1"
+        env["MOZ_REMOTE_SETTINGS_DISABLED"] = "1"
         if self.browsertime_video and self.browsertime_ffmpeg:
             ffmpeg_dir = os.path.dirname(os.path.abspath(self.browsertime_ffmpeg))
             old_path = env.setdefault("PATH", "")

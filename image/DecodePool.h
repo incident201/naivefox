@@ -15,10 +15,10 @@
 #include "nsCOMPtr.h"
 #include "nsIEventTarget.h"
 #include "nsIObserver.h"
-#include "nsStringFwd.h"
 
 class nsIThread;
 class nsIThreadPool;
+class nsIURI;
 
 namespace mozilla {
 namespace image {
@@ -66,7 +66,7 @@ class DecodePool final : public nsIObserver {
    * immediately.
    * @return true if the task was run sync, false otherwise.
    */
-  bool SyncRunIfPreferred(IDecodingTask* aTask, const nsCString& aURI);
+  bool SyncRunIfPreferred(IDecodingTask* aTask, nsIURI* aURI);
 
   /**
    * Run @aTask synchronously. This does not guarantee that @aTask will complete
@@ -74,7 +74,7 @@ class DecodePool final : public nsIObserver {
    * to run synchronously, it may recover by scheduling an async task to finish
    * up the work when the remaining data is available.
    */
-  void SyncRunIfPossible(IDecodingTask* aTask, const nsCString& aURI);
+  void SyncRunIfPossible(IDecodingTask* aTask, nsIURI* aURI);
 
   /**
    * Returns an event target interface to the DecodePool's I/O thread. Callers

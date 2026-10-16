@@ -13,6 +13,7 @@
 #include <inttypes.h>
 
 #include <cstddef>
+#include <memory>
 #include <utility>
 
 #include "DOMMatrix.h"
@@ -762,7 +763,7 @@ void Element::RecompileScriptEventListeners() {
 
     nsAutoString value;
     attrInfo.mValue->ToString(value);
-    SetEventHandler(GetEventNameForAttr(attr), value, true);
+    SetEventHandler(GetEventNameForAttr(attr), value);
   }
 }
 
@@ -2494,7 +2495,8 @@ Element* Element::AddAttrAssociatedElementObserver(
   // TODO (bug 1997286): Observe explicitly set attr-element binding/unbinding.
 
   if (!observerData.mCallbackData) {
-    observerData.mCallbackData.reset(new AttrElementObserverCallbackData());
+    observerData.mCallbackData =
+        std::make_unique<AttrElementObserverCallbackData>();
     observerData.mCallbackData->mAttr = aAttr;
     observerData.mCallbackData->mElement = do_GetWeakReference(this);
 
@@ -3052,7 +3054,7 @@ nsresult Element::BindToTree(BindContext& aContext, nsINode& aParent) {
   // recursing into kids, so each can read it from us. Only document-tree
   // content contributes to container timing.
   if (aContext.OwnerDoc().MayHaveContainerTimingAttributes() &&
-      aContext.InUncomposedDoc()) {
+      aContext.InUncomposedDoc() && !IsInNativeAnonymousSubtree()) {
     UpdateContainerTimingRootFromParent(&aParent);
   }
 
@@ -3626,8 +3628,7 @@ nsresult Element::LeaveLink(nsPresContext* aPresContext) {
   return nsDocShell::Cast(shell)->OnLeaveLink();
 }
 
-void Element::SetEventHandler(nsAtom* aEventName, const nsAString& aValue,
-                              bool aDefer) {
+void Element::SetEventHandler(nsAtom* aEventName, const nsAString& aValue) {
   Document* ownerDoc = OwnerDoc();
   if (ownerDoc->IsLoadedAsData()) {
     // Make this a no-op rather than throwing an error to avoid
@@ -3636,15 +3637,12 @@ void Element::SetEventHandler(nsAtom* aEventName, const nsAString& aValue,
   }
 
   MOZ_ASSERT(aEventName, "Must have event name!");
-  bool defer = true;
-  EventListenerManager* manager =
-      GetEventListenerManagerForAttr(aEventName, &defer);
+  EventListenerManager* manager = GetEventListenerManagerForAttr(aEventName);
   if (!manager) {
     return;
   }
 
-  defer = defer && aDefer;  // only defer if everyone agrees...
-  manager->SetEventHandler(aEventName, aValue, defer,
+  manager->SetEventHandler(aEventName, aValue,
                            !nsContentUtils::IsChromeDoc(ownerDoc), this);
 }
 
@@ -4383,9 +4381,8 @@ void Element::OnAttrSetButNotChanged(int32_t aNamespaceID, nsAtom* aName,
   }
 }
 
-EventListenerManager* Element::GetEventListenerManagerForAttr(nsAtom* aAttrName,
-                                                              bool* aDefer) {
-  *aDefer = true;
+EventListenerManager* Element::GetEventListenerManagerForAttr(
+    nsAtom* aAttrName) {
   return GetOrCreateListenerManager();
 }
 

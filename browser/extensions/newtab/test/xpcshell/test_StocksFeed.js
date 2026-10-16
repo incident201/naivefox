@@ -119,6 +119,19 @@ add_task(async function test_isEnabled_gating() {
   Assert.ok(feed.isEnabled(), "enabled when user + system prefs true");
 
   feed.store.getState = () => ({
+    Prefs: {
+      values: {
+        "widgets.stocks.enabled": true,
+        trainhopConfig: { widgetStocks: { visible: true } },
+      },
+    },
+  });
+  Assert.ok(
+    feed.isEnabled(),
+    "enabled when user pref true + trainhopConfig.widgetStocks.visible"
+  );
+
+  feed.store.getState = () => ({
     Prefs: { values: { "widgets.stocks.enabled": false } },
   });
   Assert.ok(!feed.isEnabled(), "disabled when user pref false");

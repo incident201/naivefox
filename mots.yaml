@@ -8,7 +8,7 @@
 # documentation and how to modify this file.
 repo: mozilla-central
 created_at: '2021-10-14T12:50:40.073465'
-updated_at: '2026-09-30T03:51:55.689170+00:00'
+updated_at: '2026-10-14T17:42:52.947811+00:00'
 export:
   path: ./docs/mots/index.md
   format: md
@@ -415,6 +415,10 @@ people:
     bmo_id: 149052
     name: Florian Quèze
     nick: florian
+  - &flozia
+    bmo_id: 708037
+    name: Florian Zia
+    nick: flozia
   - &fredwang
     bmo_id: 739410
     name: Frédéric Wang Nélar
@@ -913,6 +917,10 @@ people:
     bmo_id: 557153
     name: Nicolas Chevobbe
     nick: nchevobbe
+  - &ngrato
+    bmo_id: 705149
+    name: Nick Grato
+    nick: ngrato
   - &nical
     bmo_id: 438998
     name: Nicolas Silva
@@ -957,6 +965,10 @@ people:
     bmo_id: 694341
     name: Olivia Hall
     nick: olivia
+  - &omarg
+    bmo_id: 779361
+    name: Omar Gonzalez
+    nick: omarg
   - &overholt
     bmo_id: 442218
     name: Andrew Overholt
@@ -1689,6 +1701,7 @@ modules:
       url: '{doc}`/toolkit/crashreporter/crashreporter/index`'
       components:
         - Toolkit::Crash Reporting
+      review_group: crashreporting-reviewers
     owners:
       - *gsvelto
     peers:
@@ -1836,7 +1849,7 @@ modules:
         - Core::DOM
         - 'Core::DOM: Core & HTML'
         - Core::XSLT
-      review_group: dom-core
+      review_group: dom-reviewers
     owners:
       - *mccr8
     peers:
@@ -2409,6 +2422,9 @@ modules:
         owners:
           - *Mardak
         peers:
+          - *flozia
+          - *ngrato
+          - *omarg
           - *pdahiya
 
       - machine_name: core_machine_learning_models
@@ -2424,12 +2440,26 @@ modules:
           - *rrando
           - *tetchart
 
+      - machine_name: core_machine_learning_multiline_editor
+        name: 'Machine Learning: Multiline Editor'
+        includes:
+          - browser/components/multilineeditor/
+        meta:
+          components:
+            - 'Core::Machine Learning: Frontend'
+          review_group: ai-frontend-reviewers
+        owners:
+          - *flozia
+        peers:
+          - *mak
+
       - machine_name: core_machine_learning_platform
         name: 'Machine Learning: Platform'
         includes:
           - toolkit/components/aboutinference/
           - toolkit/components/ml/
           - toolkit/components/pageextractor/
+          - taskcluster/kinds/toolchain-symbols-upload/kind.yml
         meta:
           components:
             - 'Core::Machine Learning: On Device'
@@ -3274,7 +3304,7 @@ modules:
       - dom/webidl/WebGPU.webidl
       - dom/webgpu/**/*
       - gfx/wgpu_bindings/**/*
-      - taskcluster/kinds/toolchain-dxc-upload/kind.yml
+      - taskcluster/kinds/toolchain-symbols-upload/kind.yml
       - taskcluster/kinds/toolchain/dxc.yml
       - third_party/rust/naga/**/*
       - third_party/rust/wgpu-*/**/*
@@ -5008,5 +5038,5 @@ modules:
         - Ryan Tilder
       group: dev-platform
 hashes:
-  config: c6c8a7e944ae57eed39b210e9d3136a74b2e677c
-  export: 90aa36cae66b6598fb72581f2c4b0f018e621e82
+  config: caa741da2eb91b2457aba10835d7832f4207065f
+  export: 0a52272df62ea96be695e0921d087c6da5b0bfc6

@@ -1587,6 +1587,7 @@ bool ParamTraits<mozilla::dom::SessionHistoryInfo>::Read(
   }
 
   if (aResult->mURI && aResult->mURI->SchemeIs("javascript")) {
+    // Note: Session restore also skips javascript: URIs to avoid hitting this.
     aReader->FatalError("javascript: URIs should not enter session history");
     return false;
   }

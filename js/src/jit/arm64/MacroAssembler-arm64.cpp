@@ -94,8 +94,21 @@ void MacroAssemblerCompat::tagValue(JSValueType type, Register payload,
   }
 #endif
 
-  Orr(ARMRegister(dest.valueReg(), 64), ARMRegister(payload, 64),
-      Operand(ImmShiftedTag(type).value));
+  ARMRegister dest64(dest.valueReg(), 64);
+  uint64_t shiftedTag = ImmShiftedTag(type).value;
+
+  constexpr int HighHalfwordShift = 48;
+  constexpr uint64_t LowHalfwordsMask = (uint64_t(1) << HighHalfwordShift) - 1;
+
+  if (payload == dest.valueReg() && (shiftedTag & LowHalfwordsMask) == 0 &&
+      !IsImmLogical(shiftedTag, 64)) {
+    // The payload's upper bits are zero, so when orr can't encode the tag,
+    // writing its halfword over them boxes in place without materializing it.
+    Movk(dest64, shiftedTag >> HighHalfwordShift, HighHalfwordShift);
+    return;
+  }
+
+  Orr(dest64, ARMRegister(payload, 64), Operand(shiftedTag));
 }
 
 void MacroAssemblerCompat::boxValue(JSValueType type, Register src,

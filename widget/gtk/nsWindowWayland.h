@@ -59,6 +59,7 @@ class nsWindowWayland final : public nsWindow {
   bool ApplyEnterLeaveMutterWorkaround();
 
   void ForceToplevelCommit();
+  void SetToplevelOpaqueRegion(cairo_region_t* aRegion);
 
  protected:
   virtual ~nsWindowWayland() = default;

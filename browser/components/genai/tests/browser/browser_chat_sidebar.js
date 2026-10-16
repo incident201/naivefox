@@ -80,7 +80,7 @@ add_task(async function test_sidebar_providers() {
   await SidebarController.show("viewGenaiChatSidebar");
 
   const origCount = countVisible();
-  Assert.equal(origCount, 4, "Rendered expected number of provider options");
+  Assert.equal(origCount, 5, "Rendered expected number of provider options");
 
   await SidebarController.hide();
   await SpecialPowers.pushPrefEnv({
@@ -378,12 +378,12 @@ add_task(async function test_keyboard_shortcut() {
 
   await SpecialPowers.pushPrefEnv({ set: [[enabled, true]] });
   key.doCommand();
-
+  await SidebarController.waitUntilStable();
   Assert.ok(Services.prefs.getBoolPref(enabled), "Enabled with keyboard");
   Assert.ok(SidebarController.isOpen, "Opened chatbot with keyboard");
 
   key.doCommand();
-
+  await SidebarController.waitUntilStable();
   Assert.ok(!SidebarController.isOpen, "Closed chatbot with keyboard");
 
   Assert.ok(

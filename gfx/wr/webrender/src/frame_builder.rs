@@ -245,12 +245,13 @@ pub struct PictureContext {
     pub surface_index: SurfaceIndex,
     pub dirty_region_count: usize,
     pub subpixel_mode: SubpixelMode,
+    /// The picture's `PrimitiveList::shadow_offset`.
+    pub shadow_offset: LayoutVector2D,
 }
 
 /// Mutable state of a picture that gets modified when
 /// the children are processed.
 pub struct PictureState {
-    pub map_local_to_pic: SpaceMapper<LayoutPixel, PicturePixel>,
     /// Maps this picture's space to the screen framebuffer, for the debug
     /// overlays that draw into it.
     pub map_pic_to_device: SpaceMapper<PicturePixel, DevicePixel>,
@@ -347,9 +348,9 @@ impl FrameBuilder {
         ));
 
         // Empty the per-frame draw storage. The visibility pass pushes into it
-        // as it finds drawn primitives; the scene's primitive count only sizes
-        // the instance-to-draw side table.
-        scratch.primitive.frame.reset_draws(scene.prim_instances.len());
+        // as it finds drawn primitives; the scene's picture count only sizes
+        // the per-picture draw lists.
+        scratch.primitive.frame.reset_draws(scene.prim_store.pictures.len());
 
         // Cluster, prim, and clip-leaf rects are snapped to the device pixel
         // grid as they are produced by the in-frame picture-graph passes:

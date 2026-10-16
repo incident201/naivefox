@@ -1402,9 +1402,11 @@ void nsPresContext::SetInRDMPane(bool aInRDMPane) {
   mInRDMPane = aInRDMPane;
   RecomputeTheme();
   if (mPresShell) {
-    nsContentUtils::AddScriptRunner(NewRunnableMethod<bool>(
-        "PresShell::MaybeRecreateMobileViewportManager", mPresShell,
-        &PresShell::MaybeRecreateMobileViewportManager, true));
+    nsContentUtils::AddScriptRunner(
+        NewRunnableMethod<PresShell::MobileViewportManagerUpdate>(
+            "PresShell::MaybeRecreateMobileViewportManager", mPresShell,
+            &PresShell::MaybeRecreateMobileViewportManager,
+            PresShell::MobileViewportManagerUpdate::ManagerTypeMayChange));
   }
 }
 

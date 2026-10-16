@@ -4630,7 +4630,7 @@ pub extern "C" fn Servo_ResolvePseudoStyle(
     )
     .expect("ResolvePseudoStyle with a non-pseudo?");
 
-    let matching_fn = |pseudo: &PseudoElement| *pseudo == pseudo_element;
+    let matching_fn = |pseudo: &PseudoElement| pseudo_element.matches(pseudo, &element);
 
     let global_style_data = &*GLOBAL_STYLE_DATA;
     let guard = global_style_data.shared_lock.read();
@@ -5072,10 +5072,8 @@ fn parse_property_into(
 ) -> Result<(), ()> {
     let value = unsafe { value.as_str_unchecked() };
 
-    if let Some(non_custom) = property_id.non_custom_id() {
-        if !non_custom.allowed_in_rule(rule_type.into()) {
-            return Err(());
-        }
+    if !property_id.allowed_in_rule(rule_type.into()) {
+        return Err(());
     }
 
     parse_one_declaration_into(
@@ -7125,6 +7123,7 @@ pub unsafe extern "C" fn Servo_CSSSupports(
     cond: &nsACString,
     params: &CssSupportsParams,
     raw_extra_data: *mut URLExtraData,
+    rule_type: CssRuleType,
 ) -> bool {
     let condition = unsafe { cond.as_str_unchecked() };
     let mut input = Parser::new(&condition);
@@ -7151,7 +7150,7 @@ pub unsafe extern "C" fn Servo_CSSSupports(
     let mut context = ParserContext::new(
         params.origin,
         url_data,
-        Some(CssRuleType::Style),
+        Some(rule_type),
         ParsingMode::DEFAULT,
         params.quirks.into(),
         /* namespaces = */ Default::default(),
@@ -8860,10 +8859,11 @@ pub extern "C" fn Servo_StyleSet_MaybeInvalidateRelativeSelectorForRemoval(
 ) {
     let element = GeckoElement(element);
 
+    let search_direction = element.relative_selector_search_direction();
     // This element was in-tree, so we can safely say that if it was not on
     // the relative selector search path, its removal will not invalidate any
     // relative selector.
-    if element.relative_selector_search_direction().is_empty() {
+    if search_direction.is_empty() {
         return;
     }
     let node = element.as_node();
@@ -8873,6 +8873,12 @@ pub extern "C" fn Servo_StyleSet_MaybeInvalidateRelativeSelectorForRemoval(
         inherit_relative_selector_search_direction(element.parent_element(), prev_sibling);
     if inherited.is_empty() {
         return;
+    }
+
+    if let Some(sibling) = next_sibling.as_ref() {
+        // This element may be the one that fully matched the relative selector. In that case,
+        // our next sibling must inherit the information, so that the search can continue.
+        sibling.apply_selector_flags(search_direction);
     }
 
     let data = raw_data.borrow();
@@ -11836,4 +11842,10 @@ pub unsafe extern "C" fn Servo_GetComputationSteps(
 #[unsafe(no_mangle)]
 pub extern "C" fn Servo_TextTransform_Case(text_transform: TextTransform) -> TextTransformCase {
     text_transform.case()
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn Servo_RuleType_Supports_Declarations(rule_type: CssRuleType) -> bool {
+    rule_type == CssRuleType::NestedDeclarations
+        || CssRuleTypes::from(rule_type).allows_declarations()
 }

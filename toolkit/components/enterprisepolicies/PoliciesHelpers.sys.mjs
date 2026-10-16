@@ -20,6 +20,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "resource://gre/modules/addons/AddonUpdateChecker.sys.mjs",
   setEnterpriseGuards: "resource://gre/modules/ExtensionPermissions.sys.mjs",
   FileUtils: "resource://gre/modules/FileUtils.sys.mjs",
+  SitePolicyUtils: "resource://gre/modules/SitePolicyUtils.sys.mjs",
 });
 
 const PREF_LOGLEVEL = "browser.policies.loglevel";
@@ -376,7 +377,7 @@ function trailingDotPrincipal(aPrincipal) {
     return null;
   }
 
-  let bareHost = host.replace(/\.+$/, "");
+  let bareHost = lazy.SitePolicyUtils.stripTrailingDots(host);
   let otherHost = bareHost == host ? `${host}.` : bareHost;
 
   try {
@@ -489,8 +490,6 @@ export async function runOncePerModification(
   policyValue,
   callback
 ) {
-  // Stringify the value so that it matches what we'd get from getStringPref.
-  policyValue = policyValue + "";
   if (isRunOnceModificationApplied(actionName, policyValue)) {
     lazy.log.debug(
       `Not running action ${actionName} again because the policy's value is unchanged`
@@ -516,7 +515,7 @@ export async function runOncePerModification(
  */
 export function setRunOnceModificationApplied(actionName, policyValue) {
   let prefName = `browser.policies.runOncePerModification.${actionName}`;
-  Services.prefs.setStringPref(prefName, policyValue + "");
+  Services.prefs.setStringPref(prefName, policyValue);
 }
 
 /**
@@ -537,7 +536,7 @@ export function setRunOnceModificationApplied(actionName, policyValue) {
  */
 export function isRunOnceModificationApplied(actionName, policyValue) {
   let prefName = `browser.policies.runOncePerModification.${actionName}`;
-  return Services.prefs.getStringPref(prefName, undefined) === policyValue + "";
+  return Services.prefs.getStringPref(prefName, undefined) === policyValue;
 }
 
 /**

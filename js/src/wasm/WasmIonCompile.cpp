@@ -2343,7 +2343,7 @@ class FunctionCompiler {
 #endif
       case ABIArg::GPR:
       case ABIArg::FPU:
-        return callState->regArgs.append(MWasmCallBase::Arg(arg.reg(), argDef));
+        return callState->regArgs.emplaceBack(arg.reg(), argDef);
       case ABIArg::Stack: {
         auto* mir =
             MWasmStackArg::New(alloc(), arg.offsetFromArgBase(), argDef);
@@ -2439,8 +2439,8 @@ class FunctionCompiler {
       return true;
     }
 
-    if (!callState->regArgs.append(
-            MWasmCallBase::Arg(AnyRegister(InstanceReg), instancePointer_))) {
+    if (!callState->regArgs.emplaceBack(AnyRegister(InstanceReg),
+                                        instancePointer_)) {
       return false;
     }
 
@@ -3865,8 +3865,7 @@ class FunctionCompiler {
     }
 
     pendingBlocks_[absolute].hint = branchHint;
-    return pendingBlocks_[absolute].patches.append(
-        ControlFlowPatch(ins, index));
+    return pendingBlocks_[absolute].patches.emplaceBack(ins, index);
   }
 
   [[nodiscard]] bool br(uint32_t relativeDepth, const DefVector& values) {

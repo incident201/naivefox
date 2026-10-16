@@ -5,6 +5,9 @@
 import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
 
 const lazy = {};
+ChromeUtils.defineESModuleGetters(lazy, {
+  E10SUtils: "resource://gre/modules/E10SUtils.sys.mjs",
+});
 XPCOMUtils.defineLazyPreferenceGetter(
   lazy,
   "shortcutsDelay",
@@ -110,6 +113,12 @@ export class GenAIChild extends JSWindowActorChild {
               delay,
               screenXDevPx: screenX * this.contentWindow.devicePixelRatio,
               screenYDevPx: screenY * this.contentWindow.devicePixelRatio,
+              // For the search action's loadSearch call, mirroring how the
+              // context menu derives its own triggeringPrincipal/policyContainer.
+              principal: this.document.nodePrincipal,
+              policyContainer: lazy.E10SUtils.serializePolicyContainer(
+                this.document.policyContainer
+              ),
             });
             this.registerHideEvents();
           }

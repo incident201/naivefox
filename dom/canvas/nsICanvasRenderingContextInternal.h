@@ -35,6 +35,9 @@ class nsDisplayListBuilder;
 class ClientWebGLContext;
 class PresShell;
 class WebGLFramebufferJS;
+namespace dom {
+class CanvasRenderingContextOptions;
+}  // namespace dom
 namespace ipc {
 class IProtocol;
 }  // namespace ipc
@@ -199,8 +202,8 @@ class nsICanvasRenderingContextInternal : public nsISupports,
   // Redraw the dirty rectangle of this canvas.
   NS_IMETHOD Redraw(const gfxRect& dirty) = 0;
 
-  NS_IMETHOD SetContextOptions(JSContext* cx, JS::Handle<JS::Value> options,
-                               mozilla::ErrorResult& aRvForDictionaryInit) {
+  NS_IMETHOD SetContextOptions(
+      const mozilla::dom::CanvasRenderingContextOptions& aOptions) {
     return NS_OK;
   }
 

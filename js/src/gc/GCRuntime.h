@@ -780,9 +780,9 @@ class GCRuntime {
   static void* refillFreeList(JS::Zone* zone, AllocKind thingKind);
   void attemptLastDitchGC();
 
-  // Return the mark color for |sym| in the atom reference state for uncollected
-  // zones, or MarkColor::White if it's not referenced.
-  CellColor isAtomReferencedByUncollectedZone(TenuredCell* atom);
+  // Return whether |sym| is present in the atom reference state for uncollected
+  // zones.
+  bool isAtomReferencedByUncollectedZone(TenuredCell* atom);
   template <typename T>
   void maybeMarkWeaklyHeldAtom(T* atom);
 

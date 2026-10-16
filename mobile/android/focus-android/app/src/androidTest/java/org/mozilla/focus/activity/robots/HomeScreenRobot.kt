@@ -6,6 +6,7 @@ package org.mozilla.focus.activity.robots
 
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiSelector
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.mozilla.focus.R
 import org.mozilla.focus.helpers.TestHelper.appName
@@ -14,6 +15,7 @@ import org.mozilla.focus.helpers.TestHelper.mDevice
 import org.mozilla.focus.helpers.TestHelper.packageName
 import org.mozilla.focus.helpers.TestHelper.waitingTime
 import org.mozilla.focus.helpers.TestHelper.waitingTimeShort
+import org.mozilla.focus.topsites.TOP_SITES_ROW_TEST_TAG
 
 class HomeScreenRobot {
 
@@ -36,6 +38,16 @@ class HomeScreenRobot {
 
     fun verifyPageShortcutExists(title: String) {
         assertTrue(topSitesList.getChild(UiSelector().textContains(title)).waitForExists(waitingTime))
+    }
+
+    fun verifyPageShortcutsAreCentered() {
+        val shortcutsRow = topSitesList.getChild(UiSelector().resourceId(TOP_SITES_ROW_TEST_TAG))
+        assertTrue(shortcutsRow.waitForExists(waitingTime))
+        assertEquals(
+            topSitesList.visibleBounds.exactCenterX(),
+            shortcutsRow.visibleBounds.exactCenterX(),
+            1f,
+        )
     }
 
     fun longTapPageShortcut(title: String) {

@@ -136,6 +136,11 @@ struct ParamTraits<mozilla::dom::PrefersReducedMotionOverride>
           mozilla::dom::PrefersReducedMotionOverride> {};
 
 template <>
+struct ParamTraits<mozilla::dom::PrefersContrastOverride>
+    : public mozilla::dom::WebIDLEnumSerializer<
+          mozilla::dom::PrefersContrastOverride> {};
+
+template <>
 struct ParamTraits<mozilla::dom::ExplicitActiveStatus>
     : public ContiguousEnumSerializer<
           mozilla::dom::ExplicitActiveStatus,
@@ -424,6 +429,8 @@ BrowsingContext::FieldValues BrowsingContext::ComputeInitialFields(
   fields.Get<IDX_ShouldDelayMediaFromStart>() =
       !parentBC && StaticPrefs::media_block_autoplay_until_in_foreground();
 
+  fields.Get<IDX_HistoryID>() = nsID::GenerateUUID();
+
   return fields;
 }
 
@@ -467,7 +474,6 @@ already_AddRefed<BrowsingContext> BrowsingContext::CreateDetached(
 
   FieldValues fields = ComputeInitialFields(parentWC, aOpener, group, aType);
   fields.Get<IDX_Name>() = aName;
-  fields.Get<IDX_HistoryID>() = nsID::GenerateUUID();
   fields.Get<IDX_IsPopupRequested>() = aOptions.isPopupRequested;
   fields.Get<IDX_TopLevelCreatedByWebContent>() =
       aOptions.topLevelCreatedByWebContent;
@@ -3206,8 +3212,8 @@ nsresult BrowsingContext::ResetGVAutoplayRequestStatus() {
 }
 
 template <typename Callback>
-void BrowsingContext::WalkPresContexts(Callback&& aCallback) {
-  PreOrderWalk([&](BrowsingContext* aContext) {
+static void WalkPresContexts(BrowsingContext* aTop, Callback&& aCallback) {
+  aTop->PreOrderWalk([&](BrowsingContext* aContext) {
     if (nsIDocShell* shell = aContext->GetDocShell()) {
       if (RefPtr pc = shell->GetPresContext()) {
         aCallback(pc.get());
@@ -3216,8 +3222,19 @@ void BrowsingContext::WalkPresContexts(Callback&& aCallback) {
   });
 }
 
+static void MediaFeatureValuesChanged(BrowsingContext* aTop,
+                                      MediaFeatureChangeReason aReason) {
+  WalkPresContexts(aTop, [aReason](nsPresContext* aPc) {
+    aPc->MediaFeatureValuesChanged(
+        {aReason},
+        // We're already iterating through sub documents, so we don't need to
+        // propagate the change again.
+        MediaFeatureChangePropagation::JustThisDocument);
+  });
+}
+
 void BrowsingContext::PresContextAffectingFieldChanged() {
-  WalkPresContexts([&](nsPresContext* aPc) {
+  WalkPresContexts(this, [](nsPresContext* aPc) {
     aPc->RecomputeBrowsingContextDependentData();
   });
 }
@@ -3452,7 +3469,8 @@ void BrowsingContext::DidSet(FieldIndex<IDX_ForceDesktopViewport>,
   PresContextAffectingFieldChanged();
   if (nsIDocShell* shell = GetDocShell()) {
     if (RefPtr ps = shell->GetPresShell()) {
-      ps->MaybeRecreateMobileViewportManager(/* aAfterInitialization= */ true);
+      ps->MaybeRecreateMobileViewportManager(
+          PresShell::MobileViewportManagerUpdate::ManagerTypeMayChange);
     }
   }
 }
@@ -3506,13 +3524,8 @@ void BrowsingContext::DidSet(FieldIndex<IDX_TouchEventsOverrideInternal>,
   if (GetTouchEventsOverrideInternal() == aOldValue) {
     return;
   }
-  WalkPresContexts([&](nsPresContext* aPc) {
-    aPc->MediaFeatureValuesChanged(
-        {MediaFeatureChangeReason::SystemMetricsChange},
-        // We're already iterating through sub documents, so we don't need to
-        // propagate the change again.
-        MediaFeatureChangePropagation::JustThisDocument);
-  });
+  MediaFeatureValuesChanged(this,
+                            MediaFeatureChangeReason::SystemMetricsChange);
 }
 
 void BrowsingContext::DidSet(FieldIndex<IDX_EmbedderColorSchemes>,
@@ -3555,14 +3568,16 @@ void BrowsingContext::DidSet(FieldIndex<IDX_PrefersReducedMotionOverride>,
   if (PrefersReducedMotionOverride() == aOldValue) {
     return;
   }
+  MediaFeatureValuesChanged(this, MediaFeatureChangeReason::PreferenceChange);
+}
 
-  WalkPresContexts([&](nsPresContext* aPc) {
-    aPc->MediaFeatureValuesChanged(
-        {MediaFeatureChangeReason::PreferenceChange},
-        // We're already iterating through sub documents, so we don't need to
-        // propagate the change again.
-        MediaFeatureChangePropagation::JustThisDocument);
-  });
+void BrowsingContext::DidSet(FieldIndex<IDX_PrefersContrastOverride>,
+                             dom::PrefersContrastOverride aOldValue) {
+  MOZ_ASSERT(IsTop());
+  if (PrefersContrastOverride() == aOldValue) {
+    return;
+  }
+  MediaFeatureValuesChanged(this, MediaFeatureChangeReason::PreferenceChange);
 }
 
 void BrowsingContext::DidSet(FieldIndex<IDX_AnimationsPlayBackRateMultiplier>,
@@ -3630,17 +3645,9 @@ void BrowsingContext::DidSet(FieldIndex<IDX_DisplayMode>,
   if (GetDisplayMode() == aOldValue) {
     return;
   }
-
-  WalkPresContexts([&](nsPresContext* aPc) {
-    aPc->MediaFeatureValuesChanged(
-        {MediaFeatureChangeReason::DisplayModeChange},
-        // We're already iterating through sub documents, so we don't need
-        // to propagate the change again.
-        //
-        // Images and other resources don't change their display-mode
-        // evaluation, display-mode is a property of the browsing context.
-        MediaFeatureChangePropagation::JustThisDocument);
-  });
+  // Images and other resources don't change their display-mode evaluation,
+  // display-mode is a property of the browsing context.
+  MediaFeatureValuesChanged(this, MediaFeatureChangeReason::DisplayModeChange);
 }
 
 void BrowsingContext::DidSet(FieldIndex<IDX_Muted>) {
@@ -3872,7 +3879,7 @@ void BrowsingContext::SetGeolocationServiceOverride(
   if (aGeolocationOverride.WasPassed()) {
     if (!mGeolocationServiceOverride) {
       mGeolocationServiceOverride = MakeRefPtr<GeolocationService>();
-      mGeolocationServiceOverride->Init();
+      mGeolocationServiceOverride->Init(/* aIsOverride = */ true);
     }
     mGeolocationServiceOverride->Update(aGeolocationOverride.Value());
   } else if (RefPtr<GeolocationService> serviceOverride =

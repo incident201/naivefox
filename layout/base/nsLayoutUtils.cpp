@@ -6570,9 +6570,9 @@ CSSIntSize nsLayoutUtils::ComputeSizeForDrawingWithFallback(
 IntSize nsLayoutUtils::ComputeImageContainerDrawingParameters(
     imgIContainer* aImage, nsIFrame* aForFrame,
     const LayoutDeviceRect& aDestRect, const LayoutDeviceRect& aFillRect,
-    const StackingContextHelper& aSc, uint32_t aFlags,
-    SVGImageContext& aSVGContext, Maybe<ImageIntRegion>& aRegion,
-    bool* aRasterizedForDest) {
+    wr::DisplayListBuilder& aBuilder, const StackingContextHelper& aSc,
+    uint32_t aFlags, SVGImageContext& aSVGContext,
+    Maybe<ImageIntRegion>& aRegion, bool* aRasterizedForDest) {
   MOZ_ASSERT(aImage);
   MOZ_ASSERT(aForFrame);
 
@@ -6589,8 +6589,18 @@ IntSize nsLayoutUtils::ComputeImageContainerDrawingParameters(
         Some(CSSSize(aDestRect.Width(), aDestRect.Height())));
   }
 
+  // WebRender snaps the rect after moving it out of the pre-scrolled
+  // coordinates it is authored in, by the accumulated external scroll offset,
+  // so round at that position. Otherwise the size would depend on the
+  // sub-pixel phase of the scroll offset while the rect it is drawn into does
+  // not, and with fractional extents the two would differ by a pixel on every
+  // other repaint during a scroll (bug 2080185).
+  const wr::LayoutVector2D eso = aBuilder.CurrentAccumulatedScrollOffset();
+  const LayoutDevicePoint scrollOffset(eso.x, eso.y);
+
   const gfx::Matrix& itm = aSc.GetInheritedTransform();
-  LayerIntRect destRect = SnapRectForImage(itm, scaleFactors, aDestRect);
+  LayerIntRect destRect =
+      SnapRectForImage(itm, scaleFactors, aDestRect + scrollOffset);
   const IntSize snappedDestSize = destRect.Size().ToUnknownSize();
   auto setRasterizedForDest = [&](const IntSize& aSize) {
     if (aRasterizedForDest) {
@@ -6631,7 +6641,8 @@ IntSize nsLayoutUtils::ComputeImageContainerDrawingParameters(
     // If the dest rect contains the fill rect, then we are only displaying part
     // of the vector image. We need to calculate the restriction region to avoid
     // drawing more than we need, and sampling outside the desired bounds.
-    LayerIntRect clipRect = SnapRectForImage(itm, scaleFactors, aFillRect);
+    LayerIntRect clipRect =
+        SnapRectForImage(itm, scaleFactors, aFillRect + scrollOffset);
     if (destRect.Contains(clipRect)) {
       LayerIntRect restrictRect = destRect.Intersect(clipRect);
       restrictRect.MoveBy(-destRect.TopLeft());

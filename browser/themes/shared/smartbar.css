@@ -51,13 +51,11 @@
     }
 
     &[open] > .urlbar-background {
-      /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
       box-shadow: var(--smartbar-box-shadow);
     }
 
     /* Show outline on keyboard focus */
     &:focus-within:not([usertyping]):not([suppress-focus-border]) > .urlbar-background {
-      /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
       outline: var(--smartbar-outline);
       outline-offset: var(--focus-outline-offset);
     }
@@ -161,7 +159,6 @@
   }
 
   .urlbarView-row:not([type="tip"], [type="dynamic"]) {
-    /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
     min-height: var(--urlbarview-row-min-height);
   }
 
@@ -222,7 +219,6 @@
       /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
       inset: calc(-1 * var(--border-width));
       border-radius: inherit;
-      /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
       background: var(--smartbar-border-color-gradient);
       mask:
         linear-gradient(#fff 0 0) content-box,

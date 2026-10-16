@@ -155,8 +155,8 @@ add_task(async function test_selection_menu_position_with_rtl_app_locale() {
 });
 
 /**
- * Check that a blocked chatbot leaves no menu to show, as the AI action is
- * currently the only action. This inverts once Search and Copy exist.
+ * Check that a blocked chatbot leaves the menu open with just the Search
+ * action, now that Search exists independently of the chatbot.
  */
 add_task(async function test_no_menu_when_chatbot_blocked() {
   await SpecialPowers.pushPrefEnv({
@@ -165,11 +165,46 @@ add_task(async function test_no_menu_when_chatbot_blocked() {
       ["browser.ml.chat.enabled", false],
     ],
   });
-  const spy = sinon.spy(GenAI, "handleShortcutsMessage");
 
   try {
     await BrowserTestUtils.withNewTab("data:text/plain,hi", async browser => {
-      const panel = document.getElementById("selection-shortcut-action-panel");
+      const panel = await showSelectionMenu(browser);
+
+      Assert.ok(
+        document.getElementById("ai-action-button").hidden,
+        "AI action is hidden when the chatbot is blocked"
+      );
+      Assert.ok(
+        !document.getElementById("search-action-button").hidden,
+        "Search still has an action to offer"
+      );
+
+      panel.hide();
+    });
+  } finally {
+    await SpecialPowers.popPrefEnv();
+  }
+});
+
+/**
+ * Check that a blocked chatbot and an unavailable search service together
+ * leave no menu to show at all.
+ */
+add_task(async function test_no_menu_when_nothing_available() {
+  await SpecialPowers.pushPrefEnv({
+    set: [
+      ["browser.highlightToSearch.featureGate", true],
+      ["browser.ml.chat.enabled", false],
+    ],
+  });
+  const spy = sinon.spy(GenAI, "handleShortcutsMessage");
+  const panel = document.getElementById("selection-shortcut-action-panel");
+
+  // "failed" rather than the other statuses because it is the one that makes
+  // the default engine getters throw.
+  SearchService.forceInitializationStatusForTests("failed");
+  try {
+    await BrowserTestUtils.withNewTab("data:text/plain,hi", async browser => {
       await selectAllAndMouseUp(browser);
       await TestUtils.waitForCondition(
         () => spy.called,
@@ -181,11 +216,231 @@ add_task(async function test_no_menu_when_chatbot_blocked() {
       Assert.equal(
         panel.state,
         "closed",
-        "Menu stays closed with no action to offer"
+        "Menu stays closed with neither chatbot nor search available"
       );
     });
   } finally {
+    SearchService.forceInitializationStatusForTests("success");
     spy.restore();
+    await SpecialPowers.popPrefEnv();
+  }
+});
+
+/**
+ * Check that a new selection with nothing left to offer closes the menu
+ * opened for the previous selection.
+ */
+add_task(async function test_menu_closes_when_nothing_left_to_offer() {
+  await SpecialPowers.pushPrefEnv({
+    set: [
+      ["browser.highlightToSearch.featureGate", true],
+      ["browser.highlightToSearch.enabled", true],
+      ["browser.highlightToSearch.search.enabled", true],
+      ["browser.ml.chat.enabled", false],
+    ],
+  });
+  const spy = sinon.spy(GenAI, "handleShortcutsMessage");
+
+  try {
+    await BrowserTestUtils.withNewTab("data:text/plain,hi", async browser => {
+      const panel = await showSelectionMenu(browser);
+
+      SearchService.forceInitializationStatusForTests("failed");
+      spy.resetHistory();
+      await BrowserTestUtils.synthesizeMouse(
+        browser,
+        60,
+        10,
+        { type: "mouseup" },
+        browser
+      );
+      await TestUtils.waitForCondition(
+        () => spy.called,
+        "Actor offered shortcuts to the parent again"
+      );
+
+      Assert.equal(panel.state, "closed", "Stale menu is closed");
+    });
+  } finally {
+    SearchService.forceInitializationStatusForTests("success");
+    spy.restore();
+    await SpecialPowers.popPrefEnv();
+  }
+});
+
+/**
+ * Check that Search stays hidden for an existing chatbot user while the
+ * Highlight to Search feature gate is off, so release users see no change.
+ */
+add_task(async function test_search_hidden_without_feature_gate() {
+  await SpecialPowers.pushPrefEnv({
+    set: [
+      ["browser.highlightToSearch.featureGate", false],
+      ["browser.ml.chat.shortcuts", true],
+      ["browser.ml.chat.provider", "http://localhost:8080"],
+    ],
+  });
+
+  try {
+    await BrowserTestUtils.withNewTab("data:text/plain,hi", async browser => {
+      const panel = await showSelectionMenu(browser);
+
+      Assert.ok(
+        document.getElementById("search-action-button").hidden,
+        "Search stays hidden for an existing chatbot user while the gate is off"
+      );
+
+      panel.hide();
+    });
+  } finally {
+    await SpecialPowers.popPrefEnv();
+  }
+});
+
+/**
+ * Check that clicking Search opens the selection in a new tab with the
+ * default engine, tagged with the text_selection SAP, and records the click.
+ */
+add_task(async function test_search_action_click() {
+  Services.fog.testResetFOG();
+  await SpecialPowers.pushPrefEnv({
+    set: [
+      ["browser.highlightToSearch.featureGate", true],
+      ["browser.highlightToSearch.enabled", true],
+      ["browser.highlightToSearch.search.enabled", true],
+      ["browser.ml.chat.provider", ""],
+    ],
+  });
+  const loadSearchStub = sinon.stub(SearchUIUtils, "loadSearch");
+
+  try {
+    await BrowserTestUtils.withNewTab("data:text/plain,hi", async browser => {
+      const panel = await showSelectionMenu(browser);
+      const searchButton = document.getElementById("search-action-button");
+      Assert.ok(!searchButton.hidden, "Search is offered without a chatbot");
+
+      const panelHidden = BrowserTestUtils.waitForEvent(panel, "popuphidden");
+      searchButton.click();
+      await panelHidden;
+
+      Assert.ok(loadSearchStub.calledOnce, "loadSearch was called");
+      const args = loadSearchStub.firstCall.args[0];
+      Assert.equal(args.searchText, "hi", "Searches the selection");
+      Assert.equal(args.where, "tab", "Opens in a new tab");
+      Assert.equal(args.sapSource, "text_selection", "Tags the new SAP");
+      Assert.ok(args.triggeringPrincipal, "Carries a triggering principal");
+      Assert.ok(
+        "policyContainer" in args,
+        "Passes the policy container through"
+      );
+
+      const clicks = Glean.selectionMenu.actionClick.testGetValue();
+      Assert.equal(clicks.length, 1, "One action clicked");
+      Assert.equal(
+        clicks[0].extra.action,
+        "search",
+        "Clicked the search action"
+      );
+      Assert.equal(clicks[0].extra.selection, "2", "Records selection length");
+      Assert.equal(
+        clicks[0].extra.smart_window,
+        "false",
+        "Not a Smart Window click"
+      );
+    });
+  } finally {
+    loadSearchStub.restore();
+    await SpecialPowers.popPrefEnv();
+  }
+});
+
+/**
+ * Check that with the chatbot available but Search turned off, only the AI
+ * action is offered.
+ */
+add_task(async function test_search_disabled_keeps_ai_action() {
+  await SpecialPowers.pushPrefEnv({
+    set: [
+      ["browser.highlightToSearch.featureGate", true],
+      ["browser.highlightToSearch.enabled", true],
+      ["browser.highlightToSearch.search.enabled", false],
+      ["browser.ml.chat.shortcuts", true],
+      ["browser.ml.chat.provider", "http://localhost:8080"],
+    ],
+  });
+
+  try {
+    await BrowserTestUtils.withNewTab("data:text/plain,hi", async browser => {
+      const panel = await showSelectionMenu(browser);
+
+      Assert.ok(
+        !document.getElementById("ai-action-button").hidden,
+        "AI action is offered"
+      );
+      Assert.ok(
+        document.getElementById("search-action-button").hidden,
+        "Search is hidden when turned off"
+      );
+
+      panel.hide();
+    });
+  } finally {
+    await SpecialPowers.popPrefEnv();
+  }
+});
+
+/**
+ * Check that Smart Window never offers the Search action.
+ */
+add_task(async function test_smart_window_hides_search() {
+  await SpecialPowers.pushPrefEnv({
+    set: [
+      ["browser.highlightToSearch.featureGate", true],
+      ["browser.highlightToSearch.enabled", true],
+      ["browser.highlightToSearch.search.enabled", true],
+      ["browser.ml.chat.shortcuts", true],
+      ["browser.ml.chat.shortcuts.smartwindow", true],
+    ],
+  });
+
+  const win = await BrowserTestUtils.openNewBrowserWindow();
+
+  try {
+    win.document.documentElement.setAttribute("ai-window", "");
+
+    await BrowserTestUtils.openNewForegroundTab(
+      win.gBrowser,
+      "data:text/plain,hi"
+    );
+    const browser = win.gBrowser.selectedBrowser;
+    await SimpleTest.promiseFocus(browser);
+
+    const selectPromise = SpecialPowers.spawn(browser, [], () =>
+      ContentTaskUtils.waitForCondition(() => content.getSelection().toString())
+    );
+    win.goDoCommand("cmd_selectAll");
+    await selectPromise;
+    await BrowserTestUtils.synthesizeMouse(
+      browser,
+      60,
+      10,
+      { type: "mouseup" },
+      browser
+    );
+
+    const panel = win.document.getElementById(
+      "selection-shortcut-action-panel"
+    );
+    await TestUtils.waitForCondition(
+      () => panel.getAttribute("panelopen") === "true",
+      "Selection menu opened in Smart Window"
+    );
+    Assert.ok(
+      win.document.getElementById("search-action-button").hidden,
+      "Search is not offered in Smart Window"
+    );
+  } finally {
+    await BrowserTestUtils.closeWindow(win);
     await SpecialPowers.popPrefEnv();
   }
 });
@@ -299,6 +554,21 @@ add_task(async function test_smart_window_ask_chat() {
     const events = Glean.genaiChatbot.promptClick.testGetValue();
     Assert.equal(events.length, 1, "One prompt click");
     Assert.equal(events[0].extra.smart_window, "true", "Is smart window");
+
+    // The selection menu is one shared panel, so its probes have to mark the
+    // Smart Window flow to keep it out of Highlight to Search analysis.
+    const displayed = Glean.selectionMenu.displayed.testGetValue();
+    Assert.equal(
+      displayed.at(-1).extra.smart_window,
+      "true",
+      "Menu displayed in Smart Window"
+    );
+    const clicks = Glean.selectionMenu.actionClick.testGetValue();
+    Assert.equal(
+      clicks.at(-1).extra.smart_window,
+      "true",
+      "AI action clicked in Smart Window"
+    );
   } finally {
     isSidebarOpenStub.restore();
     getSidebarAiWindowStub.restore();
@@ -482,6 +752,61 @@ add_task(async function test_ai_action_dropdown() {
       () => getComputedStyle(background).borderRadius === borderRadiusBefore,
       "The border radius returns to its original value"
     );
+    const panelHidden = BrowserTestUtils.waitForEvent(panel, "popuphidden");
+    panel.hide();
+    await panelHidden;
+  });
+
+  await SpecialPowers.popPrefEnv();
+});
+
+/**
+ * Check the selection menu records its own display and action click events,
+ * separately from the chatbot-scoped shortcuts probes.
+ */
+add_task(async function test_selection_menu_events() {
+  Services.fog.testResetFOG();
+  await SpecialPowers.pushPrefEnv({
+    set: [
+      ["browser.ml.chat.shortcuts", true],
+      ["browser.ml.chat.shortcut.onboardingMouseoverCount", 2],
+      ["browser.ml.chat.provider", "http://localhost:8080"],
+    ],
+  });
+
+  await BrowserTestUtils.withNewTab("data:text/plain,hi", async browser => {
+    const panel = await showSelectionMenu(browser);
+
+    const displayed = Glean.selectionMenu.displayed.testGetValue();
+    Assert.equal(displayed.length, 1, "Menu displayed once");
+    Assert.ok(displayed[0].extra.delay, "Waited some time");
+    Assert.equal(displayed[0].extra.selection, 2, "Selected hi");
+    Assert.equal(
+      displayed[0].extra.smart_window,
+      "false",
+      "Not a Smart Window menu"
+    );
+
+    Assert.equal(
+      Glean.selectionMenu.actionClick.testGetValue(),
+      null,
+      "No action clicked yet"
+    );
+
+    const popup = document.getElementById("chat-shortcuts-options-panel");
+    document.getElementById("ai-action-button").click();
+    await BrowserTestUtils.waitForEvent(popup, "popupshown");
+
+    const clicks = Glean.selectionMenu.actionClick.testGetValue();
+    Assert.equal(clicks.length, 1, "One action clicked");
+    Assert.equal(clicks[0].extra.action, "ai", "Clicked the AI action");
+    Assert.equal(clicks[0].extra.selection, 2, "Selected hi");
+    Assert.equal(
+      clicks[0].extra.smart_window,
+      "false",
+      "Not a Smart Window click"
+    );
+
     const panelHidden = BrowserTestUtils.waitForEvent(panel, "popuphidden");
     panel.hide();
     await panelHidden;
@@ -865,20 +1190,17 @@ add_task(async function test_input_selection() {
         { type: "mouseup" },
         browser
       );
-      await TestUtils.waitForCondition(() => stub.callCount !== 0);
+      const showCalls = () =>
+        stub.getCalls().filter(c => c.args[0] == "GenAI:ShowShortcuts");
+      await TestUtils.waitForCondition(() => showCalls().length);
 
-      Assert.equal(stub.callCount, 1, "Show shortcuts once");
-      Assert.notEqual(
-        stub.firstCall.args[0],
-        "GenAI:HideShortcuts",
-        "No unnecessary hides"
-      );
+      Assert.equal(showCalls().length, 1, "Show shortcuts once");
       Assert.equal(
-        stub.firstCall.args[1].selection,
+        showCalls()[0].args[1].selection,
         "inp",
         "Got selected text from input"
       );
-      Assert.equal(stub.firstCall.args[1].inputType, "input", "Got input type");
+      Assert.equal(showCalls()[0].args[1].inputType, "input", "Got input type");
     }
   );
 

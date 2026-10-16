@@ -173,10 +173,9 @@ bool HttpChannelParent::Init(const HttpChannelCreationArgs& aArgs) {
           a.launchServiceWorkerStart(), a.launchServiceWorkerEnd(),
           a.dispatchFetchEventStart(), a.dispatchFetchEventEnd(),
           a.handleFetchEventStart(), a.handleFetchEventEnd(),
-          a.forceMainDocumentChannel(), a.navigationStartTimeStamp(),
-          a.earlyHintPreloaderId(), a.classicScriptHintCharset(),
-          a.documentCharacterSet(), a.isUserAgentHeaderModified(),
-          a.initiatorType());
+          a.navigationStartTimeStamp(), a.earlyHintPreloaderId(),
+          a.classicScriptHintCharset(), a.documentCharacterSet(),
+          a.isUserAgentHeaderModified(), a.initiatorType());
     }
     case HttpChannelCreationArgs::THttpChannelConnectArgs: {
       const HttpChannelConnectArgs& cArgs = aArgs.get_HttpChannelConnectArgs();
@@ -454,7 +453,6 @@ bool HttpChannelParent::DoAsyncOpen(
     const TimeStamp& aDispatchFetchEventEnd,
     const TimeStamp& aHandleFetchEventStart,
     const TimeStamp& aHandleFetchEventEnd,
-    const bool& aForceMainDocumentChannel,
     const TimeStamp& aNavigationStartTimeStamp,
     const uint64_t& aEarlyHintPreloaderId,
     const nsAString& aClassicScriptHintCharset,
@@ -512,6 +510,24 @@ bool HttpChannelParent::DoAsyncOpen(
     return SendFailedAsyncOpen(rv);
   }
 
+  // Document, subdocument and object/embed loads go through DocumentChannel,
+  // never PHttpChannel. Reject content-process attempts to open such a channel,
+  // including any carrying navigation- or object-load flags, to prevent forged
+  // navigation attacks. System-principal loads are exempt.
+  nsIPrincipal* loadingPrincipal = loadInfo->GetLoadingPrincipal();
+  bool isSystemPrincipal =
+      loadingPrincipal && loadingPrincipal->IsSystemPrincipal();
+  ExtContentPolicy extType = loadInfo->GetExternalContentPolicyType();
+  if (!isSystemPrincipal &&
+      (extType == ExtContentPolicy::TYPE_DOCUMENT ||
+       extType == ExtContentPolicy::TYPE_SUBDOCUMENT ||
+       extType == ExtContentPolicy::TYPE_OBJECT ||
+       (aLoadFlags & (nsIChannel::LOAD_DOCUMENT_URI |
+                      nsIRequest::LOAD_DOCUMENT_NEEDS_COOKIE |
+                      nsIRequest::LOAD_HTML_OBJECT_DATA)))) {
+    return SendFailedAsyncOpen(NS_ERROR_CONTENT_BLOCKED);
+  }
+
   nsCOMPtr<nsIChannel> channel;
   rv = mHttpHandler->NewProxiedChannel(aURI, nullptr, 0, nullptr, loadInfo,
                                        getter_AddRefs(channel));
@@ -567,10 +583,6 @@ bool HttpChannelParent::DoAsyncOpen(
 
   if (aLoadFlags != nsIRequest::LOAD_NORMAL) {
     httpChannel->SetLoadFlags(aLoadFlags);
-  }
-
-  if (aForceMainDocumentChannel) {
-    httpChannel->SetIsMainDocumentChannel(true);
   }
 
   for (uint32_t i = 0; i < requestHeaders.Length(); i++) {
@@ -1295,7 +1307,7 @@ HttpChannelParent::OnStartRequest(nsIRequest* aRequest) {
     // Capture the load's principal origin now, while the channel is alive, to
     // bind any alt-data written later (after the channel may have been
     // cleared).
-    chan->GetAltDataBindingOrigin(mAltDataBindingOrigin);
+    UpdateAltDataBindingOrigin(chan);
 
     httpChannelImpl->GetCacheKey(&args.cacheKey());
     httpChannelImpl->GetAlternativeDataType(args.altDataType());
@@ -2033,6 +2045,33 @@ NS_INTERFACE_MAP_BEGIN(CacheEntryWriteHandleParent)
   NS_INTERFACE_MAP_ENTRY(nsISupports)
   NS_INTERFACE_MAP_ENTRY(nsICacheEntryWriteHandle)
 NS_INTERFACE_MAP_END
+
+void HttpChannelParent::UpdateAltDataBindingOrigin(HttpBaseChannel* aChannel) {
+  mAltDataBindingOrigin.Truncate();
+
+  nsIPrincipal* principal = aChannel->GetAltDataBindingPrincipal();
+  if (!principal) {
+    return;
+  }
+
+  if (StaticPrefs::network_cache_alt_data_validate_binding_principal()) {
+    ContentParent* cp = nullptr;
+    if (Manager() && Manager()->Manager()) {
+      cp = static_cast<ContentParent*>(Manager()->Manager());
+    }
+    if (!cp ||
+        !cp->ValidatePrincipal(
+            principal, {ValidatePrincipalOptions::AllowSystemIfLoaded})) {
+      LOG(
+          ("HttpChannelParent::UpdateAltDataBindingOrigin [this=%p] principal "
+           "not valid for the content process",
+           this));
+      return;
+    }
+  }
+
+  principal->GetOrigin(mAltDataBindingOrigin);
+}
 
 // Records, atomically with the alt-data write, the origin of the principal
 // that produced the alt-data.

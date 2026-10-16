@@ -15,7 +15,6 @@
   color: inherit;
 
   &[_moz-menuactive] {
-    /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens, stylelint-plugin-mozilla/no-base-design-tokens */
     background-color: light-dark(var(--color-black-alpha-10), var(--color-white-alpha-20));
     color: inherit;
 
@@ -39,7 +38,6 @@
     background-color: transparent;
     @media -moz-pref("widget.windows.mica.toplevel-backdrop", 2) {
       /* For acrylic, do the same we do for popups to guarantee some contrast */
-      /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens, stylelint-plugin-mozilla/no-base-design-tokens */
       background-color: light-dark(var(--color-white-alpha-60), var(--color-black-alpha-60));
     }
 

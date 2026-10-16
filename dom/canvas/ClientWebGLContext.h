@@ -986,9 +986,8 @@ class ClientWebGLContext final : public nsICanvasRenderingContextInternal,
   const WebGLContextOptions& GetContextOptions() const {
     return mInitialOptions.ref();
   }
-  NS_IMETHOD
-  SetContextOptions(JSContext* cx, JS::Handle<JS::Value> options,
-                    ErrorResult& aRvForDictionaryInit) override;
+  NS_IMETHOD SetContextOptions(
+      const dom::CanvasRenderingContextOptions& aOptions) override;
   NS_IMETHOD
   SetDimensions(int32_t width, int32_t height) override;
   bool UpdateWebRenderCanvasData(

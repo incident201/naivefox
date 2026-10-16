@@ -18,7 +18,8 @@
     [resultstyles~="loginsFooter"],
     [resultstyles~="insecureWarning"],
     [resultstyles~="importableLogins"],
-    [resultstyles~="generatedPassword"]
+    [resultstyles~="generatedPassword"],
+    [resultstyles~="fromhistory"]
   )::part(content) {
   min-width: 250px;
 }

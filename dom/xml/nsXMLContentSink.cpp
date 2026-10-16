@@ -155,7 +155,7 @@ nsresult nsXMLContentSink::MaybePrettyPrint() {
     // Try to perform a microtask checkpoint; this avoids always breaking
     // pretty-printing if webextensions insert new content right after the
     // document loads.
-    nsAutoMicroTask mt;
+    nsAutoMicroTaskForDocument mt(mDocument);
   }
 
   if (mDocument->GetRootElement() != mDocElement) {
@@ -532,7 +532,7 @@ nsresult nsXMLContentSink::CreateElement(
 
   if (customElementDefinition) {
     {
-      nsAutoMicroTask mt;
+      nsAutoMicroTaskForDocument mt(mDocument);
     }
 
     Maybe<AutoCEReaction> autoCEReaction;
@@ -637,7 +637,7 @@ nsresult nsXMLContentSink::CloseElement(nsIContent* aContent) {
     // When the element's end tag is subsequently parsed, the user agent must
     // perform a microtask checkpoint, and then prepare the script element.
     {
-      nsAutoMicroTask mt;
+      nsAutoMicroTaskForDocument mt(mDocument);
     }
 
     // Now tell the script that it's ready to go. This may execute the script

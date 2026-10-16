@@ -458,10 +458,9 @@ export var AboutNewTabResourceMapping = {
     // Tell Experimenter to re-evaluate experiment recipe targeting in case we
     // just installed an XPI.
     try {
-      await lazy.ExperimentAPI._rsLoader.finishedUpdating();
-      await lazy.ExperimentAPI._rsLoader.updateRecipes("newtab-trainhop", {
-        onlyFeatureIds: new Set(["newtabTrainhop"]),
-      });
+      await lazy.ExperimentAPI.updateRecipesForFeatures("newtab-trainhop", [
+        "newtabTrainhop",
+      ]);
     } catch (e) {
       // TODO: consider if we should collect this in telemetry.
       this.logger.error("Error when re-evaluating Nimbus recipes:", e);

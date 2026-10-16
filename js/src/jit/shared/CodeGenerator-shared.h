@@ -61,6 +61,10 @@ class CodeGeneratorShared : public LElementVisitor {
   // Label for the common non-table-based bailout path.
   NonAssertingLabel deoptLabel_;
 
+  // Whether the out-of-line path just generated ends with a jump to
+  // deoptLabel_ that has not been emitted yet. See jumpToDeoptLabel.
+  bool deoptJumpPending_ = false;
+
   // Amount of bytes allocated for incoming args. Used for Wasm return calls.
   uint32_t inboundStackArgBytes_;
 
@@ -397,6 +401,26 @@ class CodeGeneratorShared : public LElementVisitor {
   void addOutOfLineCode(OutOfLineCode* code, const BytecodeSite* site);
   bool generateOutOfLineCode();
 
+  // Jump to deoptLabel_ at the end of an out-of-line path. The jump is only
+  // emitted once another out-of-line path follows, so the last one may fall
+  // through to deoptLabel_, which is bound right after the out-of-line code.
+  void jumpToDeoptLabel() {
+    MOZ_ASSERT(!deoptJumpPending_);
+    deoptJumpPending_ = true;
+  }
+  bool needsDeoptLabel() const {
+    return deoptLabel_.used() || deoptJumpPending_;
+  }
+
+  // Pushes the snapshot offset and jumps to deoptLabel_.
+  void emitBailoutOOL(LSnapshot* snapshot);
+
+// MIPS64, Loong64, and RISC-V64 have no flags register and can't implement
+// this with a condition code.
+#if defined(JS_CODEGEN_X86) || defined(JS_CODEGEN_X64) || \
+    defined(JS_CODEGEN_ARM) || defined(JS_CODEGEN_ARM64)
+  void bailoutIf(Assembler::Condition condition, LSnapshot* snapshot);
+#endif
   void bailoutFrom(Label* label, LSnapshot* snapshot);
   void bailout(LSnapshot* snapshot);
 

@@ -2528,8 +2528,10 @@ void gfxPlatform::InitWebRenderConfig() {
 #endif
 
 #ifdef MOZ_WIDGET_ANDROID
-  gfxVars::SetUseAImageReaderVideoGpuProcessAndroid(
-      StaticPrefs::gfx_video_aimage_reader_gpu_process_android_AtStartup());
+  bool forceAImageReader =
+      gfx::gfxVars::UseWebRenderANGLE() ||
+      StaticPrefs::gfx_video_force_aimage_reader_android_AtStartup();
+  gfxVars::SetForceAImageReaderAndroid(forceAImageReader);
 #endif
 
 #ifdef XP_WIN

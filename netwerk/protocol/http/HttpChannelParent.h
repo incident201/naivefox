@@ -170,7 +170,6 @@ class HttpChannelParent final : public nsIInterfaceRequestor,
       const TimeStamp& aDispatchFetchEventEnd,
       const TimeStamp& aHandleFetchEventStart,
       const TimeStamp& aHandleFetchEventEnd,
-      const bool& aForceMainDocumentChannel,
       const TimeStamp& aNavigationStartTimeStamp,
       const uint64_t& aEarlyHintPreloaderId,
       const nsAString& aClassicScriptHintCharset,
@@ -255,6 +254,10 @@ class HttpChannelParent final : public nsIInterfaceRequestor,
   nsCOMPtr<nsISerialEventTarget> GetEventTargetForBgParentWait();
 
   bool IsRedirectDueToAuthRetry(uint32_t redirectFlags);
+
+  // Sets mAltDataBindingOrigin from aChannel's principal, or clears it if the
+  // principal is not one the content process could have loaded.
+  void UpdateAltDataBindingOrigin(HttpBaseChannel* aChannel);
 
   int32_t mSendWindowSize;
 

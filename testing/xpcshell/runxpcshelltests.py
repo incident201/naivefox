@@ -898,6 +898,7 @@ class XPCShellTestThread(Thread):
                     if line.get("action") == "test_status" and "expected" in line:
                         # Ensure the 'expected' field matches the 'status' to avoid failing the job
                         line["expected"] = line.get("status")
+                        line.setdefault("extra", {})["will_retry"] = True
                     elif line.get("action") == "log" and line.get("level") == "ERROR":
                         # Convert ERROR log to test_status so it gets colored
                         # properly without causing a test failure.
@@ -1129,7 +1130,10 @@ class XPCShellTestThread(Thread):
                     root += "_retry"
                 filename = f"profile_{root}{ext}.json"
                 i = 2
-                while os.path.exists(os.path.join(upload_dir, filename)):
+                while any(
+                    os.path.exists(os.path.join(upload_dir, checked_filename))
+                    for checked_filename in (filename, filename + ".gz")
+                ):
                     filename = f"profile_{root}-{i}{ext}.json"
                     i += 1
                 self.timeout_profile_name = filename
@@ -2896,7 +2900,7 @@ def main():
     result = xpcsh.runTests(options)
 
     if "MOZ_AUTOMATION" in os.environ:
-        symbolicate_profiles()
+        symbolicate_profiles(symbol_dir=options.symbolsPath)
 
     if result == TBPL_RETRY:
         sys.exit(4)

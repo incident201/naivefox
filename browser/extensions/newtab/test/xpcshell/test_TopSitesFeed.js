@@ -20,6 +20,8 @@ ChromeUtils.defineESModuleGetters(this, {
   Screenshots: "resource://newtab/lib/Screenshots.sys.mjs",
   Sampling: "resource://gre/modules/components-utils/Sampling.sys.mjs",
   SearchService: "moz-src:///toolkit/components/search/SearchService.sys.mjs",
+  SponsoredTopSitesScoreProvider:
+    "resource://newtab/lib/SponsoredTopSitesScoreProvider/SponsoredTopSitesScoreProvider.mjs",
   TOP_SITES_DEFAULT_ROWS: "resource:///modules/topsites/constants.mjs",
   TOP_SITES_MAX_SITES_PER_ROW: "resource:///modules/topsites/constants.mjs",
   TopSitesFeed: "resource://newtab/lib/TopSitesFeed.sys.mjs",
@@ -485,6 +487,29 @@ add_task(async function test_refresh_discards_results_after_uninit() {
   );
   Assert.ok(feed.store.dispatch.notCalled, "and does not dispatch");
 
+  sandbox.restore();
+});
+
+add_task(async function test_refresh_passes_isStartup_as_boolean() {
+  let sandbox = sinon.createSandbox();
+  sandbox.stub(NimbusFeatures.newtab, "onUpdate");
+  let feed = getTopSitesFeedForTest(sandbox);
+  sandbox.stub(feed, "_readDefaults");
+  sandbox.stub(feed._contile, "refresh");
+  feed.init();
+  feed._startedUp = true;
+  feed._tippyTopProvider.initialized = true;
+  sandbox.stub(feed, "getLinksWithDefaults").resolves([]);
+
+  await feed.refresh({ broadcast: true, isStartup: false });
+
+  Assert.strictEqual(
+    feed.getLinksWithDefaults.firstCall.args[0],
+    false,
+    "getLinksWithDefaults gets the isStartup boolean, not an object that is always truthy"
+  );
+
+  feed.uninit();
   sandbox.restore();
 });
 
@@ -1938,6 +1963,75 @@ add_task(async function test_onAction_part_3() {
   Assert.ok(
     !Services.prefs.prefHasUserValue(CONTILE_CACHE_VALID_FOR_SECONDS_PREF)
   );
+
+  sandbox.restore();
+});
+
+add_task(async function test_sponsored_scoring_follows_prefs() {
+  let sandbox = sinon.createSandbox();
+  sandbox.stub(NimbusFeatures.newtab, "onUpdate");
+  let feed = getTopSitesFeedForTest(sandbox);
+  sandbox.stub(feed, "_readDefaults");
+  sandbox.stub(feed, "refresh");
+  sandbox.stub(feed._contile, "refresh");
+  sandbox.stub(feed._contile, "_resetContileCache");
+  sandbox.stub(NimbusFeatures.newtab, "getVariable").returns(false);
+  sandbox.stub(SponsoredTopSitesScoreProvider, "init");
+  sandbox.stub(SponsoredTopSitesScoreProvider, "uninit");
+  sandbox.stub(SponsoredTopSitesScoreProvider, "clearData").resolves();
+  const { values } = feed.store.state.Prefs;
+  values[SHOWN_ON_NEWTAB_PREF] = true;
+  values[SHOW_SPONSORED_PREF] = true;
+
+  // The store updates the pref values before feeds see PREF_CHANGED.
+  function assertAfterPrefChange(name, value, running) {
+    sandbox.resetHistory();
+    values[name] = value;
+    feed.onAction({ type: actionTypes.PREF_CHANGED, data: { name, value } });
+    Assert.equal(
+      SponsoredTopSitesScoreProvider.init.called,
+      running,
+      `Setting ${name} to ${value} ${running ? "starts" : "does not start"} the scoring`
+    );
+    Assert.equal(
+      SponsoredTopSitesScoreProvider.clearData.called &&
+        SponsoredTopSitesScoreProvider.uninit.called,
+      !running,
+      `Setting ${name} to ${value} ${running ? "keeps" : "clears"} the scoring data`
+    );
+  }
+
+  feed.init();
+  Assert.ok(
+    SponsoredTopSitesScoreProvider.init.calledOnce,
+    "The scoring starts with shortcuts and sponsored shortcuts on"
+  );
+  feed.uninit();
+
+  assertAfterPrefChange(SHOW_SPONSORED_PREF, false, false);
+  assertAfterPrefChange(SHOW_SPONSORED_PREF, true, true);
+  assertAfterPrefChange(SHOWN_ON_NEWTAB_PREF, false, false);
+  assertAfterPrefChange(SHOWN_ON_NEWTAB_PREF, true, true);
+
+  sandbox.resetHistory();
+  feed.onAction({
+    type: actionTypes.PREF_CHANGED,
+    data: { name: "unifiedAds.tiles.enabled", value: false },
+  });
+  Assert.ok(
+    SponsoredTopSitesScoreProvider.clearData.notCalled &&
+      SponsoredTopSitesScoreProvider.uninit.notCalled,
+    "Switching sponsored tiles away from MARS keeps the scoring"
+  );
+
+  sandbox.resetHistory();
+  values[SHOW_SPONSORED_PREF] = false;
+  feed.init();
+  Assert.ok(
+    SponsoredTopSitesScoreProvider.init.notCalled,
+    "The scoring does not start with sponsored shortcuts off"
+  );
+  feed.uninit();
 
   sandbox.restore();
 });

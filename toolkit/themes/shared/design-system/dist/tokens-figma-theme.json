@@ -789,6 +789,21 @@
     "dark": "{Theme$button/text/color/active}",
     "forcedColors": "{Theme$button/text/color/active}"
   },
+  "dialog/background/color": {
+    "light": "{Theme$popup/background/color}",
+    "dark": "{Theme$popup/background/color}",
+    "forcedColors": "{Theme$popup/background/color}"
+  },
+  "dialog/border/color": {
+    "light": "{Theme$popup/border/color}",
+    "dark": "{Theme$popup/border/color}",
+    "forcedColors": "{Theme$popup/border/color}"
+  },
+  "dialog/box/shadow": {
+    "light": "{Theme$popup/box/shadow}",
+    "dark": "{Theme$popup/box/shadow}",
+    "forcedColors": "{Theme$popup/box/shadow}"
+  },
   "icon/color": {
     "light": "{Colors$color/gray/70}",
     "dark": "{Colors$color/gray/0}",
@@ -895,9 +910,9 @@
     "forcedColors": "Menu"
   },
   "panel/border/color": {
-    "light": "rgb(240, 240, 244)",
-    "dark": "rgb(82, 82, 94)",
-    "forcedColors": "transparent"
+    "light": "{Theme$popup/border/color}",
+    "dark": "{Theme$popup/border/color}",
+    "forcedColors": "{Theme$popup/border/color}"
   },
   "panel/footer/background/color": {
     "light": "color-mix(in srgb, currentColor 12%, transparent)",

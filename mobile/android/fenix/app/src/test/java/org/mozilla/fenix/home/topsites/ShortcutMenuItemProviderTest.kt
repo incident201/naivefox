@@ -25,6 +25,7 @@ import mozilla.components.browser.state.state.BrowserState
 import mozilla.components.browser.state.state.createTab
 import mozilla.components.browser.state.store.BrowserStore
 import mozilla.components.compose.base.text.Text
+import mozilla.components.compose.menu.data.MenuItemTitle
 import mozilla.components.compose.menu.data.StandardMenuItem
 import mozilla.components.compose.menu.ui.MenuItemIconRes
 import mozilla.components.compose.menu.ui.MenuItemState
@@ -37,6 +38,7 @@ import org.junit.runner.RunWith
 import org.mozilla.fenix.R
 import org.mozilla.fenix.components.AppStore
 import org.mozilla.fenix.components.appstate.AppAction.ShortcutAction
+import org.mozilla.fenix.components.menu.MenuTarget
 import org.mozilla.fenix.components.menu.fake.FakeMenuHost
 import org.mozilla.fenix.components.menu.fake.reachableEvents
 import org.mozilla.fenix.components.menu.store.MenuAction
@@ -202,9 +204,11 @@ class ShortcutMenuItemProviderTest {
         browserStore: BrowserStore = browserStoreWithSelectedTab(),
         pinnedSiteStorage: PinnedSiteStorage,
         areShortcutsEnabled: Boolean = true,
+        target: MenuTarget = MenuTarget.BrowserTab,
     ) =
         ShortcutMenuItemProvider(
             browserStore = browserStore,
+            target = target,
             pinnedSiteStorage = pinnedSiteStorage,
             areShortcutsEnabled = areShortcutsEnabled,
             topSitesUseCases = topSitesUseCases,
@@ -240,14 +244,14 @@ class ShortcutMenuItemProviderTest {
 
         val addShortcutItem =
             StandardMenuItem(
-                title = Text.Resource(R.string.browser_menu_add_to_shortcuts),
+                title = MenuItemTitle(Text.Resource(R.string.browser_menu_add_to_shortcuts)),
                 icon = MenuItemIconRes(iconsR.drawable.mozac_ic_pin_24),
                 onClickEvent = MenuAction.AddShortcut,
             )
 
         val removeShortcutItem =
             StandardMenuItem(
-                title = Text.Resource(R.string.browser_menu_remove_from_shortcuts),
+                title = MenuItemTitle(Text.Resource(R.string.browser_menu_remove_from_shortcuts)),
                 icon = MenuItemIconRes(iconsR.drawable.mozac_ic_pin_fill_24),
                 onClickEvent = MenuAction.RemoveShortcut,
                 state = MenuItemState.ACTIVE,

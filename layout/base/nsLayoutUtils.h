@@ -120,6 +120,9 @@ class WebRenderLayerManager;
 namespace widget {
 enum class TransparencyMode : uint8_t;
 }
+namespace wr {
+class DisplayListBuilder;
+}  // namespace wr
 }  // namespace mozilla
 
 // Flags to customize the behavior of nsLayoutUtils::DrawString.
@@ -2193,6 +2196,7 @@ class nsLayoutUtils {
   static mozilla::gfx::IntSize ComputeImageContainerDrawingParameters(
       imgIContainer* aImage, nsIFrame* aForFrame,
       const LayoutDeviceRect& aDestRect, const LayoutDeviceRect& aFillRect,
+      mozilla::wr::DisplayListBuilder& aBuilder,
       const StackingContextHelper& aSc, uint32_t aFlags,
       mozilla::SVGImageContext& aSVGContext,
       mozilla::Maybe<mozilla::image::ImageIntRegion>& aRegion,

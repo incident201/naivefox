@@ -91,7 +91,7 @@ class ProviderContextualSearch extends ActionsProvider {
     return null;
   }
 
-  onSearchSessionEnd() {
+  onSearchSessionEnd(_queryContext, _controller, _details) {
     // We cache the results for a host while the user is typing, clear
     // when the search session ends as the results for the host may
     // change by the next search session.

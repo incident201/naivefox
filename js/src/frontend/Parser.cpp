@@ -11383,8 +11383,7 @@ PerHandlerParser<ParseHandler>::stringLiteral() {
 template <class ParseHandler>
 typename ParseHandler::NodeResult
 PerHandlerParser<ParseHandler>::noSubstitutionTaggedTemplate() {
-  if (anyChars.hasInvalidTemplateEscape()) {
-    anyChars.clearInvalidTemplateEscape();
+  if (anyChars.currentToken().hasInvalidTemplateEscape()) {
     return handler_.newRawUndefinedLiteral(pos());
   }
 

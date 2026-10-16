@@ -14,6 +14,7 @@ import mozilla.components.browser.state.state.BrowserState
 import mozilla.components.browser.state.state.createTab
 import mozilla.components.browser.state.store.BrowserStore
 import mozilla.components.compose.base.text.Text
+import mozilla.components.compose.menu.data.MenuItemTitle
 import mozilla.components.compose.menu.data.StandardMenuItem
 import mozilla.components.compose.menu.ui.MenuItemIconRes
 import mozilla.components.ui.icons.R as iconsR
@@ -23,6 +24,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.mozilla.fenix.R
 import org.mozilla.fenix.components.TabCollectionStorage
+import org.mozilla.fenix.components.menu.MenuTarget
 import org.mozilla.fenix.components.menu.fake.FakeMenuHost
 import org.mozilla.fenix.components.menu.fake.reachableEvents
 import org.mozilla.fenix.components.menu.store.MenuAction
@@ -40,7 +42,7 @@ class SaveToCollectionMenuItemProviderTest {
             every { collections } returns false
         }
 
-        val provider = SaveToCollectionMenuItemProvider(settings, mockk(), browserStore)
+        val provider = SaveToCollectionMenuItemProvider(settings, mockk(), browserStore, MenuTarget.BrowserTab)
 
         assertNull(provider.itemFlow.value)
     }
@@ -54,7 +56,13 @@ class SaveToCollectionMenuItemProviderTest {
             every { cachedTabCollections } returns listOf(mockk())
         }
 
-        val provider = SaveToCollectionMenuItemProvider(settings, tabCollectionStorage, browserStore)
+        val provider =
+            SaveToCollectionMenuItemProvider(
+                settings,
+                tabCollectionStorage,
+                browserStore,
+                MenuTarget.BrowserTab,
+            )
 
         assertEquals(expectedMenuItem(true), provider.itemFlow.value)
     }
@@ -68,7 +76,13 @@ class SaveToCollectionMenuItemProviderTest {
             every { cachedTabCollections } returns emptyList()
         }
 
-        val provider = SaveToCollectionMenuItemProvider(settings, tabCollectionStorage, browserStore)
+        val provider =
+            SaveToCollectionMenuItemProvider(
+                settings,
+                tabCollectionStorage,
+                browserStore,
+                MenuTarget.BrowserTab,
+            )
 
         assertEquals(expectedMenuItem(false), provider.itemFlow.value)
     }
@@ -121,17 +135,31 @@ class SaveToCollectionMenuItemProviderTest {
         assertEquals(step, args.saveCollectionStep)
     }
 
-    private fun createProvider(collectionsExist: Boolean, browserStore: BrowserStore = this.browserStore) =
+    @Test
+    fun `GIVEN the menu was opened from home WHEN using the item THEN ignore the selected tab`() {
+        val provider = createProvider(collectionsExist = true, target = MenuTarget.Home)
+
+        provider.onEvent(MenuAction.Navigate.SaveToCollection(hasCollection = true), menu)
+
+        assertFalse(menu.isUsed)
+    }
+
+    private fun createProvider(
+        collectionsExist: Boolean,
+        browserStore: BrowserStore = this.browserStore,
+        target: MenuTarget = MenuTarget.BrowserTab,
+    ) =
         SaveToCollectionMenuItemProvider(
             settings = mockk { every { collections } returns true },
             tabCollectionStorage =
                 mockk { every { cachedTabCollections } returns if (collectionsExist) listOf(mockk()) else emptyList() },
             browserStore = browserStore,
+            target = target,
         )
 
     private fun expectedMenuItem(collectionsAlreadyExist: Boolean) =
         StandardMenuItem(
-            title = Text.Resource(R.string.browser_menu_save_to_collection_2),
+            title = MenuItemTitle(Text.Resource(R.string.browser_menu_save_to_collection_2)),
             icon = MenuItemIconRes(iconsR.drawable.mozac_ic_collection_24),
             onClickEvent = MenuAction.Navigate.SaveToCollection(hasCollection = collectionsAlreadyExist),
         )

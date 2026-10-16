@@ -114,14 +114,18 @@ export var Sanitizer = {
    *
    * @param parentWindow the browser window to use as parent for the created
    *        dialog.
-   * @param {string} mode - flag to let the dialog know if it is opened
+   * @param {string} [mode] - flag to let the dialog know if it is opened
    *        using the clear on shutdown (clearOnShutdown) settings option
    *        in about:preferences or in a clear site data context (clearSiteData)
+   * @param {object} [options]
+   * @param {boolean} [options.closeWindowsWithHistory] - If the user chooses
+   *        to clear history, also close every browser window and open a new
+   *        one, as part of the same sanitization.
    * @returns {"accept" | "cancel"} - The selected dialog box option.
    *
    * @throws if parentWindow is undefined or doesn't have a gDialogBox.
    */
-  async showUI(parentWindow, mode) {
+  async showUI(parentWindow, mode, { closeWindowsWithHistory = false } = {}) {
     // Treat the hidden window as not being a parent window:
     if (
       parentWindow?.document.documentURI ==
@@ -137,6 +141,7 @@ export var Sanitizer = {
       parentWindow.gDialogBox.open(`chrome://browser/content/${dialogFile}`, {
         inBrowserWindow: true,
         mode,
+        closeWindowsWithHistory,
         onAccept: () => deferred.resolve("accept"),
         onCancel: () => deferred.resolve("cancel"),
       });
@@ -149,6 +154,7 @@ export var Sanitizer = {
         {
           needNativeUI: true,
           mode,
+          closeWindowsWithHistory,
           onAccept: () => deferred.resolve("accept"),
           onCancel: () => deferred.resolve("cancel"),
         }
@@ -307,6 +313,10 @@ export var Sanitizer = {
    *         - range (default: null): array-tuple of [from, to] timestamps
    *         - privateStateForNewWindow (default: "non-private"): when clearing
    *           open windows, defines the private state for the newly opened window.
+   *         - progress: object to record the sanitization progress in. If
+   *           closing the open windows was refused, for example from a
+   *           beforeunload prompt, its openWindows property is "aborted" and
+   *           nothing has been cleared.
    * @returns {object} An object containing debug information about the
    *          sanitization progress. This state object is also used as
    *          AsyncShutdown metadata.
@@ -339,7 +349,11 @@ export var Sanitizer = {
     try {
       await promise;
     } finally {
-      Services.obs.notifyObservers(null, "sanitizer-sanitization-complete");
+      Services.obs.notifyObservers(
+        null,
+        "sanitizer-sanitization-complete",
+        progress.openWindows == "aborted" ? "aborted" : null
+      );
     }
     return progress;
   },
@@ -968,10 +982,20 @@ async function sanitizeInternal(items, aItemsToClear, options) {
   let openWindowsIndex = itemsToClear.indexOf("openWindows");
   if (openWindowsIndex != -1) {
     itemsToClear.splice(openWindowsIndex, 1);
-    await items.openWindows.clear(
-      null,
-      Object.assign(options, { progress: progress.openWindowsProgress })
-    );
+    try {
+      await items.openWindows.clear(
+        null,
+        Object.assign(options, { progress: progress.openWindowsProgress })
+      );
+    } catch (ex) {
+      // Nothing has been cleared yet, so there is nothing to retry at the next
+      // startup either.
+      progress.openWindows = "aborted";
+      if (!progress.isShutdown) {
+        removePendingSanitization(uid);
+      }
+      throw ex;
+    }
     progress.openWindows = "cleared";
     delete progress.openWindowsProgress;
   }

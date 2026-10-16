@@ -281,7 +281,7 @@ export class _AdsClient {
   /**
    * Uninitialize the ads-client and allow it to release any necessary resources.
    *
-   * @param {string} [client] Optional client passed to shutdown, defaulting to `this.#client` (eg: if `this.#client` is not set yet).
+   * @param {MozAdsClient} [client] Optional client passed to shutdown, defaulting to `this.#client` (eg: if `this.#client` is not set yet).
    */
   async uninit(client) {
     lazy.logConsole.info(`Uninitializing ads-client`);

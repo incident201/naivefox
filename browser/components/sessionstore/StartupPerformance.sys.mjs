@@ -16,6 +16,13 @@ const OBSERVED_TOPICS = [
   "sessionstore-initiating-manual-restore",
 ];
 
+// Topics we listen to while a restore is in progress, to know when it has
+// settled.
+const COMPLETION_TOPICS = [
+  "sessionstore-single-window-restored",
+  "sessionstore-windows-restored",
+];
+
 export var StartupPerformance = {
   /**
    * Once we have finished restoring initial tabs, we broadcast on this topic.
@@ -89,7 +96,9 @@ export var StartupPerformance = {
       Services.obs.removeObserver(this, topic);
     }
 
-    Services.obs.addObserver(this, "sessionstore-single-window-restored");
+    for (let topic of COMPLETION_TOPICS) {
+      Services.obs.addObserver(this, topic);
+    }
     this._promiseFinished = new Promise(resolve => {
       this._resolveFinished = resolve;
     });
@@ -98,22 +107,21 @@ export var StartupPerformance = {
         this._isRestored = true;
         Services.obs.notifyObservers(null, this.RESTORED_TOPIC);
 
-        if (this._latestRestoredTimeStamp == this._startTimeStamp) {
-          // Apparently, we haven't restored any tab.
-          return;
-        }
-
         // Once we are done restoring tabs, update Telemetry.
-        let delta = this._latestRestoredTimeStamp - this._startTimeStamp;
-        if (isAutoRestore) {
-          Glean.sessionRestore.autoRestoreDurationUntilEagerTabsRestored.accumulateSingleSample(
-            delta
-          );
-        } else {
-          Glean.sessionRestore.manualRestoreDurationUntilEagerTabsRestored.accumulateSingleSample(
-            delta
-          );
+        if (this._latestRestoredTimeStamp != this._startTimeStamp) {
+          // Only record durations after eager-tab activity
+          let delta = this._latestRestoredTimeStamp - this._startTimeStamp;
+          if (isAutoRestore) {
+            Glean.sessionRestore.autoRestoreDurationUntilEagerTabsRestored.accumulateSingleSample(
+              delta
+            );
+          } else {
+            Glean.sessionRestore.manualRestoreDurationUntilEagerTabsRestored.accumulateSingleSample(
+              delta
+            );
+          }
         }
+        // Always record the counts, even when there's no eager-tab activity
         Glean.sessionRestore.numberOfEagerTabsRestored.accumulateSingleSample(
           this._totalNumberOfEagerTabs
         );
@@ -132,6 +140,31 @@ export var StartupPerformance = {
     });
   },
 
+  /**
+   * Finish the measurement and stop listening. Safe to call more than once,
+   * and the only place the completion observers are removed.
+   */
+  _finish() {
+    if (this._hasFired) {
+      return;
+    }
+    this._hasFired = true;
+    if (this._deadlineTimer) {
+      lazy.clearTimeout(this._deadlineTimer);
+      this._deadlineTimer = null;
+    }
+    for (let topic of COMPLETION_TOPICS) {
+      Services.obs.removeObserver(this, topic);
+    }
+    let resolve = this._resolveFinished;
+    this._resolveFinished = null;
+    try {
+      resolve();
+    } catch (ex) {
+      console.error("StartupPerformance: Error resolving the measure", ex);
+    }
+  },
+
   _startTimer() {
     if (this._hasFired) {
       return;
@@ -140,20 +173,7 @@ export var StartupPerformance = {
       lazy.clearTimeout(this._deadlineTimer);
     }
     this._deadlineTimer = lazy.setTimeout(() => {
-      try {
-        this._resolveFinished();
-      } catch (ex) {
-        console.error("StartupPerformance: Error in timeout handler", ex);
-      } finally {
-        // Clean up.
-        this._deadlineTimer = null;
-        this._hasFired = true;
-        this._resolveFinished = null;
-        Services.obs.removeObserver(
-          this,
-          "sessionstore-single-window-restored"
-        );
-      }
+      this._finish();
     }, COLLECT_RESULTS_AFTER_MS);
   },
 
@@ -165,6 +185,14 @@ export var StartupPerformance = {
           break;
         case "sessionstore-initiating-manual-restore":
           this._onRestorationStarts(false);
+          break;
+        case "sessionstore-windows-restored":
+          // Restoring finished without a single window being restored, so no
+          // tabs are coming and the deadline timer was never started. Record
+          // the zeroes now rather than never.
+          if (!this._totalNumberOfWindows) {
+            this._finish();
+          }
           break;
         case "sessionstore-single-window-restored":
           {

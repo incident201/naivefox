@@ -5,7 +5,6 @@
 #ifndef MOZILLA_GFX_DRAWEVENTRECORDER_H_
 #define MOZILLA_GFX_DRAWEVENTRECORDER_H_
 
-#include <deque>
 #include <functional>
 #include <vector>
 
@@ -226,7 +225,7 @@ class DrawEventRecorderPrivate : public DrawEventRecorder {
     int64_t mEventCount = -1;
   };
 
-  using ExternalImagesHolder = std::deque<ExternalImageEntry>;
+  using ExternalImagesHolder = std::vector<ExternalImageEntry>;
 
   virtual already_AddRefed<layers::CanvasChild> GetCanvasChild() const {
     return nullptr;

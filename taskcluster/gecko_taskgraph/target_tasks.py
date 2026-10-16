@@ -25,6 +25,7 @@ from taskgraph.util.taskcluster import (
 from taskgraph.util.yaml import load_yaml
 
 from gecko_taskgraph import GECKO, TEST_CONFIGS
+from gecko_taskgraph.optimize.perf_batching import PERF_CADENCE_STRATEGIES
 from gecko_taskgraph.util.attributes import (
     match_run_on_hg_branches,
     match_run_on_projects,
@@ -473,6 +474,28 @@ def target_tasks_default(full_task_graph, parameters, graph_config):
     ]
 
 
+def filter_shippable_tests_on_non_backstop(task, parameters):
+    """Remove tests running against shippable builds on non-backstop pushes."""
+    if task.kind not in TEST_KINDS:
+        return True
+
+    if parameters["backstop"]:
+        return True
+
+    build_type = task.attributes.get("build_type")
+
+    if not build_type or build_type != "opt" or filter_out_shippable(task):
+        return True
+
+    return False
+
+
+def is_perf_cadence_task(task):
+    """Whether the task is a performance task optimized through one of the
+    perf-cadence-* strategies."""
+    return any(name in PERF_CADENCE_STRATEGIES for name in (task.optimization or {}))
+
+
 @register_target_task("autoland_tasks")
 def target_tasks_autoland(full_task_graph, parameters, graph_config):
     """In addition to doing the filtering by project that the 'default'
@@ -481,22 +504,30 @@ def target_tasks_autoland(full_task_graph, parameters, graph_config):
     filtered_for_project = target_tasks_default(
         full_task_graph, parameters, graph_config
     )
+    return [
+        l
+        for l in filtered_for_project
+        if filter_shippable_tests_on_non_backstop(full_task_graph[l], parameters)
+    ]
 
-    def filter(task):
-        if task.kind not in TEST_KINDS:
-            return True
 
-        if parameters["backstop"]:
-            return True
-
-        build_type = task.attributes.get("build_type")
-
-        if not build_type or build_type != "opt" or filter_out_shippable(task):
-            return True
-
-        return False
-
-    return [l for l in filtered_for_project if filter(full_task_graph[l])]
+@register_target_task("autoland_perf_shadow_scheduler_tasks")
+def target_tasks_autoland_perf_shadow_scheduler(
+    full_task_graph, parameters, graph_config
+):
+    """Same as 'autoland_tasks', except that performance tasks are targeted on
+    every push instead of only on backstop pushes. Used by the perf shadow
+    schedulers so the cadence strategies they evaluate get to judge every
+    push-based performance task."""
+    filtered_for_project = target_tasks_default(
+        full_task_graph, parameters, graph_config
+    )
+    return [
+        l
+        for l in filtered_for_project
+        if is_perf_cadence_task(full_task_graph[l])
+        or filter_shippable_tests_on_non_backstop(full_task_graph[l], parameters)
+    ]
 
 
 @register_target_task("mozilla_central_tasks")
@@ -1480,7 +1511,7 @@ def target_tasks_codereview(full_task_graph, parameters, graph_config):
 
     def filter(task):
         # Ending tasks
-        if task.kind in ["code-review"]:
+        if task.label == "code-review-issues":
             return True
 
         # Analyzer tasks
@@ -1497,6 +1528,10 @@ def target_tasks_codereview_build_test(full_task_graph, parameters, graph_config
     """Select all build and test tasks that should run as part of code review pushes."""
 
     def filter(task):
+        # Ending tasks
+        if task.label == "code-review-build-test-issues":
+            return True
+
         if task.attributes.get("code-review-build-test") is True:
             return True
 
@@ -2031,7 +2066,11 @@ def target_firefox_pull_requests(full_task_graph, parameters, graph_config):
     labels = []
     for label, task in full_task_graph.tasks.items():
         # Always add the code review analysis & ending tasks
-        if task.attributes.get("code-review") or task.kind == "code-review":
+        if (
+            task.attributes.get("code-review")
+            or task.attributes.get("code-review-build-test")
+            or task.kind == "code-review"
+        ):
             labels.append(label)
 
         elif not standard_filter(task, parameters):

@@ -8,11 +8,18 @@ prefs = [
 support-files = [
   "bug1921817.jpg",
   "encoding_process.js",
+  "file_crossCompartment_frame.html",
   "green.png",
   "multiple.ico"
 ]
 
+["test_audioData_crossCompartment.html"]
+scheme = "https"
+
 ["test_bug1921817.html"]
+scheme = "https"
+
+["test_encodedAudioChunk_crossCompartment.html"]
 scheme = "https"
 
 ["test_encoding_process.html"]
@@ -27,6 +34,9 @@ tags = "webcodecs media-gpu os_integration"
 run-if = [
   "os != 'android' && mda_gpu",
 ]
+
+["test_imageDecoder_crossCompartment.html"]
+scheme = "https"
 
 ["test_imageDecoder_desiredSize.html"]
 scheme = "https"

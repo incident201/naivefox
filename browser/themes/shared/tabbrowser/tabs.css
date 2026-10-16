@@ -82,6 +82,10 @@
 
     &[uidensity="compact"] {
       --tab-margin-block: 4px;
+
+      @media -moz-pref("sidebar.verticalTabs") {
+        --tab-margin-block: 2px;
+      }
     }
   }
 
@@ -204,7 +208,9 @@
       margin-bottom: -15px;
     }
 
-    --tab-width-transition: min-width 100ms ease-out, max-width 100ms ease-out;
+    @media (prefers-reduced-motion: no-preference) {
+      --tab-width-transition: min-width 100ms ease-out, max-width 100ms ease-out;
+    }
   }
 
   &[noshadowfortests] {
@@ -245,8 +251,10 @@
 .closing-tabs-spacer {
   pointer-events: none;
 
-  #tabbrowser-arrowscrollbox:not(:hover) > #tabbrowser-arrowscrollbox-periphery > & {
-    transition: width 0.15s ease-out;
+  @media (prefers-reduced-motion: no-preference) {
+    #tabbrowser-arrowscrollbox:not(:hover) > #tabbrowser-arrowscrollbox-periphery > & {
+      transition: width 0.15s ease-out;
+    }
   }
 }
 
@@ -724,6 +732,7 @@ tab-split-view-wrapper[dragtarget] {
       &[selected]:-moz-window-inactive {
         background-image:
           image(var(--audio-overlay-extra-background)), image(var(--tab-background-color-selected)), image(var(--toolbox-background-color-inactive));
+        color: var(--tab-text-color-selected);
       }
 
       &:hover {
@@ -808,6 +817,7 @@ tab-split-view-wrapper[dragtarget] {
 
         &:-moz-window-inactive {
           background-image: image(var(--audio-overlay-extra-background)), image(var(--toolbox-background-color-inactive));
+          color: var(--toolbox-text-color-inactive);
         }
 
         &[selected] {
@@ -817,6 +827,7 @@ tab-split-view-wrapper[dragtarget] {
         &[selected]:-moz-window-inactive {
           background-image:
             image(var(--audio-overlay-extra-background)), image(var(--tab-background-color-selected)), image(var(--toolbox-background-color-inactive));
+          color: var(--tab-text-color-selected);
         }
 
         &:hover {
@@ -1021,8 +1032,7 @@ tab-split-view-wrapper[dragtarget] {
     outline-color: var(--tab-close-button-border-color-active);
   }
 
-  #tabbrowser-tabs[orient="horizontal"] &[pinned],
-  :root:not([sidebar-expand-on-hover]) #tabbrowser-tabs[orient="vertical"] &[pinned],
+  &[pinned],
   #tabbrowser-tabs[closebuttons="activetab"][orient="horizontal"] &:not([selected]) {
     display: none;
   }
@@ -1808,18 +1818,6 @@ tab-group > tab-split-view-wrapper {
   }
 }
 
-/* During expand-on-hover collapse animation, keep split-tab icons
-   constrained to the collapsed pill geometry to avoid mid-transition drifting. */
-:root[sidebar-expand-on-hover]
-  #tabbrowser-tabbox[sidebar-ongoing-animations]
-  #tabbrowser-tabs[orient="vertical"]
-  tab-split-view-wrapper
-  .tabbrowser-tab
-  .tab-content {
-  width: var(--tab-collapsed-background-width);
-  justify-content: center;
-}
-
 /* Drag/drop of split-view-wrapped tabs */
 #tabbrowser-tabs[orient="vertical"] tab-split-view-wrapper {
   &[small-stack] {
@@ -2449,7 +2447,6 @@ tab-group {
     font-size: 0;
     width: 16px;
     height: 16px;
-    /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
     padding: var(--focus-outline-offset);
     border: var(--focus-outline-width) solid transparent;
     border-radius: var(--border-radius-medium);
@@ -2588,7 +2585,10 @@ tab-group {
       margin-block: 0 -16px;
 
       @media -moz-pref("browser.nova.enabled") {
+        /* stylelint-disable-next-line stylelint-plugin-mozilla/use-paired-color-tokens -- a text-free fade over the scrolled tabs */
         background-image: linear-gradient(to top, transparent, var(--toolbox-background-color));
+        /* Clear of the content area's rounded corner, then fade in. */
+        mask-image: linear-gradient(to right, transparent 8px, black calc(2 * 8px), black calc(100% - 2 * 8px), transparent calc(100% - 8px));
       }
     }
 
@@ -2859,13 +2859,6 @@ tab-group {
       }
     }
   }
-
-  /* Collapsing holds the launcher at its expanded width so that clip-path has
-  something to clip, so the divider would otherwise be drawn around the width
-  it is animating away from. Wait for the real width to be restored. */
-  #sidebar-container[sidebar-ongoing-animations] #tabbrowser-tabs:not([expanded]) > & {
-    background-image: none;
-  }
 }
 
 #tabbrowser-tabs[orient="vertical"] {
@@ -2878,6 +2871,13 @@ tab-group {
    */
   --tab-padding-block-start: 3px;
   --tab-padding-block-end: 2px;
+
+  @media -moz-pref("browser.nova.enabled") {
+    :root[uidensity="compact"] & {
+      --tab-padding-block-start: 0px;
+      --tab-padding-block-end: 0px;
+    }
+  }
 
   min-height: 0;
   display: flex;
@@ -3156,12 +3156,6 @@ toolbar:not(#TabsToolbar) #firefox-view-button {
 
 #alltabs-button {
   list-style-image: url("chrome://browser/skin/search-tabs.svg");
-
-  @media (-moz-platform: windows) {
-    #TabsToolbar & {
-      list-style-image: url("chrome://global/skin/icons/arrow-down.svg");
-    }
-  }
 
   #tabbrowser-tabs[hiddensoundplaying] ~ & > .toolbarbutton-badge-stack > .toolbarbutton-badge {
     background: transparent url(chrome://browser/skin/tabbrowser/tab-audio-playing-small.svg);

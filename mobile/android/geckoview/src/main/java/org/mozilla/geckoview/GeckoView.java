@@ -139,7 +139,7 @@ public class GeckoView extends FrameLayout implements GeckoDisplay.NewSurfacePro
                 .size(wrapper.getWidth(), wrapper.getHeight())
                 .build());
         mDisplay.setDynamicToolbarMaxHeight(mDynamicToolbarMaxHeight);
-        GeckoView.this.setActive(true);
+        GeckoView.this.maybeSetActive(true);
       }
     }
 
@@ -148,7 +148,7 @@ public class GeckoView extends FrameLayout implements GeckoDisplay.NewSurfacePro
         if (mDisplay != null) {
           mDisplay.surfaceDestroyed();
         }
-        GeckoView.this.setActive(false);
+        GeckoView.this.maybeSetActive(false);
       }
 
       final GeckoDisplay display = mDisplay;
@@ -171,7 +171,7 @@ public class GeckoView extends FrameLayout implements GeckoDisplay.NewSurfacePro
                 .build());
         mDisplay.setDynamicToolbarMaxHeight(mDynamicToolbarMaxHeight);
         if (!mValid) {
-          GeckoView.this.setActive(true);
+          GeckoView.this.maybeSetActive(true);
         }
       }
       mValid = true;
@@ -181,7 +181,7 @@ public class GeckoView extends FrameLayout implements GeckoDisplay.NewSurfacePro
     public void onSurfaceDestroyed() {
       if (mDisplay != null) {
         mDisplay.surfaceDestroyed();
-        GeckoView.this.setActive(false);
+        GeckoView.this.maybeSetActive(false);
       }
       mValid = false;
     }
@@ -469,9 +469,9 @@ public class GeckoView extends FrameLayout implements GeckoDisplay.NewSurfacePro
     mDisplay.setDynamicToolbarMaxHeight(height);
   }
 
-  /* package */ void setActive(final boolean active) {
+  /* package */ void maybeSetActive(final boolean active) {
     if (mSession != null) {
-      mSession.setActive(active);
+      mSession.maybeSetActive(active);
     }
   }
 
@@ -1363,10 +1363,9 @@ public class GeckoView extends FrameLayout implements GeckoDisplay.NewSurfacePro
         return isDialogFinished;
       }
       final PrintManager printManager =
-          (PrintManager)
-              mActivityDelegate.getActivityContext().getSystemService(Context.PRINT_SERVICE);
+          (PrintManager) printContext.getSystemService(Context.PRINT_SERVICE);
       final PrintDocumentAdapter pda =
-          new GeckoViewPrintDocumentAdapter(pdfStream, getContext(), isDialogFinished);
+          new GeckoViewPrintDocumentAdapter(pdfStream, printContext, isDialogFinished);
       printManager.print("Firefox", pda, null);
       return isDialogFinished;
     }

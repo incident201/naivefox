@@ -913,8 +913,8 @@ add_task(async function test_bookmarks_empty_folder_shows_label() {
   );
   Assert.equal(
     nestedList.folderLabelEl.getAttribute("role"),
-    "listitem",
-    "Empty folder has a listitem role."
+    "treeitem",
+    "Empty folder has a treeitem role."
   );
   Assert.equal(
     nestedList.folderLabelEl.getAttribute("aria-label"),

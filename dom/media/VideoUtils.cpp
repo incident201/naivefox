@@ -6,6 +6,8 @@
 
 #include <stdint.h>
 
+#include <memory>
+
 #include "CubebUtils.h"
 #include "H264.h"
 #include "ImageContainer.h"
@@ -1209,10 +1211,10 @@ UniquePtr<TrackInfo> CreateTrackInfoWithMIMEType(
     const nsACString& aCodecMIMEType) {
   UniquePtr<TrackInfo> trackInfo;
   if (StartsWith(aCodecMIMEType, "audio/")) {
-    trackInfo.reset(new AudioInfo());
+    trackInfo = std::make_unique<AudioInfo>();
     trackInfo->mMimeType = aCodecMIMEType;
   } else if (StartsWith(aCodecMIMEType, "video/")) {
-    trackInfo.reset(new VideoInfo());
+    trackInfo = std::make_unique<VideoInfo>();
     trackInfo->mMimeType = aCodecMIMEType;
   }
   return trackInfo;

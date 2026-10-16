@@ -235,6 +235,7 @@ bool ModuleGenerator::linkCallSites() {
       case CallSiteKind::CollapseFrame:
       case CallSiteKind::FuncRef:
       case CallSiteKind::FuncRefFast:
+      case CallSiteKind::ReturnStub:
       case CallSiteKind::StackSwitch:
       case CallSiteKind::RequestTierUp:
         break;
@@ -338,7 +339,6 @@ void ModuleGenerator::noteCodeRange(uint32_t codeRangeIndex,
       break;
     case CodeRange::FarJumpIsland:
     case CodeRange::BuiltinThunk:
-    case CodeRange::ReturnCallTrampoline:
       MOZ_CRASH("Unexpected CodeRange kind");
   }
 }
@@ -808,7 +808,7 @@ bool ModuleGenerator::compileFuncDef(uint32_t funcIndex,
   if (compilingTier1()) {
     static_assert(MaxFunctionBytes < UINT32_MAX);
     uint32_t bodyLength = (uint32_t)(end - begin);
-    funcDefRanges_.infallibleAppend(BytecodeRange(bytecodeOffset, bodyLength));
+    funcDefRanges_.infallibleEmplaceBack(bytecodeOffset, bodyLength);
   }
 
   uint32_t threshold;

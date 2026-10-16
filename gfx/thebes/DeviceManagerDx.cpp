@@ -951,7 +951,18 @@ void DeviceManagerDx::CreateCompositorDevice(FeatureState& d3d11) {
                          "Texture sharing doesn't work",
                          "FEATURE_FAILURE_HW_ANGLE_NEEDS_TEXTURE_SHARING"_ns);
   }
-  if (D3D11Checks::DoesRenderTargetViewNeedRecreating(device)) {
+  using RenderTargetViewCheckResult = D3D11Checks::RenderTargetViewCheckResult;
+  const auto rtvCheckResult =
+      D3D11Checks::DoesRenderTargetViewNeedRecreating(device);
+  if (rtvCheckResult == RenderTargetViewCheckResult::Failed) {
+    // Do not retain this device. Leaving mCompositorDevice null also prevents
+    // CreateDirectCompositionDeviceLocked() from creating a DComp device.
+    d3d11.SetFailed(FeatureStatus::Failed,
+                    "Failed to check render target view recreation",
+                    "FEATURE_FAILURE_D3D11_RTV_CHECK"_ns);
+    return;
+  }
+  if (rtvCheckResult == RenderTargetViewCheckResult::NeedsRecreating) {
     gfxConfig::SetFailed(Feature::D3D11_HW_ANGLE, FeatureStatus::Broken,
                          "RenderTargetViews need recreating",
                          "FEATURE_FAILURE_HW_ANGLE_NEEDS_RTV_RECREATION"_ns);

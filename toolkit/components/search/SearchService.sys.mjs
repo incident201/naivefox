@@ -62,7 +62,9 @@ const lazy = XPCOMUtils.declareLazy({
  * @import {SearchEngineSelector} from "./SearchEngineSelector.sys.mjs"
  * @import {
  *   RefinedSearchConfig,
+ *   RefinedSearchConfigV3,
  *   SearchEngineDefinition,
+ *   SearchEngineDefinitionV3,
  * } from "../uniffi-bindgen-gecko-js/components/generated/RustSearch.sys.mjs";
  * @import {UserSearchEngine, FormInfo} from "./UserSearchEngine.sys.mjs"
  */
@@ -1896,7 +1898,7 @@ export const SearchService = new (class SearchService {
    *
    * @param {object} settings
    *   An object representing the search engine settings.
-   * @param {RefinedSearchConfig} refinedConfig
+   * @param {RefinedSearchConfig|RefinedSearchConfigV3} refinedConfig
    *   The refined search configuration for this user.
    */
   async #loadEngines(settings, refinedConfig) {
@@ -2051,7 +2053,7 @@ export const SearchService = new (class SearchService {
    * Loads engines as specified by the configuration. We only expect
    * configured engines here, user engines should not be listed.
    *
-   * @param {SearchEngineDefinition[]} engineConfigs
+   * @param {(SearchEngineDefinition|SearchEngineDefinitionV3)[]} engineConfigs
    *   An array of engines configurations based on the schema.
    * @param {object} [settings]
    *   The saved settings for the user.
@@ -2653,7 +2655,7 @@ export const SearchService = new (class SearchService {
    *
    * @param {object} [settings]
    *   The saved settings for the user.
-   * @param {SearchEngineDefinition[]} [engines]
+   * @param {(SearchEngineDefinition|SearchEngineDefinitionV3)[]} [engines]
    *   The saved settings for the user.
    * @returns {Promise<boolean>}
    *   Returns true if the default engine was changed.

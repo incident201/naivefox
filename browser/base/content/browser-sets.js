@@ -374,10 +374,11 @@ document.addEventListener(
         }
         case "toggleSidebarKb":
           if (SIDEBAR_REVAMP_ENABLED) {
-            SidebarController.handleToolbarButtonClick();
-            Glean.sidebar.keyboardShortcut.record({
-              panel: SidebarController.currentID,
-              opened: SidebarController._state.launcherExpanded,
+            SidebarController.handleToolbarButtonClick().then(() => {
+              Glean.sidebar.keyboardShortcut.record({
+                panel: SidebarController.currentID,
+                opened: SidebarController._state.launcherExpanded,
+              });
             });
           }
           break;

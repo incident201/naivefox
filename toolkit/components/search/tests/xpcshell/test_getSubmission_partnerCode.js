@@ -4,11 +4,35 @@
 /**
  * Tests that the partner code is correctly handled within
  * `SearchEngine.getSubmssion`.
+ *
+ * TODO: SearchUtils.configV3FeatureGate - when we remove v2,
+ * we should also clean this up, as it currently depends on the
+ * hardcoded values for v2. We should still keep some tests that
+ * per SAP partner codes are handled correctly & fallback to default
+ * correctly.
  */
 
 "use strict";
 
 add_setup(async function () {
+  let partnerDetails;
+  if (SearchUtils.configV3FeatureGate) {
+    partnerDetails = {
+      partner: {
+        default: { code: "googleengine" },
+        errorpage: { code: "", telemetrySuffix: "com-nocodes" },
+        newtab_search_widget: {
+          code: "firefox-b-exp1",
+          telemetrySuffix: "b-exp1",
+        },
+      },
+    };
+  } else {
+    partnerDetails = {
+      partnerCode: "googleengine",
+    };
+  }
+
   SearchTestUtils.setRemoteSettingsConfig([
     {
       identifier: `engine`,
@@ -39,7 +63,6 @@ add_setup(async function () {
     {
       identifier: `google`,
       base: {
-        partnerCode: "googleengine",
         urls: {
           search: {
             base: "https://google.com",
@@ -52,6 +75,7 @@ add_setup(async function () {
             searchTermParamName: "q",
           },
         },
+        ...partnerDetails,
       },
     },
   ]);

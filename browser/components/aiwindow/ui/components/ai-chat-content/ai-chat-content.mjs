@@ -68,6 +68,7 @@ const UI_UPDATE_TYPES = {
   CONFIRM_TAB_GROUP_SELECTION: "confirm-tab-group-selection",
   CONFIRM_OPEN_AND_GROUP_TABS_SELECTION:
     "confirm-open-and-group-tabs-selection",
+  TOGGLE_ALL_TAB_SELECTION: "toggle-all-tab-selection",
   UNDO_TAB_CLOSE: "undo-tab-close",
   UNDO_TAB_GROUP: "undo-tab-group",
   RETRY_PROMPT: "retry-prompt",
@@ -243,12 +244,6 @@ export class AIChatContent extends MozLitElement {
 
   updated(changedProperties) {
     super.updated(changedProperties);
-    // When the conversation is replaced (e.g. switching to a tab with an empty
-    // sidebar) no scroll event fires, so recompute the jump-to-bottom button
-    // here to avoid it lingering from the previous conversation.
-    if (changedProperties.has("conversationState")) {
-      this.#updateJumpButtonState();
-    }
     this.#maybeFocusAgentMonitorCard();
   }
 
@@ -469,18 +464,9 @@ export class AIChatContent extends MozLitElement {
   }
 
   #initOverflowObserver() {
-    this.#overflowObserver = new ResizeObserver(() => {
-      // The wrapper resizes on every streamed chunk, and reading
-      // scrollHeight/clientHeight below forces a synchronous reflow. Coalesce
-      // to one read per frame.
-      if (this.#overflowRafId) {
-        return;
-      }
-      this.#overflowRafId = requestAnimationFrame(() => {
-        this.#overflowRafId = null;
-        this.#updateOverflowState();
-      });
-    });
+    this.#overflowObserver = new ResizeObserver(() =>
+      this.#updateOverflowState()
+    );
     this.updateComplete.then(() => {
       this.#overflowObserver.observe(
         this.shadowRoot.querySelector(".chat-inner-wrapper")
@@ -488,9 +474,15 @@ export class AIChatContent extends MozLitElement {
     });
   }
 
+  /**
+   * Toggle the scroll container's `overflowing` attribute (which drives the
+   * scroll fades) to match whether it actually scrolls, and recompute the
+   * jump-to-bottom button, which no scroll event covers when the change came
+   * from content rather than from scrolling.
+   */
   #updateOverflowState() {
-    const wrapper = this.shadowRoot.querySelector(".chat-content-wrapper");
-    const innerWrapper = this.shadowRoot.querySelector(".chat-inner-wrapper");
+    const wrapper = this.#wrapper;
+    const innerWrapper = this.shadowRoot?.querySelector(".chat-inner-wrapper");
 
     if (!wrapper || !innerWrapper) {
       return;
@@ -506,9 +498,6 @@ export class AIChatContent extends MozLitElement {
         wrapper.scrollHeight > wrapper.clientHeight + thresholdPadding
     );
 
-    // Recompute the jump-to-bottom button after content resizes (e.g.
-    // switching to an empty/short conversation) since no scroll event
-    // fires in that case and the button would otherwise stay visible.
     this.#updateJumpButtonState();
   }
 
@@ -1463,6 +1452,7 @@ export class AIChatContent extends MozLitElement {
     return html`<aitab-tool-ui
       .state=${msg.toolUIData.properties?.state ?? "creating"}
       .title=${msg.toolUIData.properties?.title ?? ""}
+      .viewerURL=${msg.toolUIData.properties?.viewerURL ?? ""}
       @aitab-open-request=${event =>
         this.#dispatchToolUIUpdate({
           messageId: msg.messageId,
@@ -1487,6 +1477,15 @@ export class AIChatContent extends MozLitElement {
       messageId,
       toolCallId,
       updateType: UI_UPDATE_TYPES.CANCEL_TAB_SELECTION,
+      updateData: event.detail,
+    });
+  };
+
+  #handleConfirmationToggleAll = (event, messageId, toolCallId) => {
+    this.#dispatchToolUIUpdate({
+      messageId,
+      toolCallId,
+      updateType: UI_UPDATE_TYPES.TOGGLE_ALL_TAB_SELECTION,
       updateData: event.detail,
     });
   };
@@ -1601,6 +1600,12 @@ export class AIChatContent extends MozLitElement {
             msg.messageId,
             toolUIData.toolCallId
           )}
+        @ai-website-confirmation:toggle-all=${event =>
+          this.#handleConfirmationToggleAll(
+            event,
+            msg.messageId,
+            toolUIData.toolCallId
+          )}
       ></ai-website-confirmation>
     `;
   }
@@ -1624,6 +1629,12 @@ export class AIChatContent extends MozLitElement {
           )}
         @ai-website-confirmation:close=${event =>
           this.#handleConfirmationClose(
+            event,
+            msg.messageId,
+            toolUIData.toolCallId
+          )}
+        @ai-website-confirmation:toggle-all=${event =>
+          this.#handleConfirmationToggleAll(
             event,
             msg.messageId,
             toolUIData.toolCallId
@@ -2017,8 +2028,7 @@ export class AIChatContent extends MozLitElement {
           ${this.#renderError()}
         </div>
       </div>
-      <div class="fullpage-top-blur"></div>
-      <div class="fullpage-top-scrim"></div>
+      <div class="fullpage-top-box-shadow"></div>
       <kit-mention variant="sidebar"></kit-mention>
       <div
         class="assistant-response-announcer"

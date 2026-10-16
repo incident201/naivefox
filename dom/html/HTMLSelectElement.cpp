@@ -725,7 +725,7 @@ void HTMLSelectElement::DoScrollToOption(int32_t aIndex) {
   if (!option) {
     return;
   }
-  if (nsIFrame* childFrame = option->GetPrimaryFrame()) {
+  if (nsIFrame* childFrame = option->GetPrimaryFrame(FlushType::Layout)) {
     RefPtr<mozilla::PresShell> presShell = childFrame->PresShell();
     presShell->ScrollFrameIntoView(childFrame, Nothing(), AxisScrollParams(),
                                    AxisScrollParams(),
@@ -1214,7 +1214,7 @@ void HTMLSelectElement::DoneAddingChildren(bool aHaveNotified) {
   }
 
   // Notify the frame
-  ResetListBoxSelection(/* aAllowScrolling = */ true);
+  ResetListBoxSelection();
 
   if (!mInhibitStateRestoration) {
     GenerateStateKey();
@@ -1346,7 +1346,7 @@ bool HTMLSelectElement::RestoreState(PresState* aState) {
   const PresContentData& state = aState->contentData();
   if (state.type() == PresContentData::TSelectContentData) {
     RestoreStateTo(state.get_SelectContentData());
-    ResetListBoxSelection(/* aAllowScrolling = */ true);
+    ResetListBoxSelection();
   }
 
   if (aState->disabledSet() && !aState->disabled()) {
@@ -1433,7 +1433,7 @@ HTMLSelectElement::Reset() {
 
   OnSelectionChanged();
   SetUserInteracted(false);
-  ResetListBoxSelection(/* aAllowScrolling = */ true);
+  ResetListBoxSelection();
 
   // https://html.spec.whatwg.org/#update-a-select's-descendant-selectedcontent-elements
   UpdateDescendantSelectedContentElements();
@@ -1478,17 +1478,15 @@ HTMLSelectElement::SubmitNamesValues(FormData* aFormData) {
   return NS_OK;
 }
 
-void HTMLSelectElement::ResetListBoxSelection(bool aAllowScrolling) {
+void HTMLSelectElement::ResetListBoxSelection() {
   if (!IsDoneAddingChildren() || IsCombobox()) {
     return;
   }
   mListBoxSelection.Clear();
-  if (nsListControlFrame* listFrame = GetListBoxFrame()) {
-    listFrame->OnSelectionReset();
+  if (nsListControlFrame* listBox = GetListBoxFrame()) {
+    listBox->InvalidateFocus();
   }
-  if (aAllowScrolling) {
-    ScrollToSelectedOption();
-  }
+  ScrollToSelectedOption();
 }
 
 bool HTMLSelectElement::IsValueMissing(IgnoredOptionList aIgnored) const {
@@ -1792,11 +1790,6 @@ void HTMLSelectElement::ContentAppendedOrInserted(nsIContent* aFirstNewContent,
     anySelected |= CollectOptions(*this, cur, options);
     if (!aIsAppend) {
       break;
-    }
-  }
-  if (!options.IsEmpty()) {
-    if (nsListControlFrame* listBox = GetListBoxFrame()) {
-      listBox->OptionsAdded();
     }
   }
   if (anySelected && !Multiple()) {

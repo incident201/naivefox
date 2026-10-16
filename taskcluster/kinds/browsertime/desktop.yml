@@ -17,7 +17,6 @@ task-defaults:
             chrome:
                 - .*64.*shippable.*
             safari:
-                - macosx1470.*shippable.*
                 - macosx2700.*shippable.*
             safari-tp:
                 - macosx1400.*
@@ -105,7 +104,7 @@ browsertime-tp6:
                 chrome:
                     - .*shippable.*
                 safari:
-                    - .*macos.*shippable.*
+                    - (?!macosx1470).*macos.*shippable.*
                 custom-car:
                     - macosx1500.*shippable.*
                     - linux.*shippable.*
@@ -320,7 +319,7 @@ browsertime-tp7:
                 chrome:
                     - .*shippable.*
                 safari:
-                    - .*macos.*shippable.*
+                    - (?!macosx1470).*macos.*shippable.*
                 custom-car:
                     - macosx1500.*shippable.*
                     - linux.*shippable.*
@@ -1129,6 +1128,8 @@ browsertime-nav-bench:
         subtests: [nav-bench]
         run-visual-metrics: true
     description: Raptor (browsertime) navigation benchmark across 9 sites
+    limit-platforms:
+        - (?!macosx1470).*
     max-run-time: 3600
     run-on-projects:
         by-app:
@@ -1143,7 +1144,7 @@ browsertime-nav-bench:
                     windows11-64-24h2-nightlyasrelease.*: [autoland]
                     default: []
             default: []
-    tier: 3
+    tier: 2
     treeherder-symbol: Btime(nav-bench)
     mozharness:
         extra-options:
@@ -1319,10 +1320,26 @@ browsertime-webcodecs:
     description: Raptor (browsertime) WebCodecs test
     mozharness:
         extra-options:
-            - --extra-profiler-run
+            by-app:
+                firefox:
+                    - --extra-profiler-run
+                default:
+                    by-test-platform:
+                        # Chrome's out-of-process video capture service crashes on Windows when capturing
+                        # from the fake camera, so run it in the browser process there.
+                        windows.*:
+                            - --extra-profiler-run
+                            - --browsertime-arg=chrome.args=--enable-features=RunVideoCaptureServiceInBrowserProcess
+                        default:
+                            - --extra-profiler-run
     run-on-projects:
         by-app:
-            firefox: [autoland, mozilla-central]
+            firefox:
+                by-test-platform:
+                    linux.*shippable.*: [autoland, mozilla-central]
+                    windows.*shippable.*: [autoland, mozilla-central]
+                    macosx1470.*shippable.*: [autoland, mozilla-central]
+                    default: []
             default: []
     tier:
         by-app:

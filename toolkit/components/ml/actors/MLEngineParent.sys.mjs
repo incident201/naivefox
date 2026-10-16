@@ -698,7 +698,7 @@ export class MLEngineParent extends JSProcessActorParent {
    *
    * @param {string} featureId - id of the feature
    * @param {string} taskName - name of the inference task
-   * @param {string|null} modelId - name of the model id
+   * @param {string|null} [modelId] - name of the model id
    * @returns {Promise<RemoteSettingsInferenceOptions | { runtimeFilename: string }>}
    */
 

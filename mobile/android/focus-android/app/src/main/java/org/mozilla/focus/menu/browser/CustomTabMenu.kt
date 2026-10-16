@@ -4,8 +4,8 @@
 
 package org.mozilla.focus.menu.browser
 
-import android.content.res.Resources
-import android.graphics.Bitmap
+import android.content.Context
+import android.graphics.drawable.Drawable
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import kotlinx.coroutines.flow.Flow
@@ -19,9 +19,10 @@ import mozilla.components.compose.base.text.Text
 import mozilla.components.compose.menu.data.MenuAttribution
 import mozilla.components.compose.menu.data.MenuItem
 import mozilla.components.compose.menu.data.MenuItemBadge
+import mozilla.components.compose.menu.data.MenuItemTitle
 import mozilla.components.compose.menu.data.MenuItemsGroup
 import mozilla.components.compose.menu.data.StandardMenuItem
-import mozilla.components.compose.menu.ui.MenuItemIconBitmap
+import mozilla.components.compose.menu.ui.MenuItemIconDrawable
 import mozilla.components.compose.menu.ui.MenuItemIconRes
 import mozilla.components.compose.menu.ui.MenuItemState
 import mozilla.components.lib.state.ext.flow
@@ -40,22 +41,23 @@ private const val CUSTOM_ITEMS_GROUP_ID = "custom_items"
 /**
  * The menu shown while browsing in a custom tab.
  *
+ * @param context [Context] used to know in which size and color to show the icon the WebCompat Reporter extension
+ *   provides.
  * @param browserStore [BrowserStore] used to know the state of the current page.
  * @param customTabId Id of the custom tab this menu is shown for.
  * @param appName Name of this application, shown in the item for opening the current page in it.
  * @param isOnboardingTab Whether this is an onboarding custom tab, from which the current page cannot be opened
  *   somewhere else.
- * @param resources [Resources] used to know in which size to load the icon the WebCompat Reporter extension provides.
  */
 class CustomTabMenu(
+    context: Context,
     private val browserStore: BrowserStore,
     private val customTabId: String,
     private val appName: String,
     private val isOnboardingTab: Boolean,
-    resources: Resources,
 ) : MenuItems {
     private val reporterIcon =
-        WebCompatReporterIcon(browserStore, resources) { webCompatReporterAction(findCustomTab(customTabId)) }
+        WebCompatReporterIcon(context, browserStore) { webCompatReporterAction(findCustomTab(customTabId)) }
 
     /** Attributes the menu to this application, which opened the custom tab of another one. */
     val attribution =
@@ -73,7 +75,7 @@ class CustomTabMenu(
 
     private fun menuGroupsFor(
         browserState: BrowserState,
-        reportSiteIssueIcon: Bitmap?,
+        reportSiteIssueIcon: Drawable?,
     ): List<MenuItemsGroup> {
         val customTab = browserState.findCustomTab(customTabId)
         val reportSiteIssueAction = browserState.webCompatReporterAction(customTab)
@@ -104,7 +106,7 @@ private data class CustomTabMenuStatus(
     val canOpenSomewhereElse: Boolean,
     val appName: String,
     val reportSiteIssueTitle: String?,
-    val reportSiteIssueIcon: Bitmap?,
+    val reportSiteIssueIcon: Drawable?,
     val customItems: List<CustomTabMenuItem>,
 )
 
@@ -127,24 +129,28 @@ private fun CustomTabMenuStatus.navigationItems(): List<MenuItem> =
             icon = iconsR.drawable.mozac_ic_back_24,
             item = ToolbarMenu.CustomTabItem.Back,
             state = if (canGoBack) MenuItemState.DEFAULT else MenuItemState.DISABLED,
+            showText = false,
         ),
         menuItem(
             title = R.string.content_description_forward,
             icon = iconsR.drawable.mozac_ic_forward_24,
             item = ToolbarMenu.CustomTabItem.Forward,
             state = if (canGoForward) MenuItemState.DEFAULT else MenuItemState.DISABLED,
+            showText = false,
         ),
         if (isLoading) {
             menuItem(
                 title = R.string.content_description_stop,
                 icon = iconsR.drawable.mozac_ic_cross_24,
                 item = ToolbarMenu.CustomTabItem.Stop,
+                showText = false,
             )
         } else {
             menuItem(
                 title = R.string.content_description_reload,
                 icon = iconsR.drawable.mozac_ic_arrow_clockwise_24,
                 item = ToolbarMenu.CustomTabItem.Reload,
+                showText = false,
             )
         },
     )
@@ -177,8 +183,8 @@ private fun CustomTabMenuStatus.desktopSiteItem(): MenuItem? {
 
 private fun CustomTabMenuStatus.reportSiteIssueItem(): MenuItem? = reportSiteIssueTitle?.let { title ->
     StandardMenuItem(
-        title = Text.String(title),
-        icon = reportSiteIssueIcon?.let { MenuItemIconBitmap(it) },
+        title = MenuItemTitle(Text.String(title)),
+        icon = reportSiteIssueIcon?.let { MenuItemIconDrawable(it) },
         onClickEvent = MenuItemTapped(ToolbarMenu.CustomTabItem.ReportSiteIssue),
     )
 }
@@ -192,7 +198,7 @@ private fun CustomTabMenuStatus.openItems(): List<MenuItem> =
         ),
         if (canOpenSomewhereElse) {
             StandardMenuItem(
-                title = Text.Resource(R.string.menu_open_with_default_browser2, listOf(appName)),
+                title = MenuItemTitle(Text.Resource(R.string.menu_open_with_default_browser2, listOf(appName))),
                 onClickEvent = MenuItemTapped(ToolbarMenu.CustomTabItem.OpenInBrowser),
             )
         } else {
@@ -200,7 +206,7 @@ private fun CustomTabMenuStatus.openItems(): List<MenuItem> =
         },
         if (canOpenSomewhereElse) {
             StandardMenuItem(
-                title = Text.Resource(R.string.menu_open_with_a_browser2),
+                title = MenuItemTitle(Text.Resource(R.string.menu_open_with_a_browser2)),
                 onClickEvent = MenuItemTapped(ToolbarMenu.CustomTabItem.OpenInApp),
             )
         } else {
@@ -211,7 +217,7 @@ private fun CustomTabMenuStatus.openItems(): List<MenuItem> =
 /** The items the application which opened this custom tab asked to be shown in its menu. */
 private fun CustomTabMenuStatus.customMenuItems(): List<MenuItem> = customItems.map { item ->
     StandardMenuItem(
-        title = Text.String(item.name),
+        title = MenuItemTitle(Text.String(item.name)),
         onClickEvent = CustomTabMenuItemTapped(item),
     )
 }
@@ -222,10 +228,11 @@ private fun menuItem(
     item: ToolbarMenu.CustomTabItem,
     state: MenuItemState = MenuItemState.DEFAULT,
     badge: MenuItemBadge? = null,
+    showText: Boolean = true,
 ): MenuItem =
     StandardMenuItem(
-        title = Text.Resource(title),
-        contentDescription = Text.Resource(title),
+        title = MenuItemTitle(if (showText) Text.Resource(title) else Text.String("")),
+        contentDescription = if (showText) null else Text.Resource(title),
         icon = MenuItemIconRes(iconRes = icon),
         onClickEvent = MenuItemTapped(item),
         badge = badge,

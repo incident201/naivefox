@@ -20,6 +20,7 @@ UNIFIED_SOURCES += [
     "TestGfxWidgets.cpp",
     "TestMatrix.cpp",
     "TestMoz2D.cpp",
+    "TestPlanarYCbCrImage.cpp",
     "TestPoint.cpp",
     "TestPolygon.cpp",
     "TestQcms.cpp",
@@ -88,3 +89,9 @@ LOCAL_INCLUDES += [
 ]
 
 FINAL_LIBRARY = "xul-gtest"
+
+SOURCE_HEADERS += [
+    "MockWidget.h",
+    "PolygonTestUtils.h",
+    "TextureHelper.h",
+]

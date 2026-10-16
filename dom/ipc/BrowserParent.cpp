@@ -73,6 +73,7 @@
 #include "nsFrameLoaderOwner.h"
 #include "nsFrameManager.h"
 #include "nsIAppWindow.h"
+#include "nsIArray.h"
 #include "nsIBaseWindow.h"
 #include "nsIBrowser.h"
 #include "nsIBrowserController.h"
@@ -811,7 +812,7 @@ void BrowserParent::ActorDestroy(ActorDestroyReason why) {
   // Need to close undeleted ContentPermissionRequestParents before tab is
   // closed.
   // FIXME: Why is PContentPermissionRequest not managed by PBrowser?
-  nsTArray<PContentPermissionRequestParent*> parentArray =
+  nsTArray<RefPtr<ContentPermissionRequestParent>> parentArray =
       nsContentPermissionUtils::GetContentPermissionRequestParentById(mTabId);
   for (auto& permissionRequestParent : parentArray) {
     (void)PContentPermissionRequestParent::Send__delete__(
@@ -2124,7 +2125,11 @@ void BrowserParent::SendRealKeyEvent(WidgetKeyboardEvent& aEvent) {
   NS_WARNING_ASSERTION(ok, "PBrowserParent::SendRealKeyEvent() failed");
   MOZ_ASSERT(!ok || aEvent.HasBeenPostedToRemoteProcess());
   if (ok && aEvent.IsWaitingReplyFromRemoteProcess()) {
-    mWaitingReplyKeyboardEvents.AppendElement(sendKeyEventData);
+    // Although mAlternativeCharCodes contains only 3 items at most and each
+    // item is small, but let's assign it only when we actually store the data
+    // for avoiding unnecessary allocation.
+    sendKeyEventData.mAlternativeCharCodes = aEvent.mAlternativeCharCodes;
+    mWaitingReplyKeyboardEvents.AppendElement(std::move(sendKeyEventData));
   }
 }
 
@@ -2788,7 +2793,11 @@ mozilla::ipc::IPCResult BrowserParent::RecvReplyKeyEvent(
             NS_WARN_IF(data.mModifiers != aEvent.mModifiers) ||
             // The child process should've already cleared the editor commands
             // because we don't use them.
-            NS_WARN_IF(aEvent.HasEditCommands())) {
+            NS_WARN_IF(aEvent.HasEditCommands()) ||
+            // Let's avoid triggering unintended keyboard shortcuts or access
+            // keys.
+            NS_WARN_IF(data.mAlternativeCharCodes !=
+                       aEvent.mAlternativeCharCodes)) {
           // Got different event data from what we stored before dispatching an
           // event with the ID.
           return Nothing();

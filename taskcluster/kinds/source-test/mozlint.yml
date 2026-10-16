@@ -259,6 +259,7 @@ typescript:
             - 'browser/components/urlbar/**/*.ts'
             - 'browser/extensions/newtab/**/*.*js'
             - 'browser/extensions/newtab/**/*.ts'
+            - 'browser/extensions/newtab/tsconfig.json'
             - 'devtools/client/settings/**/*.*js'
             - 'devtools/client/settings/**/*.ts'
             - 'toolkit/components/extensions/**/*.*js'
@@ -933,6 +934,23 @@ agent-skills-sync:
             - 'tools/lint/agent-skills-sync/**'
 
 
+toolchain-parity:
+    description: Ensure local-toolchain/local-fetch tasks cover all tier-1 host platforms
+    platform: lint/opt
+    treeherder:
+        symbol: toolchain-parity
+    run:
+        mach: lint -v -l toolchain-parity -f treeherder -f json:/builds/worker/mozlint.json taskcluster/kinds/toolchain taskcluster/kinds/fetch
+    when:
+        files-changed:
+            - 'taskcluster/kinds/toolchain/**'
+            - 'taskcluster/kinds/fetch/**'
+            - 'tools/lint/toolchain-parity.yml'
+            - 'tools/lint/toolchain-parity/**'
+            - 'build/moz.configure/bootstrap.configure'
+            - 'python/mozbuild/mozbuild/configure/constants.py'
+
+
 c-includes:
     description: Remove unused mfbt includes from the codebase
     treeherder:
@@ -965,6 +983,21 @@ header-guards:
             - '**/*.hpp'
             - 'tools/lint/header-guards.yml'
             - 'tools/lint/header_guards/**'
+
+source-headers:
+    description: Checks source headers consistency
+    treeherder:
+        symbol: misc(mozbuild)
+    run:
+        mach: lint -l source-headers -f treeherder -f json:/builds/worker/mozlint.json .
+    when:
+        files-changed:
+            - '**/moz.build'
+            - '**/*.h'
+            - '**/*.hh'
+            - '**/*.hpp'
+            - 'tools/lint/source-headers.yml'
+            - 'tools/lint/source_headers/**'
 
 android-expired-strings:
     description: Check for references to Android strings marked for removal

@@ -798,7 +798,7 @@ already_AddRefed<RTCRtpTransceiver> PeerConnectionImpl::AddTransceiver(
     return nullptr;
   }
 
-  JsepTransceiver jsepTransceiver(*type, *mUuidGen);
+  JsepTransceiver jsepTransceiver({.type = *type}, *mUuidGen);
   jsepTransceiver.SetRtxIsAllowed(mRtxIsAllowed);
 
   // Do this last, since it is not possible to roll back.
@@ -1078,8 +1078,8 @@ PeerConnectionImpl::CreateDataChannel(
     dcTransceiver->RestartDatachannelTransceiver();
     mJsepSession->SetTransceiver(*dcTransceiver);
   } else {
-    mJsepSession->AddTransceiver(
-        JsepTransceiver(SdpMediaSection::MediaType::kApplication, *mUuidGen));
+    mJsepSession->AddTransceiver(JsepTransceiver(
+        {.type = SdpMediaSection::MediaType::kApplication}, *mUuidGen));
   }
 
   RefPtr<RTCDataChannel> retval;

@@ -4,6 +4,7 @@
 
 package mozilla.components.feature.listentopage.playback
 
+import android.app.PendingIntent
 import android.content.Intent
 import android.content.res.Resources
 import android.os.Build
@@ -13,6 +14,9 @@ import androidx.annotation.OptIn
 import androidx.annotation.PluralsRes
 import androidx.annotation.RequiresApi
 import androidx.annotation.StringRes
+import androidx.core.os.BundleCompat
+import androidx.core.os.bundleOf
+import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.CommandButton
@@ -28,6 +32,15 @@ import mozilla.components.feature.listentopage.PlaybackSpeed
 import mozilla.components.feature.listentopage.R
 import mozilla.components.support.base.log.logger.Logger
 import mozilla.components.ui.icons.R as iconsR
+
+internal const val COMMAND_SET_SESSION_ACTIVITY = "mozilla.components.feature.listentopage.SET_SESSION_ACTIVITY"
+
+private const val KEY_SESSION_ACTIVITY = "mozilla.components.feature.listentopage.SESSION_ACTIVITY"
+
+internal fun PendingIntent?.toSessionActivityArgs(): Bundle = bundleOf(KEY_SESSION_ACTIVITY to this)
+
+internal fun Bundle.sessionActivity(): PendingIntent? =
+    BundleCompat.getParcelable(this, KEY_SESSION_ACTIVITY, PendingIntent::class.java)
 
 /**
  * Owns the [ListenPlayer] that reads an article out loud.
@@ -55,8 +68,19 @@ internal class ListenMediaSessionService : MediaSessionService() {
         mediaSession =
             MediaSession.Builder(this, player.exoPlayer)
                 .setMediaButtonPreferences(notificationControls(resources, PlaybackSpeed.Default))
-                .setCallback(PlaybackSpeedCallback(resources))
+                .setCallback(ListenSessionCallback(ownPackage = packageName))
                 .build()
+        player.exoPlayer.addListener(
+            object : Player.Listener {
+                // The control carries the icon of the speed that is on, so it is republished whatever changed the
+                // speed: the notification control, or the player sheet through the controller.
+                override fun onPlaybackParametersChanged(playbackParameters: PlaybackParameters) {
+                    mediaSession?.setMediaButtonPreferences(
+                        notificationControls(resources, PlaybackSpeed.nearest(playbackParameters.speed))
+                    )
+                }
+            }
+        )
 
         setMediaNotificationProvider(
             DefaultMediaNotificationProvider.Builder(this).build().apply {
@@ -116,11 +140,11 @@ internal class ListenMediaSessionService : MediaSessionService() {
 }
 
 /**
- * Grants the speed control its command and does what the control asks.
+ * Grants the session its commands and does what a controller asks of them.
  *
- * @param resources Used to label the control it republishes.
+ * @param ownPackage The package this service runs in, which [COMMAND_SET_SESSION_ACTIVITY] is granted to
  */
-private class PlaybackSpeedCallback(private val resources: Resources) : MediaSession.Callback {
+internal class ListenSessionCallback(private val ownPackage: String) : MediaSession.Callback {
 
     @OptIn(UnstableApi::class)
     override fun onConnect(
@@ -128,10 +152,15 @@ private class PlaybackSpeedCallback(private val resources: Resources) : MediaSes
         controller: MediaSession.ControllerInfo,
     ): MediaSession.ConnectionResult {
         val granted = MediaSession.ConnectionResult.AcceptedResultBuilder(session, controller).build()
-        val cycleSpeedCommand = SessionCommand(ACTION_CYCLE_SPEED, Bundle.EMPTY)
+
+        val commands = granted.availableSessionCommands.buildUpon()
+        commands.add(SessionCommand(ACTION_CYCLE_SPEED, Bundle.EMPTY))
+        if (controller.packageName == ownPackage) {
+            commands.add(SessionCommand(COMMAND_SET_SESSION_ACTIVITY, Bundle.EMPTY))
+        }
 
         return MediaSession.ConnectionResult.AcceptedResultBuilder(session, controller)
-            .setAvailableSessionCommands(granted.availableSessionCommands.buildUpon().add(cycleSpeedCommand).build())
+            .setAvailableSessionCommands(commands.build())
             .build()
     }
 
@@ -142,15 +171,11 @@ private class PlaybackSpeedCallback(private val resources: Resources) : MediaSes
         customCommand: SessionCommand,
         args: Bundle,
     ): ListenableFuture<SessionResult> {
-        if (customCommand.customAction != ACTION_CYCLE_SPEED) {
-            return super.onCustomCommand(session, controller, customCommand, args)
+        when (customCommand.customAction) {
+            ACTION_CYCLE_SPEED -> session.player.setPlaybackSpeed(session.player.nextSpeed().multiplier)
+            COMMAND_SET_SESSION_ACTIVITY -> session.setSessionActivity(args.sessionActivity())
+            else -> return super.onCustomCommand(session, controller, customCommand, args)
         }
-
-        val nextSpeed = session.player.nextSpeed()
-        session.player.setPlaybackSpeed(nextSpeed.multiplier)
-
-        // Republished because the control carries the icon of the speed that is on, and nothing else redraws it.
-        session.setMediaButtonPreferences(notificationControls(resources, nextSpeed))
 
         return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
     }
@@ -207,7 +232,7 @@ private fun speedControl(resources: Resources, speed: PlaybackSpeed): CommandBut
 
 /** What a screen reader says for this step. */
 @get:StringRes
-private val PlaybackSpeed.contentDescription: Int
+internal val PlaybackSpeed.contentDescription: Int
     get() =
         when (this) {
             PlaybackSpeed.X0_25 -> R.string.mozac_feature_listentopage_notification_playback_speed_0_25
@@ -221,7 +246,7 @@ private val PlaybackSpeed.contentDescription: Int
         }
 
 @get:DrawableRes
-private val PlaybackSpeed.icon: Int
+internal val PlaybackSpeed.icon: Int
     get() =
         when (this) {
             PlaybackSpeed.X0_25 -> iconsR.drawable.mozac_ic_playback_speed_0_2x_24

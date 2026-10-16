@@ -87,9 +87,23 @@ var gSanitizePromptDialog = {
     this._inClearOnShutdownNewDialog = false;
     this._inClearSiteDataNewDialog = false;
     this._inBrowserWindow = !!arg.inBrowserWindow;
+    this._closeWindowsWithHistory = !!(arg.wrappedJSObject ?? arg)
+      .closeWindowsWithHistory;
     if (arg.mode) {
       this._inClearOnShutdownNewDialog = arg.mode == "clearOnShutdown";
       this._inClearSiteDataNewDialog = arg.mode == "clearSiteData";
+    }
+
+    // Only shown in the clearing contexts, and only in the in-browser-window
+    // dialog; see sanitizeDialog_v2.css. SubDialog draws its own close button
+    // in about:preferences.
+    document
+      .getElementById("sanitizeDialogClose")
+      .addEventListener("click", () => this._dialog.cancelDialog());
+    if (arg.inBrowserWindow && !this._inClearOnShutdownNewDialog) {
+      // Start keyboard focus on the content rather than the close button.
+      document.subDialogSetDefaultFocus = () =>
+        document.getElementById("sanitizeDurationChoice").focus();
     }
 
     if (arg.inBrowserWindow) {
@@ -131,7 +145,11 @@ var gSanitizePromptDialog = {
       // dialog, migrate their prefs
       Sanitizer.maybeMigratePrefs("clearOnShutdown");
     } else {
-      okButtonl10nID = "sanitize-button-ok2";
+      okButtonl10nID = "sanitize-button-delete";
+      document.l10n.setAttributes(
+        document.documentElement,
+        "sanitize-dialog-delete-title"
+      );
       clearOnShutdownGroupbox.remove();
       if (this._inClearSiteDataNewDialog) {
         clearPrivateDataGroupbox.remove();
@@ -270,10 +288,6 @@ var gSanitizePromptDialog = {
       window.resizeBy(0, -diff);
       warningBox.hidden = true;
     }
-    document.l10n.setAttributes(
-      document.documentElement,
-      "sanitize-dialog-title2"
-    );
 
     // Update data sizes to display
     await this.updateDataSizesInUI();
@@ -291,6 +305,7 @@ var gSanitizePromptDialog = {
     acceptButton.disabled = true;
     document.l10n.setAttributes(acceptButton, "sanitize-button-clearing");
     this._dialog.getButton("cancel").disabled = true;
+    document.getElementById("sanitizeDialogClose").disabled = true;
 
     try {
       let range = Sanitizer.getClearRange(this.selectedTimespan);
@@ -300,6 +315,14 @@ var gSanitizePromptDialog = {
       };
 
       let itemsToClear = this.getItemsToClear();
+      // The sanitizer closes the windows before clearing anything else, so the
+      // closed tabs don't end up in recently closed history.
+      if (
+        this._closeWindowsWithHistory &&
+        itemsToClear.includes("browsingHistoryAndDownloads")
+      ) {
+        itemsToClear.push("openWindows");
+      }
       Sanitizer.sanitize(itemsToClear, options)
         .catch(console.error)
         .then(() => {

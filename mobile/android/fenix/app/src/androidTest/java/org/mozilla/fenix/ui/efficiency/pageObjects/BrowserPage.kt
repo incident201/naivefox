@@ -22,9 +22,11 @@ import mozilla.components.browser.state.selector.selectedTab
 import mozilla.components.compose.browser.toolbar.concept.BrowserToolbarTestTags.ADDRESSBAR_URL
 import mozilla.components.compose.browser.toolbar.concept.BrowserToolbarTestTags.ADDRESSBAR_URL_BOX
 import mozilla.components.concept.engine.mediasession.MediaSession
+import mozilla.components.feature.contextmenu.R as contextMenuR
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.mozilla.fenix.ext.components
+import org.mozilla.fenix.helpers.DataGenerationHelper.getStringResource
 import org.mozilla.fenix.helpers.HomeActivityIntentTestRule
 import org.mozilla.fenix.helpers.TestAssetHelper.waitingTime
 import org.mozilla.fenix.helpers.TestAssetHelper.waitingTimeLong
@@ -176,13 +178,18 @@ class BrowserPage(composeRule: AndroidComposeTestRule<HomeActivityIntentTestRule
         return this
     }
 
-    fun verifyTranslationSheetIsDisplayed(): BrowserPage {
+    fun verifyTranslationSheetIsDisplayed(isDisplayed: Boolean = true): BrowserPage {
         // The "translate from/to" dropdowns render a beat after the sheet frame, title and
         // buttons because they depend on the async page-settings fetch. mozVerifyElementsByGroup
         // is a single-shot check, so firing it the instant the sheet animates in can miss the
         // dropdowns and fail spuriously. Gate on the last-rendered dropdown before the group check.
-        mozVerify(BrowserPageSelectors.TRANSLATION_SHEET_TRANSLATE_TO, timeout = waitingTimeLong)
-        mozVerifyElementsByGroup(BrowserPageSelectors.Group.NOT_TRANSLATED_PAGE_TRANSLATION_SHEET)
+        if (isDisplayed) {
+            mozVerify(BrowserPageSelectors.TRANSLATION_SHEET_TRANSLATE_TO, timeout = waitingTimeLong)
+            mozVerifyElementsByGroup(BrowserPageSelectors.Group.NOT_TRANSLATED_PAGE_TRANSLATION_SHEET)
+        } else {
+            mozWaitUntilAbsent(BrowserPageSelectors.TRANSLATION_SHEET_TRANSLATE_TO, timeout = waitingTimeLong)
+            mozVerifyElementsByGroupAbsent(BrowserPageSelectors.Group.NOT_TRANSLATED_PAGE_TRANSLATION_SHEET)
+        }
         return this
     }
 
@@ -707,6 +714,128 @@ class BrowserPage(composeRule: AndroidComposeTestRule<HomeActivityIntentTestRule
                 mozVerify(BrowserPageSelectors.ENGINE_VIEW, timeout = waitingTime)
             }
         }
+        return this
+    }
+
+    /**
+     * Assert the web-content long-press context menu raised for a link to another local-host asset: its URL header and
+     * the "Open link in new tab", "Open link in private tab", "Copy link" and "Share link" options. Ports the legacy
+     * BrowserRobot.verifyContextMenuForLocalHostLinks — a same-host link offers no "Download link", and a non-applink
+     * offers no "Open in external app".
+     */
+    fun verifyContextMenuForLocalHostLinks(linkUrl: String): BrowserPage {
+        mozVerify(BrowserPageSelectors.CONTEXT_MENU_LINK_URL(linkUrl))
+        mozVerify(
+            BrowserPageSelectors.CONTEXT_MENU_ITEM(
+                getStringResource(contextMenuR.string.mozac_feature_contextmenu_open_link_in_new_tab)
+            )
+        )
+        mozVerify(
+            BrowserPageSelectors.CONTEXT_MENU_ITEM(
+                getStringResource(contextMenuR.string.mozac_feature_contextmenu_open_link_in_private_tab)
+            )
+        )
+        mozVerify(
+            BrowserPageSelectors.CONTEXT_MENU_ITEM(
+                getStringResource(contextMenuR.string.mozac_feature_contextmenu_copy_link)
+            )
+        )
+        mozVerify(
+            BrowserPageSelectors.CONTEXT_MENU_ITEM(
+                getStringResource(contextMenuR.string.mozac_feature_contextmenu_share_link)
+            )
+        )
+        return this
+    }
+
+    /**
+     * Assert the web-content long-press context menu raised for a link that wraps an image: the URL header plus the
+     * four link options ("Open link in new tab", "Open link in private tab", "Copy link", "Share link") and the three
+     * image options ("Open image in new tab", "Save image", "Copy image location"). Ports the legacy
+     * BrowserRobot.verifyLinkImageContextMenuItems.
+     */
+    fun verifyLinkImageContextMenuItems(linkUrl: String): BrowserPage {
+        mozVerify(BrowserPageSelectors.CONTEXT_MENU_LINK_URL(linkUrl))
+        mozVerify(
+            BrowserPageSelectors.CONTEXT_MENU_ITEM(
+                getStringResource(contextMenuR.string.mozac_feature_contextmenu_open_link_in_new_tab)
+            )
+        )
+        mozVerify(
+            BrowserPageSelectors.CONTEXT_MENU_ITEM(
+                getStringResource(contextMenuR.string.mozac_feature_contextmenu_open_link_in_private_tab)
+            )
+        )
+        mozVerify(
+            BrowserPageSelectors.CONTEXT_MENU_ITEM(
+                getStringResource(contextMenuR.string.mozac_feature_contextmenu_copy_link)
+            )
+        )
+        mozVerify(
+            BrowserPageSelectors.CONTEXT_MENU_ITEM(
+                getStringResource(contextMenuR.string.mozac_feature_contextmenu_share_link)
+            )
+        )
+        mozVerify(
+            BrowserPageSelectors.CONTEXT_MENU_ITEM(
+                getStringResource(contextMenuR.string.mozac_feature_contextmenu_open_image_in_new_tab)
+            )
+        )
+        mozVerify(
+            BrowserPageSelectors.CONTEXT_MENU_ITEM(
+                getStringResource(contextMenuR.string.mozac_feature_contextmenu_save_image)
+            )
+        )
+        mozVerify(
+            BrowserPageSelectors.CONTEXT_MENU_ITEM(
+                getStringResource(contextMenuR.string.mozac_feature_contextmenu_copy_image_location)
+            )
+        )
+        return this
+    }
+
+    /**
+     * Assert the web-content long-press context menu raised for a bare image (no wrapping link): the image URL header
+     * plus only the three image options ("Open image in new tab", "Save image", "Copy image location"). Ports the
+     * legacy BrowserRobot.verifyNoLinkImageContextMenuItems.
+     */
+    fun verifyNoLinkImageContextMenuItems(imageUrl: String): BrowserPage {
+        mozVerify(BrowserPageSelectors.CONTEXT_MENU_LINK_URL(imageUrl))
+        mozVerify(
+            BrowserPageSelectors.CONTEXT_MENU_ITEM(
+                getStringResource(contextMenuR.string.mozac_feature_contextmenu_open_image_in_new_tab)
+            )
+        )
+        mozVerify(
+            BrowserPageSelectors.CONTEXT_MENU_ITEM(
+                getStringResource(contextMenuR.string.mozac_feature_contextmenu_save_image)
+            )
+        )
+        mozVerify(
+            BrowserPageSelectors.CONTEXT_MENU_ITEM(
+                getStringResource(contextMenuR.string.mozac_feature_contextmenu_copy_image_location)
+            )
+        )
+        return this
+    }
+
+    /**
+     * Dismiss the open web-content context menu by tapping outside it, then confirm the page is back in view. The menu
+     * is a centered, touch-outside-cancelable MaterialAlertDialog, so a tap near the top of the screen lands in the
+     * dimmed scrim around it (even the tallest, 8-row link-image menu stays centred and never reaches the top tenth).
+     *
+     * This follows TestRail 352050's "Tap outside of menu to return to web page" step; the legacy
+     * BrowserRobot.dismissContentContextMenu used a device back-press instead.
+     */
+    fun dismissContextMenuByTappingOutside(): BrowserPage {
+        mDevice.click(mDevice.displayWidth / 2, mDevice.displayHeight / 10)
+        mozVerify(BrowserPageSelectors.ENGINE_VIEW)
+        return this
+    }
+
+    /** Assert a snackbar showing the message [text] is displayed, as legacy verifySnackBarText did. */
+    fun verifySnackbarText(text: String): BrowserPage {
+        mozVerify(BrowserPageSelectors.SNACKBAR_MESSAGE(text))
         return this
     }
 

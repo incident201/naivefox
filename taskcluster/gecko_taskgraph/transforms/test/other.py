@@ -265,6 +265,19 @@ def handle_keyed_by(config, tasks):
 
 
 @transforms.add
+def add_dmg_tools(config, tasks):
+    """Let mozinstall extract the DMG without mounting it."""
+    for task in tasks:
+        test_platform = task["test-platform"]
+        if test_platform.startswith("macosx"):
+            intel = test_platform.startswith(("macosx1015", "macosx1470"))
+            task.setdefault("fetches", {}).setdefault("toolchain", []).append(
+                "macosx64-dmg" if intel else "macosx64-aarch64-dmg"
+            )
+        yield task
+
+
+@transforms.add
 def setup_raptor_external_browser_platforms(config, tasks):
     for task in tasks:
         if task["suite"] != "raptor":
@@ -1289,4 +1302,16 @@ def resolve_openh264_version(config, tasks):
                 for key in ("artifact", "dest"):
                     if key in fetch:
                         fetch[key] = fetch[key].format(openh264_version=version)
+        yield task
+
+
+@transforms.add
+def set_perfherder_extra_options(config, tasks):
+    for task in tasks:
+        options = [task["attributes"]["unittest_suite"]]
+        variant = task["attributes"].get("unittest_variant")
+        if variant:
+            options.append(variant)
+        env = task.setdefault("worker", {}).setdefault("env", {})
+        env.setdefault("PERFHERDER_EXTRA_OPTIONS", " ".join(options))
         yield task

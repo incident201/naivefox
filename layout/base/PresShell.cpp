@@ -924,7 +924,8 @@ void PresShell::Init(nsPresContext* aPresContext) {
     mZoomConstraintsClient->Init(this, mDocument);
 
     // We call this to create mMobileViewportManager, if it is needed.
-    MaybeRecreateMobileViewportManager(false);
+    MaybeRecreateMobileViewportManager(
+        MobileViewportManagerUpdate::PresShellInit);
   }
 
   if (nsCOMPtr<nsIDocShell> docShell = mPresContext->GetDocShell()) {
@@ -5703,6 +5704,9 @@ void PresShell::AddCanvasBackgroundColorItem(nsDisplayListBuilder* aBuilder,
 
   nsDisplaySolidColor* item =
       MakeDisplayItem<nsDisplaySolidColor>(aBuilder, aFrame, aBounds, bgcolor);
+  if (!item) {
+    return;
+  }
   if (canvasBg.mCSSSpecified && isRootContentDocumentCrossProcess) {
     item->SetIsCheckerboardBackground();
   }
@@ -7263,7 +7267,6 @@ void PresShell::RecordModifiers(WidgetGUIEvent* aEvent) {
     case eMouseTouchDrag:
     case eMouseLongTap:
     case eMouseRawUpdate:
-    case eMouseExploreByTouch:
     case ePointerCancel:
     case eContextMenu:
     case eTouchStart:
@@ -12102,6 +12105,13 @@ MobileViewportManager* PresShell::GetMobileViewportManager() const {
   return mMobileViewportManager;
 }
 
+// Whether layout should be sized by the MobileViewportManager from
+// GetViewportInfo, for a meta viewport or a viewport size override.
+static bool ShouldSizeLayoutFromViewportInfo(const Document* aDocument) {
+  return nsLayoutUtils::ShouldHandleMetaViewport(aDocument) ||
+         aDocument->HasViewportSizeOverrideForMiniWindow();
+}
+
 Maybe<MobileViewportManager::ManagerType> UseMobileViewportManager(
     PresShell* aPresShell, Document* aDocument) {
   // If we're not using APZ, we won't be able to zoom, so there is no
@@ -12111,7 +12121,7 @@ Maybe<MobileViewportManager::ManagerType> UseMobileViewportManager(
       return Nothing();
     }
   }
-  if (nsLayoutUtils::ShouldHandleMetaViewport(aDocument)) {
+  if (ShouldSizeLayoutFromViewportInfo(aDocument)) {
     return Some(MobileViewportManager::ManagerType::VisualAndMetaViewport);
   }
   if (nsLayoutUtils::AllowZoomingForDocument(aDocument)) {
@@ -12120,7 +12130,8 @@ Maybe<MobileViewportManager::ManagerType> UseMobileViewportManager(
   return Nothing();
 }
 
-void PresShell::MaybeRecreateMobileViewportManager(bool aAfterInitialization) {
+void PresShell::MaybeRecreateMobileViewportManager(
+    MobileViewportManagerUpdate aUpdate) {
   // Determine if we require a MobileViewportManager, and what kind if so. We
   // need one any time we allow resolution zooming for a document, and any time
   // we want to obey <meta name="viewport"> tags for it.
@@ -12133,7 +12144,11 @@ void PresShell::MaybeRecreateMobileViewportManager(bool aAfterInitialization) {
   }
   if (mvmType && mMobileViewportManager &&
       *mvmType == mMobileViewportManager->GetManagerType()) {
-    // We need one and we have one of the correct type, so we're done.
+    // We need one and we have one of the correct type, so we're done, unless
+    // it needs to pick up a new viewport size.
+    if (aUpdate == MobileViewportManagerUpdate::LayoutViewportSizeMayChange) {
+      ForceResizeReflowWithCurrentDimensions();
+    }
     return;
   }
 
@@ -12175,7 +12190,7 @@ void PresShell::MaybeRecreateMobileViewportManager(bool aAfterInitialization) {
     }
   }
 
-  if (aAfterInitialization) {
+  if (aUpdate != MobileViewportManagerUpdate::PresShellInit) {
     // Setting the initial viewport will trigger a reflow.
     if (mMobileViewportManager) {
       mMobileViewportManager->SetInitialViewport();
@@ -12190,8 +12205,7 @@ void PresShell::MaybeRecreateMobileViewportManager(bool aAfterInitialization) {
 }
 
 bool PresShell::UsesMobileViewportSizing() const {
-  return mMobileViewportManager &&
-         nsLayoutUtils::ShouldHandleMetaViewport(mDocument);
+  return mMobileViewportManager && ShouldSizeLayoutFromViewportInfo(mDocument);
 }
 
 /*

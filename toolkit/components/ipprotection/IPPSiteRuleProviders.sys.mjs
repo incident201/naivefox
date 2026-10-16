@@ -91,6 +91,16 @@ export class SiteRuleProvider extends EventTarget {
   }
 
   /**
+   * How many sites this provider holds with the given rule.
+   *
+   * @param {?string} _rule
+   * @returns {number}
+   */
+  count(_rule) {
+    return 0;
+  }
+
+  /**
    * Tells the manager this provider's underlying data changed.
    */
   notifyChange() {
@@ -275,6 +285,10 @@ export class MatchPatternPrefRule extends SiteRuleProvider {
     return null;
   }
 
+  count(rule) {
+    return rule === this.#rule ? this.#patterns.patterns.length : 0;
+  }
+
   #rebuild() {
     try {
       let arr = JSON.parse(Services.prefs.getStringPref(this.#pref, "[]"));
@@ -317,6 +331,7 @@ export class IPPPermissionRuleProvider extends SiteRuleProvider {
       this.observe(subject, topic, data);
     };
     Services.obs.addObserver(this.#observer, "perm-changed");
+    this.#recordCounts();
   }
 
   uninit() {
@@ -350,6 +365,7 @@ export class IPPPermissionRuleProvider extends SiteRuleProvider {
       Glean.ipprotection.exclusionAdded.add(1);
     }
 
+    this.#recordCounts();
     this.notifyChange();
   }
 
@@ -388,12 +404,6 @@ export class IPPPermissionRuleProvider extends SiteRuleProvider {
     );
   }
 
-  /**
-   * How many sites are stored with the given rule.
-   *
-   * @param {?string} rule
-   * @returns {number}
-   */
   count(rule) {
     let count = 0;
     for (let perm of Services.perms.getAllByTypes([
@@ -431,6 +441,15 @@ export class IPPPermissionRuleProvider extends SiteRuleProvider {
       true /* exactHost */
     );
     return permissionObject;
+  }
+
+  #recordCounts() {
+    Glean.ipprotectionInclusions.count.set(
+      this.count(IPPPrincipalRules.INCLUDED)
+    );
+    Glean.ipprotectionExclusions.count.set(
+      this.count(IPPPrincipalRules.EXCLUDED)
+    );
   }
 
   #ruleForCapability(capability) {

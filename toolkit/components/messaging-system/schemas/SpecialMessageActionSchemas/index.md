@@ -735,3 +735,20 @@ Changes the browser icon to the one identified by `id` using `CustomIconManager`
 ### `GET_REFERRAL_CODE`
 
 Gets the user's referral code (or generates one if it doesn't exist), and opens about:referrals with the code as a param. Throws an error if referrals are not enabled.
+
+### `SELECT_AND_MARK_MENU_ITEM`
+
+Open the app menu and mark an item inside it, to point the user at a feature.
+Marking of a nested item is cancelled if the user opens a different subview.
+
+* args:
+```ts
+{
+  data: {
+    // ids of the items to select and mark. The first is in the app menu's
+    // main view; each later id is marked once the user opens the subview
+    // holding it.
+    itemIds: string[],
+  }
+}
+```

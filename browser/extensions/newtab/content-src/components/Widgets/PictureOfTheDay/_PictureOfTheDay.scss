@@ -65,7 +65,6 @@
 // light mode and the widget doesn't adapt to the photo. moz-button colors the icon
 // via --button-text-color-ghost, so override the token (a host `color` won't win).
 .picture-of-the-day-context-menu-button {
-  // stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens
   --button-text-color-ghost: var(--color-white);
 }
 
@@ -430,7 +429,6 @@
 
     &::before {
       // Masked icon: background-color is the icon fill, so it takes a foreground token.
-      // stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens
       background-color: var(--button-text-color-ghost);
     }
 

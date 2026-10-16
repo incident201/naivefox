@@ -273,8 +273,7 @@ summary {
  * rotating masked element.
  */
 .progress-icon-parent {
-  /* stylelint rule disabled to support workaround for Bug 1671784 */
-  /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+  /* Non-standard border-radius needed to support workaround for Bug 1671784 */
   border-radius: 0.01px;
   overflow: hidden;
   display: flex;

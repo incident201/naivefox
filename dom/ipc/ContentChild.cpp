@@ -240,6 +240,7 @@
 
 #ifdef XP_WIN
 #  include <process.h>
+#  include <windows.h>
 #  define getpid _getpid
 #  include "mozilla/WinDllServices.h"
 #endif
@@ -1450,14 +1451,13 @@ mozilla::ipc::IPCResult ContentChild::RecvRequestMemoryReport(
 
 mozilla::ipc::IPCResult ContentChild::RecvDecodeImage(
     NotNull<nsIURI*> aURI, const ImageIntSize& aSize, const bool& aStretch,
-    const ColorScheme& aColorScheme, DecodeImageResolver&& aResolver) {
+    const ColorScheme& aColorScheme, NotNull<nsIPrincipal*> aPrincipal,
+    DecodeImageResolver&& aResolver) {
   // We're about to decode a potentially untrusted image.
   MaybeBecomeUntrusted();
 
   auto size = aSize.ToUnknownSize();
-  // TODO(Bug 1999930): Investigate using  a content-principal for
-  // moz-remote-image: requests
-  image::FetchDecodedImage(aURI, size, nsContentUtils::GetSystemPrincipal())
+  image::FetchDecodedImage(aURI, size, aPrincipal)
       ->Then(
           GetCurrentSerialEventTarget(), __func__,
           [size, aStretch, aColorScheme,
@@ -2891,6 +2891,19 @@ mozilla::ipc::IPCResult ContentChild::RecvNotifyProcessPriorityChanged(
 
   ConfigureThreadPerformanceHints(aPriority);
 
+#ifdef XP_WIN
+  bool raiseMainThreadPriority =
+      aPriority >= hal::PROCESS_PRIORITY_FOREGROUND &&
+      StaticPrefs::
+          dom_ipc_processPriorityManager_foregroundRaisesMainThreadPriority();
+  if (raiseMainThreadPriority != mMainThreadPriorityRaised &&
+      ::SetThreadPriority(::GetCurrentThread(),
+                          raiseMainThreadPriority ? THREAD_PRIORITY_ABOVE_NORMAL
+                                                  : THREAD_PRIORITY_NORMAL)) {
+    mMainThreadPriorityRaised = raiseMainThreadPriority;
+  }
+#endif
+
   mProcessPriority = aPriority;
 
   os->NotifyObservers(static_cast<nsIPropertyBag2*>(props),
@@ -3221,24 +3234,6 @@ mozilla::ipc::IPCResult ContentChild::RecvUpdateWindow(
       false,
       "ContentChild::RecvUpdateWindow calls unexpected on this platform.");
   return IPC_FAIL_NO_REASON(this);
-}
-
-PContentPermissionRequestChild*
-ContentChild::AllocPContentPermissionRequestChild(
-    Span<const PermissionRequest> aRequests, nsIPrincipal* aPrincipal,
-    nsIPrincipal* aTopLevelPrincipal, const bool& aIsHandlingUserInput,
-    const bool& aMaybeUnsafePermissionDelegate, const TabId& aTabId,
-    const bool& aIgnoreAllowSitePermission) {
-  MOZ_CRASH("unused");
-  return nullptr;
-}
-
-bool ContentChild::DeallocPContentPermissionRequestChild(
-    PContentPermissionRequestChild* actor) {
-  nsContentPermissionUtils::NotifyRemoveContentPermissionRequestChild(actor);
-  auto child = static_cast<RemotePermissionRequest*>(actor);
-  child->IPDLRelease();
-  return true;
 }
 
 already_AddRefed<PWebBrowserPersistDocumentChild>
@@ -4704,6 +4699,8 @@ mozilla::ipc::IPCResult ContentChild::RecvReactivateDocuments(
   }
   RefPtr browsingContext = aContext.get();
   MOZ_DIAGNOSTIC_ASSERT(browsingContext->IsTopContent());
+  MOZ_DIAGNOSTIC_ASSERT(browsingContext->IsInProcess() ||
+                        !aPreviousEntryForActivation);
 
   browsingContext->ReactivateDocuments(aReactivatedEntry, aNewSHEs,
                                        aPreviousEntryForActivation);

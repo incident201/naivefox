@@ -36,7 +36,7 @@ fun VoiceSelection(
         if (availableVoices.isEmpty()) {
             listOf(
                 TextItem(
-                    text = Text.Resource(R.string.mozac_feature_listentopage_no_voices_available),
+                    text = Text.Resource(R.string.mozac_feature_listentopage_error_voice_options_not_available),
                     enabled = false,
                     onClick = {},
                 )
@@ -77,6 +77,22 @@ private fun PreviewVoiceSelection() {
                 availableVoices = previewVoices,
                 selectedVoice = selectedVoice,
                 onVoiceClick = { selectedVoice = it },
+                onDismissRequest = {},
+            )
+        }
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun PreviewNoOfflineVoicesAvailableError() {
+    AcornTheme {
+        Surface(modifier = Modifier.fillMaxSize()) {
+            VoiceSelection(
+                expanded = true,
+                availableVoices = emptyList(),
+                selectedVoice = null,
+                onVoiceClick = { _ -> },
                 onDismissRequest = {},
             )
         }

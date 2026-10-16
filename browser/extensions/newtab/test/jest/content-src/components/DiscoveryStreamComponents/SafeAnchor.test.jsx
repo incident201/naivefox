@@ -47,6 +47,23 @@ describe("Discovery Stream <SafeAnchor>", () => {
     expect(warnSpy).not.toHaveBeenCalled();
   });
 
+  it("should report an open intent on right-click and middle-click only", () => {
+    const onLinkOpenIntent = jest.fn();
+    const { container } = render(
+      <SafeAnchor
+        url="https://example.com"
+        onLinkOpenIntent={onLinkOpenIntent}
+      />
+    );
+    const link = container.querySelector("a");
+
+    fireEvent.contextMenu(link);
+    fireEvent(link, new MouseEvent("auxclick", { bubbles: true, button: 1 }));
+    fireEvent(link, new MouseEvent("auxclick", { bubbles: true, button: 2 }));
+
+    expect(onLinkOpenIntent).toHaveBeenCalledTimes(2);
+  });
+
   it("should dispatch an event on click", () => {
     const dispatch = jest.fn();
     const { container } = render(<SafeAnchor dispatch={dispatch} />);
@@ -56,6 +73,29 @@ describe("Discovery Stream <SafeAnchor>", () => {
     expect(dispatch).toHaveBeenCalledTimes(1);
     // fireEvent returns false when the handler called event.preventDefault().
     expect(notCancelled).toBe(false);
+  });
+
+  it("should pass dwellLabel to the OPEN_LINK action", () => {
+    const dispatch = jest.fn();
+    const { container } = render(
+      <SafeAnchor dispatch={dispatch} dwellLabel="story_organic" />
+    );
+
+    fireEvent.click(container.querySelector("a"));
+
+    expect(dispatch.mock.calls[0][0].data).toHaveProperty(
+      "dwell_label",
+      "story_organic"
+    );
+  });
+
+  it("should leave dwell_label unset for anchors that did not opt in", () => {
+    const dispatch = jest.fn();
+    const { container } = render(<SafeAnchor dispatch={dispatch} />);
+
+    fireEvent.click(container.querySelector("a"));
+
+    expect(dispatch.mock.calls[0][0].data.dwell_label).toBeUndefined();
   });
 
   it("should call onLinkClick if provided", () => {

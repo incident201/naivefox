@@ -20,6 +20,7 @@
 #include "mozilla/TimeStamp.h"
 #include "nsCOMPtr.h"
 #include "nsIObserverService.h"
+#include "nsIURI.h"
 #include "nsThreadManager.h"
 #include "nsThreadUtils.h"
 #include "nsXPCOMCIDInternal.h"
@@ -172,13 +173,13 @@ void DecodePool::AsyncRun(IDecodingTask* aTask) {
       MakeAndAddRef<DecodingTask>((RefPtr<IDecodingTask>(aTask))));
 }
 
-bool DecodePool::SyncRunIfPreferred(IDecodingTask* aTask,
-                                    const nsCString& aURI) {
+bool DecodePool::SyncRunIfPreferred(IDecodingTask* aTask, nsIURI* aURI) {
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(aTask);
 
-  AUTO_PROFILER_LABEL_DYNAMIC_NSCSTRING("DecodePool::SyncRunIfPreferred",
-                                        GRAPHICS, aURI);
+  AUTO_PROFILER_LABEL_DYNAMIC_NSCSTRING(
+      "DecodePool::SyncRunIfPreferred", GRAPHICS,
+      aURI ? aURI->GetSpecOrDefault() : nsCString());
 
   if (aTask->ShouldPreferSyncRun()) {
     aTask->Run();
@@ -189,13 +190,13 @@ bool DecodePool::SyncRunIfPreferred(IDecodingTask* aTask,
   return false;
 }
 
-void DecodePool::SyncRunIfPossible(IDecodingTask* aTask,
-                                   const nsCString& aURI) {
+void DecodePool::SyncRunIfPossible(IDecodingTask* aTask, nsIURI* aURI) {
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(aTask);
 
-  AUTO_PROFILER_LABEL_DYNAMIC_NSCSTRING("DecodePool::SyncRunIfPossible",
-                                        GRAPHICS, aURI);
+  AUTO_PROFILER_LABEL_DYNAMIC_NSCSTRING(
+      "DecodePool::SyncRunIfPossible", GRAPHICS,
+      aURI ? aURI->GetSpecOrDefault() : nsCString());
 
   aTask->Run();
 }

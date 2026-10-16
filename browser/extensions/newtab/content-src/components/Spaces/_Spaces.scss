@@ -214,7 +214,6 @@
         grid-template-columns: --col-span(8) --col-span(4);
 
         // Here the grid tracks govern the widths instead.
-        /* stylelint-disable-next-line max-line-length */
         :is(.widgets-section-container, .layout-content-column.has-feed, .layout-highlights-column) {
           inline-size: auto;
           justify-self: stretch;

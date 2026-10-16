@@ -194,7 +194,7 @@ export class FfiConverterTypeMozAdsCacheConfig extends FfiConverterArrayBuffer {
 /**
  * MozAdsCacheMode
  */
-export const MozAdsCacheMode = Object.freeze({
+export const MozAdsCacheMode = Object.freeze(/** @lends MozAdsCacheMode */ {
     /**
      * CACHE_FIRST
      */
@@ -628,7 +628,7 @@ export class FfiConverterSequenceString extends FfiConverterArrayBuffer {
 /**
  * MozAdsIABContentTaxonomy
  */
-export const MozAdsIabContentTaxonomy = Object.freeze({
+export const MozAdsIabContentTaxonomy = Object.freeze(/** @lends MozAdsIabContentTaxonomy */ {
     /**
      * IAB1_0
      */
@@ -1461,7 +1461,7 @@ export class MozAdsRequestOptions {
         {
             blocks= [], 
             cachePolicy, 
-            flags= {}, 
+            flags= new Map(), 
             ohttp= false
         } = {
             blocks: undefined, 
@@ -2623,7 +2623,7 @@ export class FfiConverterTypeMozAdsEnvironment extends FfiConverterArrayBuffer {
 /**
  * MozAdsReportReason
  */
-export const MozAdsReportReason = Object.freeze({
+export const MozAdsReportReason = Object.freeze(/** @lends MozAdsReportReason */ {
     /**
      * INAPPROPRIATE
      */

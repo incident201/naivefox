@@ -4,17 +4,18 @@
 
 package org.mozilla.fenix.browser
 
+import androidx.compose.ui.semantics.Role
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import mozilla.components.browser.state.selector.selectedTab
 import mozilla.components.browser.state.state.BrowserState
 import mozilla.components.browser.state.store.BrowserStore
 import mozilla.components.compose.base.text.Text
 import mozilla.components.compose.menu.data.MenuItem
 import mozilla.components.compose.menu.data.MenuItemBadge
+import mozilla.components.compose.menu.data.MenuItemTitle
 import mozilla.components.compose.menu.data.StandardMenuItem
 import mozilla.components.compose.menu.store.MenuEvent
 import mozilla.components.compose.menu.ui.MenuItemIconRes
@@ -24,17 +25,20 @@ import mozilla.components.ui.icons.R as iconsR
 import org.mozilla.fenix.R
 import org.mozilla.fenix.components.menu.MenuHost
 import org.mozilla.fenix.components.menu.MenuItemProvider
+import org.mozilla.fenix.components.menu.MenuTarget
 import org.mozilla.fenix.components.menu.store.MenuAction
 
 /**
  * [MenuItemProvider] for the menu item allowing to switch the current page between its desktop and mobile versions.
  *
- * @param browserStore [BrowserStore] used to know which version of the current page is shown.
+ * @param browserStore [BrowserStore] allowing to integrate with the current open tabs.
+ * @param target [MenuTarget] for which this menu item would be shown for.
  * @param requestDesktopSite [SessionUseCases.RequestDesktopSiteUseCase] for switching between the two versions.
  * @param scope [CoroutineScope] used to keep the item up to date for as long as it can be shown.
  */
 class DesktopSiteMenuItemProvider(
     private val browserStore: BrowserStore,
+    private val target: MenuTarget,
     private val requestDesktopSite: SessionUseCases.RequestDesktopSiteUseCase,
     scope: CoroutineScope,
 ) : MenuItemProvider {
@@ -51,7 +55,7 @@ class DesktopSiteMenuItemProvider(
         event == MenuAction.RequestDesktopSite || event == MenuAction.RequestMobileSite
 
     override fun onEvent(event: MenuEvent, menu: MenuHost) {
-        val tabId = browserStore.state.selectedTab?.id ?: return
+        val tabId = target.browserSessionFrom(browserStore.state)?.id ?: return
 
         menu.dismiss()
         requestDesktopSite(enable = event == MenuAction.RequestDesktopSite, tabId = tabId)
@@ -59,7 +63,7 @@ class DesktopSiteMenuItemProvider(
 
     /** Switching versions is only offered while a page is shown. */
     private fun BrowserState.desktopSiteItem() =
-        selectedTab?.content?.let {
+        target.browserSessionFrom(this)?.content?.let {
             DesktopSiteStatus(isDesktopMode = it.desktopMode, isPdf = it.isPdf).toMenuItem()
         }
 }
@@ -84,7 +88,7 @@ private fun DesktopSiteStatus.toMenuItem(): MenuItem {
         }
 
     return StandardMenuItem(
-        title = Text.Resource(R.string.browser_menu_desktop_site),
+        title = MenuItemTitle(Text.Resource(R.string.browser_menu_desktop_site)),
         icon = MenuItemIconRes(iconsR.drawable.mozac_ic_device_desktop_24),
         onClickEvent =
             when (isDesktopMode) {
@@ -106,6 +110,7 @@ private fun DesktopSiteStatus.toMenuItem(): MenuItem {
                         state = state,
                     )
             },
+        role = Role.Switch,
         state = state,
     )
 }

@@ -20,9 +20,11 @@
  */
 
 /**
- * pdfjsVersion = 6.5.10
- * pdfjsBuild = 17bb2442f
+ * pdfjsVersion = 6.5.152
+ * pdfjsBuild = 0252c1f6c
  */
+/******/ (() => { // webpackBootstrap
+/******/ 	"use strict";
 
 ;// ./src/scripting_api/constants.js
 const Border = Object.freeze({
@@ -185,11 +187,21 @@ const VIEWER_VERSION = 21.00720099;
 const FORMS_VERSION = 21.00720099;
 const USERACTIVATION_CALLBACKID = 0;
 const USERACTIVATION_MAXTIME_VALIDITY = 5000;
-function serializeError(error) {
-  const value = `${error.toString()}\n${error.stack}`;
+function serializeError(error, prefix = "") {
+  let message;
+  try {
+    message = String(error);
+  } catch {
+    message = "Unknown error";
+  }
+  let stack;
+  try {
+    stack = error?.stack;
+  } catch {}
+  const value = typeof stack === "string" ? `${message}\n${stack}` : message;
   return {
     command: "error",
-    value
+    value: `${prefix}${value}`
   };
 }
 const makeArr = () => [];
@@ -450,17 +462,14 @@ class Field extends PDFObject {
     if (!indices.every(i => Number.isInteger(i) && i >= 0 && i < this.numItems)) {
       return;
     }
-    indices.sort();
+    indices.sort((a, b) => a - b);
     if (this.multipleSelection) {
       this._currentValueIndices = indices;
-      this._value = [];
-      indices.forEach(i => {
-        this._value.push(this._items[i].displayValue);
-      });
+      this._value = indices.map(i => this._items[i].exportValue);
     } else if (indices.length > 0) {
-      indices = indices.splice(1, indices.length - 1);
+      indices = [indices[0]];
       this._currentValueIndices = indices[0];
-      this._value = this._items[this._currentValueIndices];
+      this._value = this._items[indices[0]].exportValue;
     }
     this._send({
       id: this._id,
@@ -822,9 +831,7 @@ class Field extends PDFObject {
       try {
         this._globalEval(action);
       } catch (error) {
-        const serializedError = serializeError(error);
-        serializedError.value = `Error when executing "${eventName}" for field "${this._id}"\n${serializedError.value}`;
-        this._send(serializedError);
+        this._document.obj._send(serializeError(error, `Error when executing "${eventName}" for field "${this._id}"\n`));
       }
     }
     return true;
@@ -840,7 +847,7 @@ class RadioButtonField extends Field {
       this.exportValues.push(radioData.exportValues);
       this._radioIds.push(radioData.id);
       this._radioActions.push(createMap(radioData.actions));
-      if (this._value === radioData.exportValues) {
+      if (data.value === radioData.exportValues) {
         this._id = radioData.id;
       }
     }
@@ -2425,7 +2432,6 @@ class Doc extends PDFObject {
         this._runActions(actionName);
       }
     }
-    this._runActions("OpenAction");
     this._disableSaving = false;
   }
   _dispatchDocEvent(name) {
@@ -2480,9 +2486,7 @@ class Doc extends PDFObject {
       try {
         this._globalEval(action);
       } catch (error) {
-        const serializedError = serializeError(error);
-        serializedError.value = `Error when executing "${name}" for document\n${serializedError.value}`;
-        this._send(serializedError);
+        this._send(serializeError(error, `Error when executing "${name}" for document\n`));
       }
     }
   }
@@ -3756,7 +3760,7 @@ class Util extends PDFObject {
       actions.push(action);
       return pattern.includes(",") ? `(?=${pattern})\\${actions.length}` : pattern;
     });
-    return [new RegExp(`^${re}$`, "g"), actions];
+    return [new RegExp(`^${re}$`), actions];
   }
   _scand(cFormat, cDate, strict = false) {
     if (typeof cDate !== "string") {
@@ -3976,3 +3980,5 @@ function initSandbox(params) {
 globalThis.pdfjsScripting = {
   initSandbox: initSandbox
 };
+/******/ })()
+;

@@ -61,11 +61,14 @@
       "chrome://browser/content/aiwindow/components/aitab-error.mjs": [
         "../../../browser/components/aiwindow/ui/components/aitab-page/aitab-error/aitab-error.mjs"
       ],
+      "chrome://browser/content/aiwindow/components/aitab-footer.mjs": [
+        "../../../browser/components/aiwindow/ui/components/aitab-page/aitab-footer/aitab-footer.mjs"
+      ],
       "chrome://browser/content/aiwindow/components/aitab-header.mjs": [
         "../../../browser/components/aiwindow/ui/components/aitab-page/aitab-header/aitab-header.mjs"
       ],
       "chrome://browser/content/aiwindow/components/aitab-highlights.mjs": [
-        "../../../browser/components/aiwindow/ui/components/aitab-highlights/aitab-highlights.mjs"
+        "../../../browser/components/aiwindow/ui/components/aitab-page/aitab-highlights/aitab-highlights.mjs"
       ],
       "chrome://browser/content/aiwindow/components/aitab-list.mjs": [
         "../../../browser/components/aiwindow/ui/components/aitab-page/aitab-list/aitab-list.mjs"
@@ -74,13 +77,16 @@
         "../../../browser/components/aiwindow/ui/components/aitab-page/aitab-page-actions/aitab-page-actions.mjs"
       ],
       "chrome://browser/content/aiwindow/components/aitab-table.mjs": [
-        "../../../browser/components/aiwindow/ui/components/aitab-table/aitab-table.mjs"
+        "../../../browser/components/aiwindow/ui/components/aitab-page/aitab-table/aitab-table.mjs"
       ],
       "chrome://browser/content/aiwindow/components/aitab-text-block.mjs": [
         "../../../browser/components/aiwindow/ui/components/aitab-page/aitab-text-block/aitab-text-block.mjs"
       ],
       "chrome://browser/content/aiwindow/components/aitab-timeline.mjs": [
         "../../../browser/components/aiwindow/ui/components/aitab-page/aitab-timeline/aitab-timeline.mjs"
+      ],
+      "chrome://browser/content/aiwindow/components/aitab-tool-ui.mjs": [
+        "../../../browser/components/aiwindow/ui/components/aitab-tool-ui/aitab-tool-ui.mjs"
       ],
       "chrome://browser/content/aiwindow/components/applied-memories-button.mjs": [
         "../../../browser/components/aiwindow/ui/components/ai-chat-content/chat-assistant-footer/applied-memories-button.mjs"
@@ -1534,9 +1540,6 @@
       "resource:///modules/Dedupe.sys.mjs": [
         "../../../browser/modules/Dedupe.sys.mjs"
       ],
-      "resource:///modules/DevToolsStartup.sys.mjs": [
-        "../../../devtools/startup/DevToolsStartup.sys.mjs"
-      ],
       "resource:///modules/EveryWindow.sys.mjs": [
         "../../../browser/modules/EveryWindow.sys.mjs"
       ],
@@ -1722,6 +1725,9 @@
       ],
       "resource:///modules/asrouter/PanelTestProvider.sys.mjs": [
         "../../../browser/components/asrouter/modules/PanelTestProvider.sys.mjs"
+      ],
+      "resource:///modules/asrouter/PinnableSitesProvider.sys.mjs": [
+        "../../../browser/components/asrouter/modules/PinnableSitesProvider.sys.mjs"
       ],
       "resource:///modules/asrouter/PreonboardingSplash.sys.mjs": [
         "../../../browser/components/asrouter/modules/PreonboardingSplash.sys.mjs"
@@ -2274,6 +2280,9 @@
       ],
       "resource://devtools/client/application/src/components/session-history/SessionHistoryUnavailable.js": [
         "../../../devtools/client/application/src/components/session-history/SessionHistoryUnavailable.js"
+      ],
+      "resource://devtools/client/application/src/components/speculative-loads/SpeculativeLoadsPage.js": [
+        "../../../devtools/client/application/src/components/speculative-loads/SpeculativeLoadsPage.js"
       ],
       "resource://devtools/client/application/src/components/ui/UIButton.js": [
         "../../../devtools/client/application/src/components/ui/UIButton.js"
@@ -3928,8 +3937,8 @@
       "resource://devtools/client/responsive/utils/window.js": [
         "../../../devtools/client/responsive/utils/window.js"
       ],
-      "resource://devtools/client/settings/panel.js": [
-        "../../../devtools/client/settings/panel.js"
+      "resource://devtools/client/settings/panel.mjs": [
+        "../../../devtools/client/settings/panel.mjs"
       ],
       "resource://devtools/client/shared/WeakMapMap.js": [
         "../../../devtools/client/shared/WeakMapMap.js"
@@ -6328,6 +6337,9 @@
       "resource://gre/modules/ProfileAge.sys.mjs": [
         "../../../toolkit/modules/ProfileAge.sys.mjs"
       ],
+      "resource://gre/modules/ProfileKekPassword.sys.mjs": [
+        "../../../toolkit/modules/ProfileKekPassword.sys.mjs"
+      ],
       "resource://gre/modules/PromiseWorker.sys.mjs": [
         "../../../toolkit/components/promiseworker/PromiseWorker.sys.mjs"
       ],
@@ -6657,12 +6669,6 @@
       ],
       "resource://gre/modules/launchonlogin/WindowsLaunchOnLogin.sys.mjs": [
         "../../../toolkit/modules/launchonlogin/WindowsLaunchOnLogin.sys.mjs"
-      ],
-      "resource://gre/modules/media/IdpSandbox.sys.mjs": [
-        "../../../dom/media/IdpSandbox.sys.mjs"
-      ],
-      "resource://gre/modules/media/PeerConnectionIdp.sys.mjs": [
-        "../../../dom/media/PeerConnectionIdp.sys.mjs"
       ],
       "resource://gre/modules/megalist/MegalistViewModel.sys.mjs": [
         "../../../toolkit/components/satchel/megalist/MegalistViewModel.sys.mjs"
@@ -7000,6 +7006,9 @@
       "resource://newtab/lib/SmartShortcutsRanker/ThomSample.mjs": [
         "../../../browser/extensions/newtab/lib/SmartShortcutsRanker/ThomSample.mjs"
       ],
+      "resource://newtab/lib/SponsoredTopSitesScoreProvider/SponsoredTopSitesScoreProvider.mjs": [
+        "../../../browser/extensions/newtab/lib/SponsoredTopSitesScoreProvider/SponsoredTopSitesScoreProvider.mjs"
+      ],
       "resource://newtab/lib/StartupCacheInit.sys.mjs": [
         "../../../browser/extensions/newtab/lib/StartupCacheInit.sys.mjs"
       ],
@@ -7122,9 +7131,6 @@
       ],
       "resource://normandy/lib/CleanupManager.sys.mjs": [
         "../../../toolkit/components/normandy/lib/CleanupManager.sys.mjs"
-      ],
-      "resource://normandy/lib/ClientEnvironment.sys.mjs": [
-        "../../../toolkit/components/normandy/lib/ClientEnvironment.sys.mjs"
       ],
       "resource://normandy/lib/EventEmitter.sys.mjs": [
         "../../../toolkit/components/normandy/lib/EventEmitter.sys.mjs"
@@ -7440,6 +7446,12 @@
       ],
       "resource://test/es6module_top_level_await.js": [
         "../../../js/xpconnect/tests/unit/es6module_top_level_await.js"
+      ],
+      "resource://test/es6module_valid_import_target.js": [
+        "../../../js/xpconnect/tests/unit/es6module_valid_import_target.js"
+      ],
+      "resource://test/es6module_valid_then_missing_import.js": [
+        "../../../js/xpconnect/tests/unit/es6module_valid_then_missing_import.js"
       ],
       "resource://test/esm_lazy-1.sys.mjs": [
         "../../../js/xpconnect/tests/unit/esm_lazy-1.sys.mjs"

@@ -955,8 +955,6 @@ class nsGlobalWindowOuter final : public mozilla::dom::EventTarget,
 
   nsresult GetInterfaceInternal(const nsIID& aIID, void** aSink);
 
-  void MaybeAllowStorageForOpenedWindow(nsIURI* aURI);
-
   void MaybeResetWindowName(Document* aNewDocument);
 
  public:

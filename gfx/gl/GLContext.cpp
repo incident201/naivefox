@@ -8,6 +8,7 @@
 #include <string.h>
 
 #include <algorithm>
+#include <memory>
 #include <regex>
 #include <string>
 #include <vector>
@@ -125,6 +126,7 @@ static const char* const sExtensionNames[] = {
     "GL_ARB_texture_compression_bptc",
     "GL_ARB_texture_compression_rgtc",
     "GL_ARB_texture_float",
+    "GL_ARB_texture_mirror_clamp_to_edge",
     "GL_ARB_texture_non_power_of_two",
     "GL_ARB_texture_rectangle",
     "GL_ARB_texture_rg",
@@ -172,6 +174,7 @@ static const char* const sExtensionNames[] = {
     "GL_EXT_texture_compression_s3tc_srgb",
     "GL_EXT_texture_filter_anisotropic",
     "GL_EXT_texture_format_BGRA8888",
+    "GL_EXT_texture_mirror_clamp_to_edge",
     "GL_EXT_texture_norm16",
     "GL_EXT_texture_sRGB",
     "GL_EXT_texture_storage",
@@ -2236,7 +2239,7 @@ bool GLContext::IsValidOwningThread() const {
 
 GLBlitHelper* GLContext::BlitHelper() {
   if (!mBlitHelper) {
-    mBlitHelper.reset(new GLBlitHelper(this));
+    mBlitHelper = std::make_unique<GLBlitHelper>(this);
   }
 
   return mBlitHelper.get();
@@ -2714,7 +2717,7 @@ void GLContext::BeforeGLCall_Debug(const char* const funcName) const {
   }
 
   MOZ_ASSERT(!mDebugErrorScope);
-  mDebugErrorScope.reset(new LocalErrorScope(*this));
+  mDebugErrorScope = std::make_unique<LocalErrorScope>(*this);
 }
 
 void GLContext::AfterGLCall_Debug(const char* const funcName) const {

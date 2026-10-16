@@ -24,7 +24,6 @@
 #include "mozilla/Monitor.h"
 #include "mozilla/StaticPrefs_browser.h"
 #include "mozilla/StaticPrefs_dom.h"
-#include "mozilla/StaticPrefs_extensions.h"
 #include "mozilla/StaticPrefs_network.h"
 #include "mozilla/StaticPrefs_privacy.h"
 #include "mozilla/StaticPrefs_urlclassifier.h"
@@ -69,6 +68,7 @@
 #include "nsICertStorage.h"
 #include "nsIChannelEventSink.h"
 #include "nsIClassifiedChannel.h"
+#include "nsIConsoleReportCollector.h"
 #include "nsIContentSniffer.h"
 #include "nsIDownloader.h"
 #ifndef MOZ_NAIVEFOX
@@ -2355,8 +2355,7 @@ bool NS_HasBeenCrossOrigin(nsIChannel* aChannel, bool aReport) {
     return true;
   }
 
-  if (!StaticPrefs::extensions_web_accessible_workers_deprecated_behavior() &&
-      uri->SchemeIs("moz-extension")) {
+  if (uri->SchemeIs("moz-extension")) {
     nsContentPolicyType internalContentType =
         loadInfo->InternalContentPolicyType();
 
@@ -3053,6 +3052,38 @@ bool handleResultFunc(bool aAllowSTS, bool aIsStsHost) {
   }
   return false;
 };
+
+void NS_LogSecureUpgradeToConsole(nsIURI* aURI, nsILoadInfo* aLoadInfo,
+                                  nsIConsoleReportCollector* aReportCollector,
+                                  const nsACString& aMechanism) {
+  MOZ_ASSERT(aLoadInfo);
+  MOZ_ASSERT(aReportCollector);
+  if (!aLoadInfo || !aReportCollector) {
+    return;
+  }
+
+  // A WebSocket handshake runs on an http(s) channel; report the ws(s) URL
+  // the page opened.
+  nsCOMPtr<nsIURI> reportURI = aURI;
+  if (aLoadInfo->GetExternalContentPolicyType() ==
+      ExtContentPolicy::TYPE_WEBSOCKET) {
+    (void)NS_MutateURI(aURI).SetScheme("ws"_ns).Finalize(reportURI);
+  }
+
+  nsAutoCString scheme;
+  reportURI->GetScheme(scheme);
+  scheme.AppendLiteral("s");
+  nsAutoCString spec;
+  reportURI->GetSpec(spec);
+
+  aReportCollector->AddConsoleReport(
+      nsIScriptError::warningFlag, aMechanism,
+      PropertiesFile::SECURITY_PROPERTIES, spec, 0, 1,
+      "SecureUpgradeRequest"_ns,
+      {NS_ConvertUTF8toUTF16(aMechanism), NS_ConvertUTF8toUTF16(spec),
+       NS_ConvertUTF8toUTF16(scheme)});
+}
+
 // That function is a helper function of NS_ShouldSecureUpgrade to check if
 // CSP upgrade-insecure-requests, Mixed content auto upgrading, HTTPs-Only/-
 // First, or an enterprise HttpsOnly site policy should upgrade the given
@@ -3187,9 +3218,11 @@ static bool ShouldSecureUpgradeNoHSTS(nsIURI* aURI, nsILoadInfo* aLoadInfo) {
 // 5. Enterprise policy HttpsOnly
 // (6. Https RR - will be checked in nsHttpChannel)
 nsresult NS_ShouldSecureUpgrade(
-    nsIURI* aURI, nsILoadInfo* aLoadInfo, nsIPrincipal* aChannelResultPrincipal,
-    bool aAllowSTS, const OriginAttributes& aOriginAttributes,
-    bool& aShouldUpgrade, std::function<void(bool, nsresult)>&& aResultCallback,
+    nsIURI* aURI, nsILoadInfo* aLoadInfo,
+    nsIConsoleReportCollector* aReportCollector,
+    nsIPrincipal* aChannelResultPrincipal, bool aAllowSTS,
+    const OriginAttributes& aOriginAttributes, bool& aShouldUpgrade,
+    std::function<void(bool, nsresult)>&& aResultCallback,
     bool& aWillCallback) {
   MOZ_ASSERT(XRE_IsParentProcess());
   if (!XRE_IsParentProcess()) {
@@ -3246,13 +3279,19 @@ nsresult NS_ShouldSecureUpgrade(
   static Atomic<bool, Relaxed> storageReady(false);
   if (!storageReady && gSocketTransportService && aResultCallback) {
     nsCOMPtr<nsILoadInfo> loadInfo = aLoadInfo;
+    nsCOMPtr<nsIConsoleReportCollector> reportCollector = aReportCollector;
     nsCOMPtr<nsIURI> uri = aURI;
     auto callbackWrapper = [resultCallback{std::move(aResultCallback)}, uri,
-                            loadInfo](bool aShouldUpgrade, nsresult aStatus) {
+                            loadInfo, reportCollector](bool aShouldUpgrade,
+                                                       nsresult aStatus) {
       MOZ_ASSERT(NS_IsMainThread());
 
       // 1. HSTS upgrade
       if (aShouldUpgrade || NS_FAILED(aStatus)) {
+        if (aShouldUpgrade && NS_SUCCEEDED(aStatus)) {
+          NS_LogSecureUpgradeToConsole(uri, loadInfo, reportCollector,
+                                       "HSTS"_ns);
+        }
         resultCallback(aShouldUpgrade, aStatus);
         return;
       }
@@ -3304,6 +3343,7 @@ nsresult NS_ShouldSecureUpgrade(
   // we can't pass the loadinfo to handleResultFunc since it's not threadsafe
   // hence we set the http telemetry information on the loadinfo here.
   if (aShouldUpgrade) {
+    NS_LogSecureUpgradeToConsole(aURI, aLoadInfo, aReportCollector, "HSTS"_ns);
     aLoadInfo->SetHttpsUpgradeTelemetry(nsILoadInfo::HSTS);
   }
   if (!aShouldUpgrade) {

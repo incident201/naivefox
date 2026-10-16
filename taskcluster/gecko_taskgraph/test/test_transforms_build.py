@@ -16,6 +16,7 @@ def unified_build():
         "attributes": {"shippable": True},
         "index": {"job-name": "macosx64-opt"},
         "worker": {"env": {}, "max-run-time": 1800},
+        "mozconfig": None,
         "run": {"job-script": "taskcluster/scripts/misc/unify.sh"},
         "dependencies": {
             "x64": "build-macosx64-x64-shippable/opt",
@@ -35,6 +36,7 @@ def per_arch_build(arch, package_tests=True):
         "attributes": {},
         "index": {"job-name": f"macosx64-{arch}-opt"},
         "worker": {"env": env, "max-run-time": 7200},
+        "mozconfig": {"variant": "nightly"},
         "run": {"config": ["builds/releng_base_mac_64_cross_builds.py"]},
         "fetches": {"toolchain": ["linux64-clang"]},
     }
@@ -62,6 +64,7 @@ def test_collapse_unified_build(run_transform):
     assert job["fetches"] == {"toolchain": ["linux64-clang"]}
     assert job["worker"]["env"]["MOZ_AUTOMATION_PACKAGE_TESTS"] == "1"
     assert job["worker"]["max-run-time"] == 7200
+    assert job["mozconfig"] == {"variant": "nightly"}
 
 
 @pytest.mark.parametrize(

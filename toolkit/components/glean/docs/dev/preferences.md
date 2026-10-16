@@ -72,6 +72,11 @@ Defaults to `false`.
 Controls whether the Glean IPC tooling uses the existing PContent child/parent structure, or the new PFOGTransport child/parent structure.
 It is set to `false`, and can be set to `true` using Nimbus.
 
+`telemetry.fog.enable_store_submitted_pings`
+
+Defaults to `false`.
+Controls whether the Glean SDK should store submitted pings in its database layer. When set to `true` submitted pings will be viewable in `about:glean`.
+
 ## Defines
 
 `MOZ_AUTOMATION`

@@ -7787,6 +7787,22 @@ void nsContentUtils::RemoveScriptBlocker() {
   sBlockedScriptRunners->RemoveElementsAt(originalFirstBlocker, blockersCount);
 }
 
+nsAutoMicroTaskForDocument::nsAutoMicroTaskForDocument(
+    const Document* aDocument)
+    : mContext(aDocument && aDocument->GetInnerWindow()
+                   ? CycleCollectedJSContext::Get()
+                   : nullptr) {
+  if (mContext) {
+    mContext->EnterMicroTask();
+  }
+}
+
+nsAutoMicroTaskForDocument::~nsAutoMicroTaskForDocument() {
+  if (mContext) {
+    mContext->LeaveMicroTask();
+  }
+}
+
 /* static */
 already_AddRefed<nsPIDOMWindowOuter>
 nsContentUtils::GetMostRecentNonPBWindow() {
@@ -10462,8 +10478,6 @@ Result<bool, nsresult> nsContentUtils::SynthesizeMouseEvent(
         aMouseEventData.mInputSource != MouseEvent_Binding::MOZ_SOURCE_TOUCH;
   } else if (aType.EqualsLiteral("MozMouseHittest")) {
     msg = eMouseHitTest;
-  } else if (aType.EqualsLiteral("MozMouseExploreByTouch")) {
-    msg = eMouseExploreByTouch;
   } else {
     return Err(NS_ERROR_FAILURE);
   }
@@ -13634,9 +13648,18 @@ nsContentUtils::GetSubresourceCacheValidationInfo(nsIRequest* aRequest,
     if (!info.mMustRevalidate) {
       nsAutoCString vary;
       (void)httpChannel->GetResponseHeader("vary"_ns, vary);
-      if (!vary.IsEmpty()) {
-        info.mMustRevalidate = true;
-      }
+      info.mMustRevalidate = [&] {
+        for (const nsACString& token :
+             nsCCharSeparatedTokenizer(vary, ',').ToRange()) {
+          if (token.EqualsLiteral("*")) {
+            return true;
+          }
+          if (token.EqualsIgnoreCase("cookie")) {
+            return true;
+          }
+        }
+        return false;
+      }();
     }
   }
 

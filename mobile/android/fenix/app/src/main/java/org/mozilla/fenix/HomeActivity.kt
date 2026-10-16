@@ -118,8 +118,6 @@ import org.mozilla.fenix.components.accounts.FenixFxAEntryPoint
 import org.mozilla.fenix.components.appstate.AppAction
 import org.mozilla.fenix.components.appstate.AppAction.ShareAction
 import org.mozilla.fenix.components.appstate.OrientationMode
-import org.mozilla.fenix.components.ipprotection.ErrorMessages
-import org.mozilla.fenix.components.ipprotection.IPProtectionInfoPrompter
 import org.mozilla.fenix.components.menu.MenuAccessPoint
 import org.mozilla.fenix.components.menu.share.QRCodeDialogFragment
 import org.mozilla.fenix.components.metrics.BreadcrumbsRecorder
@@ -156,6 +154,7 @@ import org.mozilla.fenix.ext.recordEventInNimbus
 import org.mozilla.fenix.ext.setNavigationIcon
 import org.mozilla.fenix.extension.WebExtensionPromptFeature
 import org.mozilla.fenix.home.HomeFragment
+import org.mozilla.fenix.home.HomeFragmentDirections
 import org.mozilla.fenix.home.TopSitesRefresher
 import org.mozilla.fenix.home.intent.AssistIntentProcessor
 import org.mozilla.fenix.home.intent.CrashReporterIntentProcessor
@@ -169,6 +168,8 @@ import org.mozilla.fenix.home.intent.OpenSpecificTabIntentProcessor
 import org.mozilla.fenix.home.intent.SpeechProcessingIntentProcessor
 import org.mozilla.fenix.home.intent.StartSearchIntentProcessor
 import org.mozilla.fenix.home.topsites.DefaultPinnedSitesBinding
+import org.mozilla.fenix.ipprotection.store.ErrorMessages
+import org.mozilla.fenix.ipprotection.store.IPProtectionInfoPrompter
 import org.mozilla.fenix.messaging.FenixMessageSurfaceId
 import org.mozilla.fenix.messaging.MessageNotificationWorker
 import org.mozilla.fenix.nimbus.FxNimbus
@@ -1335,7 +1336,11 @@ open class HomeActivity : LocaleAwareAppCompatActivity(), NavHostActivity, Crash
             val currentFragment = navHostFragment?.childFragmentManager?.primaryNavigationFragment
             when (currentFragment) {
                 is HomeFragment -> {
-                    val action = NavGraphDirections.actionGlobalMenuDialogFragment(MenuAccessPoint.Home)
+                    val action =
+                        when (getSettings().isMenuCustomizationEnabled) {
+                            true -> HomeFragmentDirections.actionHomeFragmentToMenuFragment(MenuAccessPoint.Home)
+                            else -> NavGraphDirections.actionGlobalMenuDialogFragment(MenuAccessPoint.Home)
+                        }
                     navHost.navController.navigate(action)
                     return true
                 }
@@ -1343,7 +1348,8 @@ open class HomeActivity : LocaleAwareAppCompatActivity(), NavHostActivity, Crash
                 is BrowserFragment -> {
                     val action =
                         when (getSettings().isMenuCustomizationEnabled) {
-                            true -> BrowserFragmentDirections.actionBrowserFragmentToMenuFragment()
+                            true ->
+                                BrowserFragmentDirections.actionBrowserFragmentToMenuFragment(MenuAccessPoint.Browser)
                             else -> NavGraphDirections.actionGlobalMenuDialogFragment(MenuAccessPoint.Browser)
                         }
                     navHost.navController.navigate(action)

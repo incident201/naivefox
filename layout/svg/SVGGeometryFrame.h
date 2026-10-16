@@ -111,6 +111,10 @@ class SVGGeometryFrame final : public nsIFrame, public ISVGDisplayableFrame {
       mozilla::layers::RenderRootStateManager* aManager,
       nsDisplayListBuilder* aDisplayListBuilder, DisplaySVGGeometry* aItem,
       bool aDryRun);
+  // Whether shape-rendering asks for no anti-aliasing.
+  bool HasCrispEdges() const;
+  // Whether the WebRender primitives for this shape should be anti-aliased.
+  bool ShouldAntiAlias() const;
   /**
    * @param aMatrix The transform that must be multiplied onto aContext to
    *   establish this frame's SVG user space.

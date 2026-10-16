@@ -192,11 +192,6 @@ Standard benchmarks are third-party tests (i.e. Speedometer) that we have integr
   - ✅
   - ❌
   - ❌
-* - **browsertime-benchmark-safari-assorted-dom**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
 :::
 
 
@@ -565,11 +560,6 @@ Standard benchmarks are third-party tests (i.e. Speedometer) that we have integr
   - ✅
   - ❌
   - ❌
-* - **browsertime-benchmark-safari-jetstream3**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
 :::
 
 
@@ -924,11 +914,6 @@ Standard benchmarks are third-party tests (i.e. Speedometer) that we have integr
 * - **browsertime-benchmark-firefox-jetstream3**
   - ✅
   - ✅
-  - ❌
-  - ❌
-* - **browsertime-benchmark-safari-jetstream3**
-  - ❌
-  - ❌
   - ❌
   - ❌
 :::
@@ -1732,11 +1717,6 @@ Standard benchmarks are third-party tests (i.e. Speedometer) that we have integr
   - ✅
   - ❌
   - ❌
-* - **browsertime-benchmark-safari-motionmark-1-3**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
 :::
 
 
@@ -2077,11 +2057,6 @@ Standard benchmarks are third-party tests (i.e. Speedometer) that we have integr
 * - **browsertime-benchmark-firefox-motionmark-1-3**
   - ✅
   - ✅
-  - ❌
-  - ❌
-* - **browsertime-benchmark-safari-motionmark-1-3**
-  - ❌
-  - ❌
   - ❌
   - ❌
 :::
@@ -2440,11 +2415,6 @@ Standard benchmarks are third-party tests (i.e. Speedometer) that we have integr
   - ✅
   - ❌
   - ❌
-* - **browsertime-benchmark-safari-motionmark-htmlsuite-1-3**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
 :::
 
 
@@ -2785,11 +2755,6 @@ Standard benchmarks are third-party tests (i.e. Speedometer) that we have integr
 * - **browsertime-benchmark-firefox-motionmark-htmlsuite-1-3**
   - ✅
   - ✅
-  - ❌
-  - ❌
-* - **browsertime-benchmark-safari-motionmark-htmlsuite-1-3**
-  - ❌
-  - ❌
   - ❌
   - ❌
 :::
@@ -3620,11 +3585,6 @@ Standard benchmarks are third-party tests (i.e. Speedometer) that we have integr
   - ❌
   - ❌
   - ❌
-* - **browsertime-benchmark-safari-speedometer2**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
 :::
 
 
@@ -4039,11 +3999,6 @@ Standard benchmarks are third-party tests (i.e. Speedometer) that we have integr
   - ❌
   - ❌
 * - **browsertime-benchmark-firefox-speedometer2**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **browsertime-benchmark-safari-speedometer2**
   - ❌
   - ❌
   - ❌
@@ -6139,11 +6094,6 @@ Standard benchmarks are third-party tests (i.e. Speedometer) that we have integr
   - ✅
   - ❌
   - ❌
-* - **browsertime-benchmark-safari-stylebench**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
 :::
 
 
@@ -7174,11 +7124,6 @@ Standard benchmarks are third-party tests (i.e. Speedometer) that we have integr
   - ❌
 * - **browsertime-benchmark-wasm-firefox-wasm-godot**
   - ✅
-  - ❌
-  - ❌
-  - ❌
-* - **browsertime-benchmark-wasm-safari-wasm-godot**
-  - ❌
   - ❌
   - ❌
   - ❌
@@ -8423,11 +8368,6 @@ Standard benchmarks are third-party tests (i.e. Speedometer) that we have integr
 * - **browsertime-benchmark-firefox-webaudio**
   - ✅
   - ✅
-  - ❌
-  - ❌
-* - **browsertime-benchmark-safari-webaudio**
-  - ❌
-  - ❌
   - ❌
   - ❌
 :::
@@ -25741,11 +25681,6 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - ✅
   - ❌
   - ❌
-* - **browsertime-upload-safari-upload**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
 :::
 
 
@@ -25953,11 +25888,6 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - ✅
   - ❌
   - ❌
-* - **browsertime-upload-safari-upload-h3**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
 :::
 
 
@@ -26097,8 +26027,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-av1-q**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -26141,8 +26071,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-av1-q**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -26167,11 +26097,6 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - ✅
   - ❌
   - ❌
-* - **browsertime-webcodecs-safari-ve-av1-q**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
 :::
 
 
@@ -26185,8 +26110,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-av1-q**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -26202,8 +26127,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-av1-q**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -26219,8 +26144,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-av1-q**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -26263,8 +26188,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-av1-q**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -26318,8 +26243,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-av1-q-cam**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -26362,8 +26287,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-av1-q-cam**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -26388,11 +26313,6 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - ✅
   - ❌
   - ❌
-* - **browsertime-webcodecs-safari-ve-av1-q-cam**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
 :::
 
 
@@ -26406,8 +26326,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-av1-q-cam**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -26423,8 +26343,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-av1-q-cam**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -26440,8 +26360,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-av1-q-cam**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -26484,8 +26404,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-av1-q-cam**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -26537,8 +26457,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-av1-q-i420**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -26581,8 +26501,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-av1-q-i420**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -26607,11 +26527,6 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - ✅
   - ❌
   - ❌
-* - **browsertime-webcodecs-safari-ve-av1-q-i420**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
 :::
 
 
@@ -26625,8 +26540,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-av1-q-i420**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -26642,8 +26557,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-av1-q-i420**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -26659,8 +26574,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-av1-q-i420**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -26703,8 +26618,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-av1-q-i420**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -26756,8 +26671,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-av1-rt**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -26800,8 +26715,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-av1-rt**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -26826,11 +26741,6 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - ✅
   - ❌
   - ❌
-* - **browsertime-webcodecs-safari-ve-av1-rt**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
 :::
 
 
@@ -26844,8 +26754,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-av1-rt**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -26861,8 +26771,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-av1-rt**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -26878,8 +26788,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-av1-rt**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -26922,8 +26832,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-av1-rt**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -26977,8 +26887,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-av1-rt-cam**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -27021,8 +26931,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-av1-rt-cam**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -27047,11 +26957,6 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - ✅
   - ❌
   - ❌
-* - **browsertime-webcodecs-safari-ve-av1-rt-cam**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
 :::
 
 
@@ -27065,8 +26970,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-av1-rt-cam**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -27082,8 +26987,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-av1-rt-cam**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -27099,8 +27004,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-av1-rt-cam**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -27143,8 +27048,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-av1-rt-cam**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -27196,8 +27101,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-av1-rt-i420**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -27240,8 +27145,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-av1-rt-i420**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -27266,11 +27171,6 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - ✅
   - ❌
   - ❌
-* - **browsertime-webcodecs-safari-ve-av1-rt-i420**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
 :::
 
 
@@ -27284,8 +27184,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-av1-rt-i420**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -27301,8 +27201,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-av1-rt-i420**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -27318,8 +27218,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-av1-rt-i420**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -27362,8 +27262,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-av1-rt-i420**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -27419,11 +27319,6 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - ✅
   - ❌
   - ❌
-* - **browsertime-webcodecs-safari-ve-h264-q**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
 :::
 
 
@@ -27437,8 +27332,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-h264-q**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -27454,8 +27349,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-h264-q**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -27471,8 +27366,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-h264-q**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -27505,8 +27400,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-h264-q**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -27564,11 +27459,6 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - ✅
   - ❌
   - ❌
-* - **browsertime-webcodecs-safari-ve-h264-q-cam**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
 :::
 
 
@@ -27582,8 +27472,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-h264-q-cam**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -27599,8 +27489,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-h264-q-cam**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -27616,8 +27506,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-h264-q-cam**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -27650,8 +27540,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-h264-q-cam**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -27707,11 +27597,6 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - ✅
   - ❌
   - ❌
-* - **browsertime-webcodecs-safari-ve-h264-q-i420**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
 :::
 
 
@@ -27725,8 +27610,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-h264-q-i420**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -27742,8 +27627,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-h264-q-i420**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -27759,8 +27644,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-h264-q-i420**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -27793,8 +27678,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-h264-q-i420**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -27855,11 +27740,6 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - ✅
   - ❌
   - ❌
-* - **browsertime-webcodecs-safari-ve-h264-q-sd**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
 :::
 
 
@@ -27873,8 +27753,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-h264-q-sd**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -27890,8 +27770,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-h264-q-sd**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -27907,8 +27787,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-h264-q-sd**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -27951,8 +27831,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-h264-q-sd**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -28015,11 +27895,6 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - ✅
   - ❌
   - ❌
-* - **browsertime-webcodecs-safari-ve-h264-q-sd-cam**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
 :::
 
 
@@ -28033,8 +27908,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-h264-q-sd-cam**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -28050,8 +27925,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-h264-q-sd-cam**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -28067,8 +27942,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-h264-q-sd-cam**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -28111,8 +27986,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-h264-q-sd-cam**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -28168,11 +28043,6 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - ✅
   - ❌
   - ❌
-* - **browsertime-webcodecs-safari-ve-h264-rt**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
 :::
 
 
@@ -28186,8 +28056,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-h264-rt**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -28203,8 +28073,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-h264-rt**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -28220,8 +28090,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-h264-rt**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -28254,8 +28124,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-h264-rt**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -28313,11 +28183,6 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - ✅
   - ❌
   - ❌
-* - **browsertime-webcodecs-safari-ve-h264-rt-cam**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
 :::
 
 
@@ -28331,8 +28196,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-h264-rt-cam**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -28348,8 +28213,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-h264-rt-cam**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -28365,8 +28230,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-h264-rt-cam**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -28399,8 +28264,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-h264-rt-cam**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -28456,11 +28321,6 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - ✅
   - ❌
   - ❌
-* - **browsertime-webcodecs-safari-ve-h264-rt-i420**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
 :::
 
 
@@ -28474,8 +28334,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-h264-rt-i420**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -28491,8 +28351,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-h264-rt-i420**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -28508,8 +28368,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-h264-rt-i420**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -28542,8 +28402,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-h264-rt-i420**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -28604,11 +28464,6 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - ✅
   - ❌
   - ❌
-* - **browsertime-webcodecs-safari-ve-h264-rt-sd**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
 :::
 
 
@@ -28622,8 +28477,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-h264-rt-sd**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -28639,8 +28494,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-h264-rt-sd**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -28656,8 +28511,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-h264-rt-sd**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -28700,8 +28555,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-h264-rt-sd**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -28764,11 +28619,6 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - ✅
   - ❌
   - ❌
-* - **browsertime-webcodecs-safari-ve-h264-rt-sd-cam**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
 :::
 
 
@@ -28782,8 +28632,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-h264-rt-sd-cam**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -28799,8 +28649,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-h264-rt-sd-cam**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -28816,8 +28666,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-h264-rt-sd-cam**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -28860,8 +28710,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-h264-rt-sd-cam**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -28913,8 +28763,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp8-q**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -28957,8 +28807,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp8-q**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -28983,11 +28833,6 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - ✅
   - ❌
   - ❌
-* - **browsertime-webcodecs-safari-ve-vp8-q**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
 :::
 
 
@@ -29001,8 +28846,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp8-q**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -29018,8 +28863,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp8-q**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -29035,8 +28880,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp8-q**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -29079,8 +28924,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp8-q**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -29134,8 +28979,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp8-q-cam**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -29178,8 +29023,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp8-q-cam**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -29204,11 +29049,6 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - ✅
   - ❌
   - ❌
-* - **browsertime-webcodecs-safari-ve-vp8-q-cam**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
 :::
 
 
@@ -29222,8 +29062,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp8-q-cam**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -29239,8 +29079,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp8-q-cam**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -29256,8 +29096,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp8-q-cam**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -29300,8 +29140,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp8-q-cam**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -29353,8 +29193,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp8-q-i420**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -29397,8 +29237,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp8-q-i420**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -29423,11 +29263,6 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - ✅
   - ❌
   - ❌
-* - **browsertime-webcodecs-safari-ve-vp8-q-i420**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
 :::
 
 
@@ -29441,8 +29276,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp8-q-i420**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -29458,8 +29293,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp8-q-i420**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -29475,8 +29310,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp8-q-i420**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -29519,8 +29354,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp8-q-i420**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -29572,8 +29407,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp8-rt**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -29616,8 +29451,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp8-rt**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -29642,11 +29477,6 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - ✅
   - ❌
   - ❌
-* - **browsertime-webcodecs-safari-ve-vp8-rt**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
 :::
 
 
@@ -29660,8 +29490,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp8-rt**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -29677,8 +29507,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp8-rt**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -29694,8 +29524,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp8-rt**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -29738,8 +29568,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp8-rt**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -29793,8 +29623,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp8-rt-cam**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -29837,8 +29667,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp8-rt-cam**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -29863,11 +29693,6 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - ✅
   - ❌
   - ❌
-* - **browsertime-webcodecs-safari-ve-vp8-rt-cam**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
 :::
 
 
@@ -29881,8 +29706,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp8-rt-cam**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -29898,8 +29723,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp8-rt-cam**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -29915,8 +29740,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp8-rt-cam**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -29959,8 +29784,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp8-rt-cam**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -30012,8 +29837,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp8-rt-i420**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -30056,8 +29881,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp8-rt-i420**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -30082,11 +29907,6 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - ✅
   - ❌
   - ❌
-* - **browsertime-webcodecs-safari-ve-vp8-rt-i420**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
 :::
 
 
@@ -30100,8 +29920,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp8-rt-i420**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -30117,8 +29937,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp8-rt-i420**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -30134,8 +29954,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp8-rt-i420**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -30178,8 +29998,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp8-rt-i420**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -30231,8 +30051,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp9-q**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -30275,8 +30095,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp9-q**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -30301,11 +30121,6 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - ✅
   - ❌
   - ❌
-* - **browsertime-webcodecs-safari-ve-vp9-q**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
 :::
 
 
@@ -30319,8 +30134,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp9-q**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -30336,8 +30151,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp9-q**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -30353,8 +30168,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp9-q**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -30397,8 +30212,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp9-q**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -30452,8 +30267,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp9-q-cam**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -30496,8 +30311,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp9-q-cam**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -30522,11 +30337,6 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - ✅
   - ❌
   - ❌
-* - **browsertime-webcodecs-safari-ve-vp9-q-cam**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
 :::
 
 
@@ -30540,8 +30350,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp9-q-cam**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -30557,8 +30367,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp9-q-cam**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -30574,8 +30384,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp9-q-cam**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -30618,8 +30428,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp9-q-cam**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -30671,8 +30481,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp9-q-i420**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -30715,8 +30525,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp9-q-i420**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -30741,11 +30551,6 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - ✅
   - ❌
   - ❌
-* - **browsertime-webcodecs-safari-ve-vp9-q-i420**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
 :::
 
 
@@ -30759,8 +30564,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp9-q-i420**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -30776,8 +30581,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp9-q-i420**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -30793,8 +30598,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp9-q-i420**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -30837,8 +30642,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp9-q-i420**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -30890,8 +30695,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp9-rt**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -30934,8 +30739,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp9-rt**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -30960,11 +30765,6 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - ✅
   - ❌
   - ❌
-* - **browsertime-webcodecs-safari-ve-vp9-rt**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
 :::
 
 
@@ -30978,8 +30778,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp9-rt**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -30995,8 +30795,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp9-rt**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -31012,8 +30812,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp9-rt**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -31056,8 +30856,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp9-rt**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -31111,8 +30911,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp9-rt-cam**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -31155,8 +30955,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp9-rt-cam**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -31181,11 +30981,6 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - ✅
   - ❌
   - ❌
-* - **browsertime-webcodecs-safari-ve-vp9-rt-cam**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
 :::
 
 
@@ -31199,8 +30994,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp9-rt-cam**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -31216,8 +31011,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp9-rt-cam**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -31233,8 +31028,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp9-rt-cam**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -31277,8 +31072,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp9-rt-cam**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -31330,8 +31125,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp9-rt-i420**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -31374,8 +31169,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp9-rt-i420**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -31400,11 +31195,6 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - ✅
   - ❌
   - ❌
-* - **browsertime-webcodecs-safari-ve-vp9-rt-i420**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
 :::
 
 
@@ -31418,8 +31208,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp9-rt-i420**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -31435,8 +31225,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp9-rt-i420**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -31452,8 +31242,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp9-rt-i420**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -31496,8 +31286,8 @@ Browsertime tests that use a custom pageload test script. These use the pageload
   - mozilla-release
   - mozilla-beta
 * - **browsertime-webcodecs-firefox-ve-vp9-rt-i420**
-  - ✅
-  - ✅
+  - ❌
+  - ❌
   - ❌
   - ❌
 :::
@@ -32007,11 +31797,6 @@ Browsertime tests that use a custom pageload test script. These use the pageload
 * - **browsertime-video-playback-latency-firefox-vpl-h264**
   - ✅
   - ✅
-  - ❌
-  - ❌
-* - **browsertime-video-playback-latency-safari-vpl-h264**
-  - ❌
-  - ❌
   - ❌
   - ❌
 :::
@@ -32881,11 +32666,6 @@ Tests for page-load performance. The links direct to the actual websites that ar
   - ❌
   - ❌
   - ❌
-* - **browsertime-tp6-live-safari-amazon**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
 * - **browsertime-tp6-profiling-firefox-amazon**
   - ✅
   - ❌
@@ -33280,11 +33060,6 @@ Tests for page-load performance. The links direct to the actual websites that ar
   - ❌
   - ❌
 * - **browsertime-tp6-live-firefox-bing-search**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **browsertime-tp6-live-safari-bing-search**
   - ❌
   - ❌
   - ❌
@@ -34414,11 +34189,6 @@ Tests for page-load performance. The links direct to the actual websites that ar
   - ❌
   - ❌
   - ❌
-* - **browsertime-tp6-live-safari-ebay**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
 :::
 
 
@@ -35501,11 +35271,6 @@ Tests for page-load performance. The links direct to the actual websites that ar
   - ❌
   - ❌
   - ❌
-* - **browsertime-tp6-live-safari-fandom**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
 :::
 
 
@@ -35846,11 +35611,6 @@ Tests for page-load performance. The links direct to the actual websites that ar
   - ❌
   - ❌
   - ❌
-* - **browsertime-tp6-live-safari-google-docs**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
 :::
 
 
@@ -36147,11 +35907,6 @@ Tests for page-load performance. The links direct to the actual websites that ar
   - ❌
   - ❌
   - ❌
-* - **browsertime-tp6-live-safari-google-mail**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
 :::
 
 
@@ -36444,11 +36199,6 @@ Tests for page-load performance. The links direct to the actual websites that ar
   - ❌
   - ❌
 * - **browsertime-tp6-live-firefox-google-search**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **browsertime-tp6-live-safari-google-search**
   - ❌
   - ❌
   - ❌
@@ -36771,11 +36521,6 @@ Tests for page-load performance. The links direct to the actual websites that ar
   - ❌
   - ❌
 * - **browsertime-tp6-live-firefox-google-slides**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **browsertime-tp6-live-safari-google-slides**
   - ❌
   - ❌
   - ❌
@@ -37119,11 +36864,6 @@ Tests for page-load performance. The links direct to the actual websites that ar
   - ❌
   - ❌
   - ❌
-* - **browsertime-tp6-live-safari-imdb**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
 :::
 
 
@@ -37408,11 +37148,6 @@ Tests for page-load performance. The links direct to the actual websites that ar
   - ❌
   - ❌
 * - **browsertime-tp6-live-firefox-imgur**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **browsertime-tp6-live-safari-imgur**
   - ❌
   - ❌
   - ❌
@@ -38073,11 +37808,6 @@ Tests for page-load performance. The links direct to the actual websites that ar
   - ❌
   - ❌
   - ❌
-* - **browsertime-tp6-live-safari-linkedin**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
 :::
 
 
@@ -38371,11 +38101,6 @@ Tests for page-load performance. The links direct to the actual websites that ar
   - ❌
   - ❌
 * - **browsertime-tp6-live-firefox-microsoft**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **browsertime-tp6-live-safari-microsoft**
   - ❌
   - ❌
   - ❌
@@ -39706,11 +39431,6 @@ Tests for page-load performance. The links direct to the actual websites that ar
   - ❌
   - ❌
   - ❌
-* - **browsertime-tp6-live-safari-paypal**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
 :::
 
 
@@ -40008,11 +39728,6 @@ Tests for page-load performance. The links direct to the actual websites that ar
   - ❌
   - ❌
   - ❌
-* - **browsertime-tp6-live-safari-pinterest**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
 :::
 
 
@@ -40306,11 +40021,6 @@ Tests for page-load performance. The links direct to the actual websites that ar
   - ❌
   - ❌
 * - **browsertime-tp6-live-firefox-reddit**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **browsertime-tp6-live-safari-reddit**
   - ❌
   - ❌
   - ❌
@@ -41018,11 +40728,6 @@ Tests for page-load performance. The links direct to the actual websites that ar
   - ❌
   - ❌
 * - **browsertime-tp6-live-firefox-tumblr**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **browsertime-tp6-live-safari-tumblr**
   - ❌
   - ❌
   - ❌
@@ -42149,11 +41854,6 @@ Tests for page-load performance. The links direct to the actual websites that ar
   - ❌
   - ❌
   - ❌
-* - **browsertime-tp6-live-safari-wikipedia**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
 :::
 
 
@@ -42517,11 +42217,6 @@ Tests for page-load performance. The links direct to the actual websites that ar
   - ❌
   - ❌
   - ❌
-* - **browsertime-tp6-live-safari-yahoo-mail**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
 :::
 
 
@@ -42857,11 +42552,6 @@ Tests for page-load performance. The links direct to the actual websites that ar
   - ❌
   - ❌
 * - **browsertime-tp6-live-firefox-youtube**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-* - **browsertime-tp6-live-safari-youtube**
   - ❌
   - ❌
   - ❌
@@ -49101,18 +48791,20 @@ A composite benchmark that measures page loading and sub-navigation performance 
 * **cold**: true
 * **custom data**: true
 * **expected**: pass
+* **expose browser profiler**: true
 * **gecko profile interval**: 1
 * **interactive**: true
-* **link searchfox**: {searchfox}`testing/raptor/raptor/tests/nav-bench/browsertime-nav-bench.toml#59`
+* **link searchfox**: {searchfox}`testing/raptor/raptor/tests/nav-bench/browsertime-nav-bench.toml#60`
 * **lower is better**: false
 * **measure**: SpeedIndex
 * **page cycles**: 1
 * **page timeout**: 600000
 * **playback**: mitmproxy
 * **playback manifests dir**: nav-bench
+* **playback mode**: direct
 * **playback pageset manifest**: mitm12-darwin-firefox-amazon-nav.manifest,mitm12-darwin-firefox-bbc-nav.manifest,mitm12-darwin-firefox-duckduckgo-nav.manifest,mitm12-darwin-firefox-facebook-nav.manifest,mitm12-darwin-firefox-google-docs-nav.manifest,mitm12-darwin-firefox-google-nav.manifest,mitm12-darwin-firefox-reddit-nav.manifest,mitm12-darwin-firefox-wikipedia-nav.manifest,mitm12-darwin-firefox-yahoo-nav.manifest
 * **playback version**: 12.2.1
-* **preferences**: fission.bfcacheInParent=false browser.sessionhistory.max_total_viewers=0 network.http.http3.enable=false network.http.altsvc.enabled=false network.dns.forceResolve=192.0.2.1
+* **preferences**: fission.bfcacheInParent=false browser.sessionhistory.max_total_viewers=0 network.http.http3.enable=false network.http.altsvc.enabled=false
 * **support class**: nav_bench.py
 * **test cmds**: ['wait.byTime', '30000'] ['measure.start', 'google-nav-load'] ['navigate', 'https://www.google.com/'] ['wait.byTime', '2000'] ['measure.stop', ''] ['navigate', 'about:blank'] ['wait.byTime', '1000'] ['measure.start', 'facebook-nav-load'] ['navigate', 'https://www.facebook.com/Cristiano'] ['wait.byTime', '2000'] ['measure.stop', ''] ['navigate', 'about:blank'] ['wait.byTime', '1000'] ['measure.start', 'yahoo-nav-load'] ['navigate', 'https://ca.yahoo.com/'] ['wait.byTime', '2000'] ['measure.stop', ''] ['navigate', 'about:blank'] ['wait.byTime', '1000'] ['measure.start', 'amazon-nav-load'] ['navigate', 'https://www.amazon.ca/s?k=laptop&ref=nb_sb_noss_1'] ['wait.byTime', '2000'] ['measure.stop', ''] ['navigate', 'about:blank'] ['wait.byTime', '1000'] ['measure.start', 'bbc-nav-load'] ['navigate', 'https://www.bbc.com/news/'] ['wait.byTime', '2000'] ['measure.stop', ''] ['measure.start', 'bbc-nav-subnav'] ['click.bySelectorAndWait', 'a[href*="bbcindepth"]'] ['wait.byTime', '2000'] ['measure.stop', ''] ['navigate', 'about:blank'] ['wait.byTime', '1000'] ['measure.start', 'duckduckgo-nav-load'] ['navigate', 'https://duckduckgo.com/?q=mandelbrot+set'] ['wait.byTime', '2000'] ['measure.stop', ''] ['measure.start', 'duckduckgo-nav-subnav'] ['click.bySelectorAndWait', 'nav ul li:nth-of-type(2) > a'] ['wait.byTime', '2000'] ['measure.stop', ''] ['navigate', 'about:blank'] ['wait.byTime', '1000'] ['measure.start', 'reddit-nav-load'] ['navigate', 'https://www.reddit.com/r/IAmA/comments/m8n4vt/im_bill_gates_cochair_of_the_bill_and_melinda/'] ['wait.byTime', '3000'] ['measure.stop', ''] ['navigate', 'about:blank'] ['wait.byTime', '1000'] ['measure.start', 'google-docs-nav-load'] ['navigate', 'https://docs.google.com/document/d/1US-07msg12slQtI_xchzYxcKlTs6Fp7WqIc6W5GK5M8/edit?usp=sharing'] ['wait.byTime', '3000'] ['measure.stop', ''] ['navigate', 'about:blank'] ['wait.byTime', '1000'] ['measure.start', 'wikipedia-nav-load'] ['navigate', 'https://en.wikipedia.org/wiki/Barack_Obama'] ['wait.byTime', '2000'] ['measure.stop', ''] ['navigate', 'about:blank'] ['wait.byTime', '1000'] ['measure.start', 'google-docs-nav-warm'] ['navigate', 'https://docs.google.com/document/d/1US-07msg12slQtI_xchzYxcKlTs6Fp7WqIc6W5GK5M8/edit?usp=sharing'] ['wait.byTime', '3000'] ['measure.stop', ''] ['navigate', 'about:blank'] ['wait.byTime', '1000']
 * **test url**: <about:blank>
@@ -49157,40 +48849,6 @@ A composite benchmark that measures page loading and sub-navigation performance 
 
 
 :::{list-table} **{ref}`test-linux2404-64/opt <hardware-hpe-moonshot>`**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **browsertime-nav-bench-firefox-nav-bench**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-:::
-
-
-:::{list-table} **{ref}`test-macosx1470-64-shippable/opt <hardware-mac-mini-r8>`**
-:widths: 30 15 15 15 15
-:header-rows: 1
-
-* - **Test Name**
-  - mozilla-central
-  - autoland
-  - mozilla-release
-  - mozilla-beta
-* - **browsertime-nav-bench-firefox-nav-bench**
-  - ❌
-  - ❌
-  - ❌
-  - ❌
-:::
-
-
-:::{list-table} **{ref}`test-macosx1470-64/opt <hardware-mac-mini-r8>`**
 :widths: 30 15 15 15 15
 :header-rows: 1
 

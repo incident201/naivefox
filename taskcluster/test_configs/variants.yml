@@ -197,15 +197,6 @@ geckoview-no-fission:
             extra-options:
                 - "--disable-fission"
 
-geckoview-fission:
-    description: "{description} with fission enabled and default isolation strategy"
-    component: "GeckoView::General"
-    expiration: "2027-03-01"
-    when:
-        <<: *gv_e10s_filter
-    suffix: "fis"
-    mozinfo: "fission"
-
 geckoview-fission-isolate-high-value:
     description: "{description} with fission enabled and isolation strategy isolateHighValue"
     component: "GeckoView::General"
@@ -226,6 +217,7 @@ geckoview-isolated-process:
     when:
         <<: *gv_e10s_filter
     suffix: "isolated"
+    treeherder-suffix: "iso"
     mozinfo: "isolated_process"
     merge:
         mozharness:
@@ -237,6 +229,7 @@ geckoview-isolated-process:
                 - "--setpref=media.android-media-codec.preferred=false"
                 - "--setpref=media.ffmpeg.encoder.enabled=true"
                 - "--setpref=media.ffvpx-hw.enabled=true"
+                - "--setpref=media.gmp.android.isolated-process=true"
                 - "--setpref=media.rdd-ffvpx.enabled=true"
                 - "--setpref=media.rdd-opus.enabled=true"
                 - "--setpref=media.rdd-process.enabled=true"
@@ -435,7 +428,6 @@ wmf-media-engine:
                 - "--setpref=media.wmf.media-engine.bypass-gfx-blocklist=true"
                 - "--setpref=media.eme.mfcdm.origin-filter.enabled=0"
 
-# For EME wpts, where we need non-local connection to the license server
 eme-wmf:
     description: "{description} with Windows Media Foundation based CDM enabled for EME wpt"
     component: "Core::Audio/Video: Playback"
@@ -445,17 +437,21 @@ eme-wmf:
     suffix: "emewmf"
     mozinfo: "emewmf"
     merge:
-        worker:
-            env:
-                MOZ_DISABLE_NONLOCAL_CONNECTIONS:
-                    '0'
         virtualization: virtual-with-gpu
-        mozharness:
-            extra-options:
-                - "--setpref=media.eme.playready.enabled=true"
-                - "--setpref=media.wmf.media-engine.enabled=2"
-                - "--setpref=media.wmf.media-engine.bypass-gfx-blocklist=true"
-                - "--setpref=media.eme.mfcdm.origin-filter.enabled=0"
+
+# For EME wpts which need the Widevine CDM to verify the host, i.e. a signed
+# build. Suites using this variant should set mozharness.requires-signed-builds
+# for it. Tests disabled due to the signing issue can be enabled with the
+# vmpSigned run info property, which is set when the build has Widevine VMP
+# signatures.
+eme-signed:
+    description: "{description} with a signed build for EME wpt"
+    component: "Core::Audio/Video: Playback"
+    expiration: "never"
+    when:
+        $eval: '"shippable" in task["test-platform"] && ("windows1" in task["test-platform"] || "macosx1500-aarch64" in task["test-platform"])'
+    suffix: "emesigned"
+    mozinfo: "emesigned"
 
 # Use OpenH264 plugin built in CI and make it preferred over other codecs.
 openh264:
@@ -661,6 +657,18 @@ draw-snapshot:
             extra-options:
                 - "--setpref=reftest.use-draw-snapshot=true"
 
+native-printer:
+    description: "{description} through the system PDF printer"
+    component: "Core::Printing: Output"
+    suffix: "np"
+    expiration: "never"
+    when:
+        $eval: '"windows" in task["test-platform"]'
+    merge:
+        mozharness:
+            extra-options:
+                - "--setpref=remote.print.printer_name=\"Microsoft Print to PDF\""
+
 async-event-dispatching:
     description: "{description} with async widget event dispatching"
     component: "Remote Protocol::Agent"
@@ -753,7 +761,7 @@ no-nova:
 urlbar-ipc:
     description: "{description} with the urlbar actor message-passing path forced on"
     component: "Firefox::Address Bar"
-    expiration: "2027-06-01"
+    expiration: "never"
     suffix: "uipc"
     mozinfo: "urlbar_ipc"
     merge:

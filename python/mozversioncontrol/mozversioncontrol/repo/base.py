@@ -476,6 +476,11 @@ class Repository(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def configure(self, state_dir: Path, update_only: bool = False):
+    def configure(
+        self,
+        state_dir: Path,
+        update_only: bool = False,
+        no_system_changes: bool = False,
+    ):
         """Perform initial VCS setup, applying sensible defaults for configuration."""
         pass

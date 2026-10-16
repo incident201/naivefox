@@ -322,14 +322,11 @@ class HTMLCanvasElement final : public nsGenericHTMLElement,
 
   CSSIntSize GetWidthHeight() override;
 
-  bool CanCreateContext() const override { return !mOffscreenCanvas; }
-
   virtual already_AddRefed<nsICanvasRenderingContextInternal> CreateContext(
       CanvasContextType aContextType) override;
 
-  nsresult UpdateContext(JSContext* aCx,
-                         JS::Handle<JS::Value> aNewContextOptions,
-                         ErrorResult& aRvForDictionaryInit) override;
+  bool UpdateContext(
+      const CanvasRenderingContextOptions* aOptions = nullptr) override;
 
   nsresult ExtractData(JSContext* aCx, nsIPrincipal& aSubjectPrincipal,
                        nsAString& aType, const nsAString& aOptions,

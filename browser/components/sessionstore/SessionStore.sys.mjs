@@ -520,7 +520,8 @@ class _SessionStore {
   // states for all recently closed windows
   #closedWindows = [];
 
-  #savedGroups = /** @type {SavedTabGroupStateData[]} */ ([]);
+  /** @type {SavedTabGroupStateData[]} */
+  #savedGroups = [];
 
   /**
    * States for all saved and closed tab groups.
@@ -573,7 +574,8 @@ class _SessionStore {
    *   The unique ID of the item that closed.
    */
 
-  #lastClosedActions = /** @type {CloseAction[]} */ ([]);
+  /** @type {CloseAction[]} */
+  #lastClosedActions = [];
 
   /**
    * Removes an object from the #lastClosedActions list
@@ -812,10 +814,9 @@ class _SessionStore {
           if (ss.sessionType == ss.DEFER_SESSION) {
             let [iniState, remainingState] =
               this.#prepDataForDeferredRestore(state);
-            // Should null out state when iniState carries nothing to restore
-            // now, but savedGroups is always an array, so this is always true
-            // and the else never runs. TODO (Bug 2076441).
-            if (iniState.windows.length || iniState.savedGroups) {
+            // iniState carries windows with pinned tabs to open or closed tabs
+            // and groups to carry over, and/or saved groups to preserve.
+            if (iniState.windows.length || iniState.savedGroups.length) {
               state = iniState;
             } else {
               state = null;
@@ -866,7 +867,13 @@ class _SessionStore {
                 decision.action = "interstitial";
                 // replace the crashed session with a restore-page-only session
                 let url = "about:sessionrestore";
-                let formdata = { id: { sessionData: state }, url };
+                let formdata = {
+                  id: {
+                    sessionData: state,
+                    showReason: decision.interstitialReason,
+                  },
+                  url,
+                };
                 let entry = {
                   url,
                   triggeringPrincipal_base64:
@@ -4639,20 +4646,21 @@ class _SessionStore {
    */
   #resolveClosedDataSource(aSource) {
     let winData;
+    let options = /** @type {ClosedDataSourceOptions} */ (aSource);
     if (aSource instanceof Ci.nsIDOMWindow) {
       winData = this.#getWindowStateData(aSource);
-    } else if (aSource.sourceWindow instanceof Ci.nsIDOMWindow) {
-      winData = this.#getWindowStateData(aSource.sourceWindow);
-    } else if (typeof aSource.sourceClosedId == "number") {
-      winData = this.#getClosedWindowDataByClosedId(aSource.sourceClosedId);
+    } else if (options.sourceWindow instanceof Ci.nsIDOMWindow) {
+      winData = this.#getWindowStateData(options.sourceWindow);
+    } else if (typeof options.sourceClosedId == "number") {
+      winData = this.#getClosedWindowDataByClosedId(options.sourceClosedId);
       if (!winData) {
         throw Components.Exception(
           "No such closed window",
           Cr.NS_ERROR_INVALID_ARG
         );
       }
-    } else if (typeof aSource.sourceWindowId == "string") {
-      let win = this.getWindowById(aSource.sourceWindowId);
+    } else if (typeof options.sourceWindowId == "string") {
+      let win = this.getWindowById(options.sourceWindowId);
       winData = this.#getWindowStateData(win);
     } else {
       throw Components.Exception(
@@ -9159,6 +9167,8 @@ class _SessionStore {
       Glean.tabgroup.groupInteractions.open_suggest.add(1);
     } else if (source == TabMetrics.METRIC_SOURCE.TAB_OVERFLOW_MENU) {
       Glean.tabgroup.groupInteractions.open_tabmenu.add(1);
+    } else if (source == TabMetrics.METRIC_SOURCE.APP_MENU_GROUP_LIST) {
+      Glean.tabgroup.groupInteractions.open_appmenu_list.add(1);
     } else if (source == TabMetrics.METRIC_SOURCE.RECENT_TABS) {
       Glean.tabgroup.groupInteractions.open_recent.add(1);
     }

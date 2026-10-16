@@ -104,11 +104,6 @@ skip-if = [
 ]
 
 ["browser_fontSize_change.js"]
-skip-if = [
-  "os == 'linux' && os_version == '24.04' && arch == 'x86_64' && display == 'x11' && asan && swgl", # Bug 1775867
-  "os == 'linux' && os_version == '24.04' && arch == 'x86_64' && display == 'x11' && opt", # Bug 1775867
-  "os == 'linux' && os_version == '24.04' && arch == 'x86_64' && display == 'x11' && tsan && swgl", # Bug 1775867
-]
 
 ["browser_fullscreen.js"]
 
@@ -144,6 +139,8 @@ support-files = ["test-page-with-nan-video-duration.html"]
 ["browser_noPlayerControlsOnMiddleRightClick.js"]
 
 ["browser_noToggleOnAudio.js"]
+
+["browser_occludedSelectedTab.js"]
 
 ["browser_occluded_window.js"]
 
@@ -195,7 +192,6 @@ skip-if = [
 
 ["browser_text_tracks_webvtt_3.js"]
 skip-if = [
-  "os == 'win' && os_version == '11.26100' && arch == 'x86_64' && ccov",
   "os == 'win' && os_version == '11.26200' && arch == 'x86_64' && ccov",
 ]
 
@@ -226,9 +222,6 @@ skip-if = [
 ]
 
 ["browser_togglePolicies.js"]
-skip-if = [
-  "os == 'mac' && os_version == '14.70' && arch == 'x86_64'", # Bug 1869710
-]
 
 ["browser_togglePositionChange.js"]
 
@@ -250,7 +243,6 @@ skip-if = [
 
 ["browser_urlbar_toggle.js"]
 skip-if = [
-  "os == 'win' && os_version == '11.26100' && arch == 'x86_64' && debug && msix && verify-standalone", # Bug 1833445
   "os == 'win' && os_version == '11.26200' && arch == 'x86_64' && debug && msix && verify-standalone", # Bug 1833445
 ]
 

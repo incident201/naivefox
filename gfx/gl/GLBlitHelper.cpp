@@ -20,6 +20,7 @@
 #include "mozilla/gfx/BuildConstants.h"
 #include "mozilla/gfx/Logging.h"
 #include "mozilla/gfx/Matrix.h"
+#include "mozilla/gfx/gfxVars.h"
 #include "mozilla/layers/CompositeProcessFencesHolderMap.h"
 #include "mozilla/layers/GpuFence.h"
 #include "mozilla/layers/ImageDataSerializer.h"
@@ -1183,6 +1184,13 @@ bool GLBlitHelper::Blit(const java::GeckoSurfaceTexture::Ref& surfaceTexture,
                         const gfx::IntRect& destRect,
                         const OriginPos destOrigin, const gfx::IntSize& fbSize,
                         Maybe<gfxAlphaType> convertAlpha) const {
+  MOZ_ASSERT(!gfx::gfxVars::ForceAImageReaderAndroid());
+
+  if (gfx::gfxVars::ForceAImageReaderAndroid()) {
+    MOZ_ASSERT_UNREACHABLE("unexpected to be called");
+    return false;
+  }
+
   if (!surfaceTexture) {
     return false;
   }

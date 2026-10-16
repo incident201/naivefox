@@ -948,13 +948,19 @@ std::ostream& operator<<(std::ostream& aOut,
 
 template <typename T>
 static inline T ChromaSize(const T& aYSize, ChromaSubsampling aSubsampling) {
+  MOZ_ASSERT(aYSize.width >= 0 && aYSize.height >= 0);
+  // Equivalent to (aDimension + 1) / 2 for non-negative dimensions without
+  // overflowing at the maximum value.
+  const auto halfCeil = [](auto aDimension) {
+    return aDimension - aDimension / 2;
+  };
   switch (aSubsampling) {
     case ChromaSubsampling::FULL:
       return aYSize;
     case ChromaSubsampling::HALF_WIDTH:
-      return T((aYSize.width + 1) / 2, aYSize.height);
+      return T(halfCeil(aYSize.width), aYSize.height);
     case ChromaSubsampling::HALF_WIDTH_AND_HEIGHT:
-      return T((aYSize.width + 1) / 2, (aYSize.height + 1) / 2);
+      return T(halfCeil(aYSize.width), halfCeil(aYSize.height));
   }
   MOZ_CRASH("bad ChromaSubsampling");
 }

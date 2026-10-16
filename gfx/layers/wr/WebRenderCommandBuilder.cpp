@@ -19,6 +19,8 @@
 #include "mozilla/ProfilerMarkers.h"
 #include "mozilla/SVGGeometryFrame.h"
 #include "mozilla/SVGImageFrame.h"
+#include "mozilla/SVGTextFrame.h"
+#include "mozilla/SVGUtils.h"
 #include "mozilla/StaticPrefs_gfx.h"
 #include "mozilla/StaticPrefs_layout.h"
 #include "mozilla/UniquePtr.h"
@@ -1216,9 +1218,27 @@ static ItemActivity IsItemProbablyActive(
         return ItemActivity::Must;
       }
 
-      auto activity = HasActiveChildren(*transformItem->GetChildren(), aBuilder,
-                                        aResources, aSc, aManager,
-                                        aDisplayListBuilder, aUniformlyScaled);
+      // Blob layers that are children of a non-axis-aligned transformation
+      // such as a rotation or a skew are rasterized then transformed which
+      // leads to resampling/quality issues.
+      // So shapes that merely could be active must not pull such a transform
+      // out of the blob. The scale of the transform also has to be folded
+      // into the uniform scale check that the children see.
+      bool axisAligned = !t2d.HasNonAxisAlignedTransform();
+      bool uniformlyScaled = aUniformlyScaled;
+      if (axisAligned) {
+        auto scales = t2d.ScaleFactors();
+        uniformlyScaled =
+            uniformlyScaled && fabs(scales.xScale - scales.yScale) <
+                                   0.1 * std::max(scales.xScale, scales.yScale);
+      }
+
+      auto activity = HasActiveChildren(
+          *transformItem->GetChildren(), aBuilder, aResources, aSc, aManager,
+          aDisplayListBuilder, axisAligned && uniformlyScaled);
+      if (!axisAligned && activity < ItemActivity::Must) {
+        activity = ItemActivity::No;
+      }
 
       if (transformItem->MayBeAnimated(aDisplayListBuilder)) {
         activity = CombineActivity(activity, ItemActivity::Should);
@@ -1251,11 +1271,27 @@ static ItemActivity IsItemProbablyActive(
     }
     case DisplayItemType::TYPE_SVG_IMAGE: {
       auto* svgItem = static_cast<DisplaySVGImage*>(aItem);
-      if (StaticPrefs::gfx_webrender_svg_images() && aUniformlyScaled &&
+      // Images are sampled rather than edge anti-aliased, so the non-uniform
+      // scale restriction that applies to shapes is not needed for them.
+      bool scaleOk = aUniformlyScaled ||
+                     StaticPrefs::gfx_webrender_svg_images_non_uniform_scale();
+      if (StaticPrefs::gfx_webrender_svg_images() && scaleOk &&
           svgItem->ShouldBeActive(aBuilder, aResources, aSc, aManager,
                                   aDisplayListBuilder)) {
         return AssessBounds(aSc, aDisplayListBuilder, aItem,
                             aHasActivePrecedingSibling);
+      }
+
+      return ItemActivity::No;
+    }
+    case DisplayItemType::TYPE_SVG_TEXT: {
+      auto* textItem = static_cast<DisplaySVGText*>(aItem);
+      if (StaticPrefs::gfx_webrender_svg_text() &&
+          textItem->ShouldBeActive(aBuilder, aResources, aSc, aManager,
+                                   aDisplayListBuilder)) {
+        // Text is expensive to rasterize on the CPU, so it is worth a layer
+        // split whatever its size.
+        return ItemActivity::Should;
       }
 
       return ItemActivity::No;
@@ -1275,6 +1311,13 @@ static ItemActivity IsItemProbablyActive(
         auto activity =
             HasActiveChildren(*aItem->GetChildren(), aBuilder, aResources, aSc,
                               aManager, aDisplayListBuilder, aUniformlyScaled);
+        // A clip that WebRender can express natively costs nothing, so the
+        // children decide.
+        if (StaticPrefs::gfx_webrender_svg_mask_propagates_activity() &&
+            SVGUtils::DetermineMaskUsage(aItem->Frame(), false)
+                .IsSimpleClipShape()) {
+          return activity;
+        }
         // The mask is painted and uploaded as an image either way, so a child
         // that merely could be active is not worth the extra layers. A child
         // that should be active is: any change inside an inactive masked group
@@ -1334,6 +1377,39 @@ void Grouper::ConstructGroups(nsDisplayListBuilder* aDisplayListBuilder,
   // making it active won't add extra layers.
   bool isFirst = true;
 
+  // WebRender's anti-aliasing approximation is not very good under
+  // non-uniform scales.
+  const bool uniformlyScaled =
+      fabs(aGroup->mScale.xScale - aGroup->mScale.yScale) < 0.1;
+
+  // Items in the middle of the list normally need to be "Should" active to be
+  // worth splitting the blob. When most of the list could be active, the
+  // blob would be split many times anyway, so every item that could be
+  // active is made active instead, which yields no blob at all in the best
+  // case.
+  bool lowerMiddleThreshold =
+      StaticPrefs::gfx_webrender_blob_relaxed_active_threshold();
+  uint32_t mostlyActivePercent =
+      StaticPrefs::gfx_webrender_svg_activity_mostly_active_percent();
+  if (!lowerMiddleThreshold && mostlyActivePercent > 0) {
+    uint32_t total = 0;
+    uint32_t couldBeActive = 0;
+    for (nsDisplayItem* item : *aList) {
+      if (item->GetType() == DisplayItemType::TYPE_COMPOSITOR_HITTEST_INFO ||
+          item->IsInvisible()) {
+        continue;
+      }
+      total++;
+      if (IsItemProbablyActive(item, aBuilder, aResources, aSc, manager,
+                               mDisplayListBuilder, false,
+                               uniformlyScaled) >= ItemActivity::Could) {
+        couldBeActive++;
+      }
+    }
+    lowerMiddleThreshold =
+        total > 0 && couldBeActive * 100 >= total * mostlyActivePercent;
+  }
+
   for (auto it = aList->begin(); it != aList->end(); ++it) {
     nsDisplayItem* item = *it;
     MOZ_ASSERT(item);
@@ -1359,19 +1435,12 @@ void Grouper::ConstructGroups(nsDisplayListBuilder* aDisplayListBuilder,
     ++next;
     bool isLast = next == aList->end();
 
-    // WebRender's anti-aliasing approximation is not very good under
-    // non-uniform scales.
-    bool uniformlyScaled =
-        fabs(aGroup->mScale.xScale - aGroup->mScale.yScale) < 0.1;
-
     auto activity = IsItemProbablyActive(
         item, aBuilder, aResources, aSc, manager, mDisplayListBuilder,
         encounteredActiveItem, uniformlyScaled);
-    auto threshold =
-        isFirst || isLast ||
-                StaticPrefs::gfx_webrender_blob_relaxed_active_threshold()
-            ? ItemActivity::Could
-            : ItemActivity::Should;
+    auto threshold = isFirst || isLast || lowerMiddleThreshold
+                         ? ItemActivity::Could
+                         : ItemActivity::Should;
 
     if (activity >= threshold) {
       encounteredActiveItem = true;
@@ -2443,7 +2512,7 @@ bool WebRenderCommandBuilder::PushImageProvider(
     image::ImgDrawResult aDrawResult, mozilla::wr::DisplayListBuilder& aBuilder,
     mozilla::wr::IpcResourceUpdateQueue& aResources,
     const LayoutDeviceRect& aRect, const LayoutDeviceRect& aClip,
-    bool aRasterizedForRect) {
+    bool aRasterizedForRect, float aOpacity) {
   Maybe<wr::ImageKey> key =
       CreateImageProviderKey(aItem, aProvider, aDrawResult, aResources);
   if (!key) {
@@ -2456,7 +2525,7 @@ bool WebRenderCommandBuilder::PushImageProvider(
   auto r = wr::ToLayoutRect(aRect);
   auto c = wr::ToLayoutRect(aClip);
   aBuilder.PushImage(r, c, !aItem->BackfaceIsHidden(), antialiased, rendering,
-                     key.value(), true, wr::ColorF{1.0f, 1.0f, 1.0f, 1.0f},
+                     key.value(), true, wr::ColorF{1.0f, 1.0f, 1.0f, aOpacity},
                      false, false, aRasterizedForRect);
 
   return true;

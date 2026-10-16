@@ -1079,11 +1079,16 @@ nsresult nsUrlClassifierDBServiceWorker::CacheCompletions(
     }
     if (activeTable) {
       UniquePtr<ProtocolParser> pParse;
+      // ~ProtocolParserProtobuf() is private and required for
+      // std::make_unique<ProtocolParserProtobuf>(...)
+      // see https://github.com/llvm/llvm-project/pull/229802
+      // NOLINTBEGIN(modernize-make-unique)
       if (result->Ver() == CacheResult::V2) {
         pParse.reset(new ProtocolParserV2());
       } else {
         pParse.reset(new ProtocolParserProtobuf());
       }
+      // NOLINTEND(modernize-make-unique)
 
       RefPtr<TableUpdate> tu = pParse->GetTableUpdate(result->table);
 

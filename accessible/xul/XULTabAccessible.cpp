@@ -136,7 +136,7 @@ bool XULTabsAccessible::HasPrimaryAction() const { return false; }
 
 void XULTabsAccessible::Value(nsString& aValue) const { aValue.Truncate(); }
 
-ENameValueFlag XULTabsAccessible::NativeName(nsString& aName) const {
+ENameValueFlag XULTabsAccessible::NativeName(nsString& /*aName*/) const {
   // no name
   return eNameOK;
 }

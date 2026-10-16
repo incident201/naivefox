@@ -11,6 +11,7 @@
 #include "DeviceLostInfo.h"
 #include "PipelineLayout.h"
 #include "Sampler.h"
+#include "SupportedLimits.h"
 #include "js/Warnings.h"  // JS::WarnUTF8
 #include "mozilla/Assertions.h"
 #include "mozilla/ProfilerMarkers.h"
@@ -82,9 +83,9 @@ void wgpu_child_resolve_request_adapter_promise(
   }
 }
 
-void wgpu_child_resolve_request_device_promise(WGPUWebGPUChildPtr aChild,
-                                               RawId aDeviceId, RawId aQueueId,
-                                               const nsCString* aError) {
+void wgpu_child_resolve_request_device_promise(
+    WGPUWebGPUChildPtr aChild, RawId aDeviceId, RawId aQueueId,
+    const WGPULimits* aLimits, const ffi::WGPUFfiRequestDeviceError* aError) {
   auto* c = static_cast<WebGPUChild*>(aChild);
   auto pending_promise = c->DequeueRequestDevicePromise();
 
@@ -92,18 +93,32 @@ void wgpu_child_resolve_request_device_promise(WGPUWebGPUChildPtr aChild,
   MOZ_RELEASE_ASSERT(pending_promise.queue_id == aQueueId);
 
   if (aError == nullptr) {
+    MOZ_RELEASE_ASSERT(aLimits);
+    // Not `pending_promise.limits`: those are the limits we requested, which
+    // wgpu-core may have adjusted.
+    RefPtr<SupportedLimits> limits =
+        new SupportedLimits(pending_promise.adapter, *aLimits);
     RefPtr<Device> device =
         new Device(pending_promise.adapter, pending_promise.device_id,
-                   pending_promise.queue_id, pending_promise.features,
-                   pending_promise.limits, pending_promise.adapter_info,
-                   pending_promise.lost_promise);
+                   pending_promise.queue_id, pending_promise.features, limits,
+                   pending_promise.adapter_info, pending_promise.lost_promise);
     device->SetLabel(pending_promise.label);
     promise::MaybeResolve(std::move(pending_promise.promise),
                           std::move(device));
-  } else {
-    promise::MaybeRejectWithOperationError(std::move(pending_promise.promise),
-                                           nsCString(*aError));
+    return;
   }
+
+  switch (aError->ty) {
+    case ffi::WGPUFfiRequestDeviceErrorType_TypeError:
+      promise::MaybeRejectWithTypeError(std::move(pending_promise.promise),
+                                        nsCString(*aError->message));
+      return;
+    case ffi::WGPUFfiRequestDeviceErrorType_OperationError:
+      promise::MaybeRejectWithOperationError(std::move(pending_promise.promise),
+                                             nsCString(*aError->message));
+      return;
+  }
+  MOZ_CRASH("invalid WGPUFfiRequestDeviceErrorType");
 }
 
 void wgpu_child_resolve_pop_error_scope_promise(

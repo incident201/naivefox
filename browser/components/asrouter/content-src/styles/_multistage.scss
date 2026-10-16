@@ -32,8 +32,6 @@ html {
 // Below variables are used via config JSON in AboutWelcomeDefaults
 // and referenced below inside dummy class to pass test browser_parsable_css
 .dummy {
-  /* No need to check for stylelint violations */
-  /* stylelint-disable-next-line */
   background: var(--mr-welcome-background-color) var(--mr-welcome-background-gradient) var(--mr-secondary-position) var(--mr-screen-background-color) var(--mr-smart-window-background-gradient);
 }
 
@@ -111,6 +109,22 @@ html {
 }
 
 .onboardingContainer:has(.pinnable-sites-list) {
+  // Messages can layer their hero image over this gradient. Each stop resolves
+  // to the same flat color in dark mode (see the smart-window gradient above
+  // for the same per-stop light-dark() pattern).
+  --pinnable-sites-gradient: linear-gradient(
+    0deg,
+    light-dark(rgb(252, 245, 240), var(--onboarding-dark-backdrop-color)) 0%,
+    light-dark(rgb(250, 236, 241), var(--onboarding-dark-backdrop-color)) 57%,
+    light-dark(rgb(245, 212, 245), var(--onboarding-dark-backdrop-color)) 100%
+  );
+
+  // Colors aren't forced in the spotlight, so use the colors the hero text is
+  // designed to sit on.
+  @media (prefers-contrast) {
+    --pinnable-sites-gradient: var(--mr-screen-background-color);
+  }
+
   .screen[pos='split'] {
     .section-main {
       .main-content {
@@ -137,6 +151,12 @@ html {
       // Wide layout reserves space below the subtitle for the hero image.
       .hero-text h2 {
         margin-block-end: 370px;
+      }
+
+      @media (prefers-contrast) {
+        .hero-text h2 {
+          color: var(--mr-screen-heading-color);
+        }
       }
     }
 
@@ -165,16 +185,16 @@ html {
         }
       }
 
+      // The dismiss button sits over the secondary section.
+      @media (prefers-contrast) {
+        .dismiss-button {
+          color: var(--mr-screen-heading-color);
+        }
+      }
+
       .section-secondary {
-        // Swap the wide-layout hero image for the pink hero gradient. Each stop
-        // resolves to the same flat color in dark mode (see the smart-window
-        // gradient above for the same per-stop light-dark() pattern).
-        background: linear-gradient(
-          0deg,
-          light-dark(rgb(252, 245, 240), var(--onboarding-dark-backdrop-color)) 0%,
-          light-dark(rgb(250, 236, 241), var(--onboarding-dark-backdrop-color)) 57%,
-          light-dark(rgb(245, 212, 245), var(--onboarding-dark-backdrop-color)) 100%
-        );
+        // Swap the wide-layout hero image for the pink hero gradient.
+        background: var(--pinnable-sites-gradient);
         height: auto;
         min-height: $small-secondary-section-height;
 
@@ -1190,19 +1210,19 @@ html {
       }
 
       &[data-theme='nova-smoke@mozilla.org'] {
-        --card-stack-color-1: light-dark(#FFF9F6, #3B3532); /* stylelint-disable-line stylelint-plugin-mozilla/use-design-tokens */
-        --card-stack-color-2: light-dark(#FBF4EE, #2F2926); /* stylelint-disable-line stylelint-plugin-mozilla/use-design-tokens */
-        --card-stack-color-3: light-dark(#E3DBD7, #201B18); /* stylelint-disable-line stylelint-plugin-mozilla/use-design-tokens */
-        --card-stack-flare: light-dark(#E3DBD7, #3B3532); /* stylelint-disable-line stylelint-plugin-mozilla/use-design-tokens */
+        --card-stack-color-1: light-dark(#FFF9F6, #3B3532);
+        --card-stack-color-2: light-dark(#FBF4EE, #2F2926);
+        --card-stack-color-3: light-dark(#E3DBD7, #201B18);
+        --card-stack-flare: light-dark(#E3DBD7, #3B3532);
       }
 
-      --card-stack-secondary-width: 318px; /* stylelint-disable-line stylelint-plugin-mozilla/use-design-tokens */
-      --card-stack-secondary-height: 150px; /* stylelint-disable-line stylelint-plugin-mozilla/use-design-tokens */
+      --card-stack-secondary-width: 318px;
+      --card-stack-secondary-height: 150px;
       --card-stack-flare-x: calc(var(--card-stack-secondary-width) / 2);
-      --card-stack-border: 1px solid var(--card-border-color); /* stylelint-disable-line stylelint-plugin-mozilla/use-design-tokens */
+      --card-stack-border: 1px solid var(--card-border-color);
       // Resting offsets of the two cards drawn behind the front one.
-      --card-stack-layer-1-offset: 8px; /* stylelint-disable-line stylelint-plugin-mozilla/use-design-tokens */
-      --card-stack-layer-2-offset: 16px; /* stylelint-disable-line stylelint-plugin-mozilla/use-design-tokens */
+      --card-stack-layer-1-offset: 8px;
+      --card-stack-layer-2-offset: 16px;
       // Keep in sync with CARD_STACK_TRANSITION_OUT_TIME in MultiStageAboutWelcome.jsx.
       --card-stack-duration: 400ms;
       // Distances go through --translate so that prefers-reduced-motion,
@@ -1214,53 +1234,67 @@ html {
         --card-stack-slot-shift: 0px;
       }
 
-      background-color: color-mix(in srgb, var(--background-color-box) 40%, var(--card-stack-color-1));
-      background-image: radial-gradient(circle 125px at var(--card-stack-flare-x) center, var(--card-stack-flare) 0%, transparent 100%); /* stylelint-disable-line stylelint-plugin-mozilla/use-design-tokens */
-      background-repeat: no-repeat;
-      border: var(--card-stack-border);
       border-radius: var(--border-radius-medium);
       box-sizing: border-box;
-      height: 204px; /* stylelint-disable-line stylelint-plugin-mozilla/use-design-tokens */
-      min-height: 204px; /* stylelint-disable-line stylelint-plugin-mozilla/use-design-tokens */
+      height: 204px;
+      min-height: 204px;
       position: relative;
       overflow: visible;
-
-      &:dir(rtl) {
-        background-image: radial-gradient(circle 125px at calc(100% - var(--card-stack-flare-x)) center, var(--card-stack-flare) 0%, transparent 100%); /* stylelint-disable-line stylelint-plugin-mozilla/use-design-tokens */
-      }
+      // The screen becomes a stacking context anyway in RTL (it's flipped with
+      // a transform) and while animating, so always isolate it and draw the
+      // front card on its own layer above the back cards.
+      isolation: isolate;
 
       @container card-stack (width <= #{$card-stack-narrow-width}) {
         --card-stack-flare-x: calc(var(--card-stack-secondary-width) / 3)
       }
 
-      @container card-stack (width <= #{$card-stack-stacked-width}) {
-        background-position-y: calc(var(--card-stack-secondary-height) / -2);
-        background-image: radial-gradient(circle 100px at center, var(--card-stack-flare) 0%, transparent 100%);
+      .card-stack-front,
+      &::before,
+      &::after {
+        position: absolute;
+        box-sizing: border-box;
+        border: var(--card-stack-border);
+        border-radius: var(--border-radius-medium);
+      }
+
+      .card-stack-front {
+        inset: 0;
+        background-color: color-mix(in srgb, var(--background-color-box) 40%, var(--card-stack-color-1));
+        background-image: radial-gradient(circle 125px at var(--card-stack-flare-x) center, var(--card-stack-flare) 0%, transparent 100%);
+        background-repeat: no-repeat;
+        pointer-events: none;
+        z-index: -1;
+
+        &:dir(rtl) {
+          background-image: radial-gradient(circle 125px at calc(100% - var(--card-stack-flare-x)) center, var(--card-stack-flare) 0%, transparent 100%);
+        }
+
+        @container card-stack (width <= #{$card-stack-stacked-width}) {
+          background-position-y: calc(var(--card-stack-secondary-height) / -2);
+          background-image: radial-gradient(circle 100px at center, var(--card-stack-flare) 0%, transparent 100%);
+        }
       }
 
       &::before,
       &::after {
         content: '';
-        position: absolute;
         inset-block-start: 0;
         block-size: 100%;
-        box-sizing: border-box;
-        border: var(--card-stack-border);
-        border-radius: var(--border-radius-medium);
-        z-index: -1;
       }
 
       &::before {
-        inset-inline: 18px; /* stylelint-disable-line stylelint-plugin-mozilla/use-design-tokens */
+        inset-inline: 18px;
         background-color: var(--card-stack-color-2);
         translate: 0 var(--card-stack-layer-1-offset);
+        z-index: -2;
       }
 
       &::after {
-        inset-inline: 42px; /* stylelint-disable-line stylelint-plugin-mozilla/use-design-tokens */
+        inset-inline: 42px;
         background-color: var(--card-stack-color-3);
         translate: 0 var(--card-stack-layer-2-offset);
-        z-index: -2;
+        z-index: -3;
       }
 
       @media (prefers-reduced-motion: no-preference) {
@@ -1271,11 +1305,11 @@ html {
       }
 
       &:hover::before {
-        translate: 0 12px; /* stylelint-disable-line stylelint-plugin-mozilla/use-design-tokens */
+        translate: 0 12px;
       }
 
       &:hover::after {
-        translate: 0 24px; /* stylelint-disable-line stylelint-plugin-mozilla/use-design-tokens */
+        translate: 0 24px;
       }
 
       @container card-stack (width <= #{$card-stack-stacked-width}) {
@@ -1302,13 +1336,13 @@ html {
         overflow: hidden;
 
         @container card-stack (width <= #{$card-stack-narrow-width}) {
-          width: 180px; /* stylelint-disable-line stylelint-plugin-mozilla/use-design-tokens */
-          margin-inline-start: 12px; /* stylelint-disable-line stylelint-plugin-mozilla/use-design-tokens */
+          width: 180px;
+          margin-inline-start: 12px;
         }
 
         @container card-stack (width <= #{$card-stack-stacked-width}) {
           height: var(--card-stack-secondary-height);
-          margin-block: 12px; /* stylelint-disable-line stylelint-plugin-mozilla/use-design-tokens */
+          margin-block: 12px;
           margin-inline: auto;
         }
       }
@@ -1398,8 +1432,8 @@ html {
 
       &[layout='last-card'] {
         --card-stack-flare-x: 50%;
-        --last-card-image-width: 120px; /* stylelint-disable-line stylelint-plugin-mozilla/use-design-tokens */
-        --last-card-image-height: 120px; /* stylelint-disable-line stylelint-plugin-mozilla/use-design-tokens */
+        --last-card-image-width: 120px;
+        --last-card-image-height: 120px;
         --last-card-image-margin-inline: var(--space-xlarge);
         --last-card-image-margin-block: 0 var(--space-medium);
         --last-card-split-delay: 500ms;
@@ -1408,8 +1442,11 @@ html {
         // The card is too narrow to split the text around the image, so the
         // image sits above the stacked title and subtitle instead
         @container card-stack (width <= #{$card-stack-stacked-width}) {
-          height: 300px; /* stylelint-disable-line stylelint-plugin-mozilla/use-design-tokens */
-          background-position-y: center;
+          height: 300px;
+
+          .card-stack-front {
+            background-position-y: center;
+          }
         }
 
         .section-secondary {
@@ -2994,7 +3031,6 @@ html {
           }
 
           &.centered {
-            /* stylelint-disable-next-line */
             border-radius: 8px 8px 0 0;
             background-color: var(--button-background-color-primary);
             color: var(--button-text-color-primary);
@@ -3011,7 +3047,6 @@ html {
             }
 
             &.backup {
-              /* stylelint-disable-next-line */
               border-radius: 10px 10px 0 0;
               background-color: var(--picker-backup-flair-background);
               color: var(--picker-backup-flair-color);
@@ -4154,7 +4189,6 @@ html {
       height: 6px;
       padding-block: 0;
       margin-block: 42px 0;
-      /* stylelint-disable-next-line stylelint-plugin-mozilla/no-non-semantic-token-usage */
       background-color: color-mix(in srgb, var(--button-text-color) 25%, transparent);
       justify-content: start;
       opacity: 1;

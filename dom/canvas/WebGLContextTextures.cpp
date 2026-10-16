@@ -6,7 +6,6 @@
 #include "GLContext.h"
 #include "WebGLBuffer.h"
 #include "WebGLContext.h"
-#include "WebGLContextUtils.h"
 #include "WebGLExtensions.h"
 #include "WebGLFramebuffer.h"
 #include "WebGLProgram.h"
@@ -56,8 +55,6 @@ void WebGLContext::BindTexture(GLenum rawTarget, WebGLTexture* newTex) {
   FuncScope funcScope(*this, "bindTexture");
   if (IsContextLost()) return;
   funcScope.mBindFailureGuard = true;
-
-  if (newTex && !ValidateObject("tex", *newTex)) return;
 
   // Need to check rawTarget first before comparing against newTex->Target() as
   // newTex->Target() returns a TexTarget, which will assert on invalid value.

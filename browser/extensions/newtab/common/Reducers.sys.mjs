@@ -255,6 +255,7 @@ export const INITIAL_STATE = {
   ExternalComponents: {
     components: [],
   },
+  ExtensionWidgets: {},
   PrivacyWidget: {
     initialized: false,
     // Count of trackers blocked today, fetched by PrivacyFeed.
@@ -306,6 +307,10 @@ export const INITIAL_STATE = {
      * the first update arrives, and for a profile with no default engine.
      */
     engineName: "",
+  },
+  Travel: {
+    initialized: false,
+    results: [],
   },
 };
 
@@ -1291,6 +1296,19 @@ function RecentSearches(prevState = INITIAL_STATE.RecentSearches, action) {
   }
 }
 
+function Travel(prevState = INITIAL_STATE.Travel, action) {
+  switch (action.type) {
+    case at.WIDGETS_TRAVEL_UPDATE:
+      return {
+        ...prevState,
+        ...action.data,
+        initialized: true,
+      };
+    default:
+      return prevState;
+  }
+}
+
 function Ads(prevState = INITIAL_STATE.Ads, action) {
   switch (action.type) {
     case at.ADS_INIT:
@@ -1460,6 +1478,15 @@ function ExternalComponents(
   }
 }
 
+function ExtensionWidgets(prevState = INITIAL_STATE.ExtensionWidgets, action) {
+  switch (action.type) {
+    case at.WIDGETS_EXTENSIONS_UPDATE:
+      return action.data;
+    default:
+      return prevState;
+  }
+}
+
 export const reducers = {
   TopSites,
   App,
@@ -1481,7 +1508,9 @@ export const reducers = {
   Weather,
   Stocks,
   ExternalComponents,
+  ExtensionWidgets,
   PrivacyWidget,
   PictureOfTheDay,
   RecentSearches,
+  Travel,
 };

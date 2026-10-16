@@ -3,21 +3,6 @@
 Services.prefs.setBoolPref("dom.serviceWorkers.testing.enabled", true);
 
 add_setup(() => {
-  // This test expects the deprecated legacy behaviors on web_accessible worker scripts
-  // to be disabled.
-  //
-  // TODO(Bug 2074192): remove this part along with removing the emergency rollback pref.
-  const DEPRECATED_WEBACCESSIBLE_WORKERS_PREF =
-    "extensions.web_accessible_workers.deprecated_behavior";
-  if (
-    Services.prefs.getBoolPref(DEPRECATED_WEBACCESSIBLE_WORKERS_PREF, false)
-  ) {
-    info(
-      "WARNING: Force disabling deprecated web_accessible workers behaviors enabled through prefs."
-    );
-    Services.prefs.setBoolPref(DEPRECATED_WEBACCESSIBLE_WORKERS_PREF, false);
-  }
-
   const swm = Cc["@mozilla.org/serviceworkers/manager;1"].getService(
     Ci.nsIServiceWorkerManager
   );
@@ -344,17 +329,10 @@ async function test_webpage_worker_redirected_to_ext_webaccessible({
     let expectedSharedWorkerResult = { hasEmittedErrorEvent: true };
     let assertMessage = "Expect new Worker to have emitted DOM event 'error'";
 
-    if (!testNestedWorker) {
-      if (AppConstants.MOZ_DIAGNOSTIC_ASSERT_ENABLED) {
-        expectedSharedWorkerResult = { skipped: true };
-        assertMessage +=
-          " and SharedWorker test be skipped due to MOZ_DIAGNOSTIC_ASSERT_ENABLED set to true";
-      } else {
-        expectedSharedWorkerResult.hasEmittedErrorEvent = {
-          errorOnConstructorCall: "AbortError",
-        };
-        assertMessage += " and new SharedWorker to raise an AbortError";
-      }
+    if (!testNestedWorker && AppConstants.MOZ_DIAGNOSTIC_ASSERT_ENABLED) {
+      expectedSharedWorkerResult = { skipped: true };
+      assertMessage +=
+        " and SharedWorker test be skipped due to MOZ_DIAGNOSTIC_ASSERT_ENABLED set to true";
     }
 
     Assert.deepEqual(

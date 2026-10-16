@@ -592,6 +592,9 @@ static void MaybeScheduleReflowSVGNonDisplayText(nsIFrame* aFrame) {
       svgTextFrame->HasAnyStateBits(NS_STATE_SVG_TEXT_IN_REFLOW)) {
     return;
   }
+  if (SVGUtils::AnyOuterSVGIsCallingReflowSVG(svgTextFrame)) {
+    return;
+  }
 
   svgTextFrame->ScheduleReflowSVGNonDisplayText(
       IntrinsicDirty::FrameAncestorsAndDescendants);
@@ -3067,6 +3070,17 @@ static void WrapSeparatorTransform(nsDisplayListBuilder* aBuilder,
   aParticipants->AppendToTop(item);
 }
 
+static bool HitTestsCapturedElementsAtLivePosition(nsPresContext* aPc) {
+  switch (StaticPrefs::dom_viewTransitions_hit_testing()) {
+    case 0:
+      return false;
+    case 1:
+      return true;
+    default:
+      return aPc->IsChrome();
+  }
+}
+
 // Try to compute a clip rect to bound the contents of the mask item
 // that will be built for |aMaskedFrame|. If we're not able to compute
 // one, return an empty Maybe.
@@ -3281,7 +3295,13 @@ void nsIFrame::BuildDisplayListForStackingContext(
   // the building of the display list for these frames, and then these APIs,
   // e.g. elementFromPoint(), will skip these frames as well.
   // https://drafts.csswg.org/css-view-transitions-1/#view-transition-stacking-layer
-  if (capturedByViewTransition && aBuilder->IsForEventDelivery()) {
+  //
+  // dom.viewTransitions.hit-testing can make us hit-test them at their live
+  // position instead, which chrome documents do by default so the browser UI
+  // stays interactive while it animates. See
+  // https://github.com/w3c/csswg-drafts/issues/10930
+  if (capturedByViewTransition && aBuilder->IsForEventDelivery() &&
+      !HitTestsCapturedElementsAtLivePosition(PresContext())) {
     return;
   }
 
@@ -4381,6 +4401,15 @@ void nsIFrame::BuildDisplayListForChild(nsDisplayListBuilder* aBuilder,
     return;
   }
 
+  if (aBuilder->IsInLineClampAbsPosTraversal()) {
+    const bool isOnForcedDescendPath = childOrOutOfFlow->HasAnyStateBits(
+        NS_FRAME_FORCE_DISPLAY_LIST_DESCEND_INTO);
+
+    if (!isOnForcedDescendPath) {
+      return;
+    }
+  }
+
   // If we're generating a display list for printing, include Link items for
   // frames that correspond to HTML link elements so that we can have active
   // links in saved PDF output. Note that the state of "within a link" is
@@ -4547,6 +4576,13 @@ void nsIFrame::BuildDisplayListForChild(nsDisplayListBuilder* aBuilder,
 
   NS_ASSERTION(!isStackingContext || pseudoStackingContext,
                "Stacking contexts must also be pseudo-stacking-contexts");
+
+  Maybe<nsDisplayListBuilder::AutoInLineClampAbsPosTraversal>
+      buildAbsPosNormally;
+  if (aBuilder->IsInLineClampAbsPosTraversal() &&
+      child->IsAbsolutelyPositioned() && savedOutOfFlowData) {
+    buildAbsPosNormally.emplace(aBuilder, false);
+  }
 
   nsDisplayListBuilder::AutoBuildingDisplayList buildingForChild(
       aBuilder, child, visible, dirty);
@@ -8837,6 +8873,34 @@ OverflowAreas nsIFrame::GetOverflowAreasRelativeToParent() const {
 
 OverflowAreas nsIFrame::GetActualAndNormalOverflowAreasRelativeToParent()
     const {
+  if (MOZ_UNLIKELY(IsAbsolutelyPositioned())) {
+    const auto* referenceData = GetProperty(AnchorPosReferences());
+    if (!referenceData || !referenceData->mRememberedScrollOffset ||
+        referenceData->mDefaultScrollShift == nsPoint()) {
+      return GetOverflowAreasRelativeToParent();
+    }
+    // Including the default scroll shift in the scrollable overflow would
+    // change the scroll range that produced it. So, like sticky positioned
+    // frames below, use the position without the default scroll shift for both
+    // overflow areas, and add the current position only to the ink overflow,
+    // which is where we paint.
+    //
+    // Per spec, "after layout has been performed for abspos, it is additionally
+    // shifted by the default scroll shift, as if affected by a transform". We
+    // store the shifts the other way around. UpdateScrollShift() moves the
+    // frame by subtracting the scroll shift from the frame's current position,
+    // and stores it back, so GetPosition() is the final position with the
+    // default scroll shift applied. To get the unshifted position, we undo the
+    // default scroll shift by adding it back.
+    // https://drafts.csswg.org/css-anchor-position-1/#default-scroll-shift
+    const nsPoint unshiftedPosition =
+        GetPosition() + referenceData->mDefaultScrollShift;
+    const OverflowAreas overflows = GetOverflowAreas();
+    OverflowAreas result(overflows.InkOverflow() + GetPosition(), nsRect());
+    result.UnionWith(overflows + unshiftedPosition);
+    return result;
+  }
+
   if (MOZ_LIKELY(!IsRelativelyOrStickyPositioned())) {
     return GetOverflowAreasRelativeToParent();
   }
@@ -12284,6 +12348,12 @@ gfx::Matrix nsIFrame::ComputeWidgetTransform() const {
   gfx::Matrix4x4 matrix = nsStyleTransformMatrix::ReadTransforms(
       uiReset->mMozWindowTransform, refBox, float(appUnitsPerDevPixel),
       nsStyleTransformMatrix::Zoomed::Yes);
+
+  // Apply the transform-origin translation to the matrix.
+  const StyleTransformOrigin& origin = StyleDisplay()->mTransformOrigin;
+  Point transformOrigin = nsStyleTransformMatrix::Convert2DPosition(
+      origin.horizontal, origin.vertical, refBox, appUnitsPerDevPixel);
+  matrix.ChangeBasis(Point3D(transformOrigin.x, transformOrigin.y, 0));
 
   gfx::Matrix result2d;
   if (!matrix.CanDraw2D(&result2d)) {

@@ -12,7 +12,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
   DownloadBehaviorManager:
     "chrome://remote/content/webdriver-bidi/DownloadBehaviorManager.sys.mjs",
   error: "chrome://remote/content/shared/webdriver/Errors.sys.mjs",
-  getWebDriverSessionById:
+  getWebDriverSessionByInternalSessionId:
     "chrome://remote/content/shared/webdriver/Session.sys.mjs",
   Log: "chrome://remote/content/shared/Log.sys.mjs",
   NavigableManager: "chrome://remote/content/shared/NavigableManager.sys.mjs",
@@ -178,7 +178,9 @@ class BrowserModule extends RootBiDiModule {
    * in WebDriverBiDiConnection class.
    */
   async close() {
-    const session = lazy.getWebDriverSessionById(this.messageHandler.sessionId);
+    const session = lazy.getWebDriverSessionByInternalSessionId(
+      this.messageHandler.internalSessionId
+    );
 
     // TODO Bug 1838269. Enable browser.close command for the case of classic + bidi session, when
     // session ending for this type of session is supported.
@@ -368,14 +370,7 @@ class BrowserModule extends RootBiDiModule {
           lazy.pprint`Expected elements of "userContexts" to be strings, got ${userContextId}`
         );
 
-        const internalId =
-          lazy.UserContextManager.getInternalIdById(userContextId);
-
-        if (internalId === null) {
-          throw new lazy.error.NoSuchUserContextError(
-            `User Context with id ${userContextId} was not found`
-          );
-        }
+        const internalId = this._getUserContextInternalId(userContextId);
 
         userContexts.add(internalId);
       }
@@ -434,13 +429,7 @@ class BrowserModule extends RootBiDiModule {
       );
     }
 
-    if (!lazy.UserContextManager.hasUserContextId(userContextId)) {
-      throw new lazy.error.NoSuchUserContextError(
-        `User Context with id ${userContextId} was not found`
-      );
-    }
-
-    const internalId = lazy.UserContextManager.getInternalIdById(userContextId);
+    const internalId = this._getUserContextInternalId(userContextId);
 
     lazy.UserContextManager.removeUserContext(userContextId, {
       closeContextTabs: true,

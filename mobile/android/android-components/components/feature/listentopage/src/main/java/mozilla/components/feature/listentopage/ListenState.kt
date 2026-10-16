@@ -6,6 +6,7 @@ package mozilla.components.feature.listentopage
 
 import java.util.Locale
 import kotlin.math.abs
+import mozilla.components.feature.listentopage.PlaybackSpeed.Companion.Default
 import mozilla.components.lib.state.State
 
 /**
@@ -18,6 +19,7 @@ import mozilla.components.lib.state.State
  * @property site The site the article is from, or `null` when its URL names none. Shown on the player and on the media
  *   notification.
  * @property languageTag The BCP 47 language of the article, used to pick a voice.
+ * @property mode Whether the player is shown expanded or compact.
  * @property error The last error, or `null`.
  * @property voiceState State relating to narrator voice.
  * @property playbackState State relating to the audio being played.
@@ -29,31 +31,32 @@ data class ListenState(
     val title: String? = null,
     val site: String? = null,
     val languageTag: String? = null,
-    val mode: ListenMode = ListenMode.Player,
+    val mode: PlayerMode = PlayerMode.Expanded,
     val error: ListenError? = null,
     val voiceState: VoiceState = VoiceState(),
     val playbackState: PlaybackState = PlaybackState(),
     val articleProgress: ArticleProgress = ArticleProgress(),
 ) : State
 
-/** What the user asked to see. */
-enum class ListenMode {
-    /** The playback controls. */
-    Player
+/** The expanded or compact player. */
+enum class PlayerMode {
+    Expanded,
+    Compact,
 }
 
-/** The ways a session can fail. */
+/** The ways a session can fail. These errors are reported inside the player. */
 sealed interface ListenError {
-    /** No installed, network-free voice exists for the article language. Reported as a snackbar, with no player. */
+
+    /** No installed, network-free voice exists for the article language. */
     data object NoOfflineVoice : ListenError
 
-    /** The page gave back no usable text. Reported as a snackbar, with no player. */
+    /** The page gave back no usable text. */
     data object ContentUnavailable : ListenError
 
-    /** The synthesizer failed part-way through. Reported as a dialog over the player. */
+    /** The synthesizer failed part-way through. */
     data object SynthesisFailed : ListenError
 
-    /** The player failed part-way through. Reported as a dialog over the player. */
+    /** The player failed part-way through. */
     data object PlaybackFailed : ListenError
 }
 

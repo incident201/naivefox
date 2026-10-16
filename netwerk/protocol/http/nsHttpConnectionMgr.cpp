@@ -477,6 +477,7 @@ nsresult nsHttpConnectionMgr::PruneDeadConnections() {
 // traffic since they were "marked" and nuke them.
 nsresult nsHttpConnectionMgr::PruneNoTraffic() {
   LOG(("nsHttpConnectionMgr::PruneNoTraffic\n"));
+  MOZ_ASSERT(OnSocketThread(), "not on socket thread");
   mPruningNoTraffic = true;
   return PostEvent(&nsHttpConnectionMgr::OnMsgPruneNoTraffic);
 }
@@ -4144,6 +4145,7 @@ void nsHttpConnectionMgr::RegisterOriginCoalescingKey(HttpConnectionBase* conn,
 }
 
 bool nsHttpConnectionMgr::GetConnectionData(nsTArray<HttpRetParams>* aArg) {
+  MOZ_ASSERT(OnSocketThread(), "not on socket thread");
   for (const RefPtr<ConnectionEntry>& ent : mCT.Values()) {
     aArg->AppendElement(ent->GetConnectionData());
   }
@@ -4153,6 +4155,7 @@ bool nsHttpConnectionMgr::GetConnectionData(nsTArray<HttpRetParams>* aArg) {
 
 bool nsHttpConnectionMgr::GetHttp3ConnectionStatsData(
     nsTArray<Http3ConnectionStatsParams>* aArg) {
+  MOZ_ASSERT(OnSocketThread(), "not on socket thread");
   for (const RefPtr<ConnectionEntry>& ent : mCT.Values()) {
     if (ent->mConnInfo->GetPrivate()) {
       continue;
@@ -4172,6 +4175,7 @@ void nsHttpConnectionMgr::ResetIPFamilyPreference(nsHttpConnectionInfo* ci) {
 }
 
 void nsHttpConnectionMgr::ExcludeHttp2(const nsHttpConnectionInfo* ci) {
+  MOZ_ASSERT(OnSocketThread(), "not on socket thread");
   LOG(("nsHttpConnectionMgr::ExcludeHttp2 excluding ci %s",
        ci->HashKey().get()));
   ConnectionEntry* ent = mCT.GetWeak(ci->HashKey());
@@ -4184,6 +4188,7 @@ void nsHttpConnectionMgr::ExcludeHttp2(const nsHttpConnectionInfo* ci) {
 }
 
 void nsHttpConnectionMgr::ExcludeHttp3(const nsHttpConnectionInfo* ci) {
+  MOZ_ASSERT(OnSocketThread(), "not on socket thread");
   LOG(("nsHttpConnectionMgr::ExcludeHttp3 exclude ci %s", ci->HashKey().get()));
   ConnectionEntry* ent = mCT.GetWeak(ci->HashKey());
   if (!ent) {

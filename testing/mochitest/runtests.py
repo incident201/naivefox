@@ -362,6 +362,7 @@ class MessageLogger:
         """Transform a failure message so it doesn't fail the job."""
         if message.get("action") == "test_status" and "expected" in message:
             message["expected"] = message.get("status")
+            message.setdefault("extra", {})["will_retry"] = True
         elif message.get("action") == "log":
             if message.get("message", "").startswith("TEST-UNEXPECTED"):
                 message["message"] = message["message"].replace(
@@ -3981,7 +3982,7 @@ toolbar#nav-bar {
                     f.write(json.dumps(data))
 
         if "MOZ_AUTOMATION" in os.environ:
-            symbolicate_profiles()
+            symbolicate_profiles(symbol_dir=options.symbolsPath)
 
         self.handleShutdownProfile(options)
 
