@@ -110,6 +110,7 @@ nsresult Http3Session::Init(nsHttpConnectionInfo* aConnInfo,
   MOZ_ASSERT(udpConn);
 
   mConnInfo = aConnInfo;
+  mIsTrrServiceChannel = aConnInfo->GetIsTrrServiceChannel();
   mNetAddr = aPeerAddr;
 
   // When `isOuterConnection` is true, this Http3Session represents the *outer*
@@ -321,6 +322,7 @@ void Http3Session::RekeyAfterHttp3OnlyHandOff(nsHttpConnectionInfo* aConnInfo) {
   LOG(("Http3Session::RekeyAfterHttp3OnlyHandOff [this=%p] %s -> %s", this,
        mConnInfo->HashKey().get(), aConnInfo->HashKey().get()));
   mConnInfo = aConnInfo;
+  mIsTrrServiceChannel = aConnInfo->GetIsTrrServiceChannel();
 }
 
 void Http3Session::DoSetEchConfig(const nsACString& aEchConfig) {
@@ -1530,6 +1532,15 @@ bool Http3Session::AddStream(nsAHttpTransaction* aHttpTransaction,
 
   mStreamTransactionHash.InsertOrUpdate(aHttpTransaction, RefPtr{stream});
 
+  // A transaction added before the handshake completes didn't necessarily go
+  // through the pending queue, where the backup timer is normally started.
+  // Without it, the transaction would wait forever if the handshake never
+  // completes.
+  if (!IsConnected()) {
+    if (nsHttpTransaction* trans = aHttpTransaction->QueryHttpTransaction()) {
+      trans->MaybeStartHttp3BackupTimer();
+    }
+  }
 
   if (mState == ZERORTT) {
     if (!stream->Do0RTT()) {
@@ -2603,7 +2614,7 @@ void Http3Session::DontReuse() {
     nsCOMPtr<nsIRunnable> event = NewRunnableMethod(
         "Http3Session::DontReuse", this, &Http3Session::DontReuse);
     if (StaticPrefs::network_trr_high_priority_events() &&
-        mConnInfo->GetIsTrrServiceChannel()) {
+        mIsTrrServiceChannel) {
       event = new PrioritizableRunnable(
           event.forget(), nsIRunnablePriority::PRIORITY_MEDIUMHIGH);
     }

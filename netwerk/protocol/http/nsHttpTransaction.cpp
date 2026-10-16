@@ -6,6 +6,7 @@
 #include "nsHttpTransaction.h"
 
 #include <algorithm>
+#include <memory>
 #include <utility>
 
 #include "HTTPSRecordResolver.h"
@@ -468,6 +469,12 @@ void nsHttpTransaction::OnPendingQueueInserted(
     mHashKeyOfConnectionEntry.Assign(aConnectionHashKey);
   }
 
+  MaybeStartHttp3BackupTimer();
+}
+
+void nsHttpTransaction::MaybeStartHttp3BackupTimer() {
+  MOZ_ASSERT(OnSocketThread(), "not on socket thread");
+
   // Don't create mHttp3BackupTimer if HTTPS RR is used or Happy Eyeballs is
   // enabled. The Happy Eyeballs state machine will handle fallback to h2.
   if ((mConnInfo->IsHttp3() || mConnInfo->IsHttp3ProxyConnection()) &&
@@ -525,10 +532,10 @@ void nsHttpTransaction::SetH2WSConnRefTaken() {
 
 UniquePtr<nsHttpResponseHead> nsHttpTransaction::TakeResponseHeadAndConnInfo(
     nsHttpConnectionInfo** aOut) {
-  MOZ_ASSERT(!mResponseHeadTaken, "TakeResponseHead called 2x");
-
   // Lock TakeResponseHead() against main thread
   MutexAutoLock lock(mLock);
+
+  MOZ_ASSERT(!mResponseHeadTaken, "TakeResponseHead called 2x");
 
   if (aOut) {
     RefPtr<nsHttpConnectionInfo> connInfo = mFinalizedConnInfo;
@@ -548,10 +555,10 @@ UniquePtr<nsHttpResponseHead> nsHttpTransaction::TakeResponseHeadAndConnInfo(
 }
 
 UniquePtr<nsHttpHeaderArray> nsHttpTransaction::TakeResponseTrailers() {
-  MOZ_ASSERT(!mResponseTrailersTaken, "TakeResponseTrailers called 2x");
-
   // Lock TakeResponseTrailers() against main thread
   MutexAutoLock lock(mLock);
+
+  MOZ_ASSERT(!mResponseTrailersTaken, "TakeResponseTrailers called 2x");
 
   mResponseTrailersTaken = true;
   return std::move(mForTakeResponseTrailers);
@@ -2940,9 +2947,13 @@ nsresult nsHttpTransaction::ProcessData(char* buf, uint32_t count,
       NS_ENSURE_SUCCESS(rv, rv);
     }
 
-    if (!mContentDecodingCheck && mResponseHead) {
-      mContentDecoding = mResponseHead->HasHeader(nsHttp::Content_Encoding);
-      mContentDecodingCheck = true;
+    if (!mContentDecodingCheck) {
+      // The main thread may take mResponseHead once the data is in the pipe.
+      MutexAutoLock lock(mLock);
+      if (mResponseHead) {
+        mContentDecoding = mResponseHead->HasHeader(nsHttp::Content_Encoding);
+        mContentDecodingCheck = true;
+      }
     }
   }
 
@@ -3621,9 +3632,9 @@ void nsHttpTransaction::SetHttpTrailers(nsCString& aTrailers) {
   LOG(("[\n    %s\n]", aTrailers.get()));
 
   // Introduce a local variable to minimize the critical section.
-  UniquePtr<nsHttpHeaderArray> httpTrailers(new nsHttpHeaderArray());
-  // Given it's usually null, use double-check locking for performance.
-  if (mForTakeResponseTrailers) {
+  UniquePtr<nsHttpHeaderArray> httpTrailers =
+      std::make_unique<nsHttpHeaderArray>();
+  {
     MutexAutoLock lock(mLock);
     if (mForTakeResponseTrailers) {
       // Copy the trailer. |TakeResponseTrailers| gets the original trailer

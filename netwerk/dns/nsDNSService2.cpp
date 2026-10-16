@@ -1268,26 +1268,6 @@ nsDNSService::CancelAsyncResolveNative(
 }
 
 NS_IMETHODIMP
-nsDNSService::Resolve(const nsACString& aHostname,
-                      nsIDNSService::DNSFlags flags,
-                      JS::Handle<JS::Value> aOriginAttributes, JSContext* aCx,
-                      uint8_t aArgc, nsIDNSRecord** result) {
-  OriginAttributes attrs;
-
-  if (aArgc == 1) {
-#ifdef MOZ_NAIVEFOX
-    return NS_ERROR_NOT_IMPLEMENTED;
-#else
-    if (!aOriginAttributes.isObject() || !attrs.Init(aCx, aOriginAttributes)) {
-      return NS_ERROR_INVALID_ARG;
-    }
-#endif
-  }
-
-  return ResolveNative(aHostname, flags, attrs, result);
-}
-
-NS_IMETHODIMP
 nsDNSService::ResolveNative(const nsACString& aHostname,
                             nsIDNSService::DNSFlags flags,
                             const OriginAttributes& aOriginAttributes,
@@ -1299,12 +1279,6 @@ nsDNSService::ResolveNative(const nsACString& aHostname,
     return NS_ERROR_NOT_AVAILABLE;
   }
 
-  return ResolveInternal(aHostname, flags, aOriginAttributes, result);
-}
-
-nsresult nsDNSService::DeprecatedSyncResolve(
-    const nsACString& aHostname, nsIDNSService::DNSFlags flags,
-    const OriginAttributes& aOriginAttributes, nsIDNSRecord** result) {
   return ResolveInternal(aHostname, flags, aOriginAttributes, result);
 }
 

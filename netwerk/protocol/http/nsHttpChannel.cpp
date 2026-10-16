@@ -38,6 +38,7 @@
 #endif
 #include "mozilla/DebugOnly.h"
 #include "mozilla/FlowMarkers.h"
+#include "mozilla/LoadInfo.h"
 #include "mozilla/NullPrincipal.h"
 #include "mozilla/PerfStats.h"
 #include "mozilla/ProfilerDumpOrCrash.h"
@@ -221,14 +222,6 @@ using namespace dom;
 namespace net {
 
 namespace {
-
-static bool BrowsingContextForcesOffline(dom::BrowsingContext* aContext) {
-#ifdef MOZ_NAIVEFOX
-  return false;
-#else
-  return aContext && aContext->Top()->GetForceOffline();
-#endif
-}
 
 // True if the local cache should be bypassed when processing a request.
 #define BYPASS_LOCAL_CACHE(loadFlags, isPreferCacheLoadOverBypass) \
@@ -1031,16 +1024,12 @@ nsresult nsHttpChannel::OnBeforeConnect() {
   // SecurityInfo.sys.mjs
   mLoadInfo->SetHstsStatus(isSecureURI);
 
-#ifndef MOZ_NAIVEFOX
-  RefPtr<mozilla::dom::BrowsingContext> bc;
-  mLoadInfo->GetBrowsingContext(getter_AddRefs(bc));
   // If bypassing the cache and we're forced offline
   // we can just return the error here.
-  if (BrowsingContextForcesOffline(bc) &&
+  if (IsForcedOffline() &&
       BYPASS_LOCAL_CACHE(mLoadFlags, LoadPreferCacheLoadOverBypass())) {
     return NS_ERROR_OFFLINE;
   }
-#endif
 
   // At this point it is no longer possible to call
   // HttpBaseChannel::UpgradeToSecure.
@@ -1070,9 +1059,10 @@ nsresult nsHttpChannel::OnBeforeConnect() {
       };
 
       bool willCallback = false;
-      rv = NS_ShouldSecureUpgrade(
-          mURI, mLoadInfo, resultPrincipal, LoadAllowSTS(), originAttributes,
-          shouldUpgrade, std::move(resultCallback), willCallback);
+      rv = NS_ShouldSecureUpgrade(mURI, mLoadInfo, this, resultPrincipal,
+                                  LoadAllowSTS(), originAttributes,
+                                  shouldUpgrade, std::move(resultCallback),
+                                  willCallback);
 #ifndef MOZ_NAIVEFOX
       // If the request gets upgraded because of the HTTPS-Only mode, but no
       // event listener has been registered so far, we want to do that here.
@@ -1159,13 +1149,7 @@ nsresult nsHttpChannel::MaybeUseHTTPSRRForUpgrade(bool aShouldUpgrade,
     return aStatus;
   }
 
-#ifdef MOZ_NAIVEFOX
-  bool forceOffline = false;
-#else
-  RefPtr<mozilla::dom::BrowsingContext> bc;
-  mLoadInfo->GetBrowsingContext(getter_AddRefs(bc));
-  bool forceOffline = BrowsingContextForcesOffline(bc);
-#endif
+  bool forceOffline = IsForcedOffline();
 
   if (mURI->SchemeIs("https") || aShouldUpgrade || !LoadUseHTTPSSVC() ||
       forceOffline) {
@@ -1277,6 +1261,7 @@ nsresult nsHttpChannel::ContinueOnBeforeConnect(bool aShouldUpgrade,
     // already present in the loadinfo.
     if (aUpgradeWithHTTPSRR) {
       mLoadInfo->SetHttpsUpgradeTelemetry(nsILoadInfo::HTTPS_RR);
+      NS_LogSecureUpgradeToConsole(mURI, mLoadInfo, this, "HTTPS RR"_ns);
     }
     return AsyncCall(&nsHttpChannel::HandleAsyncRedirectChannelToHttps);
   }
@@ -1656,13 +1641,7 @@ nsresult nsHttpChannel::ContinueConnect() {
                      "CORS preflight must have been finished by the time we "
                      "do the rest of ContinueConnect");
 
-#ifdef MOZ_NAIVEFOX
-  bool forceOffline = false;
-#else
-  RefPtr<mozilla::dom::BrowsingContext> bc;
-  mLoadInfo->GetBrowsingContext(getter_AddRefs(bc));
-  bool forceOffline = BrowsingContextForcesOffline(bc);
-#endif
+  bool forceOffline = IsForcedOffline();
 
   // we may or may not have a cache entry at this point
   if (mCacheEntry) {
@@ -1794,6 +1773,9 @@ nsresult nsHttpChannel::DispatchTransaction(
 
   rv = mTransaction->AsyncRead(this, getter_AddRefs(mTransactionPump));
   if (NS_FAILED(rv)) {
+    // The transaction is already on the socket thread and points at our
+    // request head; don't let it outlive us.
+    (void)gHttpHandler->CancelTransaction(mTransaction, rv);
     return rv;
   }
 
@@ -1820,16 +1802,8 @@ void nsHttpChannel::SpeculativeConnect() {
   // don't speculate if we are offline, when doing http upgrade (i.e.
   // websockets bootstrap), or if we can't do keep-alive (because then we
   // couldn't reuse the speculative connection anyhow).
-#ifdef MOZ_NAIVEFOX
-  bool forceOffline = false;
-#else
-  RefPtr<mozilla::dom::BrowsingContext> bc;
-  mLoadInfo->GetBrowsingContext(getter_AddRefs(bc));
-  bool forceOffline = BrowsingContextForcesOffline(bc);
-#endif
-
   if (gIOService->IsOffline() || mUpgradeProtocolCallback ||
-      !(mCaps & NS_HTTP_ALLOW_KEEPALIVE) || forceOffline) {
+      !(mCaps & NS_HTTP_ALLOW_KEEPALIVE) || IsForcedOffline()) {
     return;
   }
 
@@ -4608,6 +4582,9 @@ nsresult nsHttpChannel::OpenRedirectChannel(nsresult rv) {
 
   notifier.RedirectSucceeded();
 
+  // Report timing data if e10s is disabled
+  MaybeReportTimingDataForRedirect(mRedirectChannel);
+
   ReleaseListeners();
 
   return NS_OK;
@@ -5260,14 +5237,6 @@ nsresult nsHttpChannel::OpenCacheEntryInternal(bool isHttps) {
   uint32_t cacheEntryOpenFlags;
   bool offline = gIOService->IsOffline();
 
-#ifdef MOZ_NAIVEFOX
-  bool forceOffline = false;
-#else
-  RefPtr<mozilla::dom::BrowsingContext> bc;
-  mLoadInfo->GetBrowsingContext(getter_AddRefs(bc));
-  bool forceOffline = bc && bc->Top()->GetForceOffline();
-#endif
-
   nsAutoCString cacheControlRequestHeader;
   (void)mRequestHead.GetHeader(nsHttp::Cache_Control,
                                cacheControlRequestHeader);
@@ -5276,6 +5245,7 @@ nsresult nsHttpChannel::OpenCacheEntryInternal(bool isHttps) {
     return NS_OK;
   }
 
+  bool forceOffline = IsForcedOffline();
   if (offline || (mLoadFlags & INHIBIT_CACHING) || forceOffline) {
     if (BYPASS_LOCAL_CACHE(mLoadFlags, LoadPreferCacheLoadOverBypass()) &&
         !offline && !forceOffline) {
@@ -8863,6 +8833,23 @@ void nsHttpChannel::MaybeStartDNSPrefetch() {
       (void)mDNSPrefetch->PrefetchHigh(dnsFlags);
     }
   }
+}
+
+bool nsHttpChannel::IsForcedOffline() const {
+#ifdef MOZ_NAIVEFOX
+  // The lean product has no browsing context. Offline is the process flag.
+  return false;
+#else
+  RefPtr<mozilla::dom::BrowsingContext> bc;
+  mLoadInfo->GetBrowsingContext(getter_AddRefs(bc));
+  if (!bc) {
+    // Loads that are not performed by a window, such as keepalive fetches
+    // handled by the FetchService and fetches from workers, only record the
+    // browsing context they are associated with.
+    mLoadInfo->GetAssociatedBrowsingContext(getter_AddRefs(bc));
+  }
+  return bc && bc->Top()->GetForceOffline();
+#endif
 }
 
 NS_IMETHODIMP
@@ -12997,11 +12984,17 @@ void nsHttpChannel::ReEvaluateReferrerAfterTrackingStatusIsKnown() {
 
 namespace {
 
-class BackgroundRevalidatingListener : public nsIStreamListener {
+// Also acts as the only notification callbacks of the revalidating channel, so
+// that none of its notifications reach the consumer of the original channel.
+class BackgroundRevalidatingListener : public nsIStreamListener,
+                                       public nsIInterfaceRequestor,
+                                       public nsIChannelEventSink {
+ public:
   NS_DECL_ISUPPORTS
-
   NS_DECL_NSISTREAMLISTENER
   NS_DECL_NSIREQUESTOBSERVER
+  NS_DECL_NSIINTERFACEREQUESTOR
+  NS_DECL_NSICHANNELEVENTSINK
 
  private:
   virtual ~BackgroundRevalidatingListener() = default;
@@ -13035,8 +13028,29 @@ BackgroundRevalidatingListener::OnStopRequest(nsIRequest* request,
   return NS_OK;
 }
 
+NS_IMETHODIMP
+BackgroundRevalidatingListener::GetInterface(const nsIID& aIID,
+                                             void** aResult) {
+  if (aIID.Equals(NS_GET_IID(nsIChannelEventSink))) {
+    return QueryInterface(aIID, aResult);
+  }
+  return NS_ERROR_NO_INTERFACE;
+}
+
+// The redirect response itself revalidates the cache entry, there is no need
+// to follow it.
+NS_IMETHODIMP
+BackgroundRevalidatingListener::AsyncOnChannelRedirect(
+    nsIChannel* aOldChannel, nsIChannel* aNewChannel, uint32_t aFlags,
+    nsIAsyncVerifyRedirectCallback* aCallback) {
+  LOG(("BackgroundRevalidatingListener::AsyncOnChannelRedirect %p vetoing",
+       aOldChannel));
+  return NS_BINDING_ABORTED;
+}
+
 NS_IMPL_ISUPPORTS(BackgroundRevalidatingListener, nsIStreamListener,
-                  nsIRequestObserver)
+                  nsIRequestObserver, nsIInterfaceRequestor,
+                  nsIChannelEventSink)
 
 }  // namespace
 
@@ -13069,10 +13083,30 @@ void nsHttpChannel::PerformBackgroundCacheRevalidationNow() {
   nsLoadFlags loadFlags = mLoadFlags | LOAD_ONLY_IF_MODIFIED | VALIDATE_ALWAYS |
                           LOAD_BACKGROUND | LOAD_BYPASS_SERVICE_WORKER;
 
+  RefPtr<BackgroundRevalidatingListener> listener =
+      new BackgroundRevalidatingListener();
+
+  nsCOMPtr<nsIPrincipal> principal;
+  nsContentUtils::GetSecurityManager()->GetChannelResultPrincipal(
+      this, getter_AddRefs(principal));
+  nsCOMPtr<nsILoadGroup> loadGroup;
+  rv = NS_NewLoadGroup(getter_AddRefs(loadGroup), principal);
+  if (NS_FAILED(rv)) {
+    LOG(("  failed to create the load group, rv=0x%08x",
+         static_cast<uint32_t>(rv)));
+    return;
+  }
+
+  // XXX(valentin): Preserving the old load info means mInitialSecurityCheckDone
+  // will be true. Using CloneForNewRequest would be closer to the spec, but
+  // it would mean redoing previous checks.
+  nsCOMPtr<nsILoadInfo> loadInfo =
+      static_cast<mozilla::net::LoadInfo*>(mLoadInfo.get())->Clone();
+
   nsCOMPtr<nsIChannel> validatingChannel;
-  rv = NS_NewChannelInternal(getter_AddRefs(validatingChannel), mURI, mLoadInfo,
-                             nullptr /* performance storage */, mLoadGroup,
-                             mCallbacks, loadFlags);
+  rv = NS_NewChannelInternal(getter_AddRefs(validatingChannel), mURI, loadInfo,
+                             nullptr /* performance storage */, loadGroup,
+                             listener, loadFlags);
   if (NS_FAILED(rv)) {
     LOG(("  failed to created the channel, rv=0x%08x",
          static_cast<uint32_t>(rv)));
@@ -13081,6 +13115,7 @@ void nsHttpChannel::PerformBackgroundCacheRevalidationNow() {
 
   nsCOMPtr<nsIHttpChannel> httpChannel(do_QueryInterface(validatingChannel));
   MOZ_ASSERT(httpChannel);
+
   nsCOMPtr<nsIHttpHeaderVisitor> visitor =
       new CopyNonDefaultHeaderVisitor(httpChannel);
   rv = VisitNonDefaultRequestHeaders(visitor);
@@ -13105,8 +13140,6 @@ void nsHttpChannel::PerformBackgroundCacheRevalidationNow() {
     httpChan->mStaleRevalidation = true;
   }
 
-  RefPtr<BackgroundRevalidatingListener> listener =
-      new BackgroundRevalidatingListener();
   rv = validatingChannel->AsyncOpen(listener);
   if (NS_FAILED(rv)) {
     LOG(("  failed to open the channel, rv=0x%08x", static_cast<uint32_t>(rv)));

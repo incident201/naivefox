@@ -20,6 +20,9 @@ class TestSummaryFormatter(BaseFormatter):
       - `mozleak_total` actions that exceed their threshold or lack a total
         line (the leakcheck failures the TBPL formatter prints as
         TEST-UNEXPECTED-FAIL)
+      - `lsan_summary` actions not marked `allowed` and `lsan_leak` actions
+        without an `allowed_match` (the LeakSanitizer lines the TBPL
+        formatter prints at ERROR or as TEST-UNEXPECTED-FAIL)
 
     All other actions are dropped.
 
@@ -41,6 +44,8 @@ class TestSummaryFormatter(BaseFormatter):
         "ubsan_error",
         "log",
         "mozleak_total",
+        "lsan_summary",
+        "lsan_leak",
     })
     _ALWAYS_STRIP = frozenset({
         "crashing_thread_stack",
@@ -67,6 +72,10 @@ class TestSummaryFormatter(BaseFormatter):
         if action == "log" and data.get("level") not in ("ERROR", "CRITICAL"):
             return
         if action == "mozleak_total" and not self._mozleak_total_failed(data):
+            return
+        if action == "lsan_summary" and data.get("allowed"):
+            return
+        if action == "lsan_leak" and data.get("allowed_match"):
             return
 
         if action in self._KEEP_STACK_ACTIONS:

@@ -662,13 +662,18 @@ class JujutsuRepository(Repository):
             return True
         return False
 
-    def configure(self, state_dir: Path, update_only: bool = False):
+    def configure(
+        self,
+        state_dir: Path,
+        update_only: bool = False,
+        no_system_changes: bool = False,
+    ):
         """Run the Jujutsu configuration steps."""
         print(
             "\nOur jj support currently relies on Git; checks will run for both jj and Git.\n"
         )
 
-        self._git.configure(state_dir, update_only)
+        self._git.configure(state_dir, update_only, no_system_changes=no_system_changes)
 
         topsrcdir = Path(self.path)
         if not update_only:

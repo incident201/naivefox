@@ -6,6 +6,7 @@
 #include "mozilla/net/HttpBaseChannel.h"
 
 #include <algorithm>
+#include <memory>
 #include <utility>
 
 #include "HttpBaseChannel.h"
@@ -2469,7 +2470,7 @@ HttpBaseChannel::RedirectTo(nsIURI* targetURI) {
   // We may want to rewrite origin allowance, hence we need an
   // artificial response head.
   if (!mResponseHead) {
-    mResponseHead.reset(new nsHttpResponseHead());
+    mResponseHead = std::make_unique<nsHttpResponseHead>();
   }
   return NS_OK;
 }
@@ -4623,16 +4624,21 @@ bool HttpBaseChannel::IsNavigation() {
   return LoadForceMainDocumentChannel() || (mLoadFlags & LOAD_DOCUMENT_URI);
 }
 
-nsresult HttpBaseChannel::GetAltDataBindingOrigin(nsACString& aOrigin) {
-  aOrigin.Truncate();
+nsIPrincipal* HttpBaseChannel::GetAltDataBindingPrincipal() {
   if (!mLoadInfo) {
-    return NS_ERROR_FAILURE;
+    return nullptr;
   }
 
-  nsCOMPtr<nsIPrincipal> principal = mLoadInfo->GetLoadingPrincipal();
+  nsIPrincipal* principal = mLoadInfo->GetLoadingPrincipal();
   if (!principal) {
     principal = mLoadInfo->TriggeringPrincipal();
   }
+  return principal;
+}
+
+nsresult HttpBaseChannel::GetAltDataBindingOrigin(nsACString& aOrigin) {
+  aOrigin.Truncate();
+  nsIPrincipal* principal = GetAltDataBindingPrincipal();
   if (!principal) {
     return NS_ERROR_FAILURE;
   }
@@ -5480,6 +5486,14 @@ nsresult HttpBaseChannel::SetupReplacementChannel(nsIURI* newURI,
 
   newChannel->SetLoadGroup(mLoadGroup);
   newChannel->SetNotificationCallbacks(mCallbacks);
+
+  // Console reports that could not be flushed yet, because the document being
+  // loaded does not exist, must follow the load to the redirected channel.
+  nsCOMPtr<nsIConsoleReportCollector> reporter = do_QueryInterface(newChannel);
+  if (reporter) {
+    FlushConsoleReports(reporter);
+  }
+
   // TODO: create tests for cross-origin redirect in bug 1662896.
   if (sameOriginWithOriginalUri) {
     newChannel->SetContentDisposition(mContentDispositionHint);
@@ -6334,6 +6348,14 @@ IMPL_TIMING_ATTR(RedirectEnd)
 IMPL_TIMING_ATTR(TransactionPending)
 
 #undef IMPL_TIMING_ATTR
+
+void HttpBaseChannel::MaybeReportTimingDataForRedirect(
+    nsISupports* aNewChannel) {
+  nsCOMPtr<nsITimedChannel> newTimedChannel = do_QueryInterface(aNewChannel);
+  if (!newTimedChannel) {
+    MaybeReportTimingData();
+  }
+}
 
 void HttpBaseChannel::MaybeReportTimingData() {
 #ifdef MOZ_NAIVEFOX

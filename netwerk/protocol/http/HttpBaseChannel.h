@@ -511,8 +511,9 @@ class HttpBaseChannel : public nsHashPropertyBag,
 
   bool IsDeliveringAltData() const { return LoadDeliveringAltData(); }
 
-  // Computes the origin used to bind alternative (bytecode) cache data to the
-  // principal that produced it.
+  // The principal, and its origin, used to bind alternative (bytecode) cache
+  // data to the principal that produced it.
+  nsIPrincipal* GetAltDataBindingPrincipal();
   nsresult GetAltDataBindingOrigin(nsACString& aOrigin);
 
   static void PropagateReferenceIfNeeded(nsIURI* aURI,
@@ -657,6 +658,9 @@ class HttpBaseChannel : public nsHashPropertyBag,
   virtual void DoAsyncAbort(nsresult aStatus) = 0;
 
   void MaybeReportTimingData();
+  // Reports timing data for this channel if aNewChannel, the target of a
+  // redirect, will not report it itself (e.g. moz-extension: channels).
+  void MaybeReportTimingDataForRedirect(nsISupports* aNewChannel);
   nsIURI* GetReferringPage();
   nsPIDOMWindowInner* GetInnerDOMWindow();
 

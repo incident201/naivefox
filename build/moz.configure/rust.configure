@@ -162,11 +162,6 @@ set_config(
 
 
 set_config(
-    "RUSTC_LLVM_VERSION",
-    depends(rustc_info)(lambda info: str(info.llvm_version) if info else None),
-)
-
-set_config(
     "MOZ_CLANG_NEWER_THAN_RUSTC_LLVM",
     depends(c_compiler, rustc_info)(
         lambda c_compiler, rustc_info: (
@@ -353,9 +348,11 @@ def detect_rustc_target(host_or_target, arm_target, rust_supported_targets):
         elif not candidates:
             return None
 
-        # config.guess uses the "pc" vendor for x86/x86_64 where rust uses its
-        # generic "unknown" vendor; normalize so we correlate on the right one.
-        vendor = "unknown" if host_or_target.vendor == "pc" else host_or_target.vendor
+        vendor = (
+            host_or_target.vendor
+            if any(c.target.vendor == host_or_target.vendor for c in candidates)
+            else "unknown"
+        )
 
         # We have multiple candidates. There are two cases where we can try to
         # narrow further down using extra information from the build system.
