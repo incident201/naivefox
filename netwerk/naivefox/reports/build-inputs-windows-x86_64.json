@@ -29148,7 +29148,7 @@
   "install_manifests_sha256": "5ccfc8cd2944ead72002a85f00d1fd78495c9ed446be50f42dc94b4e4b4a16b0",
   "mozconfig": "netwerk/naivefox/mozconfig-windows-x86_64",
   "mozconfig_sha256": "594d077dd74eb589b3904dbc005781f3f0ec6e058a4cd7aac5fcc954c8a6fb5b",
-  "naivefox_reference_commit": "711adae4770a6ee017356e3e74c0c4004cc90b1e",
+  "naivefox_reference_commit": "df78a0e3edf4d173a12e90f00285675bf7bc49c5",
   "objdir_evidence_sha256": {
     "backend.RecursiveMakeBackend.in": "b1c1ca41f01d233e1a31ca28d2d3156f370712f25b20c21f22d9bb898228b288",
     "config_status_deps.in": "68395b83cbe2be61f3b0d266310675612bcf50f8690ec6e9dce9607901cf5d72"
@@ -29156,7 +29156,7 @@
   "provenance_sha256": "642a32e90aaf870224f1831b2e932e08fb3153ed75765607f2112852f668e3fb",
   "provenance_version": 2,
   "report_version": 1,
-  "source_commit": "711adae4770a6ee017356e3e74c0c4004cc90b1e",
+  "source_commit": "df78a0e3edf4d173a12e90f00285675bf7bc49c5",
   "source_tree_kind": "repository",
   "source_worktree_clean": true,
   "source_worktree_status": [],

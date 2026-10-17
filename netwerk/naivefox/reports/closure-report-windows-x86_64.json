@@ -1,10 +1,10 @@
 {
   "report_provenance": {
     "provenance_version": 2,
-    "source_commit_sha": "711adae4770a6ee017356e3e74c0c4004cc90b1e",
+    "source_commit_sha": "df78a0e3edf4d173a12e90f00285675bf7bc49c5",
     "source_worktree_clean": true,
     "firefox_base_sha": "8014960797439064c025f6bbc6a236558bd4f35f",
-    "naivefox_reference_sha": "711adae4770a6ee017356e3e74c0c4004cc90b1e",
+    "naivefox_reference_sha": "df78a0e3edf4d173a12e90f00285675bf7bc49c5",
     "analyzer_sha256": "ea4dfecf21065ed75d9a2fa2b9696360bc1bcd976e57b8e743e44788df432912",
     "provenance_sha256": "642a32e90aaf870224f1831b2e932e08fb3153ed75765607f2112852f668e3fb",
     "evidence_collector_sha256": "9008a1958274d02004fafbe29866ce8f8f168755b52c5042e6f73b988ad40f3b",
@@ -22,7 +22,7 @@
   "summary": {
     "cxx_translation_units_count": 701,
     "direct_link_objects_count": 190,
-    "unstripped_link_objects_bytes": 182778431,
+    "unstripped_link_objects_bytes": 182778722,
     "unstripped_link_objects_mb": 174.31,
     "static_libraries_count": 2,
     "spidermonkey_static_present": false,
@@ -35,7 +35,7 @@
   "component_groups": {
     "netwerk": {
       "files": 76,
-      "bytes": 87430528,
+      "bytes": 87430819,
       "mb": 83.38
     },
     "xpcom": {
@@ -9416,7 +9416,7 @@
       {
         "path": "application.ini",
         "size_bytes": 354,
-        "sha256": "f827c95da13be5600bac861767063a7c9b410c08f57cb6f1c925a71768ea9c47"
+        "sha256": "925f156cfc18202385d58407def4f632d443a3ee730c5c3cf76681dae14dfb24"
       },
       {
         "path": "chrome.manifest",
@@ -9466,7 +9466,7 @@
       {
         "path": "xul.dll",
         "size_bytes": 13780992,
-        "sha256": "8aad4b7faa245174806a98e3b49d2422c2938c830af350c3aa7ed994f74ad75e"
+        "sha256": "c5a8a31e2e66bde32b9190be704bca3695002ad6138a388969c1e73e2cd5f3ea"
       },
       {
         "path": "localization/en-US/security/certificates/certManager.ftl",
@@ -9855,7 +9855,7 @@
     },
     {
       "path": "objdir/netwerk/naivefox/core/Transport.obj",
-      "size_bytes": 1394611
+      "size_bytes": 1394902
     },
     {
       "path": "objdir/netwerk/naivefox/core/TransportCodec.obj",

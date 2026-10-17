@@ -1,10 +1,10 @@
 {
   "report_provenance": {
     "provenance_version": 2,
-    "source_commit_sha": "711adae4770a6ee017356e3e74c0c4004cc90b1e",
+    "source_commit_sha": "df78a0e3edf4d173a12e90f00285675bf7bc49c5",
     "source_worktree_clean": true,
     "firefox_base_sha": "8014960797439064c025f6bbc6a236558bd4f35f",
-    "naivefox_reference_sha": "711adae4770a6ee017356e3e74c0c4004cc90b1e",
+    "naivefox_reference_sha": "df78a0e3edf4d173a12e90f00285675bf7bc49c5",
     "analyzer_sha256": "ea4dfecf21065ed75d9a2fa2b9696360bc1bcd976e57b8e743e44788df432912",
     "provenance_sha256": "642a32e90aaf870224f1831b2e932e08fb3153ed75765607f2112852f668e3fb",
     "evidence_collector_sha256": "9008a1958274d02004fafbe29866ce8f8f168755b52c5042e6f73b988ad40f3b",
@@ -22,11 +22,11 @@
   "summary": {
     "cxx_translation_units_count": 702,
     "direct_link_objects_count": 179,
-    "unstripped_link_objects_bytes": 197370408,
+    "unstripped_link_objects_bytes": 197371312,
     "unstripped_link_objects_mb": 188.23,
     "static_libraries_count": 2,
     "spidermonkey_static_present": false,
-    "libxul_size_bytes": 229975600,
+    "libxul_size_bytes": 229976056,
     "naivefox_bin_size_bytes": 5375912,
     "reachable_rust_crates_count": 265,
     "dynamic_dependencies_count": 20,
@@ -35,7 +35,7 @@
   "component_groups": {
     "netwerk": {
       "files": 75,
-      "bytes": 98427032,
+      "bytes": 98427936,
       "mb": 93.87
     },
     "xpcom": {
@@ -7050,7 +7050,7 @@
       },
       {
         "name": "libxul.so",
-        "size_bytes": 229975600
+        "size_bytes": 229976056
       },
       {
         "name": "libxul.so-gdb.py",
@@ -7082,12 +7082,12 @@
       {
         "path": "runtime-manifest.json",
         "size_bytes": 3082,
-        "sha256": "21895c859c5ce991537fa40d2cfbb4fddcf0c236e8a6620cfac158fb5e06c50e"
+        "sha256": "3e9f273dd8ae014f62afff3fd14d4eee5ab35371882da3f5e68b14da594e3fa7"
       },
       {
         "path": "runtime/application.ini",
         "size_bytes": 354,
-        "sha256": "ac9585e0bfb6b8e892eab01e27bf37e43271c83281c8aa64af4d82a5a1ec7178"
+        "sha256": "7b6643c5afbc88561050e62d27b84aa56c1fb39b3256da9865947d47aea57ab9"
       },
       {
         "path": "runtime/chrome.manifest",
@@ -7156,8 +7156,8 @@
       },
       {
         "path": "runtime/libxul.so",
-        "size_bytes": 30630968,
-        "sha256": "b2a7006aaccbb4dbda5f8f7fbc99b0b4012b19b2f3ee85bf42e013fdc8ff1087"
+        "size_bytes": 30631000,
+        "sha256": "6336084c58c15d984e288991d9b0fd039edfc03f75263347dac1451bec13b6c3"
       },
       {
         "path": "runtime/naivefox",
@@ -7501,7 +7501,7 @@
     },
     {
       "path": "objdir/netwerk/naivefox/core/Transport.o",
-      "size_bytes": 1615656
+      "size_bytes": 1616560
     },
     {
       "path": "objdir/netwerk/naivefox/core/TransportCodec.o",
