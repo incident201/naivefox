@@ -25,6 +25,11 @@ HERE = Path(__file__).resolve().parent
 APP = HERE / "http_app"
 
 
+def candidate_arm(arm, name):
+    head, kind = arm.rsplit("-", 1)
+    return f"{head}-{name}-{kind}"
+
+
 def load_module(name, filename):
     spec = importlib.util.spec_from_file_location(name, HERE / filename)
     result = importlib.util.module_from_spec(spec)
@@ -1326,7 +1331,8 @@ class Campaign:
         write_json(self.private / "link-initial.json", self.link.validate())
         self.preflight()
 
-    def services(self, directory):
+    def services(self, directory, caddy_binary=None):
+        caddy_binary = caddy_binary or self.args.caddy
         backend = OwnedProcess(
             [
                 self.args.backend,
@@ -1373,7 +1379,7 @@ class Campaign:
         )
         adapted = run_quiet(
             [
-                self.args.caddy,
+                caddy_binary,
                 "adapt",
                 "--config",
                 directory / "Caddyfile",
@@ -1470,7 +1476,7 @@ class Campaign:
             ]
         write_json(directory / "caddy.json", config)
         caddy = OwnedProcess(
-            [self.args.caddy, "run", "--config", directory / "caddy.json"],
+            [caddy_binary, "run", "--config", directory / "caddy.json"],
             directory,
             "caddy",
             env,
@@ -1574,7 +1580,8 @@ class Campaign:
             time.sleep(0.01)
         raise RuntimeError("preflight traffic did not drain")
 
-    def client(self, directory, kind, packet=False):
+    def client(self, directory, kind, packet=False, runtime=None):
+        runtime = runtime or self.args.runtime
         port = native.free_port()
         config = {
             "listen": f"{kind}://127.0.0.1:{port}",
@@ -1603,12 +1610,12 @@ class Campaign:
         }
         env.update(
             SSL_CERT_FILE=str(self.fixture / "ca.crt"),
-            LD_LIBRARY_PATH=str(self.args.runtime.parent),
+            LD_LIBRARY_PATH=str(runtime.parent),
             TMPDIR=str(directory),
             MOZ_CRASHREPORTER_DISABLE="1",
         )
         process = OwnedProcess(
-            [self.args.runtime, directory / "native.json"], directory, "native", env
+            [runtime, directory / "native.json"], directory, "native", env
         )
         self.active_processes.append(process)
         legacy.wait_for(
@@ -1706,7 +1713,7 @@ class Campaign:
         all_owned = {}
         try:
             self.check_inputs()
-            caddy, backend = self.services(directory)
+            caddy, backend = self.services(directory, getattr(self.args, "arm_caddy", {}).get(arm))
             monitor = legacy.native.Process(
                 [
                     sys.executable,
@@ -1733,7 +1740,10 @@ class Campaign:
             capture = CompleteCapture(directory, self.outer_port)
             local_port = 0
             if not reference:
-                client, local_port = self.client(directory, kind, packet=packet)
+                client, local_port = self.client(
+                    directory, kind, packet=packet,
+                    runtime=getattr(self.args, "arm_runtime", {}).get(arm),
+                )
             driver, browser_owned = self.browser(
                 directory, None if reference else kind, local_port
             )
@@ -2130,6 +2140,7 @@ def summarize(campaign, report):
             "protocol": campaign.protocol,
             "listener": kind,
             "delivery": "https" if arm.startswith("packet-") else ("wss" if campaign.protocol == "h2" else "quic"),
+            "caddy": getattr(campaign.args, "arm_candidate", {}).get(arm, "baseline"),
             "arm": arm,
             "blocks": campaign.args.blocks,
             "residual": {
@@ -2243,11 +2254,34 @@ def main():
     parser.add_argument("--timeout", type=int, default=120)
     parser.add_argument("--include-packet", action="store_true",
                         help="Add default HTTPS packet HTTP/SOCKS arms beside WSS with common H2 Firefox controls")
+    parser.add_argument("--packet-only", action="store_true",
+                        help="With --include-packet, omit the WSS arms")
+    parser.add_argument("--candidate", action="append", default=[], metavar="NAME=CADDY:BUILD_ID[:RUNTIME_MANIFEST:RUNTIME]",
+                        help="Add one arm per delivery arm served by this Caddy, optionally with its own native client, sharing the Firefox controls; repeatable")
     args = parser.parse_args()
     require(not args.include_packet or args.protocol == "h2",
             "packet comparison requires an explicit H2 reference")
+    require(not args.packet_only or args.include_packet,
+            "--packet-only requires --include-packet")
+    candidates = []
+    for value in args.candidate:
+        name, _, paths = value.partition("=")
+        fields = paths.split(":")
+        require(re.fullmatch(r"[a-z][a-z0-9]{0,15}", name) and len(fields) in (2, 4)
+                and all(fields) and name not in {"socks", "http", "candidate"}
+                and name not in {entry[0] for entry in candidates},
+                "candidate must be NAME=CADDY:BUILD_ID[:RUNTIME_MANIFEST:RUNTIME] with a unique lowercase name")
+        candidates.append((name, *map(Path, fields[:2]), tuple(map(Path, fields[2:]))))
     if args.include_packet:
-        ARMS = (*legacy.ARMS, "packet-socks", "packet-http")
+        ARMS = (*(() if args.packet_only else legacy.ARMS), "packet-socks", "packet-http")
+    args.arm_caddy, args.arm_candidate, args.arm_runtime = {}, {}, {}
+    baseline_arms = ARMS
+    for name, caddy, _, _ in candidates:
+        for arm in baseline_arms:
+            arm_name = candidate_arm(arm, name)
+            args.arm_caddy[arm_name] = caddy
+            args.arm_candidate[arm_name] = name
+        ARMS = (*ARMS, *(candidate_arm(arm, name) for arm in baseline_arms))
     require(
         os.environ.get("NAIVEFOX_CAPTURE_ISOLATED_NETWORK_ENTERED") == "1",
         "isolated namespace is required",
@@ -2297,6 +2331,25 @@ def main():
         args.runtime_manifest, args.runtime
     )
     caddy_build_id = verify_caddy_build_id(args.caddy_build_id, args.caddy)
+    candidate_build_ids = {}
+    candidate_runtime_files = {}
+    candidate_native = {}
+    for name, caddy, build_id, client in candidates:
+        caddy, build_id = caddy.resolve(strict=True), build_id.resolve(strict=True)
+        candidate_build_ids[name] = verify_caddy_build_id(build_id, caddy)
+        runtime = None
+        if client:
+            manifest, runtime = (path.resolve(strict=True) for path in client)
+            candidate_native[name], files = verify_native_runtime(manifest, runtime)
+            candidate_runtime_files.update({
+                f"candidate-{name}/native_runtime/" + str(path.relative_to(manifest.parent)): path
+                for path in (*files, manifest)
+            })
+        for arm, arm_name in args.arm_candidate.items():
+            if arm_name == name:
+                args.arm_caddy[arm] = caddy
+                if runtime is not None:
+                    args.arm_runtime[arm] = runtime
     source_files = [
         Path(__file__),
         *(
@@ -2349,6 +2402,12 @@ def main():
         "tools/caddy.build-id": args.caddy_build_id,
         "tools/nfbench-app": args.backend,
     })
+    named_inputs.update(candidate_runtime_files)
+    for name, caddy, build_id, _ in candidates:
+        named_inputs.update({
+            f"tools/candidate-{name}/caddy": caddy.resolve(strict=True),
+            f"tools/candidate-{name}/build-id": build_id.resolve(strict=True),
+        })
     args.frozen_files = list(named_inputs.values())
     os.umask(0o077)
     args.root.mkdir(parents=True)
@@ -2389,6 +2448,8 @@ def main():
         "verified_reference": reference_proof,
         "manifest": json.loads((args.asset_dir / "manifest.json").read_text()),
         "caddy_build_id": caddy_build_id,
+        "candidate_caddy_build_ids": candidate_build_ids,
+        "candidate_native_artifacts": candidate_native,
         "manifest_sha256": MANIFEST_SHA,
         "seed": args.seed,
         "blocks_per_protocol": args.blocks,

@@ -770,8 +770,8 @@ void TransportCarrier::Attach(TransportStream* aStream) {
   auto& s = *aStream->mImpl;
   s.carrier = this;
   s.state = MakeUnique<wire::StreamState>(
-      ++mHighestStream, mConfig.mProtocol == ProxyProtocol::H3 ||
-                            !mConfig.mServerPin.IsEmpty());
+      ++mHighestStream, mConfig.mProtocol == ProxyProtocol::H3,
+      !mConfig.mServerPin.IsEmpty());
   mStreams.push_back(aStream);
   RefPtr stream = aStream;
   auto timer = NS_NewTimerWithCallback(

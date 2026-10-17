@@ -298,6 +298,23 @@ TEST_F(NaiveFoxTransportCodec, Http3CreditIsBoundedAndFollowsDelivery) {
   EXPECT_FALSE(stream.Receive(Credit(7, 1)));
 }
 
+TEST_F(NaiveFoxTransportCodec, PacketReceivesWithLargerWindowThanItSends) {
+  StreamState stream(8, false, true);
+  ASSERT_TRUE(stream.Receive({Kind::Opened, 8, 0, {}}));
+  EXPECT_EQ(stream.ReceiveCredit(), 4U * 1024 * 1024);
+  EXPECT_EQ(stream.SendCredit(), 1024U * 1024);
+  Frame data{Kind::Data, 8, 0, std::vector<uint8_t>(16384, 0x5a)};
+  for (uint32_t offset = 0; offset < 2U * 1024 * 1024; offset += 16384) {
+    data.sequence = offset;
+    ASSERT_TRUE(stream.Receive(data));
+  }
+  EXPECT_EQ(stream.ReceiveCredit(), 2U * 1024 * 1024);
+  Frame sent;
+  ASSERT_TRUE(stream.MakeData(data.body.data(), data.body.size(), sent));
+  ASSERT_TRUE(stream.Receive(Credit(8, 16384)));
+  EXPECT_FALSE(stream.Receive(Credit(8, 1)));
+}
+
 TEST_F(NaiveFoxTransportCodec, UncreditedDataFailsClosed) {
   StreamState stream(1);
   ASSERT_TRUE(stream.Receive({Kind::Opened, 1, 0, {}}));

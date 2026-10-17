@@ -19,6 +19,10 @@ inline constexpr size_t kMaxFrames = 4096;
 inline constexpr size_t kMaxStreams = 32;
 inline constexpr uint32_t kReceiveWindow = 512 * 1024;
 inline constexpr uint32_t kHttp3ReceiveWindow = 1024 * 1024;
+// Packet delivery receives with a larger window than the server's 1-MiB
+// upload buffer.
+inline constexpr uint32_t kPacketReceiveWindow = 4 * 1024 * 1024;
+inline constexpr uint32_t kPacketSendWindow = kHttp3ReceiveWindow;
 
 enum class Kind : uint8_t {
   Open = 1,
@@ -101,10 +105,13 @@ bool Decode(uint32_t aExpectedSequence, size_t aExpectedCapacity,
 // only for bytes delivered to the local consumer.
 class StreamState final {
  public:
-  explicit StreamState(uint32_t aId, bool aHttp3 = false)
+  explicit StreamState(uint32_t aId, bool aHttp3 = false, bool aPacket = false)
       : mId(aId),
-        mWindow(aHttp3 ? kHttp3ReceiveWindow : kReceiveWindow),
-        mSendCredit(mWindow),
+        mWindow(aPacket  ? kPacketReceiveWindow
+                : aHttp3 ? kHttp3ReceiveWindow
+                         : kReceiveWindow),
+        mSendWindow(aPacket ? kPacketSendWindow : mWindow),
+        mSendCredit(mSendWindow),
         mReceiveCredit(mWindow),
         mFailed(aId == 0) {}
 
@@ -133,6 +140,7 @@ class StreamState final {
 
   const uint32_t mId;
   const uint32_t mWindow;
+  const uint32_t mSendWindow;
   uint32_t mSendCredit;
   uint32_t mReceiveCredit;
   uint32_t mPendingCredit = 0;

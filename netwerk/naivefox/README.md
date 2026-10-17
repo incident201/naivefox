@@ -93,8 +93,8 @@ Each selection continues with its sustained carrier:
 All adapters carry the same current NaiveFox cells, multiplexed streams,
 delivery credits, offsets and FIN/RESET semantics. A carrier hosts up to 32
 logical streams; additional carriers allow more connections. Each stream has
-512 KiB (WSS) or 1 MiB (HTTPS and QUIC) of receive credit, returned only
-after local delivery.
+512 KiB (WSS), 1 MiB (QUIC) or 4 MiB (HTTPS) of receive credit, returned
+only after local delivery.
 H3 POST completion preserves cell order even when QUIC requests arrive out of
 order. The downstream GET uses a four-byte cell-length prefix.
 
