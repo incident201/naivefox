@@ -54,7 +54,7 @@ def main():
                   edge.get("packet_gap_lost_tail") == 2 and
                   edge.get("packet_gap_lost_tail_retries", 0) >= 2,
                   "gap and lost-receipt faults did not execute")
-        f.require(3 <= edge.get("packet_gap_furthest", 0) <= 7 and
+        f.require(3 <= edge.get("packet_gap_furthest", 0) <= 15 and
                   edge.get("packet_gap_outside_window", 0) == 0,
                   "receipt released the cumulative upload window")
         f.require(edge.get("packet_gap_redundant_posts", 0) == 0,
@@ -64,7 +64,7 @@ def main():
         result = {"passed": True, "frontends": ["socks", "http"],
                   "held_gaps": edge["packet_gap_held"],
                   "later_receipts": edge["packet_gap_receipts"],
-                  "redundant_posts": 0, "window_slots": 8}
+                  "redundant_posts": 0, "window_slots": 16}
         f.private_json(run / "result.json", result)
         print(json.dumps(result), flush=True)
     finally:

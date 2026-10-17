@@ -31,7 +31,7 @@ namespace {
 using Bytes = TransportPacket::Bytes;
 using Headers = std::vector<std::pair<nsCString, nsCString>>;
 constexpr size_t kPacketLimit = 65536;
-constexpr size_t kPacketSlots = 8;
+constexpr size_t kPacketSlots = 16;
 
 void Put32(Bytes& out, uint32_t value) {
   for (int shift = 24; shift >= 0; shift -= 8) out.push_back(value >> shift);

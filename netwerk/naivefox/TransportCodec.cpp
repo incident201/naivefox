@@ -254,7 +254,7 @@ bool StreamState::Receive(const Frame& aFrame) {
         return Fail();
       }
       const uint32_t credit = ReadUint32(aFrame.body.data());
-      if (credit == 0 || credit > mWindow - mSendCredit) {
+      if (credit == 0 || credit > mSendWindow - mSendCredit) {
         return Fail();
       }
       mSendCredit += credit;

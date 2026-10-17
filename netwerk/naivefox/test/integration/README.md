@@ -201,10 +201,18 @@ controls. Window definitions, feature extraction, workload and health gates
 are unchanged. Carrier health checks distinguish the explicitly selected path.
 A short block is diagnostic evidence, not a 30-block acceptance claim.
 
+For a server change, --candidate NAME=CADDY:BUILD_ID (repeatable) adds one arm
+per delivery arm served by that Caddy, in the same blocks and with the same
+Firefox controls as the baseline --caddy; a coordinated client change appends
+:RUNTIME_MANIFEST:RUNTIME. --packet-only omits the WSS arms.
+Compare candidate and baseline within each campaign rather than across
+campaigns. Independent campaigns may run concurrently, each in its own isolated
+network namespace and campaign root with a distinct seed.
+
 
 run-packet-receipt-tests.py holds a large upload block while later blocks reach
 the origin, then loses a head response and one later receipt. Both frontends
-must preserve payload integrity, retry missing receipts, keep the eight-slot
+must preserve payload integrity, retry missing receipts, keep the sixteen-slot
 cumulative window and avoid resending blocks whose storage was already
 confirmed. Run it with --cdn-proxy against both H1 and H2 origins.
 

@@ -108,7 +108,7 @@ func (f *fixture) gapUpload(r *http.Request, body []byte) (*http.Response, error
 	if time.Now().Before(gap.until) {
 		distance := int(sequence - gap.sequence)
 		f.stats["packet_gap_furthest"] = max(f.stats["packet_gap_furthest"], distance)
-		if distance >= 8 {
+		if distance >= 16 {
 			f.stats["packet_gap_outside_window"]++
 		}
 	}

@@ -67,7 +67,7 @@ their twenty startup pairs. Packet startup needs its own short passive
 comparison; an earlier direct-carrier result is not acceptance for this path.
 
 Sustained upload consists of finite requests of at most 64 KiB, with at most
-eight unacknowledged blocks. Retries retain the original ciphertext and are
+sixteen unacknowledged blocks. Retries retain the original ciphertext and are
 bounded by a 30-second operation deadline. Only a verified cumulative response
 acknowledgement advances the client window. A verified response also confirms
 storage of its individual block, even when an earlier block is missing. Such
@@ -83,17 +83,17 @@ that incomplete item and reconnect from the next unconsumed sequence using the
 same TLS/mux state. A monotonically increasing authenticated download generation
 replaces the previous request.
 
-The server retains at most 2 MiB and 128 output blocks per carrier; a full replay
+The server retains at most 8 MiB and 512 output blocks per carrier; a full replay
 queue blocks its TLS writer. Authenticated acknowledgement releases retention.
 An unavailable resume cursor terminates the session explicitly. A connection
 break never silently restarts a target TCP connection. The upload byte bound is
-512 KiB, the reorder window eight and the recent receipt window sixteen. There
-are at most 32 packet sessions, sixteen provisional sessions, 64 aggregate HTTP
-handlers and twelve active handlers per packet session. The configured server
+1 MiB, the reorder window sixteen and the recent receipt window thirty-two.
+There are at most 32 packet sessions, sixteen provisional sessions, 128
+aggregate HTTP handlers and twenty active handlers per packet session. The configured server
 max_sessions can further reduce packet admission.
 
-The packet adapter uses the common NFOX mux, 32 logical streams and 1-MiB
-delivery credit per stream. Credit still follows actual local socket delivery.
+The packet adapter uses the common NFOX mux, 32 logical streams, 4-MiB
+downstream and 1-MiB upstream delivery credit per stream. Credit still follows actual local socket delivery.
 Five-second heartbeats keep a quiet download active. Provisional setup expires
 after 30 seconds; authenticated sessions expire after 90 seconds without fresh
 authenticated client progress. Replayed old requests do not extend that lease.
@@ -117,11 +117,15 @@ accepting it; size and read deadlines reject unfinished or oversized uploads.
 
 Packet upload cell selection accounts for framing and includes an 8-KiB
 capacity, so a 4-KiB application write does not need a second POST merely for
-its headers. The packet downlink batches ready ACK, CREDIT and payload for a
-fixed interval of at most 2 ms; a full cell bypasses that wait. This prevents
-small control writes from consuming the idle TCP congestion window before the
-reply. The cell length and body are written to inner TLS together. Direct
-carrier scheduling remains unchanged.
+its headers. The packet downlink batches ready ACK, CREDIT and payload in one
+window of at most 2 ms, opened when the drained queue gets new work; a full
+cell bypasses that wait. Once the window closes, full cells of a backlog that
+is not limited by stream credit are sent without waiting again; a partial tail
+or a small credit grant opens a new window. This prevents small control writes
+from consuming the idle TCP congestion window before the reply. OPENED is sent
+without waiting, because the client sends no target data before it arrives. The
+cell length and body are written to inner TLS together. Direct carrier
+scheduling remains unchanged.
 
 The configured max_sessions is shared across direct and packet admission.
 The public unauthenticated visitor slot is transferred to packet setup when

@@ -73,8 +73,9 @@ objects use thread-safe refcounting. Lifetime safety does not permit concurrent
 state mutation.
 
 Each carrier admits at most 32 logical streams; the client may create more
-carriers. Stream receive credit is 512 KiB on WSS and 1 MiB on QUIC and HTTPS packet
-delivery, returned only after local delivery.
+carriers. Stream receive credit is 512 KiB on WSS, 1 MiB on QUIC and 4 MiB on
+HTTPS packet delivery, returned only after local delivery. Packet uploads use
+the server's 1-MiB stream budget.
 Upload buffering uses a bounded ring; frame boundaries are independent of ring
 wrap. Server read queues and HTTP request concurrency are bounded. Partial writes
 and WOULD_BLOCK must preserve every unsent byte.

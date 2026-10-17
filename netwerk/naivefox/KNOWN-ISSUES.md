@@ -108,7 +108,8 @@ budget. Client resource caching remains disabled.
 
 wss:// uses WSS/TCP after startup. quic:// uses HTTP/3 throughout, but its shared downstream
 GET does not give each logical destination an independent QUIC stream. The WSS
-adapter keeps 512 KiB of stream credit; QUIC and HTTPS packet delivery keep 1 MiB. Long credit turnaround can limit
+adapter keeps 512 KiB of stream credit, QUIC 1 MiB and HTTPS packet delivery 4 MiB
+downstream and 1 MiB upstream. Long credit turnaround can limit
 single-stream throughput; the H3 upload pipeline is also bounded to eight requests.
 
 Short controlled-link results apply only to their recorded application, network
