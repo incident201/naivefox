@@ -9,11 +9,16 @@ import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
 import {
   expandUrlTokens,
   stripUnresolvedUrlTokens,
+  URL_REGEX,
   UrlTokenizer,
 } from "moz-src:///browser/components/aiwindow/ui/modules/UrlTokenizer.sys.mjs";
 import { componentTypeName } from "chrome://browser/content/aiwindow/modules/AITabUtils.mjs";
+import { sanitizeUntrustedContent } from "moz-src:///browser/components/aiwindow/models/ChatUtils.sys.mjs";
 
-import { isSmartPageURL } from "chrome://browser/content/aiwindow/modules/TrustedInternalURLs.mjs";
+import {
+  getSmartPageName,
+  isSmartPageURL,
+} from "chrome://browser/content/aiwindow/modules/TrustedInternalURLs.mjs";
 
 const lazy = {};
 
@@ -22,6 +27,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "moz-src:///browser/components/aiwindow/ui/modules/AIWindow.sys.mjs",
   AITabStore:
     "moz-src:///browser/components/aiwindow/ui/modules/AITabStore.sys.mjs",
+  AuthProvider:
+    "moz-src:///browser/components/aiwindow/models/AuthProvider.sys.mjs",
   ConversationStore:
     "moz-src:///browser/components/aiwindow/ui/modules/ConversationStore.sys.mjs",
   BrowserWindowTracker: "resource:///modules/BrowserWindowTracker.sys.mjs",
@@ -40,8 +47,6 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "moz-src:///browser/components/aiwindow/models/Utils.sys.mjs",
   parseVersion: "moz-src:///browser/components/aiwindow/models/Utils.sys.mjs",
   renderPrompt: "moz-src:///browser/components/aiwindow/models/Utils.sys.mjs",
-  openAIEngine:
-    "moz-src:///browser/components/aiwindow/models/openAIEngine.sys.mjs",
   PlacesUtils: "resource://gre/modules/PlacesUtils.sys.mjs",
 });
 
@@ -104,6 +109,7 @@ const JSON_SCHEMA_DIALECT = "https://json-schema.org/draft/2020-12/schema";
 
 // Total budget (characters) for page text sent to the model, split evenly
 // across the requested tabs so multi-tab requests don't overflow the prompt.
+// Measured after URL tokenization, since URLs only reach the model as tokens.
 const SOURCE_TEXT_BUDGET = 10000;
 // Separator inserted between each page's text in the model prompt.
 const PAGE_BREAK = "\n\n<----- PAGE BREAK ---->\n\n";
@@ -314,6 +320,9 @@ const HISTORY_LIMIT_ERROR = "No more modifications are supported";
  * @typedef {object} AITabMetadata
  * @property {string} id - Slug of `title` (see `#slugify`), or the slug being
  *   revised when this generation modified an existing page.
+ * @property {string} [convId] - Id of the chat that owns the page being
+ *   revised, which keeps it whichever chat asked for the revision. Absent for
+ *   a new page, which belongs to the chat that asked for it.
  * @property {string} toolConvId - Id of the conversation the surface was
  *   composed in, in the ConversationStore. Stored alongside the page so a
  *   later modification can continue that exchange, and so deleting the page
@@ -326,9 +335,10 @@ const HISTORY_LIMIT_ERROR = "No more modifications are supported";
 
 /**
  * The result of a generation attempt: metadata plus the validated surface, or
- * a description of what went wrong.
+ * a description of what went wrong and its canonical error code (the one
+ * reported to telemetry).
  *
- * @typedef {{metadata: AITabMetadata, surface: A2UISurface} | {error: string}} AITabResult
+ * @typedef {{metadata: AITabMetadata, surface: A2UISurface} | {error: string, code: string}} AITabResult
  */
 
 /**
@@ -931,7 +941,7 @@ export class AITab {
       Glean.smartWindow.aitabCreateComplete.record(completeExtra);
     }
 
-    return result.error ? { error: result.error } : result;
+    return result.error ? { error: result.error, code: result.code } : result;
   }
 
   /**
@@ -1073,6 +1083,7 @@ export class AITab {
     /** @type {AITabMetadata} */
     const metadata = {
       id: prior ? prior.page.slug : AITab.#slugify(title),
+      convId: prior?.page.convId,
       toolConvId: toolConversation.id,
       title,
       howCreated: "chat",
@@ -1100,6 +1111,35 @@ export class AITab {
     return typeof text == "string"
       ? text.trim().slice(0, MAX_INSTRUCTION_CHARS)
       : "";
+  }
+
+  /**
+   * The longest prefix of `text` that fits in `budget` once its URLs are
+   * tokenized. Never ends inside a URL, which would hand the model a token
+   * for a URL that doesn't exist.
+   *
+   * @param {string} text
+   * @param {number} budget
+   * @returns {string}
+   */
+  static #truncateToBudget(text, budget) {
+    // Measures token lengths only. The prompt is tokenized separately, so
+    // nothing registered here can resolve a link in the model's output.
+    const urlTokenizer = new UrlTokenizer();
+    let length = 0;
+    let end = 0;
+    for (const match of text.matchAll(URL_REGEX)) {
+      const gap = match.index - end;
+      if (length + gap >= budget) {
+        break;
+      }
+      length += gap + urlTokenizer.tokenizeText(match[0]).length;
+      if (length > budget) {
+        return text.slice(0, match.index);
+      }
+      end = match.index + match[0].length;
+    }
+    return text.slice(0, end + Math.max(0, budget - length));
   }
 
   /**
@@ -1174,8 +1214,7 @@ export class AITab {
 
       // Trim each page's text to its share of the budget before sending to the
       // model.
-      const budgetedText =
-        text.length > perTabBudget ? text.slice(0, perTabBudget) : text;
+      const budgetedText = AITab.#truncateToBudget(text, perTabBudget);
       const headLines = [`## ${heading}`, `URL: ${url}`];
       // Omit the Image: line when absent so the model never echoes an empty
       // value.
@@ -1191,7 +1230,7 @@ export class AITab {
 
     if (rawText) {
       sourceParts.push(
-        `${RAW_CONTENT_HEADING}\n\n${rawText.slice(0, perTabBudget)}`
+        `${RAW_CONTENT_HEADING}\n\n${AITab.#truncateToBudget(rawText, perTabBudget)}`
       );
     }
 
@@ -1203,13 +1242,16 @@ export class AITab {
    * composed it. The stored conversation carries its messages, URL ledgers and
    * security flags but no engine; #resolvePromptSet attaches one.
    *
-   * Only a page belonging to `conversation` can be loaded: slugs are visible in
-   * page URLs, so without that check a model could be talked into rewriting a
-   * page from an unrelated chat. Keying the lookup on the chat conversation
-   * would also file the new version under the wrong slug.
+   * Only a page belonging to `conversation`, or one the user referenced in it
+   * (the current tab or an @mention), can be loaded: slugs are visible in page
+   * URLs, so without that check a model could be talked into rewriting a page
+   * from an unrelated chat. URLs the conversation merely came across, such as
+   * open tabs or links in fetched pages, do not count. Keying the lookup on
+   * the chat conversation would also file the new version under the wrong
+   * slug.
    *
    * @param {string} slug
-   * @param {ChatConversation} conversation - The chat that owns the page.
+   * @param {ChatConversation} conversation - The chat asking for the revision.
    * @returns {Promise<{page: object, conversation: Conversation}
    *   |{error: string}>}
    */
@@ -1231,7 +1273,10 @@ export class AITab {
       };
     }
 
-    if (!page || page.convId !== conversation?.id) {
+    const referencedByUser = [
+      ...(conversation?.getAllMentionURLs() ?? []),
+    ].some(url => getSmartPageName(URL.parse(url)) === slug);
+    if (!page || (page.convId !== conversation?.id && !referencedByUser)) {
       return {
         error: `this conversation has no page with the slug "${slug}"`,
         code: "page_not_found",
@@ -1686,7 +1731,7 @@ export class AITab {
       // only be abandoned once it resolves.
       const response = await conversation.run({
         args,
-        fxAccountToken: await lazy.openAIEngine.getFxAccountToken(),
+        token: await lazy.AuthProvider.getToken(),
       });
 
       if (signal?.aborted) {
@@ -1714,6 +1759,15 @@ export class AITab {
           code: "invalid_json",
         };
       }
+
+      if (parsed.error && typeof parsed.error == "string") {
+        lazy.console.warn("Model returned response error", parsed.error);
+        return {
+          error: sanitizeUntrustedContent(parsed.error),
+          code: "content_related",
+        };
+      }
+
       const surface = AITab.expandSurfaceUrlTokens(parsed, urlTokenizer);
 
       const result = AITab.buildSurface(surface, env);

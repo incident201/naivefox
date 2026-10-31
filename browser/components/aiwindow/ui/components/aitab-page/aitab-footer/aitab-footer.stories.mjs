@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { html } from "chrome://global/content/vendor/lit.all.mjs";
-// eslint-disable-next-line import/no-unassigned-import
+// eslint-disable-next-line import-x/no-unassigned-import
 import "chrome://browser/content/aiwindow/components/aitab-footer.mjs";
 
 export default {
@@ -11,7 +11,7 @@ export default {
   component: "aitab-footer",
   parameters: {
     fluent: `
-aitab-page-made-with = Made with <span data-l10n-name="brand">Smart Window</span>
+aitab-page-footer-brand = Smart Window
     `,
   },
 };

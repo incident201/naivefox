@@ -17,6 +17,7 @@ const lazy = XPCOMUtils.declareLazy({
 const { TRANSPARENT_PROXY_RESOLVES_HOST, ALWAYS_TUNNEL_VIA_PROXY } =
   Ci.nsIProxyInfo;
 const failOverTimeout = 10; // seconds
+const PROXY_FAILURE = Cr.NS_ERROR_PROXY_CONNECTION_REFUSED;
 
 const MODE_PREF = "browser.ipProtection.mode";
 
@@ -203,6 +204,7 @@ export class IPPChannelFilter {
     );
     Object.freeze(proxyInfo);
     this.proxyInfo = proxyInfo;
+    this.#failed = false;
     this.#processPendingChannels();
   }
 
@@ -220,6 +222,12 @@ export class IPPChannelFilter {
     if (!this.shouldProxy(channel)) {
       // Calling this with "null" will enforce a non-proxy connection
       proxyFilter.onProxyFilterResult(defaultProxyInfo);
+      return;
+    }
+
+    if (this.#failed) {
+      channel.cancel(PROXY_FAILURE);
+      proxyFilter.onProxyFilterResult(null);
       return;
     }
 
@@ -266,7 +274,11 @@ export class IPPChannelFilter {
     }
 
     const principal = this.#principalForChannel(channel);
-    const rule = lazy.IPPSiteRuleManager.getRule(principal);
+    const { targetBrowsingContext, browsingContext } = channel.loadInfo ?? {};
+    const rule = lazy.IPPSiteRuleManager.getRule(
+      principal,
+      (targetBrowsingContext ?? browsingContext)?.top.browserId
+    );
     const isTopLevelDocument =
       channel.loadInfo?.externalContentPolicyType ===
       Ci.nsIContentPolicy.TYPE_DOCUMENT;
@@ -382,6 +394,17 @@ export class IPPChannelFilter {
   }
 
   /**
+   * Marks the connection as unable to continue: queued and new channels that
+   * should be proxied are cancelled with a proxy error, so a document shows
+   * the error page. Building a new proxyInfo clears it.
+   */
+  fail() {
+    this.#failed = true;
+    this.proxyInfo = null;
+    this.abortPendingChannels(PROXY_FAILURE);
+  }
+
+  /**
    * True if the stored pass is still valid and not yet due for rotation, meaning
    * the connection can be resumed as-is (e.g. when waking from sleep).
    */
@@ -464,11 +487,12 @@ export class IPPChannelFilter {
     }
   }
 
-  abortPendingChannels() {
+  /**
+   * @param {nsresult} [status] - the status to cancel the queued channels with.
+   */
+  abortPendingChannels(status = Cr.NS_BINDING_ABORTED) {
     if (this.#pendingChannels.length) {
-      this.#pendingChannels.forEach(data =>
-        data.channel.cancel(Cr.NS_BINDING_ABORTED)
-      );
+      this.#pendingChannels.forEach(data => data.channel.cancel(status));
       this.#pendingChannels = [];
     }
   }
@@ -476,6 +500,7 @@ export class IPPChannelFilter {
   #abort = new AbortController();
   #observers = [];
   #active = false;
+  #failed = false;
   #pendingChannels = [];
   #server = null;
   /** @type {import("./GuardianTypes.sys.mjs").ProxyPass | null} */

@@ -31,6 +31,7 @@
 #include "mozilla/StaticMutex.h"
 #include "mozilla/StaticPtr.h"
 #include "mozilla/ThreadSafeWeakPtr.h"
+#include "mozilla/UniquePtr.h"
 #include "mozilla/gfx/FontData.h"
 #include "nsRegionFwd.h"
 
@@ -1213,84 +1214,41 @@ struct GlyphBuffer {
   const Glyph*
       mGlyphs;  //!< A pointer to a buffer of glyphs. Managed by the caller.
   uint32_t mNumGlyphs;  //!< Number of glyphs mGlyphs points to.
+
+  // The following fields optionally associate each glyph with the source text
+  // it was shaped from, so that backends which support it (e.g. SkPDF) can
+  // produce a correct ToUnicode/ActualText mapping even for glyphs reached via
+  // OpenType substitution (ligatures, math styling, etc). mText and mClusters
+  // are either both set or both null.
+  const char* mText = nullptr;  //!< UTF-8 source text; not null terminated.
+  uint32_t mTextLength = 0;     //!< Number of bytes in mText.
+  // mNumGlyphs monotonically non-decreasing byte offsets into mText, each less
+  // than mTextLength, specifying where the source text for each glyph starts.
+  // Each glyph's source text extends up to the next glyph's offset, or to the
+  // end of mText for the last glyph.
+  const uint32_t* mClusters = nullptr;
 };
 
 #ifdef MOZ_ENABLE_FREETYPE
-class SharedFTFace;
-
-/** SharedFTFaceData abstracts data that may be used to back a SharedFTFace.
- * Its main function is to manage the lifetime of the data and ensure that it
- * lasts as long as the face.
- */
-class SharedFTFaceData {
- public:
-  /** Utility for creating a new face from this data. */
-  virtual already_AddRefed<SharedFTFace> CloneFace(int aFaceIndex = 0) {
-    return nullptr;
-  }
-  /** Binds the data's lifetime to the face. */
-  virtual void BindData() = 0;
-  /** Signals that the data is no longer needed by a face. */
-  virtual void ReleaseData() = 0;
-};
-
-/** Wrapper class for ref-counted SharedFTFaceData that handles calling the
- * appropriate ref-counting methods
- */
-template <class T>
-class SharedFTFaceRefCountedData : public SharedFTFaceData {
- public:
-  void BindData() { static_cast<T*>(this)->AddRef(); }
-  void ReleaseData() { static_cast<T*>(this)->Release(); }
-};
-
-// Helper class used for clearing out user font data when FT font
-// face is destroyed. Since multiple faces may use the same data, be
-// careful to assure that the data is only cleared out when all uses
-// expire. The font entry object contains a refptr to FTUserFontData and
-// each FT face created from that font entry contains a refptr to that
-// same FTUserFontData object.
-// This is also attached to FT faces for installed fonts (recording the
-// filename, rather than storing the font data) if variations are present.
-class FTUserFontData final
-    : public mozilla::gfx::SharedFTFaceRefCountedData<FTUserFontData> {
- public:
-  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(FTUserFontData)
-
-  explicit FTUserFontData(FontData* aFontData) : mFontData(aFontData) {}
-  explicit FTUserFontData(const char* aFilename) : mFilename(aFilename) {}
-
-  const uint8_t* GetData() const {
-    return mFontData ? mFontData->Data() : nullptr;
-  }
-  uint32_t Length() const { return mFontData ? mFontData->Length() : 0; }
-
-  already_AddRefed<mozilla::gfx::SharedFTFace> CloneFace(
-      int aFaceIndex = 0) override;
-
- private:
-  ~FTUserFontData() = default;
-
-  std::string mFilename;
-  RefPtr<FontData> mFontData;
-};
-
 /** SharedFTFace is a shared wrapper around an FT_Face. It is ref-counted,
  * unlike FT_Face itself, so that it may be shared among many users with
  * RefPtr. Users should take care to lock SharedFTFace before accessing any
  * FT_Face fields that may change to ensure exclusive access to it. It also
- * allows backing data's lifetime to be bound to it via SharedFTFaceData so
- * that the data will not disappear before the face does.
+ * allows backing data's lifetime to be bound to it so that the data will not
+ * disappear before the face does.
  */
 class SharedFTFace : public external::AtomicRefCounted<SharedFTFace> {
  public:
   MOZ_DECLARE_REFCOUNTED_VIRTUAL_TYPENAME(SharedFTFace)
 
-  explicit SharedFTFace(FT_Face aFace, SharedFTFaceData* aData);
+  SharedFTFace(FT_Face aFace, UniquePtr<char[]>&& aFilename, int aFaceIndex);
+  SharedFTFace(FT_Face aFace, FontData* aFontData, int aFaceIndex);
   virtual ~SharedFTFace();
 
   FT_Face GetFace() const { return mFace; }
-  SharedFTFaceData* GetData() const { return mData; }
+  const char* GetFilename() const { return mFilename.get(); }
+  const RefPtr<FontData>& GetFontData() const { return mFontData; }
+  int GetFaceIndex() const { return mFaceIndex; }
 
   /** Locks the face for exclusive access by a given owner. Returns false if
    * the given owner is acquiring the lock for the first time, and true if
@@ -1315,15 +1273,40 @@ class SharedFTFace : public external::AtomicRefCounted<SharedFTFace> {
     }
   }
 
+  already_AddRefed<mozilla::gfx::SharedFTFace> CloneFace();
+
  private:
-  FT_Face mFace;
-  SharedFTFaceData* mData;
-  Mutex mLock;
+  FT_Face mFace = nullptr;
+  // The filename, if used, must have the same lifetime as the FT_Face.
+  UniquePtr<char[]> mFilename;
+  // Since multiple faces may use the same data, use RefPtr to assure that the
+  // data is only cleared out when all uses expire.
+  RefPtr<FontData> mFontData;
+  int mFaceIndex = 0;
+  Mutex mLock{"SharedFTFace::mLock"};
   // Remember the last owner of the lock, even after unlocking, to allow users
   // to avoid reinitializing state on the FT face if the last owner hasn't
   // changed by the next time it is locked with the same owner.
-  Atomic<const void*> mLastLockOwner;
+  Atomic<const void*> mLastLockOwner{nullptr};
 };
+
+class AutoLockSharedFTFace {
+ public:
+  explicit AutoLockSharedFTFace(SharedFTFace* aFace) : mFace(aFace) {
+    if (mFace) {
+      mFace->Lock();
+    }
+  }
+  ~AutoLockSharedFTFace() {
+    if (mFace) {
+      mFace->Unlock();
+    }
+  }
+
+ private:
+  SharedFTFace* mFace = nullptr;
+};
+
 #endif
 
 class UnscaledFont : public SupportsThreadSafeWeakPtr<UnscaledFont> {
@@ -1524,6 +1507,16 @@ class DrawTarget : public external::AtomicRefCounted<DrawTarget> {
    * a11y::PdfStructTreeBuilder::SpecialId.
    */
   virtual void AccessibleId(uint64_t aInnerWindowId, uint64_t aAccId) {}
+
+  /**
+   * Returns true if this DrawTarget can make use of the source text/cluster
+   * fields on GlyphBuffer (see above) to produce a correct PDF ToUnicode/
+   * ActualText mapping for glyphs reached via OpenType substitution. Only
+   * targets which might produce PDF output return true. Callers that could
+   * supply this data (at some cost) should check this first so that consumers
+   * with no use for it, e.g. canvas or WebRender, aren't made to pay for it.
+   */
+  virtual bool SupportsGlyphSourceText() const { return false; }
 
   /**
    * Returns a SourceSurface which is a snapshot of the current contents of the
@@ -2033,6 +2026,13 @@ class DrawTarget : public external::AtomicRefCounted<DrawTarget> {
                                                      SurfaceFormat aFormat) = 0;
 
   /**
+   * Create a similar DrawTarget in the same space as this DrawTarget, covering
+   * aRect in device space.
+   */
+  virtual RefPtr<DrawTarget> CreateClippedDrawTargetForRect(
+      const IntRect& aRect, SurfaceFormat aFormat);
+
+  /**
    * Create a similar draw target, but if the draw target is not backed by a
    * raster backend (for example, it is capturing or recording), force it to
    * create a raster target instead. This is intended for code that wants to
@@ -2404,8 +2404,12 @@ class GFX2D_API Factory {
   static SubpixelOrder mSubpixelOrder;
 
  public:
+  /**
+   * aSupportsGlyphSourceText should be true if aCanvas can make use of glyph
+   * source text. See DrawTarget::SupportsGlyphSourceText().
+   */
   static already_AddRefed<DrawTarget> CreateDrawTargetWithSkCanvas(
-      SkCanvas* aCanvas);
+      SkCanvas* aCanvas, bool aSupportsGlyphSourceText = false);
 
 #ifdef MOZ_ENABLE_FREETYPE
   static void SetFTLibrary(FT_Library aFTLibrary);
@@ -2418,14 +2422,12 @@ class GFX2D_API Factory {
 
   static FT_Face NewFTFace(FT_Library aFTLibrary, const char* aFileName,
                            int aFaceIndex);
-  static already_AddRefed<SharedFTFace> NewSharedFTFace(FT_Library aFTLibrary,
-                                                        const char* aFilename,
+  static already_AddRefed<SharedFTFace> NewSharedFTFace(const char* aFilename,
                                                         int aFaceIndex);
   static FT_Face NewFTFaceFromData(FT_Library aFTLibrary, const uint8_t* aData,
                                    uint32_t aLength, int aFaceIndex);
   static already_AddRefed<SharedFTFace> NewSharedFTFaceFromData(
-      FT_Library aFTLibrary, FontData* aFontData, int aFaceIndex,
-      SharedFTFaceData* aSharedData = nullptr);
+      FontData* aFontData, int aFaceIndex);
   static void ReleaseFTFace(FT_Face aFace);
   static FT_Error LoadFTGlyph(FT_Face aFace, uint32_t aGlyphIndex,
                               int32_t aFlags);

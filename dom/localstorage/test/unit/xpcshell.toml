@@ -244,3 +244,12 @@ skip-if = [
 skip-if = [
   "privateBrowsing"
 ]
+
+["test_usageUnderflowTelemetry.js"]
+# Rewrites the usage file under storage/default, which private browsing does
+# not use (it uses storage/private, which is cleared at shutdown).
+# Debug builds assert on usage underflows before the event is recorded.
+skip-if = [
+  "privateBrowsing",
+  "debug",
+]

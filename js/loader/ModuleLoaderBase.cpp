@@ -38,7 +38,6 @@
 using mozilla::AutoSlowOperation;
 using mozilla::CycleCollectedJSContext;
 using mozilla::Err;
-using mozilla::MakeUnique;
 using mozilla::MicroTaskRunnable;
 using mozilla::Preferences;
 using mozilla::UniquePtr;
@@ -1155,7 +1154,7 @@ ResolveResult ModuleLoaderBase::ResolveModuleSpecifier(
 ResolvedModuleSet* ModuleLoaderBase::GetResolvedModuleSet() {
   MOZ_ASSERT(ImportMap::IsMultipleImportMapsSupported());
   if (!mResolvedModuleSet) {
-    mResolvedModuleSet = MakeUnique<ResolvedModuleSet>();
+    mResolvedModuleSet = std::make_unique<ResolvedModuleSet>();
   }
 
   return mResolvedModuleSet.get();

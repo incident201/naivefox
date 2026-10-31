@@ -28,7 +28,7 @@ ChromeUtils.defineESModuleGetters(this, {
   PlacesUtils: "resource://gre/modules/PlacesUtils.sys.mjs",
   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
   ProfileAge: "resource://gre/modules/ProfileAge.sys.mjs",
-  PushService: "resource://gre/modules/PushService.sys.mjs",
+  PushService: "moz-src:///dom/push/PushService.sys.mjs",
   QueryCache: "resource:///modules/asrouter/ASRouterTargeting.sys.mjs",
   Region: "resource://gre/modules/Region.sys.mjs",
   ReinstallCheck: "moz-src:///browser/components/ReinstallCheck.sys.mjs",
@@ -1517,7 +1517,7 @@ add_task(async function check_current_tab_installed_as_web_app() {
   // By default, Taskbar Tabs will try and pin this to the taskbar, but we
   // don't want to do that in this test.
   const sandbox = sinon.createSandbox();
-  sandbox.stub(TaskbarTabsPin, "pinTaskbarTab");
+  sandbox.stub(TaskbarTabsPin, "pinTaskbarTab").resolves({});
   sandbox.stub(TaskbarTabsPin, "unpinTaskbarTab");
 
   const kUri = "https://example.com";
@@ -1560,7 +1560,7 @@ add_task(async function check_current_tab_installed_as_web_app() {
 
 add_task(async function check_installed_web_apps_count() {
   const sandbox = sinon.createSandbox();
-  sandbox.stub(TaskbarTabsPin, "pinTaskbarTab");
+  sandbox.stub(TaskbarTabsPin, "pinTaskbarTab").resolves({});
   sandbox.stub(TaskbarTabsPin, "unpinTaskbarTab");
 
   const kUri1 = "https://example.com";

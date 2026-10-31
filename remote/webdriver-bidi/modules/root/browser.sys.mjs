@@ -317,6 +317,9 @@ class BrowserModule extends RootBiDiModule {
    *     Raised if an argument is of an invalid type or value.
    * @throws {NoSuchUserContextError}
    *     Raised if a user context id could not be found.
+   * @throws {UnsupportedOperationError}
+   *     Raised if "userContexts" is not provided in a session restricted to a
+   *     single user context.
    */
   async setDownloadBehavior(options = {}) {
     const {
@@ -354,6 +357,12 @@ class BrowserModule extends RootBiDiModule {
 
         behavior.destinationFolder = destinationFolder;
       }
+    }
+
+    if (userContextIds === undefined && this._isSessionRestricted) {
+      throw new lazy.error.UnsupportedOperationError(
+        `Setting the download behavior without "userContexts" is not supported in a session restricted to a single user context`
+      );
     }
 
     const userContexts = new Set();
@@ -588,6 +597,10 @@ class BrowserModule extends RootBiDiModule {
     }
 
     return null;
+  }
+
+  static get supportedCommandsInRestrictedSession() {
+    return ["setDownloadBehavior"];
   }
 }
 

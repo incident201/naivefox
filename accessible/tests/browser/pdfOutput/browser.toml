@@ -5,6 +5,8 @@ support-files = [
   "!/accessible/tests/browser/shared-head.js",
   "!/accessible/tests/mochitest/*.js",
   "!/toolkit/components/printing/tests/head.js",
+  "pdfTest.ttf",
+  "pdfTest.ttf^headers^",
 ]
 prefs = [
   "security.allow_eval_with_system_principal=true",
@@ -16,5 +18,7 @@ prefs = [
 ["browser_artifacts.js"]
 
 ["browser_outline.js"]
+
+["browser_sourceText.js"]
 
 ["browser_structTree.js"]

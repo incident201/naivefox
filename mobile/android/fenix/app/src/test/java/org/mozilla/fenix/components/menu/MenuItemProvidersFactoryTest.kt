@@ -41,6 +41,7 @@ import org.mozilla.fenix.components.AppStore
 import org.mozilla.fenix.components.FindInPageMenuItemProvider
 import org.mozilla.fenix.components.accounts.MozillaAccountMenuItemProvider
 import org.mozilla.fenix.components.menu.fake.reachableEvents
+import org.mozilla.fenix.customtabs.CustomTabAppMenuItemProvider
 import org.mozilla.fenix.downloads.DownloadsMenuItemProvider
 import org.mozilla.fenix.home.CustomizeHomepageMenuItemProvider
 import org.mozilla.fenix.home.topsites.ShortcutMenuItemProvider
@@ -96,7 +97,7 @@ class MenuItemProvidersFactoryTest {
         val registry =
             MenuItemsRegistry(configuration = MenuConfigurations.home(), resolver = factory::buildProviderFor)
 
-        val shown = registry.providers.filterValues { it.itemFlow.value != null }.keys
+        val shown = registry.providers.filterValues { it.itemsFlow.value.isNotEmpty() }.keys
         assertEquals(
             listOf(
                 FenixMenuItem.DefaultBrowserBanner,
@@ -114,7 +115,7 @@ class MenuItemProvidersFactoryTest {
             shown.toList(),
         )
         registry.providers.values
-            .mapNotNull { it.itemFlow.value }
+            .flatMap { it.itemsFlow.value }
             .flatMap { it.reachableEvents() }
             .forEach { event ->
                 assertEquals(1, registry.providers.values.count { it.handles(event) }, "Handlers of $event")
@@ -184,6 +185,7 @@ class MenuItemProvidersFactoryTest {
             FenixMenuItem.SaveToCollection::class to SaveToCollectionMenuItemProvider::class,
             FenixMenuItem.OpenInApp::class to OpenInAppMenuItemProvider::class,
             FenixMenuItem.OpenInFirefox::class to OpenInFirefoxMenuItemProvider::class,
+            FenixMenuItem.CustomTabAppItems::class to CustomTabAppMenuItemProvider::class,
             FenixMenuItem.SaveAsPdf::class to SaveAsPdfMenuItemProvider::class,
             FenixMenuItem.Print::class to PrintMenuItemProvider::class,
             FenixMenuItem.MozillaAccount::class to MozillaAccountMenuItemProvider::class,

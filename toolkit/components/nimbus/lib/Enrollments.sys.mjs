@@ -32,24 +32,9 @@ const lazy = XPCOMUtils.declareLazy({
  */
 const FLUSH_DELAY_MS = 1500;
 
-// We read this prefs *once* at startup because the ExperimentStore (and
-// SharedDataMap) have different initialization logic based on the state of these prefs.
-//
-// To ensure that changing them doesn't result in inconsistent behavaiour, they
-// will only take affect after a restart.
-//
-// They are only mutable so they can be updated for tests.
-let DATABASE_ENABLED = Services.prefs.getBoolPref(
-  "nimbus.profilesdatastoreservice.enabled",
-  false
-);
-let READ_FROM_DATABASE_ENABLED = Services.prefs.getBoolPref(
-  "nimbus.profilesdatastoreservice.read.enabled",
-  false
-);
-let SYNC_ENROLLMENTS_ENABLED = Services.prefs.getBoolPref(
-  "nimbus.profilesdatastoreservice.sync.enabled",
-  false
+const PERSISTENCE_ENABLED = Services.prefs.getBoolPref(
+  "nimbus.persistence.enabled",
+  true
 );
 
 export class PendingWrites {
@@ -221,10 +206,7 @@ export class NimbusEnrollments {
 
     const conn = await lazy.ProfilesDatastoreService.getConnection();
     return conn.executeTransaction(async txn => {
-      // Only load enrollments if the database is the source-of-truth for reads.
-      const enrollments = NimbusEnrollments.readFromDatabaseEnabled
-        ? await NimbusEnrollments.loadEnrollments(txn)
-        : null;
+      const enrollments = await NimbusEnrollments.loadEnrollments(txn);
       this.#syncTimestamps = await NimbusEnrollments.loadSyncTimestamps(txn);
 
       return enrollments;
@@ -616,33 +598,13 @@ export class NimbusEnrollments {
   }
 
   /**
-   * Whether or not writing to the NimbusEnrollments table is enabled.
+   * Whether or not reading from and writing to the NimbusEnrollments table is
+   * enabled.
    *
-   * This should only be false in xpcshell tests.
+   * This can only be false in test environments.
    */
-  static get databaseEnabled() {
-    // TODO(bug 1967779): require the ProfilesDatastoreService to be initialized
-    // and remove this.
-    return DATABASE_ENABLED;
-  }
-
-  /**
-   * Whether or not reading from the NimbusEnrollments table is enabled.
-   *
-   * This is true by default except in xpcshell tests.
-   */
-  static get readFromDatabaseEnabled() {
-    // TODO(bug 1967779): require the ProfilesDatastoreService to be initialized
-    // and remove this.
-    return DATABASE_ENABLED && READ_FROM_DATABASE_ENABLED;
-  }
-
-  static get syncEnrollmentsEnabled() {
-    // TODO(bug 1967779): require the ProfilesDatastoreService to be initialized
-    // and remove this.
-    return (
-      DATABASE_ENABLED && READ_FROM_DATABASE_ENABLED && SYNC_ENROLLMENTS_ENABLED
-    );
+  static get persistenceEnabled() {
+    return PERSISTENCE_ENABLED;
   }
 
   /**
@@ -822,7 +784,7 @@ export class NimbusEnrollments {
   /**
    * Load the slugs of all experiments from other profiles that have unenrolled.
    *
-   * @returns {Set<string>} The slugs of the experiments.
+   * @returns {Promise<Set<string>>} The slugs of the experiments.
    */
   static async loadUnenrolledExperimentSlugsFromOtherProfiles() {
     const conn = await lazy.ProfilesDatastoreService.getConnection();
@@ -842,25 +804,5 @@ export class NimbusEnrollments {
     );
 
     return new Set(rows.map(row => row.getResultByName("slug")));
-  }
-
-  /**
-   * Reload the database-related prefs
-   *
-   * ** TEST ONLY **
-   */
-  static _reloadPrefsForTests() {
-    DATABASE_ENABLED = Services.prefs.getBoolPref(
-      "nimbus.profilesdatastoreservice.enabled",
-      false
-    );
-    READ_FROM_DATABASE_ENABLED = Services.prefs.getBoolPref(
-      "nimbus.profilesdatastoreservice.read.enabled",
-      false
-    );
-    SYNC_ENROLLMENTS_ENABLED = Services.prefs.getBoolPref(
-      "nimbus.profilesdatastoreservice.sync.enabled",
-      false
-    );
   }
 }

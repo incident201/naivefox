@@ -1,36 +1,11 @@
 import pytest
-from webdriver.bidi.error import NoSuchFrameException, NoSuchUserContextException
-from webdriver.bidi.modules.storage import (
-    BrowsingContextPartitionDescriptor,
-    StorageKeyPartitionDescriptor,
-)
+from webdriver.bidi.error import UnsupportedOperationException
 
 from bidi.support.container_isolation import container_isolation
 
 pytestmark = [pytest.mark.asyncio, container_isolation]
 
 
-async def test_partition_user_context(bidi_session, session_user_context):
-    await bidi_session.storage.get_cookies(
-        partition=StorageKeyPartitionDescriptor(user_context=session_user_context)
-    )
-
-
-async def test_partition_user_context_outside_container(bidi_session):
-    with pytest.raises(NoSuchUserContextException):
-        await bidi_session.storage.get_cookies(
-            partition=StorageKeyPartitionDescriptor(user_context="default")
-        )
-
-
-async def test_partition_context(bidi_session, new_tab):
-    await bidi_session.storage.get_cookies(
-        partition=BrowsingContextPartitionDescriptor(new_tab["context"])
-    )
-
-
-async def test_partition_context_outside_container(bidi_session, tab_outside_container):
-    with pytest.raises(NoSuchFrameException):
-        await bidi_session.storage.get_cookies(
-            partition=BrowsingContextPartitionDescriptor(tab_outside_container)
-        )
+async def test_get_cookies(bidi_session):
+    with pytest.raises(UnsupportedOperationException):
+        await bidi_session.storage.get_cookies()

@@ -11,13 +11,8 @@ const SYNC_DATA_PREF_BRANCH = "nimbus.syncdatastore.";
 const SYNC_DEFAULTS_PREF_BRANCH = "nimbus.syncdefaultsstore.";
 
 const lazy = XPCOMUtils.declareLazy({
-  ExperimentAPI: "resource://nimbus/ExperimentAPI.sys.mjs",
-  NimbusEnrollments: "resource://nimbus/lib/Enrollments.sys.mjs",
   NimbusFeatures: "resource://nimbus/ExperimentAPI.sys.mjs",
-  NimbusMigrations: "resource://nimbus/lib/Migrations.sys.mjs",
   PrefUtils: "moz-src:///toolkit/modules/PrefUtils.sys.mjs",
-  ProfilesDatastoreService:
-    "moz-src:///toolkit/profile/ProfilesDatastoreService.sys.mjs",
 
   syncDataStore: () => {
     let experimentsPrefBranch = Services.prefs.getBranch(SYNC_DATA_PREF_BRANCH);
@@ -224,8 +219,8 @@ export class ExperimentStore extends SharedDataMap {
   static SYNC_DATA_PREF_BRANCH = SYNC_DATA_PREF_BRANCH;
   static SYNC_DEFAULTS_PREF_BRANCH = SYNC_DEFAULTS_PREF_BRANCH;
 
-  constructor(sharedDataKey, options) {
-    super(sharedDataKey ?? DEFAULT_STORE_ID, options);
+  constructor(sharedDataKey) {
+    super(sharedDataKey ?? DEFAULT_STORE_ID);
   }
 
   /**
@@ -251,8 +246,6 @@ export class ExperimentStore extends SharedDataMap {
     for (const featureId of featureIds) {
       this._emitFeatureUpdate(featureId, "feature-enrollments-loaded");
     }
-
-    await this._reportStartupDatabaseConsistency("startup");
 
     // Clean up the old recipes *after* we report database consistency so that
     // we're not racing.
@@ -558,67 +551,5 @@ export class ExperimentStore extends SharedDataMap {
     if (isEnrollment && removeFromNimbusEnrollments) {
       this._db?.updateEnrollment(slugOrFeatureId);
     }
-  }
-
-  async _reportStartupDatabaseConsistency(trigger) {
-    if (!lazy.NimbusEnrollments.databaseEnabled) {
-      // We are in an xpcshell test that has not initialized the
-      // ProfilesDatastoreService.
-      //
-      // TODO(bug 1967779): require the ProfilesDatastoreService to be initialized
-      // and remove this check.
-      return;
-    }
-
-    // If we call this with trigger === "migration", the migration won't
-    // actually be completed because it will be in progress.
-    if (
-      trigger === "startup" &&
-      !lazy.NimbusMigrations.isMigrationCompleted(
-        lazy.NimbusMigrations.Phase.AFTER_STORE_INITIALIZED,
-        "import-enrollments-to-sql"
-      )
-    ) {
-      // We haven't ran the migration, so it will report 0 enrollments in the
-      // database. We will report this event when the migration completes.
-      return;
-    }
-
-    const conn = await lazy.ProfilesDatastoreService.getConnection();
-    const rows = await conn.execute(
-      `
-        SELECT
-          active
-        FROM NimbusEnrollments
-        WHERE
-          profileId = :profileId;
-      `,
-      {
-        profileId: lazy.ExperimentAPI.profileId,
-      }
-    );
-
-    const dbEnrollments = rows.map(row => row.getResultByName("active"));
-    const storeEnrollments = Object.values(this._jsonFile.data).map(
-      e => e.active
-    );
-
-    function countActive(sum, active) {
-      return sum + Number(active);
-    }
-
-    const dbActiveCount = dbEnrollments.reduce(countActive, 0);
-    const storeActiveCount = storeEnrollments.reduce(countActive, 0);
-
-    Glean.nimbusEvents.startupDatabaseConsistency.record({
-      total_db_count: dbEnrollments.length,
-      total_store_count: storeEnrollments.length,
-      db_active_count: dbActiveCount,
-      store_active_count: storeActiveCount,
-      trigger,
-      primary: lazy.NimbusEnrollments.readFromDatabaseEnabled
-        ? "database"
-        : "jsonfile",
-    });
   }
 }

@@ -186,6 +186,7 @@
     <string name="pref_key_show_nonsponsored_suggestions" translatable="false">pref_key_show_nonsponsored_suggestions</string>
     <string name="pref_key_learn_about_fx_suggest" translatable="false">pref_key_learn_about_fx_suggest</string>
     <string name="pref_key_use_remote_search_configuration" translatable="false">pref_key_use_remote_search_configuration</string>
+    <string name="pref_key_use_search_config_v3" translatable="false">pref_key_use_search_config_v3</string>
 
     <!-- Site Permissions Settings -->
     <string name="pref_key_show_site_exceptions" translatable="false">pref_key_show_site_exceptions</string>
@@ -210,6 +211,8 @@
     <string name="pref_key_toolbar_has_shown_tab_swipe_cfr">pref_key_has_shown_tab_swipe_cfr</string>
     <string name="pref_key_toolbar_expanded" translatable="false">pref_key_toolbar_expanded</string>
     <string name="pref_key_toolbar_focus_mode" translatable="false">pref_key_toolbar_focus_mode</string>
+    <string name="pref_key_homepage_search_location_header" translatable="false">pref_key_homepage_search_location_header</string>
+    <string name="pref_key_homepage_search_location_top" translatable="false">pref_key_homepage_search_location_top</string>
 
     <!-- Tab bar Settings -->
     <string name="pref_key_tab_bar_top" translatable="false">pref_key_tab_bar_top</string>
@@ -249,6 +252,8 @@
     <string name="pref_key_customization_category_toolbar_layout" translatable="false">pref_key_customization_category_toolbar_layout</string>
     <string name="pref_key_customization_category_app_icon" translatable="false">pref_key_customization_category_app_icon</string>
     <string name="pref_key_customization_category_toolbar_shortcut" translatable="false">pref_key_customization_category_toolbar_shortcut</string>
+    <string name="pref_key_customization_category_menu" translatable="false">pref_key_customization_category_menu</string>
+    <string name="pref_key_customize_menu" translatable="false">pref_key_customize_menu</string>
     <string name="pref_key_toolbar_simple_shortcut" translatable="false">pref_key_toolbar_simple_shortcut</string>
     <string name="pref_key_toolbar_simple_no_shortcut" translatable="false">pref_key_toolbar_simple_no_shortcut</string>
     <string name="pref_key_toolbar_expanded_shortcut" translatable="false">pref_key_toolbar_expanded_shortcut</string>
@@ -340,6 +345,12 @@
     <string name="pref_key_open_links_in_apps_always" translatable="false">pref_key_open_links_in_apps_always</string>
     <string name="pref_key_open_links_in_apps_ask" translatable="false">pref_key_open_links_in_apps_ask</string>
     <string name="pref_key_open_links_in_apps_never" translatable="false">pref_key_open_links_in_apps_never</string>
+    <string name="pref_key_media_category" translatable="false">pref_key_media_category</string>
+    <string name="pref_key_open_links_in_youtube_feature_enabled" translatable="false">pref_key_open_links_in_youtube_feature_enabled</string>
+    <string name="pref_key_open_links_in_youtube" translatable="false">pref_key_open_links_in_youtube</string>
+    <string name="pref_key_open_links_in_youtube_always" translatable="false">pref_key_open_links_in_youtube_always</string>
+    <string name="pref_key_open_links_in_youtube_ask" translatable="false">pref_key_open_links_in_youtube_ask</string>
+    <string name="pref_key_open_links_in_youtube_never" translatable="false">pref_key_open_links_in_youtube_never</string>
     <string name="pref_key_allow_screenshots_in_private_mode" translatable="false">pref_key_allow_screenshots_in_private_mode</string>
     <string name="pref_key_dev_debug_allow_capture_of_secure_screens" translatable="false">pref_key_dev_debug_allow_capture_of_secure_screens</string>
     <!-- This preference controls behaviour that corresponds to the private browsing mode lock feature being enabled. -->
@@ -492,6 +503,8 @@
     <string name="pref_key_show_more_shortcuts" translatable="false">pref_key_show_more_shortcuts</string>
     <string name="pref_key_enable_homepage_weather_widget" translatable="false">pref_key_enable_homepage_weather_widget</string>
     <string name="pref_key_show_homepage_weather_widget" translatable="false">pref_key_show_homepage_weather_widget</string>
+    <string name="pref_key_enable_homepage_wrexham_widget" translatable="false">pref_key_enable_homepage_wrexham_widget</string>
+    <string name="pref_key_show_homepage_wrexham_widget" translatable="false">pref_key_show_homepage_wrexham_widget</string>
     <string name="pref_key_use_minimal_bottom_toolbar_while_entering_text" translatable="false">pref_key_use_minimal_bottom_toolbar_while_entering_text</string>"
     <string name="pref_key_enable_address_sync" translatable="false">pref_key_enable_address_sync</string>"
     <string name="pref_key_enable_lna_blocking_enabled" translatable="false">pref_key_enable_lna_blocking_enabled</string>
@@ -508,8 +521,10 @@
     <string name="pref_key_enable_homepage_trending_recent_search" translatable="false">pref_key_enable_homepage_trending_recent_search</string>
     <string name="pref_key_enable_oled_theme" translatable="false">pref_key_enable_oled_theme</string>
     <string name="pref_key_enable_pdf_tools" translatable="false">pref_key_enable_pdf_tools</string>
-    <string name="pref_key_enable_menu_customization" translatable="false">pref_key_enable_menu_customization</string>
+    <string name="pref_key_enable_menu_customization_screen" translatable="false">pref_key_enable_menu_customization_screen</string>
     <string name="pref_key_enable_account_settings_new_ui" translatable="false">pref_key_enable_account_settings_new_ui</string>
+    <string name="pref_key_enable_sync_decoupling" translatable="false">pref_key_enable_sync_decoupling</string>
+    <string name="pref_key_enable_qwac_ui" translatable="false">pref_key_enable_qwac_ui</string>
     <!-- Preference for the feature flag -->
     <string name="pref_key_enable_shake_to_summarize" translatable="false">pref_key_enable_shake_to_summarize</string>
     <string name="pref_key_enable_weekly_privacy_notification" translatable="false">pref_key_enable_weekly_privacy_notification</string>

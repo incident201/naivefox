@@ -110,6 +110,7 @@ add_task(
       "{skill_list}",
       "{locale}",
       "{timezone}",
+      "{location}",
       "{isoTimestamp}",
       "{todayDate}",
     ]) {

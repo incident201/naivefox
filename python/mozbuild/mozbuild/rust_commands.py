@@ -188,6 +188,10 @@ class CargoCommand:
                 setattr(self, field.name, tuple(getattr(self, field.name)))
 
 
+# Space separated names of the `RUST_TESTS` crates `./mach rusttests` runs.
+TEST_SELECTION_ENV = "MOZ_RUST_TEST_SELECTION"
+
+
 @dataclass
 class CargoInvocation:
     """State that varies per Cargo run and belongs to neither an edge nor configure.
@@ -203,6 +207,7 @@ class CargoInvocation:
     cargo_rustcflags: tuple = ()
     cargo_extra_flags: tuple = ()
     rustc_bootstrap: str = ""
+    test_crates: tuple = ()
 
     @classmethod
     def from_environ(cls, environ):
@@ -216,6 +221,7 @@ class CargoInvocation:
             cargo_rustcflags=tuple(_as_args(environ.get("CARGO_RUSTCFLAGS"))),
             cargo_extra_flags=tuple(_as_args(environ.get("CARGO_EXTRA_FLAGS"))),
             rustc_bootstrap=environ.get("RUSTC_BOOTSTRAP") or "",
+            test_crates=tuple((environ.get(TEST_SELECTION_ENV) or "").split()),
         )
 
 
@@ -492,6 +498,18 @@ def compose_env(
     substs = _cargo_config(substs)
     env = dict(environ)
 
+    library_search_path = {
+        "Linux": ("LD_LIBRARY_PATH", ":"),
+        "WINNT": ("PATH", ";"),
+    }.get(substs.get("OS_ARCH"))
+    if cmd.kind == "test" and library_search_path:
+        # Find native libraries without depending on Cargo's output layout.
+        var, separator = library_search_path
+        libpath = f"{topobjdir}/dist/bin"
+        if existing := env.get(var):
+            libpath += f"{separator}{existing}"
+        env[var] = libpath
+
     # Set both host and target tool variables for every edge. Only Cargo's
     # --target argument is edge specific.
     #
@@ -618,17 +636,23 @@ def compose_env(
     return env
 
 
-def _features_arg(cmd, substs):
+def _features_arg(cmd, substs, workspace_hack=True):
     features = list(cmd.features)
     # The NaiveFox product has one isolated Rust closure, so there is no
     # cross-invocation feature unification for the workspace hack to provide.
-    if not substs.get("MOZ_NAIVEFOX"):
+    if workspace_hack and not substs.get("MOZ_NAIVEFOX"):
         features.append("mozilla-central-workspace-hack")
-    return ["--features", ",".join(features)]
+    return ["--features", ",".join(features)] if features else []
 
 
 def compose_cargo_build_edge_argv(
-    cmd, substs, invocation, timings=False, keep_going=False, single_job=False
+    cmd,
+    substs,
+    invocation,
+    timings=False,
+    keep_going=False,
+    single_job=False,
+    workspace_hack=True,
 ):
     substs = _cargo_config(substs)
     cargo = substs.get("CARGO")
@@ -643,7 +667,7 @@ def compose_cargo_build_edge_argv(
         # Don't stop at the first failure. We want to list all failures together.
         argv.append("--no-fail-fast")
         argv.extend(_subcommand_args(cmd))
-        argv.extend(_features_arg(cmd, substs))
+        argv.extend(_features_arg(cmd, substs, workspace_hack))
         argv.extend(build_flags)
         argv.extend(extra)
         return argv

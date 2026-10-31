@@ -27,6 +27,8 @@ import textwrap
 from pathlib import Path
 from urllib.parse import quote
 
+import yaml
+
 # Other privacy-related prefs that aren't controlled by the ETP feature string
 # but are relevant to privacy. These don't change between Standard/Strict modes.
 # They are split into two tables based on whether entry[2] (pb_pref) is set:
@@ -257,6 +259,27 @@ for f in FEATURES:
         KNOWN_CODES.add(f["pb_code"])
 
 
+def scalar_from_value_line(value):
+    """
+    Return the scalar a "value:" line holds, without its inline YAML comment.
+
+    Quoting and comment rules are the scanner's job: a '#' only opens a comment
+    when it follows whitespace, and never inside a quoted scalar, so the color
+    literals ("#EE0000") and the fragment-terminated URL in StaticPrefList.yaml
+    survive intact. Text the scanner cannot reduce to a scalar on this line is
+    handed back untouched: values the preprocessor owns, such as
+    @IS_NIGHTLY_BUILD@, are not YAML at all, and a block scalar ("value: >-")
+    carries its text on the lines that follow.
+    """
+    try:
+        scalars = [t for t in yaml.scan(value) if isinstance(t, yaml.ScalarToken)]
+    except yaml.YAMLError:
+        return value
+    if not scalars or scalars[0].style in ("|", ">"):
+        return value
+    return scalars[0].value
+
+
 def parse_static_pref_list(yaml_path):
     """
     Parse StaticPrefList.yaml to extract pref defaults and comments.
@@ -328,7 +351,7 @@ def parse_static_pref_list(yaml_path):
             # Parse value line
             value_match = re.match(r"^\s*value:\s*(.+)$", pref_line)
             if value_match:
-                raw_value = value_match.group(1).strip()
+                raw_value = scalar_from_value_line(value_match.group(1).strip())
 
                 # Check for macros
                 if raw_value.startswith("@") and raw_value.endswith("@"):

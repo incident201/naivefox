@@ -3105,6 +3105,7 @@ nsStyleText::nsStyleText(const nsStyleText& aSource)
       mWordBreak(aSource.mWordBreak),
       mOverflowWrap(aSource.mOverflowWrap),
       mTextAutospace(aSource.mTextAutospace),
+      mTextAutospaceSize(aSource.mTextAutospaceSize),
       mHyphens(aSource.mHyphens),
       mRubyAlign(aSource.mRubyAlign),
       mRubyPosition(aSource.mRubyPosition),
@@ -3168,7 +3169,8 @@ nsChangeHint nsStyleText::CalcDifference(const nsStyleText& aNewData) const {
       (mHyphenateLimitChars != aNewData.mHyphenateLimitChars) ||
       (mWebkitTextSecurity != aNewData.mWebkitTextSecurity) ||
       (mTextWrapStyle != aNewData.mTextWrapStyle) ||
-      (mTextAutospace != aNewData.mTextAutospace)) {
+      (mTextAutospace != aNewData.mTextAutospace) ||
+      (mTextAutospaceSize != aNewData.mTextAutospaceSize)) {
     return NS_STYLE_HINT_REFLOW;
   }
 

@@ -1,6 +1,8 @@
 /* Any copyright is dedicated to the Public Domain.
  * http://creativecommons.org/publicdomain/zero/1.0/ */
 
+requestLongerTimeout(2);
+
 const { GenAI } = ChromeUtils.importESModule(
   "moz-src:///browser/components/genai/GenAI.sys.mjs"
 );
@@ -36,25 +38,11 @@ add_task(async function test_no_shortcuts() {
   });
 });
 
-async function selectAllAndMouseUp(browser) {
-  await SimpleTest.promiseFocus(browser);
-  const selectPromise = SpecialPowers.spawn(browser, [], () =>
-    ContentTaskUtils.waitForCondition(() => content.getSelection().toString())
-  );
-  goDoCommand("cmd_selectAll");
-  await selectPromise;
-  await BrowserTestUtils.synthesizeMouseAtCenter(
-    browser,
-    { type: "mouseup" },
-    browser
-  );
-}
-
-async function showSelectionMenu(browser) {
+async function showSelectionMenu(browser, options) {
   const panel = document.getElementById("selection-shortcut-action-panel");
   Assert.ok(!panel.hasAttribute("panelopen"), "Menu starts closed");
 
-  await selectAllAndMouseUp(browser);
+  await selectAllAndMouseUp(browser, options);
   await TestUtils.waitForCondition(
     () => panel.getAttribute("panelopen") === "true",
     "Selection menu opened"
@@ -112,21 +100,8 @@ add_task(async function test_selection_menu_position_with_rtl_app_locale() {
       "Anchor resolved to RTL"
     );
 
-    await SimpleTest.promiseFocus(browser);
-    const selectPromise = SpecialPowers.spawn(browser, [], () =>
-      ContentTaskUtils.waitForCondition(() => content.getSelection().toString())
-    );
-    goDoCommand("cmd_selectAll");
-    await selectPromise;
-
-    const clickX = 150;
-    await BrowserTestUtils.synthesizeMouse(
-      browser,
-      clickX,
-      20,
-      { type: "mouseup" },
-      browser
-    );
+    const clickX = 300;
+    await selectAllAndMouseUp(browser, { releaseX: clickX, releaseY: 20 });
     await TestUtils.waitForCondition(
       () => panel.getAttribute("panelopen") === "true",
       "Selection menu opened"
@@ -187,13 +162,14 @@ add_task(async function test_no_menu_when_chatbot_blocked() {
 });
 
 /**
- * Check that a blocked chatbot and an unavailable search service together
- * leave no menu to show at all.
+ * Check that a blocked chatbot, an unavailable search service and a disabled
+ * Copy action together leave no menu to show at all.
  */
 add_task(async function test_no_menu_when_nothing_available() {
   await SpecialPowers.pushPrefEnv({
     set: [
       ["browser.highlightToSearch.featureGate", true],
+      ["browser.highlightToSearch.copy.enabled", false],
       ["browser.ml.chat.enabled", false],
     ],
   });
@@ -227,6 +203,42 @@ add_task(async function test_no_menu_when_nothing_available() {
 });
 
 /**
+ * Check that turning the setting off hides the menu with the feature gate on,
+ * even when a chatbot has already been chosen.
+ */
+add_task(async function test_no_menu_when_setting_off() {
+  await SpecialPowers.pushPrefEnv({
+    set: [
+      ["browser.highlightToSearch.featureGate", true],
+      ["browser.highlightToSearch.enabled", false],
+      ["browser.ml.chat.shortcuts", true],
+      ["browser.ml.chat.provider", "http://localhost:8080"],
+    ],
+  });
+  const spy = sinon.spy(GenAI, "handleShortcutsMessage");
+
+  try {
+    await BrowserTestUtils.withNewTab("data:text/plain,hi", async browser => {
+      const panel = document.getElementById("selection-shortcut-action-panel");
+      await selectAllAndMouseUp(browser);
+      await TestUtils.waitForCondition(
+        () => spy.called,
+        "Actor offered shortcuts to the parent"
+      );
+
+      Assert.equal(
+        panel.state,
+        "closed",
+        "Menu stays closed with the setting off"
+      );
+    });
+  } finally {
+    spy.restore();
+    await SpecialPowers.popPrefEnv();
+  }
+});
+
+/**
  * Check that a new selection with nothing left to offer closes the menu
  * opened for the previous selection.
  */
@@ -236,6 +248,7 @@ add_task(async function test_menu_closes_when_nothing_left_to_offer() {
       ["browser.highlightToSearch.featureGate", true],
       ["browser.highlightToSearch.enabled", true],
       ["browser.highlightToSearch.search.enabled", true],
+      ["browser.highlightToSearch.copy.enabled", false],
       ["browser.ml.chat.enabled", false],
     ],
   });
@@ -318,6 +331,11 @@ add_task(async function test_search_action_click() {
       const panel = await showSelectionMenu(browser);
       const searchButton = document.getElementById("search-action-button");
       Assert.ok(!searchButton.hidden, "Search is offered without a chatbot");
+      Assert.deepEqual(
+        Glean.sapImpressionCounts.textSelection.testGetValue(),
+        { [SearchService.defaultEngine.id]: 1 },
+        "Showing Search records one impression, for the default engine"
+      );
 
       const panelHidden = BrowserTestUtils.waitForEvent(panel, "popuphidden");
       searchButton.click();
@@ -347,6 +365,16 @@ add_task(async function test_search_action_click() {
         "false",
         "Not a Smart Window click"
       );
+
+      await TestUtils.waitForCondition(
+        () => Glean.selectionMenu.dismissed.testGetValue()?.length == 1,
+        "Dismissal recorded"
+      );
+      Assert.equal(
+        Glean.selectionMenu.dismissed.testGetValue()[0].extra.interacted,
+        "true",
+        "Clicking Search is an interaction"
+      );
     });
   } finally {
     loadSearchStub.restore();
@@ -359,6 +387,7 @@ add_task(async function test_search_action_click() {
  * action is offered.
  */
 add_task(async function test_search_disabled_keeps_ai_action() {
+  Services.fog.testResetFOG();
   await SpecialPowers.pushPrefEnv({
     set: [
       ["browser.highlightToSearch.featureGate", true],
@@ -381,6 +410,11 @@ add_task(async function test_search_disabled_keeps_ai_action() {
         document.getElementById("search-action-button").hidden,
         "Search is hidden when turned off"
       );
+      Assert.deepEqual(
+        Glean.sapImpressionCounts.textSelection.testGetValue(),
+        {},
+        "No impression is recorded while Search is hidden"
+      );
 
       panel.hide();
     });
@@ -389,25 +423,22 @@ add_task(async function test_search_disabled_keeps_ai_action() {
   }
 });
 
-/**
- * Check that Smart Window never offers the Search action.
- */
-add_task(async function test_smart_window_hides_search() {
+async function doPrivateWindowImpressionTest(shouldRecordCounts) {
+  Services.fog.testResetFOG();
   await SpecialPowers.pushPrefEnv({
     set: [
       ["browser.highlightToSearch.featureGate", true],
       ["browser.highlightToSearch.enabled", true],
       ["browser.highlightToSearch.search.enabled", true],
-      ["browser.ml.chat.shortcuts", true],
-      ["browser.ml.chat.shortcuts.smartwindow", true],
+      ["browser.ml.chat.provider", ""],
+      // This pref is the opposite of what it seems like it should be.
+      ["browser.engagement.search_counts.pbm", !shouldRecordCounts],
     ],
   });
 
-  const win = await BrowserTestUtils.openNewBrowserWindow();
+  const win = await BrowserTestUtils.openNewBrowserWindow({ private: true });
 
   try {
-    win.document.documentElement.setAttribute("ai-window", "");
-
     await BrowserTestUtils.openNewForegroundTab(
       win.gBrowser,
       "data:text/plain,hi"
@@ -433,11 +464,82 @@ add_task(async function test_smart_window_hides_search() {
     );
     await TestUtils.waitForCondition(
       () => panel.getAttribute("panelopen") === "true",
+      "Selection menu opened in a private window"
+    );
+    Assert.ok(
+      !win.document.getElementById("search-action-button").hidden,
+      "Search is offered in a private window"
+    );
+    Assert.deepEqual(
+      Glean.sapImpressionCounts.textSelection.testGetValue(),
+      shouldRecordCounts ? { [SearchService.defaultPrivateEngine.id]: 1 } : {},
+      "The impression follows the private browsing counts pref"
+    );
+  } finally {
+    await BrowserTestUtils.closeWindow(win);
+    await SpecialPowers.popPrefEnv();
+  }
+}
+
+/**
+ * Check that the Search impression is recorded in a private window, using the
+ * private default engine, unless private browsing counts are turned off.
+ */
+add_task(async function test_private_window_impression_counts_enabled() {
+  await doPrivateWindowImpressionTest(true);
+});
+
+add_task(async function test_private_window_impression_counts_disabled() {
+  await doPrivateWindowImpressionTest(false);
+});
+
+/**
+ * Check that Smart Window never offers the Search or Copy actions.
+ */
+add_task(async function test_smart_window_hides_search_and_copy() {
+  Services.fog.testResetFOG();
+  await SpecialPowers.pushPrefEnv({
+    set: [
+      ["browser.highlightToSearch.featureGate", true],
+      ["browser.highlightToSearch.enabled", true],
+      ["browser.highlightToSearch.search.enabled", true],
+      ["browser.highlightToSearch.copy.enabled", true],
+      ["browser.ml.chat.shortcuts", true],
+      ["browser.ml.chat.shortcuts.smartwindow", true],
+    ],
+  });
+
+  const win = await BrowserTestUtils.openNewBrowserWindow();
+
+  try {
+    win.document.documentElement.setAttribute("ai-window", "");
+
+    await BrowserTestUtils.openNewForegroundTab(
+      win.gBrowser,
+      "data:text/plain,hi"
+    );
+    const browser = win.gBrowser.selectedBrowser;
+    await selectAllAndMouseUp(browser, { win });
+
+    const panel = win.document.getElementById(
+      "selection-shortcut-action-panel"
+    );
+    await TestUtils.waitForCondition(
+      () => panel.getAttribute("panelopen") === "true",
       "Selection menu opened in Smart Window"
     );
     Assert.ok(
       win.document.getElementById("search-action-button").hidden,
       "Search is not offered in Smart Window"
+    );
+    Assert.ok(
+      win.document.getElementById("copy-action-button").hidden,
+      "Copy is not offered in Smart Window"
+    );
+    Assert.deepEqual(
+      Glean.sapImpressionCounts.textSelection.testGetValue(),
+      {},
+      "No impression is recorded in Smart Window"
     );
   } finally {
     await BrowserTestUtils.closeWindow(win);
@@ -508,18 +610,7 @@ add_task(async function test_smart_window_ask_chat() {
       "data:text/plain,hi"
     );
     const browser = win.gBrowser.selectedBrowser;
-    await SimpleTest.promiseFocus(browser);
-
-    const selectPromise = SpecialPowers.spawn(browser, [], () => {
-      ContentTaskUtils.waitForCondition(() => content.getSelection());
-    });
-    win.goDoCommand("cmd_selectAll");
-    await selectPromise;
-    BrowserTestUtils.synthesizeMouseAtCenter(
-      browser,
-      { type: "mouseup" },
-      browser
-    );
+    await selectAllAndMouseUp(browser, { win });
 
     const selectionPanel = win.document.getElementById(
       "selection-shortcut-action-panel"
@@ -600,18 +691,7 @@ add_task(async function test_smart_window_ask_chat_ignores_classic_toggle() {
       "data:text/plain,hi"
     );
     const browser = win.gBrowser.selectedBrowser;
-    await SimpleTest.promiseFocus(browser);
-
-    const selectPromise = SpecialPowers.spawn(browser, [], () => {
-      ContentTaskUtils.waitForCondition(() => content.getSelection());
-    });
-    win.goDoCommand("cmd_selectAll");
-    await selectPromise;
-    BrowserTestUtils.synthesizeMouseAtCenter(
-      browser,
-      { type: "mouseup" },
-      browser
-    );
+    await selectAllAndMouseUp(browser, { win });
 
     const selectionPanel = win.document.getElementById(
       "selection-shortcut-action-panel"
@@ -644,17 +724,7 @@ add_task(async function test_ai_action_dropdown() {
   });
 
   await BrowserTestUtils.withNewTab("data:text/plain,hi", async browser => {
-    await SimpleTest.promiseFocus(browser);
-    const selectPromise = SpecialPowers.spawn(browser, [], () =>
-      ContentTaskUtils.waitForCondition(() => content.getSelection().toString())
-    );
-    goDoCommand("cmd_selectAll");
-    await selectPromise;
-    await BrowserTestUtils.synthesizeMouseAtCenter(
-      browser,
-      { type: "mouseup" },
-      browser
-    );
+    await selectAllAndMouseUp(browser);
 
     const panel = document.getElementById("selection-shortcut-action-panel");
     await TestUtils.waitForCondition(
@@ -761,6 +831,83 @@ add_task(async function test_ai_action_dropdown() {
 });
 
 /**
+ * Check that the menu's on/off state is reported as a state metric that
+ * follows both the feature gate and the setting.
+ */
+add_task(async function test_enabled_metric() {
+  for (const [gate, enabled] of [
+    [true, true],
+    [true, false],
+    [false, true],
+    [false, false],
+  ]) {
+    await SpecialPowers.pushPrefEnv({
+      set: [
+        ["browser.highlightToSearch.featureGate", gate],
+        ["browser.highlightToSearch.enabled", enabled],
+      ],
+    });
+    Assert.strictEqual(
+      Glean.selectionMenu.enabled.testGetValue(),
+      gate && enabled,
+      `Reports the menu with the gate ${gate} and the setting ${enabled}`
+    );
+    await SpecialPowers.popPrefEnv();
+  }
+});
+
+/**
+ * Check that the AI submenu keeps its hide item until the Highlight to Search
+ * feature gate is on, when Settings takes over turning the shortcut off.
+ */
+add_task(async function test_hide_item_follows_feature_gate() {
+  for (const gate of [false, true]) {
+    await SpecialPowers.pushPrefEnv({
+      set: [
+        ["browser.highlightToSearch.featureGate", gate],
+        ["browser.ml.chat.shortcuts", true],
+        ["browser.ml.chat.shortcut.onboardingMouseoverCount", 2],
+        ["browser.ml.chat.provider", "http://localhost:8080"],
+      ],
+    });
+
+    await BrowserTestUtils.withNewTab("data:text/plain,hi", async browser => {
+      const panel = await showSelectionMenu(browser);
+
+      const popup = document.getElementById("chat-shortcuts-options-panel");
+      const shown = BrowserTestUtils.waitForEvent(popup, "popupshown");
+      EventUtils.synthesizeMouseAtCenter(
+        document.getElementById("ai-action-button"),
+        {},
+        window
+      );
+      await shown;
+
+      Assert.equal(
+        !!popup.querySelector("[data-l10n-id='genai-shortcuts-hide']"),
+        !gate,
+        `The hide item is ${gate ? "absent" : "present"} with the gate ${
+          gate ? "on" : "off"
+        }`
+      );
+
+      const popupHidden = BrowserTestUtils.waitForEvent(popup, "popuphidden");
+      popup.hidePopup();
+      await popupHidden;
+      const panelHidden = BrowserTestUtils.waitForEvent(panel, "popuphidden");
+      panel.hide();
+      await panelHidden;
+      await TestUtils.waitForCondition(
+        () => !panel.hasAttribute("panelopen"),
+        "The selection menu closed"
+      );
+    });
+
+    await SpecialPowers.popPrefEnv();
+  }
+});
+
+/**
  * Check the selection menu records its own display and action click events,
  * separately from the chatbot-scoped shortcuts probes.
  */
@@ -815,6 +962,1074 @@ add_task(async function test_selection_menu_events() {
   await SpecialPowers.popPrefEnv();
 });
 
+async function hideAndWaitForDismissed(panel, count) {
+  const panelHidden = BrowserTestUtils.waitForEvent(panel, "popuphidden");
+  panel.hide();
+  await panelHidden;
+  return TestUtils.waitForCondition(
+    () => Glean.selectionMenu.dismissed.testGetValue()?.length == count,
+    `${count} dismissal(s) recorded`
+  );
+}
+
+/**
+ * Check that closing the menu records one dismissal, without an interaction.
+ */
+add_task(async function test_dismissed_without_interaction() {
+  Services.fog.testResetFOG();
+  await SpecialPowers.pushPrefEnv({
+    set: [
+      ["browser.highlightToSearch.featureGate", true],
+      ["browser.ml.chat.shortcuts", true],
+      ["browser.ml.chat.shortcut.onboardingMouseoverCount", 2],
+      ["browser.ml.chat.provider", "http://localhost:8080"],
+    ],
+  });
+
+  await BrowserTestUtils.withNewTab("data:text/plain,hi", async browser => {
+    const panel = await showSelectionMenu(browser);
+    Assert.equal(
+      Glean.selectionMenu.dismissed.testGetValue(),
+      null,
+      "Nothing dismissed while the menu is open"
+    );
+
+    await hideAndWaitForDismissed(panel, 1);
+    const [dismissed] = Glean.selectionMenu.dismissed.testGetValue();
+    Assert.equal(dismissed.extra.interacted, "false", "Not interacted");
+    Assert.greaterOrEqual(Number(dismissed.extra.duration), 0, "Has duration");
+    Assert.equal(dismissed.extra.smart_window, "false", "Not Smart Window");
+  });
+
+  await SpecialPowers.popPrefEnv();
+});
+
+/**
+ * Check that a prompt chosen from the AI submenu counts as an interaction.
+ */
+add_task(async function test_dismissed_after_prompt_click() {
+  Services.fog.testResetFOG();
+  await SpecialPowers.pushPrefEnv({
+    set: [
+      ["browser.highlightToSearch.featureGate", true],
+      ["browser.ml.chat.shortcuts", true],
+      ["browser.ml.chat.shortcut.onboardingMouseoverCount", 2],
+      ["browser.ml.chat.provider", "http://localhost:8080"],
+    ],
+  });
+  const askStub = sinon.stub(GenAI, "handleAskChat");
+
+  try {
+    await BrowserTestUtils.withNewTab("data:text/plain,hi", async browser => {
+      const panel = await showSelectionMenu(browser);
+      const popup = document.getElementById("chat-shortcuts-options-panel");
+      const popupShown = BrowserTestUtils.waitForEvent(popup, "popupshown");
+      await EventUtils.synthesizeMouseAtCenter(
+        document.getElementById("ai-action-button"),
+        {},
+        window
+      );
+      await popupShown;
+
+      const panelHidden = BrowserTestUtils.waitForEvent(panel, "popuphidden");
+      await EventUtils.synthesizeMouseAtCenter(
+        popup.querySelector("toolbarbutton"),
+        {},
+        window
+      );
+      await panelHidden;
+      await TestUtils.waitForCondition(
+        () => Glean.selectionMenu.dismissed.testGetValue()?.length == 1,
+        "Dismissal recorded"
+      );
+
+      Assert.ok(askStub.calledOnce, "The prompt was handled");
+      Assert.equal(
+        Glean.selectionMenu.dismissed.testGetValue()[0].extra.interacted,
+        "true",
+        "Choosing a prompt is an interaction"
+      );
+    });
+  } finally {
+    askStub.restore();
+    await SpecialPowers.popPrefEnv();
+  }
+});
+
+/**
+ * Check that the AI submenu opening on hover during onboarding is not
+ * mistaken for an interaction, although it records an action click.
+ */
+add_task(async function test_dismissed_after_onboarding_hover() {
+  Services.fog.testResetFOG();
+  await SpecialPowers.pushPrefEnv({
+    set: [
+      ["browser.highlightToSearch.featureGate", true],
+      ["browser.ml.chat.shortcuts", true],
+      ["browser.ml.chat.shortcut.onboardingMouseoverCount", 0],
+      ["browser.ml.chat.provider", "http://localhost:8080"],
+    ],
+  });
+
+  await BrowserTestUtils.withNewTab("data:text/plain,hi", async browser => {
+    const panel = await showSelectionMenu(browser);
+    const popup = document.getElementById("chat-shortcuts-options-panel");
+    const popupShown = BrowserTestUtils.waitForEvent(popup, "popupshown");
+    EventUtils.sendMouseEvent(
+      { type: "mouseover" },
+      document.getElementById("ai-action-button")
+    );
+    await popupShown;
+    Assert.equal(
+      Glean.selectionMenu.actionClick.testGetValue()?.length,
+      1,
+      "The hover open records an action click"
+    );
+
+    await hideAndWaitForDismissed(panel, 1);
+    Assert.equal(
+      Glean.selectionMenu.dismissed.testGetValue()[0].extra.interacted,
+      "false",
+      "A hover-only open is not an interaction"
+    );
+  });
+
+  await SpecialPowers.popPrefEnv();
+});
+
+/**
+ * Check that a new selection while the menu is still open ends the first
+ * display, so displays and dismissals stay paired.
+ */
+add_task(async function test_dismissed_pairs_with_displayed_on_reshow() {
+  Services.fog.testResetFOG();
+  await SpecialPowers.pushPrefEnv({
+    set: [
+      ["browser.highlightToSearch.featureGate", true],
+      ["browser.ml.chat.shortcuts", true],
+      ["browser.ml.chat.shortcut.onboardingMouseoverCount", 2],
+      ["browser.ml.chat.provider", "http://localhost:8080"],
+    ],
+  });
+
+  await BrowserTestUtils.withNewTab("data:text/plain,hi", async browser => {
+    const panel = await showSelectionMenu(browser);
+    await BrowserTestUtils.synthesizeMouse(
+      browser,
+      60,
+      10,
+      { type: "mouseup" },
+      browser
+    );
+    await TestUtils.waitForCondition(
+      () => Glean.selectionMenu.displayed.testGetValue()?.length == 2,
+      "Menu displayed again for the second selection"
+    );
+
+    await hideAndWaitForDismissed(panel, 2);
+    Assert.equal(
+      Glean.selectionMenu.displayed.testGetValue().length,
+      Glean.selectionMenu.dismissed.testGetValue().length,
+      "Every display has a dismissal"
+    );
+  });
+
+  await SpecialPowers.popPrefEnv();
+});
+
+/**
+ * Check that Copy stays gated on the Nimbus feature even when the chatbot
+ * path already shows the menu, so existing chat-shortcut users don't see it
+ * before the feature ships.
+ */
+add_task(async function test_copy_action_gated_on_feature() {
+  await SpecialPowers.pushPrefEnv({
+    set: [
+      ["browser.ml.chat.shortcuts", true],
+      ["browser.ml.chat.shortcut.onboardingMouseoverCount", 2],
+      ["browser.ml.chat.provider", "http://localhost:8080"],
+      ["browser.highlightToSearch.featureGate", false],
+      ["browser.highlightToSearch.copy.enabled", true],
+    ],
+  });
+
+  await BrowserTestUtils.withNewTab("data:text/plain,hi", async browser => {
+    const panel = await showSelectionMenu(browser);
+
+    Assert.ok(
+      document.getElementById("copy-action-button").hidden,
+      "Copy stays hidden without the feature gate, even for an existing chatbot user"
+    );
+    Assert.less(
+      document
+        .getElementById("copy-action-confirmation")
+        .getBoundingClientRect().width,
+      1,
+      "Confirmation pill has no footprint without a copy"
+    );
+
+    const panelHidden = BrowserTestUtils.waitForEvent(panel, "popuphidden");
+    panel.hide();
+    await panelHidden;
+  });
+
+  await SpecialPowers.popPrefEnv();
+});
+
+/**
+ * Check that Copy is hidden when its own setting is off, even with the
+ * feature fully enabled.
+ */
+add_task(async function test_copy_action_hidden_when_disabled() {
+  await SpecialPowers.pushPrefEnv({
+    set: [
+      ["browser.ml.chat.shortcuts", true],
+      ["browser.ml.chat.shortcut.onboardingMouseoverCount", 2],
+      ["browser.ml.chat.provider", "http://localhost:8080"],
+      ["browser.highlightToSearch.featureGate", true],
+      ["browser.highlightToSearch.enabled", true],
+      ["browser.highlightToSearch.copy.enabled", false],
+    ],
+  });
+
+  await BrowserTestUtils.withNewTab("data:text/plain,hi", async browser => {
+    const panel = await showSelectionMenu(browser);
+
+    Assert.ok(
+      document.getElementById("copy-action-button").hidden,
+      "Copy stays hidden while its own setting is off"
+    );
+
+    const panelHidden = BrowserTestUtils.waitForEvent(panel, "popuphidden");
+    panel.hide();
+    await panelHidden;
+  });
+
+  await SpecialPowers.popPrefEnv();
+});
+
+/**
+ * Check that Copy alone is enough to open the menu, so a user who has turned
+ * off the chatbot and Search can still copy.
+ */
+add_task(async function test_menu_shows_with_only_copy() {
+  await SpecialPowers.pushPrefEnv({
+    set: [
+      ["browser.highlightToSearch.featureGate", true],
+      ["browser.highlightToSearch.enabled", true],
+      ["browser.highlightToSearch.search.enabled", false],
+      ["browser.highlightToSearch.copy.enabled", true],
+      ["browser.ml.chat.enabled", false],
+    ],
+  });
+
+  await BrowserTestUtils.withNewTab("data:text/plain,hi", async browser => {
+    const panel = await showSelectionMenu(browser);
+
+    Assert.ok(
+      !document.getElementById("copy-action-button").hidden,
+      "Copy is shown"
+    );
+    Assert.ok(
+      document.getElementById("search-action-button").hidden,
+      "Search is hidden"
+    );
+    Assert.ok(
+      document.getElementById("ai-action-button").hidden,
+      "AI is hidden"
+    );
+
+    const panelHidden = BrowserTestUtils.waitForEvent(panel, "popuphidden");
+    panel.hide();
+    await panelHidden;
+  });
+
+  await SpecialPowers.popPrefEnv();
+});
+
+/**
+ * Check that clicking Copy writes the selection to the clipboard, records
+ * the action click, announces a confirmation to assistive technology, and
+ * ends the interaction by closing the menu.
+ */
+add_task(async function test_copy_action() {
+  Services.fog.testResetFOG();
+  await SpecialPowers.pushPrefEnv({
+    set: [
+      ["browser.ml.chat.shortcuts", true],
+      ["browser.ml.chat.shortcut.onboardingMouseoverCount", 2],
+      ["browser.ml.chat.provider", "http://localhost:8080"],
+      ["browser.highlightToSearch.featureGate", true],
+      ["browser.highlightToSearch.enabled", true],
+      ["browser.highlightToSearch.copy.enabled", true],
+    ],
+  });
+
+  await BrowserTestUtils.withNewTab("data:text/plain,hi", async browser => {
+    const panel = await showSelectionMenu(browser);
+
+    const copyActionButton = document.getElementById("copy-action-button");
+    Assert.ok(
+      !copyActionButton.hidden,
+      "Copy is shown with the feature enabled"
+    );
+
+    const moreActionsButton = document.getElementById("more-actions-button");
+    const moreActionsSeparator = document.getElementById(
+      "more-actions-separator"
+    );
+    Assert.ok(
+      BrowserTestUtils.isVisible(moreActionsButton) &&
+        BrowserTestUtils.isVisible(moreActionsSeparator),
+      "The three-dot button and its separator are shown before a copy"
+    );
+
+    const confirmation = document.getElementById("copy-action-confirmation");
+    Assert.equal(
+      confirmation.getAttribute("role"),
+      "status",
+      "Confirmation is announced to assistive technology"
+    );
+    Assert.less(
+      confirmation.getBoundingClientRect().width,
+      1,
+      "Confirmation has no footprint before a copy"
+    );
+
+    const panelHidden = BrowserTestUtils.waitForEvent(panel, "popuphidden");
+    await new Promise((resolve, reject) => {
+      SimpleTest.waitForClipboard(
+        "hi",
+        () => EventUtils.synthesizeMouseAtCenter(copyActionButton, {}, window),
+        resolve,
+        () => reject(new Error("Clipboard did not receive the selection"))
+      );
+    });
+
+    await TestUtils.waitForCondition(
+      () => confirmation.hasAttribute("copied"),
+      "Confirmation is shown after the text is translated"
+    );
+    Assert.greater(
+      confirmation.getBoundingClientRect().width,
+      0,
+      "Confirmation shown after copying"
+    );
+    Assert.ok(
+      BrowserTestUtils.isHidden(moreActionsButton) &&
+        BrowserTestUtils.isHidden(moreActionsSeparator),
+      "The confirmation replaces the three-dot button and its separator"
+    );
+    Assert.notEqual(
+      getComputedStyle(confirmation).backgroundColor,
+      "rgba(0, 0, 0, 0)",
+      "Confirmation renders as a filled pill, not bare text"
+    );
+    Assert.greaterOrEqual(
+      confirmation.getBoundingClientRect().left,
+      copyActionButton.getBoundingClientRect().right,
+      "Confirmation doesn't cover the clicked Copy icon"
+    );
+    const pillRect = confirmation.getBoundingClientRect();
+    const tickRect = confirmation
+      .querySelector(".copy-action-confirmation-icon")
+      .getBoundingClientRect();
+    Assert.less(
+      Math.abs(tickRect.width - tickRect.height),
+      1,
+      "The tick sits in a square"
+    );
+    Assert.less(
+      Math.abs(tickRect.height - pillRect.height),
+      1,
+      "The tick's square is as tall as the pill, so it reads as a circle in the round end"
+    );
+
+    const clicks = Glean.selectionMenu.actionClick.testGetValue();
+    Assert.equal(clicks.length, 1, "One action clicked");
+    Assert.equal(clicks[0].extra.action, "copy", "Clicked the copy action");
+    Assert.equal(clicks[0].extra.selection, 2, "Selected hi");
+
+    await TestUtils.waitForCondition(
+      () => panel.hasAttribute("copy-fading"),
+      "The whole bar fades out, not just the confirmation"
+    );
+    await panelHidden;
+    Assert.ok(
+      !panel.hasAttribute("copy-fading"),
+      "The fade is cleared so the next selection shows the bar"
+    );
+
+    await TestUtils.waitForCondition(
+      () => Glean.selectionMenu.dismissed.testGetValue()?.length == 1,
+      "Dismissal recorded"
+    );
+    Assert.equal(
+      Glean.selectionMenu.dismissed.testGetValue()[0].extra.interacted,
+      "true",
+      "Clicking Copy is an interaction"
+    );
+  });
+
+  await SpecialPowers.popPrefEnv();
+});
+
+/**
+ * Check that the bar grows to fit the translated Copied pill, rather than
+ * being sized for the pill before its text has been translated.
+ */
+add_task(async function test_copy_action_bar_fits_confirmation() {
+  await SpecialPowers.pushPrefEnv({
+    set: [
+      ["browser.highlightToSearch.featureGate", true],
+      ["browser.highlightToSearch.enabled", true],
+      ["browser.highlightToSearch.search.enabled", false],
+      ["browser.highlightToSearch.copy.enabled", true],
+      ["browser.ml.chat.enabled", false],
+    ],
+  });
+
+  await BrowserTestUtils.withNewTab("data:text/plain,hi", async browser => {
+    const panel = await showSelectionMenu(browser);
+    const initialWidth = panel.getBoundingClientRect().width;
+    const copyActionButton = document.getElementById("copy-action-button");
+    const confirmation = document.getElementById("copy-action-confirmation");
+
+    const panelHidden = BrowserTestUtils.waitForEvent(panel, "popuphidden");
+    await new Promise((resolve, reject) => {
+      SimpleTest.waitForClipboard(
+        "hi",
+        () => EventUtils.synthesizeMouseAtCenter(copyActionButton, {}, window),
+        resolve,
+        () => reject(new Error("Clipboard did not receive the selection"))
+      );
+    });
+
+    await TestUtils.waitForCondition(
+      () => confirmation.hasAttribute("copied"),
+      "Confirmation is shown after the text is translated"
+    );
+    Assert.ok(
+      confirmation.querySelector(".copy-action-confirmation-text").textContent,
+      "Confirmation text is translated"
+    );
+
+    const pillRect = confirmation.getBoundingClientRect();
+    const panelRect = panel.getBoundingClientRect();
+    Assert.greater(
+      panelRect.width,
+      initialWidth,
+      "The panel grows to fit the confirmation"
+    );
+    Assert.greaterOrEqual(
+      pillRect.left,
+      panelRect.left,
+      "Confirmation doesn't overflow the start edge of the panel"
+    );
+    Assert.lessOrEqual(
+      pillRect.right,
+      panelRect.right,
+      "Confirmation doesn't overflow the end edge of the panel"
+    );
+    Assert.lessOrEqual(
+      confirmation.scrollWidth,
+      confirmation.clientWidth,
+      "Confirmation's content isn't wider than the pill"
+    );
+    const actionsBox = panel.querySelector(".panel-subview-body");
+    Assert.lessOrEqual(
+      actionsBox.scrollWidth,
+      actionsBox.clientWidth,
+      "Nothing in the bar is clipped"
+    );
+    Assert.greaterOrEqual(
+      pillRect.left,
+      copyActionButton.getBoundingClientRect().right,
+      "Confirmation doesn't cover the Copy icon"
+    );
+
+    await panelHidden;
+  });
+
+  await SpecialPowers.popPrefEnv();
+});
+
+const MORE_ACTIONS_PREFS = [
+  ["browser.ml.chat.shortcuts", true],
+  ["browser.ml.chat.shortcut.onboardingMouseoverCount", 2],
+  ["browser.ml.chat.provider", "http://localhost:8080"],
+  ["browser.highlightToSearch.featureGate", true],
+  ["browser.highlightToSearch.enabled", true],
+  ["browser.highlightToSearch.search.enabled", true],
+  ["browser.highlightToSearch.copy.enabled", true],
+];
+
+async function openMoreActions() {
+  const moreActionsPanel = document.getElementById(
+    "selection-more-actions-panel"
+  );
+  const shown = BrowserTestUtils.waitForEvent(moreActionsPanel, "popupshown");
+  EventUtils.synthesizeMouseAtCenter(
+    document.getElementById("more-actions-button"),
+    {},
+    window
+  );
+  await shown;
+  return moreActionsPanel;
+}
+
+async function clickToggle(id) {
+  const toggle = document.getElementById(id);
+  await toggle.updateComplete;
+  EventUtils.synthesizeMouseAtCenter(toggle.buttonEl, {});
+  await toggle.updateComplete;
+}
+
+/**
+ * Check that the three-dot button stays hidden for an existing chatbot user
+ * while the Highlight to Search feature gate is off.
+ */
+add_task(async function test_more_actions_hidden_without_feature_gate() {
+  await SpecialPowers.pushPrefEnv({
+    set: [
+      ...MORE_ACTIONS_PREFS,
+      ["browser.highlightToSearch.featureGate", false],
+    ],
+  });
+
+  await BrowserTestUtils.withNewTab("data:text/plain,hi", async browser => {
+    const panel = await showSelectionMenu(browser);
+
+    Assert.ok(
+      document.getElementById("more-actions-button").hidden,
+      "Three-dot button stays hidden without the feature gate"
+    );
+    Assert.ok(
+      document.getElementById("more-actions-separator").hidden,
+      "The rule before it stays hidden too"
+    );
+
+    const panelHidden = BrowserTestUtils.waitForEvent(panel, "popuphidden");
+    panel.hide();
+    await panelHidden;
+  });
+
+  await SpecialPowers.popPrefEnv();
+});
+
+/**
+ * Check that the three-dot menu shows a toggle per action reflecting its pref,
+ * and records that it was shown.
+ */
+add_task(async function test_more_actions_menu_shows_toggles() {
+  Services.fog.testResetFOG();
+  await SpecialPowers.pushPrefEnv({
+    set: [
+      ...MORE_ACTIONS_PREFS,
+      ["browser.highlightToSearch.copy.enabled", false],
+    ],
+  });
+
+  await BrowserTestUtils.withNewTab("data:text/plain,hi", async browser => {
+    const panel = await showSelectionMenu(browser);
+
+    const moreActionsButton = document.getElementById("more-actions-button");
+    Assert.ok(!moreActionsButton.hidden, "Three-dot button is shown");
+
+    const moreActionsPanel = await openMoreActions();
+    const aiToggle = document.getElementById("more-actions-ai-toggle");
+    const searchToggle = document.getElementById("more-actions-search-toggle");
+    const copyToggle = document.getElementById("more-actions-copy-toggle");
+    Assert.ok(aiToggle.label, "AI row is already named when the menu opens");
+    await Promise.all(
+      [aiToggle, searchToggle, copyToggle].map(toggle => toggle.updateComplete)
+    );
+
+    Assert.ok(!aiToggle.hidden, "AI row is present");
+    Assert.ok(aiToggle.pressed, "AI is on");
+    Assert.ok(searchToggle.pressed, "Search is on");
+    Assert.ok(!copyToggle.pressed, "Copy is off");
+
+    const shown = Glean.selectionMenu.menuShown.testGetValue();
+    Assert.equal(shown.length, 1, "Three-dot menu shown once");
+    Assert.deepEqual(
+      [shown[0].extra.ai, shown[0].extra.search, shown[0].extra.copy],
+      ["on", "on", "off"],
+      "The shown event carries each row's state"
+    );
+
+    const hidden = BrowserTestUtils.waitForEvent(
+      moreActionsPanel,
+      "popuphidden"
+    );
+    EventUtils.synthesizeMouseAtCenter(
+      document.getElementById("more-actions-button"),
+      {}
+    );
+    await hidden;
+
+    const panelHidden = BrowserTestUtils.waitForEvent(panel, "popuphidden");
+    panel.hide();
+    await panelHidden;
+  });
+
+  await SpecialPowers.popPrefEnv();
+});
+
+/**
+ * Check that flipping a toggle writes its pref, records the change and
+ * re-renders the bar without reopening the menu.
+ */
+add_task(async function test_more_actions_toggle_updates_bar() {
+  Services.fog.testResetFOG();
+  await SpecialPowers.pushPrefEnv({ set: MORE_ACTIONS_PREFS });
+
+  await BrowserTestUtils.withNewTab("data:text/plain,hi", async browser => {
+    const panel = await showSelectionMenu(browser);
+    await openMoreActions();
+
+    const copyButton = document.getElementById("copy-action-button");
+    const aiButton = document.getElementById("ai-action-button");
+    Assert.ok(!copyButton.hidden, "Copy starts shown");
+
+    await clickToggle("more-actions-copy-toggle");
+    Assert.ok(
+      !Services.prefs.getBoolPref("browser.highlightToSearch.copy.enabled"),
+      "Copy pref is written"
+    );
+    Assert.ok(copyButton.hidden, "Copy leaves the bar immediately");
+    Assert.equal(panel.state, "open", "The bar stays open");
+
+    await clickToggle("more-actions-ai-toggle");
+    Assert.ok(
+      !Services.prefs.getBoolPref("browser.ml.chat.shortcuts"),
+      "AI pref is written"
+    );
+    Assert.ok(aiButton.hidden, "AI leaves the bar immediately");
+    Assert.ok(
+      !document.getElementById("more-actions-button").hidden,
+      "The three-dot button stays so the actions can be turned back on"
+    );
+
+    await clickToggle("more-actions-copy-toggle");
+    Assert.ok(
+      Services.prefs.getBoolPref("browser.highlightToSearch.copy.enabled"),
+      "Copy pref is written back on"
+    );
+    Assert.ok(!copyButton.hidden, "Copy returns to the bar immediately");
+
+    const toggled = Glean.selectionMenu.optionToggled.testGetValue();
+    Assert.deepEqual(
+      toggled.map(e => [e.extra.action, e.extra.enabled, e.extra.source]),
+      [
+        ["copy", "false", "menu"],
+        ["ai", "false", "menu"],
+        ["copy", "true", "menu"],
+      ],
+      "Each toggle is recorded with the menu as its source"
+    );
+
+    const panelHidden = BrowserTestUtils.waitForEvent(panel, "popuphidden");
+    panel.hide();
+    await panelHidden;
+  });
+
+  await SpecialPowers.popPrefEnv();
+});
+
+/**
+ * Check that turning off the last action in the three-dot menu explains that
+ * the menu will go away, and turns it off only once the three-dot menu closes,
+ * as unchecking the last action in Settings does. Turning an action back on
+ * first cancels it.
+ */
+add_task(async function test_more_actions_uncheck_all_turns_menu_off() {
+  Services.fog.testResetFOG();
+  await SpecialPowers.pushPrefEnv({ set: MORE_ACTIONS_PREFS });
+
+  await BrowserTestUtils.withNewTab("data:text/plain,hi", async browser => {
+    const panel = await showSelectionMenu(browser);
+    const moreActionsPanel = await openMoreActions();
+    const notice = document.getElementById("more-actions-all-off-notice");
+    const enabledPref = "browser.highlightToSearch.enabled";
+
+    await clickToggle("more-actions-copy-toggle");
+    await clickToggle("more-actions-search-toggle");
+    Assert.equal(panel.state, "open", "The bar stays open with an action left");
+    Assert.ok(
+      Services.prefs.getBoolPref(enabledPref),
+      "The menu stays on with an action left"
+    );
+    Assert.ok(
+      BrowserTestUtils.isHidden(notice),
+      "No notice with an action left"
+    );
+
+    await clickToggle("more-actions-ai-toggle");
+    await document.l10n.translateElements([notice]);
+    Assert.ok(BrowserTestUtils.isVisible(notice), "The notice is shown");
+    Assert.ok(notice.textContent.trim(), "The notice says what will happen");
+    const chevron = notice.querySelector(".more-actions-notice-chevron");
+    Assert.ok(
+      chevron && BrowserTestUtils.isVisible(chevron),
+      "The path to the setting is separated by a chevron icon"
+    );
+    Assert.ok(
+      !notice.textContent.includes(">"),
+      "No greater-than sign is used as a separator"
+    );
+    Assert.equal(notice.getAttribute("role"), "status", "It is announced");
+    Assert.ok(Services.prefs.getBoolPref(enabledPref), "The menu is still on");
+    Assert.equal(panel.state, "open", "The bar is still open");
+    for (const id of [
+      "ai-action-button",
+      "search-action-button",
+      "copy-action-button",
+      "more-actions-separator",
+    ]) {
+      Assert.ok(document.getElementById(id).hidden, `${id} is hidden`);
+    }
+    Assert.ok(
+      BrowserTestUtils.isVisible(
+        document.getElementById("more-actions-button")
+      ),
+      "Only the three-dot button is left"
+    );
+
+    await clickToggle("more-actions-search-toggle");
+    Assert.ok(BrowserTestUtils.isHidden(notice), "Turning one on removes it");
+    let menuHidden = BrowserTestUtils.waitForEvent(
+      moreActionsPanel,
+      "popuphidden"
+    );
+    EventUtils.synthesizeKey("KEY_Escape", {}, window);
+    await menuHidden;
+    Assert.ok(
+      Services.prefs.getBoolPref(enabledPref),
+      "Closing the three-dot menu with an action on keeps the menu on"
+    );
+    Assert.equal(panel.state, "open", "The bar stays open");
+
+    await openMoreActions();
+    await clickToggle("more-actions-search-toggle");
+    Assert.ok(BrowserTestUtils.isVisible(notice), "The notice is back");
+    menuHidden = BrowserTestUtils.waitForEvent(moreActionsPanel, "popuphidden");
+    const panelHidden = BrowserTestUtils.waitForEvent(panel, "popuphidden");
+    EventUtils.synthesizeKey("KEY_Escape", {}, window);
+    await menuHidden;
+    await panelHidden;
+    Assert.ok(
+      !Services.prefs.getBoolPref(enabledPref),
+      "Closing the three-dot menu with nothing left turns the menu off"
+    );
+
+    const toggled = Glean.selectionMenu.optionToggled.testGetValue();
+    Assert.deepEqual(
+      toggled.map(e => [e.extra.action, e.extra.enabled, e.extra.source]),
+      [
+        ["copy", "false", "menu"],
+        ["search", "false", "menu"],
+        ["ai", "false", "menu"],
+        ["search", "true", "menu"],
+        ["search", "false", "menu"],
+        ["master", "false", "uncheck_all"],
+      ],
+      "The menu turning itself off is recorded once, when it happens"
+    );
+  });
+
+  await SpecialPowers.popPrefEnv();
+});
+
+/**
+ * Check that the bar closes when the chatbot shortcuts pref is turned off from
+ * outside the three-dot menu while that menu is open.
+ */
+add_task(async function test_more_actions_bar_closes_on_external_ai_off() {
+  await SpecialPowers.pushPrefEnv({ set: MORE_ACTIONS_PREFS });
+
+  await BrowserTestUtils.withNewTab("data:text/plain,hi", async browser => {
+    const panel = await showSelectionMenu(browser);
+    await openMoreActions();
+
+    const panelHidden = BrowserTestUtils.waitForEvent(panel, "popuphidden");
+    Services.prefs.setBoolPref("browser.ml.chat.shortcuts", false);
+    await panelHidden;
+    Assert.equal(panel.state, "closed", "The bar closes");
+  });
+
+  await SpecialPowers.popPrefEnv();
+});
+
+/**
+ * Check that a selection made while the bar is still open starts without the
+ * previous copy confirmation or its pending hide.
+ */
+add_task(async function test_copy_confirmation_reset_on_new_selection() {
+  await SpecialPowers.pushPrefEnv({ set: MORE_ACTIONS_PREFS });
+
+  const pendingHides = new Set();
+  const { setTimeout: realSetTimeout, clearTimeout: realClearTimeout } = window;
+  window.setTimeout = (callback, delay, ...args) => {
+    const id = realSetTimeout(callback, delay, ...args);
+    if (delay == 850) {
+      pendingHides.add(id);
+    }
+    return id;
+  };
+  window.clearTimeout = id => {
+    pendingHides.delete(id);
+    realClearTimeout(id);
+  };
+
+  try {
+    await BrowserTestUtils.withNewTab("data:text/plain,hi", async browser => {
+      const panel = await showSelectionMenu(browser);
+      const confirmation = document.getElementById("copy-action-confirmation");
+
+      EventUtils.synthesizeMouseAtCenter(
+        document.getElementById("copy-action-button"),
+        {},
+        window
+      );
+      await TestUtils.waitForCondition(
+        () => confirmation.hasAttribute("copied"),
+        "Confirmation is shown after copying"
+      );
+      Assert.equal(pendingHides.size, 1, "The confirmation scheduled a hide");
+
+      GenAI.handleShortcutsMessage(
+        "GenAI:ShowShortcuts",
+        {
+          selection: "hi",
+          delay: 0,
+          screenXDevPx: 10,
+          screenYDevPx: 10,
+        },
+        browser
+      );
+      Assert.ok(
+        !confirmation.hasAttribute("copied"),
+        "Confirmation is cleared by the new selection"
+      );
+      Assert.equal(pendingHides.size, 0, "The pending hide is cancelled");
+
+      const panelHidden = BrowserTestUtils.waitForEvent(panel, "popuphidden");
+      panel.hide();
+      await panelHidden;
+    });
+  } finally {
+    window.setTimeout = realSetTimeout;
+    window.clearTimeout = realClearTimeout;
+    await SpecialPowers.popPrefEnv();
+  }
+});
+
+/**
+ * Check that a selection made while the Copied text is still being translated
+ * doesn't bring the previous confirmation back.
+ */
+add_task(async function test_copy_confirmation_reset_during_translation() {
+  await SpecialPowers.pushPrefEnv({
+    set: [
+      ["browser.ml.chat.shortcuts", true],
+      ["browser.ml.chat.shortcut.onboardingMouseoverCount", 2],
+      ["browser.ml.chat.provider", "http://localhost:8080"],
+      ["browser.highlightToSearch.featureGate", true],
+      ["browser.highlightToSearch.enabled", true],
+      ["browser.highlightToSearch.copy.enabled", true],
+    ],
+  });
+
+  await BrowserTestUtils.withNewTab("data:text/plain,hi", async browser => {
+    const panel = await showSelectionMenu(browser);
+    const confirmation = document.getElementById("copy-action-confirmation");
+    const confirmationText = confirmation.querySelector(
+      ".copy-action-confirmation-text"
+    );
+
+    EventUtils.synthesizeMouseAtCenter(
+      document.getElementById("copy-action-button"),
+      {},
+      window
+    );
+    GenAI.handleShortcutsMessage(
+      "GenAI:ShowShortcuts",
+      {
+        selection: "hi",
+        delay: 0,
+        screenXDevPx: 10,
+        screenYDevPx: 10,
+      },
+      browser
+    );
+
+    await document.l10n.translateElements([]);
+    await new Promise(resolve =>
+      requestAnimationFrame(() => requestAnimationFrame(resolve))
+    );
+    Assert.ok(
+      !confirmation.hasAttribute("copied"),
+      "The stale translation doesn't show the confirmation"
+    );
+    Assert.equal(
+      confirmationText.textContent,
+      "",
+      "The stale translation leaves no text behind"
+    );
+
+    const panelHidden = BrowserTestUtils.waitForEvent(panel, "popuphidden");
+    panel.hide();
+    await panelHidden;
+  });
+
+  await SpecialPowers.popPrefEnv();
+});
+
+/**
+ * Check that a Smart Window selection shows only the AI action, even after a
+ * classic selection in the same window showed the other actions.
+ */
+add_task(async function test_smart_window_resets_classic_actions() {
+  await SpecialPowers.pushPrefEnv({
+    set: [
+      ...MORE_ACTIONS_PREFS,
+      ["browser.ml.chat.shortcuts.smartwindow", true],
+    ],
+  });
+
+  await BrowserTestUtils.withNewTab("data:text/plain,hi", async browser => {
+    const panel = await showSelectionMenu(browser);
+    Assert.ok(
+      !document.getElementById("copy-action-button").hidden,
+      "Classic selection shows Copy"
+    );
+    const panelHidden = BrowserTestUtils.waitForEvent(panel, "popuphidden");
+    panel.hide();
+    await panelHidden;
+
+    await SpecialPowers.spawn(browser, [], () =>
+      content.getSelection().removeAllRanges()
+    );
+    document.documentElement.setAttribute("ai-window", "");
+    try {
+      await showSelectionMenu(browser);
+      for (const id of [
+        "search-action-button",
+        "copy-action-button",
+        "more-actions-separator",
+        "more-actions-button",
+      ]) {
+        Assert.ok(document.getElementById(id).hidden, `${id} is hidden`);
+      }
+      Assert.ok(
+        !document.getElementById("ai-action-button").hidden,
+        "The AI action is shown"
+      );
+    } finally {
+      document.documentElement.removeAttribute("ai-window");
+      const hidden = BrowserTestUtils.waitForEvent(panel, "popuphidden");
+      panel.hide();
+      await hidden;
+    }
+  });
+
+  await SpecialPowers.popPrefEnv();
+});
+
+/**
+ * Check that the AI row is absent from the three-dot menu, not shown
+ * unchecked, while the chatbot is blocked.
+ */
+add_task(async function test_more_actions_ai_row_absent_when_blocked() {
+  Services.fog.testResetFOG();
+  await SpecialPowers.pushPrefEnv({
+    set: [...MORE_ACTIONS_PREFS, ["browser.ml.chat.enabled", false]],
+  });
+
+  await BrowserTestUtils.withNewTab("data:text/plain,hi", async browser => {
+    const panel = await showSelectionMenu(browser);
+    await openMoreActions();
+
+    Assert.ok(
+      document.getElementById("more-actions-ai-toggle").hidden,
+      "AI row is absent while the chatbot is blocked"
+    );
+    const shown = Glean.selectionMenu.menuShown.testGetValue();
+    Assert.equal(shown[0].extra.ai, "absent", "The shown event says so");
+
+    const panelHidden = BrowserTestUtils.waitForEvent(panel, "popuphidden");
+    panel.hide();
+    await panelHidden;
+  });
+
+  await SpecialPowers.popPrefEnv();
+});
+
+/**
+ * Check that the three-dot menu closes with the bar.
+ */
+add_task(async function test_more_actions_closes_with_bar() {
+  await SpecialPowers.pushPrefEnv({ set: MORE_ACTIONS_PREFS });
+
+  await BrowserTestUtils.withNewTab("data:text/plain,hi", async browser => {
+    const panel = await showSelectionMenu(browser);
+    const moreActionsPanel = await openMoreActions();
+
+    const hidden = BrowserTestUtils.waitForEvent(
+      moreActionsPanel,
+      "popuphidden"
+    );
+    panel.hide();
+    await hidden;
+    Assert.equal(moreActionsPanel.state, "closed", "Three-dot menu closed");
+  });
+
+  await SpecialPowers.popPrefEnv();
+});
+
+/**
+ * Check that the copy confirmation keeps readable text on its fill in high
+ * contrast mode.
+ */
+add_task(async function test_copy_confirmation_in_high_contrast() {
+  await SpecialPowers.pushPrefEnv({
+    set: [
+      ["browser.ml.chat.shortcuts", true],
+      ["browser.ml.chat.shortcut.onboardingMouseoverCount", 2],
+      ["browser.ml.chat.provider", "http://localhost:8080"],
+      ["browser.highlightToSearch.featureGate", true],
+      ["browser.highlightToSearch.enabled", true],
+      ["browser.highlightToSearch.copy.enabled", true],
+      ["ui.useAccessibilityTheme", 1],
+    ],
+  });
+
+  await BrowserTestUtils.withNewTab("data:text/plain,hi", async browser => {
+    const panel = await showSelectionMenu(browser);
+    const confirmation = document.getElementById("copy-action-confirmation");
+
+    const panelHidden = BrowserTestUtils.waitForEvent(panel, "popuphidden");
+    EventUtils.synthesizeMouseAtCenter(
+      document.getElementById("copy-action-button"),
+      {},
+      window
+    );
+    await TestUtils.waitForCondition(() => confirmation.hasAttribute("copied"));
+
+    const style = getComputedStyle(confirmation);
+    Assert.notEqual(
+      style.color,
+      style.backgroundColor,
+      "Confirmation text differs from its background in high contrast"
+    );
+
+    await panelHidden;
+  });
+
+  await SpecialPowers.popPrefEnv();
+});
+
 /**
  * Check that shortcuts get shown on selection and open popup and sidebar
  */
@@ -829,17 +2044,7 @@ add_task(async function test_show_shortcuts() {
   });
 
   await BrowserTestUtils.withNewTab("data:text/plain,hi", async browser => {
-    await SimpleTest.promiseFocus(browser);
-    const selectPromise = SpecialPowers.spawn(browser, [], () => {
-      ContentTaskUtils.waitForCondition(() => content.getSelection());
-    });
-    goDoCommand("cmd_selectAll");
-    await selectPromise;
-    BrowserTestUtils.synthesizeMouseAtCenter(
-      browser,
-      { type: "mouseup" },
-      browser
-    );
+    await selectAllAndMouseUp(browser);
 
     await TestUtils.waitForCondition(() => {
       const panelElement = document.getElementById(
@@ -984,17 +2189,7 @@ add_task(async function test_show_shortcuts_second_tab() {
   await BrowserTestUtils.withNewTab(
     "data:text/html,<title>second</title>page",
     async browser => {
-      await SimpleTest.promiseFocus(browser);
-      const selectPromise = SpecialPowers.spawn(browser, [], () => {
-        ContentTaskUtils.waitForCondition(() => content.getSelection());
-      });
-      goDoCommand("cmd_selectAll");
-      await selectPromise;
-      BrowserTestUtils.synthesizeMouseAtCenter(
-        browser,
-        { type: "mouseup" },
-        browser
-      );
+      await selectAllAndMouseUp(browser);
 
       await TestUtils.waitForCondition(() => {
         const panelElement = document.getElementById(
@@ -1027,17 +2222,7 @@ add_task(async function test_show_warning_label() {
   await BrowserTestUtils.withNewTab(
     "data:text/plain,hi".repeat(1000),
     async browser => {
-      await SimpleTest.promiseFocus(browser);
-      const selectPromise = SpecialPowers.spawn(browser, [], () => {
-        ContentTaskUtils.waitForCondition(() => content.getSelection());
-      });
-      goDoCommand("cmd_selectAll");
-      await selectPromise;
-      BrowserTestUtils.synthesizeMouseAtCenter(
-        browser,
-        { type: "mouseup" },
-        browser
-      );
+      await selectAllAndMouseUp(browser);
 
       const selectionShortcutActionPanel = document.getElementById(
         "selection-shortcut-action-panel"
@@ -1123,8 +2308,10 @@ add_task(async function test_plain_clicks() {
     .withArgs("GenAI:ShowShortcuts");
 
   await BrowserTestUtils.withNewTab("data:text/plain,click", async browser => {
-    await BrowserTestUtils.synthesizeMouseAtCenter(
+    await BrowserTestUtils.synthesizeMouse(
       browser,
+      60,
+      10,
       { type: "mouseup" },
       browser
     );
@@ -1133,16 +2320,20 @@ add_task(async function test_plain_clicks() {
 
     Assert.equal(stub.callCount, 1, "Plain click handled");
 
-    await BrowserTestUtils.synthesizeMouseAtCenter(
+    await BrowserTestUtils.synthesizeMouse(
       browser,
+      60,
+      10,
       { button: 1, type: "mouseup" },
       browser
     );
 
     Assert.equal(stub.callCount, 1, "Middle click ignored");
 
-    await BrowserTestUtils.synthesizeMouseAtCenter(
+    await BrowserTestUtils.synthesizeMouse(
       browser,
+      60,
+      10,
       { shiftKey: true, type: "mouseup" },
       browser
     );
@@ -1185,8 +2376,10 @@ add_task(async function test_input_selection() {
         input.selectionEnd = 3;
       });
 
-      await BrowserTestUtils.synthesizeMouseAtCenter(
+      await BrowserTestUtils.synthesizeMouse(
         browser,
+        60,
+        10,
         { type: "mouseup" },
         browser
       );
@@ -1207,6 +2400,94 @@ add_task(async function test_input_selection() {
   sandbox.restore();
 });
 
+/**
+ * Check that a selection the page makes while the mouse is clicked doesn't
+ * show shortcuts, but one that comes with a drag does.
+ */
+add_task(async function test_page_made_selection() {
+  await SpecialPowers.pushPrefEnv({
+    set: [["browser.ml.chat.shortcuts.debounce", 0]],
+  });
+  const sandbox = sinon.createSandbox();
+  const stub = sandbox.stub(GenAI, "handleShortcutsMessage");
+  const showCalls = () =>
+    stub.getCalls().filter(c => c.args[0] == "GenAI:ShowShortcuts");
+
+  await BrowserTestUtils.withNewTab(
+    `data:text/html,<p id="text">select this text</p><div style="height:3000px"></div>`,
+    async browser => {
+      const select = (start, end) =>
+        SpecialPowers.spawn(browser, [start, end], (from, to) => {
+          const node = content.document.getElementById("text").firstChild;
+          content.getSelection().setBaseAndExtent(node, from, node, to);
+        });
+      const press = x =>
+        BrowserTestUtils.synthesizeMouse(
+          browser,
+          x,
+          10,
+          { type: "mousedown" },
+          browser
+        );
+      const release = x =>
+        BrowserTestUtils.synthesizeMouse(
+          browser,
+          x,
+          10,
+          { type: "mouseup" },
+          browser
+        );
+
+      await SimpleTest.promiseFocus(browser);
+
+      // The page selects the whole line while the mouse is clicked in place.
+      await press(10);
+      await select(0, 16);
+      await release(10);
+      // Let the actor's zero-length debounce run, so the next gesture can't
+      // cancel a message that would have been sent.
+      await SpecialPowers.spawn(
+        browser,
+        [],
+        () => new Promise(resolve => content.setTimeout(resolve, 100))
+      );
+      Assert.equal(
+        showCalls().length,
+        0,
+        "A click the page answered is ignored"
+      );
+
+      // The user then drags across a single word.
+      await press(10);
+      await select(7, 11);
+      await release(60);
+      await TestUtils.waitForCondition(() => showCalls().length);
+
+      Assert.equal(
+        showCalls()[0].args[1].selection,
+        "this",
+        "The first shortcuts were for the dragged selection, not the page's"
+      );
+
+      // The user holds the button and scrolls to extend the selection.
+      await press(10);
+      await SpecialPowers.spawn(browser, [], () => content.scrollBy(0, 50));
+      await select(0, 4);
+      await release(10);
+      await TestUtils.waitForCondition(() => showCalls().length == 2);
+
+      Assert.equal(
+        showCalls()[1].args[1].selection,
+        "sele",
+        "Scrolling while the button is held counts as the user selecting"
+      );
+    }
+  );
+
+  sandbox.restore();
+  await SpecialPowers.popPrefEnv();
+});
+
 add_task(async function test_panel_actions_layout() {
   await SpecialPowers.pushPrefEnv({
     set: [
@@ -1216,18 +2497,7 @@ add_task(async function test_panel_actions_layout() {
   });
 
   await BrowserTestUtils.withNewTab("data:text/plain,hi", async browser => {
-    await SimpleTest.promiseFocus(browser);
-
-    const selectPromise = SpecialPowers.spawn(browser, [], () => {
-      ContentTaskUtils.waitForCondition(() => content.getSelection());
-    });
-    goDoCommand("cmd_selectAll");
-    await selectPromise;
-    BrowserTestUtils.synthesizeMouseAtCenter(
-      browser,
-      { type: "mouseup" },
-      browser
-    );
+    await selectAllAndMouseUp(browser);
 
     const panel = document.getElementById("selection-shortcut-action-panel");
     await TestUtils.waitForCondition(
@@ -1337,13 +2607,7 @@ add_task(async function test_panel_opens_without_search_service() {
     // the default engine getters throw.
     SearchService.forceInitializationStatusForTests("failed");
     try {
-      goDoCommand("cmd_selectAll");
-      BrowserTestUtils.synthesizeMouseAtCenter(
-        browser,
-        { type: "mouseup" },
-        browser
-      );
-
+      await selectAllAndMouseUp(browser);
       await TestUtils.waitForCondition(
         () => panel.getAttribute("panelopen") === "true"
       );
@@ -1371,18 +2635,7 @@ add_task(async function test_ime_composition_hides_panel() {
   });
 
   await BrowserTestUtils.withNewTab("data:text/plain,hello", async browser => {
-    await SimpleTest.promiseFocus(browser);
-
-    const selectPromise = SpecialPowers.spawn(browser, [], () => {
-      ContentTaskUtils.waitForCondition(() => content.getSelection());
-    });
-    goDoCommand("cmd_selectAll");
-    await selectPromise;
-    BrowserTestUtils.synthesizeMouseAtCenter(
-      browser,
-      { type: "mouseup" },
-      browser
-    );
+    await selectAllAndMouseUp(browser);
 
     const panel = document.getElementById("selection-shortcut-action-panel");
     await TestUtils.waitForCondition(
@@ -1418,4 +2671,1158 @@ add_task(async function test_ime_composition_hides_panel() {
   });
 
   await SpecialPowers.popPrefEnv();
+});
+
+const DEFAULT_IGNORE_FIELDS = "input,moz-multiline-editor";
+
+/**
+ * Check that textareas are ignored only while the Highlight to Search feature
+ * gate is on, so existing chatbot users keep the menu there until then.
+ */
+add_task(async function test_textarea_ignored_with_feature_gate() {
+  await SpecialPowers.pushPrefEnv({
+    set: [["browser.ml.chat.shortcuts.ignoreFields", DEFAULT_IGNORE_FIELDS]],
+  });
+  Assert.ok(
+    !GenAI.ignoredInputs.has("textarea"),
+    "Textareas are not ignored while the feature gate is off"
+  );
+
+  await SpecialPowers.pushPrefEnv({
+    set: [["browser.highlightToSearch.featureGate", true]],
+  });
+  Assert.ok(
+    GenAI.ignoredInputs.has("textarea"),
+    "Textareas are ignored while the feature gate is on"
+  );
+  Assert.ok(GenAI.ignoredInputs.has("input"), "Inputs are still ignored");
+
+  await SpecialPowers.popPrefEnv();
+  Assert.ok(
+    !GenAI.ignoredInputs.has("textarea"),
+    "Textareas are shown again once the feature gate is off"
+  );
+  await SpecialPowers.popPrefEnv();
+});
+
+async function selectTextareaAndMouseUp(browser) {
+  await SimpleTest.promiseFocus(browser);
+  await BrowserTestUtils.synthesizeMouse(
+    browser,
+    10,
+    10,
+    { type: "mousedown" },
+    browser
+  );
+  await SpecialPowers.spawn(browser, [], () => {
+    const textarea = content.document.querySelector("textarea");
+    textarea.focus();
+    textarea.select();
+  });
+  await BrowserTestUtils.synthesizeMouse(
+    browser,
+    60,
+    10,
+    { type: "mouseup" },
+    browser
+  );
+}
+
+/**
+ * Check that selecting text in a textarea shows no menu while the feature gate
+ * is on, and still does while it is off.
+ */
+add_task(async function test_textarea_selection_menu() {
+  const panel = document.getElementById("selection-shortcut-action-panel");
+  const spy = sinon.spy(GenAI, "handleShortcutsMessage");
+
+  for (const featureGate of [true, false]) {
+    spy.resetHistory();
+    await SpecialPowers.pushPrefEnv({
+      set: [
+        ["browser.highlightToSearch.featureGate", featureGate],
+        ["browser.ml.chat.shortcuts.ignoreFields", DEFAULT_IGNORE_FIELDS],
+        ["browser.ml.chat.shortcuts", true],
+        ["browser.ml.chat.shortcut.onboardingMouseoverCount", 2],
+        ["browser.ml.chat.provider", "http://localhost:8080"],
+      ],
+    });
+
+    await BrowserTestUtils.withNewTab(
+      "data:text/html,<textarea>some text</textarea>",
+      async browser => {
+        await selectTextareaAndMouseUp(browser);
+        await TestUtils.waitForCondition(
+          () => spy.calledWith("GenAI:ShowShortcuts"),
+          "Actor offered the textarea selection to the parent"
+        );
+
+        if (featureGate) {
+          Assert.equal(
+            panel.state,
+            "closed",
+            "No menu for a textarea while the feature gate is on"
+          );
+        } else {
+          await TestUtils.waitForCondition(
+            () => panel.getAttribute("panelopen") === "true",
+            "Menu opens for a textarea while the feature gate is off"
+          );
+          const hidden = BrowserTestUtils.waitForEvent(panel, "popuphidden");
+          panel.hide();
+          await hidden;
+        }
+      }
+    );
+
+    await SpecialPowers.popPrefEnv();
+  }
+
+  spy.restore();
+});
+
+/**
+ * Check that the three-dot menu lines up with the bar it opens from, names the
+ * chatbot row generically, and ends with a Manage settings row.
+ */
+add_task(async function test_more_actions_menu_layout() {
+  await SpecialPowers.pushPrefEnv({
+    set: [...MORE_ACTIONS_PREFS, ["browser.ml.chat.provider", ""]],
+  });
+
+  await BrowserTestUtils.withNewTab("data:text/plain,hi", async browser => {
+    const panel = await showSelectionMenu(browser);
+    const openSpy = sinon.spy(
+      document.getElementById("selection-more-actions-panel"),
+      "openPopup"
+    );
+    const moreActionsPanel = await openMoreActions();
+
+    const aiToggle = document.getElementById("more-actions-ai-toggle");
+    Assert.equal(aiToggle.label, "Ask AI", "Chatbot row has a generic name");
+
+    Assert.ok(
+      openSpy.calledWith(panel, "after_start"),
+      "Menu opens from the start edge of the bar"
+    );
+    openSpy.restore();
+
+    const menuBody = moreActionsPanel.querySelector(".panel-subview-body");
+    Assert.less(
+      Math.abs(
+        aiToggle.buttonEl.getBoundingClientRect().right -
+          menuBody.getBoundingClientRect().right
+      ),
+      2,
+      "Toggles sit at the end of their rows"
+    );
+
+    for (const [toggle, icon] of [
+      [aiToggle, "highlights.svg"],
+      [
+        document.getElementById("more-actions-search-toggle"),
+        "search-glass.svg",
+      ],
+      [document.getElementById("more-actions-copy-toggle"), "edit-copy.svg"],
+    ]) {
+      await toggle.updateComplete;
+      Assert.ok(
+        toggle.shadowRoot.querySelector("img.icon")?.src.endsWith(icon),
+        `${icon} is shown beside its row`
+      );
+    }
+
+    const manage = document.getElementById("more-actions-manage-settings");
+    Assert.ok(BrowserTestUtils.isVisible(manage), "Manage settings is shown");
+    Assert.ok(
+      moreActionsPanel.querySelector("toolbarseparator"),
+      "Manage settings is set apart from the toggles"
+    );
+
+    const separator = document.getElementById("more-actions-separator");
+    const separatorRect = separator.getBoundingClientRect();
+    Assert.deepEqual(
+      [separatorRect.width, separatorRect.height],
+      [1, 18],
+      "A thin rule separates the actions from the three-dot button"
+    );
+    Assert.lessOrEqual(
+      document.getElementById("copy-action-button").getBoundingClientRect()
+        .right,
+      separatorRect.left,
+      "The rule comes after the last action"
+    );
+    Assert.lessOrEqual(
+      separatorRect.right,
+      document.getElementById("more-actions-button").getBoundingClientRect()
+        .left,
+      "The rule comes before the three-dot button"
+    );
+
+    const hidden = BrowserTestUtils.waitForEvent(panel, "popuphidden");
+    panel.hide();
+    await hidden;
+  });
+
+  await SpecialPowers.popPrefEnv();
+});
+
+/**
+ * Check that Manage settings opens the Highlight to Search settings, closes
+ * the menu and records the click.
+ */
+add_task(async function test_more_actions_manage_settings() {
+  Services.fog.testResetFOG();
+  await SpecialPowers.pushPrefEnv({ set: MORE_ACTIONS_PREFS });
+  const openPreferencesStub = sinon.stub(window, "openPreferences");
+
+  try {
+    await BrowserTestUtils.withNewTab("data:text/plain,hi", async browser => {
+      const panel = await showSelectionMenu(browser);
+      const moreActionsPanel = await openMoreActions();
+
+      const hidden = BrowserTestUtils.waitForEvent(panel, "popuphidden");
+      EventUtils.synthesizeMouseAtCenter(
+        document.getElementById("more-actions-manage-settings"),
+        {},
+        window
+      );
+      await hidden;
+
+      Assert.ok(
+        openPreferencesStub.calledWith("general-highlight-to-search"),
+        "Opened the Highlight to Search settings"
+      );
+      Assert.equal(moreActionsPanel.state, "closed", "Menu closed");
+
+      const clicks = Glean.selectionMenu.menuClick.testGetValue();
+      Assert.equal(clicks?.length, 1, "The click was recorded");
+      Assert.equal(clicks[0].extra.item, "settings", "It names the entry");
+    });
+  } finally {
+    openPreferencesStub.restore();
+    await SpecialPowers.popPrefEnv();
+  }
+});
+
+/**
+ * Check which sites are ignored: the defaults, their subdomains, and nothing
+ * that merely ends with the same letters or has no host.
+ */
+add_task(async function test_ignored_sites_matching() {
+  for (const spec of [
+    "https://docs.google.com/document/d/1/edit",
+    "https://example.atlassian.net/wiki/spaces/A",
+    "https://atlassian.net/",
+    "https://www.notion.so/a-page",
+    "https://someone.notion.site/a-page",
+  ]) {
+    Assert.ok(
+      GenAI.isIgnoredSite(Services.io.newURI(spec)),
+      `${spec} is ignored`
+    );
+  }
+  for (const spec of [
+    "https://www.google.com/",
+    "https://notatlassian.net/",
+    "https://example.org/",
+    "about:blank",
+  ]) {
+    Assert.ok(
+      !GenAI.isIgnoredSite(Services.io.newURI(spec)),
+      `${spec} is not ignored`
+    );
+  }
+  Assert.ok(!GenAI.isIgnoredSite(null), "A missing URI is not ignored");
+});
+
+/**
+ * Check that the menu is not shown for a selection on an ignored site or its
+ * subdomains, judged by the frame the selection is in, but only while the
+ * Highlight to Search feature gate is on.
+ */
+add_task(async function test_ignored_sites_menu() {
+  const panel = document.getElementById("selection-shortcut-action-panel");
+  const spy = sinon.spy(GenAI, "handleShortcutsMessage");
+  Services.fog.testResetFOG();
+
+  await SpecialPowers.pushPrefEnv({
+    set: [["browser.highlightToSearch.ignoredSites", "example.com"]],
+  });
+
+  for (const [url, frameUrl, featureGate, shouldShow, message] of [
+    ["https://example.com/", null, true, false, "No menu on an ignored site"],
+    ["https://www.example.com/", null, true, false, "No menu on its subdomain"],
+    ["https://example.org/", null, true, true, "Menu shows on another site"],
+    [
+      "https://example.com/",
+      null,
+      false,
+      true,
+      "Menu shows on an ignored site while the feature gate is off",
+    ],
+    [
+      "https://example.org/",
+      "https://example.com/",
+      true,
+      false,
+      "No menu for a selection in an ignored frame on another site",
+    ],
+    [
+      "https://example.com/",
+      "https://example.org/",
+      true,
+      true,
+      "Menu shows for a selection in another frame on an ignored site",
+    ],
+  ]) {
+    spy.resetHistory();
+    await SpecialPowers.pushPrefEnv({
+      set: [
+        ["browser.highlightToSearch.featureGate", featureGate],
+        ["browser.ml.chat.shortcuts", true],
+        ["browser.ml.chat.shortcut.onboardingMouseoverCount", 2],
+        ["browser.ml.chat.provider", "http://localhost:8080"],
+      ],
+    });
+
+    await BrowserTestUtils.withNewTab(url, async browser => {
+      if (frameUrl) {
+        await SpecialPowers.spawn(browser, [frameUrl], async src => {
+          const frame = content.document.createElement("iframe");
+          frame.src = src;
+          const loaded = ContentTaskUtils.waitForEvent(frame, "load");
+          content.document.body.appendChild(frame);
+          await loaded;
+        });
+        const frameContext = browser.browsingContext.children[0];
+        await SimpleTest.promiseFocus(browser);
+        await BrowserTestUtils.synthesizeMouse(
+          "body",
+          10,
+          10,
+          { type: "mousedown" },
+          frameContext
+        );
+        await SpecialPowers.spawn(frameContext, [], () => {
+          content.getSelection().selectAllChildren(content.document.body);
+        });
+        await BrowserTestUtils.synthesizeMouse(
+          "body",
+          60,
+          10,
+          { type: "mouseup" },
+          frameContext
+        );
+      } else {
+        await selectAllAndMouseUp(browser);
+      }
+      await TestUtils.waitForCondition(
+        () => spy.calledWith("GenAI:ShowShortcuts"),
+        "Actor offered the selection to the parent"
+      );
+
+      if (shouldShow) {
+        await TestUtils.waitForCondition(
+          () => panel.getAttribute("panelopen") === "true",
+          message
+        );
+        const hidden = BrowserTestUtils.waitForEvent(panel, "popuphidden");
+        panel.hide();
+        await hidden;
+      } else {
+        Assert.equal(panel.state, "closed", message);
+      }
+    });
+
+    await SpecialPowers.popPrefEnv();
+  }
+
+  Assert.deepEqual(
+    Glean.selectionMenu.suppressed.testGetValue().map(e => e.extra.reason),
+    ["site_list", "site_list", "site_list"],
+    "Each suppressed selection is recorded with its reason"
+  );
+
+  spy.restore();
+  await SpecialPowers.popPrefEnv();
+});
+
+const CALLOUT_SEEN_PREF = "browser.highlightToSearch.callout.seen";
+
+function getCalloutPanel() {
+  return document.getElementById("selection-callout-panel");
+}
+
+function getCalloutState() {
+  return getCalloutPanel()?.state ?? "closed";
+}
+
+async function waitForCalloutOpen() {
+  await TestUtils.waitForCondition(
+    () => getCalloutState() == "open",
+    "Selection callout opened"
+  );
+  return getCalloutPanel();
+}
+
+async function hideSelectionMenu(panel) {
+  const hidden = BrowserTestUtils.waitForEvent(panel, "popuphidden");
+  panel.hide();
+  await hidden;
+}
+
+/**
+ * Check that the feature callout opens beside the menu, keeps the menu open
+ * and the AI submenu closed, and is only ever shown once.
+ */
+add_task(async function test_selection_callout_shown_once() {
+  await SpecialPowers.pushPrefEnv({
+    set: [
+      ...MORE_ACTIONS_PREFS,
+      ["browser.ml.chat.shortcut.onboardingMouseoverCount", 0],
+      [CALLOUT_SEEN_PREF, false],
+    ],
+  });
+
+  await BrowserTestUtils.withNewTab("data:text/plain,hi", async browser => {
+    let titleWhenShowing = null;
+    const onShowing = event => {
+      if (event.target.id == "selection-callout-panel") {
+        titleWhenShowing = event.target
+          .querySelector(".selection-callout-title")
+          .textContent.trim();
+      }
+    };
+    document.addEventListener("popupshowing", onShowing);
+    const panel = await showSelectionMenu(browser);
+    const callout = await waitForCalloutOpen();
+    document.removeEventListener("popupshowing", onShowing);
+    Assert.ok(titleWhenShowing, "Callout is translated before it opens");
+
+    const title = callout.querySelector(".selection-callout-title");
+    const text = callout.querySelector(".selection-callout-message");
+    await document.l10n.translateElements([title, text]);
+    Assert.ok(title.textContent.trim(), "Callout has a title");
+    Assert.ok(text.textContent.trim(), "Callout explains the feature");
+    Assert.equal(
+      text.querySelector(".selection-callout-more-link")?.textContent,
+      "•••",
+      "The sentence names the three-dot button with a pressable link"
+    );
+    const badge = callout.querySelector("moz-badge");
+    const mark = callout.querySelector(".selection-callout-mark");
+    Assert.equal(badge?.getAttribute("type"), "new", "Callout has a New badge");
+    const badgeRect = badge.getBoundingClientRect();
+    const markRect = mark.getBoundingClientRect();
+    Assert.greater(
+      badgeRect.bottom,
+      markRect.bottom,
+      "The badge sits beneath the logo"
+    );
+    Assert.less(
+      Math.abs(
+        badgeRect.left +
+          badgeRect.width / 2 -
+          (markRect.left + markRect.width / 2)
+      ),
+      1.5,
+      "The badge is centered under the logo"
+    );
+    Assert.ok(
+      !callout.querySelector("#selection-callout-dismiss"),
+      "Callout has no button to dismiss it"
+    );
+    Assert.ok(
+      Services.prefs.getBoolPref(CALLOUT_SEEN_PREF),
+      "Showing the callout counts as seeing it"
+    );
+
+    EventUtils.synthesizeMouseAtCenter(
+      document.getElementById("ai-action-button"),
+      { type: "mouseover" },
+      window
+    );
+    await TestUtils.waitForTick();
+    Assert.equal(
+      document.getElementById("chat-shortcuts-options-panel").state,
+      "closed",
+      "Hovering the AI action does not open its submenu over the callout"
+    );
+    Assert.equal(callout.state, "open", "Callout stays open");
+
+    const hidden = BrowserTestUtils.waitForEvent(callout, "popuphidden");
+    await hideSelectionMenu(panel);
+    await hidden;
+  });
+
+  await BrowserTestUtils.withNewTab("data:text/plain,hi", async browser => {
+    const panel = await showSelectionMenu(browser);
+    await TestUtils.waitForTick();
+    Assert.equal(getCalloutState(), "closed", "Callout not shown again");
+    await hideSelectionMenu(panel);
+  });
+
+  await SpecialPowers.popPrefEnv();
+});
+
+/**
+ * Check that the caret of the callout outline points at the Search action, or
+ * at the first action there is when Search is off, also with an RTL app locale.
+ */
+add_task(async function test_selection_callout_points_at_first_action() {
+  for (const { name, prefs, targetId } of [
+    { name: "Search", prefs: [], targetId: "search-action-button" },
+    {
+      name: "AI without Search",
+      prefs: [["browser.highlightToSearch.search.enabled", false]],
+      targetId: "ai-action-button",
+    },
+    {
+      name: "Search in an RTL locale",
+      prefs: [["intl.l10n.pseudo", "bidi"]],
+      targetId: "search-action-button",
+    },
+  ]) {
+    await SpecialPowers.pushPrefEnv({
+      set: [...MORE_ACTIONS_PREFS, [CALLOUT_SEEN_PREF, false], ...prefs],
+    });
+    if (prefs.length && prefs[0][0] == "intl.l10n.pseudo") {
+      await TestUtils.waitForCondition(
+        () => Services.locale.isAppLocaleRTL,
+        "App locale is RTL"
+      );
+    }
+
+    await BrowserTestUtils.withNewTab("data:text/plain,hi", async browser => {
+      const panel = await showSelectionMenu(browser, { releaseX: 300 });
+      const callout = await waitForCalloutOpen();
+
+      const edge = callout.querySelector(".selection-callout-edge");
+      await TestUtils.waitForCondition(
+        () => edge.getAttribute("d"),
+        "Callout outline was drawn"
+      );
+      const body = callout.querySelector(".panel-subview-body");
+      const target = document.getElementById(targetId);
+      const targetRect = target.getBoundingClientRect();
+      const bodyRect = body.getBoundingClientRect();
+      Assert.greater(
+        bodyRect.top,
+        targetRect.bottom,
+        `${name}: Callout is below the action`
+      );
+      const targetCenter =
+        targetRect.left + targetRect.width / 2 - bodyRect.left;
+      const insideCaret = -6;
+      Assert.ok(
+        edge.isPointInFill({ x: targetCenter, y: insideCaret }),
+        `${name}: Caret sits over the center of the action`
+      );
+      Assert.ok(
+        !edge.isPointInFill({ x: targetCenter - 20, y: insideCaret }),
+        `${name}: Caret does not extend left of the action`
+      );
+      Assert.ok(
+        !edge.isPointInFill({ x: targetCenter + 20, y: insideCaret }),
+        `${name}: Caret does not extend right of the action`
+      );
+
+      await hideSelectionMenu(panel);
+    });
+
+    await SpecialPowers.popPrefEnv();
+    if (prefs.length && prefs[0][0] == "intl.l10n.pseudo") {
+      await TestUtils.waitForCondition(
+        () => !Services.locale.isAppLocaleRTL,
+        "App locale is LTR again"
+      );
+    }
+  }
+});
+
+/**
+ * Check that the link in the callout's sentence lights the three-dot button it
+ * names and opens its menu, which closes the callout.
+ */
+add_task(async function test_selection_callout_link_opens_more_actions() {
+  await SpecialPowers.pushPrefEnv({
+    set: [...MORE_ACTIONS_PREFS, [CALLOUT_SEEN_PREF, false]],
+  });
+
+  await BrowserTestUtils.withNewTab("data:text/plain,hi", async browser => {
+    const panel = await showSelectionMenu(browser);
+    const callout = await waitForCalloutOpen();
+    const button = document.getElementById("more-actions-button");
+    const text = callout.querySelector(".selection-callout-message");
+    await document.l10n.translateElements([text]);
+    const link = callout.querySelector(".selection-callout-more-link");
+
+    EventUtils.synthesizeMouseAtCenter(link, { type: "mousemove" }, window);
+    await TestUtils.waitForCondition(
+      () => button.hasAttribute("highlighted"),
+      "Hovering the link lights the three-dot button"
+    );
+    EventUtils.synthesizeMouseAtCenter(
+      callout.querySelector(".selection-callout-title"),
+      { type: "mousemove" },
+      window
+    );
+    await TestUtils.waitForCondition(
+      () => !button.hasAttribute("highlighted"),
+      "Leaving the link turns the light off"
+    );
+
+    const hidden = BrowserTestUtils.waitForEvent(callout, "popuphidden");
+    const shown = BrowserTestUtils.waitForEvent(
+      document.getElementById("selection-more-actions-panel"),
+      "popupshown"
+    );
+    EventUtils.synthesizeMouseAtCenter(link, {}, window);
+    await shown;
+    await hidden;
+    Assert.ok(
+      !button.hasAttribute("highlighted"),
+      "The light is off once the callout is gone"
+    );
+
+    await hideSelectionMenu(panel);
+  });
+
+  await SpecialPowers.popPrefEnv();
+});
+
+/**
+ * Check that opening the three-dot menu, which the callout names, closes the
+ * callout.
+ */
+add_task(async function test_selection_callout_closes_for_more_actions() {
+  await SpecialPowers.pushPrefEnv({
+    set: [...MORE_ACTIONS_PREFS, [CALLOUT_SEEN_PREF, false]],
+  });
+
+  await BrowserTestUtils.withNewTab("data:text/plain,hi", async browser => {
+    const panel = await showSelectionMenu(browser);
+    const callout = await waitForCalloutOpen();
+
+    const hidden = BrowserTestUtils.waitForEvent(callout, "popuphidden");
+    const shown = BrowserTestUtils.waitForEvent(
+      document.getElementById("selection-more-actions-panel"),
+      "popupshown"
+    );
+    document.getElementById("more-actions-button").click();
+    await shown;
+    await hidden;
+
+    await hideSelectionMenu(panel);
+  });
+
+  await SpecialPowers.popPrefEnv();
+});
+
+/**
+ * Check that the callout closes with the menu and does not come back for the
+ * next one.
+ */
+add_task(async function test_selection_callout_closes_with_menu() {
+  await SpecialPowers.pushPrefEnv({
+    set: [...MORE_ACTIONS_PREFS, [CALLOUT_SEEN_PREF, false]],
+  });
+
+  await BrowserTestUtils.withNewTab("data:text/plain,hi", async browser => {
+    const panel = await showSelectionMenu(browser);
+    const callout = await waitForCalloutOpen();
+
+    const hidden = BrowserTestUtils.waitForEvent(callout, "popuphidden");
+    await hideSelectionMenu(panel);
+    await hidden;
+  });
+
+  await BrowserTestUtils.withNewTab("data:text/plain,hi", async browser => {
+    const panel = await showSelectionMenu(browser);
+    await TestUtils.waitForTick();
+    Assert.equal(getCalloutState(), "closed", "Callout does not come back");
+    await hideSelectionMenu(panel);
+  });
+
+  await SpecialPowers.popPrefEnv();
+});
+
+/**
+ * Check that the callout stays away when the menu has no Search or Copy action
+ * to explain.
+ */
+add_task(async function test_selection_callout_needs_search_or_copy() {
+  await SpecialPowers.pushPrefEnv({
+    set: [
+      ...MORE_ACTIONS_PREFS,
+      ["browser.highlightToSearch.search.enabled", false],
+      ["browser.highlightToSearch.copy.enabled", false],
+      [CALLOUT_SEEN_PREF, false],
+    ],
+  });
+
+  await BrowserTestUtils.withNewTab("data:text/plain,hi", async browser => {
+    const panel = await showSelectionMenu(browser);
+    await TestUtils.waitForTick();
+    Assert.equal(getCalloutState(), "closed", "No callout for AI only");
+    Assert.ok(
+      !Services.prefs.getBoolPref(CALLOUT_SEEN_PREF),
+      "Callout not seen"
+    );
+    await hideSelectionMenu(panel);
+  });
+
+  await SpecialPowers.popPrefEnv();
+});
+
+/**
+ * Check that the callout stays away in Smart Window, which only offers the AI
+ * action.
+ */
+add_task(async function test_selection_callout_not_in_smart_window() {
+  await SpecialPowers.pushPrefEnv({
+    set: [
+      ...MORE_ACTIONS_PREFS,
+      ["browser.ml.chat.shortcuts.smartwindow", true],
+      [CALLOUT_SEEN_PREF, false],
+    ],
+  });
+
+  const win = await BrowserTestUtils.openNewBrowserWindow();
+
+  try {
+    win.document.documentElement.setAttribute("ai-window", "");
+
+    await BrowserTestUtils.openNewForegroundTab(
+      win.gBrowser,
+      "data:text/plain,hi"
+    );
+    const browser = win.gBrowser.selectedBrowser;
+    await SimpleTest.promiseFocus(browser);
+
+    const selectPromise = SpecialPowers.spawn(browser, [], () =>
+      ContentTaskUtils.waitForCondition(() => content.getSelection().toString())
+    );
+    win.goDoCommand("cmd_selectAll");
+    await selectPromise;
+    await BrowserTestUtils.synthesizeMouse(
+      browser,
+      60,
+      10,
+      { type: "mouseup" },
+      browser
+    );
+
+    const panel = win.document.getElementById(
+      "selection-shortcut-action-panel"
+    );
+    await TestUtils.waitForCondition(
+      () => panel.getAttribute("panelopen") === "true",
+      "Selection menu opened in Smart Window"
+    );
+    await TestUtils.waitForTick();
+    Assert.equal(
+      win.document.getElementById("selection-callout-panel")?.state ?? "closed",
+      "closed",
+      "No callout in Smart Window"
+    );
+  } finally {
+    await BrowserTestUtils.closeWindow(win);
+    await SpecialPowers.popPrefEnv();
+  }
+});
+
+/**
+ * Check that the outline is drawn again when the callout changes size.
+ */
+add_task(async function test_selection_callout_redraws_on_resize() {
+  await SpecialPowers.pushPrefEnv({
+    set: [...MORE_ACTIONS_PREFS, [CALLOUT_SEEN_PREF, false]],
+  });
+
+  await BrowserTestUtils.withNewTab("data:text/plain,hi", async browser => {
+    const panel = await showSelectionMenu(browser);
+    const callout = await waitForCalloutOpen();
+
+    const edge = callout.querySelector(".selection-callout-edge");
+    await TestUtils.waitForCondition(
+      () => edge.getAttribute("d"),
+      "Callout outline was drawn"
+    );
+    const before = edge.getAttribute("d");
+    const body = callout.querySelector(".panel-subview-body");
+    const inlineWidth = body.style.width;
+    body.style.width = "360px";
+    await TestUtils.waitForCondition(
+      () => edge.getAttribute("d") != before,
+      "Callout outline was drawn again"
+    );
+    body.style.width = inlineWidth;
+
+    await hideSelectionMenu(panel);
+  });
+
+  await SpecialPowers.popPrefEnv();
+});
+
+/**
+ * Check that the callout takes its colors from the popup rather than the
+ * toolbar text, so a theme with light tab text and a light popup cannot leave
+ * it with light text on a light card.
+ */
+add_task(async function test_selection_callout_colors_contrast() {
+  await SpecialPowers.pushPrefEnv({
+    set: [...MORE_ACTIONS_PREFS, [CALLOUT_SEEN_PREF, false]],
+  });
+
+  const popupSet = document.getElementById("mainPopupSet");
+  const root = document.documentElement;
+  popupSet.style.setProperty("--panel-background-color", "rgb(255, 255, 255)");
+  popupSet.style.setProperty("--panel-text-color", "rgb(0, 0, 0)");
+  root.style.setProperty("--text-color", "rgb(255, 255, 255)");
+
+  try {
+    await BrowserTestUtils.withNewTab("data:text/plain,hi", async browser => {
+      const panel = await showSelectionMenu(browser);
+      const callout = await waitForCalloutOpen();
+
+      const text = getComputedStyle(
+        callout.querySelector(".selection-callout-message")
+      ).color;
+      const card = getComputedStyle(
+        callout.querySelector(".selection-callout-edge")
+      ).fill;
+      Assert.equal(
+        card,
+        "rgb(255, 255, 255)",
+        "Card uses the popup background"
+      );
+      Assert.equal(text, "rgb(0, 0, 0)", "Text uses the popup text color");
+      Assert.notEqual(text, card, "Text differs from the card behind it");
+
+      await hideSelectionMenu(panel);
+    });
+  } finally {
+    popupSet.style.removeProperty("--panel-background-color");
+    popupSet.style.removeProperty("--panel-text-color");
+    root.style.removeProperty("--text-color");
+    await SpecialPowers.popPrefEnv();
+  }
+});
+
+/**
+ * Check that using the AI action while the callout is open closes it.
+ */
+add_task(async function test_selection_callout_closes_for_ai_action() {
+  await SpecialPowers.pushPrefEnv({
+    set: [...MORE_ACTIONS_PREFS, [CALLOUT_SEEN_PREF, false]],
+  });
+
+  await BrowserTestUtils.withNewTab("data:text/plain,hi", async browser => {
+    const panel = await showSelectionMenu(browser);
+    const callout = await waitForCalloutOpen();
+
+    const hidden = BrowserTestUtils.waitForEvent(callout, "popuphidden");
+    document.getElementById("ai-action-button").click();
+    await hidden;
+
+    await hideSelectionMenu(panel);
+  });
+
+  await SpecialPowers.popPrefEnv();
+});
+
+/**
+ * Check that hiding the menu with a CSS-only IME hide also closes the callout,
+ * which would otherwise float over the page on its own.
+ */
+add_task(async function test_selection_callout_hides_for_ime() {
+  await SpecialPowers.pushPrefEnv({
+    set: [...MORE_ACTIONS_PREFS, [CALLOUT_SEEN_PREF, false]],
+  });
+
+  await BrowserTestUtils.withNewTab("data:text/plain,hi", async browser => {
+    const panel = await showSelectionMenu(browser);
+    const callout = await waitForCalloutOpen();
+
+    const hidden = BrowserTestUtils.waitForEvent(callout, "popuphidden");
+    await SpecialPowers.spawn(browser, [], () => {
+      content.document.dispatchEvent(
+        new content.CompositionEvent("compositionstart", {
+          bubbles: true,
+          data: "",
+        })
+      );
+      content.document.dispatchEvent(
+        new content.Event("selectionchange", { bubbles: true })
+      );
+    });
+    await hidden;
+    Assert.ok(panel.hasAttribute("ime-hiding"), "Menu is hidden for the IME");
+
+    await hideSelectionMenu(panel);
+  });
+
+  await SpecialPowers.popPrefEnv();
+});
+
+/**
+ * Check that the callout does not come back when a CSS-only IME hide ends and
+ * the menu is shown again without having closed.
+ */
+add_task(async function test_selection_callout_stays_away_after_ime() {
+  await SpecialPowers.pushPrefEnv({
+    set: [...MORE_ACTIONS_PREFS, [CALLOUT_SEEN_PREF, false]],
+  });
+
+  await BrowserTestUtils.withNewTab("data:text/plain,hi", async browser => {
+    const panel = await showSelectionMenu(browser);
+    const callout = await waitForCalloutOpen();
+
+    let hidden = BrowserTestUtils.waitForEvent(callout, "popuphidden");
+    await SpecialPowers.spawn(browser, [], () => {
+      content.document.dispatchEvent(
+        new content.CompositionEvent("compositionstart", {
+          bubbles: true,
+          data: "",
+        })
+      );
+      content.document.dispatchEvent(
+        new content.Event("selectionchange", { bubbles: true })
+      );
+    });
+    await hidden;
+    Assert.ok(panel.hasAttribute("ime-hiding"), "Menu is hidden for the IME");
+
+    await SpecialPowers.spawn(browser, [], () => {
+      content.document.dispatchEvent(
+        new content.CompositionEvent("compositionend", {
+          bubbles: true,
+          data: "",
+        })
+      );
+    });
+    await BrowserTestUtils.synthesizeMouseAtCenter(
+      browser,
+      { type: "mouseup" },
+      browser
+    );
+    await TestUtils.waitForCondition(
+      () => !panel.hasAttribute("ime-hiding"),
+      "Menu is shown again after the IME"
+    );
+    await TestUtils.waitForTick();
+    Assert.equal(getCalloutState(), "closed", "Callout does not come back");
+
+    await hideSelectionMenu(panel);
+  });
+
+  await SpecialPowers.popPrefEnv();
+});
+
+/**
+ * Check that a callout still waiting on its translation does not open once an
+ * IME has hidden the menu.
+ */
+add_task(async function test_selection_callout_pending_does_not_open_in_ime() {
+  await SpecialPowers.pushPrefEnv({
+    set: [...MORE_ACTIONS_PREFS, [CALLOUT_SEEN_PREF, true]],
+  });
+
+  await BrowserTestUtils.withNewTab("data:text/plain,hi", async browser => {
+    const panel = await showSelectionMenu(browser);
+    Assert.equal(getCalloutState(), "closed", "Callout is not open yet");
+
+    await SpecialPowers.pushPrefEnv({ set: [[CALLOUT_SEEN_PREF, false]] });
+    const pending = panel.showCallout();
+    panel.setAttribute("ime-hiding", "true");
+    await pending;
+    await TestUtils.waitForTick();
+    Assert.equal(getCalloutState(), "closed", "Callout stays closed");
+
+    panel.removeAttribute("ime-hiding");
+    await hideSelectionMenu(panel);
+    await SpecialPowers.popPrefEnv();
+  });
+
+  await SpecialPowers.popPrefEnv();
+});
+
+/**
+ * Check that the first click on an action while the callout is open reaches
+ * the action instead of only closing the callout.
+ */
+add_task(async function test_selection_callout_click_reaches_action() {
+  Services.fog.testResetFOG();
+  await SpecialPowers.pushPrefEnv({
+    set: [...MORE_ACTIONS_PREFS, [CALLOUT_SEEN_PREF, false]],
+  });
+
+  await BrowserTestUtils.withNewTab("data:text/plain,hi", async browser => {
+    const panel = await showSelectionMenu(browser);
+    const callout = await waitForCalloutOpen();
+
+    const hidden = BrowserTestUtils.waitForEvent(callout, "popuphidden");
+    const panelHidden = BrowserTestUtils.waitForEvent(panel, "popuphidden");
+    await EventUtils.synthesizeNativeMouseEvent({
+      type: "click",
+      target: document.getElementById("copy-action-button"),
+      atCenter: true,
+    });
+    await hidden;
+
+    const clicks = Glean.selectionMenu.actionClick.testGetValue();
+    Assert.equal(clicks?.length, 1, "The click copied the selection");
+    Assert.equal(clicks[0].extra.action, "copy", "The copy action was clicked");
+
+    await panelHidden;
+  });
+
+  await SpecialPowers.popPrefEnv();
+});
+
+/**
+ * Check the size of the feature callout card and its text.
+ */
+add_task(async function test_selection_callout_sizes() {
+  await SpecialPowers.pushPrefEnv({
+    set: [
+      ...MORE_ACTIONS_PREFS,
+      ["browser.ml.chat.shortcut.onboardingMouseoverCount", 0],
+      [CALLOUT_SEEN_PREF, false],
+    ],
+  });
+
+  await BrowserTestUtils.withNewTab("data:text/plain,hi", async browser => {
+    const panel = await showSelectionMenu(browser);
+    const callout = await waitForCalloutOpen();
+
+    const body = callout.querySelector(".panel-subview-body");
+    const bodyStyle = getComputedStyle(body);
+    Assert.equal(body.getBoundingClientRect().width, 288, "Card is 288px wide");
+    Assert.deepEqual(
+      [
+        bodyStyle.paddingTop,
+        bodyStyle.paddingInlineStart,
+        bodyStyle.paddingInlineEnd,
+      ],
+      ["12px", "15px", "15px"],
+      "Card is padded 12px above and 15px on both sides"
+    );
+    Assert.equal(
+      getComputedStyle(callout.querySelector(".selection-callout-title"))
+        .fontSize,
+      "15px",
+      "Title is 15px"
+    );
+    Assert.equal(
+      getComputedStyle(callout.querySelector(".selection-callout-message"))
+        .fontSize,
+      "13px",
+      "Text is 13px"
+    );
+    const link = callout.querySelector(".selection-callout-more-link");
+    const linkRect = link.getBoundingClientRect();
+    Assert.deepEqual(
+      [linkRect.width, linkRect.height],
+      [16, 16],
+      "The link in the sentence is a 16px icon"
+    );
+    Assert.ok(
+      getComputedStyle(link, "::after").maskImage.includes("more.svg"),
+      "The link draws the same icon as the three-dot button"
+    );
+    const textBefore = document.createRange();
+    textBefore.selectNodeContents(link.previousSibling);
+    const lastLine = [...textBefore.getClientRects()].at(-1);
+    Assert.less(
+      Math.abs(
+        linkRect.top +
+          linkRect.height / 2 -
+          (lastLine.top + lastLine.height / 2)
+      ),
+      6,
+      "The icon sits on the line of the words before it"
+    );
+    const mark = callout
+      .querySelector(".selection-callout-mark")
+      .getBoundingClientRect();
+    Assert.deepEqual([mark.width, mark.height], [39, 39], "Mark is 39px");
+
+    await hideSelectionMenu(panel);
+  });
+
+  await SpecialPowers.popPrefEnv();
+});
+
+/**
+ * Read what the stylesheets declare for a property of a rule, which some
+ * platforms or themes override in the computed style.
+ *
+ * @param {string} selector the end of the rule's selector
+ * @param {string} property the property to read
+ * @returns {string|null} the declared value
+ */
+function declaredStyle(selector, property) {
+  let declared = null;
+  const find = rules => {
+    for (const rule of rules) {
+      if (rule.selectorText?.endsWith(selector)) {
+        declared = rule.style.getPropertyValue(property) || declared;
+      }
+      // Imported sheets, conditional groups and nested rules hold rules of
+      // their own.
+      const inner = rule.styleSheet?.cssRules ?? rule.cssRules;
+      if (inner) {
+        find(inner);
+      }
+    }
+  };
+  for (const sheet of document.styleSheets) {
+    try {
+      find(sheet.cssRules);
+    } catch (e) {
+      // Sheets that can't be read have no such rule.
+    }
+  }
+  return declared;
+}
+
+/**
+ * Check that the callout asks for no transparent margin around its window. A
+ * margin makes the window cover the strip, which breaks the hover highlight of
+ * the strip's buttons while the callout shows.
+ */
+add_task(async function test_selection_callout_window_has_no_margin() {
+  Assert.equal(
+    declaredStyle("#selection-callout-panel", "--panel-box-shadow-margin"),
+    "0px",
+    "The callout window has no margin"
+  );
+});
+
+/**
+ * Check that the callout takes its outline colors and its shadow from the
+ * design system tokens instead of its own values.
+ */
+add_task(async function test_selection_callout_uses_design_tokens() {
+  Assert.deepEqual(
+    [
+      declaredStyle(
+        "#selection-callout-panel",
+        "--selection-callout-edge-start"
+      ),
+      declaredStyle("#selection-callout-panel", "--selection-callout-edge-end"),
+    ],
+    ["var(--color-violet-30)", "var(--color-orange-30)"],
+    "The outline gradient uses the violet and orange tokens"
+  );
+  const shadow = declaredStyle(".selection-callout-shape", "filter");
+  for (const token of [
+    "--box-shadow-color-lighter-layer-1",
+    "--box-shadow-color-lighter-layer-2",
+  ]) {
+    Assert.ok(shadow?.includes(`var(${token})`), `The shadow uses ${token}`);
+  }
 });

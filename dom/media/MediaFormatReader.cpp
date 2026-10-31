@@ -398,8 +398,7 @@ void MediaFormatReader::DecoderFactory::DoCreateDecoder(Data& aData) {
 
       p = platform->CreateDecoder(
           {*ownerData.GetCurrentInfo()->GetAsVideoInfo(),
-           mOwner->mKnowsCompositor, mOwner->GetImageContainer(),
-           mOwner->mCrashHelper,
+           mOwner->GetImageContainer(), mOwner->mCrashHelper,
            CreateDecoderParams::UseNullDecoder(ownerData.mIsNullDecode),
            TrackType::kVideoTrack, std::move(onWaitingForKeyEvent),
            CreateDecoderParams::VideoFrameRate(
@@ -616,7 +615,7 @@ class MediaFormatReader::DemuxerProxy {
     if (!mData->mCrypto) {
       return nullptr;
     }
-    auto crypto = MakeUnique<EncryptionInfo>();
+    auto crypto = std::make_unique<EncryptionInfo>();
     *crypto = *mData->mCrypto;
     return crypto;
   }
@@ -915,7 +914,6 @@ MediaFormatReader::MediaFormatReader(MediaFormatReaderInit& aInit,
       mPendingNotifyDataArrived(false),
       mLastReportedNumDecodedFrames(0),
       mPreviousDecodedKeyframeTime_us(sNoPreviousDecodedKeyframe),
-      mKnowsCompositor(aInit.mKnowsCompositor),
       mInitDone(false),
       mTrackDemuxersMayBlock(false),
       mSeekScheduled(false),
@@ -1185,7 +1183,7 @@ MediaFormatReader::AsyncReadMetadata() {
   if (mInitDone) {
     // We are returning from dormant.
     MetadataHolder metadata;
-    metadata.mInfo = MakeUnique<MediaInfo>(mInfo);
+    metadata.mInfo = std::make_unique<MediaInfo>(mInfo);
     return MetadataPromise::CreateAndResolve(std::move(metadata), __func__);
   }
 
@@ -1215,7 +1213,7 @@ void MediaFormatReader::OnDemuxerInitDone(const MediaResult& aResult) {
 
   mDemuxerInitDone = true;
 
-  UniquePtr<MetadataTags> tags(MakeUnique<MetadataTags>());
+  auto tags = std::make_unique<MetadataTags>();
 
   const bool checkSupport = !IsWaitingOnCDMResource();
 
@@ -1250,7 +1248,7 @@ void MediaFormatReader::OnDemuxerInitDone(const MediaResult& aResult) {
         return;
       }
       mInfo.mVideo = *videoInfo->GetAsVideoInfo();
-      mVideo.mWorkingInfo = MakeUnique<VideoInfo>(mInfo.mVideo);
+      mVideo.mWorkingInfo = std::make_unique<VideoInfo>(mInfo.mVideo);
       for (const MetadataTag& tag : videoInfo->mTags) {
         tags->InsertOrUpdate(tag.mKey, tag.mValue);
       }
@@ -1282,7 +1280,7 @@ void MediaFormatReader::OnDemuxerInitDone(const MediaResult& aResult) {
 
     if (audioActive) {
       mInfo.mAudio = *audioInfo->GetAsAudioInfo();
-      mAudio.mWorkingInfo = MakeUnique<AudioInfo>(mInfo.mAudio);
+      mAudio.mWorkingInfo = std::make_unique<AudioInfo>(mInfo.mAudio);
       for (const MetadataTag& tag : audioInfo->mTags) {
         tags->InsertOrUpdate(tag.mKey, tag.mValue);
       }
@@ -1373,7 +1371,7 @@ void MediaFormatReader::MaybeResolveMetadataPromise() {
   }
 
   MetadataHolder metadata;
-  metadata.mInfo = MakeUnique<MediaInfo>(mInfo);
+  metadata.mInfo = std::make_unique<MediaInfo>(mInfo);
   metadata.mTags = mTags->Count() ? std::move(mTags) : nullptr;
 
   // We now have all the informations required to calculate the initial buffered
@@ -2228,9 +2226,11 @@ void MediaFormatReader::HandleDemuxedSamples(
     {
       MutexAutoLock lock(decoder.mMutex);
       if (aTrack == TrackInfo::kAudioTrack) {
-        decoder.mWorkingInfo = MakeUnique<AudioInfo>(*info->GetAsAudioInfo());
+        decoder.mWorkingInfo =
+            std::make_unique<AudioInfo>(*info->GetAsAudioInfo());
       } else if (aTrack == TrackInfo::kVideoTrack) {
-        decoder.mWorkingInfo = MakeUnique<VideoInfo>(*info->GetAsVideoInfo());
+        decoder.mWorkingInfo =
+            std::make_unique<VideoInfo>(*info->GetAsVideoInfo());
       }
       mWorkingInfoChanged = true;
     }
@@ -2654,6 +2654,7 @@ void MediaFormatReader::Update(TrackType aTrack) {
     // We failed to decode on Linux with HW decoder,
     // give it another try without HW decoder.
     if (decoder.mError.ref() == NS_ERROR_DOM_MEDIA_DECODE_ERR &&
+        !decoder.mHardwareDecodingDisabled &&
         decoder.mDecoder->IsHardwareAccelerated(error)) {
       LOG("Error: {} decode error, disable HW acceleration",
           TrackTypeToStr(aTrack));
@@ -3550,12 +3551,6 @@ void MediaFormatReader::GetDebugInfo(dom::MediaFormatReaderDebugInfo& aInfo) {
 void MediaFormatReader::SetVideoNullDecode(bool aIsNullDecode) {
   MOZ_ASSERT(OnTaskQueue());
   return SetNullDecode(TrackType::kVideoTrack, aIsNullDecode);
-}
-
-void MediaFormatReader::UpdateCompositor(
-    already_AddRefed<layers::KnowsCompositor> aCompositor) {
-  MOZ_ASSERT(OnTaskQueue());
-  mKnowsCompositor = aCompositor;
 }
 
 void MediaFormatReader::SetNullDecode(TrackType aTrack, bool aIsNullDecode) {

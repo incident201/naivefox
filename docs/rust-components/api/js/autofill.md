@@ -45,6 +45,11 @@
     :exclude-members: CreditCardBulkTombstoneResultEntry
 ```
 
+```{js:autoclass} RustAutofill.sys.CreditCardCandidate
+    :members:
+    :exclude-members: CreditCardCandidate
+```
+
 ```{js:autoclass} RustAutofill.sys.CreditCardMeta
     :members:
     :exclude-members: CreditCardMeta

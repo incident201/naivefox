@@ -45,6 +45,7 @@ import org.mozilla.fenix.wallpapers.WallpaperTheme
  *
  * @param browsingMode The current [BrowsingMode].
  * @param showStoriesButton Whether to show the stories button or not.
+ * @param showButtons Whether to show the stories and private browsing buttons.
  * @param browsingModeChanged Callback for when the browsing mode is toggled.
  * @param onStoriesTapped Callback for when the stories button is tapped.
  */
@@ -52,6 +53,7 @@ import org.mozilla.fenix.wallpapers.WallpaperTheme
 fun HomepageHeader(
     browsingMode: BrowsingMode,
     showStoriesButton: Boolean,
+    showButtons: Boolean,
     browsingModeChanged: (BrowsingMode) -> Unit,
     onStoriesTapped: () -> Unit,
 ) {
@@ -82,21 +84,23 @@ fun HomepageHeader(
                 .padding(horizontal = FirefoxTheme.layout.space.static100),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().wrapContentHeight(),
-            verticalAlignment = Alignment.Top,
-        ) {
-            if (showStoriesButton) {
-                StoriesButton(color = WallpaperTheme.onWallpaper, onClick = onStoriesTapped)
+        if (showButtons) {
+            Row(
+                modifier = Modifier.fillMaxWidth().wrapContentHeight(),
+                verticalAlignment = Alignment.Top,
+            ) {
+                if (showStoriesButton) {
+                    StoriesButton(color = WallpaperTheme.onWallpaper, onClick = onStoriesTapped)
+                }
+
+                Spacer(modifier = Modifier.weight(1f))
+
+                PrivateBrowsingButton(
+                    color = privateBrowsingButtonColor,
+                    browsingMode = browsingMode,
+                    browsingModeChanged = browsingModeChanged,
+                )
             }
-
-            Spacer(modifier = Modifier.weight(1f))
-
-            PrivateBrowsingButton(
-                color = privateBrowsingButtonColor,
-                browsingMode = browsingMode,
-                browsingModeChanged = browsingModeChanged,
-            )
         }
 
         if (!browsingMode.isPrivate) {
@@ -166,6 +170,7 @@ private fun HomepageHeaderPreview(@PreviewParameter(PreviewThemeProvider::class)
             HomepageHeader(
                 browsingMode = BrowsingMode.Normal,
                 showStoriesButton = true,
+                showButtons = true,
                 browsingModeChanged = {},
                 onStoriesTapped = {},
             )

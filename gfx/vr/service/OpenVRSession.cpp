@@ -1019,21 +1019,21 @@ void OpenVRSession::EnumerateControllers(VRSystemState& aState) {
   if (controllerType != VRControllerType::_empty) {
     switch (controllerType) {
       case VRControllerType::HTCVive:
-        mControllerMapper = MakeUnique<OpenVRViveMapper>();
+        mControllerMapper = std::make_unique<OpenVRViveMapper>();
         break;
       case VRControllerType::HTCViveCosmos:
-        mControllerMapper = MakeUnique<OpenVRCosmosMapper>();
+        mControllerMapper = std::make_unique<OpenVRCosmosMapper>();
         break;
 #if defined(XP_WIN)
       case VRControllerType::MSMR:
-        mControllerMapper = MakeUnique<OpenVRWMRMapper>();
+        mControllerMapper = std::make_unique<OpenVRWMRMapper>();
         break;
 #endif
       case VRControllerType::ValveIndex:
-        mControllerMapper = MakeUnique<OpenVRKnucklesMapper>();
+        mControllerMapper = std::make_unique<OpenVRKnucklesMapper>();
         break;
       default:
-        mControllerMapper = MakeUnique<OpenVRDefaultMapper>();
+        mControllerMapper = std::make_unique<OpenVRDefaultMapper>();
         NS_WARNING("Undefined controller type");
         break;
     }

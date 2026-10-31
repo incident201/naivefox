@@ -505,6 +505,11 @@ export class PanelList extends HTMLElement {
 
     switch (e.type) {
       case "resize":
+        // Resize events of in-process subframes bubble up to chrome windows.
+        if (e.target == window) {
+          this.hide();
+        }
+        break;
       case "scroll":
         if (!inPanelList) {
           this.hide();
@@ -903,7 +908,6 @@ export class PanelItem extends HTMLElement {
       "badge-type",
       "shortcut",
       "aria-haspopup",
-      "aria-keyshortcuts",
     ];
   }
 
@@ -1054,8 +1058,7 @@ export class PanelItem extends HTMLElement {
     } else if (
       name === "type" ||
       name === "disabled" ||
-      name === "aria-haspopup" ||
-      name === "aria-keyshortcuts"
+      name === "aria-haspopup"
     ) {
       this.#setButtonAttributes();
     } else if (name === "badge-type") {
@@ -1082,14 +1085,6 @@ export class PanelItem extends HTMLElement {
     } else {
       this.button.removeAttribute("aria-haspopup");
     }
-    if (this.hasAttribute("aria-keyshortcuts")) {
-      this.button.setAttribute(
-        "aria-keyshortcuts",
-        this.getAttribute("aria-keyshortcuts")
-      );
-    } else {
-      this.button.removeAttribute("aria-keyshortcuts");
-    }
   }
 
   #updateBadge() {
@@ -1111,7 +1106,6 @@ export class PanelItem extends HTMLElement {
         this.#shortcut = document.createElement("span");
         this.#shortcut.className = "shortcut";
         this.#shortcut.setAttribute("part", "shortcut");
-        this.#shortcut.setAttribute("aria-hidden", "true");
         (this.#badge ?? this.label).after(this.#shortcut);
       }
       this.#shortcut.textContent = this.getAttribute("shortcut");

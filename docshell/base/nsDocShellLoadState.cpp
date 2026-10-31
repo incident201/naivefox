@@ -141,6 +141,7 @@ nsDocShellLoadState::nsDocShellLoadState(
   mInheritPrincipal = aLoadState.InheritPrincipal();
   mPrincipalIsExplicit = aLoadState.PrincipalIsExplicit();
   mNotifiedBeforeUnloadListeners = aLoadState.NotifiedBeforeUnloadListeners();
+  mPageSwapFired = aLoadState.PageSwapFired();
   mForceAllowDataURI = aLoadState.ForceAllowDataURI();
   mIsExemptFromHTTPSFirstMode = aLoadState.IsExemptFromHTTPSFirstMode();
   mOriginalFrameSrc = aLoadState.OriginalFrameSrc();
@@ -185,7 +186,7 @@ nsDocShellLoadState::nsDocShellLoadState(
   mHasSpeculativeListener = aLoadState.HasSpeculativeListener();
   mIsMetaRefresh = aLoadState.IsMetaRefresh();
   if (aLoadState.loadingSessionHistoryInfo().isSome()) {
-    mLoadingSessionHistoryInfo = MakeUnique<LoadingSessionHistoryInfo>(
+    mLoadingSessionHistoryInfo = std::make_unique<LoadingSessionHistoryInfo>(
         aLoadState.loadingSessionHistoryInfo().ref());
   }
   mUnstrippedURI = aLoadState.UnstrippedURI();
@@ -341,6 +342,7 @@ nsDocShellLoadState::nsDocShellLoadState(const nsDocShellLoadState& aOther)
       mInheritPrincipal(aOther.mInheritPrincipal),
       mPrincipalIsExplicit(aOther.mPrincipalIsExplicit),
       mNotifiedBeforeUnloadListeners(aOther.mNotifiedBeforeUnloadListeners),
+      mPageSwapFired(aOther.mPageSwapFired),
       mPrincipalToInherit(aOther.mPrincipalToInherit),
       mPartitionedPrincipalToInherit(aOther.mPartitionedPrincipalToInherit),
       mForceAllowDataURI(aOther.mForceAllowDataURI),
@@ -393,7 +395,7 @@ nsDocShellLoadState::nsDocShellLoadState(const nsDocShellLoadState& aOther)
       !aOther.mHasSpeculativeListener && !aOther.mSpeculativeListener,
       "Cannot copy a load state with a speculative listener");
   if (aOther.mLoadingSessionHistoryInfo) {
-    mLoadingSessionHistoryInfo = MakeUnique<LoadingSessionHistoryInfo>(
+    mLoadingSessionHistoryInfo = std::make_unique<LoadingSessionHistoryInfo>(
         *aOther.mLoadingSessionHistoryInfo);
   }
 }
@@ -492,7 +494,7 @@ nsresult nsDocShellLoadState::CreateFromPendingChannel(
 }
 
 static uint32_t WebNavigationFlagsToFixupFlags(nsIURI* aURI,
-                                               const nsACString& aURIString,
+                                               const nsACString& /*aURIString*/,
                                                uint32_t aNavigationFlags) {
   if (aURI) {
     aNavigationFlags &= ~nsIWebNavigation::LOAD_FLAGS_ALLOW_THIRD_PARTY_FIXUP;
@@ -619,7 +621,7 @@ nsresult nsDocShellLoadState::CreateFromLoadURIOptions(
 }
 
 nsresult nsDocShellLoadState::CreateFromLoadURIOptions(
-    BrowsingContext* aBrowsingContext, nsIURI* aURI,
+    BrowsingContext* /*aBrowsingContext*/, nsIURI* aURI,
     const LoadURIOptions& aLoadURIOptions, uint32_t aLoadFlagsOverride,
     nsIInputStream* aPostDataOverride, nsDocShellLoadState** aResult) {
   nsresult rv = NS_OK;
@@ -942,7 +944,7 @@ void nsDocShellLoadState::SetSHEntry(SessionHistoryEntry* aSHEntry) {
   mSHEntry = aSHEntry;
   if (aSHEntry) {
     mLoadingSessionHistoryInfo =
-        MakeUnique<LoadingSessionHistoryInfo>(aSHEntry);
+        std::make_unique<LoadingSessionHistoryInfo>(aSHEntry);
     mLoadingSessionHistoryInfo->mTriggeringNavigationType =
         NavigationUtils::NavigationTypeFromLoadType(LoadType());
     MOZ_ASSERT(mLoadingSessionHistoryInfo->mTriggeringNavigationType);
@@ -970,7 +972,7 @@ void nsDocShellLoadState::SetPreviousEntryForActivation(
 void nsDocShellLoadState::SetLoadingSessionHistoryInfo(
     const mozilla::dom::LoadingSessionHistoryInfo& aLoadingInfo) {
   SetLoadingSessionHistoryInfo(
-      MakeUnique<mozilla::dom::LoadingSessionHistoryInfo>(aLoadingInfo));
+      std::make_unique<mozilla::dom::LoadingSessionHistoryInfo>(aLoadingInfo));
 }
 
 void nsDocShellLoadState::SetLoadingSessionHistoryInfo(
@@ -1616,6 +1618,7 @@ DocShellLoadStateInit nsDocShellLoadState::Serialize(
   loadState.InheritPrincipal() = mInheritPrincipal;
   loadState.PrincipalIsExplicit() = mPrincipalIsExplicit;
   loadState.NotifiedBeforeUnloadListeners() = mNotifiedBeforeUnloadListeners;
+  loadState.PageSwapFired() = mPageSwapFired;
   loadState.ForceAllowDataURI() = mForceAllowDataURI;
   loadState.IsExemptFromHTTPSFirstMode() = mIsExemptFromHTTPSFirstMode;
   loadState.OriginalFrameSrc() = mOriginalFrameSrc;

@@ -77,7 +77,11 @@
   <string name="about_content" tools:ignore="BrandUsage">%1$s hè sviluppatu da Mozilla.</string>
   <!-- Private Browsing -->
   <string name="private_browsing_common_myths">Idee precuncepite apprupositu di a navigazione privata</string>
-  <!-- Text to be announced by the accessibility service to inform the user that the private browsing mode is currently active. -->
+  <!--
+    Private Browsing
+
+    Text to be announced by the accessibility service to inform the user that the private browsing mode is currently active.
+  -->
   <string name="private_browsing_a11y_session_announcement">Sessione di navigazione privata</string>
   <!--
     True Private Browsing Mode
@@ -178,11 +182,7 @@
   <string name="recently_visited_menu_item_remove">Caccià</string>
   <!-- Content description for the button which navigates the user to show all of their history. -->
   <string name="past_explorations_show_all_content_description_2">Affissà tutte l’esplurazioni scorse</string>
-  <!--
-    Browser Fragment
-
-    Content description (not visible, for screen readers etc.): Navigate backward (browsing history)
-  -->
+  <!-- Content description (not visible, for screen readers etc.): Navigate backward (browsing history) -->
   <string name="browser_menu_back">Pagina precedente</string>
   <!-- Content description (not visible, for screen readers etc.): Navigate forward (browsing history) -->
   <string name="browser_menu_forward">Pagina seguente</string>
@@ -707,13 +707,19 @@
   <string name="search_widget_text_long">Ricercà nant’à u web</string>
   <!-- Content description (not visible, for screen readers etc.): Voice search -->
   <string name="search_widget_voice">Ricerca vucale</string>
+  <!-- Content description (not visible, for screen readers etc.): Button in the search widget that starts a search in a private tab -->
+  <string name="search_widget_private_search">Ricerca privata</string>
   <!--
     Preferences
 
     Title for the settings page
   -->
   <string name="settings">Parametri</string>
-  <!-- Preference category for general settings -->
+  <!--
+    Preferences
+
+    Preference category for general settings
+  -->
   <string name="preferences_category_general">Generale</string>
   <!-- Preference category for all links about Fenix -->
   <string name="preferences_category_about">Apprupositu</string>
@@ -1365,6 +1371,8 @@
   <string name="library_desktop_bookmarks_unfiled">Altre indette</string>
   <!-- Option in Library to open History page -->
   <string name="library_history">Cronolugia</string>
+  <!-- Content description (not visible, for screen readers etc.) for the check mark that replaces a site's icon in History and Recently closed tabs when the item is selected -->
+  <string name="library_item_selected_content_description">Selezziunatu</string>
   <!-- Settings Page Title -->
   <string name="settings_title">Parametri</string>
   <!-- Content description (not visible, for screen readers etc.): "Close button for library settings" -->
@@ -4506,6 +4514,10 @@
   <string name="lens_camera_mode_qr">Analiza di codice QR</string>
   <!-- Toast shown when the user picks an image from the gallery in QR mode but no QR code is found in it -->
   <string name="lens_camera_qr_no_code_found">Nisunu codice QR trovu in a fiura</string>
+  <!-- Button shown under an image picked from the gallery while it is being sent to Google Lens. Tapping it stops the search and returns to the camera. -->
+  <string name="lens_camera_loading_cancel_button">Abbandunà</string>
+  <!-- Action in the snackbar shown when an image picked from the gallery could not be searched with Google Lens. Tapping it searches the same image again. -->
+  <string name="lens_camera_upload_failed_retry_button">Pruvà torna</string>
   <!-- Title of the bottom sheet shown the first time the user opens the Google Lens camera screen -->
   <string name="lens_opt_out_title">Truvatelu cù Google Lens</string>
   <!-- Description of the bottom sheet shown the first time the user opens the Google Lens camera screen -->
@@ -4592,8 +4604,8 @@
     Content description for the reader mode panel: a group of buttons floating over the content
   -->
   <string name="reader_mode_panel_content_description">Ozzioni di u modu di lettura</string>
-  <!-- Content description for the button in reader mode panel that turns on the read aloud feature (playback of content begins when button is pressed) -->
+  <!-- Content description for the button in the reader view panel that turns on the Listen to Page feature (playback of content begins when button is pressed) -->
   <string name="reader_mode_panel_listen_content_description">Leghje ad alta voce</string>
-  <!-- Content description for media player displayed in Reader Mode when the Listen to Page (Read Aloud) feature is selected -->
+  <!-- Content description for media player displayed in Reader view when the Listen to Page (Read Aloud) feature is selected -->
   <string name="reader_mode_panel_media_player_content_description">Lettore multimedià</string>
 </resources>

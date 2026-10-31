@@ -204,7 +204,7 @@ bool CanvasRenderingContextHelper::GetOrCreateContext(
   }
 
   // This canvas doesn't have a context yet.
-  RefPtr<nsICanvasRenderingContextInternal> context =
+  nsCOMPtr<nsICanvasRenderingContextInternal> context =
       CreateContext(aContextType);
   if (!context) {
     aRv.ThrowUnknownError("Failed to create context");
@@ -220,10 +220,14 @@ bool CanvasRenderingContextHelper::GetOrCreateContext(
     return false;
   }
 
-  mCurrentContext = std::move(context);
+  mCurrentContext = context;
   mCurrentContextType = aContextType;
 
-  if (!UpdateContext(&aOptions)) {
+  if (!InitOrUpdateContext(context, &aOptions)) {
+    // Ensure the current context is cleared before attempting to throw any
+    // deferred context creation error.
+    mCurrentContext = nullptr;
+
     // See bug 645792 and bug 1215072.
     // We want to throw only if dictionary initialization fails,
     // so only in case aRv has been set to some error value.
@@ -238,6 +242,8 @@ bool CanvasRenderingContextHelper::GetOrCreateContext(
     } else if (aContextType == CanvasContextType::WebGPU) {
       // Telemetry::Accumulate(Telemetry::CANVAS_WEBGPU_SUCCESS, 0);
     }
+
+    context->MaybeThrowContextCreationError();
     return false;
   }
 
@@ -252,34 +258,43 @@ bool CanvasRenderingContextHelper::GetOrCreateContext(
   } else if (aContextType == CanvasContextType::WebGPU) {
     // Telemetry::Accumulate(Telemetry::CANVAS_WEBGPU_SUCCESS, 1);
   }
+
+  AfterUpdateContext();
   return true;
 }
 
-bool CanvasRenderingContextHelper::UpdateContext(
+bool CanvasRenderingContextHelper::InitOrUpdateContext(
+    const nsCOMPtr<nsICanvasRenderingContextInternal>& aContext,
     const CanvasRenderingContextOptions* aOptions) {
-  if (!mCurrentContext) {
-    return true;
-  }
+  // In case mCurrentContext is accidentally cleared by a recursive update, the
+  // caller must prove it has a distinct strong reference that will survive.
+  MOZ_ASSERT(&aContext != &mCurrentContext);
 
   CSSIntSize sz = GetWidthHeight();
 
-  mCurrentContext->SetOpaqueValueFromOpaqueAttr(GetOpaqueAttr());
+  aContext->SetOpaqueValueFromOpaqueAttr(GetOpaqueAttr());
 
   // Only set options if updated during creation.
-  nsresult rv =
-      aOptions ? mCurrentContext->SetContextOptions(*aOptions) : NS_OK;
+  nsresult rv = aOptions ? aContext->SetContextOptions(*aOptions) : NS_OK;
   if (NS_FAILED(rv)) {
-    mCurrentContext = nullptr;
     return false;
   }
 
-  rv = mCurrentContext->SetDimensions(sz.width, sz.height);
+  rv = aContext->SetDimensions(sz.width, sz.height);
   if (NS_FAILED(rv)) {
-    mCurrentContext = nullptr;
     return false;
   }
-
   return true;
+}
+
+void CanvasRenderingContextHelper::UpdateContext() {
+  nsCOMPtr<nsICanvasRenderingContextInternal> context = mCurrentContext;
+  if (!context || InitOrUpdateContext(context, nullptr)) {
+    AfterUpdateContext();
+  } else {
+    mCurrentContext = nullptr;
+    context->MaybeThrowContextCreationError();
+  }
 }
 
 nsresult CanvasRenderingContextHelper::ParseParams(

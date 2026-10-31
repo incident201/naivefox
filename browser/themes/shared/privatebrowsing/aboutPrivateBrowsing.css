@@ -543,7 +543,7 @@ content-search-handoff-ui {
   html.private .info-border {
     margin-block-start: auto;
     margin-block-end: 0;
-    padding-block: var(--space-xxlarge) 0;
+    padding-block: var(--space-xxlarge) 100px;
     padding-inline: 0;
 
     @media not (prefers-contrast) {

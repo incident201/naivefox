@@ -386,7 +386,7 @@ already_AddRefed<Decoder> DecoderFactory::CreateDecoderForICOResource(
 
   // Initialize the decoder, copying settings from @aICODecoder.
   decoder->SetMetadataDecode(aIsMetadataDecode);
-  decoder->SetIterator(std::forward<SourceBufferIterator>(aIterator));
+  decoder->SetIterator(std::move(aIterator));
   if (!aIsMetadataDecode) {
     decoder->SetOutputSize(aICODecoder->OutputSize());
   }

@@ -55,7 +55,7 @@ class MenuMiddlewareTest {
             val store = createStore(provider)
             testDispatcher.scheduler.advanceUntilIdle()
 
-            provider.itemFlow.value = null
+            provider.itemsFlow.value = emptyList()
             testDispatcher.scheduler.advanceUntilIdle()
 
             assertEquals(emptyList(), store.state.menuGroups)
@@ -134,7 +134,7 @@ class MenuMiddlewareTest {
     }
 
     private class ReactingMenuItemProvider(private val reactingTo: MenuEvent?) : MenuItemProvider {
-        override val itemFlow = MutableStateFlow<MenuItem?>(readerViewItem)
+        override val itemsFlow = MutableStateFlow<List<MenuItem>>(listOf(readerViewItem))
 
         val events = mutableListOf<MenuEvent>()
 

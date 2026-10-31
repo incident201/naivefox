@@ -67,6 +67,7 @@ preprocessed_intervention_files = [
     "bug1910292-ssd.skhynix.com-fix_image_flickering.css",
     "bug1911243-tsu-results.rf.gd-fix-table-headers.css",
     "bug1911253-qq.com-unhide-checkboxes.css",
+    "bug1912923-class.com.js",
     "bug1913668-workbench.researchallofus.org-hide-browser-notice.css",
     "bug1918604-g1.globo.com_Caca_Palavras-fix_clipped_buttons.css",
     "bug1918995-calculator.net-hide-copypaste-ui-for-buttons.css",

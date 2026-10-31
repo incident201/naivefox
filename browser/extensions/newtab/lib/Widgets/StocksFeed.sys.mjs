@@ -504,6 +504,7 @@ export class StocksFeed {
     switch (action.data.name) {
       case PREF_WIDGETS_STOCKS_ENABLED:
       case PREF_WIDGETS_SYSTEM_STOCKS_ENABLED:
+      case "region":
       case "trainhopConfig": {
         const enabled = this.isEnabled();
         if (enabled && !this.loaded) {

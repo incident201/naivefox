@@ -14,6 +14,7 @@ transforms:
 
 kind-dependencies:
     - toolchain
+    - build-apk
     - signing-apk
 
 task-defaults:
@@ -168,6 +169,56 @@ tasks:
         treeherder:
             symbol: focus-beta(ui-test-arm-beta)
 
+    focus-arm-beta-signoff:
+        attributes:
+            build-type: focus-beta-firebase
+            release-type: beta
+        task-context:
+            from-object:
+                app-name: focus
+        shipping-product: firefox-android
+        shipping-phase: promote
+        run-on-projects: []
+        description: UI test suite for Focus beta release sign-off
+        dependencies:
+            signed-apk-debug-apk: signing-apk-focus-beta-firebase
+            signed-apk-android-test: signing-apk-focus-android-test-beta
+        fetches:
+            signed-apk-debug-apk:
+                - artifact: target.arm64-v8a.apk
+                  extract: false
+            signed-apk-android-test:
+                - artifact: target.noarch.apk
+                  extract: false
+        flank-config: focus/arm64-v8a.yml
+        treeherder:
+            symbol: focus-beta(ui-test-signoff)
+
+    focus-arm-release-signoff:
+        attributes:
+            build-type: focus-beta-firebase
+            release-type: release
+        task-context:
+            from-object:
+                app-name: focus
+        shipping-product: firefox-android
+        shipping-phase: promote
+        run-on-projects: []
+        description: UI test suite for Focus release sign-off
+        dependencies:
+            signed-apk-debug-apk: signing-apk-focus-beta-firebase
+            signed-apk-android-test: signing-apk-focus-android-test-beta
+        fetches:
+            signed-apk-debug-apk:
+                - artifact: target.arm64-v8a.apk
+                  extract: false
+            signed-apk-android-test:
+                - artifact: target.noarch.apk
+                  extract: false
+        flank-config: focus/arm64-v8a.yml
+        treeherder:
+            symbol: focus-release(ui-test-signoff)
+
     fenix-arm-debug:
         attributes:
             build-type: fenix-debug-firebase
@@ -215,6 +266,56 @@ tasks:
         treeherder:
             symbol: fenix-beta(ui-test-arm-beta)
 
+    fenix-arm-beta-signoff:
+        attributes:
+            build-type: fenix-beta-firebase
+            release-type: beta
+        task-context:
+            from-object:
+                app-name: fenix
+        shipping-product: firefox-android
+        shipping-phase: promote
+        run-on-projects: []
+        description: TAE UI test suite for Fenix beta release sign-off
+        dependencies:
+            signed-apk-debug-apk: signing-apk-fenix-beta-firebase
+            signed-apk-android-test: signing-apk-fenix-android-test-beta
+        fetches:
+            signed-apk-debug-apk:
+                - artifact: target.arm64-v8a.apk
+                  extract: false
+            signed-apk-android-test:
+                - artifact: target.noarch.apk
+                  extract: false
+        flank-config: fenix/arm-tae-tests.yml
+        treeherder:
+            symbol: fenix-beta(ui-test-signoff)
+
+    fenix-arm-release-signoff:
+        attributes:
+            build-type: fenix-beta-firebase
+            release-type: release
+        task-context:
+            from-object:
+                app-name: fenix
+        shipping-product: firefox-android
+        shipping-phase: promote
+        run-on-projects: []
+        description: TAE UI test suite for Fenix release sign-off
+        dependencies:
+            signed-apk-debug-apk: signing-apk-fenix-beta-firebase
+            signed-apk-android-test: signing-apk-fenix-android-test-beta
+        fetches:
+            signed-apk-debug-apk:
+                - artifact: target.arm64-v8a.apk
+                  extract: false
+            signed-apk-android-test:
+                - artifact: target.noarch.apk
+                  extract: false
+        flank-config: fenix/arm-tae-tests.yml
+        treeherder:
+            symbol: fenix-release(ui-test-signoff)
+
     fenix-arm-nightly:
         attributes:
             build-type: fenix-nightly-firebase
@@ -223,9 +324,13 @@ tasks:
                 app-name: fenix
         description: Test Fenix
         dependencies:
+            build-apk: build-apk-fenix-nightly-firebase
             signed-apk-debug-apk: signing-apk-fenix-nightly-firebase
             signed-apk-android-test: signing-apk-fenix-android-test-nightly
         fetches:
+            build-apk:
+                - artifact: mapping.txt
+                  extract: false
             signed-apk-debug-apk:
                 - artifact: target.arm64-v8a.apk
                   extract: false
@@ -236,6 +341,7 @@ tasks:
             skip-unless-backstop: null
         run-on-projects: [mozilla-central-only]
         flank-config: fenix/arm-nightly-full.yml
+        mapping: true
         treeherder:
             symbol: fenix-nightly(ui-test-arm-nightly)
 

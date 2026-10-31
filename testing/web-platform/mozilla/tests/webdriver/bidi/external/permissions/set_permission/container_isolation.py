@@ -1,26 +1,15 @@
 import pytest
-from webdriver.bidi.error import NoSuchUserContextException
+from webdriver.bidi.error import UnsupportedOperationException
 
 from bidi.support.container_isolation import container_isolation
 
 pytestmark = [pytest.mark.asyncio, container_isolation]
 
 
-async def test_user_context(bidi_session, session_user_context):
-    for state in ["granted", "prompt"]:
-        await bidi_session.permissions.set_permission(
-            descriptor={"name": "geolocation"},
-            state=state,
-            origin="https://example.com",
-            user_context=session_user_context,
-        )
-
-
-async def test_user_context_outside_container(bidi_session):
-    with pytest.raises(NoSuchUserContextException):
+async def test_set_permission(bidi_session):
+    with pytest.raises(UnsupportedOperationException):
         await bidi_session.permissions.set_permission(
             descriptor={"name": "geolocation"},
             state="granted",
             origin="https://example.com",
-            user_context="default",
         )

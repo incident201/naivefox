@@ -144,6 +144,17 @@ WindowGlobalParent::WindowGlobalParent(
   MOZ_DIAGNOSTIC_ASSERT(XRE_IsParentProcess(), "Parent process only");
 }
 
+// An error page's own load has no session history load, so it is attributed to
+// the load which failed, if that got far enough to have a handle.
+static uint64_t HistoryLoadIdFromHandles(
+    ParentProcessChannelHandle* aDocumentHandle,
+    ParentProcessChannelHandle* aFailedHandle) {
+  if (uint64_t id = aDocumentHandle ? aDocumentHandle->HistoryLoadId() : 0) {
+    return id;
+  }
+  return aFailedHandle ? aFailedHandle->HistoryLoadId() : 0;
+}
+
 already_AddRefed<WindowGlobalParent> WindowGlobalParent::CreateDisconnected(
     const WindowGlobalInit& aInit, ContentParent* aForProcess) {
   RefPtr<CanonicalBrowsingContext> browsingContext =
@@ -208,6 +219,9 @@ already_AddRefed<WindowGlobalParent> WindowGlobalParent::CreateDisconnected(
                               result.unwrapErr().get());
     }
   }
+
+  wgp->mDocumentHistoryLoadId = HistoryLoadIdFromHandles(
+      aInit.documentChannelHandle(), aInit.failedChannelHandle());
 
   return wgp.forget();
 }
@@ -622,6 +636,11 @@ IPCResult WindowGlobalParent::RecvUpdateDocumentHasLoaded(
   return IPC_OK();
 }
 
+IPCResult WindowGlobalParent::RecvSetMayHaveViewTransitionOptIn(bool aMayHave) {
+  mMayHaveViewTransitionOptIn = aMayHave;
+  return IPC_OK();
+}
+
 IPCResult WindowGlobalParent::RecvUpdateDocumentHasUserInteracted(
     bool aDocumentHasUserInteracted) {
   mDocumentHasUserInteracted = aDocumentHasUserInteracted;
@@ -887,6 +906,8 @@ mozilla::ipc::IPCResult WindowGlobalParent::RecvUpdateChannels(
 
   mDocumentChannel = documentChannel;
   mFailedChannel = failedChannel;
+  mDocumentHistoryLoadId =
+      HistoryLoadIdFromHandles(aDocumentHandle, aFailedHandle);
 
   return IPC_OK();
 }
@@ -1411,7 +1432,7 @@ mozilla::ipc::IPCResult WindowGlobalParent::RecvExpectPageUseCounters(
   // counters before reporting via Telemetry.
   mPageUseCountersWindow = page;
   if (!page->mPageUseCounters) {
-    page->mPageUseCounters = MakeUnique<PageUseCounters>();
+    page->mPageUseCounters = std::make_unique<PageUseCounters>();
   }
   ++page->mPageUseCounters->mWaiting;
 
@@ -2043,17 +2064,19 @@ bool WindowGlobalParent::ShouldTrackSiteOriginTelemetry() {
   return DocumentPrincipal()->GetIsContentPrincipal();
 }
 
-void WindowGlobalParent::AddSecurityState(uint32_t aStateFlags) {
+mozilla::ipc::IPCResult WindowGlobalParent::RecvAddSecurityState(
+    uint32_t aStateFlags) {
+  if ((aStateFlags & kValidSecurityStateFlags) != aStateFlags) {
+    return IPC_FAIL(this, "Invalid security state flags");
+  }
+
+  AddSecurityState(aStateFlags);
+  return IPC_OK();
+}
+
+void WindowGlobalParent::ApplySecurityStateToTop(uint32_t aStateFlags) {
   MOZ_ASSERT(TopWindowContext() == this);
-  MOZ_ASSERT((aStateFlags &
-              (nsIWebProgressListener::STATE_LOADED_MIXED_DISPLAY_CONTENT |
-               nsIWebProgressListener::STATE_LOADED_MIXED_ACTIVE_CONTENT |
-               nsIWebProgressListener::STATE_BLOCKED_MIXED_DISPLAY_CONTENT |
-               nsIWebProgressListener::STATE_BLOCKED_MIXED_ACTIVE_CONTENT |
-               nsIWebProgressListener::STATE_HTTPS_ONLY_MODE_UPGRADED |
-               nsIWebProgressListener::STATE_HTTPS_ONLY_MODE_UPGRADE_FAILED |
-               nsIWebProgressListener::STATE_HTTPS_ONLY_MODE_UPGRADED_FIRST)) ==
-                 aStateFlags,
+  MOZ_ASSERT((aStateFlags & kValidSecurityStateFlags) == aStateFlags,
              "Invalid flags specified!");
 
   if ((mSecurityState & aStateFlags) == aStateFlags) {
@@ -2434,6 +2457,19 @@ bool WindowGlobalParent::HasPotentialPrefetchMatch(nsIURI* aURI) {
     auto* rec = static_cast<PrefetchRecordParent*>(p);
     if (rec->State() == PrefetchState::Ongoing &&
         rec->IsExpectedToMatch(aURI)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool WindowGlobalParent::HasMatchingPrefetchCandidate(nsIURI* aURI) {
+  nsTArray<PPrefetchRecordParent*> managed;
+  ManagedPPrefetchRecordParent(managed);
+  for (auto* p : managed) {
+    auto* rec = static_cast<PrefetchRecordParent*>(p);
+    // Network outcomes exist only in treatment and must not change eligibility.
+    if (rec->IsEligibleForPrefetch() && rec->MatchesCandidateURL(aURI)) {
       return true;
     }
   }

@@ -1209,7 +1209,7 @@ class [[nodiscard]] ScopedContextRef
 extern Context *GetCurrentValidContextTLS();
 extern void SetCurrentValidContextTLS(Context *context);
 #else
-extern thread_local Context *gCurrentValidContext;
+extern constinit thread_local Context *gCurrentValidContext;
 #endif
 
 extern void SetCurrentValidContext(Context *context);

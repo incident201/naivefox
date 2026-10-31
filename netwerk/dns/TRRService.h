@@ -24,9 +24,6 @@ class nsIObserverService;
 namespace mozilla {
 namespace net {
 
-class TRRServiceChild;
-class TRRServiceParent;
-
 const nsCString& TRRProviderKey();
 
 class TRRService : public TRRServiceBase,
@@ -108,8 +105,6 @@ class TRRService : public TRRServiceBase,
   virtual ~TRRService();
 
   friend class TRR;
-  friend class TRRServiceChild;
-  friend class TRRServiceParent;
   static void AddObserver(nsIObserver* aObserver,
                           nsIObserverService* aObserverService = nullptr);
   static bool CheckCaptivePortalIsPassed();

@@ -135,7 +135,7 @@ void WebRenderTextureHost::MaybeNotifyForUse(wr::TransactionBuilder& aTxn) {
       !mWrappedTextureHost->AsRemoteTextureHostWrapper()) {
     wr::RenderThread::Get()->NotifyForUse(GetExternalImageKey());
     aTxn.Notify(wr::Checkpoint::FrameTexturesUpdated,
-                MakeUnique<ScheduleHandleRenderTextureOps>());
+                std::make_unique<ScheduleHandleRenderTextureOps>());
   }
 #endif
 }

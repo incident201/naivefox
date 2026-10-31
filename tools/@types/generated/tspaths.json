@@ -343,6 +343,9 @@
       "chrome://browser/content/preferences/config/downloads.mjs": [
         "../../../browser/components/preferences/config/downloads.mjs"
       ],
+      "chrome://browser/content/preferences/config/notification-permissions.mjs": [
+        "../../../browser/components/preferences/config/notification-permissions.mjs"
+      ],
       "chrome://browser/content/preferences/config/passwords-autofill.mjs": [
         "../../../browser/components/preferences/config/passwords-autofill.mjs"
       ],
@@ -531,6 +534,9 @@
       ],
       "chrome://browser/content/webrtc/webrtc-preview.mjs": [
         "../../../browser/components/webrtc/content/webrtc-preview/webrtc-preview.mjs"
+      ],
+      "chrome://browser/content/widgets/moz-widget-header.mjs": [
+        "../../../browser/components/widgets/content/moz-widget-header.mjs"
       ],
       "chrome://devtools-startup/content/DevToolsShim.sys.mjs": [
         "../../../devtools/startup/DevToolsShim.sys.mjs"
@@ -879,6 +885,9 @@
       ],
       "chrome://mochitests/content/browser/devtools/shared/test-helpers/trace-objects.sys.mjs": [
         "../../../devtools/shared/test-helpers/trace-objects.sys.mjs"
+      ],
+      "chrome://mochitests/content/browser/dom/base/test/file_process_script_dynamic_import.sys.mjs": [
+        "../../../dom/base/test/file_process_script_dynamic_import.sys.mjs"
       ],
       "chrome://mochitests/content/browser/dom/serviceworkers/test/browser_head.js": [
         "../../../dom/serviceworkers/test/browser_head.js"
@@ -5731,9 +5740,6 @@
       "resource://gre/modules/ChildCrashHandler.sys.mjs": [
         "../../../mobile/shared/modules/geckoview/ChildCrashHandler.sys.mjs"
       ],
-      "resource://gre/modules/ChromePushSubscription.sys.mjs": [
-        "../../../dom/push/ChromePushSubscription.sys.mjs"
-      ],
       "resource://gre/modules/ClientID.sys.mjs": [
         "../../../toolkit/components/telemetry/app/ClientID.sys.mjs"
       ],
@@ -6097,6 +6103,9 @@
       "resource://gre/modules/GeckoViewModule.sys.mjs": [
         "../../../mobile/shared/modules/geckoview/GeckoViewModule.sys.mjs"
       ],
+      "resource://gre/modules/GeckoViewPictureInPicture.sys.mjs": [
+        "../../../mobile/shared/modules/geckoview/GeckoViewPictureInPicture.sys.mjs"
+      ],
       "resource://gre/modules/GeckoViewPreferences.sys.mjs": [
         "../../../mobile/shared/components/geckoview/GeckoViewPreferences.sys.mjs"
       ],
@@ -6135,6 +6144,9 @@
       ],
       "resource://gre/modules/HealthPing.sys.mjs": [
         "../../../toolkit/components/telemetry/pings/HealthPing.sys.mjs"
+      ],
+      "resource://gre/modules/HelperAppDlg.sys.mjs": [
+        "../../../toolkit/mozapps/downloads/HelperAppDlg.sys.mjs"
       ],
       "resource://gre/modules/HiddenFrame.sys.mjs": [
         "../../../toolkit/modules/HiddenFrame.sys.mjs"
@@ -6352,29 +6364,11 @@
       "resource://gre/modules/ProxyChannelFilter.sys.mjs": [
         "../../../toolkit/components/extensions/ProxyChannelFilter.sys.mjs"
       ],
-      "resource://gre/modules/PushBroadcastService.sys.mjs": [
-        "../../../dom/push/PushBroadcastService.sys.mjs"
-      ],
-      "resource://gre/modules/PushCrypto.sys.mjs": [
-        "../../../dom/push/PushCrypto.sys.mjs"
-      ],
-      "resource://gre/modules/PushDB.sys.mjs": [
-        "../../../dom/push/PushDB.sys.mjs"
-      ],
       "resource://gre/modules/PushNotificationHelper.sys.mjs": [
         "../../../toolkit/mozapps/pushnotificationhelper/PushNotificationHelper.sys.mjs"
       ],
       "resource://gre/modules/PushNotificationHelperRegistry.sys.mjs": [
         "../../../toolkit/mozapps/pushnotificationhelper/PushNotificationHelperRegistry.sys.mjs"
-      ],
-      "resource://gre/modules/PushRecord.sys.mjs": [
-        "../../../dom/push/PushRecord.sys.mjs"
-      ],
-      "resource://gre/modules/PushService.sys.mjs": [
-        "../../../dom/push/PushService.sys.mjs"
-      ],
-      "resource://gre/modules/PushServiceWebSocket.sys.mjs": [
-        "../../../dom/push/PushServiceWebSocket.sys.mjs"
       ],
       "resource://gre/modules/RFPHelper.sys.mjs": [
         "../../../toolkit/components/resistfingerprinting/RFPHelper.sys.mjs"
@@ -6438,9 +6432,6 @@
       ],
       "resource://gre/modules/SitePolicyUtils.sys.mjs": [
         "../../../toolkit/components/enterprisepolicies/SitePolicyUtils.sys.mjs"
-      ],
-      "resource://gre/modules/SpeechRecognitionFeature.sys.mjs": [
-        "../../../dom/media/webspeech/recognition/SpeechRecognitionFeature.sys.mjs"
       ],
       "resource://gre/modules/Sqlite.sys.mjs": [
         "../../../toolkit/modules/Sqlite.sys.mjs"
@@ -6850,9 +6841,6 @@
       "resource://gre/modules/translations/LanguageDetector.sys.mjs": [
         "../../../toolkit/components/translations/LanguageDetector.sys.mjs"
       ],
-      "resource://gre/modules/vtt.sys.mjs": [
-        "../../../dom/media/webvtt/vtt.sys.mjs"
-      ],
       "resource://gre/modules/workers/PromiseWorker.js": [
         "../../../tools/@types/subs/PromiseWorker.d.ts"
       ],
@@ -6894,6 +6882,9 @@
       ],
       "resource://newtab/common/StocksWatchlist.mjs": [
         "../../../browser/extensions/newtab/common/StocksWatchlist.mjs"
+      ],
+      "resource://newtab/common/SurfaceId.mjs": [
+        "../../../browser/extensions/newtab/common/SurfaceId.mjs"
       ],
       "resource://newtab/common/WidgetsRegistry.mjs": [
         "../../../browser/extensions/newtab/common/WidgetsRegistry.mjs"
@@ -6945,6 +6936,9 @@
       ],
       "resource://newtab/lib/InferredModel/InferredConstants.sys.mjs": [
         "../../../browser/extensions/newtab/lib/InferredModel/InferredConstants.sys.mjs"
+      ],
+      "resource://newtab/lib/InferredModel/LocationInterestGrid.sys.mjs": [
+        "../../../browser/extensions/newtab/lib/InferredModel/LocationInterestGrid.sys.mjs"
       ],
       "resource://newtab/lib/InferredPersonalizationFeed.sys.mjs": [
         "../../../browser/extensions/newtab/lib/InferredPersonalizationFeed.sys.mjs"
@@ -7048,6 +7042,9 @@
       "resource://newtab/lib/WebNotificationsFeed.sys.mjs": [
         "../../../browser/extensions/newtab/lib/WebNotificationsFeed.sys.mjs"
       ],
+      "resource://newtab/lib/Widgets/ExtensionWidgetsFeed.sys.mjs": [
+        "../../../browser/extensions/newtab/lib/Widgets/ExtensionWidgetsFeed.sys.mjs"
+      ],
       "resource://newtab/lib/Widgets/ListsFeed.sys.mjs": [
         "../../../browser/extensions/newtab/lib/Widgets/ListsFeed.sys.mjs"
       ],
@@ -7068,6 +7065,9 @@
       ],
       "resource://newtab/lib/Widgets/TimerFeed.sys.mjs": [
         "../../../browser/extensions/newtab/lib/Widgets/TimerFeed.sys.mjs"
+      ],
+      "resource://newtab/lib/Widgets/TravelFeed.sys.mjs": [
+        "../../../browser/extensions/newtab/lib/Widgets/TravelFeed.sys.mjs"
       ],
       "resource://newtab/lib/actors/NewTabAttributionParent.sys.mjs": [
         "../../../browser/extensions/newtab/lib/actors/NewTabAttributionParent.sys.mjs"
@@ -7107,9 +7107,6 @@
       ],
       "resource://nimbus/lib/Telemetry.sys.mjs": [
         "../../../toolkit/components/nimbus/lib/Telemetry.sys.mjs"
-      ],
-      "resource://normandy-content/AboutPages.sys.mjs": [
-        "../../../toolkit/components/normandy/content/AboutPages.sys.mjs"
       ],
       "resource://normandy/Normandy.sys.mjs": [
         "../../../toolkit/components/normandy/Normandy.sys.mjs"

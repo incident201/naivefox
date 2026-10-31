@@ -43,6 +43,9 @@ class BrowsertimeAndroid(PerftestAndroid, Browsertime):
     """
 
     def __init__(self, app, binary, activity=None, intent=None, **kwargs):
+        # Building a conditioned profile in super().__init__ initializes the
+        # device before run_tests() sets the test names.
+        self._test_names = None
         super().__init__(
             app,
             binary,
@@ -276,7 +279,7 @@ class BrowsertimeAndroid(PerftestAndroid, Browsertime):
     def run_test_setup(self, test):
         super().run_test_setup(test)
 
-        self.set_reverse_ports()
+        self.set_reverse_ports(test)
 
         if self.config["app"] in FIREFOX_ANDROID_APPS:
             if self.playback and self.playback.playback_mode != "direct":

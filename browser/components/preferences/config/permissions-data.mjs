@@ -4,12 +4,20 @@
 
 import { SettingGroupManager } from "chrome://browser/content/preferences/config/SettingGroupManager.mjs";
 import { Preferences } from "chrome://global/content/preferences/Preferences.mjs";
+import {
+  getNotificationPermissions,
+  isNotificationChange,
+} from "chrome://browser/content/preferences/config/notification-permissions.mjs";
 
 const XPCOMUtils = ChromeUtils.importESModule(
   "resource://gre/modules/XPCOMUtils.sys.mjs"
 ).XPCOMUtils;
 
 const lazy = XPCOMUtils.declareLazy({
+  notificationsSectionEnabled: {
+    pref: "browser.preferences.notifications-section.enabled",
+    default: false,
+  },
   AppConstants: "resource://gre/modules/AppConstants.sys.mjs",
   SelectableProfileService:
     "resource:///modules/profiles/SelectableProfileService.sys.mjs",
@@ -517,7 +525,72 @@ Preferences.addSetting(
   })
 );
 
+Preferences.addSetting(
+  class extends Preferences.AsyncSetting {
+    static id = "notificationSettingsEntry";
+
+    count = 0;
+
+    // The section is off in shipped builds, so start hidden rather than let
+    // the card show until the first refresh resolves.
+    defaultVisible = false;
+
+    beforeRefresh() {
+      this.count = lazy.notificationsSectionEnabled
+        ? getNotificationPermissions().length
+        : 0;
+    }
+
+    async visible() {
+      return lazy.notificationsSectionEnabled;
+    }
+
+    async getControlConfig() {
+      // Both branches set l10nId, since setting-control merges each config
+      // into the last one and would otherwise keep the previous message.
+      return {
+        l10nId: this.count
+          ? "notifications-entry-manage-button"
+          : "notifications-entry-manage-button-empty",
+        l10nArgs: { count: this.count },
+      };
+    }
+
+    onUserClick(event) {
+      event.preventDefault();
+      window.gotoPref("paneNotifications");
+    }
+
+    setup() {
+      Services.obs.addObserver(this.#onPermissionChanged, "perm-changed");
+      return () => {
+        Services.obs.removeObserver(this.#onPermissionChanged, "perm-changed");
+      };
+    }
+
+    #onPermissionChanged = subject => {
+      if (isNotificationChange(subject)) {
+        this.emitChange();
+      }
+    };
+  }
+);
+
 SettingGroupManager.registerGroups({
+  notificationsEntry: {
+    l10nId: "notifications-entry-card-header",
+    iconSrc:
+      "chrome://browser/skin/notification-icons/desktop-notification.svg",
+    headingLevel: 2,
+    items: [
+      {
+        id: "notificationSettingsEntry",
+        control: "moz-box-button",
+        l10nId: "notifications-entry-manage-button",
+        loadPane: "notifications",
+      },
+    ],
+  },
   permissions: {
     id: "permissions",
     subcategory: "permissions",

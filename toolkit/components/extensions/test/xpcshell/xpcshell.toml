@@ -129,9 +129,6 @@ run-if = [
 head = "head.js head_schemas.js"
 
 ["test_ext_secfetch.js"]
-skip-if = [
-  "socketprocess_networking", # Bug 1759035
-]
 
 ["test_ext_shared_array_buffer.js"]
 

@@ -1520,7 +1520,7 @@ An array that maps about:welcome screen IDs to their most recent impression time
 #### Definition
 
 ```
-declare const screenImpressions: { [key: string]: Array<UnixEpochNumber> };
+declare const screenImpressions: { [key: string]: UnixEpochNumber };
 ```
 
 ### `systemArch`

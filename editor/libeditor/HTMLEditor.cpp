@@ -538,9 +538,9 @@ NS_IMETHODIMP HTMLEditor::SetDocumentCharacterSet(
           [&aCharacterSet](HTMLEditor&, Element& aMetaElement,
                            const EditorDOMPoint&) {
             MOZ_ASSERT(!aMetaElement.IsInComposedDoc());
-            DebugOnly<nsresult> rvIgnored =
-                aMetaElement.SetAttr(kNameSpaceID_None, nsGkAtoms::httpEquiv,
-                                     u"Content-Type"_ns, false);
+            DebugOnly<nsresult> rvIgnored = aMetaElement.SetAttr(
+                kNameSpaceID_None, nsGkAtoms::httpEquiv, u"Content-Type"_ns,
+                false, IsKnownNewAttr::Yes);
             NS_WARNING_ASSERTION(
                 NS_SUCCEEDED(rvIgnored),
                 "Element::SetAttr(nsGkAtoms::httpEquiv, \"Content-Type\", "
@@ -549,7 +549,7 @@ NS_IMETHODIMP HTMLEditor::SetDocumentCharacterSet(
                 aMetaElement.SetAttr(kNameSpaceID_None, nsGkAtoms::content,
                                      u"text/html;charset="_ns +
                                          NS_ConvertASCIItoUTF16(aCharacterSet),
-                                     false);
+                                     false, IsKnownNewAttr::Yes);
             NS_WARNING_ASSERTION(
                 NS_SUCCEEDED(rvIgnored),
                 nsPrintfCString(
@@ -4138,7 +4138,7 @@ HTMLEditor::InsertOrReplaceTextWithTransaction(
   MOZ_ASSERT_IF(aData.ReplaceLength(), aPointToInsert.IsInTextNode());
 
   Result<InsertTextResult, nsresult> insertTextResultOrError =
-      !aData.ReplaceLength()
+      !aData.ReplaceLength() || NS_WARN_IF(!aPointToInsert.IsInTextNode())
           ? InsertTextWithTransaction(aData.mNormalizedString, aPointToInsert,
                                       InsertTextTo::SpecifiedPoint, aPurpose)
           : ReplaceTextWithTransaction(
@@ -4447,7 +4447,11 @@ nsresult HTMLEditor::EnsureNoFollowingUnnecessaryLineBreak(
 
   const WSScanResult nextThing =
       HTMLEditUtils::ScanInclusiveNextThingWithIgnoringUnnecessaryLineBreak(
-          aNextOrAfterModifiedPoint, aPaddingForEmptyBlock, aEditingHost);
+          aNextOrAfterModifiedPoint,
+          aPaddingForEmptyBlock == PaddingForEmptyBlock::Unnecessary
+              ? TreatAsUnnecessaryLineBreak{LineBreakFor::PaddingForEmptyBlock}
+              : TreatAsUnnecessaryLineBreak{},
+          aEditingHost);
   const Maybe<EditorLineBreak>& unnecessaryLineBreak =
       nextThing.MaybeIgnoredLineBreak();
   if (unnecessaryLineBreak.isNothing() ||
@@ -4663,9 +4667,9 @@ HTMLEditor::ReplaceContainerWithTransactionInternal(
     MOZ_ASSERT(&aAttribute == nsGkAtoms::_empty);
     CloneAttributesWithTransaction(*newContainer, aOldContainer);
   } else if (&aAttribute != nsGkAtoms::_empty) {
-    nsresult rv = newContainer->SetAttr(kNameSpaceID_None,
-                                        const_cast<nsAtom*>(&aAttribute),
-                                        aAttributeValue, true);
+    nsresult rv = newContainer->SetAttr(
+        kNameSpaceID_None, const_cast<nsAtom*>(&aAttribute), aAttributeValue,
+        true, IsKnownNewAttr::Yes);
     if (NS_FAILED(rv)) {
       NS_WARNING("Element::SetAttr() failed");
       return Err(NS_ERROR_FAILURE);
@@ -5351,7 +5355,7 @@ Result<SplitNodeResult, nsresult> HTMLEditor::DoSplitNode(
   AutoTArray<SavedRange, 10> savedRanges;
   for (SelectionType selectionType : kPresentSelectionTypes) {
     SavedRange savingRange;
-    savingRange.mSelection = GetSelection(selectionType);
+    savingRange.mSelection = GetExistingSelection(selectionType);
     if (NS_WARN_IF(!savingRange.mSelection &&
                    selectionType == SelectionType::eNormal)) {
       return Err(NS_ERROR_FAILURE);
@@ -5705,7 +5709,7 @@ nsresult HTMLEditor::DoJoinNodes(nsIContent& aContentToKeep,
     EditorRawDOMPoint atNodeToKeep(&aContentToKeep);
     for (SelectionType selectionType : kPresentSelectionTypes) {
       SavedRange savingRange;
-      savingRange.mSelection = GetSelection(selectionType);
+      savingRange.mSelection = GetExistingSelection(selectionType);
       if (selectionType == SelectionType::eNormal) {
         if (NS_WARN_IF(!savingRange.mSelection)) {
           return NS_ERROR_FAILURE;
@@ -7311,7 +7315,7 @@ Element* HTMLEditor::ComputeEditingHostInternal(
     return body && body->IsEditable() ? body : nullptr;
   }
 
-  if (NS_WARN_IF(!content)) {
+  if (!content) {
     return nullptr;
   }
 

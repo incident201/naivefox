@@ -304,7 +304,10 @@ class Core(
     }
 
     val geckoSitePermissionsStorage by lazyMonitored {
-        GeckoSitePermissionsStorage(geckoRuntime, OnDiskSitePermissionsStorage(context))
+        GeckoSitePermissionsStorage(
+            geckoRuntime,
+            OnDiskSitePermissionsStorage(context, coroutineScope = applicationScope),
+        )
     }
 
     val sessionStorage: SessionStorage by lazyMonitored {
@@ -352,7 +355,7 @@ class Core(
                 ProfileMarkerMiddleware(markerName = "BrowserStore", profiler = engine.profiler),
                 LogMiddleware(tag = "BrowserStore", shouldIncludeDetailedData = { Config.channel.isDebug }),
                 LastAccessMiddleware(),
-                RecentlyClosedMiddleware(recentlyClosedTabsStorage, RECENTLY_CLOSED_MAX),
+                RecentlyClosedMiddleware(recentlyClosedTabsStorage, RECENTLY_CLOSED_MAX, applicationScope),
                 DownloadMiddleware(
                     applicationContext = context,
                     downloadServiceClass = DownloadService::class.java,
@@ -409,7 +412,7 @@ class Core(
                 ),
                 AboutHomeMiddleware(homepageTitle = context.getString(R.string.tab_tray_homepage_tab)),
                 BrowserVisualCompletenessMiddleware(visualCompletenessQueue),
-                TabGroupMiddleware(tabGroupRepository = tabGroupRepository),
+                TabGroupMiddleware(tabGroupRepository = tabGroupRepository, scope = applicationScope),
             )
 
         BrowserStore(
@@ -758,6 +761,7 @@ class Core(
             experiment = "",
             updateChannel = updateChannel,
             service = context.components.remoteSettingsService.value,
+            useSearchConfigV3 = context.components.settings.useSearchConfigV3,
         )
     }
 

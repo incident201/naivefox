@@ -8,11 +8,11 @@ import {
   repeat,
 } from "chrome://global/content/vendor/lit.all.mjs";
 import { MozLitElement } from "chrome://global/content/lit-utils.mjs";
-// eslint-disable-next-line import/no-unassigned-import
+// eslint-disable-next-line import-x/no-unassigned-import
 import "chrome://global/content/elements/moz-button.mjs";
-// eslint-disable-next-line import/no-unassigned-import
+// eslint-disable-next-line import-x/no-unassigned-import
 import "chrome://global/content/elements/panel-list.mjs";
-// eslint-disable-next-line import/no-unassigned-import
+// eslint-disable-next-line import-x/no-unassigned-import
 import "chrome://global/content/elements/moz-badge.mjs";
 
 const { XPCOMUtils } = ChromeUtils.importESModule(
@@ -21,6 +21,7 @@ const { XPCOMUtils } = ChromeUtils.importESModule(
 
 // TODO Bug 2053495: remove with mistral release pref
 const MISTRAL_RELEASE_PREF = "browser.smartwindow.mistralRelease";
+const CUSTOM_MODEL_NAME_PREF = "browser.smartwindow.model";
 const { getModelDisplayOrder } = window.IS_STORYBOOK
   ? // TODO Bug 2053495: ensure TypeError doesn't occur in Storybook once pref gating has been removed
     { getModelDisplayOrder: () => ["1", "2", "3"] }
@@ -94,6 +95,14 @@ export class InputModelSelect extends MozLitElement {
     // defineLazyPreferenceGetter registers its pref observer on first read, so
     // touch the value here to arm the onUpdate callback above.
     void this.mistralRelease;
+    XPCOMUtils.defineLazyPreferenceGetter(
+      this,
+      "customModelName",
+      CUSTOM_MODEL_NAME_PREF,
+      "",
+      () => this.requestUpdate()
+    );
+    void this.customModelName;
   }
 
   get #caretIcon() {
@@ -178,14 +187,38 @@ export class InputModelSelect extends MozLitElement {
     return "aiwindow-input-model-select-menu-item-description";
   }
 
+  #modelName(item) {
+    return item.index === "0" ? this.customModelName : item.shortName;
+  }
+
+  #modelBrandName(item) {
+    return item.index === "0" ? this.#shortCustomModelName() : item.brandName;
+  }
+
+  /**
+   * Reduces a custom model ID to its first word, dropping any namespace or
+   * path, e.g. `hf.co/user/Llama-3.2-1B-GGUF:Q4_K_M` becomes `Llama`.
+   */
+  #shortCustomModelName() {
+    const lastSegment =
+      this.customModelName
+        .split(/[\\/]/)
+        .findLast(Boolean)
+        ?.replace(/\.gguf$/i, "") ?? "";
+    return lastSegment.split(/[-_:]/).find(Boolean) ?? "";
+  }
+
   #iconSrc(index) {
     return (this.mistralRelease ? MODEL_ICONS_V2 : MODEL_ICONS)[index];
   }
 
   render() {
-    if (!this.#modelsList.length || !this.#selectedModel) {
+    const selectedModel = this.#selectedModel;
+    if (!this.#modelsList.length || !selectedModel) {
       return html``;
     }
+    const buttonLabel =
+      this.mistralRelease && this.#modelBrandName(selectedModel);
 
     const panelListTemplate = html`<panel-list
       id=${this._menuId}
@@ -208,13 +241,13 @@ export class InputModelSelect extends MozLitElement {
                   ? " model-item-icon--custom"
                   : ""}"
                 src=${this.#iconSrc(item.index)}
-                alt=${this.mistralRelease ? item.shortName : nothing}
+                alt=${this.mistralRelease ? this.#modelName(item) : nothing}
             /></span>
             <span class="model-item-content">
               <span class="model-item-header">
-                ${this.mistralRelease && item.shortName
+                ${this.mistralRelease && this.#modelName(item)
                   ? html`<span class="model-item-label"
-                      >${item.shortName}</span
+                      >${this.#modelName(item)}</span
                     >`
                   : html`<span
                       class="model-item-label"
@@ -274,12 +307,13 @@ export class InputModelSelect extends MozLitElement {
         type="default"
         class="input-model-select-button"
         .menuId=${this._menuId}
-        data-l10n-id=${this.mistralRelease && this.#selectedModel.brandName
+        data-l10n-id=${buttonLabel
           ? nothing
-          : this.#getButtonLabelL10nId(this.#selectedModel.index)}
-        label=${this.mistralRelease && this.#selectedModel.brandName
-          ? this.#selectedModel.brandName
-          : nothing}
+          : this.#getButtonLabelL10nId(selectedModel.index)}
+        label=${buttonLabel || nothing}
+        .title=${this.mistralRelease && selectedModel.index === "0"
+          ? this.customModelName
+          : ""}
         .iconSrc=${this.#caretIcon}
         iconPosition="end"
       >

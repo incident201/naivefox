@@ -92,6 +92,7 @@ add_task(function test_trainhop_namespace_enables_the_feed() {
     [PREF_WIDGETS_ENABLED]: true,
     [PREF_TRAVEL_ENABLED]: true,
     [PREF_SYSTEM_TRAVEL_ENABLED]: false,
+    region: "US",
     trainhopConfig: { widgetTravel: { visible: true } },
   });
   Assert.ok(feed.enabled, "The dedicated namespace alone enables the feed");
@@ -100,6 +101,28 @@ add_task(function test_trainhop_namespace_enables_the_feed() {
     data: { name: "trainhopConfig" },
   });
   Assert.equal(updateBroadcasts(feed).length, 1, "Broadcasts on the rollout");
+});
+
+add_task(function test_region_resolves_broadcasts() {
+  const feed = feedWithPrefs({
+    [PREF_WIDGETS_ENABLED]: true,
+    [PREF_TRAVEL_ENABLED]: true,
+    [PREF_SYSTEM_TRAVEL_ENABLED]: false,
+    region: "",
+    trainhopConfig: { widgetTravel: { visible: true } },
+  });
+  Assert.ok(!feed.enabled, "Trainhop reveal ignored without a region");
+
+  feed.store.state.Prefs.values.region = "FR";
+  feed.onAction({
+    type: actionTypes.PREF_CHANGED,
+    data: { name: "region", value: "FR" },
+  });
+  Assert.equal(
+    updateBroadcasts(feed).length,
+    1,
+    "Broadcasts when the region resolves"
+  );
 });
 
 add_task(function test_pref_change_that_leaves_it_off_is_quiet() {

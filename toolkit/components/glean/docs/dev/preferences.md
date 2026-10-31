@@ -19,6 +19,10 @@ More information can be found in
 
 If set to a value `port` which is greater than 0, pings will be sent to
 `http://localhost:port` instead of `https://incoming.telemetry.mozilla.org`.
+[OHTTP](../user/ohttp) configs will be requested from `http://localhost:port/ohttp-configs`
+instead of from the usual place, and FOG will treat `http://localhost:port`
+as an OHTTP Relay.
+
 If set to a value `port` which is less than 0, FOG will:
 1) Tell Glean that upload is enabled, even if it isn't.
 2) Take all pings scheduled for upload and drop them on the floor,

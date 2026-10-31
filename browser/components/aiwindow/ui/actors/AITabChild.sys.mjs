@@ -11,6 +11,7 @@ export class AITabChild extends JSWindowActorChild {
   handleEvent(event) {
     switch (event.type) {
       case "AITab:GetPage":
+      case "AITab:GetHeadingFont":
       case "AITab:DeletePage":
         this.#query(event);
         break;
@@ -28,6 +29,26 @@ export class AITabChild extends JSWindowActorChild {
         break;
       default:
         console.warn(`AITabChild received unknown event: ${event.type}`);
+    }
+  }
+
+  receiveMessage({ name, data }) {
+    if (!this.contentWindow) {
+      return;
+    }
+
+    const win = this.contentWindow;
+    switch (name) {
+      case "AITab:RefreshPageData":
+        win.dispatchEvent(
+          new win.CustomEvent(name, {
+            detail: Cu.cloneInto(data, win),
+          })
+        );
+        break;
+
+      default:
+        break;
     }
   }
 

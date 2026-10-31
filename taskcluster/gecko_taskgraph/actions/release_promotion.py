@@ -344,6 +344,9 @@ def release_promotion_action(parameters, graph_config, input, task_group_id, tas
     # When doing staging releases on try, we still want to re-use tasks from
     # previous graphs.
     parameters["optimize_target_tasks"] = True
+    # Always mark release graphs as shipping, so tasks get top priority
+    # See https://bugzilla.mozilla.org/show_bug.cgi?id=2083781
+    parameters["shipping"] = True
 
     if release_promotion_flavor == "promote_firefox_partner_repack":
         release_enable_partner_repack = True

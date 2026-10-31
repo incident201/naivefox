@@ -61,6 +61,7 @@ from mozpack import executables
 from mozpack.files import FileFinder, JarFinder, TarFinder
 from mozpack.mozjar import JarReader, JarWriter
 from mozpack.packager.unpack import UnpackFinder
+from mozversioncontrol import get_repository_object
 
 from mozbuild.artifact_builds import JOB_CHOICES
 from mozbuild.artifact_cache import ArtifactCache
@@ -1590,7 +1591,30 @@ class Artifacts:
 
         return candidate_pushheads
 
+    def _deepen_shallow_clone(self, source_url, rev):
+        vcs = get_repository_object(self._topsrcdir)
+        if not vcs.is_shallow:
+            return
+
+        with build_marker("ArtifactVcs", "deepen shallow clone", log=self.log):
+            self.check_git_output(
+                [
+                    "fetch",
+                    "--no-tags",
+                    f"--deepen={NUM_REVISIONS_TO_QUERY}",
+                    "--filter=tree:0",
+                    source_url,
+                    self.check_git_output(
+                        ["rev-parse", rev], cwd=self._topsrcdir
+                    ).strip(),
+                ],
+                cwd=self._topsrcdir,
+            )
+
     def _get_revisions_from_git(self, rev="HEAD"):
+        if source_url := os.environ.get("MOZ_SOURCE_GIT_REPO"):
+            self._deepen_shallow_clone(source_url, rev)
+
         rev_list = self.check_git_output(
             [
                 "rev-list",

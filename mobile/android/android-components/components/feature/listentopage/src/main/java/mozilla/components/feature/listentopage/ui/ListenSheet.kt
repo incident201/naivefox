@@ -19,28 +19,38 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.basicMarquee
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.PreviewLightDark
+import androidx.compose.ui.unit.dp
+import mozilla.components.compose.base.annotation.FlexibleWindowLightDarkPreview
 import mozilla.components.compose.base.theme.AcornCorners
 import mozilla.components.compose.base.theme.AcornTheme
 import mozilla.components.feature.listentopage.ArticleProgress
@@ -50,9 +60,15 @@ import mozilla.components.feature.listentopage.PlaybackPhase
 import mozilla.components.feature.listentopage.PlaybackSpeed
 import mozilla.components.feature.listentopage.VoiceState
 
+/** Opacity of a player control that is present but not interactive. */
+internal const val DISABLED_ALPHA = 0.38f
+internal const val LISTEN_SHEET_PLAYER_CARD_TEST_TAG = "listenSheetPlayerCard"
 private const val FADE_OUT_DURATION_MS = 50
 private const val RESIZE_DURATION_MS = 150
 private const val FADE_IN_DURATION_MS = 50
+
+/** The width the player stops growing at, so that it does not stretch across a landscape phone or tablet window. */
+internal val PlayerMaxWidth = 560.dp
 private val EasingStandard = CubicBezierEasing(0.2f, 0f, 0f, 1f)
 private val EasingStandardAccelerate = CubicBezierEasing(0.3f, 0f, 1f, 1f)
 private val EasingStandardDecelerate = CubicBezierEasing(0f, 0f, 0f, 1f)
@@ -104,14 +120,21 @@ fun ListenSheet(
 
     val transition = updateTransition(targetState = expanded, label = "ListenSheet")
     val playbackUiState = playbackPhase.toUiState(error = error)
+    val sheetFocusRequester = remember { FocusRequester() }
 
-    Box(modifier = modifier) {
+    SideEffect(Unit) {
+        sheetFocusRequester.requestFocus()
+    }
+    Box(modifier = modifier.focusRequester(sheetFocusRequester).focusable()) {
         Card(
             shape = RoundedCornerShape(AcornCorners.extraLarge),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             elevation = CardDefaults.cardElevation(AcornTheme.layout.elevation.level2),
             border = BorderStroke(AcornTheme.layout.border.default, MaterialTheme.colorScheme.outlineVariant),
-            modifier = Modifier.fillMaxWidth(),
+            modifier =
+                Modifier.widthIn(max = PlayerMaxWidth)
+                    .align(Alignment.Center)
+                    .testTag(LISTEN_SHEET_PLAYER_CARD_TEST_TAG),
         ) {
             transition.AnimatedContent(
                 transitionSpec = {
@@ -155,7 +178,11 @@ fun ListenSheet(
             enter = ContentEnter,
             exit = ContentExit,
         ) {
-            AudioProgressBarCompact(progress = progress)
+            AudioProgressBarCompact(
+                progress = progress,
+                modifier = Modifier.widthIn(max = PlayerMaxWidth),
+                isEnabled = playbackUiState !is PlaybackUiState.Error,
+            )
         }
     }
 }
@@ -205,7 +232,10 @@ internal fun ArticleHeading(
     val context = LocalContext.current
     val reducedMotion = remember(context) { isReducedMotionEnabled(context) }
     val marquee = shouldScrollTitle && !reducedMotion
-    Column(modifier = modifier, verticalArrangement = Arrangement.Center) {
+    Column(
+        modifier = modifier.semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite },
+        verticalArrangement = Arrangement.Center,
+    ) {
         Text(
             text = article.heading.orEmpty(),
             modifier =
@@ -214,7 +244,12 @@ internal fun ArticleHeading(
                 } else {
                     Modifier
                 },
-            color = MaterialTheme.colorScheme.onSurface,
+            color =
+                if (playbackUiState !is PlaybackUiState.Error) {
+                    MaterialTheme.colorScheme.onSurface
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
             style = AcornTheme.typography.headline8,
             maxLines = 1,
             overflow = if (marquee) TextOverflow.Clip else TextOverflow.Ellipsis,
@@ -242,7 +277,7 @@ internal fun ArticleHeading(
 private fun isReducedMotionEnabled(context: Context): Boolean =
     Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
 
-@PreviewLightDark
+@FlexibleWindowLightDarkPreview
 @Composable
 private fun ListenSheetCompactPreview() {
     AcornTheme {
@@ -250,7 +285,7 @@ private fun ListenSheetCompactPreview() {
     }
 }
 
-@PreviewLightDark
+@FlexibleWindowLightDarkPreview
 @Composable
 private fun ListenSheetExpandedPreview() {
     AcornTheme {

@@ -55,6 +55,9 @@
 #include "mozilla/PageloadEvent.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/PresShell.h"
+#ifdef MOZ_WIDGET_ANDROID
+#  include "mozilla/ProcInfoParent.h"
+#endif
 #include "mozilla/ProcessHangMonitor.h"
 #include "mozilla/ProcessHangMonitorIPC.h"
 #include "mozilla/ProfilerLabels.h"
@@ -154,7 +157,9 @@
 #ifndef ANDROID
 #  include "mozilla/hwinference/HWInferenceParent.h"
 #  include "mozilla/hwinference/HWInferenceProcess.h"
-#  include "mozilla/hwinference/PSpeechRecognitionChild.h"
+#  ifdef MOZ_WEBSPEECH
+#    include "mozilla/hwinference/PSpeechRecognitionChild.h"
+#  endif
 #endif  // !ANDROID
 #include "mozilla/intl/L10nRegistry.h"
 #include "mozilla/intl/LocaleService.h"
@@ -173,6 +178,7 @@
 #include "mozilla/ipc/UtilityProcessManager.h"
 #include "mozilla/layers/CompositorThread.h"
 #include "mozilla/layers/ImageBridgeParent.h"
+#include "mozilla/layers/LayerTreeLog.h"
 #include "mozilla/layers/LayerTreeOwnerTracker.h"
 #include "mozilla/layers/PAPZParent.h"
 #include "mozilla/loader/ScriptCacheActors.h"
@@ -641,7 +647,6 @@ static const char* sObserverTopics[] = {
     "private-cookie-changed",
     NS_NETWORK_LINK_TYPE_TOPIC,
     NS_NETWORK_TRR_MODE_CHANGED_TOPIC,
-    "network:socket-process-crashed",
     DEFAULT_TIMEZONE_CHANGED_OBSERVER_TOPIC,
 };
 
@@ -1560,6 +1565,21 @@ void ContentParent::Init() {
 
   (void)SendInitProfiler(ProfilerParent::CreateForProcess(OtherPid()));
 
+#ifdef MOZ_WIDGET_ANDROID
+  // On Android content processes may be isolated, meaning we must create a
+  // ProcInfoParent to allow GetProcInfo() to query the process info remotely.
+  Endpoint<PProcInfoParent> procInfoParent;
+  Endpoint<PProcInfoChild> procInfoChild;
+  if (NS_SUCCEEDED(PProcInfo::CreateEndpoints(
+          mozilla::ipc::EndpointProcInfo::Current(), OtherEndpointProcInfo(),
+          &procInfoParent, &procInfoChild))) {
+    mProcInfoParent = ProcInfoParent::Create(std::move(procInfoParent));
+    if (mProcInfoParent) {
+      (void)SendInitProcInfo(std::move(procInfoChild));
+    }
+  }
+#endif
+
   RefPtr<GeckoMediaPluginServiceParent> gmps(
       GeckoMediaPluginServiceParent::GetSingleton());
   if (gmps) {
@@ -1884,6 +1904,13 @@ void ContentParent::ActorDestroy(ActorDestroyReason why) {
     mHangMonitorActor = nullptr;
   }
 
+#ifdef MOZ_WIDGET_ANDROID
+  if (mProcInfoParent) {
+    mProcInfoParent->Shutdown();
+    mProcInfoParent = nullptr;
+  }
+#endif
+
   RefPtr<FileSystemSecurity> fss = FileSystemSecurity::Get();
   if (fss) {
     fss->Forget(ChildID());
@@ -2005,7 +2032,7 @@ void ContentParent::ActorDestroy(ActorDestroyReason why) {
   MOZ_LOG(ContentParent::GetLog(), LogLevel::Verbose,
           ("destroying Subprocess in ActorDestroy: ContentParent id=%p "
            "mSubprocess id=%p handle %" PRIuPTR,
-           this, mSubprocess,
+           this, mSubprocess.get(),
            mSubprocess ? (uintptr_t)mSubprocess->GetChildProcessHandle() : -1));
   // FIXME (bug 1520997): does this really need an additional dispatch?
   if (GetCurrentSerialEventTarget()) {
@@ -2015,10 +2042,9 @@ void ContentParent::ActorDestroy(ActorDestroyReason why) {
               ContentParent::GetLog(), LogLevel::Debug,
               ("destroyed Subprocess in ActorDestroy: Subprocess id=%p handle "
                "%" PRIuPTR,
-               subprocess,
+               subprocess.get(),
                subprocess ? (uintptr_t)subprocess->GetChildProcessHandle()
                           : -1));
-          subprocess->Destroy();
         }));
   }
   mSubprocess = nullptr;
@@ -2397,7 +2423,8 @@ bool ContentParent::BeginSubprocessLaunch(ProcessPriority aPriority) {
 
   // Instantiate the pref serializer. It will be cleaned up in
   // `LaunchSubprocessReject`/`LaunchSubprocessResolve`.
-  mPrefSerializer = MakeUnique<mozilla::ipc::SharedPreferenceSerializer>();
+  mPrefSerializer =
+      std::make_unique<mozilla::ipc::SharedPreferenceSerializer>();
   if (!mPrefSerializer->SerializeToSharedMemory(GeckoProcessType_Content,
                                                 GetRemoteType())) {
     NS_WARNING("SharedPreferenceSerializer::SerializeToSharedMemory failed");
@@ -2611,7 +2638,7 @@ ContentParent::ContentParent(const RemoteType& aRemoteType)
 
   MOZ_LOG(ContentParent::GetLog(), LogLevel::Verbose,
           ("CreateSubprocess: ContentParent id=%p mSubprocess id=%p childID=%d",
-           this, mSubprocess, mSubprocess->GetChildID()));
+           this, mSubprocess.get(), mSubprocess->GetChildID()));
 }
 
 ContentParent::~ContentParent() {
@@ -2647,9 +2674,9 @@ ContentParent::~ContentParent() {
         ("DestroySubprocess: ContentParent id=%p childID=%" PRIu64
          " mSubprocess id=%p handle "
          "%" PRIuPTR,
-         this, (uint64_t)this->ChildID(), mSubprocess,
+         this, (uint64_t)this->ChildID(), mSubprocess.get(),
          mSubprocess ? (uintptr_t)mSubprocess->GetChildProcessHandle() : -1));
-    mSubprocess->Destroy();
+    mSubprocess = nullptr;
   }
 }
 
@@ -3136,6 +3163,8 @@ void ContentParent::OnCompositorUnexpectedShutdown() {
 }
 
 void ContentParent::OnCompositorDeviceReset() {
+  LAYERTREE_LOG("Device reset, reinitializing rendering for content {}",
+                ChildID());
   (void)SendReinitRenderingForDeviceReset();
 }
 
@@ -4022,8 +4051,6 @@ ContentParent::Observe(nsISupports* aSubject, const char* aTopic,
 
   } else if (!strcmp(aTopic, NS_NETWORK_LINK_TYPE_TOPIC)) {
     UpdateNetworkLinkType();
-  } else if (!strcmp(aTopic, "network:socket-process-crashed")) {
-    (void)SendSocketProcessCrashed();
   } else if (!strcmp(aTopic, DEFAULT_TIMEZONE_CHANGED_OBSERVER_TOPIC)) {
     (void)SendSystemTimezoneChanged();
   } else if (!strcmp(aTopic, NS_NETWORK_TRR_MODE_CHANGED_TOPIC)) {
@@ -4473,7 +4500,7 @@ void ContentParent::KillHard(const char* aReason) {
         ("KillHard Subprocess(%s): ContentParent id=%p mSubprocess id=%p "
          "handle "
          "%" PRIuPTR,
-         aReason, this, mSubprocess,
+         aReason, this, mSubprocess.get(),
          mSubprocess ? (uintptr_t)mSubprocess->GetChildProcessHandle() : -1));
     mSubprocess->SetAlreadyDead();
   }
@@ -4505,8 +4532,8 @@ void ContentParent::FriendlyName(nsAString& aName, bool aAnonymize) {
 
 mozilla::ipc::IPCResult ContentParent::RecvInitCrashReporter(
     const CrashReporter::CrashReporterInitArgs& aInitArgs) {
-  mCrashReporter = MakeUnique<CrashReporterHost>(GeckoProcessType_Content,
-                                                 OtherChildID(), aInitArgs);
+  mCrashReporter = std::make_unique<CrashReporterHost>(
+      GeckoProcessType_Content, OtherChildID(), aInitArgs);
   return IPC_OK();
 }
 
@@ -4534,7 +4561,7 @@ bool ContentParent::SendRequestMemoryReport(
     const uint32_t& aGeneration, const bool& aAnonymize,
     const bool& aMinimizeMemoryUsage, const Maybe<FileDescriptor>& aDMDFile) {
   // This automatically cancels the previous request.
-  mMemoryReportRequest = MakeUnique<MemoryReportRequestHost>(aGeneration);
+  mMemoryReportRequest = std::make_unique<MemoryReportRequestHost>(aGeneration);
   RefPtr<ContentParent> self(this);
   PContentParent::SendRequestMemoryReport(aGeneration, aAnonymize,
                                           aMinimizeMemoryUsage, aDMDFile)
@@ -4613,16 +4640,6 @@ mozilla::ipc::IPCResult ContentParent::RecvInitStreamFilter(
             aResolver(mozilla::ipc::Endpoint<PStreamFilterChild>());
           });
 
-  return IPC_OK();
-}
-
-mozilla::ipc::IPCResult ContentParent::RecvAddSecurityState(
-    const MaybeDiscarded<WindowContext>& aContext, uint32_t aStateFlags) {
-  if (aContext.IsNullOrDiscarded()) {
-    return IPC_OK();
-  }
-
-  aContext.get()->AddSecurityState(aStateFlags);
   return IPC_OK();
 }
 
@@ -4848,7 +4865,7 @@ static int32_t AddGeolocationListener(
     nsIDOMGeoPositionErrorCallback* errorCallBack, bool highAccuracy) {
   RefPtr<Geolocation> geo = Geolocation::NonWindowSingleton();
 
-  UniquePtr<PositionOptions> options = MakeUnique<PositionOptions>();
+  auto options = std::make_unique<PositionOptions>();
   options->mTimeout = 0;
   options->mMaximumAge = 0;
   options->mEnableHighAccuracy = highAccuracy;
@@ -5208,6 +5225,7 @@ mozilla::ipc::IPCResult ContentParent::RecvAcquireHWInferenceProcess() {
   return IPC_OK();
 }
 
+#  ifdef MOZ_WEBSPEECH
 mozilla::ipc::IPCResult ContentParent::RecvCreateSpeechRecognition(
     Endpoint<hwinference::PSpeechRecognitionParent>&& aEndpoint) {
   if (!mHWInferenceConnections) {
@@ -5227,6 +5245,7 @@ mozilla::ipc::IPCResult ContentParent::RecvCreateSpeechRecognition(
       ->StartContentSpeechRecognition(std::move(aEndpoint), mChildID);
   return IPC_OK();
 }
+#  endif  // MOZ_WEBSPEECH
 
 mozilla::ipc::IPCResult ContentParent::RecvReleaseHWInferenceConnection() {
   if (mHWInferenceConnections == 0) {
@@ -5784,13 +5803,13 @@ mozilla::ipc::IPCResult ContentParent::RecvBeginDriverCrashGuard(
   UniquePtr<gfx::DriverCrashGuard> guard;
   switch (aGuardType) {
     case gfx::CrashGuardType::D3D11Layers:
-      guard = MakeUnique<gfx::D3D11LayersCrashGuard>(this);
+      guard = std::make_unique<gfx::D3D11LayersCrashGuard>(this);
       break;
     case gfx::CrashGuardType::GLContext:
-      guard = MakeUnique<gfx::GLContextCrashGuard>(this);
+      guard = std::make_unique<gfx::GLContextCrashGuard>(this);
       break;
     case gfx::CrashGuardType::WMFVPXVideo:
-      guard = MakeUnique<gfx::WMFVPXVideoCrashGuard>(this);
+      guard = std::make_unique<gfx::WMFVPXVideoCrashGuard>(this);
       break;
     default:
       return IPC_FAIL(this, "unknown crash guard type");
@@ -5892,8 +5911,10 @@ mozilla::ipc::IPCResult ContentParent::RecvStoreAndBroadcastBlobURLRegistration(
     return IPC_FAIL(this, "Blob deserialization failed.");
   }
 
-  BlobURLProtocolHandler::AddDataEntryParent(aURI, aPrincipal, aPartitionKey,
-                                             blobImpl, ChildID());
+  if (NS_FAILED(BlobURLProtocolHandler::AddDataEntryParent(
+          aURI, aPrincipal, aPartitionKey, blobImpl, ChildID()))) {
+    return IPC_FAIL(this, "Conflicting Blob URL principal");
+  }
   BroadcastBlobURLRegistration(aURI, blobImpl, aPrincipal, aPartitionKey, this);
 
   return IPC_OK();
@@ -6964,6 +6985,10 @@ mozilla::ipc::IPCResult ContentParent::RecvCreateBrowsingContext(
     }
   }
 
+  if (opener && !opener->Group()->IsKnownForChildID(ChildID())) {
+    return IPC_FAIL(this, "Should be subscribed to the opener's group");
+  }
+
   RefPtr<BrowsingContext> child = BrowsingContext::Get(aInit.mId);
   if (child) {
     // This is highly suspicious. BrowsingContexts should only be created once,
@@ -7517,6 +7542,18 @@ void ContentParent::RemoveBrowsingContextGroup(BrowsingContextGroup* aGroup) {
   }
 }
 
+CanonicalBrowsingContext* ContentParent::GetBrowsingContextIfCurrent(
+    const MaybeDiscardedWindowContext& aContext) {
+  if (aContext.IsNullOrDiscarded()) {
+    return nullptr;
+  } else if (aContext->Canonical()->GetContentParent() != this) {
+    return nullptr;
+  } else if (!aContext->IsCurrent()) {
+    return nullptr;
+  }
+  return aContext->Canonical()->GetBrowsingContext();
+}
+
 mozilla::ipc::IPCResult ContentParent::RecvCommitBrowsingContextTransaction(
     const MaybeDiscarded<BrowsingContext>& aContext,
     BrowsingContext::BaseTransaction&& aTransaction, uint64_t aEpoch) {
@@ -7861,28 +7898,44 @@ mozilla::ipc::IPCResult ContentParent::RecvRemoveFromBFCache(
 }
 
 mozilla::ipc::IPCResult ContentParent::RecvSetActiveSessionHistoryEntry(
-    const MaybeDiscarded<BrowsingContext>& aContext,
+    const MaybeDiscarded<WindowContext>& aContext,
     const Maybe<nsPoint>& aPreviousScrollPos, SessionHistoryInfo&& aInfo,
-    uint32_t aLoadType, uint32_t aUpdatedCacheKey, const nsID& aChangeID) {
+    uint32_t aLoadType, uint32_t aUpdatedCacheKey, const nsID& aChangeID,
+    const Maybe<NewSessionHistorySharedState>& aNewSharedState) {
   if (aInfo.GetOriginalURI() || aInfo.GetResultPrincipalURI()) {
     return IPC_FAIL(this, "Should not be set by content");
   }
-  if (!aContext.IsNullOrDiscarded()) {
-    aContext.get_canonical()->SetActiveSessionHistoryEntry(
-        aPreviousScrollPos, &aInfo, aLoadType, aUpdatedCacheKey, aChangeID);
+
+  CanonicalBrowsingContext* cbc = GetBrowsingContextIfCurrent(aContext);
+  bool createsSharedState = false;
+  if (!cbc ||
+      (aNewSharedState && !cbc->CreateSharedState(&aInfo, *aNewSharedState,
+                                                  &createsSharedState)) ||
+      !cbc->ValidateSessionHistoryInfo(&aInfo)) {
+    return IPC_OK();
   }
+  cbc->SetActiveSessionHistoryEntry(aPreviousScrollPos, &aInfo, aLoadType,
+                                    aUpdatedCacheKey, aChangeID,
+                                    createsSharedState);
+  cbc->InheritDocumentPrincipalIfNeeded();
   return IPC_OK();
 }
 
 mozilla::ipc::IPCResult ContentParent::RecvReplaceActiveSessionHistoryEntry(
-    const MaybeDiscarded<BrowsingContext>& aContext,
-    SessionHistoryInfo&& aInfo) {
+    const MaybeDiscarded<WindowContext>& aContext, SessionHistoryInfo&& aInfo,
+    const Maybe<NewSessionHistorySharedState>& aNewSharedState) {
   if (aInfo.GetOriginalURI() || aInfo.GetResultPrincipalURI()) {
     return IPC_FAIL(this, "Should not be set by content");
   }
-  if (!aContext.IsNullOrDiscarded()) {
-    aContext.get_canonical()->ReplaceActiveSessionHistoryEntry(&aInfo);
+
+  CanonicalBrowsingContext* cbc = GetBrowsingContextIfCurrent(aContext);
+  if (!cbc || !cbc->GetActiveSessionHistoryEntry() ||
+      (aNewSharedState && !cbc->CreateSharedState(&aInfo, *aNewSharedState)) ||
+      !cbc->ValidateSessionHistoryInfo(&aInfo)) {
+    return IPC_OK();
   }
+  cbc->ReplaceActiveSessionHistoryEntry(&aInfo);
+  cbc->InheritDocumentPrincipalIfNeeded();
   return IPC_OK();
 }
 

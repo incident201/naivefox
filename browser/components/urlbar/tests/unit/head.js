@@ -1237,6 +1237,7 @@ async function check_results({
     bookmarkDateMs: optionalDateValidator,
     frecency: { optional: true },
     lastVisit: optionalDateValidator,
+    semanticDistance: { optional: true },
     // `suggestionObject` is only used for dismissing Suggest Rust results, and
     // important properties in this object are reflected in the top-level
     // payload object, so ignore it. There are Suggest tests specifically for

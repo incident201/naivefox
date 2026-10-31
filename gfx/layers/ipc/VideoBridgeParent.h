@@ -40,6 +40,8 @@ class VideoBridgeParent final : public PVideoBridgeParent,
       const SurfaceDescriptor& aSharedData, ReadLockDescriptor& aReadLock,
       const LayersBackend& aLayersBackend, const TextureFlags& aFlags,
       const dom::ContentParentId& aContentId, const uint64_t& aSerial);
+  mozilla::ipc::IPCResult RecvGetTextureFactoryIdentifier(
+      GetTextureFactoryIdentifierResolver&& aResolver);
 
   // HostIPCAllocator
   base::ProcessId GetChildProcessId() override { return OtherPid(); }

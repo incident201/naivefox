@@ -1,9 +1,18 @@
 import pytest
-from webdriver.bidi.error import NoSuchFrameException, NoSuchUserContextException
+from webdriver.bidi.error import (
+    NoSuchFrameException,
+    NoSuchUserContextException,
+    UnsupportedOperationException,
+)
 
 from bidi.support.container_isolation import container_isolation
 
 pytestmark = [pytest.mark.asyncio, container_isolation]
+
+
+async def test_global(bidi_session):
+    with pytest.raises(UnsupportedOperationException):
+        await bidi_session.session.subscribe(events=["browsingContext.load"])
 
 
 async def test_user_contexts(bidi_session, session_user_context):

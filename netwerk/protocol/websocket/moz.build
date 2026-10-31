@@ -22,10 +22,6 @@ EXPORTS.mozilla.net += [
     "WebSocketChannel.h",
     "WebSocketChannelChild.h",
     "WebSocketChannelParent.h",
-    "WebSocketConnectionBase.h",
-    "WebSocketConnectionChild.h",
-    "WebSocketConnectionListener.h",
-    "WebSocketConnectionParent.h",
     "WebSocketEventListenerChild.h",
     "WebSocketEventListenerParent.h",
     "WebSocketEventService.h",
@@ -45,9 +41,6 @@ else:
         "WebSocketChannel.cpp",
         "WebSocketChannelChild.cpp",
         "WebSocketChannelParent.cpp",
-        "WebSocketConnection.cpp",
-        "WebSocketConnectionChild.cpp",
-        "WebSocketConnectionParent.cpp",
         "WebSocketEventListenerChild.cpp",
         "WebSocketEventListenerParent.cpp",
         "WebSocketEventService.cpp",
@@ -58,7 +51,6 @@ else:
     IPDL_SOURCES += [
         "PTransportProvider.ipdl",
         "PWebSocket.ipdl",
-        "PWebSocketConnection.ipdl",
         "PWebSocketEventListener.ipdl",
     ]
 
@@ -78,7 +70,6 @@ include("/ipc/chromium/chromium-config.mozbuild")
 include("/tools/fuzzing/libfuzzer-config.mozbuild")
 
 SOURCE_HEADERS += [
-    "WebSocketConnection.h",
     "WebSocketLog.h",
     "WebSocketProtocolHandler.h",
 ]

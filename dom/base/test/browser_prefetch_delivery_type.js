@@ -33,17 +33,25 @@ function targetChannelObserved(topic, target) {
   );
 }
 
+// Purges unreferenced entries from the memory cache, as memory pressure or the
+// cache's own expired-entry sweep would.
+async function purgeMemoryCache() {
+  const purged = TestUtils.topicObserved("cacheservice:purge-memory-pools");
+  Services.cache2.purgeFromMemory(Ci.nsICacheStorageService.PURGE_EVERYTHING);
+  await purged;
+}
+
 // Navigates source -> target and returns the target's deliveryType.
 // `prefetch` says what to wait for before navigating: "complete" for the
 // prefetch response to have arrived, "started" for the request to have gone
 // out but not returned, or "none" when the source page has no rules.
 // `method` "POST" submits a form from the source page instead of loading the
-// target from the browser.
+// target from the browser. `purge` purges the memory cache before navigating.
 async function deliveryTypeAfterNavigating(
   source,
   target,
   prefetch,
-  { method = "GET" } = {}
+  { method = "GET", purge = false } = {}
 ) {
   // Register before the source page loads: an immediate prefetch can finish
   // before the source page fires load.
@@ -60,6 +68,9 @@ async function deliveryTypeAfterNavigating(
     waitForLoad: true,
   });
   await ready;
+  if (purge) {
+    await purgeMemoryCache();
+  }
 
   const loaded = BrowserTestUtils.browserLoaded(
     tab.linkedBrowser,
@@ -124,6 +135,23 @@ add_task(async function test_nostore_prefetch_served_from_cache() {
     "navigational-prefetch",
     "A navigation served from a no-store prefetch reports deliveryType."
   );
+});
+
+// The prefetch record keeps its no-store cache entry alive, so a purge of the
+// memory cache before the navigation does not lose it.
+add_task(async function test_nostore_prefetch_survives_cache_purge() {
+  const target = targetURL("purge", { noStore: true });
+  Assert.equal(
+    await deliveryTypeAfterNavigating(
+      sourceURL("file_pageload_prefetch_source.html", target),
+      target,
+      "complete",
+      { purge: true }
+    ),
+    "navigational-prefetch",
+    "The navigation is served from the prefetch after a cache purge."
+  );
+  Assert.equal(await hitCount("purge"), 1, "The target was fetched once.");
 });
 
 add_task(async function test_navigation_without_prefetch() {

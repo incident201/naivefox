@@ -3562,8 +3562,6 @@ class NavigationDelegateTest : BaseSessionTest() {
 
     @Test
     fun textDirectiveUserActivation() {
-        sessionRule.setPrefsUntilTestEnd(mapOf("dom.text_fragments.enabled" to true))
-
         val session0 = sessionRule.createOpenSession()
         session0.load(Loader().uri(createTestUrl(HELLO_HTML_PATH)))
         session0.waitForPageStop()
@@ -3590,8 +3588,6 @@ class NavigationDelegateTest : BaseSessionTest() {
     fun textDirectiveUserActivationExternalLoad() {
         // External app links (LOAD_FLAGS_EXTERNAL) are always user-initiated, so
         // text fragment directives should be allowed to scroll.
-        sessionRule.setPrefsUntilTestEnd(mapOf("dom.text_fragments.enabled" to true))
-
         val session = sessionRule.createOpenSession()
         session.load(
             Loader().uri(createTestUrl(TRANSLATIONS_ES + "#:~:text=moverse")).flags(GeckoSession.LOAD_FLAGS_EXTERNAL)

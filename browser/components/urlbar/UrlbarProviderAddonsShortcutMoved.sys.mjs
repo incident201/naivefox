@@ -13,6 +13,7 @@ import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
 
 const lazy = XPCOMUtils.declareLazy({
   ShortcutUtils: "resource://gre/modules/ShortcutUtils.sys.mjs",
+  URILoadingHelper: "resource:///modules/URILoadingHelper.sys.mjs",
   UrlbarResult: "chrome://browser/content/urlbar/UrlbarResult.mjs",
   UrlbarShared: "chrome://browser/content/urlbar/UrlbarShared.mjs",
 });
@@ -112,7 +113,11 @@ export class UrlbarProviderAddonsShortcutMoved extends UrlbarProvider {
   onEngagement(queryContext, controller, details) {
     switch (details.selType) {
       case "change_shortcuts":
-        controller.browserWindow.switchToTabHavingURI("about:keyboard", true);
+        lazy.URILoadingHelper.switchToTabHavingURI(
+          controller.browserWindow,
+          "about:keyboard",
+          true
+        );
         break;
       case "dismiss":
         break;

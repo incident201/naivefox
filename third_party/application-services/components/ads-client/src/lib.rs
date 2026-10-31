@@ -3,12 +3,12 @@
 * file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use client::error::ComponentError;
 use error_support::handle_error;
 use mars::error::CallbackRequestError;
-use url::Url as AdsClientUrl;
+pub use url::Url as AdsClientUrl;
 
 use client::AdsClient;
 use http_cache::CachePolicy;
@@ -25,8 +25,9 @@ mod mars;
 #[cfg(feature = "stateful")]
 pub mod request;
 pub mod telemetry;
+#[cfg(feature = "stateful")]
+pub mod worker;
 
-pub use ffi::telemetry::MozAdsTelemetryWrapper;
 pub use ffi::*;
 
 #[cfg(test)]
@@ -39,10 +40,9 @@ uniffi::custom_type!(AdsClientUrl, String, {
     try_lift: |val| Ok(AdsClientUrl::parse(&val)?),
     lower: |obj| obj.as_str().to_string(),
 });
-
 #[derive(uniffi::Object)]
 pub struct MozAdsClient {
-    inner: AdsClient<MozAdsTelemetryWrapper>,
+    inner: Arc<AdsClient>,
 }
 
 #[uniffi::export]
@@ -147,6 +147,29 @@ impl MozAdsClient {
 
     #[handle_error(ComponentError)]
     #[uniffi::method(default(options = None))]
+    pub fn request_spoc_or_image_ads(
+        &self,
+        moz_ad_requests: Vec<MozAdsPlacementRequestWithCount>,
+        options: Option<MozAdsRequestOptions>,
+    ) -> AdsClientApiResult<HashMap<String, Vec<MozAdsImageOrSpoc>>> {
+        let requests: Vec<AdPlacementRequest> = moz_ad_requests.iter().map(|r| r.into()).collect();
+        let options = options.unwrap_or_default();
+        let flags = AdRequestFlags::from(&options);
+        let ohttp = options.ohttp;
+        let cache_policy = options.cache_policy.map(CachePolicy::from);
+        let blocks = options.blocks;
+        let response = self
+            .inner
+            .request_spoc_or_image_ads(requests, flags, cache_policy, ohttp, blocks)
+            .map_err(ComponentError::RequestAds)?;
+        Ok(response
+            .into_iter()
+            .map(|(k, v)| (k, v.into_iter().map(|spoc| spoc.into()).collect()))
+            .collect())
+    }
+
+    #[handle_error(ComponentError)]
+    #[uniffi::method(default(options = None))]
     pub fn request_tile_ads(
         &self,
         moz_ad_requests: Vec<MozAdsPlacementRequest>,
@@ -158,9 +181,10 @@ impl MozAdsClient {
         let ohttp = options.ohttp;
         let cache_policy = options.cache_policy.map(CachePolicy::from);
         let blocks = options.blocks;
+        let relevance = options.relevance;
         let response = self
             .inner
-            .request_tile_ads(requests, flags, cache_policy, ohttp, blocks)
+            .request_tile_ads(requests, flags, cache_policy, ohttp, blocks, relevance)
             .map_err(ComponentError::RequestAds)?;
         Ok(response.into_iter().map(|(k, v)| (k, v.into())).collect())
     }

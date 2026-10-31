@@ -101,22 +101,45 @@ class TestCountsAfterRestore(RestoreCountsTestCase):
 class TestCountsWhenNothingRestored(RestoreCountsTestCase):
     def setUp(self):
         super().setUp(
-            startup_page=1,
+            startup_page=3,
             include_private=False,
             restore_on_demand=False,
             test_windows=TEST_WINDOWS,
         )
 
     def test_counts_are_recorded_when_no_window_is_restored(self):
-        # Without closed-tab persistence a deferred session with no pinned
-        # tabs carries nothing forward, so the restore opens no window at all
-        # and the deadline timer that normally reports these counts is never
-        # started.
-        self.marionette.set_prefs({
-            "browser.sessionstore.persist_closed_tabs_between_sessions": False,
-        })
+        # A session whose only windows are in _closedWindows restores no
+        # window at all, so the deadline timer that normally reports these
+        # counts is never started. Real sessions reach this on macOS, where
+        # quitting after closing the last window saves it only in
+        # _closedWindows. Build that state from the live session, and since
+        # SessionStore rewrites sessionstore.jsonlz4 on shutdown, write it to
+        # a separate file and swap it in once the browser has quit.
+        self.marionette.execute_async_script(
+            """
+            let [resolve] = arguments;
+            const { SessionStore } = ChromeUtils.importESModule(
+                "moz-src:///browser/components/sessionstore/SessionStore.sys.mjs"
+            );
+            let state = JSON.parse(SessionStore.getBrowserState());
+            state._closedWindows = state.windows;
+            state.windows = [];
+            IOUtils.writeJSON(
+                PathUtils.join(PathUtils.profileDir, "restore-counts-fixture.jsonlz4"),
+                state,
+                { compress: true }
+            ).then(resolve);
+            """
+        )
 
-        self._quit_and_restore()
+        self.marionette.quit()
+        profile_dir = self.marionette.instance.profile.profile
+        os.replace(
+            os.path.join(profile_dir, "restore-counts-fixture.jsonlz4"),
+            os.path.join(profile_dir, "sessionstore.jsonlz4"),
+        )
+        self.marionette.start_session()
+        self.marionette.set_context("chrome")
 
         counts = self._read_counts()
         for name, value in counts.items():

@@ -1717,8 +1717,17 @@ already_AddRefed<CSSValue> nsComputedDOMStyle::GetGridTemplateColumnsRows(
 }
 
 already_AddRefed<CSSValue> nsComputedDOMStyle::DoGetGridTemplateColumns() {
+  AutoWeakFrame weakFrameRef(mInnerFrame);
+
   nsGridContainerFrame* gridFrame =
       nsGridContainerFrame::GetGridFrameWithComputedInfo(mInnerFrame);
+
+  if (mInnerFrame && !weakFrameRef.IsAlive()) {
+    // We had a non-null frame, but GetGridFrameWithComputedInfo's
+    // layout-flush seems to have destroyed it. Bail out.
+    return nullptr;
+  }
+
   if (!gridFrame) {
     // The element doesn't have a box - return the computed value.
     // https://drafts.csswg.org/css-grid/#resolved-track-list
@@ -1737,8 +1746,17 @@ already_AddRefed<CSSValue> nsComputedDOMStyle::DoGetGridTemplateColumns() {
 }
 
 already_AddRefed<CSSValue> nsComputedDOMStyle::DoGetGridTemplateRows() {
+  AutoWeakFrame weakFrameRef(mInnerFrame);
+
   nsGridContainerFrame* gridFrame =
       nsGridContainerFrame::GetGridFrameWithComputedInfo(mInnerFrame);
+
+  if (mInnerFrame && !weakFrameRef.IsAlive()) {
+    // We had a non-null frame, but GetGridFrameWithComputedInfo's
+    // layout-flush seems to have destroyed it. Bail out.
+    return nullptr;
+  }
+
   if (!gridFrame) {
     // The element doesn't have a box - return the computed value.
     // https://drafts.csswg.org/css-grid/#resolved-track-list
@@ -2033,6 +2051,9 @@ nscoord nsComputedDOMStyle::GetUsedAbsoluteOffset(mozilla::Side aSide) {
         viewportFrame->AdjustViewportSizeForFixedPosition(containerRect));
   } else if (container->IsGridContainerFrame() &&
              mOuterFrame->HasAnyStateBits(NS_FRAME_OUT_OF_FLOW)) {
+    if (MOZ_UNLIKELY(mOuterFrame->HasAnyStateBits(NS_FRAME_FIRST_REFLOW))) {
+      return 0;
+    }
     containerRect = nsGridContainerFrame::GridItemCB(mOuterFrame);
     rect.MoveBy(-containerRect.x, -containerRect.y);
   }

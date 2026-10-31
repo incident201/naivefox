@@ -68,6 +68,9 @@ sealed interface FenixMenuItem {
     /** A menu item allowing to open the current custom tab in the main application. */
     data object OpenInFirefox : FenixMenuItem
 
+    /** The menu items added by the app that opened the current custom tab. */
+    data object CustomTabAppItems : FenixMenuItem
+
     /** A menu item allowing to save the current webpage as a PDF. */
     data object SaveAsPdf : FenixMenuItem
 
@@ -118,12 +121,16 @@ sealed interface FenixMenuItem {
  * @property presentationMode How the items in this section should be shown.
  * @property items The items to show in this section.
  * @property isSticky Whether this section should be sticky at the top or bottom of the menu.
+ * @property isDisabled Whether this section should be disabled.
+ * @property isHidden Whether this section should be rendered with a dashed border to indicate it is hidden.
  */
 data class MenuSectionConfiguration(
     val id: String,
     val presentationMode: MenuPresentationMode,
     val items: List<FenixMenuItem>,
     val isSticky: Boolean = false,
+    val isDisabled: Boolean = false,
+    val isHidden: Boolean = false,
 )
 
 /** How the [FenixMenuItem] should be shown inside a menu section. */

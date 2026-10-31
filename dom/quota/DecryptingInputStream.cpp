@@ -81,6 +81,11 @@ void DecryptingInputStreamBase::SerializedComplexity(uint32_t aMaxSize,
                                                      uint32_t* aSizeUsed,
                                                      uint32_t* aPipes,
                                                      uint32_t* aTransferables) {
+  MutexAutoLock lock(mMutex);
+  if (!mBaseStream) {
+    return;
+  }
+
   (*mBaseIPCSerializableInputStream)
       ->SerializedComplexity(aMaxSize, aSizeUsed, aPipes, aTransferables);
 }

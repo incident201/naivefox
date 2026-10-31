@@ -469,7 +469,7 @@ nsHttpNTLMAuth::GenerateCredentialsAsync(
           "nsIHttpAuthenticableChannel", authChannel, false));
   nsMainThreadPtrHandle<NTLMGetNextTokenCompleteEvent> cancelEvent(
       new nsMainThreadPtrHolder<NTLMGetNextTokenCompleteEvent>(
-          "NTLMGetNextTokenCompleteEvent",
+          "NTLMGetNextTokenRunnable::mCompleteEvent",
           new NTLMGetNextTokenCompleteEvent(aCallback), false));
 
   nsCOMPtr<nsIRunnable> runnable = new NTLMGetNextTokenRunnable(

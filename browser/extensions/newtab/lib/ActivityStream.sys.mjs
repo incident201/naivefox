@@ -210,6 +210,7 @@ export const WEATHER_OPTIN_REGIONS = [
   "DE", // Germany
   "GB", // United Kingdom
   "GR", // Greece
+  "GL", // Greenland
   "HU", // Hungary
   "IS", // Iceland
   "IE", // Ireland
@@ -217,6 +218,7 @@ export const WEATHER_OPTIN_REGIONS = [
   "LV", // Latvia
   "LI", // Liechtenstein
   "LT", // Lithuania
+  "LU", // Luxembourg
   "MT", // Malta
   "NL", // Netherlands
   "NO", // Norway
@@ -799,6 +801,14 @@ export const PREFS_CONFIG = new Map([
     },
   ],
   [
+    "unifiedAds.tiles.ohttpImages.enabled",
+    {
+      title:
+        "Use OHTTP when requesting sponsored top sites tile images from MARS",
+      value: false,
+    },
+  ],
+  [
     "unifiedAds.spocs.enabled",
     {
       title:
@@ -918,7 +928,7 @@ export const PREFS_CONFIG = new Map([
     {
       title:
         "Whether the Picture of the day 'Set as wallpaper' feature/CTA is enabled",
-      value: false,
+      value: true,
     },
   ],
   [
@@ -1895,10 +1905,26 @@ export const PREFS_CONFIG = new Map([
     },
   ],
   [
+    "widgets.solitaire.enabled",
+    {
+      title: "Enables the solitaire widget",
+      // Off everywhere. To release organically: add locale-config to firefox.js, switch to marketGate.
+      getValue: () => !marketGateEnabled(),
+    },
+  ],
+  [
     "widgets.travel.interaction",
     {
       title:
         "Boolean flag for determining if a user has interacted with the travel widget",
+      value: false,
+    },
+  ],
+  [
+    "widgets.solitaire.interaction",
+    {
+      title:
+        "Boolean flag for determining if a user has interacted with the solitaire widget",
       value: false,
     },
   ],
@@ -1945,6 +1971,14 @@ export const PREFS_CONFIG = new Map([
     "widgets.system.travel.enabled",
     {
       title: "Enables the travel widget experiment in Nimbus",
+      // Off everywhere. To release organically: add locale-config to firefox.js, switch to marketGate.
+      value: false,
+    },
+  ],
+  [
+    "widgets.system.solitaire.enabled",
+    {
+      title: "Enables the solitaire widget experiment in Nimbus",
       // Off everywhere. To release organically: add locale-config to firefox.js, switch to marketGate.
       value: false,
     },
@@ -2087,6 +2121,13 @@ export const PREFS_CONFIG = new Map([
     "widgets.travel.size",
     {
       title: "Size of the travel widget (medium or large)",
+      value: "",
+    },
+  ],
+  [
+    "widgets.solitaire.size",
+    {
+      title: "Size of the solitaire widget (medium or large)",
       value: "",
     },
   ],
@@ -2487,7 +2528,7 @@ export const PREFS_CONFIG = new Map([
     "pageLayouts.spacesConfig",
     {
       title:
-        "JSON config for the spaces-thematic-v1 layout variant: an `order` array of space ids, a `default` id that the page opens on and that also takes any section or widget no other space claims, and a `spaces` object mapping each id to a `label`, an `icon` chrome:// URL, and `sections` and `widgets` arrays. Defaults to the config this build ships; clearing the user value returns to it. A config that cannot render turns the layout off rather than partly applying; nothing is merged with the default. Overridden by trainhopConfig.spaces.",
+        "JSON config for the spaces-thematic-v1 layout variant: an `order` array of space ids, a `default` id that the page opens on and that also takes any section or widget no other space claims, a `preview` boolean that turns on the tab preview, and a `spaces` object mapping each id to a `label`, an `icon` chrome:// URL, an optional `previewImage` chrome:// URL that the preview shows instead of the space's first item, and `sections` and `widgets` arrays. Defaults to the config this build ships; clearing the user value returns to it. A config that cannot render turns the layout off rather than partly applying; nothing is merged with the default. Overridden by trainhopConfig.spaces.",
       value: JSON.stringify(DEFAULT_SPACES_CONFIG),
     },
   ],
@@ -2495,7 +2536,7 @@ export const PREFS_CONFIG = new Map([
     "pageLayouts.spacesOrder",
     {
       title:
-        "Comma-separated order of the spaces in the spaces-buttons-top, spaces-buttons-bottom and spaces-floating-arrows layout variants, from stories, widgets and activity. A space left out is not shown; empty means stories,widgets,activity.",
+        "Comma-separated order of the spaces in the V1 spaces layout variants, from stories, widgets and activity. A space left out is not shown; empty means stories,widgets,activity.",
       value: "",
     },
   ],
@@ -2508,12 +2549,13 @@ export const PREFS_CONFIG = new Map([
       value: 3000,
     },
   ],
-  // @experiment(remove) { bug 2078816 }
+  // @experiment(remove-conditional) { bug 2078816 }
+  // Keep for spaces-thematic-v1.
   [
     "pageLayouts.widgetFirstContentSlot.widget",
     {
       title:
-        "Id of the widget the widget-first-content-slot layout variant puts in the first card slot of Popular Today. Overridden by trainhopConfig.pageLayouts.widgetFirstContentSlot.widget.",
+        "Id of the widget the widget-first-content-slot and spaces-thematic-v1 layout variants put in the first card slot of Popular Today. spaces-thematic-v1 uses it only when no space in its config names a `firstSlotWidget`. Overridden by trainhopConfig.pageLayouts.widgetFirstContentSlot.widget.",
       value: "",
     },
   ],

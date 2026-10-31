@@ -87,7 +87,7 @@ add_task(async function test_bookmarks_panel_opens() {
   const { component } = await showBookmarksSidebar(window);
   ok(component, "Bookmarks panel component is present.");
 
-  ok(component.panelHeader, "Panel header is rendered.");
+  ok(SidebarController.panelHeader, "Panel header is rendered.");
   ok(component.searchInput, "Search input is rendered.");
 
   SidebarTestUtils.closePanel(window);

@@ -16,6 +16,7 @@ from pathlib import Path
 
 import mozfile
 from logger.logger import RaptorLogger
+from mozgeckoprofiler import source_path_mapping_args
 
 here = os.path.dirname(os.path.realpath(__file__))
 LOG = RaptorLogger(component="raptor-profiling")
@@ -83,10 +84,19 @@ class RaptorProfiling:
     Superclass for handling profling for Firefox and Chrome applications.
     """
 
-    def __init__(self, upload_dir, raptor_config, test_config):
+    def __init__(
+        self, upload_dir, raptor_config, test_config, source_path_mappings=None
+    ):
+        """
+        source_path_mappings is a list of dicts with "urlPrefix" and "localPath"
+        keys, mapping URL prefixes to the local directories they were served
+        from. The JS sources found there, and their source maps, are embedded
+        into the profile.
+        """
         self.upload_dir = upload_dir
         self.raptor_config = raptor_config
         self.test_config = test_config
+        self.source_path_mappings = source_path_mappings
         self.profile = None
         # Create a temporary directory into which the tests can put
         # their profiles. These files will be assembled into one big
@@ -111,13 +121,14 @@ class RaptorProfiling:
 
             For benchmark/scenario tests, we return those specific types,
             but for pageloads we return cold or warm depending on the --cold
-            flag.
+            flag or the test's cold setting.
             """
             if self.test_config.get("type", "pageload") not in (
                 "benchmark",
                 "scenario",
             ):
-                return "cold" if self.raptor_config.get("cold", False) else "warm"
+                cold = self.raptor_config.get("cold") or self.test_config.get("cold")
+                return "cold" if cold else "warm"
             else:
                 return self.test_config.get("type", "benchmark")
 
@@ -340,21 +351,23 @@ class RaptorProfiling:
                 },
             ]
 
-            for config in profile_configs:
-                output_profile_path = (
-                    self.upload_dir
-                    / f"profile_{test_name}_{config['suffix']}.jslb.gz"  # .jslb.gz should be more space-efficient than .json.gz
-                )
-                _edit_profile(
-                    output_profile=output_profile_path,
-                    name=f"{test_name.capitalize()} {browser_cycles} {config['name_suffix']}",
-                    labels=config.get("labels", False),
-                    compact=config.get("compact", False),
-                )
-                LOG.info(
-                    f"Created {output_profile_path.name} ({output_profile_path.stat().st_size} bytes)"
-                )
-                profiles.append(output_profile_path)
+            with source_path_mapping_args(self.source_path_mappings) as mapping_args:
+                for config in profile_configs:
+                    output_profile_path = (
+                        self.upload_dir
+                        / f"profile_{test_name}_{config['suffix']}.jslb.gz"  # .jslb.gz should be more space-efficient than .json.gz
+                    )
+                    _edit_profile(
+                        output_profile=output_profile_path,
+                        name=f"{test_name.capitalize()} {browser_cycles} {config['name_suffix']}",
+                        labels=config.get("labels", False),
+                        compact=config.get("compact", False),
+                        profiler_edit_args=list(mapping_args),
+                    )
+                    LOG.info(
+                        f"Created {output_profile_path.name} ({output_profile_path.stat().st_size} bytes)"
+                    )
+                    profiles.append(output_profile_path)
 
             self.profile.unlink(missing_ok=True)
             self.profile = None

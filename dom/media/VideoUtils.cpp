@@ -10,6 +10,7 @@
 
 #include "CubebUtils.h"
 #include "H264.h"
+#include "H265.h"
 #include "ImageContainer.h"
 #include "MediaContainerType.h"
 #include "MediaResource.h"
@@ -605,8 +606,18 @@ bool IsH265ProfileRecognizable(uint8_t aProfile,
   return p != eUnknown;
 }
 
-bool ExtractH265CodecDetails(const nsAString& aCodec, uint8_t& aProfile,
-                             uint8_t& aLevel, nsTArray<uint8_t>& aConstraints) {
+// ISO/IEC 14496-15 Annex E.3: "the 32 bits of the
+// general_profile_compatibility_flags, but in reverse bit order."
+static uint32_t ReverseBitOrder(uint32_t aValue) {
+  uint32_t reversed = 0;
+  for (uint8_t bit = 0; bit < 32; bit++) {
+    reversed |= ((aValue >> bit) & 1u) << (31 - bit);
+  }
+  return reversed;
+}
+
+bool ExtractH265CodecDetails(const nsAString& aCodec,
+                             H265CodecDetails* aDetails) {
   // HEVC codec id consists of:
   const size_t maxHevcCodecIdLength =
       5 +  // 'hev1.' or 'hvc1.' prefix (5 chars)
@@ -627,7 +638,9 @@ bool ExtractH265CodecDetails(const nsAString& aCodec, uint8_t& aProfile,
 
   nsresult rv;
   CheckedUint8 profile;
+  uint8_t profileSpace = 0;
   int32_t compabilityFlags = 0;
+  bool tierFlag = false;
   CheckedUint8 level = 0;
   nsTArray<uint8_t> constraints;
 
@@ -651,7 +664,9 @@ bool ExtractH265CodecDetails(const nsAString& aCodec, uint8_t& aProfile,
           fieldStr.First() == u'C') {
         validProfileSpace.emplace(1 + (fieldStr.First() - 'A'));
       }
-      // If fieldStr.First() is not A, B, C or a digit, ToInteger() should fail.
+      profileSpace = validProfileSpace.valueOr(0);
+      // ToInteger skips a leading character that is not a hex digit, so an
+      // unrecognized profile space is dropped rather than rejected.
       profile = validProfileSpace ? Substring(fieldStr, 1).ToInteger(&rv)
                                   : fieldStr.ToInteger(&rv);
       if (NS_FAILED(rv) || !profile.isValid() || profile.value() > 0x1F) {
@@ -671,7 +686,9 @@ bool ExtractH265CodecDetails(const nsAString& aCodec, uint8_t& aProfile,
       if (fieldStr.First() == u'L' || fieldStr.First() == u'H') {
         validProfileTier.emplace(fieldStr.First() == u'L' ? 0 : 1);
       }
-      // If fieldStr.First() is not L, H, or a digit, ToInteger() should fail.
+      tierFlag = validProfileTier.valueOr(0) != 0;
+      // ToInteger skips a leading character that is not a hex digit, so an
+      // unrecognized tier is dropped rather than rejected.
       level = validProfileTier ? Substring(fieldStr, 1).ToInteger(&rv)
                                : fieldStr.ToInteger(&rv);
       if (NS_FAILED(rv) || !level.isValid()) {
@@ -697,9 +714,20 @@ bool ExtractH265CodecDetails(const nsAString& aCodec, uint8_t& aProfile,
     return false;
   }
 
-  aProfile = profile.value();
-  aLevel = level.value();
-  aConstraints = std::move(constraints);
+  aDetails->general_profile_space = profileSpace;
+  aDetails->general_tier_flag = tierFlag;
+  aDetails->general_profile_idc = profile.value();
+  aDetails->general_profile_compatibility_flags =
+      ReverseBitOrder(static_cast<uint32_t>(compabilityFlags));
+  // ISO/IEC 14496-15 Annex E.3: "trailing bytes that are zero may be omitted."
+  // Store the constraint bytes left-aligned in
+  // general_constraint_indicator_flags.
+  aDetails->general_constraint_indicator_flags = 0;
+  for (size_t i = 0; i < constraints.Length(); i++) {
+    aDetails->general_constraint_indicator_flags |=
+        static_cast<uint64_t>(constraints[i]) << (40 - i * 8);
+  }
+  aDetails->general_level_idc = level.value();
   return true;
 }
 
@@ -1161,10 +1189,8 @@ bool IsAllowedH264Codec(const nsAString& aCodec) {
 }
 
 bool IsH265CodecString(const nsAString& aCodec) {
-  uint8_t profile = 0;
-  uint8_t level = 0;
-  nsTArray<uint8_t> constraints;
-  return ExtractH265CodecDetails(aCodec, profile, level, constraints);
+  H265CodecDetails details;
+  return ExtractH265CodecDetails(aCodec, &details);
 }
 
 bool IsAACCodecString(const nsAString& aCodec) {

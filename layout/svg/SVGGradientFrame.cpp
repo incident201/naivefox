@@ -726,6 +726,9 @@ already_AddRefed<gfxPattern> SVGRadialGradientFrame::CreateGradient(
       GetLengthValue(aGradientUnits, dom::SVGRadialGradientElement::ATTR_CY);
   float r =
       GetLengthValue(aGradientUnits, dom::SVGRadialGradientElement::ATTR_R);
+  if (r < 0) {
+    return nullptr;
+  }
   // If fx or fy are not set, use cx/cy instead
   float fx = GetLengthValue(aGradientUnits,
                             dom::SVGRadialGradientElement::ATTR_FX, cx);
@@ -733,6 +736,9 @@ already_AddRefed<gfxPattern> SVGRadialGradientFrame::CreateGradient(
                             dom::SVGRadialGradientElement::ATTR_FY, cy);
   float fr =
       GetLengthValue(aGradientUnits, dom::SVGRadialGradientElement::ATTR_FR);
+  if (fr < 0) {
+    return nullptr;
+  }
 
   return MakeAndAddRef<gfxPattern>(fx, fy, fr, cx, cy, r);
 }
@@ -794,14 +800,14 @@ bool SVGRadialGradientFrame::GetWebRenderGeometry(
 
 nsIFrame* NS_NewSVGLinearGradientFrame(mozilla::PresShell* aPresShell,
                                        mozilla::ComputedStyle* aStyle) {
-  return new (aPresShell)
-      mozilla::SVGLinearGradientFrame(aStyle, aPresShell->GetPresContext());
+  return new mozilla::SVGLinearGradientFrame(aStyle,
+                                             aPresShell->GetPresContext());
 }
 
 nsIFrame* NS_NewSVGRadialGradientFrame(mozilla::PresShell* aPresShell,
                                        mozilla::ComputedStyle* aStyle) {
-  return new (aPresShell)
-      mozilla::SVGRadialGradientFrame(aStyle, aPresShell->GetPresContext());
+  return new mozilla::SVGRadialGradientFrame(aStyle,
+                                             aPresShell->GetPresContext());
 }
 
 namespace mozilla {

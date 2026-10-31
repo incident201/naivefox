@@ -73,6 +73,17 @@ def add_variants(config, jobs):
             fips_build["attributes"]["certs"] = True
             yield fips_build
 
+        # Windows gyp builds use clang-cl, as Firefox does (see
+        # uses_clang_cl). MSVC is kept as a build-only extra, like the extra
+        # Linux compilers below.
+        if (attributes["build_platform"].startswith("win")
+                and not attributes.get("make") and not attributes.get("static")):
+            msvc_job = deepcopy(job)
+            msvc_job["name"] += "-msvc"
+            msvc_job["description"] += " w/ MSVC"
+            msvc_job["attributes"]["cc"] = "msvc"
+            yield msvc_job
+
         # The extra compilers, modular, and dbm variants are x86-Linux only.
         # aarch64 is a Linux platform too, so exclude it explicitly.
         if "linux" in attributes["build_platform"] and "aarch64" not in attributes["build_platform"]:
@@ -110,6 +121,14 @@ def add_variants(config, jobs):
                 tlsfuzz_job["name"] = job["name"].replace("-fuzz", "-tlsfuzz")
                 tlsfuzz_job["description"] = job["description"].replace("fuzz", "TLS fuzz")
                 yield tlsfuzz_job
+
+
+def uses_clang_cl(attributes):
+    """Windows gyp builds use clang-cl unless they are the MSVC variant. The
+    make builds go through coreconf, which only knows MSVC."""
+    return (attributes["build_platform"].startswith("win")
+            and not attributes.get("make")
+            and attributes.get("cc") != "msvc")
 
 
 @transforms.add
@@ -159,6 +178,8 @@ def set_gyp_command(config, jobs):
             # shlibsign runs what it signs, which the host can't do here. No
             # test on this platform reads the .chk files it would produce.
             command += " -t arm64 -Dsign_libs=0"
+        if uses_clang_cl(attributes):
+            command += " --clang-cl"
         if attributes["build_type"] in ("opt", "opt-static"):
             command += " --opt"
         if "fips" in attributes["build_type"]:
@@ -187,17 +208,24 @@ def set_gyp_command(config, jobs):
         yield job
 
 
-# The Visual Studio layout the Windows ARM64 build compiles against. See
-# automation/taskcluster/windows/setup.sh for why it comes from gecko rather
-# than from the tooltool package the other Windows builds use. Bump the index
-# when gecko moves to a newer Visual Studio.
+# The Visual Studio layout the Windows ARM64 and clang-cl builds compile
+# against. See automation/taskcluster/windows/setup.sh for why it comes from
+# gecko rather than from the tooltool package the other Windows builds use.
+# Bump the index when gecko moves to a newer Visual Studio.
 VS_TOOLCHAIN_INDEX = "gecko.cache.level-3.toolchains.v3.win64-vs2026.latest"
 VS_TOOLCHAIN_ARTIFACT = "project/gecko/vs/vs.tar.zst"
 
+# The clang-cl that Firefox's Windows builds use, runnable on an x64 Windows
+# host; it unpacks to clang/bin. Bump the index when gecko moves to a newer
+# clang.
+CLANG_TOOLCHAIN_INDEX = "gecko.cache.level-3.toolchains.v3.win64-clang-22.latest"
+CLANG_TOOLCHAIN_ARTIFACT = "public/build/clang.tar.zst"
+
 
 @transforms.add
-def add_vs_toolchain_fetch(config, jobs):
-    """Have run-task fetch gecko's Visual Studio layout for win-aarch64.
+def add_gecko_toolchain_fetches(config, jobs):
+    """Have run-task fetch gecko's Visual Studio layout, and for clang-cl
+    builds its clang, for the Windows builds that need them.
 
     run-task invokes fetch-content whenever MOZ_FETCHES is set, and
     fetch-content already knows how to pull a non-public artifact through the
@@ -205,39 +233,42 @@ def add_vs_toolchain_fetch(config, jobs):
     and unpack a .tar.zst.
 
     taskgraph's own `fetches` stanza can't express this: it only resolves
-    `fetch`/`toolchain` tasks inside our own graph, and this artifact comes
-    from gecko's. So build the MOZ_FETCHES entry by hand, resolving the index
-    to a concrete task id at decision time -- which also pins the toolchain
-    for the whole push instead of re-resolving `.latest` per task. The lookup
-    is lazy so that generating a graph with no win-aarch64 task in it makes no
+    `fetch`/`toolchain` tasks inside our own graph, and these artifacts come
+    from gecko's. So build the MOZ_FETCHES entries by hand, resolving each index
+    to a concrete task id at decision time -- which also pins the toolchains
+    for the whole push instead of re-resolving `.latest` per task. The lookups
+    are lazy so that generating a graph with no such task in it makes no
     network request.
     """
-    task_id = None
+    task_ids = {}
+
+    def fetch(index, artifact):
+        if index not in task_ids:
+            task_ids[index] = find_task_id(index)
+        return {
+            "artifact": artifact,
+            "task": task_ids[index],
+            "extract": True,
+            "verify-hash": True,
+        }
+
     for job in jobs:
         platform = job["attributes"]["build_platform"]
-        if not (platform.startswith("win") and "aarch64" in platform):
+        clang_cl = uses_clang_cl(job["attributes"])
+        if not (platform.startswith("win") and ("aarch64" in platform or clang_cl)):
             yield job
             continue
 
-        if task_id is None:
-            task_id = find_task_id(VS_TOOLCHAIN_INDEX)
+        fetches = [fetch(VS_TOOLCHAIN_INDEX, VS_TOOLCHAIN_ARTIFACT)]
+        if clang_cl:
+            fetches.append(fetch(CLANG_TOOLCHAIN_INDEX, CLANG_TOOLCHAIN_ARTIFACT))
 
         env = job.setdefault("worker", {}).setdefault("env", {})
-        env["MOZ_FETCHES"] = json.dumps(
-            [
-                {
-                    "artifact": VS_TOOLCHAIN_ARTIFACT,
-                    "task": task_id,
-                    "extract": True,
-                    "verify-hash": True,
-                }
-            ],
-            sort_keys=True,
-        )
+        env["MOZ_FETCHES"] = json.dumps(fetches, sort_keys=True)
         env.setdefault("MOZ_FETCHES_DIR", "fetches")
 
         # What taskgraph.transforms.run:use_fetches would have done for a
-        # non-public artifact.
+        # non-public artifact. The clang artifact is public.
         job["worker"]["taskcluster-proxy"] = True
         prefix = VS_TOOLCHAIN_ARTIFACT.rsplit("/", 1)[0]
         scope = f"queue:get-artifact:{prefix}/*"

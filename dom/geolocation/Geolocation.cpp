@@ -151,7 +151,7 @@ class nsGeolocationRequest final : public ContentPermissionRequestBase,
 
 static UniquePtr<PositionOptions> CreatePositionOptionsCopy(
     const PositionOptions& aOptions) {
-  UniquePtr<PositionOptions> geoOptions = MakeUnique<PositionOptions>();
+  auto geoOptions = std::make_unique<PositionOptions>();
 
   geoOptions->mEnableHighAccuracy = aOptions.mEnableHighAccuracy;
   geoOptions->mMaximumAge = aOptions.mMaximumAge;

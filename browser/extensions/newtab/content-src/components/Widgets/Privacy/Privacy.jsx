@@ -10,7 +10,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { useSelector, batch } from "react-redux";
+import { useSelector } from "react-redux";
 import { actionCreators as ac, actionTypes as at } from "common/Actions.mjs";
 import { useSizeSubmenu } from "../../../lib/utils";
 import {
@@ -448,31 +448,27 @@ function Privacy({ dispatch, widgetsMayBeMaximized, widgetEnabledMap }) {
   ]);
 
   function handlePrivacyHide() {
-    batch(() => {
-      dispatch(
-        ac.OnlyToMain({
-          type: at.SET_PREF,
-          data: { name: PRIVACY_ENTRY.enabledPref, value: false },
-        })
-      );
-      recordEnabled(false, { source: "context_menu" });
-    });
+    dispatch(
+      ac.OnlyToMain({
+        type: at.SET_PREF,
+        data: { name: PRIVACY_ENTRY.enabledPref, value: false },
+      })
+    );
+    recordEnabled(false, { source: "context_menu" });
   }
 
   const handleChangeSize = useCallback(
     size => {
-      batch(() => {
-        dispatch(
-          ac.OnlyToMain({
-            type: at.SET_PREF,
-            data: { name: PRIVACY_ENTRY.sizePref, value: size },
-          })
-        );
-        recordUserAction(USER_ACTION_TYPES.CHANGE_SIZE, {
-          source: "context_menu",
-          value: size,
-          size,
-        });
+      dispatch(
+        ac.OnlyToMain({
+          type: at.SET_PREF,
+          data: { name: PRIVACY_ENTRY.sizePref, value: size },
+        })
+      );
+      recordUserAction(USER_ACTION_TYPES.CHANGE_SIZE, {
+        source: "context_menu",
+        value: size,
+        size,
       });
     },
     [dispatch, recordUserAction]
@@ -481,18 +477,16 @@ function Privacy({ dispatch, widgetsMayBeMaximized, widgetEnabledMap }) {
   const sizeSubmenuRef = useSizeSubmenu(handleChangeSize);
 
   function handleLearnMore() {
-    batch(() => {
-      dispatch(
-        ac.OnlyToMain({
-          type: at.OPEN_LINK,
-          data: {
-            url: "https://support.mozilla.org/kb/firefox-new-tab-widgets",
-          },
-        })
-      );
-      recordUserAction(USER_ACTION_TYPES.LEARN_MORE, {
-        source: "context_menu",
-      });
+    dispatch(
+      ac.OnlyToMain({
+        type: at.OPEN_LINK,
+        data: {
+          url: "https://support.mozilla.org/kb/firefox-new-tab-widgets",
+        },
+      })
+    );
+    recordUserAction(USER_ACTION_TYPES.LEARN_MORE, {
+      source: "context_menu",
     });
   }
 
@@ -500,62 +494,56 @@ function Privacy({ dispatch, widgetsMayBeMaximized, widgetEnabledMap }) {
   // decision (`cta`); the parent (PrivacyFeed) executes it — content only
   // forwards it and logs the interaction.
   function handleCtaClick() {
-    batch(() => {
-      dispatch(
-        ac.OnlyToMain({
-          type: at.WIDGETS_PRIVACY_CTA,
-          data: { action: cta, message_id: ctaMessageId },
-        })
-      );
-      // action_value is the CTA destination (the click's endpoint, incl. the
-      // Bug 2061524 UTM params). Which message drove the click is recovered by
-      // joining to this visit's message_impression on newtab_visit_id.
-      recordUserAction(USER_ACTION_TYPES.MESSAGE_CTA_CLICK, {
-        source: "message",
-        value: ctaDestination(cta),
-      });
+    dispatch(
+      ac.OnlyToMain({
+        type: at.WIDGETS_PRIVACY_CTA,
+        data: { action: cta, message_id: ctaMessageId },
+      })
+    );
+    // action_value is the CTA destination (the click's endpoint, incl. the
+    // Bug 2061524 UTM params). Which message drove the click is recovered by
+    // joining to this visit's message_impression on newtab_visit_id.
+    recordUserAction(USER_ACTION_TYPES.MESSAGE_CTA_CLICK, {
+      source: "message",
+      value: ctaDestination(cta),
     });
   }
 
   function handleViewProtections(event) {
     event.preventDefault();
-    batch(() => {
-      dispatch(
-        ac.OnlyToMain({
-          type: at.WIDGETS_PRIVACY_CTA,
-          data: {
-            action: {
-              type: "OPEN_ABOUT_PAGE",
-              data: { args: "protections", where: "tab" },
-            },
+    dispatch(
+      ac.OnlyToMain({
+        type: at.WIDGETS_PRIVACY_CTA,
+        data: {
+          action: {
+            type: "OPEN_ABOUT_PAGE",
+            data: { args: "protections", where: "tab" },
           },
-        })
-      );
-      recordUserAction(USER_ACTION_TYPES.TRACKING_MESSAGE_CLICK, {
-        source: "widget",
-      });
+        },
+      })
+    );
+    recordUserAction(USER_ACTION_TYPES.TRACKING_MESSAGE_CLICK, {
+      source: "widget",
     });
   }
 
   // The ETP-off card sends the user where protection can be turned back on in about:preferences#privacy's Enhanced Tracking Protection section.
   function handleOpenEtpSettings(event) {
     event.preventDefault();
-    batch(() => {
-      dispatch(
-        ac.OnlyToMain({
-          type: at.WIDGETS_PRIVACY_CTA,
-          data: {
-            action: {
-              type: "OPEN_PREFERENCES_PAGE",
-              data: { category: ETP_SETTINGS_CATEGORY },
-            },
+    dispatch(
+      ac.OnlyToMain({
+        type: at.WIDGETS_PRIVACY_CTA,
+        data: {
+          action: {
+            type: "OPEN_PREFERENCES_PAGE",
+            data: { category: ETP_SETTINGS_CATEGORY },
           },
-        })
-      );
-      recordUserAction(USER_ACTION_TYPES.TRACKING_MESSAGE_CLICK, {
-        source: "widget",
-        value: ETP_SETTINGS_URL,
-      });
+        },
+      })
+    );
+    recordUserAction(USER_ACTION_TYPES.TRACKING_MESSAGE_CLICK, {
+      source: "widget",
+      value: ETP_SETTINGS_URL,
     });
   }
 

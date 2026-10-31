@@ -5,6 +5,7 @@
 #ifndef MOZILLA_GFX_RENDERCOMPOSITOR_H
 #define MOZILLA_GFX_RENDERCOMPOSITOR_H
 
+#include "GLContextTypes.h"
 #include "GLTypes.h"
 #include "Units.h"
 #include "mozilla/RefPtr.h"
@@ -16,7 +17,10 @@ namespace mozilla {
 
 namespace gl {
 class GLContext;
-}
+#ifdef MOZ_WIDGET_ANDROID
+class GLContextEGL;
+#endif
+}  // namespace gl
 
 namespace layers {
 class AndroidHardwareBuffer;
@@ -238,7 +242,10 @@ class RenderCompositor {
   }
   virtual bool MaybeProcessScreenshotQueue() { return false; }
 #ifdef MOZ_WIDGET_ANDROID
-  virtual bool MaybeCaptureScreenPixels(
+  // Copies aSourceRect of the most recently rendered frame into
+  // aHardwareBuffer, flipping and scaling as required. Returns whether the
+  // capture succeeded.
+  virtual bool CaptureScreenPixels(
       const gfx::IntRect& aSourceRect,
       layers::AndroidHardwareBuffer* aHardwareBuffer) {
     return false;
@@ -258,6 +265,16 @@ class RenderCompositor {
     mLatestRenderFrameId = mLatestRenderFrameId.Next();
     return mLatestRenderFrameId;
   }
+
+#ifdef MOZ_WIDGET_ANDROID
+  // Copies aSourceRect from aGL's default framebuffer into aHardwareBuffer,
+  // flipping and scaling as required. Returns whether the capture succeeded.
+  static bool CaptureScreenPixelsFromGL(
+      gl::GLContextEGL* aGL, const gfx::IntRect& aSourceRect,
+      const LayoutDeviceIntSize& aFramebufferSize,
+      gl::OriginPos aFramebufferOrigin,
+      layers::AndroidHardwareBuffer* aHardwareBuffer);
+#endif
 
   RefPtr<widget::CompositorWidget> mWidget;
   RefPtr<layers::SyncObjectHost> mSyncObject;

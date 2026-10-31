@@ -134,17 +134,16 @@ In a `small` widget, the header hides a `moz-badge` in the `leading` slot, and h
 </moz-widget>
 ```
 
-When the `menu` slot holds a `panel-list`, the header shows a menu button that opens it. A `panel-list` without an `id` gets a generated one. An `id` set by the surface has to be unique to its document or shadow root. `menu-label` sets the button's accessible name, which defaults to "More options":
+When `moz-widget`'s `menu` slot holds a `panel-list`, the header shows a menu button that opens it. A `panel-list` without an `id` gets a generated one. An `id` set by the surface has to be unique to its document or shadow root. `menu-label` sets the button's accessible name, which defaults to "More options":
 
 ```html
 <moz-widget widget-id="weather" title="Weather">
-  <moz-widget-header slot="header" data-l10n-id="weather-header">
-    <panel-list slot="menu" id="weather-menu">
-      <panel-item data-l10n-id="weather-refresh"></panel-item>
-      <hr />
-      <panel-item data-l10n-id="weather-remove"></panel-item>
-    </panel-list>
-  </moz-widget-header>
+  <moz-widget-header slot="header" data-l10n-id="weather-header"></moz-widget-header>
+  <panel-list slot="menu" id="weather-menu">
+    <panel-item data-l10n-id="weather-refresh"></panel-item>
+    <hr />
+    <panel-item data-l10n-id="weather-remove"></panel-item>
+  </panel-list>
 </moz-widget>
 ```
 
@@ -161,6 +160,18 @@ weather-header =
 ```html
 <moz-widget widget-id="weather" title="Weather" padded>
   <moz-widget-header slot="header" title="Weather"></moz-widget-header>
+</moz-widget>
+```
+
+### Without a header
+
+Without a header, the content extends to the card's edges. `moz-widget` draws the menu button over the top-end corner of the content, shown while the widget is hovered or focused, or while its menu is open. `menu-label` on `moz-widget` sets the button's accessible name.
+
+```html
+<moz-widget widget-id="weather" title="Weather" menu-label="Weather options">
+  <panel-list slot="menu">
+    <panel-item data-l10n-id="weather-refresh"></panel-item>
+  </panel-list>
 </moz-widget>
 ```
 

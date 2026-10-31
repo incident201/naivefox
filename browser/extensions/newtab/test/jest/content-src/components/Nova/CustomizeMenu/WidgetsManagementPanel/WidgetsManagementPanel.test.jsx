@@ -101,6 +101,14 @@ const WIDGETS = [
     preference: "widgets.travel.enabled",
     widgetSize: "medium",
   },
+  {
+    id: "solitaire",
+    l10nId: "newtab-custom-widget-solitaire-toggle",
+    source: "WIDGET_SOLITAIRE",
+    widget_name: "solitaire",
+    preference: "widgets.solitaire.enabled",
+    widgetSize: "medium",
+  },
 ];
 
 // The minimum entry the panel renders from; the registry helpers tolerate the
@@ -125,6 +133,7 @@ const PANEL_LABELS = {
   "newtab-custom-widget-picture-toggle": "Picture of the day",
   "newtab-custom-widget-privacy-toggle": "Privacy",
   "newtab-custom-widget-search-toggle": "Search",
+  "newtab-custom-widget-solitaire-toggle": "Solitaire",
   "newtab-custom-widget-stocks-toggle2": "Finance",
   "newtab-custom-widget-timer-toggle": "Timer",
   "newtab-custom-widget-travel-toggle": "Travel",
@@ -133,8 +142,8 @@ const PANEL_LABELS = {
 };
 
 // The German, Greek and Japanese labels are Firefox's own translations, apart
-// from the fixture widget's, the Japanese Search label, and the Horoscopes and
-// Travel labels, which have no translations yet. The Finance fixtures reuse the Stocks
+// from the fixture widget's, the Japanese Search label, and the Horoscopes,
+// Travel and Solitaire labels, which have no translations yet. The Finance fixtures reuse the Stocks
 // translations as stand-ins until the renamed message is translated.
 // Übersicht sorts before Uhr only under locale-aware collation; a code point
 // comparison would put it after Wetter.
@@ -146,6 +155,7 @@ const GERMAN_PANEL_LABELS = {
   "newtab-custom-widget-crossword-toggle": "Kreuzworträtsel",
   "newtab-custom-widget-lists-toggle": "Listen",
   "newtab-custom-widget-travel-toggle": "Reisen",
+  "newtab-custom-widget-solitaire-toggle": "Solitär",
   "newtab-custom-widget-search-toggle": "Suche",
   "newtab-custom-widget-timer-toggle": "Timer",
   "newtab-custom-widget-fixture-toggle": "Übersicht",
@@ -161,6 +171,7 @@ const GREEK_PANEL_LABELS = {
   "newtab-custom-widget-weather-toggle": "Καιρός",
   "newtab-custom-widget-lists-toggle": "Λίστες",
   "newtab-custom-widget-stocks-toggle2": "Μετοχές",
+  "newtab-custom-widget-solitaire-toggle": "Πασιέντζα",
   "newtab-custom-widget-clock-toggle": "Ρολόι",
   "newtab-custom-widget-crossword-toggle": "Σταυρόλεξο",
   "newtab-custom-widget-travel-toggle": "Ταξίδια",
@@ -172,6 +183,7 @@ const GREEK_PANEL_LABELS = {
 const JAPANESE_PANEL_LABELS = {
   "newtab-custom-widget-lists-toggle": "ToDo リスト",
   "newtab-custom-widget-crossword-toggle": "クロスワードパズル",
+  "newtab-custom-widget-solitaire-toggle": "ソリティア",
   "newtab-custom-widget-timer-toggle": "タイマー",
   "newtab-custom-widget-travel-toggle": "トラベル",
   "newtab-custom-widget-privacy-toggle": "プライバシー",
@@ -193,6 +205,7 @@ const EN_US_ORDER = [
   "pictureOfTheDay",
   "privacy",
   "recentSearches",
+  "solitaire",
   "focusTimer",
   "travel",
   "weather",
@@ -209,6 +222,7 @@ const EN_US_ORDER_WITH_FIXTURE = [
   "pictureOfTheDay",
   "privacy",
   "recentSearches",
+  "solitaire",
   "focusTimer",
   "travel",
   "weather",
@@ -222,6 +236,7 @@ const GERMAN_ORDER = [
   "crossword",
   "lists",
   "travel",
+  "solitaire",
   "recentSearches",
   "focusTimer",
   "fixtureWidget",
@@ -237,6 +252,7 @@ const GREEK_ORDER = [
   "weather",
   "lists",
   "stocks",
+  "solitaire",
   "clocks",
   "crossword",
   "travel",
@@ -246,6 +262,7 @@ const GREEK_ORDER = [
 const JAPANESE_ORDER = [
   "lists",
   "crossword",
+  "solitaire",
   "focusTimer",
   "travel",
   "privacy",
@@ -269,6 +286,7 @@ const TIMER_ID_SORT_ORDER = [
   "pictureOfTheDay",
   "privacy",
   "recentSearches",
+  "solitaire",
   "travel",
   "weather",
 ];
@@ -283,6 +301,7 @@ const ID_ORDER = [
   "pictureOfTheDay",
   "privacy",
   "recentSearches",
+  "solitaire",
   "stocks",
   "travel",
   "weather",
@@ -534,27 +553,6 @@ describe("<WidgetsManagementPanel>", () => {
       );
     });
 
-    it("labels an extension widget's toggle with its extension's Fluent id", async () => {
-      const fixture = withFixtureWidget({
-        extensionID: "fixture-widget@mozilla.org",
-      });
-      delete fixture.customizeL10nId;
-
-      const { container } = await renderPanel({}, allWidgetsVisible(), {
-        ExtensionWidgets: {
-          "fixture-widget@mozilla.org": {
-            src: "",
-            customizeL10nId: "fixture-widget-name",
-          },
-        },
-      });
-
-      expect(container.querySelector("#fixtureWidget-toggle")).toHaveAttribute(
-        "data-l10n-id",
-        "fixture-widget-name"
-      );
-    });
-
     it("skips a retired registry entry", async () => {
       withFixtureWidget({ retired: true });
 
@@ -664,6 +662,7 @@ describe("<WidgetsManagementPanel>", () => {
         "horoscopes-toggle",
         "pictureOfTheDay-toggle",
         "recentSearches-toggle",
+        "solitaire-toggle",
         "focusTimer-toggle",
         "travel-toggle",
         "weather-toggle",

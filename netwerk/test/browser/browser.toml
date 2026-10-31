@@ -142,6 +142,9 @@ support-files = ["early_hint_preload_test_helper.sys.mjs",]
 
 ["browser_accept_language_override.js"]
 
+["browser_akamai_waf_telemetry.js"]
+support-files = ["!/netwerk/test/unit/http2-ca.pem"] # for node server
+
 ["browser_alt_data_cross_origin.js"]
 support-files = ["alt_data_cross_origin.sjs"]
 
@@ -157,9 +160,6 @@ run-if = [
 ]
 
 ["browser_clientAuth_he.js"]
-skip-if = [
-  "socketprocess_networking",
-]
 
 ["browser_cookie_filtering_basic.js"]
 
@@ -201,7 +201,6 @@ support-files = ["file_link_hover.sjs"]
 skip-if = [
   "http2",
   "http3",
-  "socketprocess_networking",
 ]
 
 ["browser_necko_l10n.js"]
@@ -212,9 +211,6 @@ skip-if = [
 ]
 
 ["browser_post_auth.js"]
-skip-if = [
-  "socketprocess_networking", # Bug 1772209
-]
 
 ["browser_post_file.js"]
 

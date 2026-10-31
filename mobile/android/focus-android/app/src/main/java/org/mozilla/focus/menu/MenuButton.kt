@@ -5,7 +5,6 @@
 package org.mozilla.focus.menu
 
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
@@ -20,13 +19,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
@@ -62,10 +60,6 @@ fun MenuButton(
 ) {
     var isMenuShown by remember { mutableStateOf(false) }
     val view = LocalView.current
-
-    // Read outside of the popup, which reports the size of its own window rather than of the application's.
-    val maxMenuHeight =
-        with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() } * MENU_MAX_HEIGHT_RATIO
     val horizontalMargin = with(LocalDensity.current) { MENU_HORIZONTAL_MARGIN.roundToPx() }
 
     Box(contentAlignment = Alignment.Center) {
@@ -91,7 +85,6 @@ fun MenuButton(
             ) {
                 MenuPopupContent(
                     buildMenuStore = buildMenuStore,
-                    maxHeight = maxMenuHeight,
                     onDismissRequest = { isMenuShown = false },
                 )
             }
@@ -102,7 +95,6 @@ fun MenuButton(
 @Composable
 private fun MenuPopupContent(
     buildMenuStore: (scope: CoroutineScope, onDismiss: () -> Unit) -> MenuStore,
-    maxHeight: Dp,
     onDismissRequest: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
@@ -110,7 +102,14 @@ private fun MenuPopupContent(
 
     MenuTheme {
         Surface(
-            modifier = Modifier.width(MENU_WIDTH).heightIn(max = maxHeight),
+            modifier =
+                Modifier.width(MENU_WIDTH).layout { measurable, constraints ->
+                    val placeable =
+                        measurable.measure(
+                            constraints.copy(maxHeight = (constraints.maxHeight * MENU_MAX_HEIGHT_RATIO).toInt())
+                        )
+                    layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+                },
             shape = MaterialTheme.shapes.large,
             color = MaterialTheme.colorScheme.surfaceContainer,
             shadowElevation = MENU_ELEVATION,

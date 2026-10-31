@@ -113,8 +113,7 @@ HttpChannelParent::HttpChannelParent(dom::BrowserParent* iframeEmbedding,
       mCacheNeedFlowControlInitialized(false),
       mNeedFlowControl(true),
       mSuspendedForFlowControl(false),
-      mAfterOnStartRequestBegun(false),
-      mDataSentToChildProcess(false) {
+      mAfterOnStartRequestBegun(false) {
   LOG(("Creating HttpChannelParent [this=%p]\n", this));
 
   // Ensure gHttpHandler is initialized: we need the atom table up and running.
@@ -460,7 +459,23 @@ bool HttpChannelParent::DoAsyncOpen(
     const bool& aIsUserAgentHeaderModified, const nsString& aInitiatorType) {
   MOZ_ASSERT(aURI, "aURI should not be NULL");
 
-  if (aEarlyHintPreloaderId) {
+  dom::PContentParent* pcp = Manager()->Manager();
+  const dom::RemoteType& remoteType =
+      static_cast<dom::ContentParent*>(pcp)->GetRemoteType();
+
+  nsCOMPtr<nsILoadInfo> loadInfo;
+  nsresult rv = mozilla::ipc::LoadInfoArgsToLoadInfo(aLoadInfoArgs, remoteType,
+                                                     getter_AddRefs(loadInfo));
+  if (NS_FAILED(rv)) {
+    return SendFailedAsyncOpen(rv);
+  }
+
+  // If the early hint preload is gone or was made for a different request,
+  // ignore it and load the resource normally.
+  RefPtr<EarlyHintRegistrar> registrar =
+      aEarlyHintPreloaderId ? EarlyHintRegistrar::GetOrCreate() : nullptr;
+  if (registrar &&
+      registrar->MatchesRequest(aEarlyHintPreloaderId, aURI, loadInfo)) {
     // Wait for HttpBackgrounChannel to continue the async open procedure.
     mEarlyHintPreloaderId = aEarlyHintPreloaderId;
     RefPtr<HttpChannelParent> self = this;
@@ -496,19 +511,6 @@ bool HttpChannelParent::DoAsyncOpen(
   PROFILER_MARKER("Receive AsyncOpen in Parent", NETWORK,
                   MarkerThreadId::MainThread(), ChannelMarker,
                   aURI->GetSpecOrDefault(), aChannelId);
-
-  nsresult rv;
-
-  dom::PContentParent* pcp = Manager()->Manager();
-  const dom::RemoteType& remoteType =
-      static_cast<dom::ContentParent*>(pcp)->GetRemoteType();
-
-  nsCOMPtr<nsILoadInfo> loadInfo;
-  rv = mozilla::ipc::LoadInfoArgsToLoadInfo(aLoadInfoArgs, remoteType,
-                                            getter_AddRefs(loadInfo));
-  if (NS_FAILED(rv)) {
-    return SendFailedAsyncOpen(rv);
-  }
 
   // Document, subdocument and object/embed loads go through DocumentChannel,
   // never PHttpChannel. Reject content-process attempts to open such a channel,
@@ -1276,9 +1278,6 @@ HttpChannelParent::OnStartRequest(nsIRequest* aRequest) {
     httpChannelImpl->GetCacheTokenFetchCount(&args.cacheFetchCount());
     httpChannelImpl->GetCacheTokenExpirationTime(&args.cacheExpirationTime());
     httpChannelImpl->GetProtocolVersion(args.protocolVersion());
-
-    mDataSentToChildProcess = httpChannelImpl->DataSentToChildProcess();
-    args.dataFromSocketProcess() = mDataSentToChildProcess;
   }
 
   // Propagate whether or not conversion should occur from the parent-side
@@ -1468,14 +1467,6 @@ HttpChannelParent::OnStopRequest(nsIRequest* aRequest, nsresult aStatusCode) {
   // is ready to send OnStopRequest.
   MOZ_ASSERT(mIPCClosed || mBgParent);
 
-  if (mDataSentToChildProcess) {
-    if (mIPCClosed || !mBgParent ||
-        !mBgParent->OnConsoleReport(consoleReports)) {
-      return NS_ERROR_UNEXPECTED;
-    }
-    return NS_OK;
-  }
-
   // If we're handling a multi-part stream, then send this directly
   // over PHttpChannel to make synchronization easier.
   if (mIPCClosed || !mBgParent ||
@@ -1569,11 +1560,6 @@ HttpChannelParent::OnDataAvailable(nsIRequest* aRequest,
        this, aRequest, aOffset, aCount));
   MOZ_ASSERT(NS_IsMainThread());
 
-  if (mDataSentToChildProcess) {
-    uint32_t n;
-    return aInputStream->ReadSegments(NS_DiscardSegment, nullptr, aCount, &n);
-  }
-
   nsresult channelStatus = NS_OK;
   mChannel->GetStatus(&channelStatus);
 
@@ -1653,14 +1639,12 @@ bool HttpChannelParent::NeedFlowControl() {
   // a. pref-out
   // b. the resource is from cache or partial cache
   // c. the resource is small
-  // d. data will be sent from socket process to child process directly
   // Note that we served the cached resource first for partical cache, which is
   // ignored here since we only take the first ODA into consideration.
   if (gHttpHandler->SendWindowSize() == 0 || !httpChannelImpl ||
       httpChannelImpl->IsReadingFromCache() ||
       NS_FAILED(httpChannelImpl->GetContentLength(&contentLength)) ||
-      contentLength < gHttpHandler->SendWindowSize() ||
-      mDataSentToChildProcess) {
+      contentLength < gHttpHandler->SendWindowSize()) {
     mNeedFlowControl = false;
   }
   mCacheNeedFlowControlInitialized = true;

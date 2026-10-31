@@ -878,12 +878,12 @@ class CorePS {
   }
 
  public:
-  static void Create(PSLockRef aLock) {
+  static void Create(PSLockRef /*aLock*/) {
     MOZ_ASSERT(!sInstance);
     sInstance = new CorePS();
   }
 
-  static void Destroy(PSLockRef aLock) {
+  static void Destroy(PSLockRef /*aLock*/) {
     MOZ_ASSERT(sInstance);
     delete sInstance;
     sInstance = nullptr;
@@ -1195,7 +1195,8 @@ class ActivePS {
                              size_t(scMaximumChunkSize)));
   }
 
-  static uint32_t AdjustFeatures(uint32_t aFeatures, uint32_t aFilterCount) {
+  static uint32_t AdjustFeatures(uint32_t aFeatures,
+                                 uint32_t /*aFilterCount*/) {
     // Filter out any features unavailable in this platform/configuration.
     aFeatures &= AvailableFeatures();
 
@@ -1237,7 +1238,7 @@ class ActivePS {
         mProfileBufferChunkManager(
             aChunkManagerOrNull
                 ? std::move(aChunkManagerOrNull)
-                : MakeUnique<ProfileBufferChunkManagerWithLocalLimit>(
+                : std::make_unique<ProfileBufferChunkManagerWithLocalLimit>(
                       size_t(ClampToAllowedEntries(aCapacity.Value())) *
                           scBytesPerEntry,
                       ChunkSizeForEntries(aCapacity.Value()))),
@@ -1517,7 +1518,7 @@ class ActivePS {
 
   // Writes out the current active configuration of the profile.
   static void WriteActiveConfiguration(
-      PSLockRef aLock, JSONWriter& aWriter,
+      PSLockRef /*aLock*/, JSONWriter& aWriter,
       const Span<const char>& aPropertyName = MakeStringSpan("")) {
     if (!sInstance) {
       if (!aPropertyName.empty()) {
@@ -1899,7 +1900,7 @@ class ActivePS {
         });
   }
 
-  static void AddBaseProfileThreads(PSLockRef aLock,
+  static void AddBaseProfileThreads(PSLockRef /*aLock*/,
                                     UniquePtr<char[]> aBaseProfileThreads) {
     MOZ_ASSERT(sInstance);
     DEBUG_LOG("AddBaseProfileThreads(%p)", aBaseProfileThreads.get());
@@ -1950,14 +1951,14 @@ class ActivePS {
 
 #if defined(MOZ_MEMORY) && defined(MOZ_PROFILER_MEMORY)
   static void SetMemoryCounter(UniquePtr<BaseProfilerCount> aMemoryCounter,
-                               PSLockRef aLock) {
+                               [[maybe_unused]] PSLockRef aLock) {
     MOZ_ASSERT(sInstance);
 
     sInstance->mMemoryCounter = std::move(aMemoryCounter);
   }
 
   static bool IsMemoryCounter(const BaseProfilerCount* aMemoryCounter,
-                              PSLockRef aLock) {
+                              [[maybe_unused]] PSLockRef aLock) {
     MOZ_ASSERT(sInstance);
 
     return sInstance->mMemoryCounter.get() == aMemoryCounter;
@@ -2137,7 +2138,7 @@ void profiler_add_state_change_callback(
   }
 
   (void)mIdentifiedProfilingStateChangeCallbacks.append(
-      MakeUnique<IdentifiedProfilingStateChangeCallback>(
+      std::make_unique<IdentifiedProfilingStateChangeCallback>(
           aProfilingStateSet, std::move(aCallback), aUniqueIdentifier));
 }
 
@@ -2651,8 +2652,8 @@ static void MergeStacks(
 }
 
 #if defined(USE_FRAME_POINTER_STACK_WALK) || defined(USE_MOZ_STACK_WALK)
-static void StackWalkCallback(uint32_t aFrameNumber, void* aPC, void* aSP,
-                              void* aClosure) {
+static void StackWalkCallback([[maybe_unused]] uint32_t aFrameNumber, void* aPC,
+                              void* aSP, void* aClosure) {
   NativeStack* nativeStack = static_cast<NativeStack*>(aClosure);
   MOZ_ASSERT(nativeStack->mCount < MAX_NATIVE_FRAMES);
   nativeStack->mSPs[nativeStack->mCount] = aSP;
@@ -2855,23 +2856,6 @@ static void DoEHABIBacktrace(
 
 #ifdef USE_LUL_STACKWALK
 
-// See the comment at the callsite for why this function is necessary.
-#  if defined(MOZ_HAVE_ASAN_IGNORE)
-MOZ_ASAN_IGNORE static void ASAN_memcpy(void* aDst, const void* aSrc,
-                                        size_t aLen) {
-  // The obvious thing to do here is call memcpy(). However, although
-  // ASAN_memcpy() is not instrumented by ASAN, memcpy() still is, and the
-  // false positive still manifests! So we must implement memcpy() ourselves
-  // within this function.
-  char* dst = static_cast<char*>(aDst);
-  const char* src = static_cast<const char*>(aSrc);
-
-  for (size_t i = 0; i < aLen; i++) {
-    dst[i] = src[i];
-  }
-}
-#  endif
-
 static void DoLULBacktrace(
     const ThreadRegistration::UnlockedReaderAndAtomicRWOnThread& aThreadData,
     const Registers& aRegs, NativeStack& aNativeStack,
@@ -2940,31 +2924,12 @@ static void DoLULBacktrace(
   // assumes that the TaggedUWord holding the stack pointer value is valid, but
   // it should be, since it was constructed that way in the code just above.
 
-  // We could construct |stackImg| so that LUL reads directly from the stack in
-  // question, rather than from a copy of it.  That would reduce overhead and
-  // space use a bit.  However, it gives a problem with dynamic analysis tools
-  // (ASan, TSan, Valgrind) which is that such tools will report invalid or
-  // racing memory accesses, and such accesses will be reported deep inside LUL.
-  // By taking a copy here, we can either sanitise the copy (for Valgrind) or
-  // copy it using an unchecked memcpy (for ASan, TSan).  That way we don't have
-  // to try and suppress errors inside LUL.
-  //
-  // N_STACK_BYTES is set to 160KB.  This is big enough to hold all stacks
-  // observed in some minutes of testing, whilst keeping the size of this
-  // function (DoNativeBacktrace)'s frame reasonable.  Most stacks observed in
-  // practice are small, 4KB or less, and so the copy costs are insignificant
-  // compared to other profiler overhead.
-  //
-  // |stackImg| is allocated on this (the sampling thread's) stack.  That
-  // implies that the frame for this function is at least N_STACK_BYTES large.
-  // In general it would be considered unacceptable to have such a large frame
-  // on a stack, but it only exists for the unwinder thread, and so is not
-  // expected to be a problem.  Allocating it on the heap is troublesome because
-  // this function runs whilst the sampled thread is suspended, so any heap
-  // allocation risks deadlock.  Allocating it as a global variable is not
-  // thread safe, which would be a problem if we ever allow multiple sampler
-  // threads.  Hence allocating it on the stack seems to be the least-worst
-  // option.
+  // Point the StackImage directly at the target thread's stack, avoiding
+  // memcpy. This is safe because the target thread is
+  // suspended for the duration of the unwind (periodic path) or we are
+  // unwinding our own stack (synchronous path). Sanitizer tools (ASan,
+  // TSan, Valgrind) may report false positives from LUL reading the
+  // stack directly; suppress with appropriate annotations if needed.
 
   lul::StackImage stackImg;
 
@@ -3003,9 +2968,6 @@ static void DoLULBacktrace(
     if (start < end) {
       nToCopy = end - start;
       if (nToCopy >= 1024u * 1024u) {
-        // start is abnormally far from end, possibly due to some special code
-        // that uses a separate stack elsewhere (e.g.: rr). In this case we just
-        // give up on this sample.
         nToCopy = 0;
       } else if (nToCopy > lul::N_STACK_BYTES) {
         nToCopy = lul::N_STACK_BYTES;
@@ -3014,23 +2976,7 @@ static void DoLULBacktrace(
     MOZ_ASSERT(nToCopy <= lul::N_STACK_BYTES);
     stackImg.mLen = nToCopy;
     stackImg.mStartAvma = start;
-    if (nToCopy > 0) {
-      // If this is a vanilla memcpy(), ASAN makes the following complaint:
-      //
-      //   ERROR: AddressSanitizer: stack-buffer-underflow ...
-      //   ...
-      //   HINT: this may be a false positive if your program uses some custom
-      //   stack unwind mechanism or swapcontext
-      //
-      // This code is very much a custom stack unwind mechanism! So we use an
-      // alternative memcpy() implementation that is ignored by ASAN.
-#  if defined(MOZ_HAVE_ASAN_IGNORE)
-      ASAN_memcpy(&stackImg.mContents[0], (void*)start, nToCopy);
-#  else
-      memcpy(&stackImg.mContents[0], (void*)start, nToCopy);
-#  endif
-      (void)VALGRIND_MAKE_MEM_DEFINED(&stackImg.mContents[0], nToCopy);
-    }
+    stackImg.mContents = reinterpret_cast<uint8_t*>(start);
   }
 
   size_t framePointerFramesAcquired = 0;
@@ -3145,11 +3091,11 @@ void DoNativeBacktraceDirect(const void* stackTop, NativeStack& aNativeStack,
 
 // Writes some components shared by periodic and synchronous profiles to
 // ActivePS's ProfileBuffer. (This should only be called from DoSyncSample()
-// and DoPeriodicSample().)
+// and DoPeriodicSample().) Returns whether JitReturnAddr entries were written.
 //
 // The grammar for entry sequences is in a comment above
 // ProfileBuffer::StreamSamplesToJSON.
-static inline void DoSharedSample(
+static inline bool DoSharedSample(
     bool aIsSynchronous, uint32_t aFeatures,
     const ThreadRegistration::UnlockedReaderAndAtomicRWOnThread& aThreadData,
     JsFrame* aJsFrames, const Registers& aRegs, uint64_t aSamplePos,
@@ -3195,6 +3141,8 @@ static inline void DoSharedSample(
       aBuffer.AddEntry(ProfileBufferEntry::NativeLeafAddr((void*)aRegs.mPC));
     }
   }
+
+  return collector.HasCollectedJitReturnAddr();
 }
 
 // Writes the components of a synchronous sample to the given ProfileBuffer.
@@ -3240,7 +3188,8 @@ static void DoSyncSample(
 // Writes the components of a periodic sample to ActivePS's ProfileBuffer.
 // The ThreadId entry is already written in the main ProfileBuffer, its location
 // is `aSamplePos`, we can write the rest to `aBuffer` (which may be different).
-static inline void DoPeriodicSample(
+// Returns whether JitReturnAddr entries were written.
+static inline bool DoPeriodicSample(
     PSLockRef aLock,
     const ThreadRegistration::UnlockedReaderAndAtomicRWOnThread& aThreadData,
     const Registers& aRegs, uint64_t aSamplePos, uint64_t aBufferRangeStart,
@@ -3250,9 +3199,9 @@ static inline void DoPeriodicSample(
   MOZ_RELEASE_ASSERT(ActivePS::Exists(aLock));
 
   JsFrameBuffer& jsFrames = CorePS::JsFrames(aLock);
-  DoSharedSample(/* aIsSynchronous = */ false, ActivePS::Features(aLock),
-                 aThreadData, jsFrames, aRegs, aSamplePos, aBufferRangeStart,
-                 aBuffer);
+  return DoSharedSample(/* aIsSynchronous = */ false, ActivePS::Features(aLock),
+                        aThreadData, jsFrames, aRegs, aSamplePos,
+                        aBufferRangeStart, aBuffer);
 }
 
 #undef UNWINDING_REGS_HAVE_ECX_EDX
@@ -3905,7 +3854,8 @@ profiler_code_address_service_for_presymbolication() {
     const char* symbolicate = getenv("MOZ_PROFILER_SYMBOLICATE");
     return symbolicate && symbolicate[0] != '\0';
   }();
-  return preSymbolicate ? MakeUnique<ProfilerCodeAddressService>() : nullptr;
+  return preSymbolicate ? std::make_unique<ProfilerCodeAddressService>()
+                        : nullptr;
 }
 
 static ProfilerResult<ProfileGenerationAdditionalInformation>
@@ -4588,7 +4538,7 @@ class SamplerThread {
     // Also this means the sampler has not started its run yet, so any callback
     // added now will be invoked at the end of the next loop; this guarantees
     // that the callback will be invoked after at least one full sampling loop.
-    mPostSamplingCallbackList = MakeUnique<PostSamplingCallbackListItem>(
+    mPostSamplingCallbackList = std::make_unique<PostSamplingCallbackListItem>(
         std::move(mPostSamplingCallbackList), std::move(aCallback));
   }
 
@@ -4690,6 +4640,7 @@ class SamplerThread {
 
 #if defined(GP_OS_windows)
   bool mNoTimerResolutionChange = true;
+  HANDLE mHiResTimer = nullptr;
 #endif
 
   struct SpiedThread {
@@ -5084,7 +5035,9 @@ void SamplerThread::Run() {
                  runningTimesDiff.GetThreadCPUDelta() == Some(uint64_t(0)))) {
               const bool dup_ok = ActivePS::Buffer(lock).DuplicateLastSample(
                   threadId, threadSampleDeltaMs,
-                  profiledThreadData->LastSample(), runningTimesDiff);
+                  profiledThreadData->LastSample(),
+                  profiledThreadData->LastSampleHasJitReturnAddrs(),
+                  runningTimesDiff);
               if (dup_ok) {
                 continue;
               }
@@ -5101,6 +5054,7 @@ void SamplerThread::Run() {
             // (DoPeriodicSample only knows about the temporary local buffer.)
             const uint64_t samplePos = buffer.AddThreadIdEntry(threadId);
             profiledThreadData->LastSample() = Some(samplePos);
+            profiledThreadData->LastSampleHasJitReturnAddrs() = false;
 
             // Also add the time, so it's always there after the thread ID, as
             // expected by the parser. (Other stack data is optional.)
@@ -5125,9 +5079,10 @@ void SamplerThread::Run() {
               mSampler.SuspendAndSampleAndResumeThread(
                   lock, lockedThreadData.DataCRef(), now,
                   [&](const Registers& aRegs, const TimeStamp& aNow) {
-                    DoPeriodicSample(lock, lockedThreadData.DataCRef(), aRegs,
-                                     samplePos, bufferRangeStart,
-                                     localProfileBuffer);
+                    profiledThreadData->LastSampleHasJitReturnAddrs() =
+                        DoPeriodicSample(lock, lockedThreadData.DataCRef(),
+                                         aRegs, samplePos, bufferRangeStart,
+                                         localProfileBuffer);
 
                     // For "eventDelay", we want the input delay - but if
                     // there are no events in the input queue (or even if there
@@ -5815,7 +5770,7 @@ MOZ_DEFINE_MALLOC_SIZE_OF(GeckoProfilerMallocSizeOf)
 
 NS_IMETHODIMP GeckoProfilerReporter::CollectReports(
     nsIHandleReportCallback* aHandleReport, nsISupports* aData,
-    bool aAnonymize) {
+    bool /*aAnonymize*/) {
   MOZ_RELEASE_ASSERT(NS_IsMainThread());
 
   size_t profSize = 0;
@@ -5896,7 +5851,7 @@ static ProfilingStack* locked_register_thread(
           lockedRWFromAnyThread = aOffThreadRef.GetLockedRWFromAnyThread();
 
       ProfiledThreadData* profiledThreadData = ActivePS::AddLiveProfiledThread(
-          aLock, MakeUnique<ProfiledThreadData>(
+          aLock, std::make_unique<ProfiledThreadData>(
                      aOffThreadRef.UnlockedConstReaderCRef().Info()));
       lockedRWFromAnyThread->SetProfilingFeaturesAndData(
           threadProfilingFeatures, profiledThreadData, aLock);
@@ -5980,7 +5935,7 @@ static void locked_profiler_start(PSLockRef aLock, PowerOfTwo32 aCapacity,
 static Vector<const char*> SplitAtCommas(const char* aString,
                                          UniquePtr<char[]>& aStorage) {
   size_t len = strlen(aString);
-  aStorage = MakeUnique<char[]>(len + 1);
+  aStorage = std::make_unique<char[]>(len + 1);
   PodCopy(aStorage.get(), aString, len + 1);
 
   // Iterate over all characters in aStorage and split at commas, by
@@ -6028,8 +5983,8 @@ static const char* get_size_suffix(const char* str) {
 }
 
 #if defined(GECKO_PROFILER_ASYNC_POSIX_SIGNAL_CONTROL)
-static void profiler_start_signal_handler(int signal, siginfo_t* info,
-                                          void* context) {
+static void profiler_start_signal_handler(int /*signal*/, siginfo_t* /*info*/,
+                                          void* /*context*/) {
   // Starting the profiler from a signal handler is a risky business: Both of
   // the main tasks that we would like to accomplish (allocating memory, and
   // starting a thread) are illegal within a UNIX signal handler. Conversely,
@@ -6049,8 +6004,8 @@ static void profiler_start_signal_handler(int signal, siginfo_t* info,
   }
 }
 
-static void profiler_stop_signal_handler(int signal, siginfo_t* info,
-                                         void* context) {
+static void profiler_stop_signal_handler(int /*signal*/, siginfo_t* /*info*/,
+                                         void* /*context*/) {
   // Signal handlers are limited in what functions they can call, for more
   // details see: https://man7.org/linux/man-pages/man7/signal-safety.7.html
   // As we have a background thread already running for checking whether or
@@ -6194,7 +6149,7 @@ void profiler_dump_and_stop() {
     nsProfiler->DumpProfileToFileAsyncNoJs(path.value(), 0)
         ->Then(
             GetMainThreadSerialEventTarget(), __func__,
-            [](void_t ok) {
+            [](void_t /*ok*/) {
               LOG("Stopping profiler after dumping profile to disk");
               profiler_stop();
             },
@@ -6216,7 +6171,7 @@ void profiler_dump_and_stop() {
           nsProfiler->DumpProfileToFileAsyncNoJs(path.value(), 0)
               ->Then(
                   GetMainThreadSerialEventTarget(), __func__,
-                  [](void_t ok) {
+                  [](void_t /*ok*/) {
                     LOG("Stopping profiler after dumping profile to disk");
                     profiler_stop();
                   },
@@ -7107,7 +7062,7 @@ static void locked_profiler_start(PSLockRef aLock, PowerOfTwo32 aCapacity,
       ThreadRegistry::OffThreadRef::RWFromAnyThreadWithLock lockedThreadData =
           offThreadRef.GetLockedRWFromAnyThread();
       ProfiledThreadData* profiledThreadData = ActivePS::AddLiveProfiledThread(
-          aLock, MakeUnique<ProfiledThreadData>(info));
+          aLock, std::make_unique<ProfiledThreadData>(info));
       lockedThreadData->SetProfilingFeaturesAndData(threadProfilingFeatures,
                                                     profiledThreadData, aLock);
       lockedThreadData->GetNewCpuTimeInNs();
@@ -8361,7 +8316,7 @@ UniquePtr<ProfileChunkedBuffer> profiler_capture_backtrace() {
 
   ProfileChunkedBuffer captureBuffer(
       ProfileChunkedBuffer::ThreadSafety::WithoutMutex,
-      MakeUnique<ProfileBufferChunkManagerSingle>(
+      std::make_unique<ProfileBufferChunkManagerSingle>(
           ProfileBufferChunkManager::scExpectedMaximumStackSize));
 
   if (!profiler_capture_backtrace_into(captureBuffer,
@@ -8504,8 +8459,8 @@ void profiler_clear_js_context() {
 static void profiler_suspend_and_sample_thread(
     const PSAutoLock* aLockIfAsynchronousSampling,
     const ThreadRegistration::UnlockedReaderAndAtomicRWOnThread& aThreadData,
-    JsFrame* aJsFrames, uint32_t aFeatures, ProfilerStackCollector& aCollector,
-    bool aSampleNative) {
+    JsFrame* aJsFrames, [[maybe_unused]] uint32_t aFeatures,
+    ProfilerStackCollector& aCollector, bool aSampleNative) {
   const ThreadRegistrationInfo& info = aThreadData.Info();
 
   if (info.IsMainThread()) {
@@ -8515,7 +8470,8 @@ static void profiler_suspend_and_sample_thread(
   // Allocate the space for the native stack
   NativeStack nativeStack{.mCount = 0};
 
-  auto collectStack = [&](const Registers& aRegs, const TimeStamp& aNow) {
+  auto collectStack = [&](const Registers& aRegs,
+                          [[maybe_unused]] const TimeStamp& aNow) {
     // The target thread is now suspended. Collect a native backtrace,
     // and call the callback.
     StackWalkControl* stackWalkControlIfSupported = nullptr;

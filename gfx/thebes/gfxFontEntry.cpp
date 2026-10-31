@@ -7,6 +7,7 @@
 #include <algorithm>
 
 #include "COLRFonts.h"
+#include "FontPaletteCache.h"
 #include "ThebesRLBox.h"
 #include "gfxContext.h"
 #include "gfxGraphiteShaper.h"
@@ -74,6 +75,8 @@ gfxFontEntry::~gfxFontEntry() {
   hb_blob_destroy(mCOLR.exchange(nullptr));
   hb_blob_destroy(mCPAL.exchange(nullptr));
 
+  delete mPaletteCache.exchange(nullptr);
+
   if (TrakTableInitialized()) {
     // Only if it was initialized, so that we don't try to call hb_blob_destroy
     // on the kTrakTableUninitialized flag value!
@@ -93,7 +96,11 @@ gfxFontEntry::~gfxFontEntry() {
     }
   }
 
-  delete mSVGGlyphs.exchange(nullptr);
+  // Only the main thread uses SVG glyphs, but the last reference to a font
+  // entry may be dropped on any thread. Nothing else can access the entry
+  // anymore at this point, so this read is safe.
+  MOZ_ASSERT(NS_IsMainThread() || !mSVGGlyphs);
+  mSVGGlyphs = nullptr;
   delete[] mUVSData.exchange(nullptr);
 
   gfxCharacterMap* cmap = mCharacterMap.exchange(nullptr);
@@ -288,6 +295,7 @@ already_AddRefed<gfxFont> gfxFontEntry::FindOrMakeFont(
   if (!newFont) {
     return nullptr;
   }
+  newFont->InitMetrics();
   if (!newFont->Valid()) {
     newFont->Destroy();
     return nullptr;
@@ -369,6 +377,7 @@ bool gfxFontEntry::TryGetSVGData(const gfxFont* aFont) {
   if (!NS_IsMainThread()) {
     return false;
   }
+  AssertIsOnMainThread();
 
   if (!mSVGInitialized) {
     // If UnitsPerEm is not known/valid, we can't use SVG glyphs
@@ -387,10 +396,7 @@ bool gfxFontEntry::TryGetSVGData(const gfxFont* aFont) {
 
     // gfxSVGGlyphs will hb_blob_destroy() the table when it is finished
     // with it.
-    auto* svgGlyphs = new gfxSVGGlyphs(svgTable, this);
-    if (!mSVGGlyphs.compareExchange(nullptr, svgGlyphs)) {
-      delete svgGlyphs;
-    }
+    mSVGGlyphs = std::make_unique<gfxSVGGlyphs>(svgTable, this);
     mSVGInitialized = true;
   }
 
@@ -439,6 +445,46 @@ bool gfxFontEntry::TryGetColorGlyphs() {
 
   mCheckedForColorGlyph = true;
   return mCOLR && mCPAL;
+}
+
+already_AddRefed<gfx::FontPalette> gfxFontEntry::GetPalette(
+    nsAtom* aPaletteName, gfx::FontPaletteValueSet* aPaletteValueSet) {
+  // Get the palette cache, creating it if necessary. Note that once the
+  // mPaletteCache has been assigned, it is never modified until font entry
+  // destruction, so there is no risk of the local `cache` pointer here
+  // becoming invalid during this function.
+  gfx::PaletteCache* cache = mPaletteCache;
+  if (!cache) {
+    cache = new gfx::PaletteCache();
+    if (!mPaletteCache.compareExchange(nullptr, cache)) {
+      delete cache;  // Lost a race: use the cache created by the winner.
+      cache = mPaletteCache;
+    }
+  }
+
+  // Reading and modifying the cache is guarded by our RWLock.
+  {
+    // First try to return an existing cached palette.
+    AutoReadLock lock(mLock);
+    RefPtr palette = cache->GetCachedPalette(aPaletteValueSet, aPaletteName);
+    if (palette) {
+      return palette.forget();
+    }
+  }
+
+  // Create a new resolved palette.
+  gfxFontEntry::AutoHBFace face = GetHBFace();
+  RefPtr palette = MakeRefPtr<FontPalette>(gfx::COLRFonts::CreateColorPalette(
+      face, aPaletteValueSet, aPaletteName, FamilyName()));
+
+  // Store it in the cache for future use. This may evict an existing cache
+  // entry, but any caller that retrieved the old entry was given its own
+  // strong reference to the palette it contained, which will remain valid
+  // as long as the caller holds its ref.
+  AutoWriteLock lock(mLock);
+  cache->AddPalette(aPaletteValueSet, aPaletteName, palette);
+
+  return palette.forget();
 }
 
 already_AddRefed<gfxCharacterMap> gfxFontEntry::GetCMAPFromFontInfo(
@@ -688,6 +734,7 @@ void gfxFontEntry::ReleaseGrFace(tainted_opaque_gr<gr_face*> aFace) {
 }
 
 void gfxFontEntry::DisconnectSVG() {
+  AssertIsOnMainThread();
   if (mSVGInitialized && mSVGGlyphs) {
     mSVGGlyphs = nullptr;
     mSVGInitialized = false;
@@ -746,7 +793,7 @@ bool gfxFontEntry::SupportsOpenTypeFeature(Script aScript,
                                            uint32_t aFeatureTag) {
   MutexAutoLock lock(mFeatureInfoLock);
   if (!mSupportedFeatures) {
-    mSupportedFeatures = MakeUnique<nsTHashMap<nsUint32HashKey, bool>>();
+    mSupportedFeatures = std::make_unique<nsTHashMap<nsUint32HashKey, bool>>();
   }
 
   // note: high-order three bytes *must* be unique for each feature
@@ -808,7 +855,7 @@ const hb_set_t* gfxFontEntry::InputsForOpenTypeFeature(Script aScript,
                                                        uint32_t aFeatureTag) {
   MutexAutoLock lock(mFeatureInfoLock);
   if (!mFeatureInputs) {
-    mFeatureInputs = MakeUnique<nsTHashMap<nsUint32HashKey, hb_set_t*>>();
+    mFeatureInputs = std::make_unique<nsTHashMap<nsUint32HashKey, hb_set_t*>>();
   }
 
   NS_ASSERTION(aFeatureTag == HB_TAG('s', 'u', 'p', 's') ||
@@ -865,7 +912,7 @@ bool gfxFontEntry::SupportsGraphiteFeature(uint32_t aFeatureTag) {
   MutexAutoLock lock(mFeatureInfoLock);
 
   if (!mSupportedFeatures) {
-    mSupportedFeatures = MakeUnique<nsTHashMap<nsUint32HashKey, bool>>();
+    mSupportedFeatures = std::make_unique<nsTHashMap<nsUint32HashKey, bool>>();
   }
 
   // note: high-order three bytes *must* be unique for each feature
@@ -1409,9 +1456,9 @@ void gfxFontEntry::AddSizeOfExcludingThis(MallocSizeOf aMallocSizeOf,
     aSizes->mFontTableCacheSize +=
         mUserFontData->SizeOfIncludingThis(aMallocSizeOf);
   }
-  if (mSVGGlyphs) {
+  if (gfxSVGGlyphs* svgGlyphs = GetSVGGlyphs()) {
     aSizes->mFontTableCacheSize +=
-        GetSVGGlyphs()->SizeOfIncludingThis(aMallocSizeOf);
+        svgGlyphs->SizeOfIncludingThis(aMallocSizeOf);
   }
 
   {

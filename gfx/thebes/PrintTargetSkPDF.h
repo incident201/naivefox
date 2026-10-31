@@ -8,12 +8,9 @@
 #include "PrintTarget.h"
 #include "mozilla/UniquePtr.h"
 
-class SkCanvas;
-class SkWStream;
-class SkDynamicMemoryWStream;
-class SkDocument;
-
 namespace mozilla::gfx {
+
+class GkSkWStream;
 
 /**
  * Skia PDF printing target.
@@ -21,14 +18,14 @@ namespace mozilla::gfx {
 class PrintTargetSkPDF final : public PrintTarget {
  public:
   static already_AddRefed<PrintTargetSkPDF> CreateOrNull(
-      nsIOutputStream* aStream, const IntSize& aSizeInPoints);
+      nsIOutputStream* aStream);
 
   nsresult BeginPrinting(const nsAString& aTitle,
                          const nsAString& aPrintToFileName,
                          uint64_t aInnerWindowId, int32_t aStartPage,
                          int32_t aEndPage) override;
   nsresult EndPrinting() override;
-  void Finish() override;
+  nsresult AbortPrinting() override;
 
   nsresult BeginPage(const IntSize& aSizeInPoints) override;
   nsresult EndPage() override;
@@ -39,7 +36,7 @@ class PrintTargetSkPDF final : public PrintTarget {
   already_AddRefed<DrawTarget> GetReferenceDrawTarget() final;
 
  private:
-  PrintTargetSkPDF(const IntSize& aSize, UniquePtr<SkWStream> aStream);
+  explicit PrintTargetSkPDF(UniquePtr<GkSkWStream> aStream);
   virtual ~PrintTargetSkPDF();
 
   struct SkPDFDocState;

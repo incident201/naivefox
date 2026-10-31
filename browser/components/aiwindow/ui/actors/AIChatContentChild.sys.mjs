@@ -55,6 +55,7 @@ export class AIChatContentChild extends JSWindowActorChild {
     "AIChatContent:RequestAssets",
     "AIChatContent:HistoryGridRender",
     "AIChatContent:HistoryGridItemClick",
+    "AIChatContent:FirstCharacterDisplayed",
     "AIChatContent:ClientError",
   ]);
 

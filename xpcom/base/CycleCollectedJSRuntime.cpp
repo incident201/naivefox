@@ -236,7 +236,7 @@ void NoteWeakMapsTracer::trace(JSObject* aMap, JS::GCCellPtr aKey,
     mChildTracer.mKey = aKey;
     mChildTracer.mKeyDelegate = kdelegate;
 
-    if (!aValue.is<JSString>()) {
+    if (aValue && !aValue.is<JSString>()) {
       JS::TraceChildren(&mChildTracer, aValue);
     }
 
@@ -652,7 +652,7 @@ void JSHolderMap::Put(void* aHolder, nsScriptObjectTracer* aTracer,
     auto ptr = mPerZoneJSHolders.lookupForAdd(aZone);
     if (!ptr) {
       MOZ_ALWAYS_TRUE(
-          mPerZoneJSHolders.add(ptr, aZone, MakeUnique<EntryVector>()));
+          mPerZoneJSHolders.add(ptr, aZone, std::make_unique<EntryVector>()));
     }
     vector = ptr->value().get();
   }
@@ -1765,6 +1765,23 @@ nsresult CycleCollectedJSRuntime::TraverseRoots(
 
   NoteWeakMapsTracer trc(mJSRuntime, aCb);
   js::TraceWeakMaps(&trc);
+
+  // Ensure WeakRef targets are represented in the graph so that we can check
+  // whether they are garbage with IsGCThingWhiteInCCGraph in
+  // ClearWhiteJSWeakRefTargets.
+  //
+  // Only objects are added. Symbols can be gray, but the only way they can
+  // reach anything else the CC cares about is by being a weak map key, in which
+  // case NoteWeakMapping has already added them to the graph.
+  JS::NoteWeakRefTargets(
+      mJSRuntime,
+      [](JS::GCCellPtr aTarget, void* aData) {
+        auto& cb = *static_cast<nsCycleCollectionNoteRootCallback*>(aData);
+        if (aTarget.is<JSObject>() && JS::GCThingIsMarkedGrayInCC(aTarget)) {
+          cb.NoteJSRoot(&aTarget.as<JSObject>());
+        }
+      },
+      &aCb);
 
   return NS_OK;
 }

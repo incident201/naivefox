@@ -8,6 +8,7 @@ var { XPCOMUtils } = ChromeUtils.importESModule(
 const lazy = XPCOMUtils.declareLazy({
   ContextualIdentityService:
     "moz-src:///toolkit/components/contextualidentity/ContextualIdentityService.sys.mjs",
+  PageThumbs: "resource://gre/modules/PageThumbs.sys.mjs",
   PageWireframes:
     "moz-src:///browser/components/sessionstore/PageWireframes.sys.mjs",
   SponsorProtection:
@@ -550,7 +551,7 @@ class TabPanel extends HoverPanel {
     thumbnailCanvas.width = 280 * this.win.devicePixelRatio;
     thumbnailCanvas.height = 140 * this.win.devicePixelRatio;
 
-    this.win.PageThumbs.captureTabPreviewThumbnail(
+    lazy.PageThumbs.captureTabPreviewThumbnail(
       tab.linkedBrowser,
       thumbnailCanvas
     )

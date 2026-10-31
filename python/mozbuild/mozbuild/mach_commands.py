@@ -1641,16 +1641,22 @@ def source_package(command_context, output, upload):
             f"--exclude=./{substs['DIST']}",
             f"--exclude={os.path.basename(command_context.topobjdir)}",
         ]
+        from mozbuild.action.package import is_gnu_tar
+
+        tar = substs["TAR"]
+        if is_gnu_tar(tar):
+            tar_flags = ["--mode=go-w", f"--transform=s,^./,{archive_prefix}/,"]
+        else:
+            tar_flags = ["-s", f",^./,{archive_prefix}/,"]
         command_context.run_process(
             [
-                "tar",
+                tar,
                 "-cJv",
                 "--owner=0",
                 "--group=0",
                 "--numeric-owner",
-                "--mode=go-w",
                 *excludes,
-                f"--transform=s,^./,{archive_prefix}/,",
+                *tar_flags,
                 "-f",
                 archive_path,
                 "./",
@@ -4036,17 +4042,12 @@ def repackage_desktop_file(
 @CommandArgument(
     "--verbose", action="store_true", help="Log informative status messages."
 )
-def package_l10n(command_context, verbose=False, locales=[]):
-    if "RecursiveMake" not in command_context.substs["BUILD_BACKENDS"]:
-        print(
-            "Artifact builds do not support localization. "
-            "If you know what you are doing, you can use:\n"
-            "ac_add_options --disable-compile-environment\n"
-            "export BUILD_BACKENDS=FasterMake,RecursiveMake\n"
-            "in your mozconfig."
-        )
-        return 1
-
+@CommandArgument(
+    "--package-tests",
+    action="store_true",
+    help="Package the multi-locale test archives after packaging.",
+)
+def package_l10n(command_context, locales, verbose=False, package_tests=False):
     locales = sorted(locale for locale in locales if locale != "en-US")
 
     append_env = {
@@ -4135,6 +4136,29 @@ def package_l10n(command_context, verbose=False, locales=[]):
             + "to install the multi-locale geckoview_example and test APKs."
         )
 
+    if package_tests:
+        command_context._run_make(
+            directory=command_context.topobjdir,
+            target=["package-tests", "AB_CD=multi"],
+            pass_thru=True,
+            ensure_exit_code=True,
+        )
+
+    return 0
+
+
+@SubCommand(
+    "package-multi-locale",
+    "upload",
+    description="Copy the multi-locale package to $UPLOAD_PATH.",
+)
+def package_l10n_upload(command_context):
+    command_context._run_make(
+        directory=command_context.topobjdir,
+        target=["upload", "AB_CD=multi"],
+        pass_thru=True,
+        ensure_exit_code=True,
+    )
     return 0
 
 
@@ -4167,16 +4191,6 @@ def run_mach(command_context, cmd, **kwargs):
     + "default: UPLOAD_PATH environment variable if set; '$topobjdir/dist/repackage-single-locales' if not set",
 )
 def repackage_single_locales(command_context, verbose=False, locales=[], dest=None):
-    if "RecursiveMake" not in command_context.substs["BUILD_BACKENDS"]:
-        print(
-            "Artifact builds do not support localization. "
-            "If you know what you are doing, you can use:\n"
-            "ac_add_options --disable-compile-environment\n"
-            "export BUILD_BACKENDS=FasterMake,RecursiveMake\n"
-            "in your mozconfig."
-        )
-        return 1
-
     if not dest:
         dest = os.environ.get(
             "UPLOAD_PATH",

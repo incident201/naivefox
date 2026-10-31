@@ -101,6 +101,9 @@ const PREF_URLBAR_DEFAULTS = /** @type {PreferenceDefinition[]} */ ([
   // `urlMinPicks` into a use_count threshold.
   ["autoFill.adaptiveHistory.urlPicksAgeDays", 14],
 
+  // The number of times URL canonization has been used in non-private windows.
+  ["canonizedURLCount", 0],
+
   // Feature gate pref for clipboard suggestions in the urlbar.
   ["clipboard.featureGate", false],
 
@@ -200,6 +203,12 @@ const PREF_URLBAR_DEFAULTS = /** @type {PreferenceDefinition[]} */ ([
   // semantic results never evict them. When false, semantic results share the
   // general group with plain history results.
   ["suggest.semanticHistory.separateGroup", false],
+
+  // Whether a semantic history search starting with an origin or URL, like
+  // "example.com some topic" or "example.com/some-topic", only searches pages
+  // in that domain and its subdomains, using the rest of the search string as
+  // the query.
+  ["suggest.semanticHistory.domainScopedSearch", false],
 
   // Feature gate pref for important-dates suggestions in the urlbar.
   ["importantDates.featureGate", false],
@@ -351,40 +360,6 @@ const PREF_URLBAR_DEFAULTS = /** @type {PreferenceDefinition[]} */ ([
   // Whether or not use the Nova icon size for AMP suggestion.
   // Otherwise, use standard rich-suggestion size.
   ["quicksuggest.ampTopPickUseNovaIconSize", false],
-
-  // Whether the Firefox Suggest data collection opt-in result is enabled.
-  ["quicksuggest.contextualOptIn", false],
-
-  // The last time (as seconds) the user dismissed the Firefox Suggest contextual
-  // opt-in result.
-  ["quicksuggest.contextualOptIn.lastDismissedTime", 0],
-
-  // Number that the user dismissed the Firefox Suggest contextual opt-in result.
-  ["quicksuggest.contextualOptIn.dismissedCount", 0],
-
-  // Period until reshow the Firefox Suggest contextual opt-in result when first dismissed.
-  ["quicksuggest.contextualOptIn.firstReshowAfterPeriodDays", 7],
-
-  // Period until reshow the Firefox Suggest contextual opt-in result when second dismissed.
-  ["quicksuggest.contextualOptIn.secondReshowAfterPeriodDays", 14],
-
-  // Period until reshow the Firefox Suggest contextual opt-in result when third dismissed.
-  ["quicksuggest.contextualOptIn.thirdReshowAfterPeriodDays", 60],
-
-  // Number of impression for the Firefox Suggest contextual opt-in result.
-  ["quicksuggest.contextualOptIn.impressionCount", 0],
-
-  // Limit for impression to dismiss the Firefox Suggest contextual opt-in
-  // result.
-  ["quicksuggest.contextualOptIn.impressionLimit", 20],
-
-  // The first impression time (seconds) for the Firefox Suggest contextual
-  // opt-in result.
-  ["quicksuggest.contextualOptIn.firstImpressionTime", 0],
-
-  // Days until dismiss the Firefox Suggest contextual opt-in result after first
-  // impression.
-  ["quicksuggest.contextualOptIn.impressionDaysLimit", 5],
 
   // Comma-separated list of Suggest dynamic suggestion types to enable.
   ["quicksuggest.dynamicSuggestionTypes", ""],
@@ -639,6 +614,10 @@ const PREF_URLBAR_DEFAULTS = /** @type {PreferenceDefinition[]} */ ([
   // temporal search suggestions are turned on.
   ["suggest.temporal", true],
 
+  // If `browser.urlbar.suggest.temporal` is true, this controls whether
+  // seasonal temporal search suggestions are shown.
+  ["suggest.temporal.seasonal", true],
+
   // Whether results will include top sites and the view will open on focus.
   ["suggest.topsites", true],
 
@@ -684,7 +663,12 @@ const PREF_URLBAR_DEFAULTS = /** @type {PreferenceDefinition[]} */ ([
   ["temporal.featureGate", false],
 
   // The maximum number of temporal search suggestions to show.
-  ["temporal.rowCount", 3],
+  ["temporal.rowCount", 5],
+
+  // The maximum number of results in the zero prefix view when temporal search
+  // suggestions are enabled (see `TemporalSuggestions.isEnabled`). A user-set
+  // `maxRichResults` takes precedence.
+  ["temporal.zeroPrefixMaxRichResults", 13],
 
   // The number of times the user has been shown the onboarding search tip.
   ["tipShownCount.searchTip_onboard", 0],
@@ -899,10 +883,14 @@ let inParent =
  * @param {boolean} [options.separateSemanticGroup]
  *   If true, semantic history results get their own group that fills only the
  *   space left after the other general groups.
+ * @param {boolean} [options.temporalZeroPrefix]
+ *   If true, the groups are flexed for the zero prefix view with temporal
+ *   search suggestions.
  */
 function makeDefaultResultGroups({
   showSearchSuggestionsFirst,
   separateSemanticGroup = false,
+  temporalZeroPrefix = false,
 }) {
   /**
    * @type {ResultGroup}
@@ -988,6 +976,10 @@ function makeDefaultResultGroups({
                 group: lazy.UrlbarShared.RESULT_GROUP.RECENT_SEARCH,
               },
               {
+                flex: 99,
+                group: lazy.UrlbarShared.RESULT_GROUP.TEMPORAL_SUGGESTION,
+              },
+              {
                 flex: 4,
                 group: lazy.UrlbarShared.RESULT_GROUP.REMOTE_SUGGESTION,
               },
@@ -1036,8 +1028,14 @@ function makeDefaultResultGroups({
   if (!showSearchSuggestionsFirst) {
     mainGroup.children.reverse();
   }
-  mainGroup.children[0].flex = 2;
-  mainGroup.children[1].flex = 1;
+  if (temporalZeroPrefix) {
+    // Top sites, then recent searches and temporal suggestions split 7:3:3.
+    mainGroup.children[0].flex = 7;
+    mainGroup.children[1].flex = 6;
+  } else {
+    mainGroup.children[0].flex = 2;
+    mainGroup.children[1].flex = 1;
+  }
   rootGroup.children.push(mainGroup);
 
   return rootGroup;
@@ -1308,21 +1306,6 @@ class Preferences {
     return this.get("scotchBonnet.enableOverride") || this.get(pref);
   }
 
-  #getShowSearchSuggestionsFirst(context, pref = "showSearchSuggestionsFirst") {
-    let showSearchSuggestionsFirst =
-      context.searchString ||
-      (!this.get("suggest.trending") && !this.get("suggest.recentsearches"));
-
-    let inSearchEngineMode = !!context.searchMode?.engineName;
-
-    // If we're in a case were search suggestions would be shown first, but not
-    // in search engine mode, then just use the preference.
-    if (!inSearchEngineMode && showSearchSuggestionsFirst) {
-      showSearchSuggestionsFirst = this.get(pref);
-    }
-    return showSearchSuggestionsFirst;
-  }
-
   getResultGroups({ context }) {
     // We try to cache result groups so we don't have to rebuild them each time.
     // This key may be modified per each SAP, and will track the cached groups,
@@ -1334,13 +1317,15 @@ class Preferences {
     key += separateSemanticGroup;
     switch (context.sapName) {
       case "urlbar": {
-        let showSearchSuggestionsFirst =
-          this.#getShowSearchSuggestionsFirst(context);
+        let temporalZeroPrefix = context.isTemporalZeroPrefix;
+        let showSearchSuggestionsFirst = context.showSearchSuggestionsFirst;
         key += showSearchSuggestionsFirst;
+        key += temporalZeroPrefix;
         return this.#getOrCacheResultGroups(key, () =>
           makeDefaultResultGroups({
             showSearchSuggestionsFirst,
             separateSemanticGroup,
+            temporalZeroPrefix,
           })
         );
       }
@@ -1355,10 +1340,7 @@ class Preferences {
         );
       }
       case "smartbar": {
-        let showSearchSuggestionsFirst = this.#getShowSearchSuggestionsFirst(
-          context,
-          "smartbar.showSearchSuggestionsFirst"
-        );
+        let showSearchSuggestionsFirst = context.showSearchSuggestionsFirst;
         key += showSearchSuggestionsFirst;
         return this.#getOrCacheResultGroups(key, () =>
           makeSmartBarGroups({

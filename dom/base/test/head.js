@@ -6,7 +6,9 @@ const scope = this;
 
 async function newFocusedWindow(trigger, isInitialBlank = false) {
   let winPromise = BrowserTestUtils.domWindowOpenedAndLoaded();
-  let delayedStartupPromise = BrowserTestUtils.waitForNewWindow();
+  let delayedStartupPromise = BrowserTestUtils.waitForNewWindow({
+    waitForAnyURLLoaded: !isInitialBlank,
+  });
 
   await trigger();
 

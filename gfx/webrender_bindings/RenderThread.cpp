@@ -25,6 +25,7 @@
 #include "mozilla/layers/Fence.h"
 #include "mozilla/layers/SharedSurfacesParent.h"
 #include "mozilla/layers/SurfacePool.h"
+#include "mozilla/layers/SyncObject.h"
 #include "mozilla/layers/SynchronousTask.h"
 #include "mozilla/layers/WebRenderBridgeParent.h"
 #include "mozilla/webrender/RenderTextureHost.h"
@@ -63,7 +64,8 @@
 
 using namespace mozilla;
 
-static already_AddRefed<gl::GLContext> CreateGLContext(nsACString& aError);
+static already_AddRefed<gl::GLContext> CreateGLContext(
+    nsACString& aError, RefPtr<layers::SyncObjectHost>* aOutSyncObject);
 
 MOZ_DEFINE_MALLOC_SIZE_OF(WebRenderRendererMallocSizeOf)
 MOZ_DEFINE_MALLOC_SIZE_OF(WebRenderPoolMallocSizeOf)
@@ -1336,7 +1338,7 @@ void RenderThread::InitDeviceTask() {
   nsAutoCString err;
   CreateSingletonGL(err);
   if (gfx::gfxVars::UseWebRenderProgramBinaryDisk()) {
-    mProgramCache = MakeUnique<WebRenderProgramCache>(ThreadPool().Raw());
+    mProgramCache = std::make_unique<WebRenderProgramCache>(ThreadPool().Raw());
   }
   // Query the shared GL context to force the
   // lazy initialization to happen now.
@@ -1500,7 +1502,8 @@ void RenderThread::CreateSingletonGL(nsACString& aError) {
   MOZ_ASSERT(IsInRenderThread());
   LOG("RenderThread::CreateSingletonGL()");
 
-  mSingletonGL = CreateGLContext(aError);
+  mSingletonGLSyncObject = nullptr;
+  mSingletonGL = CreateGLContext(aError, &mSingletonGLSyncObject);
   mSingletonGLIsForHardwareWebRender = !gfx::gfxVars::UseSoftwareWebRender();
 }
 
@@ -1511,7 +1514,8 @@ gl::GLContext* RenderThread::SingletonGL(nsACString& aError) {
     mShaders = nullptr;
   }
   if (mSingletonGL && mSingletonGLIsForHardwareWebRender && !mShaders) {
-    mShaders = MakeUnique<WebRenderShaders>(mSingletonGL, mProgramCache.get());
+    mShaders =
+        std::make_unique<WebRenderShaders>(mSingletonGL, mProgramCache.get());
   }
 
   return mSingletonGL.get();
@@ -1540,6 +1544,7 @@ void RenderThread::ClearSingletonGL() {
   }
   mShaders = nullptr;
   mSingletonGL = nullptr;
+  mSingletonGLSyncObject = nullptr;
 }
 
 RefPtr<layers::ShaderProgramOGLsHolder>
@@ -1678,7 +1683,7 @@ WebRenderProgramCache::~WebRenderProgramCache() {
 
 #if defined(XP_WIN) || defined(XP_DARWIN)
 static already_AddRefed<gl::GLContext> CreateGLContextANGLE(
-    nsACString& aError) {
+    nsACString& aError, RefPtr<layers::SyncObjectHost>* aOutSyncObject) {
   nsCString failureId;
   const auto lib = gl::GLLibraryEGL::Get(&failureId);
   if (!lib) {
@@ -1688,8 +1693,10 @@ static already_AddRefed<gl::GLContext> CreateGLContextANGLE(
   }
 
 #  if defined(XP_WIN)
-  const RefPtr<ID3D11Device> d3d11Device =
-      gfx::DeviceManagerDx::Get()->GetCompositorDevice();
+  RefPtr<ID3D11Device> d3d11Device;
+  RefPtr<layers::SyncObjectHost> syncObject;
+  gfx::DeviceManagerDx::Get()->GetCompositorDeviceAndSyncObject(&d3d11Device,
+                                                                &syncObject);
   if (!d3d11Device) {
     aError.Assign("RcANGLE(no compositor device for EGLDisplay)"_ns);
     return nullptr;
@@ -1744,6 +1751,24 @@ static already_AddRefed<gl::GLContext> CreateGLContextANGLE(
     return nullptr;
   }
 
+#  if defined(XP_WIN)
+  *aOutSyncObject = std::move(syncObject);
+#  endif
+  return gl.forget();
+}
+#endif
+
+#ifdef MOZ_WIDGET_ANDROID
+static already_AddRefed<gl::GLContext> CreateGLContextANGLEAndroid(
+    nsACString& aError) {
+  nsCString failureId;
+  RefPtr<gl::GLContext> gl = gl::GLContextProviderEGL::CreateForCompositorANGLE(
+      !gfx::gfxVars::UseSoftwareWebRender(), &failureId);
+  if (!gl || !gl->IsANGLE() || !gl->MakeCurrent()) {
+    aError.Assign(nsPrintfCString(
+        "RcANGLE(create compositor context failed: %s)", failureId.get()));
+    return nullptr;
+  }
   return gl.forget();
 }
 #endif
@@ -1778,22 +1803,28 @@ static already_AddRefed<gl::GLContext> CreateGLContextCGL() {
 }
 #endif
 
-static already_AddRefed<gl::GLContext> CreateGLContext(nsACString& aError) {
+static already_AddRefed<gl::GLContext> CreateGLContext(
+    nsACString& aError, RefPtr<layers::SyncObjectHost>* aOutSyncObject) {
   RefPtr<gl::GLContext> gl;
 
 #ifdef XP_WIN
   if (gfx::gfxVars::UseWebRenderANGLE()) {
-    gl = CreateGLContextANGLE(aError);
+    gl = CreateGLContextANGLE(aError, aOutSyncObject);
   }
 #elif defined(MOZ_WIDGET_ANDROID)
-  gl = CreateGLContextEGL();
+  if (gfx::gfxVars::UseWebRenderANGLE() &&
+      gl::GLLibraryEGL::IsANGLEAvailable()) {
+    gl = CreateGLContextANGLEAndroid(aError);
+  } else {
+    gl = CreateGLContextEGL();
+  }
 #elif defined(MOZ_WIDGET_GTK)
   if (gfx::gfxVars::UseEGL()) {
     gl = CreateGLContextEGL();
   }
 #elif XP_DARWIN
   if (gfx::gfxVars::UseWebRenderANGLE()) {
-    gl = CreateGLContextANGLE(aError);
+    gl = CreateGLContextANGLE(aError, aOutSyncObject);
   } else {
     gl = CreateGLContextCGL();
   }

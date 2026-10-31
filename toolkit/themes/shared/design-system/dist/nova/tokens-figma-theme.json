@@ -334,20 +334,10 @@
     "dark": "{Theme$button/text/color/muted/active}",
     "forcedColors": "{Theme$button/text/color/ghost/active}"
   },
-  "button/text/color/menu/disabled": {
-    "light": "{Theme$button/text/color/ghost/disabled}",
-    "dark": "{Theme$button/text/color/disabled}",
-    "forcedColors": "{Theme$button/text/color/disabled}"
-  },
-  "button/text/color/menu/hover": {
-    "light": "{Theme$button/text/color/ghost/hover}",
-    "dark": "{Theme$button/text/color/hover}",
-    "forcedColors": "-moz-menuhovertext"
-  },
-  "button/text/color/menu/selected": {
-    "light": "{Theme$button/text/color/ghost/selected}",
-    "dark": "{Theme$button/text/color/selected}",
-    "forcedColors": "{Theme$button/text/color/primary/selected}"
+  "button/text/color/menu": {
+    "light": "{Theme$button/text/color/ghost}",
+    "dark": "{Theme$button/text/color/ghost}",
+    "forcedColors": "MenuText"
   },
   "button/text/color/primary": {
     "light": "{Colors$color/white}",
@@ -411,8 +401,23 @@
   },
   "button/text/color/menu/active": {
     "light": "{Theme$button/text/color/ghost/active}",
-    "dark": "{Theme$button/text/color/active}",
-    "forcedColors": "transparent"
+    "dark": "{Theme$button/text/color/ghost/active}",
+    "forcedColors": "{Theme$button/text/color/menu/hover}"
+  },
+  "button/text/color/menu/disabled": {
+    "light": "{Theme$button/text/color/ghost/disabled}",
+    "dark": "{Theme$button/text/color/ghost/disabled}",
+    "forcedColors": "{Theme$button/text/color/disabled}"
+  },
+  "button/text/color/menu/hover": {
+    "light": "{Theme$button/text/color/ghost/hover}",
+    "dark": "{Theme$button/text/color/ghost/hover}",
+    "forcedColors": "-moz-menuhovertext"
+  },
+  "button/text/color/menu/selected": {
+    "light": "{Theme$button/text/color/ghost/selected}",
+    "dark": "{Theme$button/text/color/ghost/selected}",
+    "forcedColors": "{Theme$button/text/color/primary/selected}"
   },
   "card/header/background/color": {
     "light": "{Theme$button/background/color}",
@@ -499,11 +504,6 @@
     "dark": "{Colors$color/gray/60}",
     "forcedColors": "{HCM Theme$ButtonText}"
   },
-  "toolbar/field/background/color": {
-    "light": "{Theme$toolbar/background/color}",
-    "dark": "{Theme$toolbar/background/color}",
-    "forcedColors": "{Theme$toolbar/background/color}"
-  },
   "toolbar/field/background/color/focus": {
     "light": "{Theme$background/color/box}",
     "dark": "{Theme$background/color/box}",
@@ -523,6 +523,11 @@
     "light": "{Theme$focus/outline/color}",
     "dark": "{Theme$focus/outline/color}",
     "forcedColors": "{Theme$focus/outline/color}"
+  },
+  "toolbar/field/background/color": {
+    "light": "{Colors$color/white/alpha/40}",
+    "dark": "{Colors$color/black/alpha/20}",
+    "forcedColors": "{HCM Theme$Field}"
   },
   "toolbar/background/color": {
     "light": "rgba(255, 255, 255, 0.4)",
@@ -558,6 +563,11 @@
     "light": "{Theme$toolbarbutton/outline/color/active}",
     "dark": "{Theme$toolbarbutton/outline/color/active}",
     "forcedColors": "{Theme$toolbarbutton/outline/color/active}"
+  },
+  "toolbarbutton/outline/color/disabled": {
+    "light": "transparent",
+    "dark": "transparent",
+    "forcedColors": "{Theme$button/border/color/disabled}"
   },
   "toolbarbutton/outline/color/hover": {
     "light": "transparent",

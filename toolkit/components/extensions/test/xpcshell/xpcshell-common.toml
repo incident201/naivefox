@@ -124,6 +124,14 @@ run-if = [
 
 ["test_ext_browsingData_cookies_cookieStoreId.js"]
 
+["test_ext_builtin_widget.js"]
+run-if = [
+  "appname != 'thunderbird'",
+]
+skip-if = [
+  "os == 'android'", # Widgets are not exposed to android.
+]
+
 ["test_ext_cache_api.js"]
 
 ["test_ext_captivePortal.js"]
@@ -197,6 +205,8 @@ skip-if = [
 ["test_ext_contentscript_slow_frame.js"]
 
 ["test_ext_contentscript_structured_clone.js"]
+
+["test_ext_contentscript_sync_xhr.js"]
 
 ["test_ext_contentscript_teardown.js"]
 
@@ -554,9 +564,6 @@ skip-if = [
 ]
 
 ["test_ext_proxy_socks.js"]
-skip-if = [
-  "socketprocess_networking",
-]
 run-sequentially = ["true"] # TCPServerSocket fails otherwise
 
 ["test_ext_proxy_speculative.js"]

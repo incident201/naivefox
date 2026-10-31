@@ -357,8 +357,11 @@ struct nsTextFrame::PaintTextSelectionParams : nsTextFrame::PaintTextParams {
 };
 
 struct nsTextFrame::DrawTextRunParams {
+  DrawTextRunParams(gfxContext* aContext,
+                    gfx::FontPaletteValueSet* aPaletteValueSet)
+      : context(aContext), paletteValueSet(aPaletteValueSet) {}
+
   gfxContext* context;
-  mozilla::gfx::PaletteCache& paletteCache;
   PropertyProvider* provider = nullptr;
   gfxFloat* advanceWidth = nullptr;
   mozilla::SVGContextPaint* contextPaint = nullptr;
@@ -366,13 +369,11 @@ struct nsTextFrame::DrawTextRunParams {
   nscolor textColor = NS_RGBA(0, 0, 0, 0);
   nscolor textStrokeColor = NS_RGBA(0, 0, 0, 0);
   nsAtom* fontPalette = nullptr;
+  gfx::FontPaletteValueSet* paletteValueSet = nullptr;
   float textStrokeWidth = 0.0f;
   bool drawSoftHyphen = false;
   bool hasTextShadow = false;
   bool paintingShadows = false;
-  DrawTextRunParams(gfxContext* aContext,
-                    mozilla::gfx::PaletteCache& aPaletteCache)
-      : context(aContext), paletteCache(aPaletteCache) {}
 };
 
 struct nsTextFrame::ClipEdges {
@@ -403,15 +404,16 @@ struct nsTextFrame::ClipEdges {
 };
 
 struct nsTextFrame::DrawTextParams : nsTextFrame::DrawTextRunParams {
+  DrawTextParams(gfxContext* aContext,
+                 gfx::FontPaletteValueSet* aPaletteValueSet)
+      : DrawTextRunParams(aContext, aPaletteValueSet) {}
+
   Point framePt;
   LayoutDeviceRect dirtyRect;
   const nsTextPaintStyle* textStyle = nullptr;
   const ClipEdges* clipEdges = nullptr;
   const nscolor* decorationOverrideColor = nullptr;
   Range glyphRange;
-  DrawTextParams(gfxContext* aContext,
-                 mozilla::gfx::PaletteCache& aPaletteCache)
-      : DrawTextRunParams(aContext, aPaletteCache) {}
 };
 
 struct nsTextFrame::PaintShadowParams {
@@ -1092,7 +1094,7 @@ static void CreateObserversForAnimatedGlyphs(gfxTextRun* aTextRun) {
   observers->SetCapacity(observers->Length() +
                          fontsWithAnimatedGlyphs.Length());
   for (auto font : fontsWithAnimatedGlyphs) {
-    observers->AppendElement(MakeUnique<GlyphObserver>(font, aTextRun));
+    observers->AppendElement(std::make_unique<GlyphObserver>(font, aTextRun));
   }
 }
 
@@ -2639,11 +2641,11 @@ already_AddRefed<gfxTextRun> BuildTextRunsScanner::BuildTextRunForFrames(
     }
     char16_t maskChar =
         needsToMaskPassword ? 0 : textStyle->TextSecurityMaskChar();
-    transformingFactory = MakeUnique<nsCaseTransformTextRunFactory>(
+    transformingFactory = std::make_unique<nsCaseTransformTextRunFactory>(
         std::move(transformingFactory), false, useCapitalEsZett, maskChar);
   }
   if (anyMathMLStyling) {
-    transformingFactory = MakeUnique<MathMLTextRunFactory>(
+    transformingFactory = std::make_unique<MathMLTextRunFactory>(
         std::move(transformingFactory), mathFlags, sstyScriptLevel,
         fontInflation);
   }
@@ -2955,7 +2957,7 @@ void BuildTextRunsScanner::SetupBreakSinksForTextRun(gfxTextRun* aTextRun,
                              mappedFlow->mStartFrame->GetContentOffset());
 
     UniquePtr<BreakSink>* breakSink = mBreakSinks.AppendElement(
-        MakeUnique<BreakSink>(aTextRun, mDrawTarget, offset));
+        std::make_unique<BreakSink>(aTextRun, mDrawTarget, offset));
 
     uint32_t length = iterNext.GetSkippedOffset() - offset;
     uint32_t flags = 0;
@@ -4485,6 +4487,33 @@ void nsTextFrame::PropertyProvider::GetHyphenationBreaks(
   }
 }
 
+bool nsTextFrame::PropertyProvider::GetSourceText(Range aRange,
+                                                  nsAString& aText) const {
+  MOZ_ASSERT(IsInBounds(mStart, mLength, aRange), "Range out of bounds");
+  MOZ_ASSERT(aText.IsEmpty());
+
+  const bool isTransformed =
+      !!(mTextRun->GetFlags2() & nsTextFrameUtils::Flags::IsTransformed);
+  const nsTransformedTextRun* transformedTextRun =
+      isTransformed ? static_cast<const nsTransformedTextRun*>(mTextRun.get())
+                    : nullptr;
+  gfxSkipCharsIterator skipIter(mStart);
+
+  // text-transform must not affect a plain text copy, so we always map back to
+  // the DOM text, even for a transformed textrun. The DOM text is never masked,
+  // so we must explicitly return false for masked password characters.
+  aText.SetCapacity(aRange.Length());
+  for (uint32_t i = aRange.start; i < aRange.end; ++i) {
+    if (transformedTextRun && transformedTextRun->mStyles[i]->mMaskPassword) {
+      aText.Truncate();
+      return false;
+    }
+    aText.Append(mCharacterDataBuffer.CharAt(
+        AssertedCast<uint32_t>(skipIter.ConvertSkippedToOriginal(i))));
+  }
+  return true;
+}
+
 void nsTextFrame::PropertyProvider::InitializeForDisplay(bool aTrimAfter) {
   nsTextFrame::TrimmedOffsets trimmed = mFrame->GetTrimmedOffsets(
       mCharacterDataBuffer,
@@ -4583,7 +4612,8 @@ void nsTextFrame::PropertyProvider::InitTextAutospace() {
   const auto styleTextAutospace = mTextStyle->EffectiveTextAutospace();
   if (TextAutospace::Enabled(styleTextAutospace, mFrame)) {
     mTextAutospace.emplace(styleTextAutospace,
-                           GetFontMetrics()->InterScriptSpacingWidth());
+                           GetFontMetrics()->InterScriptSpacingWidth(
+                               mTextStyle->EffectiveTextAutospaceSize()));
   }
 }
 
@@ -4923,15 +4953,14 @@ static void VerifyNotDirty(nsFrameState state) {
 #endif
 
 nsIFrame* NS_NewTextFrame(PresShell* aPresShell, ComputedStyle* aStyle) {
-  return new (aPresShell) nsTextFrame(aStyle, aPresShell->GetPresContext());
+  return new nsTextFrame(aStyle, aPresShell->GetPresContext());
 }
 
 NS_IMPL_FRAMEARENA_HELPERS(nsTextFrame)
 
 nsIFrame* NS_NewContinuingTextFrame(PresShell* aPresShell,
                                     ComputedStyle* aStyle) {
-  return new (aPresShell)
-      nsContinuingTextFrame(aStyle, aPresShell->GetPresContext());
+  return new nsContinuingTextFrame(aStyle, aPresShell->GetPresContext());
 }
 
 NS_IMPL_FRAMEARENA_HELPERS(nsContinuingTextFrame)
@@ -6926,7 +6955,7 @@ void nsTextFrame::PaintOneShadow(const PaintShadowParams& aParams,
   // need to translate any coordinates to fit on the surface.
   gfxFloat advanceWidth;
   nsTextPaintStyle textPaintStyle(this);
-  DrawTextParams params(shadowContext, PresContext()->FontPaletteCache());
+  DrawTextParams params(shadowContext, PresContext()->GetFontPaletteValueSet());
   params.paintingShadows = true;
   params.advanceWidth = &advanceWidth;
   params.dirtyRect = aParams.dirtyRect;
@@ -7232,7 +7261,8 @@ bool nsTextFrame::PaintTextWithSelectionColors(
   }
 
   gfxFloat advance;
-  DrawTextParams params(aParams.context, PresContext()->FontPaletteCache());
+  DrawTextParams params(aParams.context,
+                        PresContext()->GetFontPaletteValueSet());
   params.dirtyRect = aParams.dirtyRect;
   params.framePt = aParams.framePt;
   params.provider = aParams.provider;
@@ -7519,13 +7549,14 @@ void nsTextFrame::DrawEmphasisMarks(gfxContext* aContext, WritingMode aWM,
       pt.x += info->baselineOffset;
     }
   }
+  auto* paletteValueSet = PresContext()->GetFontPaletteValueSet();
   if (!isTextCombined) {
     mTextRun->DrawEmphasisMarks(aContext, info->textRun.get(), info->advance,
-                                pt, aRange, aProvider,
-                                PresContext()->FontPaletteCache(), aImgParams);
+                                pt, aRange, aProvider, paletteValueSet,
+                                aImgParams);
   } else {
     pt.y += (GetSize().height - info->advance) / 2;
-    gfxTextRun::DrawParams params(aContext, PresContext()->FontPaletteCache());
+    gfxTextRun::DrawParams params(aContext, paletteValueSet);
     info->textRun->Draw(Range(info->textRun.get()), pt, params, aImgParams);
   }
 }
@@ -7873,7 +7904,8 @@ void nsTextFrame::PaintText(const PaintTextParams& aParams,
   }
 
   gfxFloat advanceWidth;
-  DrawTextParams params(aParams.context, PresContext()->FontPaletteCache());
+  DrawTextParams params(aParams.context,
+                        PresContext()->GetFontPaletteValueSet());
   params.dirtyRect = aParams.dirtyRect;
   params.framePt = aParams.framePt;
   params.provider = &provider;
@@ -7899,7 +7931,7 @@ static void DrawTextRun(const gfxTextRun* aTextRun,
                         const nsTextFrame::DrawTextRunParams& aParams,
                         mozilla::image::imgDrawingParams& aImgParams,
                         nsTextFrame* aFrame) {
-  gfxTextRun::DrawParams params(aParams.context, aParams.paletteCache);
+  gfxTextRun::DrawParams params(aParams.context, aParams.paletteValueSet);
   params.provider = aParams.provider;
   params.advanceWidth = aParams.advanceWidth;
   params.contextPaint = aParams.contextPaint;

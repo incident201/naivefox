@@ -58,6 +58,9 @@
   --tab-collapsed-background-width: var(--tab-min-height);
   --tab-collapsed-width: calc(var(--tab-collapsed-background-width) + 2 * var(--tab-margin-inline-inner));
   --tab-collapsed-split-pill-offset: 0px;
+  /* Added to the inline-end side of the launcher, so a classic scrollbar fits
+   * next to the tab backgrounds. */
+  --tab-collapsed-scrollbar-extra: 0px;
   --tab-pinned-min-width-expanded: calc(var(--tab-background-width-pinned-expanded) + 2 * var(--tab-margin-inline-pinned-expanded));
   --tab-note-icon-end-margin: 4px;
   --tab-selected-color-scheme: var(--toolbar-color-scheme);
@@ -148,8 +151,6 @@
   }
 
   --tab-group-label-text-dark: var(--color-gray-100);
-  /* 5px of padding-block are adding to .tabbrowser-tab */
-  --tab-height-with-margin-padding: calc(5px + var(--tab-min-height) + (2 * var(--tab-margin-block)));
 
   @media -moz-pref("sidebar.verticalTabs") {
     --tab-min-height: max(32px, calc(var(--tab-label-line-height) * 1em));
@@ -168,11 +169,16 @@
     /* 32px tab background + 2 * 9px. */
     &:not([uidensity="touch"]) {
       --tab-margin-inline-inner: 9px;
+
+      @media -moz-pref("sidebar.verticalTabs") and (not (-moz-overlay-scrollbars)) {
+        --tab-collapsed-scrollbar-extra: 2px;
+      }
     }
 
     /* 28px tab background + 2 * 11px. */
     &[uidensity="compact"] {
       --tab-margin-inline-inner: 11px;
+      --tab-collapsed-scrollbar-extra: 0px;
     }
   }
 }
@@ -300,6 +306,12 @@ tab-split-view-wrapper[dragtarget] {
     max-width: var(--tab-max-width);
     transition: var(--tab-width-transition);
 
+    @media (prefers-reduced-motion: no-preference) {
+      &[tabdrop-samewindow] {
+        transition: var(--tab-width-transition), var(--tab-dragover-transition);
+      }
+    }
+
     &:not([fadein]) {
       max-width: 0.1px;
       min-width: 0.1px;
@@ -325,10 +337,15 @@ tab-split-view-wrapper[dragtarget] {
 
     @media (prefers-reduced-motion: no-preference) {
       :not(tab-group:active) > &[fadein]:not(:active, [multiselected]),
-      &[multiselected-move-together],
-      &[tabdrop-samewindow] {
+      &[multiselected-move-together] {
         transition: var(--tab-dragover-transition);
       }
+    }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    &[tabdrop-samewindow] {
+      transition: var(--tab-dragover-transition);
     }
   }
 
@@ -1396,8 +1413,8 @@ tab-group > tab-split-view-wrapper {
 
       .tab-group-line {
         inset-inline-start: calc(var(--tab-margin-inline-inner) * -1) !important;
-        inset-block-start: calc(var(--space-xsmall) * -2);
-        inset-block-end: calc(var(--space-xsmall) * -1);
+        inset-block-start: calc(var(--split-view-wrapper-padding) * -2);
+        inset-block-end: calc(var(--split-view-wrapper-padding) * -1);
       }
 
       :root:not([sidebar-expand-on-hover]) &:last-child {
@@ -1544,7 +1561,8 @@ tab-group > tab-split-view-wrapper {
   }
 
   @media (prefers-reduced-motion: no-preference) {
-    #tabbrowser-tabs[movingtab] &:not(:active) {
+    #tabbrowser-tabs[movingtab] &:not(:active),
+    &[tabdrop-samewindow] {
       transition: var(--tab-dragover-transition);
     }
   }
@@ -2053,7 +2071,8 @@ tab-group {
   }
 
   @media (prefers-reduced-motion: no-preference) {
-    #tabbrowser-tabs[movingtab] &:not(:active) {
+    #tabbrowser-tabs[movingtab] &:not(:active),
+    &[tabdrop-samewindow] {
       transition: var(--tab-dragover-transition);
     }
   }
@@ -2538,6 +2557,24 @@ tab-group {
 
 /* Tab Overflow */
 
+@property --tab-overflow-fade-start {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0;
+}
+
+@property --tab-overflow-fade-end {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0;
+}
+
+@property --tab-overflow-scrollbar-strip {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0;
+}
+
 #tabbrowser-arrowscrollbox,
 #pinned-tabs-container {
   &[orient="horizontal"] {
@@ -2574,28 +2611,61 @@ tab-group {
   &[orient="vertical"] {
     &::part(overflow-start-indicator),
     &::part(overflow-end-indicator) {
-      background-image: linear-gradient(to top, transparent 0%, light-dark(rgba(0, 0, 0, 0.05), rgba(255, 255, 255, 0.05)));
-      background-repeat: no-repeat;
-      pointer-events: none;
+      display: none;
+    }
 
-      position: relative;
-      height: 16px;
-      z-index: 1;
+    /* The strip keeps the scrollbar unmasked, so it must not be wider than the
+     * scrollbar or the space after the tabs. env(scrollbar-inline-size)
+     * ignores scrollbar-width: thin, which is half of it rounded down, or
+     * always 11px on macOS. */
+    &::part(scrollbox) {
+      --tab-overflow-scrollbar-strip: round(down, env(scrollbar-inline-size) / 2, 1px);
+      @media (prefers-reduced-motion: no-preference) {
+        transition:
+          --tab-overflow-fade-start 150ms ease,
+          --tab-overflow-fade-end 150ms ease;
+      }
 
-      margin-block: 0 -16px;
+      @media (-moz-platform: macos) {
+        --tab-overflow-scrollbar-strip: 11px;
+      }
 
-      @media -moz-pref("browser.nova.enabled") {
-        /* stylelint-disable-next-line stylelint-plugin-mozilla/use-paired-color-tokens -- a text-free fade over the scrolled tabs */
-        background-image: linear-gradient(to top, transparent, var(--toolbox-background-color));
-        /* Clear of the content area's rounded corner, then fade in. */
-        mask-image: linear-gradient(to right, transparent 8px, black calc(2 * 8px), black calc(100% - 2 * 8px), transparent calc(100% - 8px));
+      @media (-moz-overlay-scrollbars) {
+        --tab-overflow-scrollbar-strip: var(--tab-margin-inline-inner);
       }
     }
 
-    /* Flip the fade at the bottom */
-    &::part(overflow-end-indicator) {
-      transform: scaleY(-1);
-      margin-block: -16px 0;
+    &[overflowing]::part(scrollbox) {
+      mask-image:
+        linear-gradient(
+          to bottom,
+          transparent,
+          black min(var(--tab-overflow-fade-start), 25%),
+          black max(calc(100% - var(--tab-overflow-fade-end)), 75%),
+          transparent
+        ),
+        linear-gradient(black, black);
+      mask-repeat: no-repeat;
+      mask-position:
+        0 0,
+        right;
+      mask-size:
+        auto,
+        var(--tab-overflow-scrollbar-strip) 100%;
+    }
+
+    &:-moz-locale-dir(rtl)[overflowing]::part(scrollbox) {
+      mask-position:
+        0 0,
+        left;
+    }
+
+    &:not([scrolledtostart])::part(scrollbox) {
+      --tab-overflow-fade-start: var(--tab-height-with-margin-padding);
+    }
+
+    &:not([scrolledtoend])::part(scrollbox) {
+      --tab-overflow-fade-end: var(--tab-height-with-margin-padding);
     }
   }
 
@@ -2809,6 +2879,12 @@ tab-group {
       &::part(items-wrapper) {
         padding-inline: var(--tab-container-margin-inline-pinned-expanded);
       }
+
+      @media (-moz-overlay-scrollbars) {
+        &::part(scrollbox) {
+          --tab-overflow-scrollbar-strip: calc(var(--tab-container-margin-inline-pinned-expanded) + var(--tab-margin-inline-pinned-expanded));
+        }
+      }
     }
   }
 
@@ -2871,13 +2947,19 @@ tab-group {
    */
   --tab-padding-block-start: 3px;
   --tab-padding-block-end: 2px;
+  /* How far the collapsed close button, including its outline, extends above .tab-content. */
+  --tab-close-button-overhang: calc(3px + var(--border-width));
 
   @media -moz-pref("browser.nova.enabled") {
+    --tab-close-button-overhang: calc(2px + var(--border-width));
+
     :root[uidensity="compact"] & {
       --tab-padding-block-start: 0px;
       --tab-padding-block-end: 0px;
     }
   }
+
+  --tab-height-with-margin-padding: calc(var(--tab-padding-block-start) + var(--tab-padding-block-end) + var(--tab-min-height) + 2 * var(--tab-margin-block));
 
   min-height: 0;
   display: flex;
@@ -2889,6 +2971,10 @@ tab-group {
     content: "";
     border-bottom: var(--tabstrip-inner-border);
     margin-inline: var(--tab-margin-inline-inner);
+  }
+
+  &:not([expanded])::after {
+    margin-inline-end: calc(var(--tab-margin-inline-inner) + var(--tab-collapsed-scrollbar-extra));
   }
 
   &:not([overflow])::after {
@@ -2912,7 +2998,7 @@ tab-group {
 
     /* prevent the shadow of the close button from being cutoff by the toolbar on the first tab */
     &:nth-child(1 of :not([hidden], [pinned])) {
-      padding-block-start: var(--space-xsmall);
+      padding-block-start: max(var(--space-xsmall), var(--tab-close-button-overhang));
     }
   }
 
@@ -2932,6 +3018,10 @@ tab-group {
     --tab-close-button-border-color: var(--button-border-color);
     --tab-close-button-border-color-hover: var(--button-border-color-hover);
     --tab-close-button-border-color-active: var(--button-border-color-active);
+
+    .tabbrowser-tab:not([dragtarget]) {
+      overflow-clip-margin: max(var(--tab-margin-overflow-clip), calc(var(--tab-close-button-overhang) - var(--tab-padding-block-start)));
+    }
 
     .tabbrowser-tab[pinned] {
       width: var(--tab-collapsed-width);
@@ -2973,7 +3063,7 @@ tab-group {
       display: block;
       position: absolute;
       inset: auto;
-      top: -3px;
+      top: calc(var(--border-width) - var(--tab-close-button-overhang));
       inset-inline-start: 2px;
 
       /* In forced-colors, --close-button-extra-background will be opaque, and
@@ -2987,7 +3077,6 @@ tab-group {
         width: var(--icon-size);
         height: var(--icon-size);
         padding: 2px;
-        top: -2px;
         box-shadow: var(--box-shadow-level-1);
       }
 

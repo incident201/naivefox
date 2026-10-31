@@ -409,9 +409,9 @@ function compare_remote_settings_files {
     local_location_output="$REMOTE_SETTINGS_DIR/${bucket}/${collection}.json"
     download_json "${BASEDIR}/changeset.json" "${remote_records_url}"
 
-    # We sort both the keys and the records in search-config-v2 to make it
+    # We sort both the keys and the records in search-config-v2/3 to make it
     # easier to read and to experiment with making changes via the dump file.
-    if [ "${collection}" = "search-config-v2" ]; then
+    if [ "${collection}" = "search-config-v2" ] || [ "${collection}" = "search-config-v3" ]; then
       ${JQ} --sort-keys '{"data": .changes | sort_by(.recordType, .identifier), "timestamp": .timestamp}' < "${BASEDIR}/changeset.json" > "${local_location_output}"
     else
       ${JQ} '{"data": .changes, "timestamp": .timestamp}' < "${BASEDIR}/changeset.json" > "${local_location_output}"

@@ -337,7 +337,7 @@ class BrowserToolbarMiddleware(
             }
 
             is StartPageActions.ProxyActivationAnimationFinished -> {
-                ipProtectionStore.dispatch(IPProtectionAction.ProxyActivationShown)
+                ipProtectionStore.dispatch(IPProtectionAction.ActivationAction.ProxyActivationShown)
                 next(action)
             }
 
@@ -1287,7 +1287,7 @@ class BrowserToolbarMiddleware(
 
             ToolbarAction.Menu ->
                 ActionButtonRes(
-                    drawableResId = iconsR.drawable.mozac_ic_ellipsis_vertical_24,
+                    drawableResId = iconsR.drawable.mozac_ic_more_vertical_round_24,
                     contentDescription = R.string.content_description_menu,
                     highlighted =
                         appStore.state.supportedMenuNotifications.filterNot { it == NotDefaultBrowser }.isNotEmpty(),
@@ -1299,13 +1299,13 @@ class BrowserToolbarMiddleware(
                     drawableResId =
                         if (browserScreenStore.state.readerModeStatus.isActive) {
                             if (settings.listenToPageFeatureFlagEnabled) {
-                                iconsR.drawable.mozac_ic_reader_view_audio_fill_24
+                                iconsR.drawable.mozac_ic_reader_view_headphones_fill_24
                             } else {
                                 iconsR.drawable.mozac_ic_reader_view_fill_24
                             }
                         } else {
                             if (settings.listenToPageFeatureFlagEnabled) {
-                                iconsR.drawable.mozac_ic_reader_view_audio_24
+                                iconsR.drawable.mozac_ic_reader_view_headphones_24
                             } else {
                                 iconsR.drawable.mozac_ic_reader_view_24
                             }
@@ -1314,7 +1314,11 @@ class BrowserToolbarMiddleware(
                         if (browserScreenStore.state.readerModeStatus.isActive) {
                             R.string.browser_menu_read_close
                         } else {
-                            R.string.browser_menu_read
+                            if (settings.listenToPageFeatureFlagEnabled) {
+                                R.string.browser_menu_read_or_listen
+                            } else {
+                                R.string.browser_menu_read
+                            }
                         },
                     state =
                         if (browserScreenStore.state.readerModeStatus.isActive) {

@@ -7,9 +7,18 @@ import { Provider } from "react-redux";
 import { combineReducers, createStore } from "redux";
 import { INITIAL_STATE, reducers } from "common/Reducers.sys.mjs";
 import { WidgetsSidebar } from "content-src/components/Widgets/WidgetsSidebar";
+import { PAGE_LAYOUT_VARIANTS } from "common/PageLayoutVariants.mjs";
 
 jest.mock("content-src/components/Widgets/Weather/Weather", () => ({
   Weather: () => <div data-testid="weather-widget" />,
+}));
+
+let privacyProps;
+jest.mock("content-src/components/Widgets/Privacy/Privacy", () => ({
+  Privacy: props => {
+    privacyProps = props;
+    return <div data-testid="privacy-widget" />;
+  },
 }));
 
 function makeState(prefs = {}) {
@@ -37,6 +46,7 @@ const SIDEBAR_PREFS = {
   "widgets.weather.size": "small",
   "widgets.system.weather.enabled": true,
   showWeather: true,
+  region: "US",
 };
 
 describe("WidgetsSidebar", () => {
@@ -61,6 +71,18 @@ describe("WidgetsSidebar", () => {
       makeState({ ...SIDEBAR_PREFS, "widgets.weather.enabled": false })
     );
     expect(screen.queryByTestId("weather-widget")).toBeNull();
+  });
+
+  it("renders when the spaces experiment overrides the master toggle", () => {
+    renderSidebar(
+      makeState({
+        ...SIDEBAR_PREFS,
+        "widgets.enabled": false,
+        "pageLayouts.variant": PAGE_LAYOUT_VARIANTS.SPACES_BUTTONS_BOTTOM,
+        trainhopConfig: { widgets: { enabled: true } },
+      })
+    );
+    expect(screen.getByTestId("weather-widget")).toBeTruthy();
   });
 
   it("does not render when showWeather is false", () => {
@@ -94,5 +116,40 @@ describe("WidgetsSidebar", () => {
       })
     );
     expect(screen.queryByTestId("weather-widget")).toBeNull();
+  });
+
+  describe("privacy", () => {
+    const PRIVACY_SIDEBAR_PREFS = {
+      "nova.enabled": true,
+      "widgets.enabled": true,
+      "widgets.privacy.enabled": true,
+      "widgets.system.privacy.enabled": true,
+      "widgets.privacy.size": "small",
+      trainhopConfig: { widgets: { privacySidebar: true } },
+    };
+
+    beforeEach(() => {
+      privacyProps = undefined;
+    });
+
+    it("renders the privacy widget when trainhop places it in the sidebar at small", () => {
+      renderSidebar(makeState(PRIVACY_SIDEBAR_PREFS));
+      expect(screen.getByTestId("privacy-widget")).toBeTruthy();
+      expect(privacyProps.widgetsMayBeMaximized).toBeUndefined();
+    });
+
+    it("falls back to privacy when weather leaves the sidebar", () => {
+      renderSidebar(
+        makeState({
+          ...SIDEBAR_PREFS,
+          ...PRIVACY_SIDEBAR_PREFS,
+          trainhopConfig: {
+            widgets: { privacySidebar: true, weatherSidebar: false },
+          },
+        })
+      );
+      expect(screen.getByTestId("privacy-widget")).toBeTruthy();
+      expect(screen.queryByTestId("weather-widget")).toBeNull();
+    });
   });
 });

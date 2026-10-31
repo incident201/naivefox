@@ -100,8 +100,10 @@ TEST_F(DefaultAgentTest, SendDefaultAgentPing) {
                                        NotificationAction::NoAction};
   uint32_t daysSinceAppLaunch = 12;
   std::string isTaskbarPinned = "NotPinned";
-  HRESULT result = SendDefaultAgentPing(browserInfo, pdfInfo, activities,
-                                        daysSinceAppLaunch, isTaskbarPinned);
+  InstallInfo installInfo = {false, "", "full", false, true};
+  HRESULT result =
+      SendDefaultAgentPing(browserInfo, pdfInfo, activities, daysSinceAppLaunch,
+                           isTaskbarPinned, installInfo);
   ASSERT_EQ(S_OK, result);
 }
 
@@ -117,9 +119,12 @@ TEST_F(DefaultAgentTest, SendPing) {
   uint32_t daysSinceLaunch = 12;
 
   auto isTaskbarPinned = u"NotPinned"_ns;
+  auto winPackageFamilyName = u"Mozilla.Firefox_n80bbvh6b1yt2"_ns;
+  auto installerType = u"msix"_ns;
   nsresult result = defaultAgent->SendPing(
       currentBrowser, previousBrowser, pdfHandler, notificationShown,
-      notificationAction, daysSinceLaunch, isTaskbarPinned);
+      notificationAction, daysSinceLaunch, isTaskbarPinned, true,
+      winPackageFamilyName, installerType, false, false);
   ASSERT_EQ(result, NS_OK);
 }
 
@@ -157,11 +162,12 @@ class DefaultAgentPingTest : public ::testing::Test {
     NotificationActivities activities = {NotificationType::Initial,
                                          NotificationShown::NotShown,
                                          NotificationAction::NoAction};
+    InstallInfo installInfo = {false, "", "full", true, false};
     return mozilla::glean_pings::DefaultAgent.TestSubmission(
         [](const nsACString& aReason) {},
         [&]() {
-          HRESULT result = SendDefaultAgentPing(browserInfo, pdfInfo,
-                                                activities, 12, "NotPinned");
+          HRESULT result = SendDefaultAgentPing(
+              browserInfo, pdfInfo, activities, 12, "NotPinned", installInfo);
           EXPECT_EQ(S_OK, result);
         });
   }

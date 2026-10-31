@@ -28,7 +28,8 @@
   background-repeat: no-repeat;
 }
 
-// Once a picture loads, the image replaces the fallback gradient.
+// With a picture to show, drop the fallback so a loading picture shows the
+// plain tile instead.
 .picture-of-the-day.has-picture::before {
   content: none;
 }
@@ -203,6 +204,11 @@
   block-size: 100%;
   object-fit: cover;
   z-index: 0;
+  opacity: 0;
+
+  &.loaded {
+    opacity: 1;
+  }
 }
 
 // The "New" badge sits inline before the title so the title makes room for it
@@ -340,6 +346,16 @@
   color: var(--color-white);
   font-size: var(--font-size-small);
   text-shadow: 0 1px 2px color-mix(in srgb, var(--color-black) 60%, transparent);
+}
+
+// Only the author ellipsizes, so the links after it always stay visible.
+.picture-of-the-day-attribution-author {
+  display: inline-block;
+  max-inline-size: 100%;
+  overflow: hidden;
+  vertical-align: bottom;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 // The source and license parts are links; underline to distinguish them from

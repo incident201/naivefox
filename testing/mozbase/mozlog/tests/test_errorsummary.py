@@ -383,6 +383,46 @@ import pytest
             """.strip(),
             id="unexpected_assertion_count",
         ),
+        pytest.param(
+            [
+                (
+                    "suite_start",
+                    {
+                        "manifestA": ["dir/test_foo.py"],
+                        "manifestB": ["dir/test_bar.py"],
+                    },
+                ),
+                (
+                    "test_start",
+                    "dir/test_foo.py TestFoo.test_foo",
+                    None,
+                    None,
+                    "manifestA",
+                ),
+                ("test_end", "dir/test_foo.py TestFoo.test_foo", "ERROR", "PASS"),
+                (
+                    "test_start",
+                    "dir/test_bar.py TestBar.test_bar",
+                    None,
+                    None,
+                    "manifestB",
+                ),
+                ("crash", "", "signature", "dir/test_bar.py TestBar.test_bar"),
+                ("test_end", "dir/test_bar.py TestBar.test_bar", "ERROR", "PASS"),
+                ("crash", "", "signature", "marionette.py"),
+                ("suite_end",),
+            ],
+            """
+                {"groups": ["manifestA", "manifestB"], "action": "test_groups", "line": 0}
+                {"test": "dir/test_foo.py TestFoo.test_foo", "subtest": null, "group": "manifestA", "status": "ERROR", "expected": "PASS", "message": null, "stack": null, "modifiers": "", "known_intermittent": [], "action": "test_result", "line": 2}
+                {"test": "dir/test_bar.py TestBar.test_bar", "group": "manifestB", "signature": "signature", "stackwalk_stderr": null, "stackwalk_stdout": null, "action": "crash", "line": 4}
+                {"test": "dir/test_bar.py TestBar.test_bar", "subtest": null, "group": "manifestB", "status": "ERROR", "expected": "PASS", "message": null, "stack": null, "modifiers": "", "known_intermittent": [], "action": "test_result", "line": 5}
+                {"test": "marionette.py", "group": "", "signature": "signature", "stackwalk_stderr": null, "stackwalk_stdout": null, "action": "crash", "line": 6}
+                {"group": "manifestA", "status": "ERROR", "duration": 10, "action": "group_result", "line": 7}
+                {"group": "manifestB", "status": "ERROR", "duration": 20, "action": "group_result", "line": 7}
+            """.strip(),
+            id="group_from_test_start",
+        ),
     ),
 )
 def test_errorsummary(monkeypatch, get_logger, logs, expected):
@@ -502,6 +542,54 @@ def test_errorsummary_crash_group_status(get_logger, calls, expected_status):
     assert [(g["group"], g["status"]) for g in group_results] == [
         ("manifestA", expected_status)
     ]
+
+
+def test_errorsummary_crash_with_group(get_logger):
+    logger = get_logger("errorsummary")
+    logger.suite_start({
+        "manifestA": ["a.html == a-ref.html"],
+        "manifestB": ["b.html == b-ref.html"],
+    })
+    logger.test_start("a.html == a-ref.html")
+    logger.test_end("a.html == a-ref.html", "OK")
+    logger.test_start("b.html == b-ref.html")
+    logger.crash("", "signature", "b.html", group="manifestB")
+    logger.suite_end()
+
+    lines = [
+        json.loads(line) for line in logger.handlers[0].stream.getvalue().splitlines()
+    ]
+    crashes = [line for line in lines if line["action"] == "crash"]
+    assert len(crashes) == 1
+    assert crashes[0]["test"] == "b.html"
+    assert crashes[0]["group"] == "manifestB"
+    group_results = {
+        line["group"]: line["status"]
+        for line in lines
+        if line["action"] == "group_result"
+    }
+    assert group_results == {"manifestA": "OK", "manifestB": "ERROR"}
+
+
+def test_errorsummary_crash_group_overrides_test_mapping(get_logger):
+    logger = get_logger("errorsummary")
+    logger.suite_start({"manifestA": ["test_a"], "manifestB": ["test_b"]})
+    logger.test_start("test_a")
+    logger.test_end("test_a", "OK")
+    logger.crash("", "signature", "test_a", group="manifestB")
+    logger.suite_end()
+
+    lines = [
+        json.loads(line) for line in logger.handlers[0].stream.getvalue().splitlines()
+    ]
+    crashes = [line for line in lines if line["action"] == "crash"]
+    assert [(c["test"], c["group"]) for c in crashes] == [("test_a", "manifestB")]
+    group_results = {
+        line["group"]: line["status"]
+        for line in lines
+        if line["action"] == "group_result"
+    }
+    assert group_results == {"manifestA": "OK", "manifestB": "ERROR"}
 
 
 if __name__ == "__main__":

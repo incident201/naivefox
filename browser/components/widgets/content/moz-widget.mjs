@@ -4,7 +4,7 @@
 
 import { MozLitElement } from "chrome://global/content/lit-utils.mjs";
 import { html, nothing } from "chrome://global/content/vendor/lit.all.mjs";
-// eslint-disable-next-line import/no-unassigned-import
+// eslint-disable-next-line import-x/no-unassigned-import
 import "chrome://browser/content/widgets/moz-widget-header.mjs";
 
 const WIDGET_SANDBOX =
@@ -23,10 +23,12 @@ const FRAME_SLOT = "frame";
  * @property {string} title - The widget's accessible name, taken off the host element.
  * @property {string} size - `small`, `medium`, or `large`. Defaults to `large`.
  * @property {boolean} padded - Insets the header and content.
+ * @property {string} menuLabel - The accessible name of the menu button drawn without a header. Defaults to "More options".
  * @property {string} src - A widget document URL.
  * @property {string} remoteType - The remote type a `<browser>` frame loads in.
  * @property {number} browsingContextGroupId - The browsing context group a `<browser>` frame's initial load joins.
  * @slot header - A `moz-widget-header` shown above the content.
+ * @slot menu - A `panel-list`, opened by the header's menu button, or by a menu button over the content without a header.
  * @slot default - Widget content used when `src` is not set.
  */
 export class MozWidget extends MozLitElement {
@@ -37,7 +39,10 @@ export class MozWidget extends MozLitElement {
     browsingContextGroupId: { type: Number, attribute: "group-id" },
     size: { reflect: true },
     padded: { type: Boolean, reflect: true },
+    menuLabel: { type: String, attribute: "menu-label", fluent: true },
     src: { reflect: true },
+    _menuId: { state: true },
+    _hasHeader: { state: true },
   };
 
   /** @type {MozBrowser|null} The `<browser>` frame if used. */
@@ -49,9 +54,12 @@ export class MozWidget extends MozLitElement {
     this.title = null;
     this.size = null;
     this.padded = false;
+    this.menuLabel = null;
     this.src = null;
     this.remoteType = null;
     this.browsingContextGroupId = null;
+    this._menuId = null;
+    this._hasHeader = false;
   }
 
   /**
@@ -80,6 +88,12 @@ export class MozWidget extends MozLitElement {
 
   willUpdate(changes) {
     super.willUpdate(changes);
+    if (!this.hasUpdated) {
+      this.#setMenu(this.querySelector(':scope > [slot="menu"]'));
+    }
+    if (!this.hasUpdated || changes.has("_menuId")) {
+      this.#updateHeader();
+    }
     if (!this.src) {
       this.#setBrowser(null);
       return;
@@ -87,6 +101,25 @@ export class MozWidget extends MozLitElement {
     if (this.supportsXULElements) {
       this.#updateBrowser(changes);
     }
+  }
+
+  #onMenuSlotChange(event) {
+    this.#setMenu(event.target.assignedElements()[0]);
+  }
+
+  #setMenu(menu) {
+    if (menu) {
+      menu.id ||= `moz-widget-menu-${crypto.randomUUID()}`;
+    }
+    this._menuId = menu?.id || null;
+  }
+
+  #updateHeader() {
+    const header = this.querySelector(':scope > [slot="header"]');
+    if (header) {
+      header.menuId = this._menuId;
+    }
+    this._hasHeader = !!header;
   }
 
   #updateBrowser(changes) {
@@ -150,6 +183,19 @@ export class MozWidget extends MozLitElement {
     ></iframe>`;
   }
 
+  #renderMenuButton() {
+    return html`<moz-button
+      id="menu-button"
+      type="ghost"
+      size="small"
+      iconsrc="chrome://global/skin/icons/more.svg"
+      .menuId=${this._menuId}
+      data-l10n-id=${this.menuLabel ? nothing : "moz-button-more-options"}
+      .ariaLabel=${this.menuLabel}
+      .title=${this.menuLabel}
+    ></moz-button>`;
+  }
+
   render() {
     const usesIframe = this.src && !this.#browser;
     const label = this.title && !usesIframe ? this.title : nothing;
@@ -159,8 +205,10 @@ export class MozWidget extends MozLitElement {
         href="chrome://browser/content/widgets/moz-widget.css"
       />
       <article class="widget" aria-label=${label}>
-        <slot name="header"></slot>
+        <slot name="header" @slotchange=${this.#updateHeader}></slot>
+        ${this._menuId && !this._hasHeader ? this.#renderMenuButton() : nothing}
         <div class="widget-content">${this.#renderContent()}</div>
+        <slot name="menu" @slotchange=${this.#onMenuSlotChange}></slot>
       </article>
     `;
   }

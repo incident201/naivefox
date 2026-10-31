@@ -319,6 +319,7 @@ class CreditCardTelemetry extends AutofillTelemetryBase {
     "cc-exp": "cc_exp",
     "cc-exp-month": "cc_exp_month",
     "cc-exp-year": "cc_exp_year",
+    "cc-csc": "cc_csc",
   };
   recordFormEvent(method, flowId, aExtra) {
     // Don't modify the passed-in aExtra as it's reused.

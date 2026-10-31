@@ -492,6 +492,9 @@ bool WarpCacheIRTranspiler::emitGuardFuse(RealmFuses::FuseIndex fuseIndex) {
     case RealmFuses::FuseIndex::OptimizeArraySpeciesFuse:
     case RealmFuses::FuseIndex::OptimizeTypedArraySpeciesFuse:
     case RealmFuses::FuseIndex::OptimizeRegExpPrototypeFuse:
+    case RealmFuses::FuseIndex::ObjectProtoHasNoIndexedPropsFuse:
+    case RealmFuses::FuseIndex::ArrayProtoHasNoIndexedPropsFuse:
+    case RealmFuses::FuseIndex::StringProtoHasNoIndexedPropsFuse:
       // This is a no-op because WarpOracle has added a compilation dependency.
       MOZ_ASSERT(RealmFuses::isInvalidatingFuse(fuseIndex));
       return true;
@@ -6689,14 +6692,14 @@ bool WarpCacheIRTranspiler::emitCallClassHook(ObjOperandId calleeId,
   MOZ_ASSERT(callInfo_->argFormat() == CallInfo::ArgFormat::Standard);
   MOZ_ASSERT(flags.getArgFormat() == CallFlags::ArgFormat::Standard);
 
-  // Callees can be from any realm. If this changes, we should update
-  // MCallClassHook::maybeCrossRealm.
-  MOZ_ASSERT(!flags.isSameRealm());
-
   auto* call = MCallClassHook::New(alloc(), target, callInfo_->argc(),
                                    callInfo_->constructing());
   if (!call) {
     return false;
+  }
+
+  if (flags.isSameRealm()) {
+    call->setNotCrossRealm();
   }
 
   if (callInfo_->ignoresReturnValue()) {
@@ -7274,9 +7277,9 @@ bool WarpCacheIRTranspiler::emitAssertRecoveredOnBailoutResult(
 }
 
 bool WarpCacheIRTranspiler::emitAssertNoAllocationMetadataBuilder(
-    uint32_t builderAddrOffset) {
-  // This is a no-op because we discard all JIT code when we set an allocation
-  // metadata callback.
+    uint32_t hasBuilderAddrOffset) {
+  // This is a no-op because we discard all JIT code when allocation metadata is
+  // enabled for a realm.
   return true;
 }
 

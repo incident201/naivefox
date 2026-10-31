@@ -12,9 +12,6 @@ tags = "remote-settings"
 ["browser_asrouter_experimentsAPILoader.js"]
 
 ["browser_asrouter_group_frequency.js"]
-skip-if = [
-  "os == 'linux' && os_version == '24.04' && arch == 'x86_64' && debug && socketprocess_networking && verify-standalone", # Bug 1775851
-]
 
 ["browser_asrouter_group_userprefs.js"]
 
@@ -84,7 +81,7 @@ skip-if = [
 ["browser_trigger_listeners.js"]
 https_first_disabled = true
 skip-if = [
-  "os == 'linux' && os_version == '22.04' && arch == 'x86_64' && nova", # Bug 2057840
+  "os == 'linux' && os_version == '22.04' && arch == 'x86_64'", # Bug 2057840
 ]
 
 ["browser_trigger_messagesLoaded.js"]

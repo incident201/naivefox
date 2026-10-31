@@ -12,6 +12,8 @@ task-defaults:
     run:
         clone-with: hg
         script: build-7zz.sh
+        resources:
+            - taskcluster/scripts/misc/7zz.patch
         toolchain-artifact: public/build/7zz.tar.zst
     fetches:
         fetch:

@@ -2551,7 +2551,8 @@ export class UrlbarView {
       result.type == UrlbarShared.RESULT_TYPE.SEARCH &&
       !result.payload.providesSearchMode &&
       !result.payload.inPrivateWindow &&
-      result.providerName != "UrlbarProviderQuickSuggest"
+      (result.providerName != "UrlbarProviderQuickSuggest" ||
+        result.payload.suggestionObject?.suggestionType == "temporal")
     ) {
       item.setAttribute(
         "type",
@@ -3199,9 +3200,11 @@ export class UrlbarView {
       isItemVisible &&
       // Show the search suggestions label only if there are other visible
       // results before this one that aren't the heuristic or suggestions.
+      // Also show the label for atypical search results that define their own.
       !(
         item.result.type == UrlbarShared.RESULT_TYPE.SEARCH &&
         item.result.payload.suggestion &&
+        !item.result.rowLabel &&
         seenOnlyHeuristicOrSearchSuggestions
       )
     ) {
@@ -3442,7 +3445,7 @@ export class UrlbarView {
 
     let result = row?.result;
     if (result) {
-      this.controller.parentController.onBeforeSelection(result, element);
+      this.controller.parentController.onBeforeSelection(result);
     }
 
     this.#setAccessibleFocus(setAccessibleFocus && element);
@@ -4358,6 +4361,9 @@ export class UrlbarView {
   /**
    * @param {UrlbarResult} result
    *   The result to get menu commands for.
+   * @param {object} [options]
+   * @param {boolean} [options.showSkipMenuWithTabItem]
+   *   If true, the "Skip this menu when using the tab key" checkbox is shown.
    * @returns {?UrlbarResultCommand[]}
    *   Everything the result's menu shows, null if it has nothing to show. The
    *   three-dot button and a right-click both open this menu, so it combines
@@ -4365,7 +4371,7 @@ export class UrlbarView {
    *   window, and closes with the checkbox that skips the menu button when
    *   tabbing through the results.
    */
-  #getMenuCommands(result) {
+  #getMenuCommands(result, { showSkipMenuWithTabItem = false } = {}) {
     let commands = this.#getResultMenuCommands(result);
     if (this.#canOpenInNewTarget(result)) {
       let openInCommands = this.#openInCommands;
@@ -4373,8 +4379,8 @@ export class UrlbarView {
         ? [...openInCommands, { name: "separator" }, ...commands]
         : openInCommands;
     }
-    if (!commands) {
-      return null;
+    if (!commands || !showSkipMenuWithTabItem) {
+      return commands;
     }
     return [
       ...commands,
@@ -4885,7 +4891,12 @@ export class UrlbarView {
           b => b.name == buttonName
         ).menu;
       } else {
-        commands = this.#getMenuCommands(this.#resultMenuResult);
+        commands = this.#getMenuCommands(this.#resultMenuResult, {
+          showSkipMenuWithTabItem:
+            triggeringEvent.type == "ResultMenuTriggered" &&
+            (!UrlbarPrefs.get("resultMenu.keyboardAccessible") ||
+              triggeringEvent.detail.target == this.selectedElement),
+        });
       }
 
       this.#populateResultMenu({ commands });
@@ -5010,15 +5021,9 @@ class QueryContextCache {
       // doesn't necessarily imply top sites since there are other queries that
       // use it too, like search mode. If any result is from the top-sites
       // provider, assume the context is top sites.
-      // However, if contextual opt-in message is shown, disable the cache. The
-      // message might hide when beginning of query, this cache will be shown
-      // for a moment.
       if (
         queryContext.results?.some(
           r => r.providerName == "UrlbarProviderTopSites"
-        ) &&
-        !queryContext.results.some(
-          r => r.providerName == "UrlbarProviderQuickSuggestContextualOptIn"
         )
       ) {
         this.#topSitesContext = queryContext;

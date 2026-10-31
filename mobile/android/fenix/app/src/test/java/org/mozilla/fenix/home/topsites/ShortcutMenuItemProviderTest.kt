@@ -15,7 +15,6 @@ import io.mockk.mockk
 import io.mockk.verify
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
@@ -63,7 +62,7 @@ class ShortcutMenuItemProviderTest {
         runTest {
             val provider = provider(pinnedSiteStorage = storageWith(shortcut = null))
 
-            assertEquals(addShortcutItem, provider.itemFlow.value)
+            assertEquals(addShortcutItem, provider.itemsFlow.value.single())
         }
 
     @Test
@@ -72,11 +71,11 @@ class ShortcutMenuItemProviderTest {
             val provider = provider(pinnedSiteStorage = storageWith(shortcut = shortcut))
 
             // Adding the page is offered before reading from disk, removing it once it is known to be a shortcut.
-            assertEquals(addShortcutItem, provider.itemFlow.value)
+            assertEquals(addShortcutItem, provider.itemsFlow.value.single())
 
             runCurrent()
 
-            assertEquals(removeShortcutItem, provider.itemFlow.value)
+            assertEquals(removeShortcutItem, provider.itemsFlow.value.single())
         }
 
     @Test
@@ -87,7 +86,7 @@ class ShortcutMenuItemProviderTest {
 
             runCurrent()
 
-            assertEquals(addShortcutItem, provider.itemFlow.value)
+            assertEquals(addShortcutItem, provider.itemsFlow.value.single())
         }
 
     @Test
@@ -96,7 +95,7 @@ class ShortcutMenuItemProviderTest {
 
         runCurrent()
 
-        assertNull(provider.itemFlow.value)
+        assertTrue(provider.itemsFlow.value.isEmpty())
     }
 
     @Test
@@ -105,7 +104,7 @@ class ShortcutMenuItemProviderTest {
 
         runCurrent()
 
-        assertNull(provider.itemFlow.value)
+        assertTrue(provider.itemsFlow.value.isEmpty())
     }
 
     @Test
@@ -193,7 +192,7 @@ class ShortcutMenuItemProviderTest {
             val provider = provider(pinnedSiteStorage = storageWith(shortcut = shortcut))
             runCurrent()
 
-            val events = requireNotNull(provider.itemFlow.value).reachableEvents()
+            val events = provider.itemsFlow.value.single().reachableEvents()
 
             assertTrue(events.all { provider.handles(it) }, "Not all of $events are handled")
             assertFalse(provider.handles(MenuAction.AddBookmark))

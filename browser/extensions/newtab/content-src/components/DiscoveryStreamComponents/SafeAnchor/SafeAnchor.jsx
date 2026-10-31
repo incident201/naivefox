@@ -3,6 +3,7 @@
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 import { actionCreators as ac, actionTypes as at } from "common/Actions.mjs";
+import { nextDwellId } from "content-src/lib/dwell-id";
 import React from "react";
 
 export class SafeAnchor extends React.PureComponent {
@@ -21,6 +22,7 @@ export class SafeAnchor extends React.PureComponent {
   }
 
   onClick(event) {
+    const dwellId = this.props.dwellLabel ? nextDwellId() : undefined;
     // Use dispatch instead of normal link click behavior to include referrer
     if (this.props.dispatch) {
       event.preventDefault();
@@ -40,7 +42,7 @@ export class SafeAnchor extends React.PureComponent {
             // so the action shape is unchanged for the anchors that did not opt
             // in.
             ...(this.props.dwellLabel
-              ? { dwell_label: this.props.dwellLabel }
+              ? { dwell_label: this.props.dwellLabel, dwell_id: dwellId }
               : {}),
           },
         })
@@ -49,7 +51,7 @@ export class SafeAnchor extends React.PureComponent {
 
     // Propagate event if there's a handler
     if (this.props.onLinkClick) {
-      this.props.onLinkClick(event);
+      this.props.onLinkClick(event, dwellId);
     }
   }
 

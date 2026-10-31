@@ -517,9 +517,9 @@ add_task(async function test_IPPProxyManager_catastrophic_on_500() {
 });
 
 /**
- * Tests that activation failures reset the proxy state to the previous state.
+ * Starts the service with a proxy pass request that fails.
  */
-add_task(async function test_IPPProxyManager_activation_failure() {
+async function initServiceWithFailingPass() {
   IPPDummyAuthProvider.simulateSignIn(true);
   IPPDummyAuthProvider.setGetEntitlementResponse({
     entitlement: createTestEntitlement(),
@@ -537,15 +537,166 @@ add_task(async function test_IPPProxyManager_activation_failure() {
     IPProtectionStates.READY,
     "IP Protection service should be ready"
   );
+}
 
-  await IPPProxyManager.start(false);
+/**
+ * Tests that a user activation that fails returns to the previous state.
+ */
+add_task(async function test_IPPProxyManager_user_activation_failure() {
+  await initServiceWithFailingPass();
+
+  await IPPProxyManager.start(true);
 
   Assert.equal(
     IPPProxyManager.state,
     IPPProxyStates.READY,
     "Proxy should return to READY state after activation failure"
   );
+  Assert.ok(
+    !IPPProxyManager.channelFilter(),
+    "The channel filter should be gone"
+  );
 
+  IPProtectionService.uninit();
+});
+
+/**
+ * Tests that a system activation that fails stays in ERROR, holding traffic,
+ * until it is stopped.
+ */
+add_task(async function test_IPPProxyManager_system_activation_failure() {
+  await initServiceWithFailingPass();
+
+  await IPPProxyManager.start(false);
+
+  Assert.equal(
+    IPPProxyManager.state,
+    IPPProxyStates.ERROR,
+    "Proxy should be in ERROR after a system activation failure"
+  );
+  Assert.ok(
+    IPPProxyManager.channelFilter()?.active,
+    "The channel filter should still hold traffic"
+  );
+
+  IPPProxyManager.updateState();
+  Assert.equal(
+    IPPProxyManager.state,
+    IPPProxyStates.ERROR,
+    "Recomputing the state should not leave ERROR"
+  );
+
+  await IPPProxyManager.stop(false);
+  Assert.equal(
+    IPPProxyManager.state,
+    IPPProxyStates.READY,
+    "Stopping should leave ERROR"
+  );
+  Assert.ok(
+    !IPPProxyManager.channelFilter(),
+    "Stopping should remove the channel filter"
+  );
+
+  IPProtectionService.uninit();
+});
+
+/**
+ * Tests that a user start retries out of ERROR, going straight to ACTIVATING
+ * without announcing READY in between.
+ */
+add_task(async function test_IPPProxyManager_user_start_retries_error() {
+  await initServiceWithFailingPass();
+  await IPPProxyManager.start(false, false, undefined, IPPMode.MODE_INCLUSION);
+  Assert.equal(IPPProxyManager.state, IPPProxyStates.ERROR);
+
+  IPPDummyAuthProvider.setProxyPass({
+    status: 200,
+    error: undefined,
+    pass: new ProxyPass(createProxyPassToken()),
+  });
+  const states = [];
+  const record = () => states.push(IPPProxyManager.state);
+  IPPProxyManager.addEventListener("IPPProxyManager:StateChanged", record);
+
+  const { started } = await IPPProxyManager.start(true);
+
+  IPPProxyManager.removeEventListener("IPPProxyManager:StateChanged", record);
+  Assert.ok(started, "The user start should succeed");
+  Assert.deepEqual(
+    states,
+    [IPPProxyStates.ACTIVATING, IPPProxyStates.ACTIVE],
+    "The retry should not pass through READY"
+  );
+  Assert.equal(
+    IPPProxyManager.mode,
+    IPPMode.getDefault(),
+    "The retry should use the default mode"
+  );
+
+  await IPPProxyManager.stop(false);
+  IPProtectionService.uninit();
+});
+
+/**
+ * Tests that a system start does not retry out of ERROR.
+ */
+add_task(async function test_IPPProxyManager_system_start_keeps_error() {
+  await initServiceWithFailingPass();
+  await IPPProxyManager.start(false);
+
+  const { started, error } = await IPPProxyManager.start(false);
+
+  Assert.ok(!started, "The system start should be refused");
+  Assert.ok(error, "The refusal should carry the error");
+  Assert.equal(IPPProxyManager.state, IPPProxyStates.ERROR);
+
+  await IPPProxyManager.stop(false);
+  IPProtectionService.uninit();
+});
+
+/**
+ * Tests that a load held by a user activation that fails is cancelled with a
+ * proxy error rather than aborted.
+ */
+add_task(
+  async function test_IPPProxyManager_user_activation_failure_fails_held_load() {
+    await initServiceWithFailingPass();
+
+    const started = IPPProxyManager.start(true);
+    const channel = makeDocumentChannel("https://example.com/");
+    applyFilter(IPPProxyManager.channelFilter(), channel);
+    await started;
+
+    Assert.equal(
+      channel.cancelStatus,
+      Cr.NS_ERROR_PROXY_CONNECTION_REFUSED,
+      "The held load should be cancelled with a proxy error"
+    );
+
+    IPProtectionService.uninit();
+  }
+);
+
+/**
+ * Tests that in ERROR, new loads are cancelled with a proxy error.
+ */
+add_task(async function test_IPPProxyManager_error_fails_proxied_loads() {
+  await initServiceWithFailingPass();
+  await IPPProxyManager.start(false);
+
+  const later = makeDocumentChannel("https://example.com/");
+  Assert.strictEqual(
+    applyFilter(IPPProxyManager.channelFilter(), later),
+    null,
+    "A new load should not get a connection"
+  );
+  Assert.equal(
+    later.cancelStatus,
+    Cr.NS_ERROR_PROXY_CONNECTION_REFUSED,
+    "A new load should be cancelled with a proxy error"
+  );
+
+  await IPPProxyManager.stop(false);
   IPProtectionService.uninit();
 });
 

@@ -146,35 +146,6 @@ bool BaseCompiler::checkStackHeight() {
   return true;
 }
 
-bool BaseCompiler::createStackMap(Maybe<Trap> reason) {
-  return createStackMap(reason, HasDebugFrameWithLiveRefs::No);
-}
-
-bool BaseCompiler::createStackMap(Maybe<Trap> reason,
-                                  CodeOffset assemblerOffset) {
-  if (!checkStackHeight()) {
-    return false;
-  }
-  const ExitStubMapVector noExtras;
-  StackMap* stackMap;
-  return stackMapGenerator_.createStackMap(reason, noExtras,
-                                           HasDebugFrameWithLiveRefs::No, stk_,
-                                           &stackMap) &&
-         (!stackMap || stackMaps_->add(assemblerOffset.offset(), stackMap));
-}
-
-bool BaseCompiler::createStackMap(
-    Maybe<Trap> reason, HasDebugFrameWithLiveRefs debugFrameWithLiveRefs) {
-  if (!checkStackHeight()) {
-    return false;
-  }
-  const ExitStubMapVector noExtras;
-  StackMap* stackMap;
-  return stackMapGenerator_.createStackMap(
-             reason, noExtras, debugFrameWithLiveRefs, stk_, &stackMap) &&
-         (!stackMap || stackMaps_->add(masm.currentOffset(), stackMap));
-}
-
 bool BaseCompiler::createStackMap(
     Maybe<Trap> reason, FaultingCodeRange insnRange,
     HasDebugFrameWithLiveRefs debugFrameWithLiveRefs) {
@@ -183,9 +154,26 @@ bool BaseCompiler::createStackMap(
   }
   const ExitStubMapVector noExtras;
   StackMap* stackMap;
+  // `createStackMap` returns false on OOM.  It can also succeed without
+  // creating a map, if the map wouldn't contain any refs, in which case there
+  // is nothing to add.
   return stackMapGenerator_.createStackMap(
              reason, noExtras, debugFrameWithLiveRefs, stk_, &stackMap) &&
          (!stackMap || stackMaps_->add(insnRange.resumeOffset(), stackMap));
+}
+
+bool BaseCompiler::createStackMap(
+    Maybe<Trap> reason, CodeOffset resumeOffset,
+    HasDebugFrameWithLiveRefs debugFrameWithLiveRefs) {
+  MOZ_ASSERT(resumeOffset.bound());
+  if (!checkStackHeight()) {
+    return false;
+  }
+  const ExitStubMapVector noExtras;
+  StackMap* stackMap;
+  return stackMapGenerator_.createStackMap(
+             reason, noExtras, debugFrameWithLiveRefs, stk_, &stackMap) &&
+         (!stackMap || stackMaps_->add(resumeOffset.offset(), stackMap));
 }
 
 bool BaseCompiler::createDebugOnlyStackMapForNonResumingTrap(StackMap** result,

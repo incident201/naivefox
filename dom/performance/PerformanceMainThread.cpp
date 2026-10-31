@@ -75,7 +75,7 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN_INHERITED(PerformanceMainThread,
       mTiming, mNavigation, mDocEntry, mFCPTiming, mEventTimingEntries,
       mLargestContentfulPaintEntries, mContainerTimingEntries, mFirstInputEvent,
       mPendingPointerDown, mPendingEventTimingEntries, mEventCounts,
-      mInteractionMetrics, mCurrentEventTimingEntry)
+      mInteractionMetrics, mCurrentEventTimingEntry, mPendingLCPCandidate)
   tmp->mTextFrameUnions.Clear();
   tmp->mContainerTimingRecords.Clear();
   mozilla::DropJSObjects(tmp);
@@ -88,7 +88,7 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INHERITED(PerformanceMainThread,
       mLargestContentfulPaintEntries, mContainerTimingEntries, mFirstInputEvent,
       mPendingPointerDown, mPendingEventTimingEntries, mEventCounts,
       mTextFrameUnions, mContainerTimingRecords, mInteractionMetrics,
-      mCurrentEventTimingEntry)
+      mCurrentEventTimingEntry, mPendingLCPCandidate)
 
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
 
@@ -673,8 +673,7 @@ void PerformanceMainThread::CreateNavigationTimingEntry() {
   nsAutoString name;
   GetURLSpecFromChannel(mChannel, name);
 
-  UniquePtr<PerformanceTimingData> timing =
-      std::make_unique<PerformanceTimingData>(mChannel, nullptr, 0);
+  auto timing = std::make_unique<PerformanceTimingData>(mChannel, nullptr, 0);
 
   nsCOMPtr<nsIHttpChannel> httpChannel = do_QueryInterface(mChannel);
   if (httpChannel) {
@@ -920,6 +919,13 @@ void PerformanceMainThread::FinalizeLCPEntriesForText() {
   MOZ_ASSERT(GetTextFrameUnions().IsEmpty());
 }
 
+void PerformanceMainThread::QueuePendingLCPCandidate() {
+  if (RefPtr<LargestContentfulPaint> candidate =
+          std::move(mPendingLCPCandidate)) {
+    candidate->QueueEntry();
+  }
+}
+
 bool PerformanceMainThread::IsPendingLCPCandidate(
     Element* aElement, imgRequestProxy* aImgRequestProxy) {
   Document* doc = aElement->GetComposedDoc();
@@ -959,6 +965,7 @@ void PerformanceMainThread::SetHasDispatchedInputEvent() {
 void PerformanceMainThread::ClearGeneratedTempDataForLCP() {
   mTextFrameUnions.Clear();
   mImagesPendingRendering.Clear();
+  mPendingLCPCandidate = nullptr;
 
   nsIGlobalObject* global = GetRelevantGlobal();
   if (!global) {

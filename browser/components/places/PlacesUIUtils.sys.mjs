@@ -746,6 +746,31 @@ export var PlacesUIUtils = {
   },
 
   /**
+   * Opens the sidebar for a query in a browser window, opening a new window
+   * if none is available.
+   *
+   * @param {nsINavHistoryResultNode} node
+   *   The query node.
+   */
+  async showSidebarForQuery(node) {
+    let { query, queryOptions } = lazy.PlacesUtils.asQuery(node);
+    let sidebarId =
+      queryOptions.queryType ==
+        Ci.nsINavHistoryQueryOptions.QUERY_TYPE_BOOKMARKS ||
+      queryOptions.resultType ==
+        Ci.nsINavHistoryQueryOptions.RESULTS_AS_TAGS_ROOT ||
+      query.tags.length
+        ? "viewBookmarksSidebar"
+        : "viewHistorySidebar";
+    let browserWindow =
+      lazy.BrowserWindowTracker.getTopWindow() ??
+      (await lazy.BrowserWindowTracker.promiseOpenWindow());
+    await browserWindow.SidebarController.promiseInitialized;
+    await browserWindow.SidebarController.show(sidebarId);
+    browserWindow.focus();
+  },
+
+  /**
    * @param {Array<object>} aItemsToOpen
    *   needs to be an array of objects of the form:
    *   {uri: string, isBookmark: boolean}

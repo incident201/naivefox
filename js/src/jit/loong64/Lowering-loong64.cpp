@@ -1348,7 +1348,7 @@ void LIRGenerator::visitWasmReplaceLaneSimd128(MWasmReplaceLaneSimd128* ins) {
   LAllocation lhs = useRegisterAtStart(ins->lhs());
   if (ins->rhs()->type() == MIRType::Int64) {
     auto* lir = new (alloc())
-        LWasmReplaceInt64LaneSimd128(lhs, useInt64Register(ins->rhs()));
+        LWasmReplaceInt64LaneSimd128(lhs, useInt64RegisterOrZero(ins->rhs()));
     defineReuseInput(lir, ins, 0);
   } else {
     LAllocation rhsAlloc = useRegisterOrZero(ins->rhs());

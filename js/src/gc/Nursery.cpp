@@ -405,7 +405,12 @@ bool js::Nursery::init(AutoLockGCBgAlloc& lock) {
   return initFirstChunk(lock);
 }
 
-js::Nursery::~Nursery() { disable(); }
+js::Nursery::~Nursery() {
+  disable();
+#ifdef JS_CONTIGUOUS_NURSERY
+  UnmapPages(region_);
+#endif
+}
 
 void js::Nursery::enable() {
   MOZ_ASSERT(TlsContext.get()->generationalDisabled == 0);
@@ -444,17 +449,24 @@ static size_t SemispaceSizeFactor(bool semispaceEnabled) {
 #ifdef JS_CONTIGUOUS_NURSERY
 bool js::Nursery::reserveContiguousNursery() {
   size_t reservedBytes = MaxNurseryBytesParam;
-  void* pages = MapAlignedPages(reservedBytes, ChunkSize);
-  if (!pages) {
-    return false;
+  if (region_.isEmpty()) {
+    auto commit = DecommitEnabled() ? Commit::No : Commit::Yes;
+    void* pages =
+        MapAlignedPages(reservedBytes, ChunkSize, StallAndRetry::Yes, commit);
+    if (!pages) {
+      return false;
+    }
+    MOZ_MAKE_MEM_NOACCESS(pages, reservedBytes);
+    region_ = ChunkRegion(uintptr_t(pages), reservedBytes);
+  } else {
+    MOZ_ASSERT(region_.size() == reservedBytes);
   }
-  region_ = ChunkRegion(uintptr_t(pages), reservedBytes);
   size_t spaceReservedBytes =
       reservedBytes / SemispaceSizeFactor(semispaceEnabled());
   auto loRegion = ChunkRegion(region_.slice(0, spaceReservedBytes));
   auto hiRegion = ChunkRegion(region_.slice(spaceReservedBytes, reservedBytes));
-  toSpace.initializeRegion(loRegion, capacity());
-  fromSpace.initializeRegion(hiRegion, semispaceEnabled_ ? capacity() : 0);
+  toSpace.initializeRegion(loRegion);
+  fromSpace.initializeRegion(hiRegion);
   return true;
 }
 #endif
@@ -469,8 +481,15 @@ bool js::Nursery::initFirstChunk(AutoLockGCBgAlloc& lock) {
 #ifdef JS_CONTIGUOUS_NURSERY
   if (!reserveContiguousNursery()) {
     setCapacity(0);
-    MOZ_ASSERT(toSpace.isEmpty());
-    MOZ_ASSERT(fromSpace.isEmpty());
+    return false;
+  }
+  if (!toSpace.grow(0, capacity())) {
+    setCapacity(0);
+    return false;
+  }
+  if (semispaceEnabled_ && !fromSpace.grow(0, capacity())) {
+    toSpace.shrinkSynchronously(capacity(), 0);
+    setCapacity(0);
     return false;
   }
 #else
@@ -526,6 +545,24 @@ void js::Nursery::setCapacity(size_t newCapacity) {
   }
 }
 
+void js::Nursery::Space::reset() {
+  MOZ_ASSERT(isEmpty());
+  position_ = currentEnd_ = 0;
+#ifdef JS_CONTIGUOUS_NURSERY
+  // The overall nursery region is kept reserved but uncommitted. If the nursery
+  // is re-enabled, the space subregions will be reinitialized at that time.
+  region_ = ChunkRegion();
+#else
+  MOZ_ASSERT(chunks_.length() == 0);
+#endif
+  MOZ_ASSERT(activeChunkCount_ == 0);
+  MOZ_ASSERT(maxChunkCount_ == 0);
+  startChunk_ = 0;
+  startPosition_ = 0;
+  MOZ_ASSERT(mallocedBuffers.empty());
+  MOZ_ASSERT(mallocedBufferBytes == 0);
+}
+
 void js::Nursery::disable() {
   MOZ_ASSERT(isEmpty());
   if (!isEnabled()) {
@@ -537,8 +574,10 @@ void js::Nursery::disable() {
   decommitTask->join();
 
 #if JS_CONTIGUOUS_NURSERY
-  UnmapPages(region_);
-  region_ = ChunkRegion();
+  toSpace.shrinkSynchronously(capacity(), 0);
+  if (semispaceEnabled_) {
+    fromSpace.shrinkSynchronously(capacity(), 0);
+  }
 #else
   // Free all chunks.
   freeChunksFrom(toSpace, 0);
@@ -546,12 +585,13 @@ void js::Nursery::disable() {
   decommitTask->runFromMainThread();
 #endif
 
+  toSpace.activeChunkCount_ = fromSpace.activeChunkCount_ = 0;
   setCapacity(0);
 
   // We must reset currentEnd_ so that there is no space for anything in the
   // nursery. JIT'd code uses this even if the nursery is disabled.
-  toSpace = Space(ChunkKind::NurseryToSpace);
-  fromSpace = Space(ChunkKind::NurseryFromSpace);
+  toSpace.reset();
+  fromSpace.reset();
   MOZ_ASSERT(toSpace.isEmpty());
   MOZ_ASSERT(fromSpace.isEmpty());
 
@@ -934,12 +974,12 @@ void* js::Nursery::reallocateBuffer(Zone* zone, Cell* cell, void* oldBuffer,
                                     size_t oldBytes, size_t newBytes,
                                     size_t maxNurserySize) {
   if (!IsInsideNursery(cell)) {
-    MOZ_ASSERT(IsBufferAlloc(oldBuffer));
+    AssertIsBufferAlloc(oldBuffer);
     MOZ_ASSERT(!IsNurseryOwned(zone, oldBuffer));
     return ReallocBuffer(zone, oldBuffer, newBytes, false);
   }
 
-  if (IsBufferAlloc(oldBuffer)) {
+  if (IsGCPointerBufferAlloc(oldBuffer)) {
     MOZ_ASSERT(IsNurseryOwned(zone, oldBuffer));
     return ReallocBuffer(zone, oldBuffer, newBytes, true);
   }
@@ -958,11 +998,11 @@ void* js::Nursery::reallocateBuffer(Zone* zone, Cell* cell, void* oldBuffer,
 
 void Nursery::freeBuffer(JS::Zone* zone, gc::Cell* cell, void* buffer,
                          size_t bytes) {
-  MOZ_ASSERT(IsBufferAlloc(buffer) || isInside(buffer));
-  MOZ_ASSERT_IF(!IsInsideNursery(cell), IsBufferAlloc(buffer));
+  MOZ_ASSERT_IF(!isInside(buffer), IsGCPointerBufferAlloc(buffer));
+  MOZ_ASSERT_IF(!IsInsideNursery(cell), IsGCPointerBufferAlloc(buffer));
   MOZ_ASSERT_IF(!IsInsideNursery(cell), !IsNurseryOwned(zone, buffer));
 
-  if (!IsBufferAlloc(buffer)) {
+  if (!IsGCPointerBufferAlloc(buffer)) {
     // The nursery cannot make use of the returned space.
     return;
   }
@@ -1901,7 +1941,7 @@ Nursery::WasBufferMoved js::Nursery::maybeMoveRawBufferOnPromotion(
   bool nurseryOwned = IsInsideNursery(owner);
 
   void* buffer = *bufferp;
-  if (IsBufferAlloc(buffer)) {
+  if (IsGCPointerBufferAlloc(buffer)) {
     // This is an external buffer allocation owned by a nursery GC thing.
     Zone* zone = owner->zone();
     MOZ_ASSERT(IsNurseryOwned(zone, buffer));
@@ -2122,12 +2162,10 @@ void js::Nursery::clear() {
 }
 
 #ifdef JS_CONTIGUOUS_NURSERY
-void js::Nursery::Space::initializeRegion(ChunkRegion region,
-                                          size_t initialCapacity) {
-  MOZ_ASSERT(initialCapacity == Nursery::roundSize(initialCapacity));
+void js::Nursery::Space::initializeRegion(ChunkRegion region) {
+  MOZ_ASSERT(isEmpty());
+  MOZ_ASSERT(activeChunkCount() == 0);
   region_ = region;
-  maxChunkCount_ = RoundUp(initialCapacity, ChunkSize) / ChunkSize;
-  MarkPagesUnusedHard(region.slice(initialCapacity));
 }
 
 bool js::Nursery::Space::grow(size_t oldCapacity, size_t newCapacity) {
@@ -2135,9 +2173,9 @@ bool js::Nursery::Space::grow(size_t oldCapacity, size_t newCapacity) {
   if (!MarkPagesInUseHard(commitRange)) {
     return false;
   }
-  // The as-yet-unallocated region of a chunk gets poisoned when the chunk is
-  // acquired. When growing in a sub-chunk configurations though, we should
-  // poison the newly-available tail of the first chunk.
+  // The as-yet-unallocated chunks of the space get poisoned as they are
+  // acquired, in moveToStartOfNextChunk. But when growing from a sub-chunk
+  // capacity, we should poison the newly-available tail of the first chunk.
   if (oldCapacity < ChunkSize) {
     Poison(region_.slice(oldCapacity, std::min(newCapacity, ChunkSize)),
            JS_FRESH_NURSERY_PATTERN, MemCheckKind::MakeUndefined);
@@ -2614,6 +2652,7 @@ void js::Nursery::Space::decommitSubChunkRegion(Nursery* nursery,
 js::Nursery::Space::Space(gc::ChunkKind kind) : kind(kind) {
   MOZ_ASSERT(kind == ChunkKind::NurseryFromSpace ||
              kind == ChunkKind::NurseryToSpace);
+  reset();
 }
 
 void js::Nursery::Space::setKind(ChunkKind newKind) {

@@ -16,9 +16,6 @@
 #endif
 #include "mozilla/glean/NetwerkDnsMetrics.h"
 #include "mozilla/glean/NetwerkMetrics.h"
-#ifndef MOZ_NAIVEFOX
-#  include "mozilla/net/TRRServiceChild.h"
-#endif
 #include "nsCharSeparatedTokenizer.h"
 #include "nsComponentManagerUtils.h"
 #include "nsDirectoryServiceUtils.h"
@@ -194,28 +191,26 @@ nsresult TRRService::Init(bool aNativeHTTPSQueryEnabled) {
   ReadPrefs(nullptr);
   mConfirmation.HandleEvent(ConfirmationEvent::Init);
 
-  if (XRE_IsParentProcess()) {
-    mCaptiveIsPassed = CheckCaptivePortalIsPassed();
+  mCaptiveIsPassed = CheckCaptivePortalIsPassed();
 
-    mParentalControlEnabled = GetParentalControlsEnabledInternal();
+  mParentalControlEnabled = GetParentalControlsEnabledInternal();
 
-    mLinkService = do_GetService(NS_NETWORK_LINK_SERVICE_CONTRACTID);
-    if (mLinkService) {
-      nsTArray<nsCString> suffixList;
-      mLinkService->GetDnsSuffixList(suffixList);
-      RebuildSuffixList(std::move(suffixList));
+  mLinkService = do_GetService(NS_NETWORK_LINK_SERVICE_CONTRACTID);
+  if (mLinkService) {
+    nsTArray<nsCString> suffixList;
+    mLinkService->GetDnsSuffixList(suffixList);
+    RebuildSuffixList(std::move(suffixList));
+  }
+
+  if (!StaticPrefs::network_trr_parse_on_socket_thread()) {
+    nsCOMPtr<nsIThread> thread;
+    if (NS_FAILED(
+            NS_NewNamedThread("TRR Background", getter_AddRefs(thread)))) {
+      NS_WARNING("NS_NewNamedThread failed!");
+      return NS_ERROR_FAILURE;
     }
 
-    if (!StaticPrefs::network_trr_parse_on_socket_thread()) {
-      nsCOMPtr<nsIThread> thread;
-      if (NS_FAILED(
-              NS_NewNamedThread("TRR Background", getter_AddRefs(thread)))) {
-        NS_WARNING("NS_NewNamedThread failed!");
-        return NS_ERROR_FAILURE;
-      }
-
-      sTRRBackgroundThread = thread;
-    }
+    sTRRBackgroundThread = thread;
   }
 
   LOG(("Initialized TRRService\n"));
@@ -472,10 +467,6 @@ void TRRService::AddEtcHosts(const nsTArray<nsCString>& aArray) {
 }
 
 void TRRService::ReadEtcHostsFile() {
-  if (!XRE_IsParentProcess()) {
-    return;
-  }
-
   DNSServiceBase::DoReadEtcHostsFile(
       [](const nsTArray<nsCString>* aArray) -> bool {
         RefPtr<TRRService> service(sTRRServicePtr);
@@ -546,7 +537,7 @@ nsresult TRRService::DispatchTRRRequest(TRR* aTrrRequest) {
 
 already_AddRefed<nsIEventTarget> TRRService::MainThreadOrTRRTarget(
     bool aWithLock) {
-  if (XRE_IsSocketProcess() || mDontUseTRRThread) {
+  if (mDontUseTRRThread) {
     nsCOMPtr<nsIEventTarget> mainThread = do_GetMainThread();
     return mainThread.forget();
   }
@@ -648,16 +639,13 @@ TRRService::Observe(nsISupports* aSubject, const char* aTopic,
     bl->Clear();
   } else if (!strcmp(aTopic, NS_DNS_SUFFIX_LIST_UPDATED_TOPIC) ||
              !strcmp(aTopic, NS_NETWORK_LINK_TOPIC)) {
-    // nsINetworkLinkService is only available on parent process.
-    if (XRE_IsParentProcess()) {
-      nsCOMPtr<nsINetworkLinkService> link = do_QueryInterface(aSubject);
-      // The network link service notification normally passes itself as the
-      // subject, but some unit tests will sometimes pass a null subject.
-      if (link) {
-        nsTArray<nsCString> suffixList;
-        link->GetDnsSuffixList(suffixList);
-        RebuildSuffixList(std::move(suffixList));
-      }
+    nsCOMPtr<nsINetworkLinkService> link = do_QueryInterface(aSubject);
+    // The network link service notification normally passes itself as the
+    // subject, but some unit tests will sometimes pass a null subject.
+    if (link) {
+      nsTArray<nsCString> suffixList;
+      link->GetDnsSuffixList(suffixList);
+      RebuildSuffixList(std::move(suffixList));
     }
 
     if (!strcmp(aTopic, NS_NETWORK_LINK_TOPIC)) {
@@ -735,51 +723,34 @@ void TRRService::ConfirmationContext::SetState(
   mState = aNewState;
 
   enum ConfirmationState state = mState;
-  if (XRE_IsParentProcess()) {
-    NS_DispatchToMainThread(NS_NewRunnableFunction(
-        "TRRService::ConfirmationContextNotify", [state] {
-          if (nsCOMPtr<nsIObserverService> obs =
-                  mozilla::services::GetObserverService()) {
-            auto stateString =
-                [](enum ConfirmationState aState) -> const char16_t* {
-              switch (aState) {
-                case CONFIRM_OFF:
-                  return u"CONFIRM_OFF";
-                case CONFIRM_TRYING_OK:
-                  return u"CONFIRM_TRYING_OK";
-                case CONFIRM_OK:
-                  return u"CONFIRM_OK";
-                case CONFIRM_FAILED:
-                  return u"CONFIRM_FAILED";
-                case CONFIRM_TRYING_FAILED:
-                  return u"CONFIRM_TRYING_FAILED";
-                case CONFIRM_DISABLED:
-                  return u"CONFIRM_DISABLED";
-              }
-              MOZ_ASSERT_UNREACHABLE();
-              return u"";
-            };
+  NS_DispatchToMainThread(
+      NS_NewRunnableFunction("TRRService::ConfirmationContextNotify", [state] {
+        if (nsCOMPtr<nsIObserverService> obs =
+                mozilla::services::GetObserverService()) {
+          auto stateString =
+              [](enum ConfirmationState aState) -> const char16_t* {
+            switch (aState) {
+              case CONFIRM_OFF:
+                return u"CONFIRM_OFF";
+              case CONFIRM_TRYING_OK:
+                return u"CONFIRM_TRYING_OK";
+              case CONFIRM_OK:
+                return u"CONFIRM_OK";
+              case CONFIRM_FAILED:
+                return u"CONFIRM_FAILED";
+              case CONFIRM_TRYING_FAILED:
+                return u"CONFIRM_TRYING_FAILED";
+              case CONFIRM_DISABLED:
+                return u"CONFIRM_DISABLED";
+            }
+            MOZ_ASSERT_UNREACHABLE();
+            return u"";
+          };
 
-            obs->NotifyObservers(nullptr, "network:trr-confirmation",
-                                 stateString(state));
-          }
-        }));
-  }
-
-  if (XRE_IsParentProcess()) {
-    return;
-  }
-
-#ifndef MOZ_NAIVEFOX
-  MOZ_ASSERT(XRE_IsSocketProcess());
-  MOZ_ASSERT(NS_IsMainThread());
-
-  TRRServiceChild* child = TRRServiceChild::GetSingleton();
-  if (child && child->CanSend()) {
-    LOG(("TRRService::SendSetConfirmationState"));
-    (void)child->SendSetConfirmationState(mState);
-  }
-#endif
+          obs->NotifyObservers(nullptr, "network:trr-confirmation",
+                               stateString(state));
+        }
+      }));
 }
 
 bool TRRService::ConfirmationContext::HandleEvent(ConfirmationEvent aEvent) {
@@ -1240,8 +1211,7 @@ void TRRService::RetryTRRConfirm() {
 }
 
 void TRRService::RecordTRRStatus(TRR* aTrrRequest) {
-  MOZ_ASSERT_IF(XRE_IsParentProcess(), NS_IsMainThread() || IsOnTRRThread());
-  MOZ_ASSERT_IF(XRE_IsSocketProcess(), NS_IsMainThread());
+  MOZ_ASSERT(NS_IsMainThread() || IsOnTRRThread());
 
   nsresult channelStatus = aTrrRequest->ChannelStatus();
 
@@ -1437,8 +1407,7 @@ AHostResolver::LookupStatus TRRService::CompleteLookup(
     TRR* aTRRRequest) {
   // this is an NS check for the TRR blocklist or confirmationNS check
 
-  MOZ_ASSERT_IF(XRE_IsParentProcess(), NS_IsMainThread() || IsOnTRRThread());
-  MOZ_ASSERT_IF(XRE_IsSocketProcess(), NS_IsMainThread());
+  MOZ_ASSERT(NS_IsMainThread() || IsOnTRRThread());
   MOZ_ASSERT(!rec);
 
   RefPtr<AddrInfo> newRRSet(aNewRRSet);
@@ -1481,21 +1450,7 @@ NS_IMETHODIMP TRRService::OnProxyConfigChanged() {
 }
 
 void TRRService::InitTRRConnectionInfo(bool aForceReinit) {
-  if (XRE_IsParentProcess()) {
-    TRRServiceBase::InitTRRConnectionInfo(aForceReinit);
-    return;
-  }
-
-#ifndef MOZ_NAIVEFOX
-  MOZ_ASSERT(XRE_IsSocketProcess());
-  MOZ_ASSERT(NS_IsMainThread());
-
-  TRRServiceChild* child = TRRServiceChild::GetSingleton();
-  if (child && child->CanSend()) {
-    LOG(("TRRService::SendInitTRRConnectionInfo"));
-    (void)child->SendInitTRRConnectionInfo(aForceReinit);
-  }
-#endif
+  TRRServiceBase::InitTRRConnectionInfo(aForceReinit);
 }
 
 }  // namespace mozilla::net

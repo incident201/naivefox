@@ -352,8 +352,7 @@ void WinWindowOcclusionTracker::Ensure() {
     sTracker = nullptr;
   }
 
-  UniquePtr<base::Thread> thread =
-      MakeUnique<base::Thread>("WinWindowOcclusionCalc");
+  auto thread = std::make_unique<base::Thread>("WinWindowOcclusionCalc");
 
   if (!thread->StartWithOptions(options)) {
     return;

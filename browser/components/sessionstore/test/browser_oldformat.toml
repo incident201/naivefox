@@ -93,9 +93,6 @@ skip-if = [
 ["browser_367052.js"]
 
 ["browser_393716.js"]
-skip-if = [
-  "debug", # Bug 1507747
-]
 
 ["browser_394759_basic.js"]
 # Disabled for intermittent failures, bug 944372.

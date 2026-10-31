@@ -395,7 +395,7 @@ UniquePtr<OffscreenCanvasCloneData> OffscreenCanvas::ToCloneData(
     return nullptr;
   }
 
-  auto cloneData = MakeUnique<OffscreenCanvasCloneData>(
+  auto cloneData = std::make_unique<OffscreenCanvasCloneData>(
       mDisplay, mLang, mWidth, mHeight, mCompositorBackendType, mNeutered,
       mIsWriteOnly, mExpandedReader);
   SetNeutered();
@@ -422,7 +422,13 @@ already_AddRefed<ImageBitmap> OffscreenCanvas::TransferToImageBitmap(
     return nullptr;
   }
 
-  if (mCurrentContext) {
+  if (mCurrentContextType == CanvasContextType::OffscreenCanvas2D) {
+    // The bitmap needs to be reset to transparent black, but the canvas size
+    // is unchanged, so keep the buffer provider alive. Freeing it would force
+    // a new (synchronously IPC-allocated) shared texture on the next use.
+    static_cast<CanvasRenderingContext2D*>(mCurrentContext.get())
+        ->ResetBitmap(/* aFreeBuffer */ false);
+  } else if (mCurrentContext) {
     mCurrentContext->ResetBitmap();
   }
   return result.forget();

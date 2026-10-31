@@ -130,8 +130,12 @@
 /* Primary toolbar buttons */
 
 .toolbarbutton-1 {
-  :root:not([customizing]) &[disabled] {
+  &[disabled] {
     opacity: var(--toolbarbutton-opacity-disabled);
+
+    :root[customizing] & {
+      opacity: 1;
+    }
   }
 
   /* Special-case the overflow and the hamburger button so they show up disabled
@@ -260,6 +264,11 @@ toolbar .toolbarbutton-1 {
     }
   }
 
+  :root:not([customizing]) &[disabled] > :is(.toolbarbutton-icon, .toolbarbutton-text, .toolbarbutton-badge-stack),
+  &:is(#nav-bar-overflow-button, #PanelUI-menu-button)[disabled] > :is(.toolbarbutton-icon, .toolbarbutton-text, .toolbarbutton-badge-stack) {
+    outline-color: var(--toolbarbutton-outline-color-disabled);
+  }
+
   &:not([disabled]) {
     > :is(.toolbarbutton-icon, .toolbarbutton-text, .toolbarbutton-badge-stack) {
       background-color: var(--toolbarbutton-background-color);
@@ -297,7 +306,7 @@ toolbar .toolbarbutton-1 {
 
 #PanelUI-menu-button {
   /* Adds padding to end of toolbar while making that space click the first button */
-  padding-inline-end: var(--toolbar-padding-inline);
+  padding-inline-end: var(--toolbar-end-edge-padding, var(--toolbar-padding-inline));
 }
 
 toolbar .toolbaritem-combined-buttons {
@@ -446,6 +455,19 @@ toolbar .toolbaritem-combined-buttons {
    enough to be visible but not long enough to explain anything to users. */
 #reload-button[disabled]:not(:-moz-window-inactive) {
   opacity: 1;
+
+  @media (forced-colors) {
+    color: inherit;
+    fill: var(--toolbarbutton-icon-fill);
+
+    > .toolbarbutton-icon {
+      outline-color: var(--toolbarbutton-outline-color);
+    }
+
+    &:hover {
+      fill: var(--toolbarbutton-icon-fill-hover);
+    }
+  }
 
   &:hover > .toolbarbutton-icon {
     background-color: var(--toolbarbutton-background-color-hover);

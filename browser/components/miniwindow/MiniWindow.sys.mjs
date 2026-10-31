@@ -433,6 +433,11 @@ export class MiniWindow {
       "key_closeWindow",
       "key_toggleMute",
     ]);
+    const ALLOWED_COMMANDS = new Set([
+      "cmd_fullZoomReduce",
+      "cmd_fullZoomEnlarge",
+      "cmd_fullZoomReset",
+    ]);
     // A crop frames one specific page, so history navigation only makes sense
     // in a full-tab mini window.
     if (!this.#cropped) {
@@ -442,7 +447,11 @@ export class MiniWindow {
     }
     let keyset = this.miniWin.document.getElementById("mainKeyset");
     for (let key of keyset ? [...keyset.children] : []) {
-      if (key.localName === "key" && !ALLOWED_KEYS.has(key.id)) {
+      if (
+        key.localName === "key" &&
+        !ALLOWED_KEYS.has(key.id) &&
+        !ALLOWED_COMMANDS.has(key.getAttribute("command"))
+      ) {
         key.setAttribute("disabled", "true");
       }
     }
@@ -824,8 +833,8 @@ export class MiniWindow {
         width: cropInfo.width,
         height: cropInfo.height,
       },
-      layoutWidth: cropInfo.viewportWidth,
-      layoutHeight: cropInfo.viewportHeight,
+      layoutWidth: cropInfo.innerWidth || cropInfo.viewportWidth,
+      layoutHeight: cropInfo.innerHeight || cropInfo.viewportHeight,
     };
   }
 

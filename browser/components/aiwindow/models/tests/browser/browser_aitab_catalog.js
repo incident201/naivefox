@@ -77,20 +77,29 @@ add_task(function test_bound_array_items_validated() {
   const base = data => ({
     components: [
       { id: "root", component: "Page", header: "h", children: ["c"] },
-      { id: "h", component: "Header", title: "Cards" },
-      { id: "c", component: "Cards", items: { path: "/cards" } },
+      { id: "h", component: "Header", title: "Timeline" },
+      { id: "c", component: "Timeline", items: { path: "/events" } },
     ],
-    dataModel: { cards: data },
+    dataModel: { events: data },
   });
 
-  const ok = buildSurface(base([{ title: "A" }, { title: "B" }]), gEnv);
+  const ok = buildSurface(
+    base([
+      { date_label: "Mon", title: "A" },
+      { date_label: "Tue", title: "B" },
+    ]),
+    gEnv
+  );
   Assert.ok(
     ok.ok,
-    `bound cards with valid items pass; errors: ${JSON.stringify(ok.errors)}`
+    `bound timeline items that are valid pass; errors: ${JSON.stringify(ok.errors)}`
   );
 
-  const bad = buildSurface(base([{ eyebrow: "no title here" }]), gEnv);
-  Assert.ok(!bad.ok, "a bound card item missing required `title` is rejected");
+  const bad = buildSurface(base([{ date_label: "no title here" }]), gEnv);
+  Assert.ok(
+    !bad.ok,
+    "a bound timeline item missing required `title` is rejected"
+  );
 });
 
 add_task(function test_bound_array_nested_in_slot_validated() {

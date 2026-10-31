@@ -141,9 +141,9 @@ add_task(async function test_callModulesFromCategory() {
   Services.catMan.deleteCategory(CATEGORY);
 });
 
-// With idleDispatch, a consumer whose jsGlobal is a window that has closed by
-// the time the idle task runs should be dropped, so we don't initialize (and
-// leak) a closing window.
+// With idleDispatch set to a window, the consumers should be queued with that
+// window's requestIdleCallback, and dropped if it has closed by the time the
+// idle task runs, so we don't initialize (and leak) a closing window.
 add_task(
   async function test_callModulesFromCategory_idleDispatch_closed_window() {
     const CATEGORY = "test-js-global-catman-closed-window";
@@ -161,20 +161,36 @@ add_task(
 
     let sandbox = sinon.createSandbox();
 
+    let fakeWindow = closed => ({
+      closed,
+      requestIdleCallback: sandbox.spy(cb => ChromeUtils.idleDispatch(cb)),
+      FakeObj: { doThing: sandbox.spy() },
+    });
+
     // A window that has closed: its consumer should be dropped.
-    let closedWindow = { closed: true, FakeObj: { doThing: sandbox.spy() } };
+    let closedWindow = fakeWindow(true);
     await BrowserUtils.callModulesFromCategory(
-      { categoryName: CATEGORY, idleDispatch: true, jsGlobal: closedWindow },
+      {
+        categoryName: CATEGORY,
+        idleDispatch: closedWindow,
+        jsGlobal: closedWindow,
+      },
       "win"
     );
+    sinon.assert.calledOnce(closedWindow.requestIdleCallback);
     sinon.assert.notCalled(closedWindow.FakeObj.doThing);
 
     // A window that is still open: its consumer should run as usual.
-    let openWindow = { closed: false, FakeObj: { doThing: sandbox.spy() } };
+    let openWindow = fakeWindow(false);
     await BrowserUtils.callModulesFromCategory(
-      { categoryName: CATEGORY, idleDispatch: true, jsGlobal: openWindow },
+      {
+        categoryName: CATEGORY,
+        idleDispatch: openWindow,
+        jsGlobal: openWindow,
+      },
       "win"
     );
+    sinon.assert.calledOnce(openWindow.requestIdleCallback);
     sinon.assert.calledOnce(openWindow.FakeObj.doThing);
     sinon.assert.calledWithExactly(openWindow.FakeObj.doThing, "win");
 
@@ -419,6 +435,96 @@ add_task(async function test_callModulesFromCategory_error_telemetry_runtime() {
 
   Services.catMan.deleteCategory(RUNTIME_CAT);
 });
+
+// fileName and lineNumber name where the thrown error was created, and are
+// held to the same URI schemes as the module extra.
+add_task(
+  async function test_callModulesFromCategory_error_telemetry_location() {
+    const LOCATION_CAT = "somelocationtelemetrycat";
+    const MODULE = "resource://test/my_catman_1.sys.mjs";
+
+    Services.fog.testResetFOG();
+
+    for (let [module, consumer] of [
+      [MODULE, "Module1.throwingFunction"],
+      ["file:///tmp/my_catman_local.js", "LocalObj.fail"],
+      ["file:///tmp/my_catman_chained.js", "ChainedObj.fail"],
+      ["file:///tmp/my_catman_eval.js", "EvalObj.fail"],
+      ["file:///tmp/my_catman_nofile.js", "NoFileObj.fail"],
+    ]) {
+      let catManUpdated = TestUtils.topicObserved("xpcom-category-entry-added");
+      Services.catMan.addCategoryEntry(
+        LOCATION_CAT,
+        module,
+        consumer,
+        false,
+        false
+      );
+      await catManUpdated;
+    }
+
+    // LocalObj throws from this test file, whose fileName is a local path.
+    // The others pass Error's fileName and lineNumber arguments to stand in
+    // for a script loaded by another, evaluated code, and a value with a
+    // line but no file.
+    let jsGlobal = {
+      LocalObj: {
+        fail() {
+          throw new Error("Local consumer failed.");
+        },
+      },
+      ChainedObj: {
+        fail() {
+          throw new Error(
+            "Chained consumer failed.",
+            "resource://gre/modules/ExtensionCommon.sys.mjs -> moz-extension://uuid/api.js",
+            3
+          );
+        },
+      },
+      EvalObj: {
+        fail() {
+          throw new Error(
+            "Evaluated consumer failed.",
+            "chrome://browser/content/browser.js line 7 > eval",
+            1
+          );
+        },
+      },
+      NoFileObj: {
+        fail() {
+          throw new Error("Consumer without a file failed.", "", 5);
+        },
+      },
+    };
+    await BrowserUtils.callModulesFromCategory({
+      categoryName: LOCATION_CAT,
+      jsGlobal,
+    });
+
+    let locations = Object.fromEntries(
+      Glean.browserUtils.categoryDispatchError
+        .testGetValue()
+        .map(e => [
+          e.extra.consumer,
+          { fileName: e.extra.fileName, lineNumber: e.extra.lineNumber },
+        ])
+    );
+    Assert.deepEqual(
+      locations,
+      {
+        "Module1.throwingFunction": { fileName: MODULE, lineNumber: "10" },
+        "LocalObj.fail": { fileName: "other", lineNumber: undefined },
+        "ChainedObj.fail": { fileName: "other", lineNumber: undefined },
+        "EvalObj.fail": { fileName: "other", lineNumber: undefined },
+        "NoFileObj.fail": { fileName: undefined, lineNumber: undefined },
+      },
+      "The error's file and line are recorded only for a single URI with an allowed scheme."
+    );
+
+    Services.catMan.deleteCategory(LOCATION_CAT);
+  }
+);
 
 // The errorName extra names XPCOM exceptions and bare nsresults by their
 // NS_ERROR_* name, and DOMExceptions by their DOM name.

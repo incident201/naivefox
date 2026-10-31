@@ -343,6 +343,10 @@
                 "source": {
                   "type": "string",
                   "description": "Identitifer of the browser that should be pre-selected in the import migration wizard popup (e.g. 'chrome'), See https://searchfox.org/mozilla-central/rev/8dae1cc76a6b45e05198bc0d5d4edb7bf1003265/browser/components/migration/MigrationUtils.jsm#917"
+                },
+                "tabModal": {
+                  "type": "boolean",
+                  "description": "Open the migration wizard as a dialog over the current tab instead of in about:preferences."
                 }
               },
               "additionalProperties": false

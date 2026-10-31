@@ -592,10 +592,6 @@ struct DIGroup {
     mVisibleRect = mVisibleRect.Intersect(ViewAs<LayerPixel>(
         mActualBounds, PixelCastJustification::LayerIsImage));
 
-    if (mVisibleRect.IsEmpty()) {
-      return;
-    }
-
     // Invalidate any unused items
     GP("mDisplayItems\n");
     mDisplayItems.RemoveIf([&](BlobItemData* data) {
@@ -610,6 +606,10 @@ struct DIGroup {
       data->mUsed = false;
       return false;
     });
+
+    if (mVisibleRect.IsEmpty()) {
+      return;
+    }
 
     IntSize dtSize = mVisibleRect.Size().ToUnknownSize();
     // The actual display item's size shouldn't have the scale factored in
@@ -751,6 +751,7 @@ struct DIGroup {
         return;
       }
     }
+    mInvalidRect.SetEmpty();
     mFonts = std::move(fonts);
     aResources.SetBlobImageVisibleArea(
         *mKey,
@@ -1128,14 +1129,14 @@ static ItemActivity IsItemProbablyActive(
     const mozilla::layers::StackingContextHelper& aSc,
     mozilla::layers::RenderRootStateManager* aManager,
     nsDisplayListBuilder* aDisplayListBuilder, bool aSiblingActive,
-    bool aUniformlyScaled);
+    const Matrix& aTransform);
 
 static ItemActivity HasActiveChildren(
     const nsDisplayList& aList, mozilla::wr::DisplayListBuilder& aBuilder,
     mozilla::wr::IpcResourceUpdateQueue& aResources,
     const mozilla::layers::StackingContextHelper& aSc,
     mozilla::layers::RenderRootStateManager* aManager,
-    nsDisplayListBuilder* aDisplayListBuilder, bool aUniformlyScaled) {
+    nsDisplayListBuilder* aDisplayListBuilder, const Matrix& aTransform) {
   ItemActivity activity = ItemActivity::No;
   for (nsDisplayItem* item : aList) {
     // Here we only want to know if a child must be active, so we don't specify
@@ -1147,7 +1148,7 @@ static ItemActivity HasActiveChildren(
     // make them active more aggressively.
     auto childActivity =
         IsItemProbablyActive(item, aBuilder, aResources, aSc, aManager,
-                             aDisplayListBuilder, false, aUniformlyScaled);
+                             aDisplayListBuilder, false, aTransform);
     activity = CombineActivity(activity, childActivity);
     if (activity == ItemActivity::Must) {
       return activity;
@@ -1206,7 +1207,7 @@ static ItemActivity IsItemProbablyActive(
     const mozilla::layers::StackingContextHelper& aSc,
     mozilla::layers::RenderRootStateManager* aManager,
     nsDisplayListBuilder* aDisplayListBuilder, bool aHasActivePrecedingSibling,
-    bool aUniformlyScaled) {
+    const Matrix& aTransform) {
   switch (aItem->GetType()) {
     case DisplayItemType::TYPE_TRANSFORM: {
       nsDisplayTransform* transformItem =
@@ -1218,27 +1219,9 @@ static ItemActivity IsItemProbablyActive(
         return ItemActivity::Must;
       }
 
-      // Blob layers that are children of a non-axis-aligned transformation
-      // such as a rotation or a skew are rasterized then transformed which
-      // leads to resampling/quality issues.
-      // So shapes that merely could be active must not pull such a transform
-      // out of the blob. The scale of the transform also has to be folded
-      // into the uniform scale check that the children see.
-      bool axisAligned = !t2d.HasNonAxisAlignedTransform();
-      bool uniformlyScaled = aUniformlyScaled;
-      if (axisAligned) {
-        auto scales = t2d.ScaleFactors();
-        uniformlyScaled =
-            uniformlyScaled && fabs(scales.xScale - scales.yScale) <
-                                   0.1 * std::max(scales.xScale, scales.yScale);
-      }
-
-      auto activity = HasActiveChildren(
-          *transformItem->GetChildren(), aBuilder, aResources, aSc, aManager,
-          aDisplayListBuilder, axisAligned && uniformlyScaled);
-      if (!axisAligned && activity < ItemActivity::Must) {
-        activity = ItemActivity::No;
-      }
+      auto activity = HasActiveChildren(*transformItem->GetChildren(), aBuilder,
+                                        aResources, aSc, aManager,
+                                        aDisplayListBuilder, t2d * aTransform);
 
       if (transformItem->MayBeAnimated(aDisplayListBuilder)) {
         activity = CombineActivity(activity, ItemActivity::Should);
@@ -1253,16 +1236,16 @@ static ItemActivity IsItemProbablyActive(
       }
       return HasActiveChildren(*opacityItem->GetChildren(), aBuilder,
                                aResources, aSc, aManager, aDisplayListBuilder,
-                               aUniformlyScaled);
+                               aTransform);
     }
     case DisplayItemType::TYPE_FOREIGN_OBJECT: {
       return ItemActivity::Must;
     }
     case DisplayItemType::TYPE_SVG_GEOMETRY: {
       auto* svgItem = static_cast<DisplaySVGGeometry*>(aItem);
-      if (StaticPrefs::gfx_webrender_svg_shapes() && aUniformlyScaled &&
+      if (StaticPrefs::gfx_webrender_svg_shapes() &&
           svgItem->ShouldBeActive(aBuilder, aResources, aSc, aManager,
-                                  aDisplayListBuilder)) {
+                                  aDisplayListBuilder, aTransform)) {
         return AssessBounds(aSc, aDisplayListBuilder, aItem,
                             aHasActivePrecedingSibling);
       }
@@ -1271,11 +1254,7 @@ static ItemActivity IsItemProbablyActive(
     }
     case DisplayItemType::TYPE_SVG_IMAGE: {
       auto* svgItem = static_cast<DisplaySVGImage*>(aItem);
-      // Images are sampled rather than edge anti-aliased, so the non-uniform
-      // scale restriction that applies to shapes is not needed for them.
-      bool scaleOk = aUniformlyScaled ||
-                     StaticPrefs::gfx_webrender_svg_images_non_uniform_scale();
-      if (StaticPrefs::gfx_webrender_svg_images() && scaleOk &&
+      if (StaticPrefs::gfx_webrender_svg_images() &&
           svgItem->ShouldBeActive(aBuilder, aResources, aSc, aManager,
                                   aDisplayListBuilder)) {
         return AssessBounds(aSc, aDisplayListBuilder, aItem,
@@ -1304,13 +1283,13 @@ static ItemActivity IsItemProbablyActive(
       }
 
       return HasActiveChildren(*aItem->GetChildren(), aBuilder, aResources, aSc,
-                               aManager, aDisplayListBuilder, aUniformlyScaled);
+                               aManager, aDisplayListBuilder, aTransform);
     }
     case DisplayItemType::TYPE_MASK: {
       if (aItem->GetChildren()) {
         auto activity =
             HasActiveChildren(*aItem->GetChildren(), aBuilder, aResources, aSc,
-                              aManager, aDisplayListBuilder, aUniformlyScaled);
+                              aManager, aDisplayListBuilder, aTransform);
         // A clip that WebRender can express natively costs nothing, so the
         // children decide.
         if (StaticPrefs::gfx_webrender_svg_mask_propagates_activity() &&
@@ -1336,7 +1315,7 @@ static ItemActivity IsItemProbablyActive(
       if (aItem->GetChildren()) {
         return HasActiveChildren(*aItem->GetChildren(), aBuilder, aResources,
                                  aSc, aManager, aDisplayListBuilder,
-                                 aUniformlyScaled);
+                                 aTransform);
       }
       return ItemActivity::No;
     }
@@ -1377,11 +1356,6 @@ void Grouper::ConstructGroups(nsDisplayListBuilder* aDisplayListBuilder,
   // making it active won't add extra layers.
   bool isFirst = true;
 
-  // WebRender's anti-aliasing approximation is not very good under
-  // non-uniform scales.
-  const bool uniformlyScaled =
-      fabs(aGroup->mScale.xScale - aGroup->mScale.yScale) < 0.1;
-
   // Items in the middle of the list normally need to be "Should" active to be
   // worth splitting the blob. When most of the list could be active, the
   // blob would be split many times anyway, so every item that could be
@@ -1402,7 +1376,7 @@ void Grouper::ConstructGroups(nsDisplayListBuilder* aDisplayListBuilder,
       total++;
       if (IsItemProbablyActive(item, aBuilder, aResources, aSc, manager,
                                mDisplayListBuilder, false,
-                               uniformlyScaled) >= ItemActivity::Could) {
+                               Matrix()) >= ItemActivity::Could) {
         couldBeActive++;
       }
     }
@@ -1435,9 +1409,9 @@ void Grouper::ConstructGroups(nsDisplayListBuilder* aDisplayListBuilder,
     ++next;
     bool isLast = next == aList->end();
 
-    auto activity = IsItemProbablyActive(
-        item, aBuilder, aResources, aSc, manager, mDisplayListBuilder,
-        encounteredActiveItem, uniformlyScaled);
+    auto activity = IsItemProbablyActive(item, aBuilder, aResources, aSc,
+                                         manager, mDisplayListBuilder,
+                                         encounteredActiveItem, Matrix());
     auto threshold = isFirst || isLast || lowerMiddleThreshold
                          ? ItemActivity::Could
                          : ItemActivity::Should;
@@ -1451,8 +1425,6 @@ void Grouper::ConstructGroups(nsDisplayListBuilder* aDisplayListBuilder,
       RefPtr<WebRenderGroupData> groupData =
           aCommandBuilder->CreateOrRecycleWebRenderUserData<WebRenderGroupData>(
               item);
-
-      groupData->mFollowingGroup.mInvalidRect.SetEmpty();
 
       // Initialize groupData->mFollowingGroup with data from currentGroup.
       // We want to copy out this information before calling EndGroup because
@@ -1477,6 +1449,7 @@ void Grouper::ConstructGroups(nsDisplayListBuilder* aDisplayListBuilder,
         // The group changed size
         GP("Inner group size change\n");
         groupData->mFollowingGroup.ClearItems();
+        groupData->mFollowingGroup.mInvalidRect.SetEmpty();
         groupData->mFollowingGroup.ClearImageKey(
             aCommandBuilder->mManager->GetRenderRootStateManager());
       }
@@ -1784,7 +1757,6 @@ void WebRenderCommandBuilder::DoGroupingForDisplayList(
 
   GP("Inherited scale %f %f\n", scale.xScale, scale.yScale);
 
-  group.mInvalidRect.SetEmpty();
   if (group.mAppUnitsPerDevPixel != appUnitsPerDevPixel ||
       group.mScale != scale || group.mResidualOffset != residualOffset) {
     GP("Property change. Deleting blob\n");
@@ -1806,6 +1778,7 @@ void WebRenderCommandBuilder::DoGroupingForDisplayList(
     }
 
     group.ClearItems();
+    group.mInvalidRect.SetEmpty();
     group.ClearImageKey(mManager->GetRenderRootStateManager());
   }
 

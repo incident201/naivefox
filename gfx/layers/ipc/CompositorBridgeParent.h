@@ -218,7 +218,7 @@ class CompositorBridgeParentBase : public PCompositorBridgeParent,
   virtual mozilla::ipc::IPCResult RecvNotifyMemoryPressure() = 0;
   virtual mozilla::ipc::IPCResult RecvWaitOnTransactionProcessed() = 0;
   virtual mozilla::ipc::IPCResult RecvStartFrameTimeRecording(
-      const int32_t& bufferSize, uint32_t* startIndex) = 0;
+      const uint32_t& bufferSize, uint32_t* startIndex) = 0;
   virtual mozilla::ipc::IPCResult RecvStopFrameTimeRecording(
       const uint32_t& startIndex, nsTArray<float>* intervals) = 0;
   virtual mozilla::ipc::IPCResult RecvCheckContentOnlyTDR(
@@ -290,7 +290,7 @@ class CompositorBridgeParent final : public CompositorBridgeParentBase {
       const wr::RenderReasons& aReasons) override;
 
   mozilla::ipc::IPCResult RecvStartFrameTimeRecording(
-      const int32_t& aBufferSize, uint32_t* aOutStartIndex) override;
+      const uint32_t& aBufferSize, uint32_t* aOutStartIndex) override;
   mozilla::ipc::IPCResult RecvStopFrameTimeRecording(
       const uint32_t& aStartIndex, nsTArray<float>* intervals) override;
 
@@ -378,7 +378,15 @@ class CompositorBridgeParent final : public CompositorBridgeParentBase {
    */
   void ForceIsFirstPaint();
 
-  void NotifyChildCreated(LayersId aChild, LayersId aEmbedderId);
+  // Returns the embedder aChild had before, if any.
+  // aMessage names the message that attached the layer tree, for logging.
+  LayersId NotifyChildCreated(LayersId aChild, LayersId aEmbedderId,
+                              const char* aMessage);
+
+  // Sends the embed policies of aNewEmbedder and aOldEmbedder to WebRender
+  // after one of their children was added or moved between them.
+  static void RefreshEmbedPolicies(LayersId aNewEmbedder,
+                                   LayersId aOldEmbedder);
 
   void AsyncRender();
 
@@ -490,6 +498,20 @@ class CompositorBridgeParent final : public CompositorBridgeParentBase {
   // Erases the entry for |aId| if present.
   static void EraseLayerTreeStateUnderLock(
       LayersId aId, const StaticMonitorAutoLock& aProofOfLock);
+
+  // Appends the id namespace of every layer tree embedded by aEmbedder.
+  static void CollectEmbeddedChildNamespaces(LayersId aEmbedder,
+                                             nsTArray<uint32_t>& aOut);
+
+  // Iterates every entry. aFn should take (LayersId, LayerTreeState&).
+  template <typename Function>
+  static void ForEachLayerTreeStateUnderLock(
+      const StaticMonitorAutoLock& aProofOfLock, Function&& aFn) {
+    sIndirectLayerTreesLock.AssertCurrentThreadOwns();
+    for (auto& entry : sIndirectLayerTrees) {
+      aFn(entry.first, entry.second);
+    }
+  }
 
   /**
    * Given the layers id for a content process, get the GeckoContentController

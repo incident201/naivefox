@@ -57,7 +57,7 @@ skip-if = [
 
 ["browser_opentabs_recency.js"]
 skip-if = [
-  "os == 'linux' && os_version == '22.04' && arch == 'x86_64' && opt && nova", # Bug 2057846
+  "os == 'linux' && os_version == '22.04' && arch == 'x86_64' && opt", # Bug 2057846
   "os == 'linux' && os_version == '24.04' && arch == 'x86_64' && display == 'x11' && opt",
   "os == 'win' && opt",
 ]

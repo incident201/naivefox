@@ -374,8 +374,7 @@ bool ScaledFontFontconfig::GetFontInstanceData(FontInstanceDataOutput aCb,
                                                void* aBaton) {
   std::vector<wr::FontVariation> variations;
   if (HasVariationSettings()) {
-    UnscaledFontFreeType::GetVariationSettingsFromFace(&variations,
-                                                       mFace->GetFace());
+    UnscaledFontFreeType::GetVariationSettingsFromFace(&variations, mFace);
   }
 
   aCb(reinterpret_cast<uint8_t*>(&mInstanceData), sizeof(mInstanceData),
@@ -471,8 +470,7 @@ bool ScaledFontFontconfig::GetWRFontInstanceOptions(
   *aOutPlatformOptions = Some(platformOptions);
 
   if (HasVariationSettings()) {
-    UnscaledFontFreeType::GetVariationSettingsFromFace(aOutVariations,
-                                                       mFace->GetFace());
+    UnscaledFontFreeType::GetVariationSettingsFromFace(aOutVariations, mFace);
   }
 
   return true;
@@ -496,15 +494,14 @@ already_AddRefed<ScaledFont> UnscaledFontFontconfig::CreateScaledFont(
     return nullptr;
   }
 
-  if (aNumVariations > 0 && face->GetData()) {
-    if (RefPtr<SharedFTFace> varFace = face->GetData()->CloneFace()) {
+  if (aNumVariations > 0) {
+    if (RefPtr<SharedFTFace> varFace = face->CloneFace()) {
       face = varFace;
     }
-  }
-
-  // Only apply variations if we have an explicitly cloned face.
-  if (aNumVariations > 0 && face != GetFace()) {
-    ApplyVariationsToFace(aVariations, aNumVariations, face->GetFace());
+    // Only apply variations if we have an explicitly cloned face.
+    if (face != GetFace()) {
+      ApplyVariationsToFace(aVariations, aNumVariations, face->GetFace());
+    }
   }
 
   RefPtr<ScaledFontFontconfig> scaledFont =

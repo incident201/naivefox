@@ -156,10 +156,12 @@ linux64-clang-22-raw:
             - 'build/build-clang/use-clang-artifact.json'
             - 'build/build-clang/clang-22.json'
             - 'build/build-clang/stage-4-pgo.json'
+            - 'build/build-clang/stage-4-bolt.json'
         resources:
             - 'build/build-clang/use-clang-artifact.json'
             - 'build/build-clang/clang-22.json'
             - 'build/build-clang/stage-4-pgo.json'
+            - 'build/build-clang/stage-4-bolt.json'
         toolchain-artifact: public/build/clang.tar.zst
     fetches:
         fetch:
@@ -793,10 +795,12 @@ linux64-clang-23-raw:
             - 'build/build-clang/use-clang-artifact.json'
             - 'build/build-clang/clang-23.json'
             - 'build/build-clang/stage-4-pgo.json'
+            - 'build/build-clang/stage-4-bolt.json'
         resources:
             - 'build/build-clang/use-clang-artifact.json'
             - 'build/build-clang/clang-23.json'
             - 'build/build-clang/stage-4-pgo.json'
+            - 'build/build-clang/stage-4-bolt.json'
         toolchain-artifact: public/build/clang.tar.zst
     fetches:
         fetch:
@@ -1424,10 +1428,12 @@ linux64-clang-trunk-raw:
             - 'build/build-clang/use-clang-artifact.json'
             - 'build/build-clang/clang-trunk.json'
             - 'build/build-clang/stage-4-pgo.json'
+            - 'build/build-clang/stage-4-bolt.json'
         resources:
             - 'build/build-clang/use-clang-artifact.json'
             - 'build/build-clang/clang-trunk.json'
             - 'build/build-clang/stage-4-pgo.json'
+            - 'build/build-clang/stage-4-bolt.json'
         toolchain-artifact: public/build/clang.tar.zst
     fetches:
         fetch:

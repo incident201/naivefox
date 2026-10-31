@@ -356,8 +356,9 @@ smart_window:
     type: event
     description: |
       about:smartpage finishes looking up a generated page. The outcome is
-      the status the page shows. The font extra is only whether the heading
-      face was installed before that.
+      the status the page shows. The event is sent after the component
+      renders, without waiting for the font. The font extra records
+      whether the heading face was installed at that point.
     bugs:
       - https://bugzilla.mozilla.org/show_bug.cgi?id=2069135
     data_reviews:
@@ -374,9 +375,9 @@ smart_window:
       font:
         type: string
         description: >
-          Heading font install, recorded beside outcome: "ready" when
-          the face was added, "unavailable" when no font bytes were sent,
-          "error" when installing the face failed.
+          Heading font status at render: "ready" when the face was
+          added, "unavailable" when it has not been added yet,
+          "error" when installing the face already failed.
 
   aitab_link_click:
     type: event
@@ -672,6 +673,31 @@ smart_window:
         description: >
           True when this response (success or failure) was produced by a
           user-initiated retry of a previous turn
+
+  time_to_first_character:
+    type: event
+    description: |
+      Recorded when the first character of an assistant response is rendered
+      after a chat request is submitted
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2073242
+    data_reviews:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2073242
+    data_sensitivity:
+      - interaction
+    notification_emails: *emails
+    expires: never
+    extra_keys:
+      location: *location
+      chat_id: *chat_id
+      message_seq: *message_seq
+      request_id: *request_id
+      model: *model
+      latency:
+        type: quantity
+        unit: ms
+        description: >
+          Time from response request start to the first rendered assistant character
 
   client_error:
     type: event
@@ -1675,6 +1701,42 @@ smart_window:
     notification_emails: *emails
     expires: never
 
+  sidebar_open_by_default:
+    type: boolean
+    lifetime: application
+    description: |
+      Records if the user currently has the Smart Window sidebar set to open
+      by default, as set by the `browser.smartwindow.sidebar.openByDefault`
+      pref.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2059197
+    data_reviews:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2059197
+    data_sensitivity:
+      - interaction
+    notification_emails: *emails
+    expires: never
+
+  sidebar_open_by_default_change:
+    type: event
+    description: |
+      Recorded when the `browser.smartwindow.sidebar.openByDefault` pref
+      changes, for example from the settings page or from the sidebar
+      auto-open callout.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2059197
+    data_reviews:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2059197
+    data_sensitivity:
+      - interaction
+    notification_emails: *emails
+    expires: never
+    extra_keys:
+      enabled:
+        type: boolean
+        description: >
+          Whether the sidebar is now set to open by default
+
   llmaj_based_telemetry:
     type: event
     description: |
@@ -2020,6 +2082,87 @@ smart_window:
           The position (0-index) of the Top Sites tile.
           For example: 2 means the third tile in the row.
       visible_topsites: *visible_topsites
+
+  resume_cards_displayed:
+    type: event
+    description: >
+      Recorded once when the Smart Window resume section finishes loading.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2067873
+    data_reviews:
+      - https://phabricator.services.mozilla.com/D332941
+    data_sensitivity:
+      - interaction
+    notification_emails: *emails
+    expires: never
+    extra_keys:
+      chat_id: *chat_id
+      location: *location
+      message_seq: *message_seq
+      state:
+        type: string
+        description: >
+          What the section showed: cards, empty_no_suggestions, or
+          empty_all_dismissed.
+      cards:
+        type: quantity
+        unit: count
+        description: >
+          The number of resume cards visible when the section was shown.
+      total_cards:
+        type: quantity
+        unit: count
+        description: >
+          The number of resume cards available, including ones hidden
+          behind "Show more".
+
+  resume_card_action:
+    type: event
+    description: >
+      Recorded when the user interacts with a resume card.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2067873
+    data_reviews:
+      - https://phabricator.services.mozilla.com/D332941
+    data_sensitivity:
+      - interaction
+    notification_emails: *emails
+    expires: never
+    extra_keys:
+      chat_id: *chat_id
+      location: *location
+      message_seq: *message_seq
+      action:
+        type: string
+        description: >
+          The action taken: resume, card_click (the surface area of the card),
+          open_tabs, snooze, or dismiss.
+      position:
+        type: quantity
+        description: >
+          The position (0-index) of the card acted on.
+
+  resume_section_action:
+    type: event
+    description: >
+      Recorded when the user interacts with the resume section's own controls
+      rather than a card.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2067873
+    data_reviews:
+      - https://phabricator.services.mozilla.com/D332941
+    data_sensitivity:
+      - interaction
+    notification_emails: *emails
+    expires: never
+    extra_keys:
+      chat_id: *chat_id
+      location: *location
+      message_seq: *message_seq
+      action:
+        type: string
+        description: >
+          The action taken: show_more, show_less, or hide_section.
 
   bookmarkbar:
     type: labeled_counter
@@ -2397,8 +2540,13 @@ smart_window:
         type: string
         description: >
           One of the monitor run error codes: network_error, timeout,
-          rate_limit, auth_error, content_extraction_error, canceled,
-          interrupted, model_error, prompt_load_error or unknown_error.
+          budget_exceeded, rate_limit, request_too_large, max_users_reached,
+          upstream_rate_limit, fastly_rate_limit, request_blocked,
+          invalid_model, invalid_request, global_budget_exceeded,
+          guest_budget_exceeded, max_guests_reached,
+          auth_error, content_extraction_error,
+          canceled, interrupted, model_error, prompt_load_error or
+          unknown_error.
           Only present when success is false. Never a free-form message.
       outcome:
         type: boolean
@@ -3451,7 +3599,7 @@ smart_window:
           Canonical error code, or absent on success: no_content, canceled,
           page_load_failed, page_not_found, conversation_unavailable,
           pages_unreadable, nothing_to_change, history_limit, empty_response,
-          invalid_json, invalid_format, or generation_failed
+          invalid_json, content_related, invalid_format, or generation_failed
       components_used:
         type: string
         description: >

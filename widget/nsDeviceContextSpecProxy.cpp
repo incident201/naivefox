@@ -38,17 +38,7 @@ nsDeviceContextSpecProxy::Init(nsIPrintSettings* aPrintSettings,
 }
 
 already_AddRefed<PrintTarget> nsDeviceContextSpecProxy::MakePrintTarget() {
-  double width, height;
-  mPrintSettings->GetEffectiveSheetSize(&width, &height);
-  if (width <= 0 || height <= 0) {
-    return nullptr;
-  }
-
-  // convert twips to points
-  width /= TWIPS_PER_POINT_FLOAT;
-  height /= TWIPS_PER_POINT_FLOAT;
-
-  return PrintTargetRecording::CreateOrNull(IntSize::Ceil(width, height));
+  return PrintTargetRecording::CreateOrNull();
 }
 
 NS_IMETHODIMP
@@ -71,6 +61,7 @@ nsDeviceContextSpecProxy::BeginDocument(const nsAString& aTitle,
   }
 
   mRecorder = new mozilla::layout::DrawEventRecorderPRFileDesc();
+  mRecorder->SetSupportsGlyphSourceText(true);
   nsresult rv = mRemotePrintJob->InitializePrint(
       nsString(aTitle), aWindowContext, aStartPage, aEndPage);
   if (NS_FAILED(rv)) {
@@ -103,8 +94,7 @@ nsDeviceContextSpecProxy::EndDocument() {
                                                                  __func__);
 }
 
-NS_IMETHODIMP
-nsDeviceContextSpecProxy::BeginPage(const IntSize& aSizeInPoints) {
+nsresult nsDeviceContextSpecProxy::BeginPage(const IntSize& aSizeInPoints) {
   if (!mRemotePrintJob || mRemotePrintJob->IsDestroyed()) {
     mRemotePrintJob = nullptr;
     return NS_ERROR_NOT_AVAILABLE;
@@ -116,8 +106,7 @@ nsDeviceContextSpecProxy::BeginPage(const IntSize& aSizeInPoints) {
   return NS_OK;
 }
 
-NS_IMETHODIMP
-nsDeviceContextSpecProxy::EndPage() {
+nsresult nsDeviceContextSpecProxy::EndPage() {
   if (!mRemotePrintJob || mRemotePrintJob->IsDestroyed()) {
     mRemotePrintJob = nullptr;
     return NS_ERROR_NOT_AVAILABLE;

@@ -444,12 +444,13 @@ macro_rules! enumerate_interners {
     ($macro_name: ident) => {
         $macro_name! {
             clip: ClipIntern,
-            prim: RectanglePrim,
+            // Rectangles, box shadows and line decorations are interned by the
+            // content display list builder, so they have no slot here. See
+            // doc/dl-builder-interning.md.
             normal_border: NormalBorderPrim,
             image_border: ImageBorder,
             image: Image,
             yuv_image: YuvImage,
-            line_decoration: LineDecoration,
             linear_grad: LinearGradient,
             radial_grad: RadialGradient,
             conic_grad: ConicGradient,
@@ -459,7 +460,6 @@ macro_rules! enumerate_interners {
             backdrop_capture: BackdropCapture,
             backdrop_render: BackdropRender,
             polygon: PolygonIntern,
-            box_shadow: BoxShadow,
         }
     }
 }
@@ -493,6 +493,7 @@ macro_rules! enumerate_interning_report_fields {
             backdrop_render,
             polygon,
             box_shadow,
+            path,
         }
     }
 }

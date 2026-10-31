@@ -280,7 +280,7 @@ add_task(async function test_search_the_web_end_to_end() {
     mockEngineManager.assertAllRequestsHandled();
     mockSearchManager.assertAllRequestsHandled();
   } finally {
-    mockEngineManager.rejectAllRequests();
+    await mockEngineManager.rejectAllRequests();
     mockSearchManager.rejectAllRequests();
     mockEngineManager.cleanupMocks();
     mockSearchManager.cleanupMocks();
@@ -425,7 +425,7 @@ add_task(async function test_search_the_web_reads_result_pages_up_to_limit() {
     mockEngineManager.assertAllRequestsHandled();
     mockSearchManager.assertAllRequestsHandled();
   } finally {
-    mockEngineManager.rejectAllRequests();
+    await mockEngineManager.rejectAllRequests();
     mockSearchManager.rejectAllRequests();
     mockEngineManager.cleanupMocks();
     mockSearchManager.cleanupMocks();
@@ -473,7 +473,7 @@ add_task(async function test_search_the_web_invalid_answer_is_not_answered() {
     mockEngineManager.assertAllRequestsHandled();
     mockSearchManager.assertAllRequestsHandled();
   } finally {
-    mockEngineManager.rejectAllRequests();
+    await mockEngineManager.rejectAllRequests();
     mockSearchManager.rejectAllRequests();
     mockEngineManager.cleanupMocks();
     mockSearchManager.cleanupMocks();
@@ -688,7 +688,7 @@ add_task(async function test_search_the_web_page_read_timeout_does_not_hang() {
     mockSearchManager.assertAllRequestsHandled();
   } finally {
     sb.restore();
-    mockEngineManager.rejectAllRequests();
+    await mockEngineManager.rejectAllRequests();
     mockSearchManager.rejectAllRequests();
     mockEngineManager.cleanupMocks();
     mockSearchManager.cleanupMocks();
@@ -1713,7 +1713,7 @@ add_task(async function test_answers_search_returns_answer_and_citations() {
 
     mockEngineManager.assertAllRequestsHandled();
   } finally {
-    mockEngineManager.rejectAllRequests();
+    await mockEngineManager.rejectAllRequests();
     mockEngineManager.cleanupMocks();
     await SpecialPowers.popPrefEnv();
   }
@@ -1764,7 +1764,7 @@ add_task(async function test_answers_pref_ignored_on_custom_endpoint() {
 
     mockSearchManager.assertAllRequestsHandled();
   } finally {
-    mockEngineManager.rejectAllRequests();
+    await mockEngineManager.rejectAllRequests();
     mockSearchManager.rejectAllRequests();
     mockEngineManager.cleanupMocks();
     mockSearchManager.cleanupMocks();
@@ -1807,7 +1807,7 @@ add_task(async function test_answers_runs_when_tab_overrides_custom_choice() {
 
     mockEngineManager.assertAllRequestsHandled();
   } finally {
-    mockEngineManager.rejectAllRequests();
+    await mockEngineManager.rejectAllRequests();
     mockEngineManager.cleanupMocks();
     await SpecialPowers.popPrefEnv(); // model choice
     await SpecialPowers.popPrefEnv(); // search prefs
@@ -1884,7 +1884,7 @@ add_task(
 
       mockSearchManager.assertAllRequestsHandled();
     } finally {
-      mockEngineManager.rejectAllRequests();
+      await mockEngineManager.rejectAllRequests();
       mockSearchManager.rejectAllRequests();
       mockEngineManager.cleanupMocks();
       mockSearchManager.cleanupMocks();
@@ -1944,7 +1944,7 @@ add_task(async function test_answers_failure_returns_turn_then_escalates() {
 
     mockEngineManager.assertAllRequestsHandled();
   } finally {
-    mockEngineManager.rejectAllRequests();
+    await mockEngineManager.rejectAllRequests();
     mockEngineManager.cleanupMocks();
     await SpecialPowers.popPrefEnv();
   }

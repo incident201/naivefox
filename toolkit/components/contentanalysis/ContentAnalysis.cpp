@@ -442,7 +442,7 @@ nsresult ContentAnalysisRequest::GetFileDigest(const nsAString& aFilePath,
   NS_ENSURE_SUCCESS(rv, rv);
   auto closeFile = MakeScopeExit([fd]() { PR_Close(fd); });
   constexpr uint32_t kBufferSize = 1024 * 1024;
-  auto buffer = mozilla::MakeUnique<uint8_t[]>(kBufferSize);
+  auto buffer = std::make_unique<uint8_t[]>(kBufferSize);
   if (!buffer) {
     return NS_ERROR_OUT_OF_MEMORY;
   }

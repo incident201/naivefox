@@ -46,12 +46,12 @@ extern "C" {
   uint16_t uniffi_ads_client_checksum_method_mozadsclient_report_ad();
   uint16_t uniffi_ads_client_checksum_method_mozadsclient_request_image_ads();
   uint16_t uniffi_ads_client_checksum_method_mozadsclient_request_spoc_ads();
+  uint16_t uniffi_ads_client_checksum_method_mozadsclient_request_spoc_or_image_ads();
   uint16_t uniffi_ads_client_checksum_method_mozadsclient_request_tile_ads();
   uint16_t uniffi_ads_client_checksum_method_mozadsclient_shutdown();
   uint16_t uniffi_ads_client_checksum_method_mozadsclientbuilder_build();
   uint16_t uniffi_ads_client_checksum_method_mozadsclientbuilder_cache_config();
   uint16_t uniffi_ads_client_checksum_method_mozadsclientbuilder_environment();
-  uint16_t uniffi_ads_client_checksum_method_mozadsclientbuilder_store_config();
   uint16_t uniffi_ads_client_checksum_method_mozadsclientbuilder_telemetry();
   uint16_t uniffi_ads_client_checksum_constructor_mozadsclientbuilder_new();
   void uniffi_ads_client_fn_method_mozadsclient_clear_cache(uint64_t, RustCallStatus*);
@@ -60,12 +60,12 @@ extern "C" {
   void uniffi_ads_client_fn_method_mozadsclient_report_ad(uint64_t, RustBuffer, RustBuffer, RustBuffer, RustCallStatus*);
   RustBuffer uniffi_ads_client_fn_method_mozadsclient_request_image_ads(uint64_t, RustBuffer, RustBuffer, RustCallStatus*);
   RustBuffer uniffi_ads_client_fn_method_mozadsclient_request_spoc_ads(uint64_t, RustBuffer, RustBuffer, RustCallStatus*);
+  RustBuffer uniffi_ads_client_fn_method_mozadsclient_request_spoc_or_image_ads(uint64_t, RustBuffer, RustBuffer, RustCallStatus*);
   RustBuffer uniffi_ads_client_fn_method_mozadsclient_request_tile_ads(uint64_t, RustBuffer, RustBuffer, RustCallStatus*);
   void uniffi_ads_client_fn_method_mozadsclient_shutdown(uint64_t, RustCallStatus*);
   uint64_t uniffi_ads_client_fn_method_mozadsclientbuilder_build(uint64_t, RustCallStatus*);
   uint64_t uniffi_ads_client_fn_method_mozadsclientbuilder_cache_config(uint64_t, RustBuffer, RustCallStatus*);
   uint64_t uniffi_ads_client_fn_method_mozadsclientbuilder_environment(uint64_t, RustBuffer, RustCallStatus*);
-  uint64_t uniffi_ads_client_fn_method_mozadsclientbuilder_store_config(uint64_t, RustBuffer, RustCallStatus*);
   uint64_t uniffi_ads_client_fn_method_mozadsclientbuilder_telemetry(uint64_t, uint64_t, RustCallStatus*);
   uint64_t uniffi_ads_client_fn_constructor_mozadsclientbuilder_new(RustCallStatus*);
   uint64_t uniffi_ads_client_fn_clone_mozadsclient(uint64_t, RustCallStatus*);
@@ -144,6 +144,7 @@ extern "C" {
   uint16_t uniffi_autofill_checksum_method_store_get_all_passports();
   uint16_t uniffi_autofill_checksum_method_store_get_credit_card();
   uint16_t uniffi_autofill_checksum_method_store_get_passport();
+  uint16_t uniffi_autofill_checksum_method_store_list_credit_card_candidates();
   uint16_t uniffi_autofill_checksum_method_store_register_with_sync_manager();
   uint16_t uniffi_autofill_checksum_method_store_run_maintenance();
   uint16_t uniffi_autofill_checksum_method_store_scrub_encrypted_data();
@@ -208,6 +209,7 @@ extern "C" {
   RustBuffer uniffi_autofill_fn_method_store_get_all_passports(uint64_t, RustCallStatus*);
   RustBuffer uniffi_autofill_fn_method_store_get_credit_card(uint64_t, RustBuffer, RustCallStatus*);
   RustBuffer uniffi_autofill_fn_method_store_get_passport(uint64_t, RustBuffer, RustCallStatus*);
+  RustBuffer uniffi_autofill_fn_method_store_list_credit_card_candidates(uint64_t, RustCallStatus*);
   void uniffi_autofill_fn_method_store_register_with_sync_manager(uint64_t, RustCallStatus*);
   void uniffi_autofill_fn_method_store_run_maintenance(uint64_t, RustCallStatus*);
   void uniffi_autofill_fn_method_store_scrub_encrypted_data(uint64_t, RustCallStatus*);
@@ -1356,19 +1358,19 @@ const static mozilla::uniffi::UniFFIPointerType kPointerType0 {
   uniffi_ads_client_fn_clone_mozadsclient,
   uniffi_ads_client_fn_free_mozadsclient,
 };
-class FfiValueObjectHandle45 {
+class FfiValueObjectHandle49 {
  private:
   uint64_t mValue = 0;
 
  public:
-  FfiValueObjectHandle45() = default;
-  explicit FfiValueObjectHandle45(uint64_t aValue) : mValue(aValue) {}
+  FfiValueObjectHandle49() = default;
+  explicit FfiValueObjectHandle49(uint64_t aValue) : mValue(aValue) {}
 
   // Delete copy constructor and assignment as this type is non-copyable.
-  FfiValueObjectHandle45(const FfiValueObjectHandle45&) = delete;
-  FfiValueObjectHandle45& operator=(const FfiValueObjectHandle45&) = delete;
+  FfiValueObjectHandle49(const FfiValueObjectHandle49&) = delete;
+  FfiValueObjectHandle49& operator=(const FfiValueObjectHandle49&) = delete;
 
-  FfiValueObjectHandle45& operator=(FfiValueObjectHandle45&& aOther) {
+  FfiValueObjectHandle49& operator=(FfiValueObjectHandle49&& aOther) {
     FreeHandle();
     mValue = aOther.mValue;
     aOther.mValue = 0;
@@ -1410,8 +1412,8 @@ class FfiValueObjectHandle45 {
     return temp;
   }
 
-  static FfiValueObjectHandle45 FromRust(uint64_t aValue) {
-    return FfiValueObjectHandle45(aValue);
+  static FfiValueObjectHandle49 FromRust(uint64_t aValue) {
+    return FfiValueObjectHandle49(aValue);
   }
 
   void FreeHandle() {
@@ -1423,7 +1425,7 @@ class FfiValueObjectHandle45 {
     }
   }
 
-  ~FfiValueObjectHandle45() {
+  ~FfiValueObjectHandle49() {
     // If the pointer is non-null, this means Lift/IntoRust was never called
     // because there was some failure along the way. Free the pointer to avoid a
     // leak
@@ -1436,19 +1438,19 @@ const static mozilla::uniffi::UniFFIPointerType kPointerType1 {
   uniffi_ads_client_fn_clone_mozadsclientbuilder,
   uniffi_ads_client_fn_free_mozadsclientbuilder,
 };
-class FfiValueObjectHandle47 {
+class FfiValueObjectHandle51 {
  private:
   uint64_t mValue = 0;
 
  public:
-  FfiValueObjectHandle47() = default;
-  explicit FfiValueObjectHandle47(uint64_t aValue) : mValue(aValue) {}
+  FfiValueObjectHandle51() = default;
+  explicit FfiValueObjectHandle51(uint64_t aValue) : mValue(aValue) {}
 
   // Delete copy constructor and assignment as this type is non-copyable.
-  FfiValueObjectHandle47(const FfiValueObjectHandle47&) = delete;
-  FfiValueObjectHandle47& operator=(const FfiValueObjectHandle47&) = delete;
+  FfiValueObjectHandle51(const FfiValueObjectHandle51&) = delete;
+  FfiValueObjectHandle51& operator=(const FfiValueObjectHandle51&) = delete;
 
-  FfiValueObjectHandle47& operator=(FfiValueObjectHandle47&& aOther) {
+  FfiValueObjectHandle51& operator=(FfiValueObjectHandle51&& aOther) {
     FreeHandle();
     mValue = aOther.mValue;
     aOther.mValue = 0;
@@ -1490,8 +1492,8 @@ class FfiValueObjectHandle47 {
     return temp;
   }
 
-  static FfiValueObjectHandle47 FromRust(uint64_t aValue) {
-    return FfiValueObjectHandle47(aValue);
+  static FfiValueObjectHandle51 FromRust(uint64_t aValue) {
+    return FfiValueObjectHandle51(aValue);
   }
 
   void FreeHandle() {
@@ -1503,7 +1505,7 @@ class FfiValueObjectHandle47 {
     }
   }
 
-  ~FfiValueObjectHandle47() {
+  ~FfiValueObjectHandle51() {
     // If the pointer is non-null, this means Lift/IntoRust was never called
     // because there was some failure along the way. Free the pointer to avoid a
     // leak
@@ -1516,19 +1518,19 @@ const static mozilla::uniffi::UniFFIPointerType kPointerType2 {
   uniffi_autofill_fn_clone_addressesbridgedengine,
   uniffi_autofill_fn_free_addressesbridgedengine,
 };
-class FfiValueObjectHandle80 {
+class FfiValueObjectHandle83 {
  private:
   uint64_t mValue = 0;
 
  public:
-  FfiValueObjectHandle80() = default;
-  explicit FfiValueObjectHandle80(uint64_t aValue) : mValue(aValue) {}
+  FfiValueObjectHandle83() = default;
+  explicit FfiValueObjectHandle83(uint64_t aValue) : mValue(aValue) {}
 
   // Delete copy constructor and assignment as this type is non-copyable.
-  FfiValueObjectHandle80(const FfiValueObjectHandle80&) = delete;
-  FfiValueObjectHandle80& operator=(const FfiValueObjectHandle80&) = delete;
+  FfiValueObjectHandle83(const FfiValueObjectHandle83&) = delete;
+  FfiValueObjectHandle83& operator=(const FfiValueObjectHandle83&) = delete;
 
-  FfiValueObjectHandle80& operator=(FfiValueObjectHandle80&& aOther) {
+  FfiValueObjectHandle83& operator=(FfiValueObjectHandle83&& aOther) {
     FreeHandle();
     mValue = aOther.mValue;
     aOther.mValue = 0;
@@ -1570,8 +1572,8 @@ class FfiValueObjectHandle80 {
     return temp;
   }
 
-  static FfiValueObjectHandle80 FromRust(uint64_t aValue) {
-    return FfiValueObjectHandle80(aValue);
+  static FfiValueObjectHandle83 FromRust(uint64_t aValue) {
+    return FfiValueObjectHandle83(aValue);
   }
 
   void FreeHandle() {
@@ -1583,7 +1585,7 @@ class FfiValueObjectHandle80 {
     }
   }
 
-  ~FfiValueObjectHandle80() {
+  ~FfiValueObjectHandle83() {
     // If the pointer is non-null, this means Lift/IntoRust was never called
     // because there was some failure along the way. Free the pointer to avoid a
     // leak
@@ -1596,19 +1598,19 @@ const static mozilla::uniffi::UniFFIPointerType kPointerType3 {
   uniffi_autofill_fn_clone_creditcardsbridgedengine,
   uniffi_autofill_fn_free_creditcardsbridgedengine,
 };
-class FfiValueObjectHandle81 {
+class FfiValueObjectHandle84 {
  private:
   uint64_t mValue = 0;
 
  public:
-  FfiValueObjectHandle81() = default;
-  explicit FfiValueObjectHandle81(uint64_t aValue) : mValue(aValue) {}
+  FfiValueObjectHandle84() = default;
+  explicit FfiValueObjectHandle84(uint64_t aValue) : mValue(aValue) {}
 
   // Delete copy constructor and assignment as this type is non-copyable.
-  FfiValueObjectHandle81(const FfiValueObjectHandle81&) = delete;
-  FfiValueObjectHandle81& operator=(const FfiValueObjectHandle81&) = delete;
+  FfiValueObjectHandle84(const FfiValueObjectHandle84&) = delete;
+  FfiValueObjectHandle84& operator=(const FfiValueObjectHandle84&) = delete;
 
-  FfiValueObjectHandle81& operator=(FfiValueObjectHandle81&& aOther) {
+  FfiValueObjectHandle84& operator=(FfiValueObjectHandle84&& aOther) {
     FreeHandle();
     mValue = aOther.mValue;
     aOther.mValue = 0;
@@ -1650,8 +1652,8 @@ class FfiValueObjectHandle81 {
     return temp;
   }
 
-  static FfiValueObjectHandle81 FromRust(uint64_t aValue) {
-    return FfiValueObjectHandle81(aValue);
+  static FfiValueObjectHandle84 FromRust(uint64_t aValue) {
+    return FfiValueObjectHandle84(aValue);
   }
 
   void FreeHandle() {
@@ -1663,7 +1665,7 @@ class FfiValueObjectHandle81 {
     }
   }
 
-  ~FfiValueObjectHandle81() {
+  ~FfiValueObjectHandle84() {
     // If the pointer is non-null, this means Lift/IntoRust was never called
     // because there was some failure along the way. Free the pointer to avoid a
     // leak
@@ -1676,19 +1678,19 @@ const static mozilla::uniffi::UniFFIPointerType kPointerType4 {
   uniffi_autofill_fn_clone_store,
   uniffi_autofill_fn_free_store,
 };
-class FfiValueObjectHandle53 {
+class FfiValueObjectHandle56 {
  private:
   uint64_t mValue = 0;
 
  public:
-  FfiValueObjectHandle53() = default;
-  explicit FfiValueObjectHandle53(uint64_t aValue) : mValue(aValue) {}
+  FfiValueObjectHandle56() = default;
+  explicit FfiValueObjectHandle56(uint64_t aValue) : mValue(aValue) {}
 
   // Delete copy constructor and assignment as this type is non-copyable.
-  FfiValueObjectHandle53(const FfiValueObjectHandle53&) = delete;
-  FfiValueObjectHandle53& operator=(const FfiValueObjectHandle53&) = delete;
+  FfiValueObjectHandle56(const FfiValueObjectHandle56&) = delete;
+  FfiValueObjectHandle56& operator=(const FfiValueObjectHandle56&) = delete;
 
-  FfiValueObjectHandle53& operator=(FfiValueObjectHandle53&& aOther) {
+  FfiValueObjectHandle56& operator=(FfiValueObjectHandle56&& aOther) {
     FreeHandle();
     mValue = aOther.mValue;
     aOther.mValue = 0;
@@ -1730,8 +1732,8 @@ class FfiValueObjectHandle53 {
     return temp;
   }
 
-  static FfiValueObjectHandle53 FromRust(uint64_t aValue) {
-    return FfiValueObjectHandle53(aValue);
+  static FfiValueObjectHandle56 FromRust(uint64_t aValue) {
+    return FfiValueObjectHandle56(aValue);
   }
 
   void FreeHandle() {
@@ -1743,7 +1745,7 @@ class FfiValueObjectHandle53 {
     }
   }
 
-  ~FfiValueObjectHandle53() {
+  ~FfiValueObjectHandle56() {
     // If the pointer is non-null, this means Lift/IntoRust was never called
     // because there was some failure along the way. Free the pointer to avoid a
     // leak
@@ -1756,19 +1758,19 @@ const static mozilla::uniffi::UniFFIPointerType kPointerType5 {
   uniffi_breach_alerts_fn_clone_breachalertsstore,
   uniffi_breach_alerts_fn_free_breachalertsstore,
 };
-class FfiValueObjectHandle832 {
+class FfiValueObjectHandle842 {
  private:
   uint64_t mValue = 0;
 
  public:
-  FfiValueObjectHandle832() = default;
-  explicit FfiValueObjectHandle832(uint64_t aValue) : mValue(aValue) {}
+  FfiValueObjectHandle842() = default;
+  explicit FfiValueObjectHandle842(uint64_t aValue) : mValue(aValue) {}
 
   // Delete copy constructor and assignment as this type is non-copyable.
-  FfiValueObjectHandle832(const FfiValueObjectHandle832&) = delete;
-  FfiValueObjectHandle832& operator=(const FfiValueObjectHandle832&) = delete;
+  FfiValueObjectHandle842(const FfiValueObjectHandle842&) = delete;
+  FfiValueObjectHandle842& operator=(const FfiValueObjectHandle842&) = delete;
 
-  FfiValueObjectHandle832& operator=(FfiValueObjectHandle832&& aOther) {
+  FfiValueObjectHandle842& operator=(FfiValueObjectHandle842&& aOther) {
     FreeHandle();
     mValue = aOther.mValue;
     aOther.mValue = 0;
@@ -1810,8 +1812,8 @@ class FfiValueObjectHandle832 {
     return temp;
   }
 
-  static FfiValueObjectHandle832 FromRust(uint64_t aValue) {
-    return FfiValueObjectHandle832(aValue);
+  static FfiValueObjectHandle842 FromRust(uint64_t aValue) {
+    return FfiValueObjectHandle842(aValue);
   }
 
   void FreeHandle() {
@@ -1823,7 +1825,7 @@ class FfiValueObjectHandle832 {
     }
   }
 
-  ~FfiValueObjectHandle832() {
+  ~FfiValueObjectHandle842() {
     // If the pointer is non-null, this means Lift/IntoRust was never called
     // because there was some failure along the way. Free the pointer to avoid a
     // leak
@@ -1836,19 +1838,19 @@ const static mozilla::uniffi::UniFFIPointerType kPointerType6 {
   uniffi_context_id_fn_clone_contextidcomponent,
   uniffi_context_id_fn_free_contextidcomponent,
 };
-class FfiValueObjectHandle1039 {
+class FfiValueObjectHandle1051 {
  private:
   uint64_t mValue = 0;
 
  public:
-  FfiValueObjectHandle1039() = default;
-  explicit FfiValueObjectHandle1039(uint64_t aValue) : mValue(aValue) {}
+  FfiValueObjectHandle1051() = default;
+  explicit FfiValueObjectHandle1051(uint64_t aValue) : mValue(aValue) {}
 
   // Delete copy constructor and assignment as this type is non-copyable.
-  FfiValueObjectHandle1039(const FfiValueObjectHandle1039&) = delete;
-  FfiValueObjectHandle1039& operator=(const FfiValueObjectHandle1039&) = delete;
+  FfiValueObjectHandle1051(const FfiValueObjectHandle1051&) = delete;
+  FfiValueObjectHandle1051& operator=(const FfiValueObjectHandle1051&) = delete;
 
-  FfiValueObjectHandle1039& operator=(FfiValueObjectHandle1039&& aOther) {
+  FfiValueObjectHandle1051& operator=(FfiValueObjectHandle1051&& aOther) {
     FreeHandle();
     mValue = aOther.mValue;
     aOther.mValue = 0;
@@ -1890,8 +1892,8 @@ class FfiValueObjectHandle1039 {
     return temp;
   }
 
-  static FfiValueObjectHandle1039 FromRust(uint64_t aValue) {
-    return FfiValueObjectHandle1039(aValue);
+  static FfiValueObjectHandle1051 FromRust(uint64_t aValue) {
+    return FfiValueObjectHandle1051(aValue);
   }
 
   void FreeHandle() {
@@ -1903,7 +1905,7 @@ class FfiValueObjectHandle1039 {
     }
   }
 
-  ~FfiValueObjectHandle1039() {
+  ~FfiValueObjectHandle1051() {
     // If the pointer is non-null, this means Lift/IntoRust was never called
     // because there was some failure along the way. Free the pointer to avoid a
     // leak
@@ -1923,7 +1925,7 @@ extern "C" uint64_t callback_clone_2(uint64_t uniffiHandle);
 // Trait interface FFI value class for db_crypto::EncryptorDecryptor.
 //
 // This is a hybrid between the one for interfaces and callback interface version
-class FfiValueObjectHandle61 {
+class FfiValueObjectHandle64 {
  private:
   // The raw FFI value is a uint64_t in all cases.
   // For callback interfaces, the uint64_t handle gets casted to a pointer.  Callback interface
@@ -1932,14 +1934,14 @@ class FfiValueObjectHandle61 {
   uint64_t mValue = 0;
 
  public:
-  FfiValueObjectHandle61() = default;
-  explicit FfiValueObjectHandle61(uint64_t aValue) : mValue(aValue) {}
+  FfiValueObjectHandle64() = default;
+  explicit FfiValueObjectHandle64(uint64_t aValue) : mValue(aValue) {}
 
   // Delete copy constructor and assignment as this type is non-copyable.
-  FfiValueObjectHandle61(const FfiValueObjectHandle61&) = delete;
-  FfiValueObjectHandle61& operator=(const FfiValueObjectHandle61&) = delete;
+  FfiValueObjectHandle64(const FfiValueObjectHandle64&) = delete;
+  FfiValueObjectHandle64& operator=(const FfiValueObjectHandle64&) = delete;
 
-  FfiValueObjectHandle61& operator=(FfiValueObjectHandle61&& aOther) {
+  FfiValueObjectHandle64& operator=(FfiValueObjectHandle64&& aOther) {
     FreeHandle();
     mValue = aOther.mValue;
     aOther.mValue = 0;
@@ -1994,8 +1996,8 @@ class FfiValueObjectHandle61 {
     return temp;
   }
 
-  static FfiValueObjectHandle61 FromRust(uint64_t aValue) {
-    return FfiValueObjectHandle61(aValue);
+  static FfiValueObjectHandle64 FromRust(uint64_t aValue) {
+    return FfiValueObjectHandle64(aValue);
   }
 
   void FreeHandle() {
@@ -2017,7 +2019,7 @@ class FfiValueObjectHandle61 {
     mValue = 0;
   }
 
-  ~FfiValueObjectHandle61() {
+  ~FfiValueObjectHandle64() {
     // If the pointer is non-null, this means Lift/IntoRust was never called
     // because there was some failure along the way. Free the pointer to avoid a
     // leak
@@ -2037,7 +2039,7 @@ extern "C" uint64_t callback_clone_3(uint64_t uniffiHandle);
 // Trait interface FFI value class for db_crypto::KeyManager.
 //
 // This is a hybrid between the one for interfaces and callback interface version
-class FfiValueObjectHandle92 {
+class FfiValueObjectHandle97 {
  private:
   // The raw FFI value is a uint64_t in all cases.
   // For callback interfaces, the uint64_t handle gets casted to a pointer.  Callback interface
@@ -2046,14 +2048,14 @@ class FfiValueObjectHandle92 {
   uint64_t mValue = 0;
 
  public:
-  FfiValueObjectHandle92() = default;
-  explicit FfiValueObjectHandle92(uint64_t aValue) : mValue(aValue) {}
+  FfiValueObjectHandle97() = default;
+  explicit FfiValueObjectHandle97(uint64_t aValue) : mValue(aValue) {}
 
   // Delete copy constructor and assignment as this type is non-copyable.
-  FfiValueObjectHandle92(const FfiValueObjectHandle92&) = delete;
-  FfiValueObjectHandle92& operator=(const FfiValueObjectHandle92&) = delete;
+  FfiValueObjectHandle97(const FfiValueObjectHandle97&) = delete;
+  FfiValueObjectHandle97& operator=(const FfiValueObjectHandle97&) = delete;
 
-  FfiValueObjectHandle92& operator=(FfiValueObjectHandle92&& aOther) {
+  FfiValueObjectHandle97& operator=(FfiValueObjectHandle97&& aOther) {
     FreeHandle();
     mValue = aOther.mValue;
     aOther.mValue = 0;
@@ -2108,8 +2110,8 @@ class FfiValueObjectHandle92 {
     return temp;
   }
 
-  static FfiValueObjectHandle92 FromRust(uint64_t aValue) {
-    return FfiValueObjectHandle92(aValue);
+  static FfiValueObjectHandle97 FromRust(uint64_t aValue) {
+    return FfiValueObjectHandle97(aValue);
   }
 
   void FreeHandle() {
@@ -2131,7 +2133,7 @@ class FfiValueObjectHandle92 {
     mValue = 0;
   }
 
-  ~FfiValueObjectHandle92() {
+  ~FfiValueObjectHandle97() {
     // If the pointer is non-null, this means Lift/IntoRust was never called
     // because there was some failure along the way. Free the pointer to avoid a
     // leak
@@ -2144,19 +2146,19 @@ const static mozilla::uniffi::UniFFIPointerType kPointerType9 {
   uniffi_db_crypto_fn_clone_managedencryptordecryptor,
   uniffi_db_crypto_fn_free_managedencryptordecryptor,
 };
-class FfiValueObjectHandle1245 {
+class FfiValueObjectHandle1259 {
  private:
   uint64_t mValue = 0;
 
  public:
-  FfiValueObjectHandle1245() = default;
-  explicit FfiValueObjectHandle1245(uint64_t aValue) : mValue(aValue) {}
+  FfiValueObjectHandle1259() = default;
+  explicit FfiValueObjectHandle1259(uint64_t aValue) : mValue(aValue) {}
 
   // Delete copy constructor and assignment as this type is non-copyable.
-  FfiValueObjectHandle1245(const FfiValueObjectHandle1245&) = delete;
-  FfiValueObjectHandle1245& operator=(const FfiValueObjectHandle1245&) = delete;
+  FfiValueObjectHandle1259(const FfiValueObjectHandle1259&) = delete;
+  FfiValueObjectHandle1259& operator=(const FfiValueObjectHandle1259&) = delete;
 
-  FfiValueObjectHandle1245& operator=(FfiValueObjectHandle1245&& aOther) {
+  FfiValueObjectHandle1259& operator=(FfiValueObjectHandle1259&& aOther) {
     FreeHandle();
     mValue = aOther.mValue;
     aOther.mValue = 0;
@@ -2198,8 +2200,8 @@ class FfiValueObjectHandle1245 {
     return temp;
   }
 
-  static FfiValueObjectHandle1245 FromRust(uint64_t aValue) {
-    return FfiValueObjectHandle1245(aValue);
+  static FfiValueObjectHandle1259 FromRust(uint64_t aValue) {
+    return FfiValueObjectHandle1259(aValue);
   }
 
   void FreeHandle() {
@@ -2211,7 +2213,7 @@ class FfiValueObjectHandle1245 {
     }
   }
 
-  ~FfiValueObjectHandle1245() {
+  ~FfiValueObjectHandle1259() {
     // If the pointer is non-null, this means Lift/IntoRust was never called
     // because there was some failure along the way. Free the pointer to avoid a
     // leak
@@ -2224,19 +2226,19 @@ const static mozilla::uniffi::UniFFIPointerType kPointerType10 {
   uniffi_db_crypto_fn_clone_nsskeymanager,
   uniffi_db_crypto_fn_free_nsskeymanager,
 };
-class FfiValueObjectHandle1246 {
+class FfiValueObjectHandle1260 {
  private:
   uint64_t mValue = 0;
 
  public:
-  FfiValueObjectHandle1246() = default;
-  explicit FfiValueObjectHandle1246(uint64_t aValue) : mValue(aValue) {}
+  FfiValueObjectHandle1260() = default;
+  explicit FfiValueObjectHandle1260(uint64_t aValue) : mValue(aValue) {}
 
   // Delete copy constructor and assignment as this type is non-copyable.
-  FfiValueObjectHandle1246(const FfiValueObjectHandle1246&) = delete;
-  FfiValueObjectHandle1246& operator=(const FfiValueObjectHandle1246&) = delete;
+  FfiValueObjectHandle1260(const FfiValueObjectHandle1260&) = delete;
+  FfiValueObjectHandle1260& operator=(const FfiValueObjectHandle1260&) = delete;
 
-  FfiValueObjectHandle1246& operator=(FfiValueObjectHandle1246&& aOther) {
+  FfiValueObjectHandle1260& operator=(FfiValueObjectHandle1260&& aOther) {
     FreeHandle();
     mValue = aOther.mValue;
     aOther.mValue = 0;
@@ -2278,8 +2280,8 @@ class FfiValueObjectHandle1246 {
     return temp;
   }
 
-  static FfiValueObjectHandle1246 FromRust(uint64_t aValue) {
-    return FfiValueObjectHandle1246(aValue);
+  static FfiValueObjectHandle1260 FromRust(uint64_t aValue) {
+    return FfiValueObjectHandle1260(aValue);
   }
 
   void FreeHandle() {
@@ -2291,7 +2293,7 @@ class FfiValueObjectHandle1246 {
     }
   }
 
-  ~FfiValueObjectHandle1246() {
+  ~FfiValueObjectHandle1260() {
     // If the pointer is non-null, this means Lift/IntoRust was never called
     // because there was some failure along the way. Free the pointer to avoid a
     // leak
@@ -2311,7 +2313,7 @@ extern "C" uint64_t callback_clone_4(uint64_t uniffiHandle);
 // Trait interface FFI value class for db_crypto::PrimaryPasswordAuthenticator.
 //
 // This is a hybrid between the one for interfaces and callback interface version
-class FfiValueObjectHandle52 {
+class FfiValueObjectHandle55 {
  private:
   // The raw FFI value is a uint64_t in all cases.
   // For callback interfaces, the uint64_t handle gets casted to a pointer.  Callback interface
@@ -2320,14 +2322,14 @@ class FfiValueObjectHandle52 {
   uint64_t mValue = 0;
 
  public:
-  FfiValueObjectHandle52() = default;
-  explicit FfiValueObjectHandle52(uint64_t aValue) : mValue(aValue) {}
+  FfiValueObjectHandle55() = default;
+  explicit FfiValueObjectHandle55(uint64_t aValue) : mValue(aValue) {}
 
   // Delete copy constructor and assignment as this type is non-copyable.
-  FfiValueObjectHandle52(const FfiValueObjectHandle52&) = delete;
-  FfiValueObjectHandle52& operator=(const FfiValueObjectHandle52&) = delete;
+  FfiValueObjectHandle55(const FfiValueObjectHandle55&) = delete;
+  FfiValueObjectHandle55& operator=(const FfiValueObjectHandle55&) = delete;
 
-  FfiValueObjectHandle52& operator=(FfiValueObjectHandle52&& aOther) {
+  FfiValueObjectHandle55& operator=(FfiValueObjectHandle55&& aOther) {
     FreeHandle();
     mValue = aOther.mValue;
     aOther.mValue = 0;
@@ -2382,8 +2384,8 @@ class FfiValueObjectHandle52 {
     return temp;
   }
 
-  static FfiValueObjectHandle52 FromRust(uint64_t aValue) {
-    return FfiValueObjectHandle52(aValue);
+  static FfiValueObjectHandle55 FromRust(uint64_t aValue) {
+    return FfiValueObjectHandle55(aValue);
   }
 
   void FreeHandle() {
@@ -2405,7 +2407,7 @@ class FfiValueObjectHandle52 {
     mValue = 0;
   }
 
-  ~FfiValueObjectHandle52() {
+  ~FfiValueObjectHandle55() {
     // If the pointer is non-null, this means Lift/IntoRust was never called
     // because there was some failure along the way. Free the pointer to avoid a
     // leak
@@ -2418,19 +2420,19 @@ const static mozilla::uniffi::UniFFIPointerType kPointerType12 {
   uniffi_db_crypto_fn_clone_statickeymanager,
   uniffi_db_crypto_fn_free_statickeymanager,
 };
-class FfiValueObjectHandle1247 {
+class FfiValueObjectHandle1261 {
  private:
   uint64_t mValue = 0;
 
  public:
-  FfiValueObjectHandle1247() = default;
-  explicit FfiValueObjectHandle1247(uint64_t aValue) : mValue(aValue) {}
+  FfiValueObjectHandle1261() = default;
+  explicit FfiValueObjectHandle1261(uint64_t aValue) : mValue(aValue) {}
 
   // Delete copy constructor and assignment as this type is non-copyable.
-  FfiValueObjectHandle1247(const FfiValueObjectHandle1247&) = delete;
-  FfiValueObjectHandle1247& operator=(const FfiValueObjectHandle1247&) = delete;
+  FfiValueObjectHandle1261(const FfiValueObjectHandle1261&) = delete;
+  FfiValueObjectHandle1261& operator=(const FfiValueObjectHandle1261&) = delete;
 
-  FfiValueObjectHandle1247& operator=(FfiValueObjectHandle1247&& aOther) {
+  FfiValueObjectHandle1261& operator=(FfiValueObjectHandle1261&& aOther) {
     FreeHandle();
     mValue = aOther.mValue;
     aOther.mValue = 0;
@@ -2472,8 +2474,8 @@ class FfiValueObjectHandle1247 {
     return temp;
   }
 
-  static FfiValueObjectHandle1247 FromRust(uint64_t aValue) {
-    return FfiValueObjectHandle1247(aValue);
+  static FfiValueObjectHandle1261 FromRust(uint64_t aValue) {
+    return FfiValueObjectHandle1261(aValue);
   }
 
   void FreeHandle() {
@@ -2485,7 +2487,7 @@ class FfiValueObjectHandle1247 {
     }
   }
 
-  ~FfiValueObjectHandle1247() {
+  ~FfiValueObjectHandle1261() {
     // If the pointer is non-null, this means Lift/IntoRust was never called
     // because there was some failure along the way. Free the pointer to avoid a
     // leak
@@ -2498,19 +2500,19 @@ const static mozilla::uniffi::UniFFIPointerType kPointerType13 {
   uniffi_filter_adult_fn_clone_filteradultcomponent,
   uniffi_filter_adult_fn_free_filteradultcomponent,
 };
-class FfiValueObjectHandle1661 {
+class FfiValueObjectHandle1679 {
  private:
   uint64_t mValue = 0;
 
  public:
-  FfiValueObjectHandle1661() = default;
-  explicit FfiValueObjectHandle1661(uint64_t aValue) : mValue(aValue) {}
+  FfiValueObjectHandle1679() = default;
+  explicit FfiValueObjectHandle1679(uint64_t aValue) : mValue(aValue) {}
 
   // Delete copy constructor and assignment as this type is non-copyable.
-  FfiValueObjectHandle1661(const FfiValueObjectHandle1661&) = delete;
-  FfiValueObjectHandle1661& operator=(const FfiValueObjectHandle1661&) = delete;
+  FfiValueObjectHandle1679(const FfiValueObjectHandle1679&) = delete;
+  FfiValueObjectHandle1679& operator=(const FfiValueObjectHandle1679&) = delete;
 
-  FfiValueObjectHandle1661& operator=(FfiValueObjectHandle1661&& aOther) {
+  FfiValueObjectHandle1679& operator=(FfiValueObjectHandle1679&& aOther) {
     FreeHandle();
     mValue = aOther.mValue;
     aOther.mValue = 0;
@@ -2552,8 +2554,8 @@ class FfiValueObjectHandle1661 {
     return temp;
   }
 
-  static FfiValueObjectHandle1661 FromRust(uint64_t aValue) {
-    return FfiValueObjectHandle1661(aValue);
+  static FfiValueObjectHandle1679 FromRust(uint64_t aValue) {
+    return FfiValueObjectHandle1679(aValue);
   }
 
   void FreeHandle() {
@@ -2565,7 +2567,7 @@ class FfiValueObjectHandle1661 {
     }
   }
 
-  ~FfiValueObjectHandle1661() {
+  ~FfiValueObjectHandle1679() {
     // If the pointer is non-null, this means Lift/IntoRust was never called
     // because there was some failure along the way. Free the pointer to avoid a
     // leak
@@ -2578,19 +2580,19 @@ const static mozilla::uniffi::UniFFIPointerType kPointerType14 {
   uniffi_fxcontainers_fn_clone_containersstore,
   uniffi_fxcontainers_fn_free_containersstore,
 };
-class FfiValueObjectHandle1861 {
+class FfiValueObjectHandle1881 {
  private:
   uint64_t mValue = 0;
 
  public:
-  FfiValueObjectHandle1861() = default;
-  explicit FfiValueObjectHandle1861(uint64_t aValue) : mValue(aValue) {}
+  FfiValueObjectHandle1881() = default;
+  explicit FfiValueObjectHandle1881(uint64_t aValue) : mValue(aValue) {}
 
   // Delete copy constructor and assignment as this type is non-copyable.
-  FfiValueObjectHandle1861(const FfiValueObjectHandle1861&) = delete;
-  FfiValueObjectHandle1861& operator=(const FfiValueObjectHandle1861&) = delete;
+  FfiValueObjectHandle1881(const FfiValueObjectHandle1881&) = delete;
+  FfiValueObjectHandle1881& operator=(const FfiValueObjectHandle1881&) = delete;
 
-  FfiValueObjectHandle1861& operator=(FfiValueObjectHandle1861&& aOther) {
+  FfiValueObjectHandle1881& operator=(FfiValueObjectHandle1881&& aOther) {
     FreeHandle();
     mValue = aOther.mValue;
     aOther.mValue = 0;
@@ -2632,8 +2634,8 @@ class FfiValueObjectHandle1861 {
     return temp;
   }
 
-  static FfiValueObjectHandle1861 FromRust(uint64_t aValue) {
-    return FfiValueObjectHandle1861(aValue);
+  static FfiValueObjectHandle1881 FromRust(uint64_t aValue) {
+    return FfiValueObjectHandle1881(aValue);
   }
 
   void FreeHandle() {
@@ -2645,7 +2647,7 @@ class FfiValueObjectHandle1861 {
     }
   }
 
-  ~FfiValueObjectHandle1861() {
+  ~FfiValueObjectHandle1881() {
     // If the pointer is non-null, this means Lift/IntoRust was never called
     // because there was some failure along the way. Free the pointer to avoid a
     // leak
@@ -2658,19 +2660,19 @@ const static mozilla::uniffi::UniFFIPointerType kPointerType15 {
   uniffi_logins_fn_clone_loginsbridgedengine,
   uniffi_logins_fn_free_loginsbridgedengine,
 };
-class FfiValueObjectHandle127 {
+class FfiValueObjectHandle132 {
  private:
   uint64_t mValue = 0;
 
  public:
-  FfiValueObjectHandle127() = default;
-  explicit FfiValueObjectHandle127(uint64_t aValue) : mValue(aValue) {}
+  FfiValueObjectHandle132() = default;
+  explicit FfiValueObjectHandle132(uint64_t aValue) : mValue(aValue) {}
 
   // Delete copy constructor and assignment as this type is non-copyable.
-  FfiValueObjectHandle127(const FfiValueObjectHandle127&) = delete;
-  FfiValueObjectHandle127& operator=(const FfiValueObjectHandle127&) = delete;
+  FfiValueObjectHandle132(const FfiValueObjectHandle132&) = delete;
+  FfiValueObjectHandle132& operator=(const FfiValueObjectHandle132&) = delete;
 
-  FfiValueObjectHandle127& operator=(FfiValueObjectHandle127&& aOther) {
+  FfiValueObjectHandle132& operator=(FfiValueObjectHandle132&& aOther) {
     FreeHandle();
     mValue = aOther.mValue;
     aOther.mValue = 0;
@@ -2712,8 +2714,8 @@ class FfiValueObjectHandle127 {
     return temp;
   }
 
-  static FfiValueObjectHandle127 FromRust(uint64_t aValue) {
-    return FfiValueObjectHandle127(aValue);
+  static FfiValueObjectHandle132 FromRust(uint64_t aValue) {
+    return FfiValueObjectHandle132(aValue);
   }
 
   void FreeHandle() {
@@ -2725,7 +2727,7 @@ class FfiValueObjectHandle127 {
     }
   }
 
-  ~FfiValueObjectHandle127() {
+  ~FfiValueObjectHandle132() {
     // If the pointer is non-null, this means Lift/IntoRust was never called
     // because there was some failure along the way. Free the pointer to avoid a
     // leak
@@ -2738,19 +2740,19 @@ const static mozilla::uniffi::UniFFIPointerType kPointerType16 {
   uniffi_logins_fn_clone_loginstore,
   uniffi_logins_fn_free_loginstore,
 };
-class FfiValueObjectHandle117 {
+class FfiValueObjectHandle122 {
  private:
   uint64_t mValue = 0;
 
  public:
-  FfiValueObjectHandle117() = default;
-  explicit FfiValueObjectHandle117(uint64_t aValue) : mValue(aValue) {}
+  FfiValueObjectHandle122() = default;
+  explicit FfiValueObjectHandle122(uint64_t aValue) : mValue(aValue) {}
 
   // Delete copy constructor and assignment as this type is non-copyable.
-  FfiValueObjectHandle117(const FfiValueObjectHandle117&) = delete;
-  FfiValueObjectHandle117& operator=(const FfiValueObjectHandle117&) = delete;
+  FfiValueObjectHandle122(const FfiValueObjectHandle122&) = delete;
+  FfiValueObjectHandle122& operator=(const FfiValueObjectHandle122&) = delete;
 
-  FfiValueObjectHandle117& operator=(FfiValueObjectHandle117&& aOther) {
+  FfiValueObjectHandle122& operator=(FfiValueObjectHandle122&& aOther) {
     FreeHandle();
     mValue = aOther.mValue;
     aOther.mValue = 0;
@@ -2792,8 +2794,8 @@ class FfiValueObjectHandle117 {
     return temp;
   }
 
-  static FfiValueObjectHandle117 FromRust(uint64_t aValue) {
-    return FfiValueObjectHandle117(aValue);
+  static FfiValueObjectHandle122 FromRust(uint64_t aValue) {
+    return FfiValueObjectHandle122(aValue);
   }
 
   void FreeHandle() {
@@ -2805,7 +2807,7 @@ class FfiValueObjectHandle117 {
     }
   }
 
-  ~FfiValueObjectHandle117() {
+  ~FfiValueObjectHandle122() {
     // If the pointer is non-null, this means Lift/IntoRust was never called
     // because there was some failure along the way. Free the pointer to avoid a
     // leak
@@ -2818,19 +2820,19 @@ const static mozilla::uniffi::UniFFIPointerType kPointerType17 {
   uniffi_relevancy_fn_clone_relevancystore,
   uniffi_relevancy_fn_free_relevancystore,
 };
-class FfiValueObjectHandle2469 {
+class FfiValueObjectHandle2495 {
  private:
   uint64_t mValue = 0;
 
  public:
-  FfiValueObjectHandle2469() = default;
-  explicit FfiValueObjectHandle2469(uint64_t aValue) : mValue(aValue) {}
+  FfiValueObjectHandle2495() = default;
+  explicit FfiValueObjectHandle2495(uint64_t aValue) : mValue(aValue) {}
 
   // Delete copy constructor and assignment as this type is non-copyable.
-  FfiValueObjectHandle2469(const FfiValueObjectHandle2469&) = delete;
-  FfiValueObjectHandle2469& operator=(const FfiValueObjectHandle2469&) = delete;
+  FfiValueObjectHandle2495(const FfiValueObjectHandle2495&) = delete;
+  FfiValueObjectHandle2495& operator=(const FfiValueObjectHandle2495&) = delete;
 
-  FfiValueObjectHandle2469& operator=(FfiValueObjectHandle2469&& aOther) {
+  FfiValueObjectHandle2495& operator=(FfiValueObjectHandle2495&& aOther) {
     FreeHandle();
     mValue = aOther.mValue;
     aOther.mValue = 0;
@@ -2872,8 +2874,8 @@ class FfiValueObjectHandle2469 {
     return temp;
   }
 
-  static FfiValueObjectHandle2469 FromRust(uint64_t aValue) {
-    return FfiValueObjectHandle2469(aValue);
+  static FfiValueObjectHandle2495 FromRust(uint64_t aValue) {
+    return FfiValueObjectHandle2495(aValue);
   }
 
   void FreeHandle() {
@@ -2885,7 +2887,7 @@ class FfiValueObjectHandle2469 {
     }
   }
 
-  ~FfiValueObjectHandle2469() {
+  ~FfiValueObjectHandle2495() {
     // If the pointer is non-null, this means Lift/IntoRust was never called
     // because there was some failure along the way. Free the pointer to avoid a
     // leak
@@ -2898,19 +2900,19 @@ const static mozilla::uniffi::UniFFIPointerType kPointerType18 {
   uniffi_remote_settings_fn_clone_remotesettingsclient,
   uniffi_remote_settings_fn_free_remotesettingsclient,
 };
-class FfiValueObjectHandle157 {
+class FfiValueObjectHandle162 {
  private:
   uint64_t mValue = 0;
 
  public:
-  FfiValueObjectHandle157() = default;
-  explicit FfiValueObjectHandle157(uint64_t aValue) : mValue(aValue) {}
+  FfiValueObjectHandle162() = default;
+  explicit FfiValueObjectHandle162(uint64_t aValue) : mValue(aValue) {}
 
   // Delete copy constructor and assignment as this type is non-copyable.
-  FfiValueObjectHandle157(const FfiValueObjectHandle157&) = delete;
-  FfiValueObjectHandle157& operator=(const FfiValueObjectHandle157&) = delete;
+  FfiValueObjectHandle162(const FfiValueObjectHandle162&) = delete;
+  FfiValueObjectHandle162& operator=(const FfiValueObjectHandle162&) = delete;
 
-  FfiValueObjectHandle157& operator=(FfiValueObjectHandle157&& aOther) {
+  FfiValueObjectHandle162& operator=(FfiValueObjectHandle162&& aOther) {
     FreeHandle();
     mValue = aOther.mValue;
     aOther.mValue = 0;
@@ -2952,8 +2954,8 @@ class FfiValueObjectHandle157 {
     return temp;
   }
 
-  static FfiValueObjectHandle157 FromRust(uint64_t aValue) {
-    return FfiValueObjectHandle157(aValue);
+  static FfiValueObjectHandle162 FromRust(uint64_t aValue) {
+    return FfiValueObjectHandle162(aValue);
   }
 
   void FreeHandle() {
@@ -2965,7 +2967,7 @@ class FfiValueObjectHandle157 {
     }
   }
 
-  ~FfiValueObjectHandle157() {
+  ~FfiValueObjectHandle162() {
     // If the pointer is non-null, this means Lift/IntoRust was never called
     // because there was some failure along the way. Free the pointer to avoid a
     // leak
@@ -2978,19 +2980,19 @@ const static mozilla::uniffi::UniFFIPointerType kPointerType19 {
   uniffi_remote_settings_fn_clone_remotesettingsservice,
   uniffi_remote_settings_fn_free_remotesettingsservice,
 };
-class FfiValueObjectHandle139 {
+class FfiValueObjectHandle144 {
  private:
   uint64_t mValue = 0;
 
  public:
-  FfiValueObjectHandle139() = default;
-  explicit FfiValueObjectHandle139(uint64_t aValue) : mValue(aValue) {}
+  FfiValueObjectHandle144() = default;
+  explicit FfiValueObjectHandle144(uint64_t aValue) : mValue(aValue) {}
 
   // Delete copy constructor and assignment as this type is non-copyable.
-  FfiValueObjectHandle139(const FfiValueObjectHandle139&) = delete;
-  FfiValueObjectHandle139& operator=(const FfiValueObjectHandle139&) = delete;
+  FfiValueObjectHandle144(const FfiValueObjectHandle144&) = delete;
+  FfiValueObjectHandle144& operator=(const FfiValueObjectHandle144&) = delete;
 
-  FfiValueObjectHandle139& operator=(FfiValueObjectHandle139&& aOther) {
+  FfiValueObjectHandle144& operator=(FfiValueObjectHandle144&& aOther) {
     FreeHandle();
     mValue = aOther.mValue;
     aOther.mValue = 0;
@@ -3032,8 +3034,8 @@ class FfiValueObjectHandle139 {
     return temp;
   }
 
-  static FfiValueObjectHandle139 FromRust(uint64_t aValue) {
-    return FfiValueObjectHandle139(aValue);
+  static FfiValueObjectHandle144 FromRust(uint64_t aValue) {
+    return FfiValueObjectHandle144(aValue);
   }
 
   void FreeHandle() {
@@ -3045,7 +3047,7 @@ class FfiValueObjectHandle139 {
     }
   }
 
-  ~FfiValueObjectHandle139() {
+  ~FfiValueObjectHandle144() {
     // If the pointer is non-null, this means Lift/IntoRust was never called
     // because there was some failure along the way. Free the pointer to avoid a
     // leak
@@ -3058,19 +3060,19 @@ const static mozilla::uniffi::UniFFIPointerType kPointerType20 {
   uniffi_search_fn_clone_searchengineselector,
   uniffi_search_fn_free_searchengineselector,
 };
-class FfiValueObjectHandle2856 {
+class FfiValueObjectHandle2886 {
  private:
   uint64_t mValue = 0;
 
  public:
-  FfiValueObjectHandle2856() = default;
-  explicit FfiValueObjectHandle2856(uint64_t aValue) : mValue(aValue) {}
+  FfiValueObjectHandle2886() = default;
+  explicit FfiValueObjectHandle2886(uint64_t aValue) : mValue(aValue) {}
 
   // Delete copy constructor and assignment as this type is non-copyable.
-  FfiValueObjectHandle2856(const FfiValueObjectHandle2856&) = delete;
-  FfiValueObjectHandle2856& operator=(const FfiValueObjectHandle2856&) = delete;
+  FfiValueObjectHandle2886(const FfiValueObjectHandle2886&) = delete;
+  FfiValueObjectHandle2886& operator=(const FfiValueObjectHandle2886&) = delete;
 
-  FfiValueObjectHandle2856& operator=(FfiValueObjectHandle2856&& aOther) {
+  FfiValueObjectHandle2886& operator=(FfiValueObjectHandle2886&& aOther) {
     FreeHandle();
     mValue = aOther.mValue;
     aOther.mValue = 0;
@@ -3112,8 +3114,8 @@ class FfiValueObjectHandle2856 {
     return temp;
   }
 
-  static FfiValueObjectHandle2856 FromRust(uint64_t aValue) {
-    return FfiValueObjectHandle2856(aValue);
+  static FfiValueObjectHandle2886 FromRust(uint64_t aValue) {
+    return FfiValueObjectHandle2886(aValue);
   }
 
   void FreeHandle() {
@@ -3125,7 +3127,7 @@ class FfiValueObjectHandle2856 {
     }
   }
 
-  ~FfiValueObjectHandle2856() {
+  ~FfiValueObjectHandle2886() {
     // If the pointer is non-null, this means Lift/IntoRust was never called
     // because there was some failure along the way. Free the pointer to avoid a
     // leak
@@ -3138,19 +3140,19 @@ const static mozilla::uniffi::UniFFIPointerType kPointerType21 {
   uniffi_suggest_fn_clone_suggeststore,
   uniffi_suggest_fn_free_suggeststore,
 };
-class FfiValueObjectHandle230 {
+class FfiValueObjectHandle235 {
  private:
   uint64_t mValue = 0;
 
  public:
-  FfiValueObjectHandle230() = default;
-  explicit FfiValueObjectHandle230(uint64_t aValue) : mValue(aValue) {}
+  FfiValueObjectHandle235() = default;
+  explicit FfiValueObjectHandle235(uint64_t aValue) : mValue(aValue) {}
 
   // Delete copy constructor and assignment as this type is non-copyable.
-  FfiValueObjectHandle230(const FfiValueObjectHandle230&) = delete;
-  FfiValueObjectHandle230& operator=(const FfiValueObjectHandle230&) = delete;
+  FfiValueObjectHandle235(const FfiValueObjectHandle235&) = delete;
+  FfiValueObjectHandle235& operator=(const FfiValueObjectHandle235&) = delete;
 
-  FfiValueObjectHandle230& operator=(FfiValueObjectHandle230&& aOther) {
+  FfiValueObjectHandle235& operator=(FfiValueObjectHandle235&& aOther) {
     FreeHandle();
     mValue = aOther.mValue;
     aOther.mValue = 0;
@@ -3192,8 +3194,8 @@ class FfiValueObjectHandle230 {
     return temp;
   }
 
-  static FfiValueObjectHandle230 FromRust(uint64_t aValue) {
-    return FfiValueObjectHandle230(aValue);
+  static FfiValueObjectHandle235 FromRust(uint64_t aValue) {
+    return FfiValueObjectHandle235(aValue);
   }
 
   void FreeHandle() {
@@ -3205,7 +3207,7 @@ class FfiValueObjectHandle230 {
     }
   }
 
-  ~FfiValueObjectHandle230() {
+  ~FfiValueObjectHandle235() {
     // If the pointer is non-null, this means Lift/IntoRust was never called
     // because there was some failure along the way. Free the pointer to avoid a
     // leak
@@ -3218,19 +3220,19 @@ const static mozilla::uniffi::UniFFIPointerType kPointerType22 {
   uniffi_suggest_fn_clone_suggeststorebuilder,
   uniffi_suggest_fn_free_suggeststorebuilder,
 };
-class FfiValueObjectHandle231 {
+class FfiValueObjectHandle236 {
  private:
   uint64_t mValue = 0;
 
  public:
-  FfiValueObjectHandle231() = default;
-  explicit FfiValueObjectHandle231(uint64_t aValue) : mValue(aValue) {}
+  FfiValueObjectHandle236() = default;
+  explicit FfiValueObjectHandle236(uint64_t aValue) : mValue(aValue) {}
 
   // Delete copy constructor and assignment as this type is non-copyable.
-  FfiValueObjectHandle231(const FfiValueObjectHandle231&) = delete;
-  FfiValueObjectHandle231& operator=(const FfiValueObjectHandle231&) = delete;
+  FfiValueObjectHandle236(const FfiValueObjectHandle236&) = delete;
+  FfiValueObjectHandle236& operator=(const FfiValueObjectHandle236&) = delete;
 
-  FfiValueObjectHandle231& operator=(FfiValueObjectHandle231&& aOther) {
+  FfiValueObjectHandle236& operator=(FfiValueObjectHandle236&& aOther) {
     FreeHandle();
     mValue = aOther.mValue;
     aOther.mValue = 0;
@@ -3272,8 +3274,8 @@ class FfiValueObjectHandle231 {
     return temp;
   }
 
-  static FfiValueObjectHandle231 FromRust(uint64_t aValue) {
-    return FfiValueObjectHandle231(aValue);
+  static FfiValueObjectHandle236 FromRust(uint64_t aValue) {
+    return FfiValueObjectHandle236(aValue);
   }
 
   void FreeHandle() {
@@ -3285,7 +3287,7 @@ class FfiValueObjectHandle231 {
     }
   }
 
-  ~FfiValueObjectHandle231() {
+  ~FfiValueObjectHandle236() {
     // If the pointer is non-null, this means Lift/IntoRust was never called
     // because there was some failure along the way. Free the pointer to avoid a
     // leak
@@ -3298,19 +3300,19 @@ const static mozilla::uniffi::UniFFIPointerType kPointerType23 {
   uniffi_tabs_fn_clone_remotecommandstore,
   uniffi_tabs_fn_free_remotecommandstore,
 };
-class FfiValueObjectHandle249 {
+class FfiValueObjectHandle254 {
  private:
   uint64_t mValue = 0;
 
  public:
-  FfiValueObjectHandle249() = default;
-  explicit FfiValueObjectHandle249(uint64_t aValue) : mValue(aValue) {}
+  FfiValueObjectHandle254() = default;
+  explicit FfiValueObjectHandle254(uint64_t aValue) : mValue(aValue) {}
 
   // Delete copy constructor and assignment as this type is non-copyable.
-  FfiValueObjectHandle249(const FfiValueObjectHandle249&) = delete;
-  FfiValueObjectHandle249& operator=(const FfiValueObjectHandle249&) = delete;
+  FfiValueObjectHandle254(const FfiValueObjectHandle254&) = delete;
+  FfiValueObjectHandle254& operator=(const FfiValueObjectHandle254&) = delete;
 
-  FfiValueObjectHandle249& operator=(FfiValueObjectHandle249&& aOther) {
+  FfiValueObjectHandle254& operator=(FfiValueObjectHandle254&& aOther) {
     FreeHandle();
     mValue = aOther.mValue;
     aOther.mValue = 0;
@@ -3352,8 +3354,8 @@ class FfiValueObjectHandle249 {
     return temp;
   }
 
-  static FfiValueObjectHandle249 FromRust(uint64_t aValue) {
-    return FfiValueObjectHandle249(aValue);
+  static FfiValueObjectHandle254 FromRust(uint64_t aValue) {
+    return FfiValueObjectHandle254(aValue);
   }
 
   void FreeHandle() {
@@ -3365,7 +3367,7 @@ class FfiValueObjectHandle249 {
     }
   }
 
-  ~FfiValueObjectHandle249() {
+  ~FfiValueObjectHandle254() {
     // If the pointer is non-null, this means Lift/IntoRust was never called
     // because there was some failure along the way. Free the pointer to avoid a
     // leak
@@ -3378,19 +3380,19 @@ const static mozilla::uniffi::UniFFIPointerType kPointerType24 {
   uniffi_tabs_fn_clone_tabsbridgedengine,
   uniffi_tabs_fn_free_tabsbridgedengine,
 };
-class FfiValueObjectHandle246 {
+class FfiValueObjectHandle251 {
  private:
   uint64_t mValue = 0;
 
  public:
-  FfiValueObjectHandle246() = default;
-  explicit FfiValueObjectHandle246(uint64_t aValue) : mValue(aValue) {}
+  FfiValueObjectHandle251() = default;
+  explicit FfiValueObjectHandle251(uint64_t aValue) : mValue(aValue) {}
 
   // Delete copy constructor and assignment as this type is non-copyable.
-  FfiValueObjectHandle246(const FfiValueObjectHandle246&) = delete;
-  FfiValueObjectHandle246& operator=(const FfiValueObjectHandle246&) = delete;
+  FfiValueObjectHandle251(const FfiValueObjectHandle251&) = delete;
+  FfiValueObjectHandle251& operator=(const FfiValueObjectHandle251&) = delete;
 
-  FfiValueObjectHandle246& operator=(FfiValueObjectHandle246&& aOther) {
+  FfiValueObjectHandle251& operator=(FfiValueObjectHandle251&& aOther) {
     FreeHandle();
     mValue = aOther.mValue;
     aOther.mValue = 0;
@@ -3432,8 +3434,8 @@ class FfiValueObjectHandle246 {
     return temp;
   }
 
-  static FfiValueObjectHandle246 FromRust(uint64_t aValue) {
-    return FfiValueObjectHandle246(aValue);
+  static FfiValueObjectHandle251 FromRust(uint64_t aValue) {
+    return FfiValueObjectHandle251(aValue);
   }
 
   void FreeHandle() {
@@ -3445,7 +3447,7 @@ class FfiValueObjectHandle246 {
     }
   }
 
-  ~FfiValueObjectHandle246() {
+  ~FfiValueObjectHandle251() {
     // If the pointer is non-null, this means Lift/IntoRust was never called
     // because there was some failure along the way. Free the pointer to avoid a
     // leak
@@ -3458,19 +3460,19 @@ const static mozilla::uniffi::UniFFIPointerType kPointerType25 {
   uniffi_tabs_fn_clone_tabsstore,
   uniffi_tabs_fn_free_tabsstore,
 };
-class FfiValueObjectHandle3446 {
+class FfiValueObjectHandle3482 {
  private:
   uint64_t mValue = 0;
 
  public:
-  FfiValueObjectHandle3446() = default;
-  explicit FfiValueObjectHandle3446(uint64_t aValue) : mValue(aValue) {}
+  FfiValueObjectHandle3482() = default;
+  explicit FfiValueObjectHandle3482(uint64_t aValue) : mValue(aValue) {}
 
   // Delete copy constructor and assignment as this type is non-copyable.
-  FfiValueObjectHandle3446(const FfiValueObjectHandle3446&) = delete;
-  FfiValueObjectHandle3446& operator=(const FfiValueObjectHandle3446&) = delete;
+  FfiValueObjectHandle3482(const FfiValueObjectHandle3482&) = delete;
+  FfiValueObjectHandle3482& operator=(const FfiValueObjectHandle3482&) = delete;
 
-  FfiValueObjectHandle3446& operator=(FfiValueObjectHandle3446&& aOther) {
+  FfiValueObjectHandle3482& operator=(FfiValueObjectHandle3482&& aOther) {
     FreeHandle();
     mValue = aOther.mValue;
     aOther.mValue = 0;
@@ -3512,8 +3514,8 @@ class FfiValueObjectHandle3446 {
     return temp;
   }
 
-  static FfiValueObjectHandle3446 FromRust(uint64_t aValue) {
-    return FfiValueObjectHandle3446(aValue);
+  static FfiValueObjectHandle3482 FromRust(uint64_t aValue) {
+    return FfiValueObjectHandle3482(aValue);
   }
 
   void FreeHandle() {
@@ -3525,7 +3527,7 @@ class FfiValueObjectHandle3446 {
     }
   }
 
-  ~FfiValueObjectHandle3446() {
+  ~FfiValueObjectHandle3482() {
     // If the pointer is non-null, this means Lift/IntoRust was never called
     // because there was some failure along the way. Free the pointer to avoid a
     // leak
@@ -3545,7 +3547,7 @@ extern "C" uint64_t callback_clone_7(uint64_t uniffiHandle);
 // Trait interface FFI value class for viaduct::Backend.
 //
 // This is a hybrid between the one for interfaces and callback interface version
-class FfiValueObjectHandle262 {
+class FfiValueObjectHandle267 {
  private:
   // The raw FFI value is a uint64_t in all cases.
   // For callback interfaces, the uint64_t handle gets casted to a pointer.  Callback interface
@@ -3554,14 +3556,14 @@ class FfiValueObjectHandle262 {
   uint64_t mValue = 0;
 
  public:
-  FfiValueObjectHandle262() = default;
-  explicit FfiValueObjectHandle262(uint64_t aValue) : mValue(aValue) {}
+  FfiValueObjectHandle267() = default;
+  explicit FfiValueObjectHandle267(uint64_t aValue) : mValue(aValue) {}
 
   // Delete copy constructor and assignment as this type is non-copyable.
-  FfiValueObjectHandle262(const FfiValueObjectHandle262&) = delete;
-  FfiValueObjectHandle262& operator=(const FfiValueObjectHandle262&) = delete;
+  FfiValueObjectHandle267(const FfiValueObjectHandle267&) = delete;
+  FfiValueObjectHandle267& operator=(const FfiValueObjectHandle267&) = delete;
 
-  FfiValueObjectHandle262& operator=(FfiValueObjectHandle262&& aOther) {
+  FfiValueObjectHandle267& operator=(FfiValueObjectHandle267&& aOther) {
     FreeHandle();
     mValue = aOther.mValue;
     aOther.mValue = 0;
@@ -3616,8 +3618,8 @@ class FfiValueObjectHandle262 {
     return temp;
   }
 
-  static FfiValueObjectHandle262 FromRust(uint64_t aValue) {
-    return FfiValueObjectHandle262(aValue);
+  static FfiValueObjectHandle267 FromRust(uint64_t aValue) {
+    return FfiValueObjectHandle267(aValue);
   }
 
   void FreeHandle() {
@@ -3639,7 +3641,7 @@ class FfiValueObjectHandle262 {
     mValue = 0;
   }
 
-  ~FfiValueObjectHandle262() {
+  ~FfiValueObjectHandle267() {
     // If the pointer is non-null, this means Lift/IntoRust was never called
     // because there was some failure along the way. Free the pointer to avoid a
     // leak
@@ -3652,19 +3654,19 @@ const static mozilla::uniffi::UniFFIPointerType kPointerType27 {
   uniffi_webext_storage_fn_clone_webextstoragebridgedengine,
   uniffi_webext_storage_fn_free_webextstoragebridgedengine,
 };
-class FfiValueObjectHandle275 {
+class FfiValueObjectHandle280 {
  private:
   uint64_t mValue = 0;
 
  public:
-  FfiValueObjectHandle275() = default;
-  explicit FfiValueObjectHandle275(uint64_t aValue) : mValue(aValue) {}
+  FfiValueObjectHandle280() = default;
+  explicit FfiValueObjectHandle280(uint64_t aValue) : mValue(aValue) {}
 
   // Delete copy constructor and assignment as this type is non-copyable.
-  FfiValueObjectHandle275(const FfiValueObjectHandle275&) = delete;
-  FfiValueObjectHandle275& operator=(const FfiValueObjectHandle275&) = delete;
+  FfiValueObjectHandle280(const FfiValueObjectHandle280&) = delete;
+  FfiValueObjectHandle280& operator=(const FfiValueObjectHandle280&) = delete;
 
-  FfiValueObjectHandle275& operator=(FfiValueObjectHandle275&& aOther) {
+  FfiValueObjectHandle280& operator=(FfiValueObjectHandle280&& aOther) {
     FreeHandle();
     mValue = aOther.mValue;
     aOther.mValue = 0;
@@ -3706,8 +3708,8 @@ class FfiValueObjectHandle275 {
     return temp;
   }
 
-  static FfiValueObjectHandle275 FromRust(uint64_t aValue) {
-    return FfiValueObjectHandle275(aValue);
+  static FfiValueObjectHandle280 FromRust(uint64_t aValue) {
+    return FfiValueObjectHandle280(aValue);
   }
 
   void FreeHandle() {
@@ -3719,7 +3721,7 @@ class FfiValueObjectHandle275 {
     }
   }
 
-  ~FfiValueObjectHandle275() {
+  ~FfiValueObjectHandle280() {
     // If the pointer is non-null, this means Lift/IntoRust was never called
     // because there was some failure along the way. Free the pointer to avoid a
     // leak
@@ -3732,19 +3734,19 @@ const static mozilla::uniffi::UniFFIPointerType kPointerType28 {
   uniffi_webext_storage_fn_clone_webextstoragestore,
   uniffi_webext_storage_fn_free_webextstoragestore,
 };
-class FfiValueObjectHandle4047 {
+class FfiValueObjectHandle4089 {
  private:
   uint64_t mValue = 0;
 
  public:
-  FfiValueObjectHandle4047() = default;
-  explicit FfiValueObjectHandle4047(uint64_t aValue) : mValue(aValue) {}
+  FfiValueObjectHandle4089() = default;
+  explicit FfiValueObjectHandle4089(uint64_t aValue) : mValue(aValue) {}
 
   // Delete copy constructor and assignment as this type is non-copyable.
-  FfiValueObjectHandle4047(const FfiValueObjectHandle4047&) = delete;
-  FfiValueObjectHandle4047& operator=(const FfiValueObjectHandle4047&) = delete;
+  FfiValueObjectHandle4089(const FfiValueObjectHandle4089&) = delete;
+  FfiValueObjectHandle4089& operator=(const FfiValueObjectHandle4089&) = delete;
 
-  FfiValueObjectHandle4047& operator=(FfiValueObjectHandle4047&& aOther) {
+  FfiValueObjectHandle4089& operator=(FfiValueObjectHandle4089&& aOther) {
     FreeHandle();
     mValue = aOther.mValue;
     aOther.mValue = 0;
@@ -3786,8 +3788,8 @@ class FfiValueObjectHandle4047 {
     return temp;
   }
 
-  static FfiValueObjectHandle4047 FromRust(uint64_t aValue) {
-    return FfiValueObjectHandle4047(aValue);
+  static FfiValueObjectHandle4089 FromRust(uint64_t aValue) {
+    return FfiValueObjectHandle4089(aValue);
   }
 
   void FreeHandle() {
@@ -3799,7 +3801,7 @@ class FfiValueObjectHandle4047 {
     }
   }
 
-  ~FfiValueObjectHandle4047() {
+  ~FfiValueObjectHandle4089() {
     // If the pointer is non-null, this means Lift/IntoRust was never called
     // because there was some failure along the way. Free the pointer to avoid a
     // leak
@@ -3814,19 +3816,19 @@ const static mozilla::uniffi::UniFFIPointerType kPointerType29 {
   uniffi_uniffi_bindings_tests_fn_clone_testinterface,
   uniffi_uniffi_bindings_tests_fn_free_testinterface,
 };
-class FfiValueObjectHandle281 {
+class FfiValueObjectHandle286 {
  private:
   uint64_t mValue = 0;
 
  public:
-  FfiValueObjectHandle281() = default;
-  explicit FfiValueObjectHandle281(uint64_t aValue) : mValue(aValue) {}
+  FfiValueObjectHandle286() = default;
+  explicit FfiValueObjectHandle286(uint64_t aValue) : mValue(aValue) {}
 
   // Delete copy constructor and assignment as this type is non-copyable.
-  FfiValueObjectHandle281(const FfiValueObjectHandle281&) = delete;
-  FfiValueObjectHandle281& operator=(const FfiValueObjectHandle281&) = delete;
+  FfiValueObjectHandle286(const FfiValueObjectHandle286&) = delete;
+  FfiValueObjectHandle286& operator=(const FfiValueObjectHandle286&) = delete;
 
-  FfiValueObjectHandle281& operator=(FfiValueObjectHandle281&& aOther) {
+  FfiValueObjectHandle286& operator=(FfiValueObjectHandle286&& aOther) {
     FreeHandle();
     mValue = aOther.mValue;
     aOther.mValue = 0;
@@ -3868,8 +3870,8 @@ class FfiValueObjectHandle281 {
     return temp;
   }
 
-  static FfiValueObjectHandle281 FromRust(uint64_t aValue) {
-    return FfiValueObjectHandle281(aValue);
+  static FfiValueObjectHandle286 FromRust(uint64_t aValue) {
+    return FfiValueObjectHandle286(aValue);
   }
 
   void FreeHandle() {
@@ -3881,7 +3883,7 @@ class FfiValueObjectHandle281 {
     }
   }
 
-  ~FfiValueObjectHandle281() {
+  ~FfiValueObjectHandle286() {
     // If the pointer is non-null, this means Lift/IntoRust was never called
     // because there was some failure along the way. Free the pointer to avoid a
     // leak
@@ -3894,19 +3896,19 @@ const static mozilla::uniffi::UniFFIPointerType kPointerType30 {
   uniffi_uniffi_bindings_tests_fn_clone_asyncinterface,
   uniffi_uniffi_bindings_tests_fn_free_asyncinterface,
 };
-class FfiValueObjectHandle279 {
+class FfiValueObjectHandle284 {
  private:
   uint64_t mValue = 0;
 
  public:
-  FfiValueObjectHandle279() = default;
-  explicit FfiValueObjectHandle279(uint64_t aValue) : mValue(aValue) {}
+  FfiValueObjectHandle284() = default;
+  explicit FfiValueObjectHandle284(uint64_t aValue) : mValue(aValue) {}
 
   // Delete copy constructor and assignment as this type is non-copyable.
-  FfiValueObjectHandle279(const FfiValueObjectHandle279&) = delete;
-  FfiValueObjectHandle279& operator=(const FfiValueObjectHandle279&) = delete;
+  FfiValueObjectHandle284(const FfiValueObjectHandle284&) = delete;
+  FfiValueObjectHandle284& operator=(const FfiValueObjectHandle284&) = delete;
 
-  FfiValueObjectHandle279& operator=(FfiValueObjectHandle279&& aOther) {
+  FfiValueObjectHandle284& operator=(FfiValueObjectHandle284&& aOther) {
     FreeHandle();
     mValue = aOther.mValue;
     aOther.mValue = 0;
@@ -3948,8 +3950,8 @@ class FfiValueObjectHandle279 {
     return temp;
   }
 
-  static FfiValueObjectHandle279 FromRust(uint64_t aValue) {
-    return FfiValueObjectHandle279(aValue);
+  static FfiValueObjectHandle284 FromRust(uint64_t aValue) {
+    return FfiValueObjectHandle284(aValue);
   }
 
   void FreeHandle() {
@@ -3961,7 +3963,7 @@ class FfiValueObjectHandle279 {
     }
   }
 
-  ~FfiValueObjectHandle279() {
+  ~FfiValueObjectHandle284() {
     // If the pointer is non-null, this means Lift/IntoRust was never called
     // because there was some failure along the way. Free the pointer to avoid a
     // leak
@@ -3981,7 +3983,7 @@ extern "C" uint64_t callback_clone_10(uint64_t uniffiHandle);
 // Trait interface FFI value class for uniffi_bindings_tests::AsyncTestTraitInterface.
 //
 // This is a hybrid between the one for interfaces and callback interface version
-class FfiValueObjectHandle282 {
+class FfiValueObjectHandle287 {
  private:
   // The raw FFI value is a uint64_t in all cases.
   // For callback interfaces, the uint64_t handle gets casted to a pointer.  Callback interface
@@ -3990,14 +3992,14 @@ class FfiValueObjectHandle282 {
   uint64_t mValue = 0;
 
  public:
-  FfiValueObjectHandle282() = default;
-  explicit FfiValueObjectHandle282(uint64_t aValue) : mValue(aValue) {}
+  FfiValueObjectHandle287() = default;
+  explicit FfiValueObjectHandle287(uint64_t aValue) : mValue(aValue) {}
 
   // Delete copy constructor and assignment as this type is non-copyable.
-  FfiValueObjectHandle282(const FfiValueObjectHandle282&) = delete;
-  FfiValueObjectHandle282& operator=(const FfiValueObjectHandle282&) = delete;
+  FfiValueObjectHandle287(const FfiValueObjectHandle287&) = delete;
+  FfiValueObjectHandle287& operator=(const FfiValueObjectHandle287&) = delete;
 
-  FfiValueObjectHandle282& operator=(FfiValueObjectHandle282&& aOther) {
+  FfiValueObjectHandle287& operator=(FfiValueObjectHandle287&& aOther) {
     FreeHandle();
     mValue = aOther.mValue;
     aOther.mValue = 0;
@@ -4052,8 +4054,8 @@ class FfiValueObjectHandle282 {
     return temp;
   }
 
-  static FfiValueObjectHandle282 FromRust(uint64_t aValue) {
-    return FfiValueObjectHandle282(aValue);
+  static FfiValueObjectHandle287 FromRust(uint64_t aValue) {
+    return FfiValueObjectHandle287(aValue);
   }
 
   void FreeHandle() {
@@ -4075,7 +4077,7 @@ class FfiValueObjectHandle282 {
     mValue = 0;
   }
 
-  ~FfiValueObjectHandle282() {
+  ~FfiValueObjectHandle287() {
     // If the pointer is non-null, this means Lift/IntoRust was never called
     // because there was some failure along the way. Free the pointer to avoid a
     // leak
@@ -4088,19 +4090,19 @@ const static mozilla::uniffi::UniFFIPointerType kPointerType32 {
   uniffi_uniffi_bindings_tests_fn_clone_complexmethods,
   uniffi_uniffi_bindings_tests_fn_free_complexmethods,
 };
-class FfiValueObjectHandle4244 {
+class FfiValueObjectHandle4288 {
  private:
   uint64_t mValue = 0;
 
  public:
-  FfiValueObjectHandle4244() = default;
-  explicit FfiValueObjectHandle4244(uint64_t aValue) : mValue(aValue) {}
+  FfiValueObjectHandle4288() = default;
+  explicit FfiValueObjectHandle4288(uint64_t aValue) : mValue(aValue) {}
 
   // Delete copy constructor and assignment as this type is non-copyable.
-  FfiValueObjectHandle4244(const FfiValueObjectHandle4244&) = delete;
-  FfiValueObjectHandle4244& operator=(const FfiValueObjectHandle4244&) = delete;
+  FfiValueObjectHandle4288(const FfiValueObjectHandle4288&) = delete;
+  FfiValueObjectHandle4288& operator=(const FfiValueObjectHandle4288&) = delete;
 
-  FfiValueObjectHandle4244& operator=(FfiValueObjectHandle4244&& aOther) {
+  FfiValueObjectHandle4288& operator=(FfiValueObjectHandle4288&& aOther) {
     FreeHandle();
     mValue = aOther.mValue;
     aOther.mValue = 0;
@@ -4142,8 +4144,8 @@ class FfiValueObjectHandle4244 {
     return temp;
   }
 
-  static FfiValueObjectHandle4244 FromRust(uint64_t aValue) {
-    return FfiValueObjectHandle4244(aValue);
+  static FfiValueObjectHandle4288 FromRust(uint64_t aValue) {
+    return FfiValueObjectHandle4288(aValue);
   }
 
   void FreeHandle() {
@@ -4155,7 +4157,7 @@ class FfiValueObjectHandle4244 {
     }
   }
 
-  ~FfiValueObjectHandle4244() {
+  ~FfiValueObjectHandle4288() {
     // If the pointer is non-null, this means Lift/IntoRust was never called
     // because there was some failure along the way. Free the pointer to avoid a
     // leak
@@ -4175,7 +4177,7 @@ extern "C" uint64_t callback_clone_11(uint64_t uniffiHandle);
 // Trait interface FFI value class for uniffi_bindings_tests::TestTraitInterface.
 //
 // This is a hybrid between the one for interfaces and callback interface version
-class FfiValueObjectHandle283 {
+class FfiValueObjectHandle288 {
  private:
   // The raw FFI value is a uint64_t in all cases.
   // For callback interfaces, the uint64_t handle gets casted to a pointer.  Callback interface
@@ -4184,14 +4186,14 @@ class FfiValueObjectHandle283 {
   uint64_t mValue = 0;
 
  public:
-  FfiValueObjectHandle283() = default;
-  explicit FfiValueObjectHandle283(uint64_t aValue) : mValue(aValue) {}
+  FfiValueObjectHandle288() = default;
+  explicit FfiValueObjectHandle288(uint64_t aValue) : mValue(aValue) {}
 
   // Delete copy constructor and assignment as this type is non-copyable.
-  FfiValueObjectHandle283(const FfiValueObjectHandle283&) = delete;
-  FfiValueObjectHandle283& operator=(const FfiValueObjectHandle283&) = delete;
+  FfiValueObjectHandle288(const FfiValueObjectHandle288&) = delete;
+  FfiValueObjectHandle288& operator=(const FfiValueObjectHandle288&) = delete;
 
-  FfiValueObjectHandle283& operator=(FfiValueObjectHandle283&& aOther) {
+  FfiValueObjectHandle288& operator=(FfiValueObjectHandle288&& aOther) {
     FreeHandle();
     mValue = aOther.mValue;
     aOther.mValue = 0;
@@ -4246,8 +4248,8 @@ class FfiValueObjectHandle283 {
     return temp;
   }
 
-  static FfiValueObjectHandle283 FromRust(uint64_t aValue) {
-    return FfiValueObjectHandle283(aValue);
+  static FfiValueObjectHandle288 FromRust(uint64_t aValue) {
+    return FfiValueObjectHandle288(aValue);
   }
 
   void FreeHandle() {
@@ -4269,7 +4271,7 @@ class FfiValueObjectHandle283 {
     mValue = 0;
   }
 
-  ~FfiValueObjectHandle283() {
+  ~FfiValueObjectHandle288() {
     // If the pointer is non-null, this means Lift/IntoRust was never called
     // because there was some failure along the way. Free the pointer to avoid a
     // leak
@@ -4593,13 +4595,13 @@ extern "C" void callback_free_0(uint64_t uniffiHandle);
 //
 // This works like the `FfiValueInt<uint64_t>`, except it has extra code to
 // cleanup the callback handles.
-class FfiValueObjectHandle50 {
+class FfiValueObjectHandle53 {
  private:
   uint64_t mValue = 0;
 
  public:
-  FfiValueObjectHandle50() = default;
-  explicit FfiValueObjectHandle50(uint64_t aValue) : mValue(aValue) {}
+  FfiValueObjectHandle53() = default;
+  explicit FfiValueObjectHandle53(uint64_t aValue) : mValue(aValue) {}
 
   void Lower(const dom::OwningUniFFIScaffoldingValue& aValue,
              ErrorResult& aError) {
@@ -4630,7 +4632,7 @@ class FfiValueObjectHandle50 {
     return handle;
   }
 
-  static FfiValueObjectHandle50 FromRust(uint64_t aValue) { return FfiValueObjectHandle50(aValue); };
+  static FfiValueObjectHandle53 FromRust(uint64_t aValue) { return FfiValueObjectHandle53(aValue); };
 
   void ReleaseHandleIfSet() {
     // A non-zero value indicates that we own a callback handle that was never passed to Rust or
@@ -4641,7 +4643,7 @@ class FfiValueObjectHandle50 {
     }
   }
 
-  ~FfiValueObjectHandle50() {
+  ~FfiValueObjectHandle53() {
     ReleaseHandleIfSet();
   }
 };
@@ -4653,13 +4655,13 @@ extern "C" void callback_free_1(uint64_t uniffiHandle);
 //
 // This works like the `FfiValueInt<uint64_t>`, except it has extra code to
 // cleanup the callback handles.
-class FfiValueObjectHandle89 {
+class FfiValueObjectHandle94 {
  private:
   uint64_t mValue = 0;
 
  public:
-  FfiValueObjectHandle89() = default;
-  explicit FfiValueObjectHandle89(uint64_t aValue) : mValue(aValue) {}
+  FfiValueObjectHandle94() = default;
+  explicit FfiValueObjectHandle94(uint64_t aValue) : mValue(aValue) {}
 
   void Lower(const dom::OwningUniFFIScaffoldingValue& aValue,
              ErrorResult& aError) {
@@ -4690,7 +4692,7 @@ class FfiValueObjectHandle89 {
     return handle;
   }
 
-  static FfiValueObjectHandle89 FromRust(uint64_t aValue) { return FfiValueObjectHandle89(aValue); };
+  static FfiValueObjectHandle94 FromRust(uint64_t aValue) { return FfiValueObjectHandle94(aValue); };
 
   void ReleaseHandleIfSet() {
     // A non-zero value indicates that we own a callback handle that was never passed to Rust or
@@ -4701,7 +4703,7 @@ class FfiValueObjectHandle89 {
     }
   }
 
-  ~FfiValueObjectHandle89() {
+  ~FfiValueObjectHandle94() {
     ReleaseHandleIfSet();
   }
 };
@@ -4713,13 +4715,13 @@ extern "C" void callback_free_5(uint64_t uniffiHandle);
 //
 // This works like the `FfiValueInt<uint64_t>`, except it has extra code to
 // cleanup the callback handles.
-class FfiValueObjectHandle107 {
+class FfiValueObjectHandle112 {
  private:
   uint64_t mValue = 0;
 
  public:
-  FfiValueObjectHandle107() = default;
-  explicit FfiValueObjectHandle107(uint64_t aValue) : mValue(aValue) {}
+  FfiValueObjectHandle112() = default;
+  explicit FfiValueObjectHandle112(uint64_t aValue) : mValue(aValue) {}
 
   void Lower(const dom::OwningUniFFIScaffoldingValue& aValue,
              ErrorResult& aError) {
@@ -4750,7 +4752,7 @@ class FfiValueObjectHandle107 {
     return handle;
   }
 
-  static FfiValueObjectHandle107 FromRust(uint64_t aValue) { return FfiValueObjectHandle107(aValue); };
+  static FfiValueObjectHandle112 FromRust(uint64_t aValue) { return FfiValueObjectHandle112(aValue); };
 
   void ReleaseHandleIfSet() {
     // A non-zero value indicates that we own a callback handle that was never passed to Rust or
@@ -4761,7 +4763,7 @@ class FfiValueObjectHandle107 {
     }
   }
 
-  ~FfiValueObjectHandle107() {
+  ~FfiValueObjectHandle112() {
     ReleaseHandleIfSet();
   }
 };
@@ -4773,13 +4775,13 @@ extern "C" void callback_free_6(uint64_t uniffiHandle);
 //
 // This works like the `FfiValueInt<uint64_t>`, except it has extra code to
 // cleanup the callback handles.
-class FfiValueObjectHandle252 {
+class FfiValueObjectHandle257 {
  private:
   uint64_t mValue = 0;
 
  public:
-  FfiValueObjectHandle252() = default;
-  explicit FfiValueObjectHandle252(uint64_t aValue) : mValue(aValue) {}
+  FfiValueObjectHandle257() = default;
+  explicit FfiValueObjectHandle257(uint64_t aValue) : mValue(aValue) {}
 
   void Lower(const dom::OwningUniFFIScaffoldingValue& aValue,
              ErrorResult& aError) {
@@ -4810,7 +4812,7 @@ class FfiValueObjectHandle252 {
     return handle;
   }
 
-  static FfiValueObjectHandle252 FromRust(uint64_t aValue) { return FfiValueObjectHandle252(aValue); };
+  static FfiValueObjectHandle257 FromRust(uint64_t aValue) { return FfiValueObjectHandle257(aValue); };
 
   void ReleaseHandleIfSet() {
     // A non-zero value indicates that we own a callback handle that was never passed to Rust or
@@ -4821,7 +4823,7 @@ class FfiValueObjectHandle252 {
     }
   }
 
-  ~FfiValueObjectHandle252() {
+  ~FfiValueObjectHandle257() {
     ReleaseHandleIfSet();
   }
 };
@@ -4835,13 +4837,13 @@ extern "C" void callback_free_8(uint64_t uniffiHandle);
 //
 // This works like the `FfiValueInt<uint64_t>`, except it has extra code to
 // cleanup the callback handles.
-class FfiValueObjectHandle287 {
+class FfiValueObjectHandle292 {
  private:
   uint64_t mValue = 0;
 
  public:
-  FfiValueObjectHandle287() = default;
-  explicit FfiValueObjectHandle287(uint64_t aValue) : mValue(aValue) {}
+  FfiValueObjectHandle292() = default;
+  explicit FfiValueObjectHandle292(uint64_t aValue) : mValue(aValue) {}
 
   void Lower(const dom::OwningUniFFIScaffoldingValue& aValue,
              ErrorResult& aError) {
@@ -4872,7 +4874,7 @@ class FfiValueObjectHandle287 {
     return handle;
   }
 
-  static FfiValueObjectHandle287 FromRust(uint64_t aValue) { return FfiValueObjectHandle287(aValue); };
+  static FfiValueObjectHandle292 FromRust(uint64_t aValue) { return FfiValueObjectHandle292(aValue); };
 
   void ReleaseHandleIfSet() {
     // A non-zero value indicates that we own a callback handle that was never passed to Rust or
@@ -4883,7 +4885,7 @@ class FfiValueObjectHandle287 {
     }
   }
 
-  ~FfiValueObjectHandle287() {
+  ~FfiValueObjectHandle292() {
     ReleaseHandleIfSet();
   }
 };
@@ -4895,13 +4897,13 @@ extern "C" void callback_free_9(uint64_t uniffiHandle);
 //
 // This works like the `FfiValueInt<uint64_t>`, except it has extra code to
 // cleanup the callback handles.
-class FfiValueObjectHandle288 {
+class FfiValueObjectHandle293 {
  private:
   uint64_t mValue = 0;
 
  public:
-  FfiValueObjectHandle288() = default;
-  explicit FfiValueObjectHandle288(uint64_t aValue) : mValue(aValue) {}
+  FfiValueObjectHandle293() = default;
+  explicit FfiValueObjectHandle293(uint64_t aValue) : mValue(aValue) {}
 
   void Lower(const dom::OwningUniFFIScaffoldingValue& aValue,
              ErrorResult& aError) {
@@ -4932,7 +4934,7 @@ class FfiValueObjectHandle288 {
     return handle;
   }
 
-  static FfiValueObjectHandle288 FromRust(uint64_t aValue) { return FfiValueObjectHandle288(aValue); };
+  static FfiValueObjectHandle293 FromRust(uint64_t aValue) { return FfiValueObjectHandle293(aValue); };
 
   void ReleaseHandleIfSet() {
     // A non-zero value indicates that we own a callback handle that was never passed to Rust or
@@ -4943,7 +4945,7 @@ class FfiValueObjectHandle288 {
     }
   }
 
-  ~FfiValueObjectHandle288() {
+  ~FfiValueObjectHandle293() {
     ReleaseHandleIfSet();
   }
 };
@@ -4955,13 +4957,13 @@ extern "C" void callback_free_12(uint64_t uniffiHandle);
 //
 // This works like the `FfiValueInt<uint64_t>`, except it has extra code to
 // cleanup the callback handles.
-class FfiValueObjectHandle304 {
+class FfiValueObjectHandle309 {
  private:
   uint64_t mValue = 0;
 
  public:
-  FfiValueObjectHandle304() = default;
-  explicit FfiValueObjectHandle304(uint64_t aValue) : mValue(aValue) {}
+  FfiValueObjectHandle309() = default;
+  explicit FfiValueObjectHandle309(uint64_t aValue) : mValue(aValue) {}
 
   void Lower(const dom::OwningUniFFIScaffoldingValue& aValue,
              ErrorResult& aError) {
@@ -4992,7 +4994,7 @@ class FfiValueObjectHandle304 {
     return handle;
   }
 
-  static FfiValueObjectHandle304 FromRust(uint64_t aValue) { return FfiValueObjectHandle304(aValue); };
+  static FfiValueObjectHandle309 FromRust(uint64_t aValue) { return FfiValueObjectHandle309(aValue); };
 
   void ReleaseHandleIfSet() {
     // A non-zero value indicates that we own a callback handle that was never passed to Rust or
@@ -5003,7 +5005,7 @@ class FfiValueObjectHandle304 {
     }
   }
 
-  ~FfiValueObjectHandle304() {
+  ~FfiValueObjectHandle309() {
     ReleaseHandleIfSet();
   }
 };
@@ -5045,10 +5047,10 @@ class ScaffoldingCallHandler1 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueRustBuffer mPath{};
-  FfiValueObjectHandle52 mPrimaryPasswordAuthenticator{};
+  FfiValueObjectHandle55 mPrimaryPasswordAuthenticator{};
 
   // MakeRustCall stores the result of the call in these fields
-  FfiValueObjectHandle53 mUniffiReturnValue{};
+  FfiValueObjectHandle56 mUniffiReturnValue{};
 
 public:
   void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
@@ -5067,7 +5069,7 @@ public:
   }
 
   void MakeRustCall(RustCallStatus* aOutStatus) override {
-    mUniffiReturnValue = FfiValueObjectHandle53::FromRust(
+    mUniffiReturnValue = FfiValueObjectHandle56::FromRust(
       uniffi_autofill_fn_func_create_autofill_store_with_nss_keymanager(
         mPath.IntoRust(),
         mPrimaryPasswordAuthenticator.IntoRust(),
@@ -5091,7 +5093,7 @@ private:
   FfiValueRustBuffer mKey{};
 
   // MakeRustCall stores the result of the call in these fields
-  FfiValueObjectHandle53 mUniffiReturnValue{};
+  FfiValueObjectHandle56 mUniffiReturnValue{};
 
 public:
   void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
@@ -5110,7 +5112,7 @@ public:
   }
 
   void MakeRustCall(RustCallStatus* aOutStatus) override {
-    mUniffiReturnValue = FfiValueObjectHandle53::FromRust(
+    mUniffiReturnValue = FfiValueObjectHandle56::FromRust(
       uniffi_autofill_fn_func_create_autofill_store_with_static_key_manager(
         mPath.IntoRust(),
         mKey.IntoRust(),
@@ -5249,10 +5251,10 @@ public:
 class ScaffoldingCallHandler6 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle92 mKeyManager{};
+  FfiValueObjectHandle97 mKeyManager{};
 
   // MakeRustCall stores the result of the call in these fields
-  FfiValueObjectHandle61 mUniffiReturnValue{};
+  FfiValueObjectHandle64 mUniffiReturnValue{};
 
 public:
   void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
@@ -5267,7 +5269,7 @@ public:
   }
 
   void MakeRustCall(RustCallStatus* aOutStatus) override {
-    mUniffiReturnValue = FfiValueObjectHandle61::FromRust(
+    mUniffiReturnValue = FfiValueObjectHandle64::FromRust(
       uniffi_db_crypto_fn_func_create_managed_encdec(
         mKeyManager.IntoRust(),
         aOutStatus
@@ -5289,7 +5291,7 @@ private:
   FfiValueRustBuffer mKey{};
 
   // MakeRustCall stores the result of the call in these fields
-  FfiValueObjectHandle92 mUniffiReturnValue{};
+  FfiValueObjectHandle97 mUniffiReturnValue{};
 
 public:
   void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
@@ -5304,7 +5306,7 @@ public:
   }
 
   void MakeRustCall(RustCallStatus* aOutStatus) override {
-    mUniffiReturnValue = FfiValueObjectHandle92::FromRust(
+    mUniffiReturnValue = FfiValueObjectHandle97::FromRust(
       uniffi_db_crypto_fn_func_create_static_key_manager(
         mKey.IntoRust(),
         aOutStatus
@@ -5864,10 +5866,10 @@ class ScaffoldingCallHandler24 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueRustBuffer mPath{};
-  FfiValueObjectHandle52 mPrimaryPasswordAuthenticator{};
+  FfiValueObjectHandle55 mPrimaryPasswordAuthenticator{};
 
   // MakeRustCall stores the result of the call in these fields
-  FfiValueObjectHandle117 mUniffiReturnValue{};
+  FfiValueObjectHandle122 mUniffiReturnValue{};
 
 public:
   void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
@@ -5886,7 +5888,7 @@ public:
   }
 
   void MakeRustCall(RustCallStatus* aOutStatus) override {
-    mUniffiReturnValue = FfiValueObjectHandle117::FromRust(
+    mUniffiReturnValue = FfiValueObjectHandle122::FromRust(
       uniffi_logins_fn_func_create_login_store_with_nss_keymanager(
         mPath.IntoRust(),
         mPrimaryPasswordAuthenticator.IntoRust(),
@@ -5910,7 +5912,7 @@ private:
   FfiValueRustBuffer mKey{};
 
   // MakeRustCall stores the result of the call in these fields
-  FfiValueObjectHandle117 mUniffiReturnValue{};
+  FfiValueObjectHandle122 mUniffiReturnValue{};
 
 public:
   void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
@@ -5929,7 +5931,7 @@ public:
   }
 
   void MakeRustCall(RustCallStatus* aOutStatus) override {
-    mUniffiReturnValue = FfiValueObjectHandle117::FromRust(
+    mUniffiReturnValue = FfiValueObjectHandle122::FromRust(
       uniffi_logins_fn_func_create_login_store_with_static_key_manager(
         mPath.IntoRust(),
         mKey.IntoRust(),
@@ -6036,7 +6038,7 @@ class ScaffoldingCallHandler28 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueRustBuffer mTargets{};
-  FfiValueObjectHandle252 mSink{};
+  FfiValueObjectHandle257 mSink{};
 
   // MakeRustCall stores the result of the call in these fields
   FfiValueInt<uint32_t> mUniffiReturnValue{};
@@ -6199,7 +6201,7 @@ public:
 class ScaffoldingCallHandler34 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle262 mBackend{};
+  FfiValueObjectHandle267 mBackend{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -6331,7 +6333,7 @@ public:
 class ScaffoldingCallHandler38 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle45 mUniffiPtr{};
+  FfiValueObjectHandle49 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -6360,7 +6362,7 @@ public:
 class ScaffoldingCallHandler39 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle45 mUniffiPtr{};
+  FfiValueObjectHandle49 mUniffiPtr{};
   FfiValueRustBuffer mClickUrl{};
   FfiValueRustBuffer mOptions{};
 
@@ -6401,7 +6403,7 @@ public:
 class ScaffoldingCallHandler40 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle45 mUniffiPtr{};
+  FfiValueObjectHandle49 mUniffiPtr{};
   FfiValueRustBuffer mImpressionUrl{};
   FfiValueRustBuffer mOptions{};
 
@@ -6442,7 +6444,7 @@ public:
 class ScaffoldingCallHandler41 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle45 mUniffiPtr{};
+  FfiValueObjectHandle49 mUniffiPtr{};
   FfiValueRustBuffer mReportUrl{};
   FfiValueRustBuffer mReason{};
   FfiValueRustBuffer mOptions{};
@@ -6489,7 +6491,7 @@ public:
 class ScaffoldingCallHandler42 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle45 mUniffiPtr{};
+  FfiValueObjectHandle49 mUniffiPtr{};
   FfiValueRustBuffer mMozAdRequests{};
   FfiValueRustBuffer mOptions{};
 
@@ -6538,7 +6540,7 @@ public:
 class ScaffoldingCallHandler43 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle45 mUniffiPtr{};
+  FfiValueObjectHandle49 mUniffiPtr{};
   FfiValueRustBuffer mMozAdRequests{};
   FfiValueRustBuffer mOptions{};
 
@@ -6587,7 +6589,56 @@ public:
 class ScaffoldingCallHandler44 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle45 mUniffiPtr{};
+  FfiValueObjectHandle49 mUniffiPtr{};
+  FfiValueRustBuffer mMozAdRequests{};
+  FfiValueRustBuffer mOptions{};
+
+  // MakeRustCall stores the result of the call in these fields
+  FfiValueRustBuffer mUniffiReturnValue{};
+
+public:
+  void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
+    if (aArgs.Length() < 3) {
+      aError.ThrowUnknownError(nsPrintfCString("LowerRustArgs: Incorrect argument length for uniffi_ads_client_fn_method_mozadsclient_request_spoc_or_image_ads (expected: 3, actual: %zu)", aArgs.Length()));
+      return;
+    }
+    mUniffiPtr.Lower(aArgs[0], aError);
+    if (aError.Failed()) {
+      return;
+    }
+    mMozAdRequests.Lower(aArgs[1], aError);
+    if (aError.Failed()) {
+      return;
+    }
+    mOptions.Lower(aArgs[2], aError);
+    if (aError.Failed()) {
+      return;
+    }
+  }
+
+  void MakeRustCall(RustCallStatus* aOutStatus) override {
+    mUniffiReturnValue = FfiValueRustBuffer::FromRust(
+      uniffi_ads_client_fn_method_mozadsclient_request_spoc_or_image_ads(
+        mUniffiPtr.IntoRust(),
+        mMozAdRequests.IntoRust(),
+        mOptions.IntoRust(),
+        aOutStatus
+      )
+    );
+  }
+
+  virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
+    mUniffiReturnValue.Lift(
+      aCx,
+      &aDest.Construct(),
+      aError
+    );
+  }
+};
+class ScaffoldingCallHandler45 : public UniffiSyncCallHandler {
+private:
+  // LowerRustArgs stores the resulting arguments in these fields
+  FfiValueObjectHandle49 mUniffiPtr{};
   FfiValueRustBuffer mMozAdRequests{};
   FfiValueRustBuffer mOptions{};
 
@@ -6633,10 +6684,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler45 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler46 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle45 mUniffiPtr{};
+  FfiValueObjectHandle49 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -6662,57 +6713,20 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler46 : public UniffiSyncCallHandler {
-private:
-  // LowerRustArgs stores the resulting arguments in these fields
-
-  // MakeRustCall stores the result of the call in these fields
-  FfiValueObjectHandle47 mUniffiReturnValue{};
-
-public:
-  void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
-  }
-
-  void MakeRustCall(RustCallStatus* aOutStatus) override {
-    mUniffiReturnValue = FfiValueObjectHandle47::FromRust(
-      uniffi_ads_client_fn_constructor_mozadsclientbuilder_new(
-        aOutStatus
-      )
-    );
-  }
-
-  virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
-    mUniffiReturnValue.Lift(
-      aCx,
-      &aDest.Construct(),
-      aError
-    );
-  }
-};
 class ScaffoldingCallHandler47 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle47 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
-  FfiValueObjectHandle45 mUniffiReturnValue{};
+  FfiValueObjectHandle51 mUniffiReturnValue{};
 
 public:
   void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
-    if (aArgs.Length() < 1) {
-      aError.ThrowUnknownError(nsPrintfCString("LowerRustArgs: Incorrect argument length for uniffi_ads_client_fn_method_mozadsclientbuilder_build (expected: 1, actual: %zu)", aArgs.Length()));
-      return;
-    }
-    mUniffiPtr.Lower(aArgs[0], aError);
-    if (aError.Failed()) {
-      return;
-    }
   }
 
   void MakeRustCall(RustCallStatus* aOutStatus) override {
-    mUniffiReturnValue = FfiValueObjectHandle45::FromRust(
-      uniffi_ads_client_fn_method_mozadsclientbuilder_build(
-        mUniffiPtr.IntoRust(),
+    mUniffiReturnValue = FfiValueObjectHandle51::FromRust(
+      uniffi_ads_client_fn_constructor_mozadsclientbuilder_new(
         aOutStatus
       )
     );
@@ -6729,11 +6743,48 @@ public:
 class ScaffoldingCallHandler48 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle47 mUniffiPtr{};
+  FfiValueObjectHandle51 mUniffiPtr{};
+
+  // MakeRustCall stores the result of the call in these fields
+  FfiValueObjectHandle49 mUniffiReturnValue{};
+
+public:
+  void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
+    if (aArgs.Length() < 1) {
+      aError.ThrowUnknownError(nsPrintfCString("LowerRustArgs: Incorrect argument length for uniffi_ads_client_fn_method_mozadsclientbuilder_build (expected: 1, actual: %zu)", aArgs.Length()));
+      return;
+    }
+    mUniffiPtr.Lower(aArgs[0], aError);
+    if (aError.Failed()) {
+      return;
+    }
+  }
+
+  void MakeRustCall(RustCallStatus* aOutStatus) override {
+    mUniffiReturnValue = FfiValueObjectHandle49::FromRust(
+      uniffi_ads_client_fn_method_mozadsclientbuilder_build(
+        mUniffiPtr.IntoRust(),
+        aOutStatus
+      )
+    );
+  }
+
+  virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
+    mUniffiReturnValue.Lift(
+      aCx,
+      &aDest.Construct(),
+      aError
+    );
+  }
+};
+class ScaffoldingCallHandler49 : public UniffiSyncCallHandler {
+private:
+  // LowerRustArgs stores the resulting arguments in these fields
+  FfiValueObjectHandle51 mUniffiPtr{};
   FfiValueRustBuffer mCacheConfig{};
 
   // MakeRustCall stores the result of the call in these fields
-  FfiValueObjectHandle47 mUniffiReturnValue{};
+  FfiValueObjectHandle51 mUniffiReturnValue{};
 
 public:
   void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
@@ -6752,7 +6803,7 @@ public:
   }
 
   void MakeRustCall(RustCallStatus* aOutStatus) override {
-    mUniffiReturnValue = FfiValueObjectHandle47::FromRust(
+    mUniffiReturnValue = FfiValueObjectHandle51::FromRust(
       uniffi_ads_client_fn_method_mozadsclientbuilder_cache_config(
         mUniffiPtr.IntoRust(),
         mCacheConfig.IntoRust(),
@@ -6769,14 +6820,14 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler49 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler50 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle47 mUniffiPtr{};
+  FfiValueObjectHandle51 mUniffiPtr{};
   FfiValueRustBuffer mEnvironment{};
 
   // MakeRustCall stores the result of the call in these fields
-  FfiValueObjectHandle47 mUniffiReturnValue{};
+  FfiValueObjectHandle51 mUniffiReturnValue{};
 
 public:
   void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
@@ -6795,7 +6846,7 @@ public:
   }
 
   void MakeRustCall(RustCallStatus* aOutStatus) override {
-    mUniffiReturnValue = FfiValueObjectHandle47::FromRust(
+    mUniffiReturnValue = FfiValueObjectHandle51::FromRust(
       uniffi_ads_client_fn_method_mozadsclientbuilder_environment(
         mUniffiPtr.IntoRust(),
         mEnvironment.IntoRust(),
@@ -6812,57 +6863,14 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler50 : public UniffiSyncCallHandler {
-private:
-  // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle47 mUniffiPtr{};
-  FfiValueRustBuffer mStoreConfig{};
-
-  // MakeRustCall stores the result of the call in these fields
-  FfiValueObjectHandle47 mUniffiReturnValue{};
-
-public:
-  void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
-    if (aArgs.Length() < 2) {
-      aError.ThrowUnknownError(nsPrintfCString("LowerRustArgs: Incorrect argument length for uniffi_ads_client_fn_method_mozadsclientbuilder_store_config (expected: 2, actual: %zu)", aArgs.Length()));
-      return;
-    }
-    mUniffiPtr.Lower(aArgs[0], aError);
-    if (aError.Failed()) {
-      return;
-    }
-    mStoreConfig.Lower(aArgs[1], aError);
-    if (aError.Failed()) {
-      return;
-    }
-  }
-
-  void MakeRustCall(RustCallStatus* aOutStatus) override {
-    mUniffiReturnValue = FfiValueObjectHandle47::FromRust(
-      uniffi_ads_client_fn_method_mozadsclientbuilder_store_config(
-        mUniffiPtr.IntoRust(),
-        mStoreConfig.IntoRust(),
-        aOutStatus
-      )
-    );
-  }
-
-  virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
-    mUniffiReturnValue.Lift(
-      aCx,
-      &aDest.Construct(),
-      aError
-    );
-  }
-};
 class ScaffoldingCallHandler51 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle47 mUniffiPtr{};
-  FfiValueObjectHandle50 mTelemetry{};
+  FfiValueObjectHandle51 mUniffiPtr{};
+  FfiValueObjectHandle53 mTelemetry{};
 
   // MakeRustCall stores the result of the call in these fields
-  FfiValueObjectHandle47 mUniffiReturnValue{};
+  FfiValueObjectHandle51 mUniffiReturnValue{};
 
 public:
   void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
@@ -6881,7 +6889,7 @@ public:
   }
 
   void MakeRustCall(RustCallStatus* aOutStatus) override {
-    mUniffiReturnValue = FfiValueObjectHandle47::FromRust(
+    mUniffiReturnValue = FfiValueObjectHandle51::FromRust(
       uniffi_ads_client_fn_method_mozadsclientbuilder_telemetry(
         mUniffiPtr.IntoRust(),
         mTelemetry.IntoRust(),
@@ -6901,7 +6909,7 @@ public:
 class ScaffoldingCallHandler52 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle80 mUniffiPtr{};
+  FfiValueObjectHandle83 mUniffiPtr{};
   FfiValueInt<int64_t> mServerModifiedMillis{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -6944,7 +6952,7 @@ public:
 class ScaffoldingCallHandler53 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle80 mUniffiPtr{};
+  FfiValueObjectHandle83 mUniffiPtr{};
   FfiValueRustBuffer mNewSyncId{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -6987,7 +6995,7 @@ public:
 class ScaffoldingCallHandler54 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle80 mUniffiPtr{};
+  FfiValueObjectHandle83 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
   FfiValueInt<int64_t> mUniffiReturnValue{};
@@ -7024,7 +7032,7 @@ public:
 class ScaffoldingCallHandler55 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle80 mUniffiPtr{};
+  FfiValueObjectHandle83 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -7053,7 +7061,7 @@ public:
 class ScaffoldingCallHandler56 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle80 mUniffiPtr{};
+  FfiValueObjectHandle83 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
   FfiValueRustBuffer mUniffiReturnValue{};
@@ -7090,7 +7098,7 @@ public:
 class ScaffoldingCallHandler57 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle80 mUniffiPtr{};
+  FfiValueObjectHandle83 mUniffiPtr{};
   FfiValueInt<int64_t> mNewTimestamp{};
   FfiValueRustBuffer mUploadedIds{};
 
@@ -7131,7 +7139,7 @@ public:
 class ScaffoldingCallHandler58 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle80 mUniffiPtr{};
+  FfiValueObjectHandle83 mUniffiPtr{};
   FfiValueRustBuffer mIncomingEnvelopesAsJson{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -7166,7 +7174,7 @@ public:
 class ScaffoldingCallHandler59 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle80 mUniffiPtr{};
+  FfiValueObjectHandle83 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -7195,7 +7203,7 @@ public:
 class ScaffoldingCallHandler60 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle80 mUniffiPtr{};
+  FfiValueObjectHandle83 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
   FfiValueRustBuffer mUniffiReturnValue{};
@@ -7232,7 +7240,7 @@ public:
 class ScaffoldingCallHandler61 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle80 mUniffiPtr{};
+  FfiValueObjectHandle83 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -7261,7 +7269,7 @@ public:
 class ScaffoldingCallHandler62 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle80 mUniffiPtr{};
+  FfiValueObjectHandle83 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -7290,7 +7298,7 @@ public:
 class ScaffoldingCallHandler63 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle81 mUniffiPtr{};
+  FfiValueObjectHandle84 mUniffiPtr{};
   FfiValueInt<int64_t> mServerModifiedMillis{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -7333,7 +7341,7 @@ public:
 class ScaffoldingCallHandler64 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle81 mUniffiPtr{};
+  FfiValueObjectHandle84 mUniffiPtr{};
   FfiValueRustBuffer mNewSyncId{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -7376,7 +7384,7 @@ public:
 class ScaffoldingCallHandler65 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle81 mUniffiPtr{};
+  FfiValueObjectHandle84 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
   FfiValueInt<int64_t> mUniffiReturnValue{};
@@ -7413,7 +7421,7 @@ public:
 class ScaffoldingCallHandler66 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle81 mUniffiPtr{};
+  FfiValueObjectHandle84 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -7442,7 +7450,7 @@ public:
 class ScaffoldingCallHandler67 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle81 mUniffiPtr{};
+  FfiValueObjectHandle84 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
   FfiValueRustBuffer mUniffiReturnValue{};
@@ -7479,7 +7487,7 @@ public:
 class ScaffoldingCallHandler68 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle81 mUniffiPtr{};
+  FfiValueObjectHandle84 mUniffiPtr{};
   FfiValueInt<int64_t> mNewTimestamp{};
   FfiValueRustBuffer mUploadedIds{};
 
@@ -7520,7 +7528,7 @@ public:
 class ScaffoldingCallHandler69 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle81 mUniffiPtr{};
+  FfiValueObjectHandle84 mUniffiPtr{};
   FfiValueRustBuffer mIncomingEnvelopesAsJson{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -7555,7 +7563,7 @@ public:
 class ScaffoldingCallHandler70 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle81 mUniffiPtr{};
+  FfiValueObjectHandle84 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -7584,7 +7592,7 @@ public:
 class ScaffoldingCallHandler71 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle81 mUniffiPtr{};
+  FfiValueObjectHandle84 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
   FfiValueRustBuffer mUniffiReturnValue{};
@@ -7621,7 +7629,7 @@ public:
 class ScaffoldingCallHandler72 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle81 mUniffiPtr{};
+  FfiValueObjectHandle84 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -7650,7 +7658,7 @@ public:
 class ScaffoldingCallHandler73 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle81 mUniffiPtr{};
+  FfiValueObjectHandle84 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -7680,10 +7688,10 @@ class ScaffoldingCallHandler74 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueRustBuffer mDbpath{};
-  FfiValueObjectHandle61 mEncdec{};
+  FfiValueObjectHandle64 mEncdec{};
 
   // MakeRustCall stores the result of the call in these fields
-  FfiValueObjectHandle53 mUniffiReturnValue{};
+  FfiValueObjectHandle56 mUniffiReturnValue{};
 
 public:
   void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
@@ -7702,7 +7710,7 @@ public:
   }
 
   void MakeRustCall(RustCallStatus* aOutStatus) override {
-    mUniffiReturnValue = FfiValueObjectHandle53::FromRust(
+    mUniffiReturnValue = FfiValueObjectHandle56::FromRust(
       uniffi_autofill_fn_constructor_store_new(
         mDbpath.IntoRust(),
         mEncdec.IntoRust(),
@@ -7722,7 +7730,7 @@ public:
 class ScaffoldingCallHandler75 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle53 mUniffiPtr{};
+  FfiValueObjectHandle56 mUniffiPtr{};
   FfiValueRustBuffer mA{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -7765,7 +7773,7 @@ public:
 class ScaffoldingCallHandler76 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle53 mUniffiPtr{};
+  FfiValueObjectHandle56 mUniffiPtr{};
   FfiValueRustBuffer mEntryWithMeta{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -7808,7 +7816,7 @@ public:
 class ScaffoldingCallHandler77 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle53 mUniffiPtr{};
+  FfiValueObjectHandle56 mUniffiPtr{};
   FfiValueRustBuffer mCc{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -7851,7 +7859,7 @@ public:
 class ScaffoldingCallHandler78 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle53 mUniffiPtr{};
+  FfiValueObjectHandle56 mUniffiPtr{};
   FfiValueRustBuffer mEntryWithMeta{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -7894,7 +7902,7 @@ public:
 class ScaffoldingCallHandler79 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle53 mUniffiPtr{};
+  FfiValueObjectHandle56 mUniffiPtr{};
   FfiValueRustBuffer mTombstones{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -7937,7 +7945,7 @@ public:
 class ScaffoldingCallHandler80 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle53 mUniffiPtr{};
+  FfiValueObjectHandle56 mUniffiPtr{};
   FfiValueRustBuffer mEntriesWithMeta{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -7980,7 +7988,7 @@ public:
 class ScaffoldingCallHandler81 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle53 mUniffiPtr{};
+  FfiValueObjectHandle56 mUniffiPtr{};
   FfiValueRustBuffer mTombstones{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -8023,7 +8031,7 @@ public:
 class ScaffoldingCallHandler82 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle53 mUniffiPtr{};
+  FfiValueObjectHandle56 mUniffiPtr{};
   FfiValueRustBuffer mEntriesWithMeta{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -8066,7 +8074,7 @@ public:
 class ScaffoldingCallHandler83 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle53 mUniffiPtr{};
+  FfiValueObjectHandle56 mUniffiPtr{};
   FfiValueRustBuffer mP{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -8109,10 +8117,10 @@ public:
 class ScaffoldingCallHandler84 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle53 mUniffiPtr{};
+  FfiValueObjectHandle56 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
-  FfiValueObjectHandle80 mUniffiReturnValue{};
+  FfiValueObjectHandle83 mUniffiReturnValue{};
 
 public:
   void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
@@ -8127,7 +8135,7 @@ public:
   }
 
   void MakeRustCall(RustCallStatus* aOutStatus) override {
-    mUniffiReturnValue = FfiValueObjectHandle80::FromRust(
+    mUniffiReturnValue = FfiValueObjectHandle83::FromRust(
       uniffi_autofill_fn_method_store_addresses_bridged_engine(
         mUniffiPtr.IntoRust(),
         aOutStatus
@@ -8146,7 +8154,7 @@ public:
 class ScaffoldingCallHandler85 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle53 mUniffiPtr{};
+  FfiValueObjectHandle56 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
   FfiValueInt<int64_t> mUniffiReturnValue{};
@@ -8183,7 +8191,7 @@ public:
 class ScaffoldingCallHandler86 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle53 mUniffiPtr{};
+  FfiValueObjectHandle56 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
   FfiValueInt<int64_t> mUniffiReturnValue{};
@@ -8220,7 +8228,7 @@ public:
 class ScaffoldingCallHandler87 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle53 mUniffiPtr{};
+  FfiValueObjectHandle56 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
   FfiValueInt<int64_t> mUniffiReturnValue{};
@@ -8257,10 +8265,10 @@ public:
 class ScaffoldingCallHandler88 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle53 mUniffiPtr{};
+  FfiValueObjectHandle56 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
-  FfiValueObjectHandle81 mUniffiReturnValue{};
+  FfiValueObjectHandle84 mUniffiReturnValue{};
 
 public:
   void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
@@ -8275,7 +8283,7 @@ public:
   }
 
   void MakeRustCall(RustCallStatus* aOutStatus) override {
-    mUniffiReturnValue = FfiValueObjectHandle81::FromRust(
+    mUniffiReturnValue = FfiValueObjectHandle84::FromRust(
       uniffi_autofill_fn_method_store_credit_cards_bridged_engine(
         mUniffiPtr.IntoRust(),
         aOutStatus
@@ -8294,7 +8302,7 @@ public:
 class ScaffoldingCallHandler89 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle53 mUniffiPtr{};
+  FfiValueObjectHandle56 mUniffiPtr{};
   FfiValueRustBuffer mGuid{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -8337,7 +8345,7 @@ public:
 class ScaffoldingCallHandler90 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle53 mUniffiPtr{};
+  FfiValueObjectHandle56 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -8366,7 +8374,7 @@ public:
 class ScaffoldingCallHandler91 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle53 mUniffiPtr{};
+  FfiValueObjectHandle56 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -8395,7 +8403,7 @@ public:
 class ScaffoldingCallHandler92 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle53 mUniffiPtr{};
+  FfiValueObjectHandle56 mUniffiPtr{};
   FfiValueRustBuffer mGuid{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -8438,7 +8446,7 @@ public:
 class ScaffoldingCallHandler93 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle53 mUniffiPtr{};
+  FfiValueObjectHandle56 mUniffiPtr{};
   FfiValueRustBuffer mGuid{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -8481,7 +8489,7 @@ public:
 class ScaffoldingCallHandler94 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle53 mUniffiPtr{};
+  FfiValueObjectHandle56 mUniffiPtr{};
   FfiValueRustBuffer mGuid{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -8524,7 +8532,7 @@ public:
 class ScaffoldingCallHandler95 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle53 mUniffiPtr{};
+  FfiValueObjectHandle56 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
   FfiValueRustBuffer mUniffiReturnValue{};
@@ -8561,7 +8569,7 @@ public:
 class ScaffoldingCallHandler96 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle53 mUniffiPtr{};
+  FfiValueObjectHandle56 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
   FfiValueRustBuffer mUniffiReturnValue{};
@@ -8598,7 +8606,7 @@ public:
 class ScaffoldingCallHandler97 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle53 mUniffiPtr{};
+  FfiValueObjectHandle56 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
   FfiValueRustBuffer mUniffiReturnValue{};
@@ -8635,7 +8643,7 @@ public:
 class ScaffoldingCallHandler98 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle53 mUniffiPtr{};
+  FfiValueObjectHandle56 mUniffiPtr{};
   FfiValueRustBuffer mGuid{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -8678,7 +8686,7 @@ public:
 class ScaffoldingCallHandler99 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle53 mUniffiPtr{};
+  FfiValueObjectHandle56 mUniffiPtr{};
   FfiValueRustBuffer mGuid{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -8721,7 +8729,44 @@ public:
 class ScaffoldingCallHandler100 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle53 mUniffiPtr{};
+  FfiValueObjectHandle56 mUniffiPtr{};
+
+  // MakeRustCall stores the result of the call in these fields
+  FfiValueRustBuffer mUniffiReturnValue{};
+
+public:
+  void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
+    if (aArgs.Length() < 1) {
+      aError.ThrowUnknownError(nsPrintfCString("LowerRustArgs: Incorrect argument length for uniffi_autofill_fn_method_store_list_credit_card_candidates (expected: 1, actual: %zu)", aArgs.Length()));
+      return;
+    }
+    mUniffiPtr.Lower(aArgs[0], aError);
+    if (aError.Failed()) {
+      return;
+    }
+  }
+
+  void MakeRustCall(RustCallStatus* aOutStatus) override {
+    mUniffiReturnValue = FfiValueRustBuffer::FromRust(
+      uniffi_autofill_fn_method_store_list_credit_card_candidates(
+        mUniffiPtr.IntoRust(),
+        aOutStatus
+      )
+    );
+  }
+
+  virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
+    mUniffiReturnValue.Lift(
+      aCx,
+      &aDest.Construct(),
+      aError
+    );
+  }
+};
+class ScaffoldingCallHandler101 : public UniffiSyncCallHandler {
+private:
+  // LowerRustArgs stores the resulting arguments in these fields
+  FfiValueObjectHandle56 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -8747,10 +8792,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler101 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler102 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle53 mUniffiPtr{};
+  FfiValueObjectHandle56 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -8776,10 +8821,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler102 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler103 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle53 mUniffiPtr{};
+  FfiValueObjectHandle56 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -8805,10 +8850,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler103 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler104 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle53 mUniffiPtr{};
+  FfiValueObjectHandle56 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
   FfiValueRustBuffer mUniffiReturnValue{};
@@ -8842,10 +8887,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler104 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler105 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle53 mUniffiPtr{};
+  FfiValueObjectHandle56 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -8871,10 +8916,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler105 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler106 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle53 mUniffiPtr{};
+  FfiValueObjectHandle56 mUniffiPtr{};
   FfiValueRustBuffer mGuid{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -8906,10 +8951,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler106 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler107 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle53 mUniffiPtr{};
+  FfiValueObjectHandle56 mUniffiPtr{};
   FfiValueRustBuffer mGuid{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -8941,10 +8986,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler107 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler108 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle53 mUniffiPtr{};
+  FfiValueObjectHandle56 mUniffiPtr{};
   FfiValueRustBuffer mGuid{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -8976,10 +9021,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler108 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler109 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle53 mUniffiPtr{};
+  FfiValueObjectHandle56 mUniffiPtr{};
   FfiValueRustBuffer mGuid{};
   FfiValueRustBuffer mA{};
 
@@ -9017,10 +9062,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler109 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler110 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle53 mUniffiPtr{};
+  FfiValueObjectHandle56 mUniffiPtr{};
   FfiValueRustBuffer mEntryWithMeta{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -9052,10 +9097,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler110 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler111 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle53 mUniffiPtr{};
+  FfiValueObjectHandle56 mUniffiPtr{};
   FfiValueRustBuffer mGuid{};
   FfiValueRustBuffer mCc{};
 
@@ -9093,10 +9138,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler111 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler112 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle53 mUniffiPtr{};
+  FfiValueObjectHandle56 mUniffiPtr{};
   FfiValueRustBuffer mEntryWithMeta{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -9128,10 +9173,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler112 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler113 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle53 mUniffiPtr{};
+  FfiValueObjectHandle56 mUniffiPtr{};
   FfiValueRustBuffer mGuid{};
   FfiValueRustBuffer mP{};
 
@@ -9169,13 +9214,13 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler113 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler114 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueRustBuffer mDbPath{};
 
   // MakeRustCall stores the result of the call in these fields
-  FfiValueObjectHandle832 mUniffiReturnValue{};
+  FfiValueObjectHandle842 mUniffiReturnValue{};
 
 public:
   void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
@@ -9190,7 +9235,7 @@ public:
   }
 
   void MakeRustCall(RustCallStatus* aOutStatus) override {
-    mUniffiReturnValue = FfiValueObjectHandle832::FromRust(
+    mUniffiReturnValue = FfiValueObjectHandle842::FromRust(
       uniffi_breach_alerts_fn_constructor_breachalertsstore_new_store(
         mDbPath.IntoRust(),
         aOutStatus
@@ -9206,10 +9251,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler114 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler115 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle832 mUniffiPtr{};
+  FfiValueObjectHandle842 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -9235,10 +9280,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler115 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler116 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle832 mUniffiPtr{};
+  FfiValueObjectHandle842 mUniffiPtr{};
   FfiValueRustBuffer mBreachNames{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -9270,10 +9315,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler116 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler117 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle832 mUniffiPtr{};
+  FfiValueObjectHandle842 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -9299,10 +9344,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler117 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler118 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle832 mUniffiPtr{};
+  FfiValueObjectHandle842 mUniffiPtr{};
   FfiValueRustBuffer mBreachNames{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -9342,10 +9387,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler118 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler119 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle832 mUniffiPtr{};
+  FfiValueObjectHandle842 mUniffiPtr{};
   FfiValueRustBuffer mDismissals{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -9377,16 +9422,16 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler119 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler120 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueRustBuffer mInitContextId{};
   FfiValueInt<int64_t> mCreationTimestampS{};
   FfiValueInt<int8_t> mRunningInTestAutomation{};
-  FfiValueObjectHandle89 mCallback{};
+  FfiValueObjectHandle94 mCallback{};
 
   // MakeRustCall stores the result of the call in these fields
-  FfiValueObjectHandle1039 mUniffiReturnValue{};
+  FfiValueObjectHandle1051 mUniffiReturnValue{};
 
 public:
   void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
@@ -9413,7 +9458,7 @@ public:
   }
 
   void MakeRustCall(RustCallStatus* aOutStatus) override {
-    mUniffiReturnValue = FfiValueObjectHandle1039::FromRust(
+    mUniffiReturnValue = FfiValueObjectHandle1051::FromRust(
       uniffi_context_id_fn_constructor_contextidcomponent_new(
         mInitContextId.IntoRust(),
         mCreationTimestampS.IntoRust(),
@@ -9432,10 +9477,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler120 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler121 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle1039 mUniffiPtr{};
+  FfiValueObjectHandle1051 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -9461,10 +9506,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler121 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler122 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle1039 mUniffiPtr{};
+  FfiValueObjectHandle1051 mUniffiPtr{};
   FfiValueInt<uint8_t> mRotationDaysInS{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -9504,10 +9549,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler122 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler123 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle1039 mUniffiPtr{};
+  FfiValueObjectHandle1051 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -9533,10 +9578,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler123 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler124 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle61 mUniffiPtr{};
+  FfiValueObjectHandle64 mUniffiPtr{};
   FfiValueRustBuffer mCiphertext{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -9576,10 +9621,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler124 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler125 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle61 mUniffiPtr{};
+  FfiValueObjectHandle64 mUniffiPtr{};
   FfiValueRustBuffer mCleartext{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -9619,10 +9664,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler125 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler126 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle92 mUniffiPtr{};
+  FfiValueObjectHandle97 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
   FfiValueRustBuffer mUniffiReturnValue{};
@@ -9656,13 +9701,13 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler126 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler127 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle92 mKeyManager{};
+  FfiValueObjectHandle97 mKeyManager{};
 
   // MakeRustCall stores the result of the call in these fields
-  FfiValueObjectHandle1245 mUniffiReturnValue{};
+  FfiValueObjectHandle1259 mUniffiReturnValue{};
 
 public:
   void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
@@ -9677,7 +9722,7 @@ public:
   }
 
   void MakeRustCall(RustCallStatus* aOutStatus) override {
-    mUniffiReturnValue = FfiValueObjectHandle1245::FromRust(
+    mUniffiReturnValue = FfiValueObjectHandle1259::FromRust(
       uniffi_db_crypto_fn_constructor_managedencryptordecryptor_new(
         mKeyManager.IntoRust(),
         aOutStatus
@@ -9693,14 +9738,14 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler127 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler128 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueRustBuffer mKeyName{};
-  FfiValueObjectHandle52 mPrimaryPasswordAuthenticator{};
+  FfiValueObjectHandle55 mPrimaryPasswordAuthenticator{};
 
   // MakeRustCall stores the result of the call in these fields
-  FfiValueObjectHandle1246 mUniffiReturnValue{};
+  FfiValueObjectHandle1260 mUniffiReturnValue{};
 
 public:
   void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
@@ -9719,7 +9764,7 @@ public:
   }
 
   void MakeRustCall(RustCallStatus* aOutStatus) override {
-    mUniffiReturnValue = FfiValueObjectHandle1246::FromRust(
+    mUniffiReturnValue = FfiValueObjectHandle1260::FromRust(
       uniffi_db_crypto_fn_constructor_nsskeymanager_new(
         mKeyName.IntoRust(),
         mPrimaryPasswordAuthenticator.IntoRust(),
@@ -9736,13 +9781,13 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler128 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler129 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle1246 mUniffiPtr{};
+  FfiValueObjectHandle1260 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
-  FfiValueObjectHandle92 mUniffiReturnValue{};
+  FfiValueObjectHandle97 mUniffiReturnValue{};
 
 public:
   void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
@@ -9757,7 +9802,7 @@ public:
   }
 
   void MakeRustCall(RustCallStatus* aOutStatus) override {
-    mUniffiReturnValue = FfiValueObjectHandle92::FromRust(
+    mUniffiReturnValue = FfiValueObjectHandle97::FromRust(
       uniffi_db_crypto_fn_method_nsskeymanager_into_dyn_key_manager(
         mUniffiPtr.IntoRust(),
         aOutStatus
@@ -9773,9 +9818,9 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler129 : public UniffiAsyncCallHandler {
+class ScaffoldingCallHandler130 : public UniffiAsyncCallHandler {
 public:
-  ScaffoldingCallHandler129() : UniffiAsyncCallHandler(
+  ScaffoldingCallHandler130() : UniffiAsyncCallHandler(
         ffi_db_crypto_rust_future_poll_rust_buffer,
         ffi_db_crypto_rust_future_free_rust_buffer
     ) { }
@@ -9789,7 +9834,7 @@ protected:
   // Always called on the main thread since async Rust calls don't block, they
   // return a future.
   void LowerArgsAndMakeRustCall(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
-    FfiValueObjectHandle52 mUniffiPtr{};
+    FfiValueObjectHandle55 mUniffiPtr{};
     mUniffiPtr.Lower(aArgs[0], aError);
     if (aError.Failed()) {
       return;
@@ -9814,9 +9859,9 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler130 : public UniffiAsyncCallHandler {
+class ScaffoldingCallHandler131 : public UniffiAsyncCallHandler {
 public:
-  ScaffoldingCallHandler130() : UniffiAsyncCallHandler(
+  ScaffoldingCallHandler131() : UniffiAsyncCallHandler(
         ffi_db_crypto_rust_future_poll_void,
         ffi_db_crypto_rust_future_free_void
     ) { }
@@ -9829,7 +9874,7 @@ protected:
   // Always called on the main thread since async Rust calls don't block, they
   // return a future.
   void LowerArgsAndMakeRustCall(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
-    FfiValueObjectHandle52 mUniffiPtr{};
+    FfiValueObjectHandle55 mUniffiPtr{};
     mUniffiPtr.Lower(aArgs[0], aError);
     if (aError.Failed()) {
       return;
@@ -9848,9 +9893,9 @@ public:
   void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler131 : public UniffiAsyncCallHandler {
+class ScaffoldingCallHandler132 : public UniffiAsyncCallHandler {
 public:
-  ScaffoldingCallHandler131() : UniffiAsyncCallHandler(
+  ScaffoldingCallHandler132() : UniffiAsyncCallHandler(
         ffi_db_crypto_rust_future_poll_void,
         ffi_db_crypto_rust_future_free_void
     ) { }
@@ -9863,7 +9908,7 @@ protected:
   // Always called on the main thread since async Rust calls don't block, they
   // return a future.
   void LowerArgsAndMakeRustCall(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
-    FfiValueObjectHandle52 mUniffiPtr{};
+    FfiValueObjectHandle55 mUniffiPtr{};
     mUniffiPtr.Lower(aArgs[0], aError);
     if (aError.Failed()) {
       return;
@@ -9882,13 +9927,13 @@ public:
   void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler132 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler133 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueRustBuffer mKey{};
 
   // MakeRustCall stores the result of the call in these fields
-  FfiValueObjectHandle1247 mUniffiReturnValue{};
+  FfiValueObjectHandle1261 mUniffiReturnValue{};
 
 public:
   void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
@@ -9903,36 +9948,9 @@ public:
   }
 
   void MakeRustCall(RustCallStatus* aOutStatus) override {
-    mUniffiReturnValue = FfiValueObjectHandle1247::FromRust(
+    mUniffiReturnValue = FfiValueObjectHandle1261::FromRust(
       uniffi_db_crypto_fn_constructor_statickeymanager_new(
         mKey.IntoRust(),
-        aOutStatus
-      )
-    );
-  }
-
-  virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
-    mUniffiReturnValue.Lift(
-      aCx,
-      &aDest.Construct(),
-      aError
-    );
-  }
-};
-class ScaffoldingCallHandler133 : public UniffiSyncCallHandler {
-private:
-  // LowerRustArgs stores the resulting arguments in these fields
-
-  // MakeRustCall stores the result of the call in these fields
-  FfiValueObjectHandle1661 mUniffiReturnValue{};
-
-public:
-  void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
-  }
-
-  void MakeRustCall(RustCallStatus* aOutStatus) override {
-    mUniffiReturnValue = FfiValueObjectHandle1661::FromRust(
-      uniffi_filter_adult_fn_constructor_filteradultcomponent_new(
         aOutStatus
       )
     );
@@ -9949,7 +9967,34 @@ public:
 class ScaffoldingCallHandler134 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle1661 mUniffiPtr{};
+
+  // MakeRustCall stores the result of the call in these fields
+  FfiValueObjectHandle1679 mUniffiReturnValue{};
+
+public:
+  void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
+  }
+
+  void MakeRustCall(RustCallStatus* aOutStatus) override {
+    mUniffiReturnValue = FfiValueObjectHandle1679::FromRust(
+      uniffi_filter_adult_fn_constructor_filteradultcomponent_new(
+        aOutStatus
+      )
+    );
+  }
+
+  virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
+    mUniffiReturnValue.Lift(
+      aCx,
+      &aDest.Construct(),
+      aError
+    );
+  }
+};
+class ScaffoldingCallHandler135 : public UniffiSyncCallHandler {
+private:
+  // LowerRustArgs stores the resulting arguments in these fields
+  FfiValueObjectHandle1679 mUniffiPtr{};
   FfiValueRustBuffer mBaseDomainToCheck{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -9989,15 +10034,15 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler135 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler136 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueRustBuffer mBytes{};
   FfiValueRustBuffer mDefaultIdentities{};
-  FfiValueObjectHandle107 mCallback{};
+  FfiValueObjectHandle112 mCallback{};
 
   // MakeRustCall stores the result of the call in these fields
-  FfiValueObjectHandle1861 mUniffiReturnValue{};
+  FfiValueObjectHandle1881 mUniffiReturnValue{};
 
 public:
   void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
@@ -10020,7 +10065,7 @@ public:
   }
 
   void MakeRustCall(RustCallStatus* aOutStatus) override {
-    mUniffiReturnValue = FfiValueObjectHandle1861::FromRust(
+    mUniffiReturnValue = FfiValueObjectHandle1881::FromRust(
       uniffi_fxcontainers_fn_constructor_containersstore_new(
         mBytes.IntoRust(),
         mDefaultIdentities.IntoRust(),
@@ -10038,10 +10083,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler136 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler137 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle1861 mUniffiPtr{};
+  FfiValueObjectHandle1881 mUniffiPtr{};
   FfiValueRustBuffer mName{};
   FfiValueRustBuffer mIcon{};
   FfiValueRustBuffer mColor{};
@@ -10093,10 +10138,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler137 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler138 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle1861 mUniffiPtr{};
+  FfiValueObjectHandle1881 mUniffiPtr{};
   FfiValueRustBuffer mPolicyId{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -10136,10 +10181,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler138 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler139 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle1861 mUniffiPtr{};
+  FfiValueObjectHandle1881 mUniffiPtr{};
   FfiValueRustBuffer mSite{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -10179,10 +10224,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler139 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler140 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle1861 mUniffiPtr{};
+  FfiValueObjectHandle1881 mUniffiPtr{};
   FfiValueRustBuffer mUserContextId{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -10222,10 +10267,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler140 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler141 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle1861 mUniffiPtr{};
+  FfiValueObjectHandle1881 mUniffiPtr{};
   FfiValueRustBuffer mUserContextIds{};
   FfiValueInt<int64_t> mPosition{};
 
@@ -10271,10 +10316,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler141 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler142 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle1861 mUniffiPtr{};
+  FfiValueObjectHandle1881 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
   FfiValueRustBuffer mUniffiReturnValue{};
@@ -10308,10 +10353,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler142 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler143 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle1861 mUniffiPtr{};
+  FfiValueObjectHandle1881 mUniffiPtr{};
   FfiValueRustBuffer mPolicyId{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -10351,10 +10396,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler143 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler144 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle1861 mUniffiPtr{};
+  FfiValueObjectHandle1881 mUniffiPtr{};
   FfiValueRustBuffer mName{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -10394,10 +10439,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler144 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler145 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle1861 mUniffiPtr{};
+  FfiValueObjectHandle1881 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
   FfiValueRustBuffer mUniffiReturnValue{};
@@ -10431,10 +10476,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler145 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler146 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle1861 mUniffiPtr{};
+  FfiValueObjectHandle1881 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
   FfiValueRustBuffer mUniffiReturnValue{};
@@ -10468,10 +10513,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler146 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler147 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle1861 mUniffiPtr{};
+  FfiValueObjectHandle1881 mUniffiPtr{};
   FfiValueInt<uint32_t> mUserContextId{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -10511,10 +10556,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler147 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler148 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle1861 mUniffiPtr{};
+  FfiValueObjectHandle1881 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
   FfiValueRustBuffer mUniffiReturnValue{};
@@ -10548,10 +10593,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler148 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler149 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle1861 mUniffiPtr{};
+  FfiValueObjectHandle1881 mUniffiPtr{};
   FfiValueInt<uint32_t> mUserContextId{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -10591,10 +10636,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler149 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler150 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle1861 mUniffiPtr{};
+  FfiValueObjectHandle1881 mUniffiPtr{};
   FfiValueInt<uint32_t> mUserContextId{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -10634,10 +10679,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler150 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler151 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle1861 mUniffiPtr{};
+  FfiValueObjectHandle1881 mUniffiPtr{};
   FfiValueRustBuffer mSite{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -10669,10 +10714,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler151 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler152 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle1861 mUniffiPtr{};
+  FfiValueObjectHandle1881 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
   FfiValueRustBuffer mUniffiReturnValue{};
@@ -10706,10 +10751,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler152 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler153 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle1861 mUniffiPtr{};
+  FfiValueObjectHandle1881 mUniffiPtr{};
   FfiValueRustBuffer mSite{};
   FfiValueInt<uint32_t> mUserContextId{};
 
@@ -10747,10 +10792,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler153 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler154 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle1861 mUniffiPtr{};
+  FfiValueObjectHandle1881 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -10776,10 +10821,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler154 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler155 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle1861 mUniffiPtr{};
+  FfiValueObjectHandle1881 mUniffiPtr{};
   FfiValueInt<uint32_t> mUserContextId{};
   FfiValueRustBuffer mName{};
   FfiValueRustBuffer mIcon{};
@@ -10837,14 +10882,14 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler155 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler156 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueRustBuffer mPath{};
-  FfiValueObjectHandle61 mEncdec{};
+  FfiValueObjectHandle64 mEncdec{};
 
   // MakeRustCall stores the result of the call in these fields
-  FfiValueObjectHandle117 mUniffiReturnValue{};
+  FfiValueObjectHandle122 mUniffiReturnValue{};
 
 public:
   void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
@@ -10863,7 +10908,7 @@ public:
   }
 
   void MakeRustCall(RustCallStatus* aOutStatus) override {
-    mUniffiReturnValue = FfiValueObjectHandle117::FromRust(
+    mUniffiReturnValue = FfiValueObjectHandle122::FromRust(
       uniffi_logins_fn_constructor_loginstore_new(
         mPath.IntoRust(),
         mEncdec.IntoRust(),
@@ -10880,10 +10925,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler156 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler157 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle117 mUniffiPtr{};
+  FfiValueObjectHandle122 mUniffiPtr{};
   FfiValueRustBuffer mLogin{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -10923,10 +10968,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler157 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler158 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle117 mUniffiPtr{};
+  FfiValueObjectHandle122 mUniffiPtr{};
   FfiValueRustBuffer mLogins{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -10966,10 +11011,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler158 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler159 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle117 mUniffiPtr{};
+  FfiValueObjectHandle122 mUniffiPtr{};
   FfiValueRustBuffer mEntriesWithMeta{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -11009,10 +11054,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler159 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler160 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle117 mUniffiPtr{};
+  FfiValueObjectHandle122 mUniffiPtr{};
   FfiValueRustBuffer mLogin{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -11052,10 +11097,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler160 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler161 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle117 mUniffiPtr{};
+  FfiValueObjectHandle122 mUniffiPtr{};
   FfiValueRustBuffer mEntryWithMeta{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -11095,10 +11140,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler161 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler162 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle117 mUniffiPtr{};
+  FfiValueObjectHandle122 mUniffiPtr{};
   FfiValueRustBuffer mIds{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -11138,13 +11183,13 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler162 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler163 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle117 mUniffiPtr{};
+  FfiValueObjectHandle122 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
-  FfiValueObjectHandle127 mUniffiReturnValue{};
+  FfiValueObjectHandle132 mUniffiReturnValue{};
 
 public:
   void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
@@ -11159,7 +11204,7 @@ public:
   }
 
   void MakeRustCall(RustCallStatus* aOutStatus) override {
-    mUniffiReturnValue = FfiValueObjectHandle127::FromRust(
+    mUniffiReturnValue = FfiValueObjectHandle132::FromRust(
       uniffi_logins_fn_method_loginstore_bridged_engine(
         mUniffiPtr.IntoRust(),
         aOutStatus
@@ -11175,10 +11220,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler163 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler164 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle117 mUniffiPtr{};
+  FfiValueObjectHandle122 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
   FfiValueInt<int64_t> mUniffiReturnValue{};
@@ -11212,10 +11257,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler164 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler165 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle117 mUniffiPtr{};
+  FfiValueObjectHandle122 mUniffiPtr{};
   FfiValueRustBuffer mFormActionOrigin{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -11255,10 +11300,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler165 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler166 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle117 mUniffiPtr{};
+  FfiValueObjectHandle122 mUniffiPtr{};
   FfiValueRustBuffer mOrigin{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -11298,10 +11343,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler166 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler167 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle117 mUniffiPtr{};
+  FfiValueObjectHandle122 mUniffiPtr{};
   FfiValueRustBuffer mId{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -11341,10 +11386,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler167 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler168 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle117 mUniffiPtr{};
+  FfiValueObjectHandle122 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
   FfiValueRustBuffer mUniffiReturnValue{};
@@ -11378,10 +11423,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler168 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler169 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle117 mUniffiPtr{};
+  FfiValueObjectHandle122 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
   FfiValueRustBuffer mUniffiReturnValue{};
@@ -11415,10 +11460,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler169 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler170 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle117 mUniffiPtr{};
+  FfiValueObjectHandle122 mUniffiPtr{};
   FfiValueRustBuffer mIds{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -11458,10 +11503,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler170 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler171 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle117 mUniffiPtr{};
+  FfiValueObjectHandle122 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
   FfiValueRustBuffer mUniffiReturnValue{};
@@ -11495,10 +11540,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler171 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler172 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle117 mUniffiPtr{};
+  FfiValueObjectHandle122 mUniffiPtr{};
   FfiValueRustBuffer mLook{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -11538,10 +11583,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler172 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler173 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle117 mUniffiPtr{};
+  FfiValueObjectHandle122 mUniffiPtr{};
   FfiValueRustBuffer mId{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -11581,10 +11626,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler173 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler174 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle117 mUniffiPtr{};
+  FfiValueObjectHandle122 mUniffiPtr{};
   FfiValueRustBuffer mBaseDomain{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -11624,10 +11669,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler174 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler175 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle117 mUniffiPtr{};
+  FfiValueObjectHandle122 mUniffiPtr{};
   FfiValueRustBuffer mIds{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -11667,10 +11712,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler175 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler176 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle117 mUniffiPtr{};
+  FfiValueObjectHandle122 mUniffiPtr{};
   FfiValueRustBuffer mBaseDomain{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -11710,10 +11755,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler176 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler177 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle117 mUniffiPtr{};
+  FfiValueObjectHandle122 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
   FfiValueInt<int8_t> mUniffiReturnValue{};
@@ -11747,10 +11792,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler177 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler178 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle117 mUniffiPtr{};
+  FfiValueObjectHandle122 mUniffiPtr{};
   FfiValueRustBuffer mId{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -11790,10 +11835,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler178 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler179 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle117 mUniffiPtr{};
+  FfiValueObjectHandle122 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
   FfiValueRustBuffer mUniffiReturnValue{};
@@ -11827,10 +11872,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler179 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler180 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle117 mUniffiPtr{};
+  FfiValueObjectHandle122 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
   FfiValueRustBuffer mUniffiReturnValue{};
@@ -11864,10 +11909,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler180 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler181 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle117 mUniffiPtr{};
+  FfiValueObjectHandle122 mUniffiPtr{};
   FfiValueRustBuffer mOrigins{};
   FfiValueRustBuffer mDomains{};
 
@@ -11913,10 +11958,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler181 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler182 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle117 mUniffiPtr{};
+  FfiValueObjectHandle122 mUniffiPtr{};
   FfiValueRustBuffer mId{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -11948,10 +11993,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler182 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler183 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle117 mUniffiPtr{};
+  FfiValueObjectHandle122 mUniffiPtr{};
   FfiValueRustBuffer mId{};
   FfiValueInt<int64_t> mTimestamp{};
 
@@ -11989,10 +12034,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler183 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler184 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle117 mUniffiPtr{};
+  FfiValueObjectHandle122 mUniffiPtr{};
   FfiValueRustBuffer mPasswords{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -12024,10 +12069,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler184 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler185 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle117 mUniffiPtr{};
+  FfiValueObjectHandle122 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -12053,10 +12098,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler185 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler186 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle117 mUniffiPtr{};
+  FfiValueObjectHandle122 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -12082,10 +12127,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler186 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler187 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle117 mUniffiPtr{};
+  FfiValueObjectHandle122 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -12111,10 +12156,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler187 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler188 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle117 mUniffiPtr{};
+  FfiValueObjectHandle122 mUniffiPtr{};
   FfiValueRustBuffer mOptions{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -12146,10 +12191,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler188 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler189 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle117 mUniffiPtr{};
+  FfiValueObjectHandle122 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -12175,10 +12220,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler189 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler190 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle117 mUniffiPtr{};
+  FfiValueObjectHandle122 mUniffiPtr{};
   FfiValueRustBuffer mId{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -12210,10 +12255,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler190 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler191 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle117 mUniffiPtr{};
+  FfiValueObjectHandle122 mUniffiPtr{};
   FfiValueRustBuffer mId{};
   FfiValueRustBuffer mLogin{};
 
@@ -12259,10 +12304,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler191 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler192 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle117 mUniffiPtr{};
+  FfiValueObjectHandle122 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -12288,10 +12333,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler192 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler193 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle117 mUniffiPtr{};
+  FfiValueObjectHandle122 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -12317,10 +12362,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler193 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler194 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle127 mUniffiPtr{};
+  FfiValueObjectHandle132 mUniffiPtr{};
   FfiValueInt<int64_t> mServerModifiedMillis{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -12360,10 +12405,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler194 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler195 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle127 mUniffiPtr{};
+  FfiValueObjectHandle132 mUniffiPtr{};
   FfiValueRustBuffer mNewSyncId{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -12403,10 +12448,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler195 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler196 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle127 mUniffiPtr{};
+  FfiValueObjectHandle132 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
   FfiValueInt<int64_t> mUniffiReturnValue{};
@@ -12440,10 +12485,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler196 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler197 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle127 mUniffiPtr{};
+  FfiValueObjectHandle132 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -12469,10 +12514,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler197 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler198 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle127 mUniffiPtr{};
+  FfiValueObjectHandle132 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -12498,10 +12543,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler198 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler199 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle127 mUniffiPtr{};
+  FfiValueObjectHandle132 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
   FfiValueRustBuffer mUniffiReturnValue{};
@@ -12535,10 +12580,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler199 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler200 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle127 mUniffiPtr{};
+  FfiValueObjectHandle132 mUniffiPtr{};
   FfiValueInt<int64_t> mNewTimestamp{};
   FfiValueRustBuffer mUploadedIds{};
 
@@ -12576,10 +12621,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler200 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler201 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle127 mUniffiPtr{};
+  FfiValueObjectHandle132 mUniffiPtr{};
   FfiValueRustBuffer mIncomingEnvelopesAsJson{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -12611,10 +12656,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler201 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler202 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle127 mUniffiPtr{};
+  FfiValueObjectHandle132 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -12640,10 +12685,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler202 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler203 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle127 mUniffiPtr{};
+  FfiValueObjectHandle132 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
   FfiValueRustBuffer mUniffiReturnValue{};
@@ -12677,10 +12722,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler203 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler204 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle127 mUniffiPtr{};
+  FfiValueObjectHandle132 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -12706,10 +12751,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler204 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler205 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle127 mUniffiPtr{};
+  FfiValueObjectHandle132 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -12735,14 +12780,14 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler205 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler206 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueRustBuffer mDbPath{};
-  FfiValueObjectHandle139 mRemoteSettings{};
+  FfiValueObjectHandle144 mRemoteSettings{};
 
   // MakeRustCall stores the result of the call in these fields
-  FfiValueObjectHandle2469 mUniffiReturnValue{};
+  FfiValueObjectHandle2495 mUniffiReturnValue{};
 
 public:
   void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
@@ -12761,7 +12806,7 @@ public:
   }
 
   void MakeRustCall(RustCallStatus* aOutStatus) override {
-    mUniffiReturnValue = FfiValueObjectHandle2469::FromRust(
+    mUniffiReturnValue = FfiValueObjectHandle2495::FromRust(
       uniffi_relevancy_fn_constructor_relevancystore_new(
         mDbPath.IntoRust(),
         mRemoteSettings.IntoRust(),
@@ -12778,10 +12823,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler206 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler207 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle2469 mUniffiPtr{};
+  FfiValueObjectHandle2495 mUniffiPtr{};
   FfiValueRustBuffer mBandit{};
   FfiValueRustBuffer mArms{};
 
@@ -12819,10 +12864,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler207 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler208 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle2469 mUniffiPtr{};
+  FfiValueObjectHandle2495 mUniffiPtr{};
   FfiValueRustBuffer mBandit{};
   FfiValueRustBuffer mArms{};
 
@@ -12868,10 +12913,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler208 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler209 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle2469 mUniffiPtr{};
+  FfiValueObjectHandle2495 mUniffiPtr{};
   FfiValueRustBuffer mBandit{};
   FfiValueRustBuffer mArm{};
   FfiValueInt<int8_t> mSelected{};
@@ -12915,10 +12960,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler209 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler210 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle2469 mUniffiPtr{};
+  FfiValueObjectHandle2495 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -12944,10 +12989,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler210 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler211 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle2469 mUniffiPtr{};
+  FfiValueObjectHandle2495 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -12973,10 +13018,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler211 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler212 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle2469 mUniffiPtr{};
+  FfiValueObjectHandle2495 mUniffiPtr{};
   FfiValueRustBuffer mBandit{};
   FfiValueRustBuffer mArm{};
 
@@ -13022,10 +13067,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler212 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler213 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle2469 mUniffiPtr{};
+  FfiValueObjectHandle2495 mUniffiPtr{};
   FfiValueRustBuffer mTopUrlsByFrecency{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -13065,10 +13110,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler213 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler214 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle2469 mUniffiPtr{};
+  FfiValueObjectHandle2495 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -13094,10 +13139,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler214 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler215 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle2469 mUniffiPtr{};
+  FfiValueObjectHandle2495 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
   FfiValueRustBuffer mUniffiReturnValue{};
@@ -13131,10 +13176,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler215 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler216 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle157 mUniffiPtr{};
+  FfiValueObjectHandle162 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
   FfiValueRustBuffer mUniffiReturnValue{};
@@ -13168,10 +13213,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler216 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler217 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle157 mUniffiPtr{};
+  FfiValueObjectHandle162 mUniffiPtr{};
   FfiValueRustBuffer mRecord{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -13211,10 +13256,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler217 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler218 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle157 mUniffiPtr{};
+  FfiValueObjectHandle162 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
   FfiValueRustBuffer mUniffiReturnValue{};
@@ -13248,10 +13293,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler218 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler219 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle157 mUniffiPtr{};
+  FfiValueObjectHandle162 mUniffiPtr{};
   FfiValueInt<int8_t> mSyncIfEmpty{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -13291,10 +13336,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler219 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler220 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle157 mUniffiPtr{};
+  FfiValueObjectHandle162 mUniffiPtr{};
   FfiValueInt<int8_t> mSyncIfEmpty{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -13334,10 +13379,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler220 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler221 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle157 mUniffiPtr{};
+  FfiValueObjectHandle162 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -13363,10 +13408,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler221 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler222 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle157 mUniffiPtr{};
+  FfiValueObjectHandle162 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -13392,10 +13437,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler222 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler223 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle157 mUniffiPtr{};
+  FfiValueObjectHandle162 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -13421,14 +13466,14 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler223 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler224 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueRustBuffer mStorageDir{};
   FfiValueRustBuffer mConfig{};
 
   // MakeRustCall stores the result of the call in these fields
-  FfiValueObjectHandle139 mUniffiReturnValue{};
+  FfiValueObjectHandle144 mUniffiReturnValue{};
 
 public:
   void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
@@ -13447,7 +13492,7 @@ public:
   }
 
   void MakeRustCall(RustCallStatus* aOutStatus) override {
-    mUniffiReturnValue = FfiValueObjectHandle139::FromRust(
+    mUniffiReturnValue = FfiValueObjectHandle144::FromRust(
       uniffi_remote_settings_fn_constructor_remotesettingsservice_new(
         mStorageDir.IntoRust(),
         mConfig.IntoRust(),
@@ -13464,10 +13509,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler224 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler225 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle139 mUniffiPtr{};
+  FfiValueObjectHandle144 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
   FfiValueRustBuffer mUniffiReturnValue{};
@@ -13501,14 +13546,14 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler225 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler226 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle139 mUniffiPtr{};
+  FfiValueObjectHandle144 mUniffiPtr{};
   FfiValueRustBuffer mCollectionName{};
 
   // MakeRustCall stores the result of the call in these fields
-  FfiValueObjectHandle157 mUniffiReturnValue{};
+  FfiValueObjectHandle162 mUniffiReturnValue{};
 
 public:
   void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
@@ -13527,7 +13572,7 @@ public:
   }
 
   void MakeRustCall(RustCallStatus* aOutStatus) override {
-    mUniffiReturnValue = FfiValueObjectHandle157::FromRust(
+    mUniffiReturnValue = FfiValueObjectHandle162::FromRust(
       uniffi_remote_settings_fn_method_remotesettingsservice_make_client(
         mUniffiPtr.IntoRust(),
         mCollectionName.IntoRust(),
@@ -13544,10 +13589,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler226 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler227 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle139 mUniffiPtr{};
+  FfiValueObjectHandle144 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
   FfiValueRustBuffer mUniffiReturnValue{};
@@ -13581,10 +13626,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler227 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler228 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle139 mUniffiPtr{};
+  FfiValueObjectHandle144 mUniffiPtr{};
   FfiValueRustBuffer mConfig{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -13616,19 +13661,19 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler228 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler229 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
 
   // MakeRustCall stores the result of the call in these fields
-  FfiValueObjectHandle2856 mUniffiReturnValue{};
+  FfiValueObjectHandle2886 mUniffiReturnValue{};
 
 public:
   void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
   }
 
   void MakeRustCall(RustCallStatus* aOutStatus) override {
-    mUniffiReturnValue = FfiValueObjectHandle2856::FromRust(
+    mUniffiReturnValue = FfiValueObjectHandle2886::FromRust(
       uniffi_search_fn_constructor_searchengineselector_new(
         aOutStatus
       )
@@ -13643,10 +13688,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler229 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler230 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle2856 mUniffiPtr{};
+  FfiValueObjectHandle2886 mUniffiPtr{};
   FfiValueRustBuffer mUserEnvironment{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -13686,10 +13731,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler230 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler231 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle2856 mUniffiPtr{};
+  FfiValueObjectHandle2886 mUniffiPtr{};
   FfiValueRustBuffer mUserEnvironment{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -13729,10 +13774,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler231 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler232 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle2856 mUniffiPtr{};
+  FfiValueObjectHandle2886 mUniffiPtr{};
   FfiValueRustBuffer mOverrides{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -13764,10 +13809,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler232 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler233 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle2856 mUniffiPtr{};
+  FfiValueObjectHandle2886 mUniffiPtr{};
   FfiValueRustBuffer mConfiguration{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -13799,10 +13844,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler233 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler234 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle2856 mUniffiPtr{};
+  FfiValueObjectHandle2886 mUniffiPtr{};
   FfiValueRustBuffer mConfiguration{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -13834,11 +13879,11 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler234 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler235 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle2856 mUniffiPtr{};
-  FfiValueObjectHandle139 mService{};
+  FfiValueObjectHandle2886 mUniffiPtr{};
+  FfiValueObjectHandle144 mService{};
   FfiValueInt<int8_t> mApplyEngineOverrides{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -13875,11 +13920,11 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler235 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler236 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle2856 mUniffiPtr{};
-  FfiValueObjectHandle139 mService{};
+  FfiValueObjectHandle2886 mUniffiPtr{};
+  FfiValueObjectHandle144 mService{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -13910,14 +13955,14 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler236 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler237 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueRustBuffer mPath{};
-  FfiValueObjectHandle139 mRemoteSettingsService{};
+  FfiValueObjectHandle144 mRemoteSettingsService{};
 
   // MakeRustCall stores the result of the call in these fields
-  FfiValueObjectHandle230 mUniffiReturnValue{};
+  FfiValueObjectHandle235 mUniffiReturnValue{};
 
 public:
   void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
@@ -13936,7 +13981,7 @@ public:
   }
 
   void MakeRustCall(RustCallStatus* aOutStatus) override {
-    mUniffiReturnValue = FfiValueObjectHandle230::FromRust(
+    mUniffiReturnValue = FfiValueObjectHandle235::FromRust(
       uniffi_suggest_fn_constructor_suggeststore_new(
         mPath.IntoRust(),
         mRemoteSettingsService.IntoRust(),
@@ -13953,10 +13998,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler237 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler238 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle230 mUniffiPtr{};
+  FfiValueObjectHandle235 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
   FfiValueInt<int8_t> mUniffiReturnValue{};
@@ -13990,10 +14035,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler238 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler239 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle230 mUniffiPtr{};
+  FfiValueObjectHandle235 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -14019,10 +14064,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler239 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler240 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle230 mUniffiPtr{};
+  FfiValueObjectHandle235 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -14048,10 +14093,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler240 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler241 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle230 mUniffiPtr{};
+  FfiValueObjectHandle235 mUniffiPtr{};
   FfiValueRustBuffer mKey{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -14083,10 +14128,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler241 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler242 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle230 mUniffiPtr{};
+  FfiValueObjectHandle235 mUniffiPtr{};
   FfiValueRustBuffer mSuggestion{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -14118,10 +14163,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler242 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler243 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle230 mUniffiPtr{};
+  FfiValueObjectHandle235 mUniffiPtr{};
   FfiValueRustBuffer mSuggestionUrl{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -14153,10 +14198,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler243 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler244 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle230 mUniffiPtr{};
+  FfiValueObjectHandle235 mUniffiPtr{};
   FfiValueRustBuffer mGeoname{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -14196,10 +14241,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler244 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler245 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle230 mUniffiPtr{};
+  FfiValueObjectHandle235 mUniffiPtr{};
   FfiValueRustBuffer mQuery{};
   FfiValueInt<int8_t> mMatchNamePrefix{};
   FfiValueRustBuffer mFilter{};
@@ -14251,10 +14296,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler245 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler246 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle230 mUniffiPtr{};
+  FfiValueObjectHandle235 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
   FfiValueRustBuffer mUniffiReturnValue{};
@@ -14288,10 +14333,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler246 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler247 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle230 mUniffiPtr{};
+  FfiValueObjectHandle235 mUniffiPtr{};
   FfiValueRustBuffer mProvider{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -14331,10 +14376,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler247 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler248 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle230 mUniffiPtr{};
+  FfiValueObjectHandle235 mUniffiPtr{};
   FfiValueRustBuffer mConstraints{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -14374,10 +14419,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler248 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler249 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle230 mUniffiPtr{};
+  FfiValueObjectHandle235 mUniffiPtr{};
   FfiValueRustBuffer mKind{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -14409,10 +14454,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler249 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler250 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle230 mUniffiPtr{};
+  FfiValueObjectHandle235 mUniffiPtr{};
   FfiValueRustBuffer mKey{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -14452,10 +14497,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler250 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler251 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle230 mUniffiPtr{};
+  FfiValueObjectHandle235 mUniffiPtr{};
   FfiValueRustBuffer mSuggestion{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -14495,10 +14540,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler251 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler252 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle230 mUniffiPtr{};
+  FfiValueObjectHandle235 mUniffiPtr{};
   FfiValueRustBuffer mQuery{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -14538,10 +14583,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler252 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler253 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle230 mUniffiPtr{};
+  FfiValueObjectHandle235 mUniffiPtr{};
   FfiValueRustBuffer mQuery{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -14581,57 +14626,20 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler253 : public UniffiSyncCallHandler {
-private:
-  // LowerRustArgs stores the resulting arguments in these fields
-
-  // MakeRustCall stores the result of the call in these fields
-  FfiValueObjectHandle231 mUniffiReturnValue{};
-
-public:
-  void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
-  }
-
-  void MakeRustCall(RustCallStatus* aOutStatus) override {
-    mUniffiReturnValue = FfiValueObjectHandle231::FromRust(
-      uniffi_suggest_fn_constructor_suggeststorebuilder_new(
-        aOutStatus
-      )
-    );
-  }
-
-  virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
-    mUniffiReturnValue.Lift(
-      aCx,
-      &aDest.Construct(),
-      aError
-    );
-  }
-};
 class ScaffoldingCallHandler254 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle231 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
-  FfiValueObjectHandle230 mUniffiReturnValue{};
+  FfiValueObjectHandle236 mUniffiReturnValue{};
 
 public:
   void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
-    if (aArgs.Length() < 1) {
-      aError.ThrowUnknownError(nsPrintfCString("LowerRustArgs: Incorrect argument length for uniffi_suggest_fn_method_suggeststorebuilder_build (expected: 1, actual: %zu)", aArgs.Length()));
-      return;
-    }
-    mUniffiPtr.Lower(aArgs[0], aError);
-    if (aError.Failed()) {
-      return;
-    }
   }
 
   void MakeRustCall(RustCallStatus* aOutStatus) override {
-    mUniffiReturnValue = FfiValueObjectHandle230::FromRust(
-      uniffi_suggest_fn_method_suggeststorebuilder_build(
-        mUniffiPtr.IntoRust(),
+    mUniffiReturnValue = FfiValueObjectHandle236::FromRust(
+      uniffi_suggest_fn_constructor_suggeststorebuilder_new(
         aOutStatus
       )
     );
@@ -14648,11 +14656,48 @@ public:
 class ScaffoldingCallHandler255 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle231 mUniffiPtr{};
+  FfiValueObjectHandle236 mUniffiPtr{};
+
+  // MakeRustCall stores the result of the call in these fields
+  FfiValueObjectHandle235 mUniffiReturnValue{};
+
+public:
+  void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
+    if (aArgs.Length() < 1) {
+      aError.ThrowUnknownError(nsPrintfCString("LowerRustArgs: Incorrect argument length for uniffi_suggest_fn_method_suggeststorebuilder_build (expected: 1, actual: %zu)", aArgs.Length()));
+      return;
+    }
+    mUniffiPtr.Lower(aArgs[0], aError);
+    if (aError.Failed()) {
+      return;
+    }
+  }
+
+  void MakeRustCall(RustCallStatus* aOutStatus) override {
+    mUniffiReturnValue = FfiValueObjectHandle235::FromRust(
+      uniffi_suggest_fn_method_suggeststorebuilder_build(
+        mUniffiPtr.IntoRust(),
+        aOutStatus
+      )
+    );
+  }
+
+  virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
+    mUniffiReturnValue.Lift(
+      aCx,
+      &aDest.Construct(),
+      aError
+    );
+  }
+};
+class ScaffoldingCallHandler256 : public UniffiSyncCallHandler {
+private:
+  // LowerRustArgs stores the resulting arguments in these fields
+  FfiValueObjectHandle236 mUniffiPtr{};
   FfiValueRustBuffer mPath{};
 
   // MakeRustCall stores the result of the call in these fields
-  FfiValueObjectHandle231 mUniffiReturnValue{};
+  FfiValueObjectHandle236 mUniffiReturnValue{};
 
 public:
   void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
@@ -14671,51 +14716,8 @@ public:
   }
 
   void MakeRustCall(RustCallStatus* aOutStatus) override {
-    mUniffiReturnValue = FfiValueObjectHandle231::FromRust(
+    mUniffiReturnValue = FfiValueObjectHandle236::FromRust(
       uniffi_suggest_fn_method_suggeststorebuilder_cache_path(
-        mUniffiPtr.IntoRust(),
-        mPath.IntoRust(),
-        aOutStatus
-      )
-    );
-  }
-
-  virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
-    mUniffiReturnValue.Lift(
-      aCx,
-      &aDest.Construct(),
-      aError
-    );
-  }
-};
-class ScaffoldingCallHandler256 : public UniffiSyncCallHandler {
-private:
-  // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle231 mUniffiPtr{};
-  FfiValueRustBuffer mPath{};
-
-  // MakeRustCall stores the result of the call in these fields
-  FfiValueObjectHandle231 mUniffiReturnValue{};
-
-public:
-  void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
-    if (aArgs.Length() < 2) {
-      aError.ThrowUnknownError(nsPrintfCString("LowerRustArgs: Incorrect argument length for uniffi_suggest_fn_method_suggeststorebuilder_data_path (expected: 2, actual: %zu)", aArgs.Length()));
-      return;
-    }
-    mUniffiPtr.Lower(aArgs[0], aError);
-    if (aError.Failed()) {
-      return;
-    }
-    mPath.Lower(aArgs[1], aError);
-    if (aError.Failed()) {
-      return;
-    }
-  }
-
-  void MakeRustCall(RustCallStatus* aOutStatus) override {
-    mUniffiReturnValue = FfiValueObjectHandle231::FromRust(
-      uniffi_suggest_fn_method_suggeststorebuilder_data_path(
         mUniffiPtr.IntoRust(),
         mPath.IntoRust(),
         aOutStatus
@@ -14734,12 +14736,55 @@ public:
 class ScaffoldingCallHandler257 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle231 mUniffiPtr{};
+  FfiValueObjectHandle236 mUniffiPtr{};
+  FfiValueRustBuffer mPath{};
+
+  // MakeRustCall stores the result of the call in these fields
+  FfiValueObjectHandle236 mUniffiReturnValue{};
+
+public:
+  void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
+    if (aArgs.Length() < 2) {
+      aError.ThrowUnknownError(nsPrintfCString("LowerRustArgs: Incorrect argument length for uniffi_suggest_fn_method_suggeststorebuilder_data_path (expected: 2, actual: %zu)", aArgs.Length()));
+      return;
+    }
+    mUniffiPtr.Lower(aArgs[0], aError);
+    if (aError.Failed()) {
+      return;
+    }
+    mPath.Lower(aArgs[1], aError);
+    if (aError.Failed()) {
+      return;
+    }
+  }
+
+  void MakeRustCall(RustCallStatus* aOutStatus) override {
+    mUniffiReturnValue = FfiValueObjectHandle236::FromRust(
+      uniffi_suggest_fn_method_suggeststorebuilder_data_path(
+        mUniffiPtr.IntoRust(),
+        mPath.IntoRust(),
+        aOutStatus
+      )
+    );
+  }
+
+  virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
+    mUniffiReturnValue.Lift(
+      aCx,
+      &aDest.Construct(),
+      aError
+    );
+  }
+};
+class ScaffoldingCallHandler258 : public UniffiSyncCallHandler {
+private:
+  // LowerRustArgs stores the resulting arguments in these fields
+  FfiValueObjectHandle236 mUniffiPtr{};
   FfiValueRustBuffer mLibrary{};
   FfiValueRustBuffer mEntryPoint{};
 
   // MakeRustCall stores the result of the call in these fields
-  FfiValueObjectHandle231 mUniffiReturnValue{};
+  FfiValueObjectHandle236 mUniffiReturnValue{};
 
 public:
   void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
@@ -14762,7 +14807,7 @@ public:
   }
 
   void MakeRustCall(RustCallStatus* aOutStatus) override {
-    mUniffiReturnValue = FfiValueObjectHandle231::FromRust(
+    mUniffiReturnValue = FfiValueObjectHandle236::FromRust(
       uniffi_suggest_fn_method_suggeststorebuilder_load_extension(
         mUniffiPtr.IntoRust(),
         mLibrary.IntoRust(),
@@ -14780,14 +14825,14 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler258 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler259 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle231 mUniffiPtr{};
+  FfiValueObjectHandle236 mUniffiPtr{};
   FfiValueRustBuffer mBucketName{};
 
   // MakeRustCall stores the result of the call in these fields
-  FfiValueObjectHandle231 mUniffiReturnValue{};
+  FfiValueObjectHandle236 mUniffiReturnValue{};
 
 public:
   void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
@@ -14806,7 +14851,7 @@ public:
   }
 
   void MakeRustCall(RustCallStatus* aOutStatus) override {
-    mUniffiReturnValue = FfiValueObjectHandle231::FromRust(
+    mUniffiReturnValue = FfiValueObjectHandle236::FromRust(
       uniffi_suggest_fn_method_suggeststorebuilder_remote_settings_bucket_name(
         mUniffiPtr.IntoRust(),
         mBucketName.IntoRust(),
@@ -14823,14 +14868,14 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler259 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler260 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle231 mUniffiPtr{};
+  FfiValueObjectHandle236 mUniffiPtr{};
   FfiValueRustBuffer mServer{};
 
   // MakeRustCall stores the result of the call in these fields
-  FfiValueObjectHandle231 mUniffiReturnValue{};
+  FfiValueObjectHandle236 mUniffiReturnValue{};
 
 public:
   void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
@@ -14849,7 +14894,7 @@ public:
   }
 
   void MakeRustCall(RustCallStatus* aOutStatus) override {
-    mUniffiReturnValue = FfiValueObjectHandle231::FromRust(
+    mUniffiReturnValue = FfiValueObjectHandle236::FromRust(
       uniffi_suggest_fn_method_suggeststorebuilder_remote_settings_server(
         mUniffiPtr.IntoRust(),
         mServer.IntoRust(),
@@ -14866,14 +14911,14 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler260 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler261 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle231 mUniffiPtr{};
-  FfiValueObjectHandle139 mRsService{};
+  FfiValueObjectHandle236 mUniffiPtr{};
+  FfiValueObjectHandle144 mRsService{};
 
   // MakeRustCall stores the result of the call in these fields
-  FfiValueObjectHandle231 mUniffiReturnValue{};
+  FfiValueObjectHandle236 mUniffiReturnValue{};
 
 public:
   void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
@@ -14892,7 +14937,7 @@ public:
   }
 
   void MakeRustCall(RustCallStatus* aOutStatus) override {
-    mUniffiReturnValue = FfiValueObjectHandle231::FromRust(
+    mUniffiReturnValue = FfiValueObjectHandle236::FromRust(
       uniffi_suggest_fn_method_suggeststorebuilder_remote_settings_service(
         mUniffiPtr.IntoRust(),
         mRsService.IntoRust(),
@@ -14909,10 +14954,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler261 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler262 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle249 mUniffiPtr{};
+  FfiValueObjectHandle254 mUniffiPtr{};
   FfiValueRustBuffer mDeviceId{};
   FfiValueRustBuffer mCommand{};
 
@@ -14958,10 +15003,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler262 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler263 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle249 mUniffiPtr{};
+  FfiValueObjectHandle254 mUniffiPtr{};
   FfiValueRustBuffer mDeviceId{};
   FfiValueRustBuffer mCommand{};
   FfiValueInt<int64_t> mWhen{};
@@ -15013,10 +15058,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler263 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler264 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle249 mUniffiPtr{};
+  FfiValueObjectHandle254 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
   FfiValueRustBuffer mUniffiReturnValue{};
@@ -15050,10 +15095,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler264 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler265 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle249 mUniffiPtr{};
+  FfiValueObjectHandle254 mUniffiPtr{};
   FfiValueRustBuffer mDeviceId{};
   FfiValueRustBuffer mCommand{};
 
@@ -15099,10 +15144,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler265 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler266 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle249 mUniffiPtr{};
+  FfiValueObjectHandle254 mUniffiPtr{};
   FfiValueRustBuffer mCommand{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -15142,10 +15187,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler266 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler267 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle246 mUniffiPtr{};
+  FfiValueObjectHandle251 mUniffiPtr{};
   FfiValueInt<int64_t> mServerModifiedMillis{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -15185,10 +15230,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler267 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler268 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle246 mUniffiPtr{};
+  FfiValueObjectHandle251 mUniffiPtr{};
   FfiValueRustBuffer mNewSyncId{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -15228,10 +15273,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler268 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler269 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle246 mUniffiPtr{};
+  FfiValueObjectHandle251 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
   FfiValueInt<int64_t> mUniffiReturnValue{};
@@ -15265,10 +15310,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler269 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler270 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle246 mUniffiPtr{};
+  FfiValueObjectHandle251 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -15294,10 +15339,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler270 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler271 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle246 mUniffiPtr{};
+  FfiValueObjectHandle251 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -15323,10 +15368,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler271 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler272 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle246 mUniffiPtr{};
+  FfiValueObjectHandle251 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
   FfiValueRustBuffer mUniffiReturnValue{};
@@ -15360,10 +15405,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler272 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler273 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle246 mUniffiPtr{};
+  FfiValueObjectHandle251 mUniffiPtr{};
   FfiValueRustBuffer mClientData{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -15395,10 +15440,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler273 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler274 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle246 mUniffiPtr{};
+  FfiValueObjectHandle251 mUniffiPtr{};
   FfiValueInt<int64_t> mNewTimestamp{};
   FfiValueRustBuffer mUploadedIds{};
 
@@ -15436,10 +15481,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler274 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler275 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle246 mUniffiPtr{};
+  FfiValueObjectHandle251 mUniffiPtr{};
   FfiValueRustBuffer mIncomingEnvelopesAsJson{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -15471,10 +15516,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler275 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler276 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle246 mUniffiPtr{};
+  FfiValueObjectHandle251 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -15500,10 +15545,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler276 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler277 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle246 mUniffiPtr{};
+  FfiValueObjectHandle251 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
   FfiValueRustBuffer mUniffiReturnValue{};
@@ -15537,10 +15582,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler277 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler278 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle246 mUniffiPtr{};
+  FfiValueObjectHandle251 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -15566,10 +15611,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler278 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler279 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle246 mUniffiPtr{};
+  FfiValueObjectHandle251 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -15595,13 +15640,13 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler279 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler280 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueRustBuffer mPath{};
 
   // MakeRustCall stores the result of the call in these fields
-  FfiValueObjectHandle3446 mUniffiReturnValue{};
+  FfiValueObjectHandle3482 mUniffiReturnValue{};
 
 public:
   void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
@@ -15616,46 +15661,9 @@ public:
   }
 
   void MakeRustCall(RustCallStatus* aOutStatus) override {
-    mUniffiReturnValue = FfiValueObjectHandle3446::FromRust(
+    mUniffiReturnValue = FfiValueObjectHandle3482::FromRust(
       uniffi_tabs_fn_constructor_tabsstore_new(
         mPath.IntoRust(),
-        aOutStatus
-      )
-    );
-  }
-
-  virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
-    mUniffiReturnValue.Lift(
-      aCx,
-      &aDest.Construct(),
-      aError
-    );
-  }
-};
-class ScaffoldingCallHandler280 : public UniffiSyncCallHandler {
-private:
-  // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle3446 mUniffiPtr{};
-
-  // MakeRustCall stores the result of the call in these fields
-  FfiValueObjectHandle246 mUniffiReturnValue{};
-
-public:
-  void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
-    if (aArgs.Length() < 1) {
-      aError.ThrowUnknownError(nsPrintfCString("LowerRustArgs: Incorrect argument length for uniffi_tabs_fn_method_tabsstore_bridged_engine (expected: 1, actual: %zu)", aArgs.Length()));
-      return;
-    }
-    mUniffiPtr.Lower(aArgs[0], aError);
-    if (aError.Failed()) {
-      return;
-    }
-  }
-
-  void MakeRustCall(RustCallStatus* aOutStatus) override {
-    mUniffiReturnValue = FfiValueObjectHandle246::FromRust(
-      uniffi_tabs_fn_method_tabsstore_bridged_engine(
-        mUniffiPtr.IntoRust(),
         aOutStatus
       )
     );
@@ -15672,7 +15680,44 @@ public:
 class ScaffoldingCallHandler281 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle3446 mUniffiPtr{};
+  FfiValueObjectHandle3482 mUniffiPtr{};
+
+  // MakeRustCall stores the result of the call in these fields
+  FfiValueObjectHandle251 mUniffiReturnValue{};
+
+public:
+  void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
+    if (aArgs.Length() < 1) {
+      aError.ThrowUnknownError(nsPrintfCString("LowerRustArgs: Incorrect argument length for uniffi_tabs_fn_method_tabsstore_bridged_engine (expected: 1, actual: %zu)", aArgs.Length()));
+      return;
+    }
+    mUniffiPtr.Lower(aArgs[0], aError);
+    if (aError.Failed()) {
+      return;
+    }
+  }
+
+  void MakeRustCall(RustCallStatus* aOutStatus) override {
+    mUniffiReturnValue = FfiValueObjectHandle251::FromRust(
+      uniffi_tabs_fn_method_tabsstore_bridged_engine(
+        mUniffiPtr.IntoRust(),
+        aOutStatus
+      )
+    );
+  }
+
+  virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
+    mUniffiReturnValue.Lift(
+      aCx,
+      &aDest.Construct(),
+      aError
+    );
+  }
+};
+class ScaffoldingCallHandler282 : public UniffiSyncCallHandler {
+private:
+  // LowerRustArgs stores the resulting arguments in these fields
+  FfiValueObjectHandle3482 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -15698,10 +15743,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler282 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler283 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle3446 mUniffiPtr{};
+  FfiValueObjectHandle3482 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
   FfiValueRustBuffer mUniffiReturnValue{};
@@ -15735,13 +15780,13 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler283 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler284 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle3446 mUniffiPtr{};
+  FfiValueObjectHandle3482 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
-  FfiValueObjectHandle249 mUniffiReturnValue{};
+  FfiValueObjectHandle254 mUniffiReturnValue{};
 
 public:
   void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
@@ -15756,7 +15801,7 @@ public:
   }
 
   void MakeRustCall(RustCallStatus* aOutStatus) override {
-    mUniffiReturnValue = FfiValueObjectHandle249::FromRust(
+    mUniffiReturnValue = FfiValueObjectHandle254::FromRust(
       uniffi_tabs_fn_method_tabsstore_new_remote_command_store(
         mUniffiPtr.IntoRust(),
         aOutStatus
@@ -15772,10 +15817,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler284 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler285 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle3446 mUniffiPtr{};
+  FfiValueObjectHandle3482 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -15801,10 +15846,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler285 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler286 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle3446 mUniffiPtr{};
+  FfiValueObjectHandle3482 mUniffiPtr{};
   FfiValueRustBuffer mRemoteTabs{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -15836,10 +15881,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler286 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler287 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle3446 mUniffiPtr{};
+  FfiValueObjectHandle3482 mUniffiPtr{};
   FfiValueRustBuffer mInfo{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -15871,9 +15916,9 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler287 : public UniffiAsyncCallHandler {
+class ScaffoldingCallHandler288 : public UniffiAsyncCallHandler {
 public:
-  ScaffoldingCallHandler287() : UniffiAsyncCallHandler(
+  ScaffoldingCallHandler288() : UniffiAsyncCallHandler(
         ffi_viaduct_rust_future_poll_rust_buffer,
         ffi_viaduct_rust_future_free_rust_buffer
     ) { }
@@ -15887,7 +15932,7 @@ protected:
   // Always called on the main thread since async Rust calls don't block, they
   // return a future.
   void LowerArgsAndMakeRustCall(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
-    FfiValueObjectHandle262 mUniffiPtr{};
+    FfiValueObjectHandle267 mUniffiPtr{};
     mUniffiPtr.Lower(aArgs[0], aError);
     if (aError.Failed()) {
       return;
@@ -15924,10 +15969,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler288 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler289 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle275 mUniffiPtr{};
+  FfiValueObjectHandle280 mUniffiPtr{};
   FfiValueInt<int64_t> mServerModifiedMillis{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -15967,10 +16012,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler289 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler290 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle275 mUniffiPtr{};
+  FfiValueObjectHandle280 mUniffiPtr{};
   FfiValueRustBuffer mNewSyncId{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -16010,10 +16055,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler290 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler291 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle275 mUniffiPtr{};
+  FfiValueObjectHandle280 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
   FfiValueInt<int64_t> mUniffiReturnValue{};
@@ -16047,10 +16092,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler291 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler292 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle275 mUniffiPtr{};
+  FfiValueObjectHandle280 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -16076,10 +16121,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler292 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler293 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle275 mUniffiPtr{};
+  FfiValueObjectHandle280 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -16105,10 +16150,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler293 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler294 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle275 mUniffiPtr{};
+  FfiValueObjectHandle280 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
   FfiValueRustBuffer mUniffiReturnValue{};
@@ -16142,10 +16187,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler294 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler295 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle275 mUniffiPtr{};
+  FfiValueObjectHandle280 mUniffiPtr{};
   FfiValueInt<int64_t> mServerModifiedMillis{};
   FfiValueRustBuffer mGuids{};
 
@@ -16183,10 +16228,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler295 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler296 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle275 mUniffiPtr{};
+  FfiValueObjectHandle280 mUniffiPtr{};
   FfiValueRustBuffer mIncoming{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -16218,10 +16263,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler296 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler297 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle275 mUniffiPtr{};
+  FfiValueObjectHandle280 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -16247,10 +16292,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler297 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler298 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle275 mUniffiPtr{};
+  FfiValueObjectHandle280 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
   FfiValueRustBuffer mUniffiReturnValue{};
@@ -16284,10 +16329,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler298 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler299 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle275 mUniffiPtr{};
+  FfiValueObjectHandle280 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -16313,10 +16358,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler299 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler300 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle275 mUniffiPtr{};
+  FfiValueObjectHandle280 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -16342,13 +16387,13 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler300 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler301 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueRustBuffer mPath{};
 
   // MakeRustCall stores the result of the call in these fields
-  FfiValueObjectHandle4047 mUniffiReturnValue{};
+  FfiValueObjectHandle4089 mUniffiReturnValue{};
 
 public:
   void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
@@ -16363,46 +16408,9 @@ public:
   }
 
   void MakeRustCall(RustCallStatus* aOutStatus) override {
-    mUniffiReturnValue = FfiValueObjectHandle4047::FromRust(
+    mUniffiReturnValue = FfiValueObjectHandle4089::FromRust(
       uniffi_webext_storage_fn_constructor_webextstoragestore_new(
         mPath.IntoRust(),
-        aOutStatus
-      )
-    );
-  }
-
-  virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
-    mUniffiReturnValue.Lift(
-      aCx,
-      &aDest.Construct(),
-      aError
-    );
-  }
-};
-class ScaffoldingCallHandler301 : public UniffiSyncCallHandler {
-private:
-  // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle4047 mUniffiPtr{};
-
-  // MakeRustCall stores the result of the call in these fields
-  FfiValueObjectHandle275 mUniffiReturnValue{};
-
-public:
-  void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
-    if (aArgs.Length() < 1) {
-      aError.ThrowUnknownError(nsPrintfCString("LowerRustArgs: Incorrect argument length for uniffi_webext_storage_fn_method_webextstoragestore_bridged_engine (expected: 1, actual: %zu)", aArgs.Length()));
-      return;
-    }
-    mUniffiPtr.Lower(aArgs[0], aError);
-    if (aError.Failed()) {
-      return;
-    }
-  }
-
-  void MakeRustCall(RustCallStatus* aOutStatus) override {
-    mUniffiReturnValue = FfiValueObjectHandle275::FromRust(
-      uniffi_webext_storage_fn_method_webextstoragestore_bridged_engine(
-        mUniffiPtr.IntoRust(),
         aOutStatus
       )
     );
@@ -16419,7 +16427,44 @@ public:
 class ScaffoldingCallHandler302 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle4047 mUniffiPtr{};
+  FfiValueObjectHandle4089 mUniffiPtr{};
+
+  // MakeRustCall stores the result of the call in these fields
+  FfiValueObjectHandle280 mUniffiReturnValue{};
+
+public:
+  void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
+    if (aArgs.Length() < 1) {
+      aError.ThrowUnknownError(nsPrintfCString("LowerRustArgs: Incorrect argument length for uniffi_webext_storage_fn_method_webextstoragestore_bridged_engine (expected: 1, actual: %zu)", aArgs.Length()));
+      return;
+    }
+    mUniffiPtr.Lower(aArgs[0], aError);
+    if (aError.Failed()) {
+      return;
+    }
+  }
+
+  void MakeRustCall(RustCallStatus* aOutStatus) override {
+    mUniffiReturnValue = FfiValueObjectHandle280::FromRust(
+      uniffi_webext_storage_fn_method_webextstoragestore_bridged_engine(
+        mUniffiPtr.IntoRust(),
+        aOutStatus
+      )
+    );
+  }
+
+  virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
+    mUniffiReturnValue.Lift(
+      aCx,
+      &aDest.Construct(),
+      aError
+    );
+  }
+};
+class ScaffoldingCallHandler303 : public UniffiSyncCallHandler {
+private:
+  // LowerRustArgs stores the resulting arguments in these fields
+  FfiValueObjectHandle4089 mUniffiPtr{};
   FfiValueRustBuffer mExtId{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -16459,10 +16504,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler303 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler304 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle4047 mUniffiPtr{};
+  FfiValueObjectHandle4089 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -16488,10 +16533,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler304 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler305 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle4047 mUniffiPtr{};
+  FfiValueObjectHandle4089 mUniffiPtr{};
   FfiValueRustBuffer mExtId{};
   FfiValueRustBuffer mKeys{};
 
@@ -16537,10 +16582,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler305 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler306 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle4047 mUniffiPtr{};
+  FfiValueObjectHandle4089 mUniffiPtr{};
   FfiValueRustBuffer mExtId{};
   FfiValueRustBuffer mKeys{};
 
@@ -16586,10 +16631,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler306 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler307 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle4047 mUniffiPtr{};
+  FfiValueObjectHandle4089 mUniffiPtr{};
   FfiValueRustBuffer mExtId{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -16629,10 +16674,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler307 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler308 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle4047 mUniffiPtr{};
+  FfiValueObjectHandle4089 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
   FfiValueRustBuffer mUniffiReturnValue{};
@@ -16666,10 +16711,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler308 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler309 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle4047 mUniffiPtr{};
+  FfiValueObjectHandle4089 mUniffiPtr{};
   FfiValueRustBuffer mExtId{};
   FfiValueRustBuffer mKeys{};
 
@@ -16715,10 +16760,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler309 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler310 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle4047 mUniffiPtr{};
+  FfiValueObjectHandle4089 mUniffiPtr{};
   FfiValueRustBuffer mExtId{};
   FfiValueRustBuffer mVal{};
 
@@ -16766,9 +16811,9 @@ public:
 };
 
 #ifdef MOZ_UNIFFI_FIXTURES
-class ScaffoldingCallHandler319 : public UniffiAsyncCallHandler {
+class ScaffoldingCallHandler320 : public UniffiAsyncCallHandler {
 public:
-  ScaffoldingCallHandler319() : UniffiAsyncCallHandler(
+  ScaffoldingCallHandler320() : UniffiAsyncCallHandler(
         ffi_uniffi_bindings_tests_rust_future_poll_f32,
         ffi_uniffi_bindings_tests_rust_future_free_f32
     ) { }
@@ -16807,9 +16852,9 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler320 : public UniffiAsyncCallHandler {
+class ScaffoldingCallHandler321 : public UniffiAsyncCallHandler {
 public:
-  ScaffoldingCallHandler320() : UniffiAsyncCallHandler(
+  ScaffoldingCallHandler321() : UniffiAsyncCallHandler(
         ffi_uniffi_bindings_tests_rust_future_poll_f64,
         ffi_uniffi_bindings_tests_rust_future_free_f64
     ) { }
@@ -16848,9 +16893,9 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler321 : public UniffiAsyncCallHandler {
+class ScaffoldingCallHandler322 : public UniffiAsyncCallHandler {
 public:
-  ScaffoldingCallHandler321() : UniffiAsyncCallHandler(
+  ScaffoldingCallHandler322() : UniffiAsyncCallHandler(
         ffi_uniffi_bindings_tests_rust_future_poll_i16,
         ffi_uniffi_bindings_tests_rust_future_free_i16
     ) { }
@@ -16889,9 +16934,9 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler322 : public UniffiAsyncCallHandler {
+class ScaffoldingCallHandler323 : public UniffiAsyncCallHandler {
 public:
-  ScaffoldingCallHandler322() : UniffiAsyncCallHandler(
+  ScaffoldingCallHandler323() : UniffiAsyncCallHandler(
         ffi_uniffi_bindings_tests_rust_future_poll_i32,
         ffi_uniffi_bindings_tests_rust_future_free_i32
     ) { }
@@ -16930,9 +16975,9 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler323 : public UniffiAsyncCallHandler {
+class ScaffoldingCallHandler324 : public UniffiAsyncCallHandler {
 public:
-  ScaffoldingCallHandler323() : UniffiAsyncCallHandler(
+  ScaffoldingCallHandler324() : UniffiAsyncCallHandler(
         ffi_uniffi_bindings_tests_rust_future_poll_i64,
         ffi_uniffi_bindings_tests_rust_future_free_i64
     ) { }
@@ -16971,9 +17016,9 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler324 : public UniffiAsyncCallHandler {
+class ScaffoldingCallHandler325 : public UniffiAsyncCallHandler {
 public:
-  ScaffoldingCallHandler324() : UniffiAsyncCallHandler(
+  ScaffoldingCallHandler325() : UniffiAsyncCallHandler(
         ffi_uniffi_bindings_tests_rust_future_poll_i8,
         ffi_uniffi_bindings_tests_rust_future_free_i8
     ) { }
@@ -17012,9 +17057,9 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler325 : public UniffiAsyncCallHandler {
+class ScaffoldingCallHandler326 : public UniffiAsyncCallHandler {
 public:
-  ScaffoldingCallHandler325() : UniffiAsyncCallHandler(
+  ScaffoldingCallHandler326() : UniffiAsyncCallHandler(
         ffi_uniffi_bindings_tests_rust_future_poll_rust_buffer,
         ffi_uniffi_bindings_tests_rust_future_free_rust_buffer
     ) { }
@@ -17053,23 +17098,23 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler326 : public UniffiAsyncCallHandler {
+class ScaffoldingCallHandler327 : public UniffiAsyncCallHandler {
 public:
-  ScaffoldingCallHandler326() : UniffiAsyncCallHandler(
+  ScaffoldingCallHandler327() : UniffiAsyncCallHandler(
         ffi_uniffi_bindings_tests_rust_future_poll_u64,
         ffi_uniffi_bindings_tests_rust_future_free_u64
     ) { }
 
 private:
   // Complete stores the result of the call in mUniffiReturnValue
-  FfiValueObjectHandle279 mUniffiReturnValue{};
+  FfiValueObjectHandle284 mUniffiReturnValue{};
 
 protected:
   // Convert a sequence of JS arguments and call the scaffolding function.
   // Always called on the main thread since async Rust calls don't block, they
   // return a future.
   void LowerArgsAndMakeRustCall(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
-    FfiValueObjectHandle279 mV{};
+    FfiValueObjectHandle284 mV{};
     mV.Lower(aArgs[0], aError);
     if (aError.Failed()) {
       return;
@@ -17081,7 +17126,7 @@ protected:
   }
 
   void CallCompleteFn(RustCallStatus* aOutStatus) override {
-    mUniffiReturnValue = FfiValueObjectHandle279::FromRust(
+    mUniffiReturnValue = FfiValueObjectHandle284::FromRust(
       ffi_uniffi_bindings_tests_rust_future_complete_u64(mFutureHandle, aOutStatus));
   }
 
@@ -17094,9 +17139,9 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler327 : public UniffiAsyncCallHandler {
+class ScaffoldingCallHandler328 : public UniffiAsyncCallHandler {
 public:
-  ScaffoldingCallHandler327() : UniffiAsyncCallHandler(
+  ScaffoldingCallHandler328() : UniffiAsyncCallHandler(
         ffi_uniffi_bindings_tests_rust_future_poll_rust_buffer,
         ffi_uniffi_bindings_tests_rust_future_free_rust_buffer
     ) { }
@@ -17135,9 +17180,9 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler328 : public UniffiAsyncCallHandler {
+class ScaffoldingCallHandler329 : public UniffiAsyncCallHandler {
 public:
-  ScaffoldingCallHandler328() : UniffiAsyncCallHandler(
+  ScaffoldingCallHandler329() : UniffiAsyncCallHandler(
         ffi_uniffi_bindings_tests_rust_future_poll_u16,
         ffi_uniffi_bindings_tests_rust_future_free_u16
     ) { }
@@ -17176,9 +17221,9 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler329 : public UniffiAsyncCallHandler {
+class ScaffoldingCallHandler330 : public UniffiAsyncCallHandler {
 public:
-  ScaffoldingCallHandler329() : UniffiAsyncCallHandler(
+  ScaffoldingCallHandler330() : UniffiAsyncCallHandler(
         ffi_uniffi_bindings_tests_rust_future_poll_u32,
         ffi_uniffi_bindings_tests_rust_future_free_u32
     ) { }
@@ -17217,9 +17262,9 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler330 : public UniffiAsyncCallHandler {
+class ScaffoldingCallHandler331 : public UniffiAsyncCallHandler {
 public:
-  ScaffoldingCallHandler330() : UniffiAsyncCallHandler(
+  ScaffoldingCallHandler331() : UniffiAsyncCallHandler(
         ffi_uniffi_bindings_tests_rust_future_poll_u64,
         ffi_uniffi_bindings_tests_rust_future_free_u64
     ) { }
@@ -17258,9 +17303,9 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler331 : public UniffiAsyncCallHandler {
+class ScaffoldingCallHandler332 : public UniffiAsyncCallHandler {
 public:
-  ScaffoldingCallHandler331() : UniffiAsyncCallHandler(
+  ScaffoldingCallHandler332() : UniffiAsyncCallHandler(
         ffi_uniffi_bindings_tests_rust_future_poll_u8,
         ffi_uniffi_bindings_tests_rust_future_free_u8
     ) { }
@@ -17299,9 +17344,9 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler332 : public UniffiAsyncCallHandler {
+class ScaffoldingCallHandler333 : public UniffiAsyncCallHandler {
 public:
-  ScaffoldingCallHandler332() : UniffiAsyncCallHandler(
+  ScaffoldingCallHandler333() : UniffiAsyncCallHandler(
         ffi_uniffi_bindings_tests_rust_future_poll_rust_buffer,
         ffi_uniffi_bindings_tests_rust_future_free_rust_buffer
     ) { }
@@ -17340,9 +17385,9 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler333 : public UniffiAsyncCallHandler {
+class ScaffoldingCallHandler334 : public UniffiAsyncCallHandler {
 public:
-  ScaffoldingCallHandler333() : UniffiAsyncCallHandler(
+  ScaffoldingCallHandler334() : UniffiAsyncCallHandler(
         ffi_uniffi_bindings_tests_rust_future_poll_void,
         ffi_uniffi_bindings_tests_rust_future_free_void
     ) { }
@@ -17368,13 +17413,13 @@ public:
   void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler334 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler335 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle281 mInt{};
+  FfiValueObjectHandle286 mInt{};
 
   // MakeRustCall stores the result of the call in these fields
-  FfiValueObjectHandle281 mUniffiReturnValue{};
+  FfiValueObjectHandle286 mUniffiReturnValue{};
 
 public:
   void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
@@ -17389,46 +17434,9 @@ public:
   }
 
   void MakeRustCall(RustCallStatus* aOutStatus) override {
-    mUniffiReturnValue = FfiValueObjectHandle281::FromRust(
+    mUniffiReturnValue = FfiValueObjectHandle286::FromRust(
       uniffi_uniffi_bindings_tests_fn_func_clone_interface(
         mInt.IntoRust(),
-        aOutStatus
-      )
-    );
-  }
-
-  virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
-    mUniffiReturnValue.Lift(
-      aCx,
-      &aDest.Construct(),
-      aError
-    );
-  }
-};
-class ScaffoldingCallHandler335 : public UniffiSyncCallHandler {
-private:
-  // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueInt<uint32_t> mValue{};
-
-  // MakeRustCall stores the result of the call in these fields
-  FfiValueObjectHandle282 mUniffiReturnValue{};
-
-public:
-  void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
-    if (aArgs.Length() < 1) {
-      aError.ThrowUnknownError(nsPrintfCString("LowerRustArgs: Incorrect argument length for uniffi_uniffi_bindings_tests_fn_func_create_async_test_trait_interface (expected: 1, actual: %zu)", aArgs.Length()));
-      return;
-    }
-    mValue.Lower(aArgs[0], aError);
-    if (aError.Failed()) {
-      return;
-    }
-  }
-
-  void MakeRustCall(RustCallStatus* aOutStatus) override {
-    mUniffiReturnValue = FfiValueObjectHandle282::FromRust(
-      uniffi_uniffi_bindings_tests_fn_func_create_async_test_trait_interface(
-        mValue.IntoRust(),
         aOutStatus
       )
     );
@@ -17448,12 +17456,12 @@ private:
   FfiValueInt<uint32_t> mValue{};
 
   // MakeRustCall stores the result of the call in these fields
-  FfiValueObjectHandle283 mUniffiReturnValue{};
+  FfiValueObjectHandle287 mUniffiReturnValue{};
 
 public:
   void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
     if (aArgs.Length() < 1) {
-      aError.ThrowUnknownError(nsPrintfCString("LowerRustArgs: Incorrect argument length for uniffi_uniffi_bindings_tests_fn_func_create_test_trait_interface (expected: 1, actual: %zu)", aArgs.Length()));
+      aError.ThrowUnknownError(nsPrintfCString("LowerRustArgs: Incorrect argument length for uniffi_uniffi_bindings_tests_fn_func_create_async_test_trait_interface (expected: 1, actual: %zu)", aArgs.Length()));
       return;
     }
     mValue.Lower(aArgs[0], aError);
@@ -17463,8 +17471,8 @@ public:
   }
 
   void MakeRustCall(RustCallStatus* aOutStatus) override {
-    mUniffiReturnValue = FfiValueObjectHandle283::FromRust(
-      uniffi_uniffi_bindings_tests_fn_func_create_test_trait_interface(
+    mUniffiReturnValue = FfiValueObjectHandle287::FromRust(
+      uniffi_uniffi_bindings_tests_fn_func_create_async_test_trait_interface(
         mValue.IntoRust(),
         aOutStatus
       )
@@ -17480,6 +17488,43 @@ public:
   }
 };
 class ScaffoldingCallHandler337 : public UniffiSyncCallHandler {
+private:
+  // LowerRustArgs stores the resulting arguments in these fields
+  FfiValueInt<uint32_t> mValue{};
+
+  // MakeRustCall stores the result of the call in these fields
+  FfiValueObjectHandle288 mUniffiReturnValue{};
+
+public:
+  void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
+    if (aArgs.Length() < 1) {
+      aError.ThrowUnknownError(nsPrintfCString("LowerRustArgs: Incorrect argument length for uniffi_uniffi_bindings_tests_fn_func_create_test_trait_interface (expected: 1, actual: %zu)", aArgs.Length()));
+      return;
+    }
+    mValue.Lower(aArgs[0], aError);
+    if (aError.Failed()) {
+      return;
+    }
+  }
+
+  void MakeRustCall(RustCallStatus* aOutStatus) override {
+    mUniffiReturnValue = FfiValueObjectHandle288::FromRust(
+      uniffi_uniffi_bindings_tests_fn_func_create_test_trait_interface(
+        mValue.IntoRust(),
+        aOutStatus
+      )
+    );
+  }
+
+  virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
+    mUniffiReturnValue.Lift(
+      aCx,
+      &aDest.Construct(),
+      aError
+    );
+  }
+};
+class ScaffoldingCallHandler338 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueRustBuffer mArg{};
@@ -17516,7 +17561,7 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler338 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler339 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueInt<uint32_t> mInput{};
@@ -17545,7 +17590,7 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler339 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler340 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueInt<uint32_t> mInput{};
@@ -17574,7 +17619,7 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler340 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler341 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueRustBuffer mTheArgument{};
@@ -17611,7 +17656,7 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler341 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler342 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
 
@@ -17638,9 +17683,9 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler342 : public UniffiAsyncCallHandler {
+class ScaffoldingCallHandler343 : public UniffiAsyncCallHandler {
 public:
-  ScaffoldingCallHandler342() : UniffiAsyncCallHandler(
+  ScaffoldingCallHandler343() : UniffiAsyncCallHandler(
         ffi_uniffi_bindings_tests_rust_future_poll_u32,
         ffi_uniffi_bindings_tests_rust_future_free_u32
     ) { }
@@ -17654,7 +17699,7 @@ protected:
   // Always called on the main thread since async Rust calls don't block, they
   // return a future.
   void LowerArgsAndMakeRustCall(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
-    FfiValueObjectHandle282 mInt{};
+    FfiValueObjectHandle287 mInt{};
     mInt.Lower(aArgs[0], aError);
     if (aError.Failed()) {
       return;
@@ -17679,9 +17724,9 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler343 : public UniffiAsyncCallHandler {
+class ScaffoldingCallHandler344 : public UniffiAsyncCallHandler {
 public:
-  ScaffoldingCallHandler343() : UniffiAsyncCallHandler(
+  ScaffoldingCallHandler344() : UniffiAsyncCallHandler(
         ffi_uniffi_bindings_tests_rust_future_poll_void,
         ffi_uniffi_bindings_tests_rust_future_free_void
     ) { }
@@ -17694,7 +17739,7 @@ protected:
   // Always called on the main thread since async Rust calls don't block, they
   // return a future.
   void LowerArgsAndMakeRustCall(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
-    FfiValueObjectHandle282 mInt{};
+    FfiValueObjectHandle287 mInt{};
     mInt.Lower(aArgs[0], aError);
     if (aError.Failed()) {
       return;
@@ -17713,9 +17758,9 @@ public:
   void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler344 : public UniffiAsyncCallHandler {
+class ScaffoldingCallHandler345 : public UniffiAsyncCallHandler {
 public:
-  ScaffoldingCallHandler344() : UniffiAsyncCallHandler(
+  ScaffoldingCallHandler345() : UniffiAsyncCallHandler(
         ffi_uniffi_bindings_tests_rust_future_poll_void,
         ffi_uniffi_bindings_tests_rust_future_free_void
     ) { }
@@ -17728,7 +17773,7 @@ protected:
   // Always called on the main thread since async Rust calls don't block, they
   // return a future.
   void LowerArgsAndMakeRustCall(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
-    FfiValueObjectHandle282 mInt{};
+    FfiValueObjectHandle287 mInt{};
     mInt.Lower(aArgs[0], aError);
     if (aError.Failed()) {
       return;
@@ -17753,9 +17798,9 @@ public:
   void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler345 : public UniffiAsyncCallHandler {
+class ScaffoldingCallHandler346 : public UniffiAsyncCallHandler {
 public:
-  ScaffoldingCallHandler345() : UniffiAsyncCallHandler(
+  ScaffoldingCallHandler346() : UniffiAsyncCallHandler(
         ffi_uniffi_bindings_tests_rust_future_poll_rust_buffer,
         ffi_uniffi_bindings_tests_rust_future_free_rust_buffer
     ) { }
@@ -17769,7 +17814,7 @@ protected:
   // Always called on the main thread since async Rust calls don't block, they
   // return a future.
   void LowerArgsAndMakeRustCall(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
-    FfiValueObjectHandle282 mInt{};
+    FfiValueObjectHandle287 mInt{};
     mInt.Lower(aArgs[0], aError);
     if (aError.Failed()) {
       return;
@@ -17800,9 +17845,9 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler346 : public UniffiAsyncCallHandler {
+class ScaffoldingCallHandler347 : public UniffiAsyncCallHandler {
 public:
-  ScaffoldingCallHandler346() : UniffiAsyncCallHandler(
+  ScaffoldingCallHandler347() : UniffiAsyncCallHandler(
         ffi_uniffi_bindings_tests_rust_future_poll_u32,
         ffi_uniffi_bindings_tests_rust_future_free_u32
     ) { }
@@ -17816,7 +17861,7 @@ protected:
   // Always called on the main thread since async Rust calls don't block, they
   // return a future.
   void LowerArgsAndMakeRustCall(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
-    FfiValueObjectHandle287 mCbi{};
+    FfiValueObjectHandle292 mCbi{};
     mCbi.Lower(aArgs[0], aError);
     if (aError.Failed()) {
       return;
@@ -17841,9 +17886,9 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler347 : public UniffiAsyncCallHandler {
+class ScaffoldingCallHandler348 : public UniffiAsyncCallHandler {
 public:
-  ScaffoldingCallHandler347() : UniffiAsyncCallHandler(
+  ScaffoldingCallHandler348() : UniffiAsyncCallHandler(
         ffi_uniffi_bindings_tests_rust_future_poll_void,
         ffi_uniffi_bindings_tests_rust_future_free_void
     ) { }
@@ -17856,7 +17901,7 @@ protected:
   // Always called on the main thread since async Rust calls don't block, they
   // return a future.
   void LowerArgsAndMakeRustCall(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
-    FfiValueObjectHandle287 mCbi{};
+    FfiValueObjectHandle292 mCbi{};
     mCbi.Lower(aArgs[0], aError);
     if (aError.Failed()) {
       return;
@@ -17875,9 +17920,9 @@ public:
   void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler348 : public UniffiAsyncCallHandler {
+class ScaffoldingCallHandler349 : public UniffiAsyncCallHandler {
 public:
-  ScaffoldingCallHandler348() : UniffiAsyncCallHandler(
+  ScaffoldingCallHandler349() : UniffiAsyncCallHandler(
         ffi_uniffi_bindings_tests_rust_future_poll_void,
         ffi_uniffi_bindings_tests_rust_future_free_void
     ) { }
@@ -17890,7 +17935,7 @@ protected:
   // Always called on the main thread since async Rust calls don't block, they
   // return a future.
   void LowerArgsAndMakeRustCall(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
-    FfiValueObjectHandle287 mCbi{};
+    FfiValueObjectHandle292 mCbi{};
     mCbi.Lower(aArgs[0], aError);
     if (aError.Failed()) {
       return;
@@ -17915,9 +17960,9 @@ public:
   void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler349 : public UniffiAsyncCallHandler {
+class ScaffoldingCallHandler350 : public UniffiAsyncCallHandler {
 public:
-  ScaffoldingCallHandler349() : UniffiAsyncCallHandler(
+  ScaffoldingCallHandler350() : UniffiAsyncCallHandler(
         ffi_uniffi_bindings_tests_rust_future_poll_rust_buffer,
         ffi_uniffi_bindings_tests_rust_future_free_rust_buffer
     ) { }
@@ -17931,7 +17976,7 @@ protected:
   // Always called on the main thread since async Rust calls don't block, they
   // return a future.
   void LowerArgsAndMakeRustCall(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
-    FfiValueObjectHandle287 mCbi{};
+    FfiValueObjectHandle292 mCbi{};
     mCbi.Lower(aArgs[0], aError);
     if (aError.Failed()) {
       return;
@@ -17962,10 +18007,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler350 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler351 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle288 mCbi{};
+  FfiValueObjectHandle293 mCbi{};
 
   // MakeRustCall stores the result of the call in these fields
   FfiValueInt<uint32_t> mUniffiReturnValue{};
@@ -17999,10 +18044,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler351 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler352 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle288 mCbi{};
+  FfiValueObjectHandle293 mCbi{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -18028,10 +18073,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler352 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler353 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle288 mCbi{};
+  FfiValueObjectHandle293 mCbi{};
   FfiValueInt<uint32_t> mValue{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -18063,10 +18108,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler353 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler354 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle288 mCbi{};
+  FfiValueObjectHandle293 mCbi{};
   FfiValueRustBuffer mNumbers{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -18106,10 +18151,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler354 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler355 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle283 mInt{};
+  FfiValueObjectHandle288 mInt{};
 
   // MakeRustCall stores the result of the call in these fields
   FfiValueInt<uint32_t> mUniffiReturnValue{};
@@ -18143,10 +18188,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler355 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler356 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle283 mInt{};
+  FfiValueObjectHandle288 mInt{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -18172,10 +18217,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler356 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler357 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle283 mInt{};
+  FfiValueObjectHandle288 mInt{};
   FfiValueInt<uint32_t> mValue{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -18207,10 +18252,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler357 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler358 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle283 mInt{};
+  FfiValueObjectHandle288 mInt{};
   FfiValueRustBuffer mNumbers{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -18250,13 +18295,13 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler358 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler359 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle282 mInt{};
+  FfiValueObjectHandle287 mInt{};
 
   // MakeRustCall stores the result of the call in these fields
-  FfiValueObjectHandle282 mUniffiReturnValue{};
+  FfiValueObjectHandle287 mUniffiReturnValue{};
 
 public:
   void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
@@ -18271,7 +18316,7 @@ public:
   }
 
   void MakeRustCall(RustCallStatus* aOutStatus) override {
-    mUniffiReturnValue = FfiValueObjectHandle282::FromRust(
+    mUniffiReturnValue = FfiValueObjectHandle287::FromRust(
       uniffi_uniffi_bindings_tests_fn_func_roundtrip_async_test_trait_interface(
         mInt.IntoRust(),
         aOutStatus
@@ -18287,7 +18332,7 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler359 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler360 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueRustBuffer mIntList{};
@@ -18324,7 +18369,7 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler360 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler361 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueInt<int8_t> mA{};
@@ -18361,7 +18406,7 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler361 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler362 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueRustBuffer mA{};
@@ -18398,7 +18443,7 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler362 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler363 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueRustBuffer mEn{};
@@ -18435,7 +18480,7 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler363 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler364 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueRustBuffer mRec{};
@@ -18472,7 +18517,7 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler364 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler365 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueInt<uint64_t> mHandle{};
@@ -18509,7 +18554,7 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler365 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler366 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueRustBuffer mEn{};
@@ -18546,7 +18591,7 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler366 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler367 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueRustBuffer mEn{};
@@ -18583,7 +18628,7 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler367 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler368 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueFloat<float> mA{};
@@ -18620,7 +18665,7 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler368 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler369 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueFloat<double> mA{};
@@ -18657,7 +18702,7 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler369 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler370 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueRustBuffer mA{};
@@ -18694,7 +18739,7 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler370 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler371 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueInt<int16_t> mA{};
@@ -18731,7 +18776,7 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler371 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler372 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueInt<int32_t> mA{};
@@ -18768,7 +18813,7 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler372 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler373 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueInt<int64_t> mA{};
@@ -18805,7 +18850,7 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler373 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler374 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueInt<int8_t> mA{};
@@ -18842,7 +18887,7 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler374 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler375 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueRustBuffer mA{};
@@ -18879,7 +18924,7 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler375 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler376 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueRustBuffer mRec{};
@@ -18916,7 +18961,7 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler376 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler377 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueRustBuffer mA{};
@@ -18953,13 +18998,13 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler377 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler378 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle283 mInt{};
+  FfiValueObjectHandle288 mInt{};
 
   // MakeRustCall stores the result of the call in these fields
-  FfiValueObjectHandle283 mUniffiReturnValue{};
+  FfiValueObjectHandle288 mUniffiReturnValue{};
 
 public:
   void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
@@ -18974,7 +19019,7 @@ public:
   }
 
   void MakeRustCall(RustCallStatus* aOutStatus) override {
-    mUniffiReturnValue = FfiValueObjectHandle283::FromRust(
+    mUniffiReturnValue = FfiValueObjectHandle288::FromRust(
       uniffi_uniffi_bindings_tests_fn_func_roundtrip_test_trait_interface(
         mInt.IntoRust(),
         aOutStatus
@@ -18990,7 +19035,7 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler378 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler379 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueRustBuffer mIntList{};
@@ -19027,7 +19072,7 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler379 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler380 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueInt<int64_t> mTime{};
@@ -19064,7 +19109,7 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler380 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler381 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueFloat<double> mTime{};
@@ -19101,7 +19146,7 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler381 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler382 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueFloat<float> mTime{};
@@ -19138,7 +19183,7 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler382 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler383 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueInt<uint16_t> mA{};
@@ -19175,7 +19220,7 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler383 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler384 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueInt<uint32_t> mA{};
@@ -19212,7 +19257,7 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler384 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler385 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueInt<uint64_t> mA{};
@@ -19249,7 +19294,7 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler385 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler386 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueInt<uint8_t> mA{};
@@ -19286,7 +19331,7 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler386 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler387 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueRustBuffer mUrl{};
@@ -19323,7 +19368,7 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler387 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler388 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueRustBuffer mA{};
@@ -19360,7 +19405,7 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler388 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler389 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueInt<uint8_t> mA{};
@@ -19457,7 +19502,7 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler389 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler390 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueRustBuffer mInterfaces{};
@@ -19494,7 +19539,7 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler390 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler391 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
 
@@ -19513,10 +19558,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler391 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler392 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle304 mCb{};
+  FfiValueObjectHandle309 mCb{};
 
   // MakeRustCall stores the result of the call in these fields
   FfiValueRustBuffer mUniffiReturnValue{};
@@ -19550,7 +19595,7 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler392 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler393 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueInt<uint64_t> mCustom{};
@@ -19587,7 +19632,7 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler393 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler394 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueRustBuffer mEn{};
@@ -19624,13 +19669,13 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler394 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler395 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle281 mInt{};
+  FfiValueObjectHandle286 mInt{};
 
   // MakeRustCall stores the result of the call in these fields
-  FfiValueObjectHandle281 mUniffiReturnValue{};
+  FfiValueObjectHandle286 mUniffiReturnValue{};
 
 public:
   void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
@@ -19645,7 +19690,7 @@ public:
   }
 
   void MakeRustCall(RustCallStatus* aOutStatus) override {
-    mUniffiReturnValue = FfiValueObjectHandle281::FromRust(
+    mUniffiReturnValue = FfiValueObjectHandle286::FromRust(
       uniffi_uniffi_bindings_tests_external_types_fn_func_roundtrip_ext_interface(
         mInt.IntoRust(),
         aOutStatus
@@ -19661,7 +19706,7 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler395 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler396 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueRustBuffer mRec{};
@@ -19698,13 +19743,13 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler396 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler397 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueRustBuffer mName{};
 
   // MakeRustCall stores the result of the call in these fields
-  FfiValueObjectHandle279 mUniffiReturnValue{};
+  FfiValueObjectHandle284 mUniffiReturnValue{};
 
 public:
   void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
@@ -19719,7 +19764,7 @@ public:
   }
 
   void MakeRustCall(RustCallStatus* aOutStatus) override {
-    mUniffiReturnValue = FfiValueObjectHandle279::FromRust(
+    mUniffiReturnValue = FfiValueObjectHandle284::FromRust(
       uniffi_uniffi_bindings_tests_fn_constructor_asyncinterface_new(
         mName.IntoRust(),
         aOutStatus
@@ -19735,9 +19780,9 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler397 : public UniffiAsyncCallHandler {
+class ScaffoldingCallHandler398 : public UniffiAsyncCallHandler {
 public:
-  ScaffoldingCallHandler397() : UniffiAsyncCallHandler(
+  ScaffoldingCallHandler398() : UniffiAsyncCallHandler(
         ffi_uniffi_bindings_tests_rust_future_poll_rust_buffer,
         ffi_uniffi_bindings_tests_rust_future_free_rust_buffer
     ) { }
@@ -19751,7 +19796,7 @@ protected:
   // Always called on the main thread since async Rust calls don't block, they
   // return a future.
   void LowerArgsAndMakeRustCall(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
-    FfiValueObjectHandle279 mUniffiPtr{};
+    FfiValueObjectHandle284 mUniffiPtr{};
     mUniffiPtr.Lower(aArgs[0], aError);
     if (aError.Failed()) {
       return;
@@ -19776,9 +19821,9 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler398 : public UniffiAsyncCallHandler {
+class ScaffoldingCallHandler399 : public UniffiAsyncCallHandler {
 public:
-  ScaffoldingCallHandler398() : UniffiAsyncCallHandler(
+  ScaffoldingCallHandler399() : UniffiAsyncCallHandler(
         ffi_uniffi_bindings_tests_rust_future_poll_void,
         ffi_uniffi_bindings_tests_rust_future_free_void
     ) { }
@@ -19791,7 +19836,7 @@ protected:
   // Always called on the main thread since async Rust calls don't block, they
   // return a future.
   void LowerArgsAndMakeRustCall(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
-    FfiValueObjectHandle282 mUniffiPtr{};
+    FfiValueObjectHandle287 mUniffiPtr{};
     mUniffiPtr.Lower(aArgs[0], aError);
     if (aError.Failed()) {
       return;
@@ -19810,9 +19855,9 @@ public:
   void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler399 : public UniffiAsyncCallHandler {
+class ScaffoldingCallHandler400 : public UniffiAsyncCallHandler {
 public:
-  ScaffoldingCallHandler399() : UniffiAsyncCallHandler(
+  ScaffoldingCallHandler400() : UniffiAsyncCallHandler(
         ffi_uniffi_bindings_tests_rust_future_poll_u32,
         ffi_uniffi_bindings_tests_rust_future_free_u32
     ) { }
@@ -19826,7 +19871,7 @@ protected:
   // Always called on the main thread since async Rust calls don't block, they
   // return a future.
   void LowerArgsAndMakeRustCall(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
-    FfiValueObjectHandle282 mUniffiPtr{};
+    FfiValueObjectHandle287 mUniffiPtr{};
     mUniffiPtr.Lower(aArgs[0], aError);
     if (aError.Failed()) {
       return;
@@ -19851,9 +19896,9 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler400 : public UniffiAsyncCallHandler {
+class ScaffoldingCallHandler401 : public UniffiAsyncCallHandler {
 public:
-  ScaffoldingCallHandler400() : UniffiAsyncCallHandler(
+  ScaffoldingCallHandler401() : UniffiAsyncCallHandler(
         ffi_uniffi_bindings_tests_rust_future_poll_void,
         ffi_uniffi_bindings_tests_rust_future_free_void
     ) { }
@@ -19866,7 +19911,7 @@ protected:
   // Always called on the main thread since async Rust calls don't block, they
   // return a future.
   void LowerArgsAndMakeRustCall(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
-    FfiValueObjectHandle282 mUniffiPtr{};
+    FfiValueObjectHandle287 mUniffiPtr{};
     mUniffiPtr.Lower(aArgs[0], aError);
     if (aError.Failed()) {
       return;
@@ -19891,9 +19936,9 @@ public:
   void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler401 : public UniffiAsyncCallHandler {
+class ScaffoldingCallHandler402 : public UniffiAsyncCallHandler {
 public:
-  ScaffoldingCallHandler401() : UniffiAsyncCallHandler(
+  ScaffoldingCallHandler402() : UniffiAsyncCallHandler(
         ffi_uniffi_bindings_tests_rust_future_poll_rust_buffer,
         ffi_uniffi_bindings_tests_rust_future_free_rust_buffer
     ) { }
@@ -19907,7 +19952,7 @@ protected:
   // Always called on the main thread since async Rust calls don't block, they
   // return a future.
   void LowerArgsAndMakeRustCall(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
-    FfiValueObjectHandle282 mUniffiPtr{};
+    FfiValueObjectHandle287 mUniffiPtr{};
     mUniffiPtr.Lower(aArgs[0], aError);
     if (aError.Failed()) {
       return;
@@ -19938,19 +19983,19 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler402 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler403 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
 
   // MakeRustCall stores the result of the call in these fields
-  FfiValueObjectHandle4244 mUniffiReturnValue{};
+  FfiValueObjectHandle4288 mUniffiReturnValue{};
 
 public:
   void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
   }
 
   void MakeRustCall(RustCallStatus* aOutStatus) override {
-    mUniffiReturnValue = FfiValueObjectHandle4244::FromRust(
+    mUniffiReturnValue = FfiValueObjectHandle4288::FromRust(
       uniffi_uniffi_bindings_tests_fn_constructor_complexmethods_new(
         aOutStatus
       )
@@ -19965,10 +20010,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler403 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler404 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle4244 mUniffiPtr{};
+  FfiValueObjectHandle4288 mUniffiPtr{};
   FfiValueRustBuffer mArg{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -20008,10 +20053,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler404 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler405 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle4244 mUniffiPtr{};
+  FfiValueObjectHandle4288 mUniffiPtr{};
   FfiValueRustBuffer mTheArgument{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -20051,13 +20096,13 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler405 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler406 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
   FfiValueInt<uint32_t> mValue{};
 
   // MakeRustCall stores the result of the call in these fields
-  FfiValueObjectHandle281 mUniffiReturnValue{};
+  FfiValueObjectHandle286 mUniffiReturnValue{};
 
 public:
   void LowerRustArgs(const dom::Sequence<dom::OwningUniFFIScaffoldingValue>& aArgs, ErrorResult& aError) override {
@@ -20072,7 +20117,7 @@ public:
   }
 
   void MakeRustCall(RustCallStatus* aOutStatus) override {
-    mUniffiReturnValue = FfiValueObjectHandle281::FromRust(
+    mUniffiReturnValue = FfiValueObjectHandle286::FromRust(
       uniffi_uniffi_bindings_tests_fn_constructor_testinterface_new(
         mValue.IntoRust(),
         aOutStatus
@@ -20088,10 +20133,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler406 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler407 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle281 mUniffiPtr{};
+  FfiValueObjectHandle286 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
   FfiValueInt<uint32_t> mUniffiReturnValue{};
@@ -20125,10 +20170,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler407 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler408 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle281 mUniffiPtr{};
+  FfiValueObjectHandle286 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
   FfiValueInt<uint32_t> mUniffiReturnValue{};
@@ -20162,10 +20207,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler408 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler409 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle283 mUniffiPtr{};
+  FfiValueObjectHandle288 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
 
@@ -20191,10 +20236,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler409 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler410 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle283 mUniffiPtr{};
+  FfiValueObjectHandle288 mUniffiPtr{};
 
   // MakeRustCall stores the result of the call in these fields
   FfiValueInt<uint32_t> mUniffiReturnValue{};
@@ -20228,10 +20273,10 @@ public:
     );
   }
 };
-class ScaffoldingCallHandler410 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler411 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle283 mUniffiPtr{};
+  FfiValueObjectHandle288 mUniffiPtr{};
   FfiValueInt<uint32_t> mValue{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -20263,10 +20308,10 @@ public:
   virtual void LiftSuccessfulCallResult(JSContext* aCx, dom::Optional<dom::OwningUniFFIScaffoldingValue>& aDest, ErrorResult& aError) override {
   }
 };
-class ScaffoldingCallHandler411 : public UniffiSyncCallHandler {
+class ScaffoldingCallHandler412 : public UniffiSyncCallHandler {
 private:
   // LowerRustArgs stores the resulting arguments in these fields
-  FfiValueObjectHandle283 mUniffiPtr{};
+  FfiValueObjectHandle288 mUniffiPtr{};
   FfiValueRustBuffer mNumbers{};
 
   // MakeRustCall stores the result of the call in these fields
@@ -20312,1116 +20357,1119 @@ UniquePtr<UniffiSyncCallHandler> GetSyncCallHandler(uint64_t aId) {
   switch (aId) {
 
     case 0: {
-      return MakeUnique<ScaffoldingCallHandler0>();
+      return std::make_unique<ScaffoldingCallHandler0>();
     }
     case 1: {
-      return MakeUnique<ScaffoldingCallHandler1>();
+      return std::make_unique<ScaffoldingCallHandler1>();
     }
     case 2: {
-      return MakeUnique<ScaffoldingCallHandler2>();
+      return std::make_unique<ScaffoldingCallHandler2>();
     }
     case 3: {
-      return MakeUnique<ScaffoldingCallHandler3>();
+      return std::make_unique<ScaffoldingCallHandler3>();
     }
     case 4: {
-      return MakeUnique<ScaffoldingCallHandler4>();
+      return std::make_unique<ScaffoldingCallHandler4>();
     }
     case 5: {
-      return MakeUnique<ScaffoldingCallHandler5>();
+      return std::make_unique<ScaffoldingCallHandler5>();
     }
     case 6: {
-      return MakeUnique<ScaffoldingCallHandler6>();
+      return std::make_unique<ScaffoldingCallHandler6>();
     }
     case 7: {
-      return MakeUnique<ScaffoldingCallHandler7>();
+      return std::make_unique<ScaffoldingCallHandler7>();
     }
     case 8: {
-      return MakeUnique<ScaffoldingCallHandler8>();
+      return std::make_unique<ScaffoldingCallHandler8>();
     }
     case 9: {
-      return MakeUnique<ScaffoldingCallHandler9>();
+      return std::make_unique<ScaffoldingCallHandler9>();
     }
     case 10: {
-      return MakeUnique<ScaffoldingCallHandler10>();
+      return std::make_unique<ScaffoldingCallHandler10>();
     }
     case 11: {
-      return MakeUnique<ScaffoldingCallHandler11>();
+      return std::make_unique<ScaffoldingCallHandler11>();
     }
     case 12: {
-      return MakeUnique<ScaffoldingCallHandler12>();
+      return std::make_unique<ScaffoldingCallHandler12>();
     }
     case 13: {
-      return MakeUnique<ScaffoldingCallHandler13>();
+      return std::make_unique<ScaffoldingCallHandler13>();
     }
     case 14: {
-      return MakeUnique<ScaffoldingCallHandler14>();
+      return std::make_unique<ScaffoldingCallHandler14>();
     }
     case 15: {
-      return MakeUnique<ScaffoldingCallHandler15>();
+      return std::make_unique<ScaffoldingCallHandler15>();
     }
     case 16: {
-      return MakeUnique<ScaffoldingCallHandler16>();
+      return std::make_unique<ScaffoldingCallHandler16>();
     }
     case 17: {
-      return MakeUnique<ScaffoldingCallHandler17>();
+      return std::make_unique<ScaffoldingCallHandler17>();
     }
     case 18: {
-      return MakeUnique<ScaffoldingCallHandler18>();
+      return std::make_unique<ScaffoldingCallHandler18>();
     }
     case 19: {
-      return MakeUnique<ScaffoldingCallHandler19>();
+      return std::make_unique<ScaffoldingCallHandler19>();
     }
     case 20: {
-      return MakeUnique<ScaffoldingCallHandler20>();
+      return std::make_unique<ScaffoldingCallHandler20>();
     }
     case 21: {
-      return MakeUnique<ScaffoldingCallHandler21>();
+      return std::make_unique<ScaffoldingCallHandler21>();
     }
     case 22: {
-      return MakeUnique<ScaffoldingCallHandler22>();
+      return std::make_unique<ScaffoldingCallHandler22>();
     }
     case 23: {
-      return MakeUnique<ScaffoldingCallHandler23>();
+      return std::make_unique<ScaffoldingCallHandler23>();
     }
     case 24: {
-      return MakeUnique<ScaffoldingCallHandler24>();
+      return std::make_unique<ScaffoldingCallHandler24>();
     }
     case 25: {
-      return MakeUnique<ScaffoldingCallHandler25>();
+      return std::make_unique<ScaffoldingCallHandler25>();
     }
     case 26: {
-      return MakeUnique<ScaffoldingCallHandler26>();
+      return std::make_unique<ScaffoldingCallHandler26>();
     }
     case 27: {
-      return MakeUnique<ScaffoldingCallHandler27>();
+      return std::make_unique<ScaffoldingCallHandler27>();
     }
     case 28: {
-      return MakeUnique<ScaffoldingCallHandler28>();
+      return std::make_unique<ScaffoldingCallHandler28>();
     }
     case 29: {
-      return MakeUnique<ScaffoldingCallHandler29>();
+      return std::make_unique<ScaffoldingCallHandler29>();
     }
     case 30: {
-      return MakeUnique<ScaffoldingCallHandler30>();
+      return std::make_unique<ScaffoldingCallHandler30>();
     }
     case 31: {
-      return MakeUnique<ScaffoldingCallHandler31>();
+      return std::make_unique<ScaffoldingCallHandler31>();
     }
     case 32: {
-      return MakeUnique<ScaffoldingCallHandler32>();
+      return std::make_unique<ScaffoldingCallHandler32>();
     }
     case 33: {
-      return MakeUnique<ScaffoldingCallHandler33>();
+      return std::make_unique<ScaffoldingCallHandler33>();
     }
     case 34: {
-      return MakeUnique<ScaffoldingCallHandler34>();
+      return std::make_unique<ScaffoldingCallHandler34>();
     }
     case 35: {
-      return MakeUnique<ScaffoldingCallHandler35>();
+      return std::make_unique<ScaffoldingCallHandler35>();
     }
     case 37: {
-      return MakeUnique<ScaffoldingCallHandler37>();
+      return std::make_unique<ScaffoldingCallHandler37>();
     }
     case 38: {
-      return MakeUnique<ScaffoldingCallHandler38>();
+      return std::make_unique<ScaffoldingCallHandler38>();
     }
     case 39: {
-      return MakeUnique<ScaffoldingCallHandler39>();
+      return std::make_unique<ScaffoldingCallHandler39>();
     }
     case 40: {
-      return MakeUnique<ScaffoldingCallHandler40>();
+      return std::make_unique<ScaffoldingCallHandler40>();
     }
     case 41: {
-      return MakeUnique<ScaffoldingCallHandler41>();
+      return std::make_unique<ScaffoldingCallHandler41>();
     }
     case 42: {
-      return MakeUnique<ScaffoldingCallHandler42>();
+      return std::make_unique<ScaffoldingCallHandler42>();
     }
     case 43: {
-      return MakeUnique<ScaffoldingCallHandler43>();
+      return std::make_unique<ScaffoldingCallHandler43>();
     }
     case 44: {
-      return MakeUnique<ScaffoldingCallHandler44>();
+      return std::make_unique<ScaffoldingCallHandler44>();
     }
     case 45: {
-      return MakeUnique<ScaffoldingCallHandler45>();
+      return std::make_unique<ScaffoldingCallHandler45>();
     }
     case 46: {
-      return MakeUnique<ScaffoldingCallHandler46>();
+      return std::make_unique<ScaffoldingCallHandler46>();
     }
     case 47: {
-      return MakeUnique<ScaffoldingCallHandler47>();
+      return std::make_unique<ScaffoldingCallHandler47>();
     }
     case 48: {
-      return MakeUnique<ScaffoldingCallHandler48>();
+      return std::make_unique<ScaffoldingCallHandler48>();
     }
     case 49: {
-      return MakeUnique<ScaffoldingCallHandler49>();
+      return std::make_unique<ScaffoldingCallHandler49>();
     }
     case 50: {
-      return MakeUnique<ScaffoldingCallHandler50>();
+      return std::make_unique<ScaffoldingCallHandler50>();
     }
     case 51: {
-      return MakeUnique<ScaffoldingCallHandler51>();
+      return std::make_unique<ScaffoldingCallHandler51>();
     }
     case 52: {
-      return MakeUnique<ScaffoldingCallHandler52>();
+      return std::make_unique<ScaffoldingCallHandler52>();
     }
     case 53: {
-      return MakeUnique<ScaffoldingCallHandler53>();
+      return std::make_unique<ScaffoldingCallHandler53>();
     }
     case 54: {
-      return MakeUnique<ScaffoldingCallHandler54>();
+      return std::make_unique<ScaffoldingCallHandler54>();
     }
     case 55: {
-      return MakeUnique<ScaffoldingCallHandler55>();
+      return std::make_unique<ScaffoldingCallHandler55>();
     }
     case 56: {
-      return MakeUnique<ScaffoldingCallHandler56>();
+      return std::make_unique<ScaffoldingCallHandler56>();
     }
     case 57: {
-      return MakeUnique<ScaffoldingCallHandler57>();
+      return std::make_unique<ScaffoldingCallHandler57>();
     }
     case 58: {
-      return MakeUnique<ScaffoldingCallHandler58>();
+      return std::make_unique<ScaffoldingCallHandler58>();
     }
     case 59: {
-      return MakeUnique<ScaffoldingCallHandler59>();
+      return std::make_unique<ScaffoldingCallHandler59>();
     }
     case 60: {
-      return MakeUnique<ScaffoldingCallHandler60>();
+      return std::make_unique<ScaffoldingCallHandler60>();
     }
     case 61: {
-      return MakeUnique<ScaffoldingCallHandler61>();
+      return std::make_unique<ScaffoldingCallHandler61>();
     }
     case 62: {
-      return MakeUnique<ScaffoldingCallHandler62>();
+      return std::make_unique<ScaffoldingCallHandler62>();
     }
     case 63: {
-      return MakeUnique<ScaffoldingCallHandler63>();
+      return std::make_unique<ScaffoldingCallHandler63>();
     }
     case 64: {
-      return MakeUnique<ScaffoldingCallHandler64>();
+      return std::make_unique<ScaffoldingCallHandler64>();
     }
     case 65: {
-      return MakeUnique<ScaffoldingCallHandler65>();
+      return std::make_unique<ScaffoldingCallHandler65>();
     }
     case 66: {
-      return MakeUnique<ScaffoldingCallHandler66>();
+      return std::make_unique<ScaffoldingCallHandler66>();
     }
     case 67: {
-      return MakeUnique<ScaffoldingCallHandler67>();
+      return std::make_unique<ScaffoldingCallHandler67>();
     }
     case 68: {
-      return MakeUnique<ScaffoldingCallHandler68>();
+      return std::make_unique<ScaffoldingCallHandler68>();
     }
     case 69: {
-      return MakeUnique<ScaffoldingCallHandler69>();
+      return std::make_unique<ScaffoldingCallHandler69>();
     }
     case 70: {
-      return MakeUnique<ScaffoldingCallHandler70>();
+      return std::make_unique<ScaffoldingCallHandler70>();
     }
     case 71: {
-      return MakeUnique<ScaffoldingCallHandler71>();
+      return std::make_unique<ScaffoldingCallHandler71>();
     }
     case 72: {
-      return MakeUnique<ScaffoldingCallHandler72>();
+      return std::make_unique<ScaffoldingCallHandler72>();
     }
     case 73: {
-      return MakeUnique<ScaffoldingCallHandler73>();
+      return std::make_unique<ScaffoldingCallHandler73>();
     }
     case 74: {
-      return MakeUnique<ScaffoldingCallHandler74>();
+      return std::make_unique<ScaffoldingCallHandler74>();
     }
     case 75: {
-      return MakeUnique<ScaffoldingCallHandler75>();
+      return std::make_unique<ScaffoldingCallHandler75>();
     }
     case 76: {
-      return MakeUnique<ScaffoldingCallHandler76>();
+      return std::make_unique<ScaffoldingCallHandler76>();
     }
     case 77: {
-      return MakeUnique<ScaffoldingCallHandler77>();
+      return std::make_unique<ScaffoldingCallHandler77>();
     }
     case 78: {
-      return MakeUnique<ScaffoldingCallHandler78>();
+      return std::make_unique<ScaffoldingCallHandler78>();
     }
     case 79: {
-      return MakeUnique<ScaffoldingCallHandler79>();
+      return std::make_unique<ScaffoldingCallHandler79>();
     }
     case 80: {
-      return MakeUnique<ScaffoldingCallHandler80>();
+      return std::make_unique<ScaffoldingCallHandler80>();
     }
     case 81: {
-      return MakeUnique<ScaffoldingCallHandler81>();
+      return std::make_unique<ScaffoldingCallHandler81>();
     }
     case 82: {
-      return MakeUnique<ScaffoldingCallHandler82>();
+      return std::make_unique<ScaffoldingCallHandler82>();
     }
     case 83: {
-      return MakeUnique<ScaffoldingCallHandler83>();
+      return std::make_unique<ScaffoldingCallHandler83>();
     }
     case 84: {
-      return MakeUnique<ScaffoldingCallHandler84>();
+      return std::make_unique<ScaffoldingCallHandler84>();
     }
     case 85: {
-      return MakeUnique<ScaffoldingCallHandler85>();
+      return std::make_unique<ScaffoldingCallHandler85>();
     }
     case 86: {
-      return MakeUnique<ScaffoldingCallHandler86>();
+      return std::make_unique<ScaffoldingCallHandler86>();
     }
     case 87: {
-      return MakeUnique<ScaffoldingCallHandler87>();
+      return std::make_unique<ScaffoldingCallHandler87>();
     }
     case 88: {
-      return MakeUnique<ScaffoldingCallHandler88>();
+      return std::make_unique<ScaffoldingCallHandler88>();
     }
     case 89: {
-      return MakeUnique<ScaffoldingCallHandler89>();
+      return std::make_unique<ScaffoldingCallHandler89>();
     }
     case 90: {
-      return MakeUnique<ScaffoldingCallHandler90>();
+      return std::make_unique<ScaffoldingCallHandler90>();
     }
     case 91: {
-      return MakeUnique<ScaffoldingCallHandler91>();
+      return std::make_unique<ScaffoldingCallHandler91>();
     }
     case 92: {
-      return MakeUnique<ScaffoldingCallHandler92>();
+      return std::make_unique<ScaffoldingCallHandler92>();
     }
     case 93: {
-      return MakeUnique<ScaffoldingCallHandler93>();
+      return std::make_unique<ScaffoldingCallHandler93>();
     }
     case 94: {
-      return MakeUnique<ScaffoldingCallHandler94>();
+      return std::make_unique<ScaffoldingCallHandler94>();
     }
     case 95: {
-      return MakeUnique<ScaffoldingCallHandler95>();
+      return std::make_unique<ScaffoldingCallHandler95>();
     }
     case 96: {
-      return MakeUnique<ScaffoldingCallHandler96>();
+      return std::make_unique<ScaffoldingCallHandler96>();
     }
     case 97: {
-      return MakeUnique<ScaffoldingCallHandler97>();
+      return std::make_unique<ScaffoldingCallHandler97>();
     }
     case 98: {
-      return MakeUnique<ScaffoldingCallHandler98>();
+      return std::make_unique<ScaffoldingCallHandler98>();
     }
     case 99: {
-      return MakeUnique<ScaffoldingCallHandler99>();
+      return std::make_unique<ScaffoldingCallHandler99>();
     }
     case 100: {
-      return MakeUnique<ScaffoldingCallHandler100>();
+      return std::make_unique<ScaffoldingCallHandler100>();
     }
     case 101: {
-      return MakeUnique<ScaffoldingCallHandler101>();
+      return std::make_unique<ScaffoldingCallHandler101>();
     }
     case 102: {
-      return MakeUnique<ScaffoldingCallHandler102>();
+      return std::make_unique<ScaffoldingCallHandler102>();
     }
     case 103: {
-      return MakeUnique<ScaffoldingCallHandler103>();
+      return std::make_unique<ScaffoldingCallHandler103>();
     }
     case 104: {
-      return MakeUnique<ScaffoldingCallHandler104>();
+      return std::make_unique<ScaffoldingCallHandler104>();
     }
     case 105: {
-      return MakeUnique<ScaffoldingCallHandler105>();
+      return std::make_unique<ScaffoldingCallHandler105>();
     }
     case 106: {
-      return MakeUnique<ScaffoldingCallHandler106>();
+      return std::make_unique<ScaffoldingCallHandler106>();
     }
     case 107: {
-      return MakeUnique<ScaffoldingCallHandler107>();
+      return std::make_unique<ScaffoldingCallHandler107>();
     }
     case 108: {
-      return MakeUnique<ScaffoldingCallHandler108>();
+      return std::make_unique<ScaffoldingCallHandler108>();
     }
     case 109: {
-      return MakeUnique<ScaffoldingCallHandler109>();
+      return std::make_unique<ScaffoldingCallHandler109>();
     }
     case 110: {
-      return MakeUnique<ScaffoldingCallHandler110>();
+      return std::make_unique<ScaffoldingCallHandler110>();
     }
     case 111: {
-      return MakeUnique<ScaffoldingCallHandler111>();
+      return std::make_unique<ScaffoldingCallHandler111>();
     }
     case 112: {
-      return MakeUnique<ScaffoldingCallHandler112>();
+      return std::make_unique<ScaffoldingCallHandler112>();
     }
     case 113: {
-      return MakeUnique<ScaffoldingCallHandler113>();
+      return std::make_unique<ScaffoldingCallHandler113>();
     }
     case 114: {
-      return MakeUnique<ScaffoldingCallHandler114>();
+      return std::make_unique<ScaffoldingCallHandler114>();
     }
     case 115: {
-      return MakeUnique<ScaffoldingCallHandler115>();
+      return std::make_unique<ScaffoldingCallHandler115>();
     }
     case 116: {
-      return MakeUnique<ScaffoldingCallHandler116>();
+      return std::make_unique<ScaffoldingCallHandler116>();
     }
     case 117: {
-      return MakeUnique<ScaffoldingCallHandler117>();
+      return std::make_unique<ScaffoldingCallHandler117>();
     }
     case 118: {
-      return MakeUnique<ScaffoldingCallHandler118>();
+      return std::make_unique<ScaffoldingCallHandler118>();
     }
     case 119: {
-      return MakeUnique<ScaffoldingCallHandler119>();
+      return std::make_unique<ScaffoldingCallHandler119>();
     }
     case 120: {
-      return MakeUnique<ScaffoldingCallHandler120>();
+      return std::make_unique<ScaffoldingCallHandler120>();
     }
     case 121: {
-      return MakeUnique<ScaffoldingCallHandler121>();
+      return std::make_unique<ScaffoldingCallHandler121>();
     }
     case 122: {
-      return MakeUnique<ScaffoldingCallHandler122>();
+      return std::make_unique<ScaffoldingCallHandler122>();
     }
     case 123: {
-      return MakeUnique<ScaffoldingCallHandler123>();
+      return std::make_unique<ScaffoldingCallHandler123>();
     }
     case 124: {
-      return MakeUnique<ScaffoldingCallHandler124>();
+      return std::make_unique<ScaffoldingCallHandler124>();
     }
     case 125: {
-      return MakeUnique<ScaffoldingCallHandler125>();
+      return std::make_unique<ScaffoldingCallHandler125>();
     }
     case 126: {
-      return MakeUnique<ScaffoldingCallHandler126>();
+      return std::make_unique<ScaffoldingCallHandler126>();
     }
     case 127: {
-      return MakeUnique<ScaffoldingCallHandler127>();
+      return std::make_unique<ScaffoldingCallHandler127>();
     }
     case 128: {
-      return MakeUnique<ScaffoldingCallHandler128>();
+      return std::make_unique<ScaffoldingCallHandler128>();
     }
-    case 132: {
-      return MakeUnique<ScaffoldingCallHandler132>();
+    case 129: {
+      return std::make_unique<ScaffoldingCallHandler129>();
     }
     case 133: {
-      return MakeUnique<ScaffoldingCallHandler133>();
+      return std::make_unique<ScaffoldingCallHandler133>();
     }
     case 134: {
-      return MakeUnique<ScaffoldingCallHandler134>();
+      return std::make_unique<ScaffoldingCallHandler134>();
     }
     case 135: {
-      return MakeUnique<ScaffoldingCallHandler135>();
+      return std::make_unique<ScaffoldingCallHandler135>();
     }
     case 136: {
-      return MakeUnique<ScaffoldingCallHandler136>();
+      return std::make_unique<ScaffoldingCallHandler136>();
     }
     case 137: {
-      return MakeUnique<ScaffoldingCallHandler137>();
+      return std::make_unique<ScaffoldingCallHandler137>();
     }
     case 138: {
-      return MakeUnique<ScaffoldingCallHandler138>();
+      return std::make_unique<ScaffoldingCallHandler138>();
     }
     case 139: {
-      return MakeUnique<ScaffoldingCallHandler139>();
+      return std::make_unique<ScaffoldingCallHandler139>();
     }
     case 140: {
-      return MakeUnique<ScaffoldingCallHandler140>();
+      return std::make_unique<ScaffoldingCallHandler140>();
     }
     case 141: {
-      return MakeUnique<ScaffoldingCallHandler141>();
+      return std::make_unique<ScaffoldingCallHandler141>();
     }
     case 142: {
-      return MakeUnique<ScaffoldingCallHandler142>();
+      return std::make_unique<ScaffoldingCallHandler142>();
     }
     case 143: {
-      return MakeUnique<ScaffoldingCallHandler143>();
+      return std::make_unique<ScaffoldingCallHandler143>();
     }
     case 144: {
-      return MakeUnique<ScaffoldingCallHandler144>();
+      return std::make_unique<ScaffoldingCallHandler144>();
     }
     case 145: {
-      return MakeUnique<ScaffoldingCallHandler145>();
+      return std::make_unique<ScaffoldingCallHandler145>();
     }
     case 146: {
-      return MakeUnique<ScaffoldingCallHandler146>();
+      return std::make_unique<ScaffoldingCallHandler146>();
     }
     case 147: {
-      return MakeUnique<ScaffoldingCallHandler147>();
+      return std::make_unique<ScaffoldingCallHandler147>();
     }
     case 148: {
-      return MakeUnique<ScaffoldingCallHandler148>();
+      return std::make_unique<ScaffoldingCallHandler148>();
     }
     case 149: {
-      return MakeUnique<ScaffoldingCallHandler149>();
+      return std::make_unique<ScaffoldingCallHandler149>();
     }
     case 150: {
-      return MakeUnique<ScaffoldingCallHandler150>();
+      return std::make_unique<ScaffoldingCallHandler150>();
     }
     case 151: {
-      return MakeUnique<ScaffoldingCallHandler151>();
+      return std::make_unique<ScaffoldingCallHandler151>();
     }
     case 152: {
-      return MakeUnique<ScaffoldingCallHandler152>();
+      return std::make_unique<ScaffoldingCallHandler152>();
     }
     case 153: {
-      return MakeUnique<ScaffoldingCallHandler153>();
+      return std::make_unique<ScaffoldingCallHandler153>();
     }
     case 154: {
-      return MakeUnique<ScaffoldingCallHandler154>();
+      return std::make_unique<ScaffoldingCallHandler154>();
     }
     case 155: {
-      return MakeUnique<ScaffoldingCallHandler155>();
+      return std::make_unique<ScaffoldingCallHandler155>();
     }
     case 156: {
-      return MakeUnique<ScaffoldingCallHandler156>();
+      return std::make_unique<ScaffoldingCallHandler156>();
     }
     case 157: {
-      return MakeUnique<ScaffoldingCallHandler157>();
+      return std::make_unique<ScaffoldingCallHandler157>();
     }
     case 158: {
-      return MakeUnique<ScaffoldingCallHandler158>();
+      return std::make_unique<ScaffoldingCallHandler158>();
     }
     case 159: {
-      return MakeUnique<ScaffoldingCallHandler159>();
+      return std::make_unique<ScaffoldingCallHandler159>();
     }
     case 160: {
-      return MakeUnique<ScaffoldingCallHandler160>();
+      return std::make_unique<ScaffoldingCallHandler160>();
     }
     case 161: {
-      return MakeUnique<ScaffoldingCallHandler161>();
+      return std::make_unique<ScaffoldingCallHandler161>();
     }
     case 162: {
-      return MakeUnique<ScaffoldingCallHandler162>();
+      return std::make_unique<ScaffoldingCallHandler162>();
     }
     case 163: {
-      return MakeUnique<ScaffoldingCallHandler163>();
+      return std::make_unique<ScaffoldingCallHandler163>();
     }
     case 164: {
-      return MakeUnique<ScaffoldingCallHandler164>();
+      return std::make_unique<ScaffoldingCallHandler164>();
     }
     case 165: {
-      return MakeUnique<ScaffoldingCallHandler165>();
+      return std::make_unique<ScaffoldingCallHandler165>();
     }
     case 166: {
-      return MakeUnique<ScaffoldingCallHandler166>();
+      return std::make_unique<ScaffoldingCallHandler166>();
     }
     case 167: {
-      return MakeUnique<ScaffoldingCallHandler167>();
+      return std::make_unique<ScaffoldingCallHandler167>();
     }
     case 168: {
-      return MakeUnique<ScaffoldingCallHandler168>();
+      return std::make_unique<ScaffoldingCallHandler168>();
     }
     case 169: {
-      return MakeUnique<ScaffoldingCallHandler169>();
+      return std::make_unique<ScaffoldingCallHandler169>();
     }
     case 170: {
-      return MakeUnique<ScaffoldingCallHandler170>();
+      return std::make_unique<ScaffoldingCallHandler170>();
     }
     case 171: {
-      return MakeUnique<ScaffoldingCallHandler171>();
+      return std::make_unique<ScaffoldingCallHandler171>();
     }
     case 172: {
-      return MakeUnique<ScaffoldingCallHandler172>();
+      return std::make_unique<ScaffoldingCallHandler172>();
     }
     case 173: {
-      return MakeUnique<ScaffoldingCallHandler173>();
+      return std::make_unique<ScaffoldingCallHandler173>();
     }
     case 174: {
-      return MakeUnique<ScaffoldingCallHandler174>();
+      return std::make_unique<ScaffoldingCallHandler174>();
     }
     case 175: {
-      return MakeUnique<ScaffoldingCallHandler175>();
+      return std::make_unique<ScaffoldingCallHandler175>();
     }
     case 176: {
-      return MakeUnique<ScaffoldingCallHandler176>();
+      return std::make_unique<ScaffoldingCallHandler176>();
     }
     case 177: {
-      return MakeUnique<ScaffoldingCallHandler177>();
+      return std::make_unique<ScaffoldingCallHandler177>();
     }
     case 178: {
-      return MakeUnique<ScaffoldingCallHandler178>();
+      return std::make_unique<ScaffoldingCallHandler178>();
     }
     case 179: {
-      return MakeUnique<ScaffoldingCallHandler179>();
+      return std::make_unique<ScaffoldingCallHandler179>();
     }
     case 180: {
-      return MakeUnique<ScaffoldingCallHandler180>();
+      return std::make_unique<ScaffoldingCallHandler180>();
     }
     case 181: {
-      return MakeUnique<ScaffoldingCallHandler181>();
+      return std::make_unique<ScaffoldingCallHandler181>();
     }
     case 182: {
-      return MakeUnique<ScaffoldingCallHandler182>();
+      return std::make_unique<ScaffoldingCallHandler182>();
     }
     case 183: {
-      return MakeUnique<ScaffoldingCallHandler183>();
+      return std::make_unique<ScaffoldingCallHandler183>();
     }
     case 184: {
-      return MakeUnique<ScaffoldingCallHandler184>();
+      return std::make_unique<ScaffoldingCallHandler184>();
     }
     case 185: {
-      return MakeUnique<ScaffoldingCallHandler185>();
+      return std::make_unique<ScaffoldingCallHandler185>();
     }
     case 186: {
-      return MakeUnique<ScaffoldingCallHandler186>();
+      return std::make_unique<ScaffoldingCallHandler186>();
     }
     case 187: {
-      return MakeUnique<ScaffoldingCallHandler187>();
+      return std::make_unique<ScaffoldingCallHandler187>();
     }
     case 188: {
-      return MakeUnique<ScaffoldingCallHandler188>();
+      return std::make_unique<ScaffoldingCallHandler188>();
     }
     case 189: {
-      return MakeUnique<ScaffoldingCallHandler189>();
+      return std::make_unique<ScaffoldingCallHandler189>();
     }
     case 190: {
-      return MakeUnique<ScaffoldingCallHandler190>();
+      return std::make_unique<ScaffoldingCallHandler190>();
     }
     case 191: {
-      return MakeUnique<ScaffoldingCallHandler191>();
+      return std::make_unique<ScaffoldingCallHandler191>();
     }
     case 192: {
-      return MakeUnique<ScaffoldingCallHandler192>();
+      return std::make_unique<ScaffoldingCallHandler192>();
     }
     case 193: {
-      return MakeUnique<ScaffoldingCallHandler193>();
+      return std::make_unique<ScaffoldingCallHandler193>();
     }
     case 194: {
-      return MakeUnique<ScaffoldingCallHandler194>();
+      return std::make_unique<ScaffoldingCallHandler194>();
     }
     case 195: {
-      return MakeUnique<ScaffoldingCallHandler195>();
+      return std::make_unique<ScaffoldingCallHandler195>();
     }
     case 196: {
-      return MakeUnique<ScaffoldingCallHandler196>();
+      return std::make_unique<ScaffoldingCallHandler196>();
     }
     case 197: {
-      return MakeUnique<ScaffoldingCallHandler197>();
+      return std::make_unique<ScaffoldingCallHandler197>();
     }
     case 198: {
-      return MakeUnique<ScaffoldingCallHandler198>();
+      return std::make_unique<ScaffoldingCallHandler198>();
     }
     case 199: {
-      return MakeUnique<ScaffoldingCallHandler199>();
+      return std::make_unique<ScaffoldingCallHandler199>();
     }
     case 200: {
-      return MakeUnique<ScaffoldingCallHandler200>();
+      return std::make_unique<ScaffoldingCallHandler200>();
     }
     case 201: {
-      return MakeUnique<ScaffoldingCallHandler201>();
+      return std::make_unique<ScaffoldingCallHandler201>();
     }
     case 202: {
-      return MakeUnique<ScaffoldingCallHandler202>();
+      return std::make_unique<ScaffoldingCallHandler202>();
     }
     case 203: {
-      return MakeUnique<ScaffoldingCallHandler203>();
+      return std::make_unique<ScaffoldingCallHandler203>();
     }
     case 204: {
-      return MakeUnique<ScaffoldingCallHandler204>();
+      return std::make_unique<ScaffoldingCallHandler204>();
     }
     case 205: {
-      return MakeUnique<ScaffoldingCallHandler205>();
+      return std::make_unique<ScaffoldingCallHandler205>();
     }
     case 206: {
-      return MakeUnique<ScaffoldingCallHandler206>();
+      return std::make_unique<ScaffoldingCallHandler206>();
     }
     case 207: {
-      return MakeUnique<ScaffoldingCallHandler207>();
+      return std::make_unique<ScaffoldingCallHandler207>();
     }
     case 208: {
-      return MakeUnique<ScaffoldingCallHandler208>();
+      return std::make_unique<ScaffoldingCallHandler208>();
     }
     case 209: {
-      return MakeUnique<ScaffoldingCallHandler209>();
+      return std::make_unique<ScaffoldingCallHandler209>();
     }
     case 210: {
-      return MakeUnique<ScaffoldingCallHandler210>();
+      return std::make_unique<ScaffoldingCallHandler210>();
     }
     case 211: {
-      return MakeUnique<ScaffoldingCallHandler211>();
+      return std::make_unique<ScaffoldingCallHandler211>();
     }
     case 212: {
-      return MakeUnique<ScaffoldingCallHandler212>();
+      return std::make_unique<ScaffoldingCallHandler212>();
     }
     case 213: {
-      return MakeUnique<ScaffoldingCallHandler213>();
+      return std::make_unique<ScaffoldingCallHandler213>();
     }
     case 214: {
-      return MakeUnique<ScaffoldingCallHandler214>();
+      return std::make_unique<ScaffoldingCallHandler214>();
     }
     case 215: {
-      return MakeUnique<ScaffoldingCallHandler215>();
+      return std::make_unique<ScaffoldingCallHandler215>();
     }
     case 216: {
-      return MakeUnique<ScaffoldingCallHandler216>();
+      return std::make_unique<ScaffoldingCallHandler216>();
     }
     case 217: {
-      return MakeUnique<ScaffoldingCallHandler217>();
+      return std::make_unique<ScaffoldingCallHandler217>();
     }
     case 218: {
-      return MakeUnique<ScaffoldingCallHandler218>();
+      return std::make_unique<ScaffoldingCallHandler218>();
     }
     case 219: {
-      return MakeUnique<ScaffoldingCallHandler219>();
+      return std::make_unique<ScaffoldingCallHandler219>();
     }
     case 220: {
-      return MakeUnique<ScaffoldingCallHandler220>();
+      return std::make_unique<ScaffoldingCallHandler220>();
     }
     case 221: {
-      return MakeUnique<ScaffoldingCallHandler221>();
+      return std::make_unique<ScaffoldingCallHandler221>();
     }
     case 222: {
-      return MakeUnique<ScaffoldingCallHandler222>();
+      return std::make_unique<ScaffoldingCallHandler222>();
     }
     case 223: {
-      return MakeUnique<ScaffoldingCallHandler223>();
+      return std::make_unique<ScaffoldingCallHandler223>();
     }
     case 224: {
-      return MakeUnique<ScaffoldingCallHandler224>();
+      return std::make_unique<ScaffoldingCallHandler224>();
     }
     case 225: {
-      return MakeUnique<ScaffoldingCallHandler225>();
+      return std::make_unique<ScaffoldingCallHandler225>();
     }
     case 226: {
-      return MakeUnique<ScaffoldingCallHandler226>();
+      return std::make_unique<ScaffoldingCallHandler226>();
     }
     case 227: {
-      return MakeUnique<ScaffoldingCallHandler227>();
+      return std::make_unique<ScaffoldingCallHandler227>();
     }
     case 228: {
-      return MakeUnique<ScaffoldingCallHandler228>();
+      return std::make_unique<ScaffoldingCallHandler228>();
     }
     case 229: {
-      return MakeUnique<ScaffoldingCallHandler229>();
+      return std::make_unique<ScaffoldingCallHandler229>();
     }
     case 230: {
-      return MakeUnique<ScaffoldingCallHandler230>();
+      return std::make_unique<ScaffoldingCallHandler230>();
     }
     case 231: {
-      return MakeUnique<ScaffoldingCallHandler231>();
+      return std::make_unique<ScaffoldingCallHandler231>();
     }
     case 232: {
-      return MakeUnique<ScaffoldingCallHandler232>();
+      return std::make_unique<ScaffoldingCallHandler232>();
     }
     case 233: {
-      return MakeUnique<ScaffoldingCallHandler233>();
+      return std::make_unique<ScaffoldingCallHandler233>();
     }
     case 234: {
-      return MakeUnique<ScaffoldingCallHandler234>();
+      return std::make_unique<ScaffoldingCallHandler234>();
     }
     case 235: {
-      return MakeUnique<ScaffoldingCallHandler235>();
+      return std::make_unique<ScaffoldingCallHandler235>();
     }
     case 236: {
-      return MakeUnique<ScaffoldingCallHandler236>();
+      return std::make_unique<ScaffoldingCallHandler236>();
     }
     case 237: {
-      return MakeUnique<ScaffoldingCallHandler237>();
+      return std::make_unique<ScaffoldingCallHandler237>();
     }
     case 238: {
-      return MakeUnique<ScaffoldingCallHandler238>();
+      return std::make_unique<ScaffoldingCallHandler238>();
     }
     case 239: {
-      return MakeUnique<ScaffoldingCallHandler239>();
+      return std::make_unique<ScaffoldingCallHandler239>();
     }
     case 240: {
-      return MakeUnique<ScaffoldingCallHandler240>();
+      return std::make_unique<ScaffoldingCallHandler240>();
     }
     case 241: {
-      return MakeUnique<ScaffoldingCallHandler241>();
+      return std::make_unique<ScaffoldingCallHandler241>();
     }
     case 242: {
-      return MakeUnique<ScaffoldingCallHandler242>();
+      return std::make_unique<ScaffoldingCallHandler242>();
     }
     case 243: {
-      return MakeUnique<ScaffoldingCallHandler243>();
+      return std::make_unique<ScaffoldingCallHandler243>();
     }
     case 244: {
-      return MakeUnique<ScaffoldingCallHandler244>();
+      return std::make_unique<ScaffoldingCallHandler244>();
     }
     case 245: {
-      return MakeUnique<ScaffoldingCallHandler245>();
+      return std::make_unique<ScaffoldingCallHandler245>();
     }
     case 246: {
-      return MakeUnique<ScaffoldingCallHandler246>();
+      return std::make_unique<ScaffoldingCallHandler246>();
     }
     case 247: {
-      return MakeUnique<ScaffoldingCallHandler247>();
+      return std::make_unique<ScaffoldingCallHandler247>();
     }
     case 248: {
-      return MakeUnique<ScaffoldingCallHandler248>();
+      return std::make_unique<ScaffoldingCallHandler248>();
     }
     case 249: {
-      return MakeUnique<ScaffoldingCallHandler249>();
+      return std::make_unique<ScaffoldingCallHandler249>();
     }
     case 250: {
-      return MakeUnique<ScaffoldingCallHandler250>();
+      return std::make_unique<ScaffoldingCallHandler250>();
     }
     case 251: {
-      return MakeUnique<ScaffoldingCallHandler251>();
+      return std::make_unique<ScaffoldingCallHandler251>();
     }
     case 252: {
-      return MakeUnique<ScaffoldingCallHandler252>();
+      return std::make_unique<ScaffoldingCallHandler252>();
     }
     case 253: {
-      return MakeUnique<ScaffoldingCallHandler253>();
+      return std::make_unique<ScaffoldingCallHandler253>();
     }
     case 254: {
-      return MakeUnique<ScaffoldingCallHandler254>();
+      return std::make_unique<ScaffoldingCallHandler254>();
     }
     case 255: {
-      return MakeUnique<ScaffoldingCallHandler255>();
+      return std::make_unique<ScaffoldingCallHandler255>();
     }
     case 256: {
-      return MakeUnique<ScaffoldingCallHandler256>();
+      return std::make_unique<ScaffoldingCallHandler256>();
     }
     case 257: {
-      return MakeUnique<ScaffoldingCallHandler257>();
+      return std::make_unique<ScaffoldingCallHandler257>();
     }
     case 258: {
-      return MakeUnique<ScaffoldingCallHandler258>();
+      return std::make_unique<ScaffoldingCallHandler258>();
     }
     case 259: {
-      return MakeUnique<ScaffoldingCallHandler259>();
+      return std::make_unique<ScaffoldingCallHandler259>();
     }
     case 260: {
-      return MakeUnique<ScaffoldingCallHandler260>();
+      return std::make_unique<ScaffoldingCallHandler260>();
     }
     case 261: {
-      return MakeUnique<ScaffoldingCallHandler261>();
+      return std::make_unique<ScaffoldingCallHandler261>();
     }
     case 262: {
-      return MakeUnique<ScaffoldingCallHandler262>();
+      return std::make_unique<ScaffoldingCallHandler262>();
     }
     case 263: {
-      return MakeUnique<ScaffoldingCallHandler263>();
+      return std::make_unique<ScaffoldingCallHandler263>();
     }
     case 264: {
-      return MakeUnique<ScaffoldingCallHandler264>();
+      return std::make_unique<ScaffoldingCallHandler264>();
     }
     case 265: {
-      return MakeUnique<ScaffoldingCallHandler265>();
+      return std::make_unique<ScaffoldingCallHandler265>();
     }
     case 266: {
-      return MakeUnique<ScaffoldingCallHandler266>();
+      return std::make_unique<ScaffoldingCallHandler266>();
     }
     case 267: {
-      return MakeUnique<ScaffoldingCallHandler267>();
+      return std::make_unique<ScaffoldingCallHandler267>();
     }
     case 268: {
-      return MakeUnique<ScaffoldingCallHandler268>();
+      return std::make_unique<ScaffoldingCallHandler268>();
     }
     case 269: {
-      return MakeUnique<ScaffoldingCallHandler269>();
+      return std::make_unique<ScaffoldingCallHandler269>();
     }
     case 270: {
-      return MakeUnique<ScaffoldingCallHandler270>();
+      return std::make_unique<ScaffoldingCallHandler270>();
     }
     case 271: {
-      return MakeUnique<ScaffoldingCallHandler271>();
+      return std::make_unique<ScaffoldingCallHandler271>();
     }
     case 272: {
-      return MakeUnique<ScaffoldingCallHandler272>();
+      return std::make_unique<ScaffoldingCallHandler272>();
     }
     case 273: {
-      return MakeUnique<ScaffoldingCallHandler273>();
+      return std::make_unique<ScaffoldingCallHandler273>();
     }
     case 274: {
-      return MakeUnique<ScaffoldingCallHandler274>();
+      return std::make_unique<ScaffoldingCallHandler274>();
     }
     case 275: {
-      return MakeUnique<ScaffoldingCallHandler275>();
+      return std::make_unique<ScaffoldingCallHandler275>();
     }
     case 276: {
-      return MakeUnique<ScaffoldingCallHandler276>();
+      return std::make_unique<ScaffoldingCallHandler276>();
     }
     case 277: {
-      return MakeUnique<ScaffoldingCallHandler277>();
+      return std::make_unique<ScaffoldingCallHandler277>();
     }
     case 278: {
-      return MakeUnique<ScaffoldingCallHandler278>();
+      return std::make_unique<ScaffoldingCallHandler278>();
     }
     case 279: {
-      return MakeUnique<ScaffoldingCallHandler279>();
+      return std::make_unique<ScaffoldingCallHandler279>();
     }
     case 280: {
-      return MakeUnique<ScaffoldingCallHandler280>();
+      return std::make_unique<ScaffoldingCallHandler280>();
     }
     case 281: {
-      return MakeUnique<ScaffoldingCallHandler281>();
+      return std::make_unique<ScaffoldingCallHandler281>();
     }
     case 282: {
-      return MakeUnique<ScaffoldingCallHandler282>();
+      return std::make_unique<ScaffoldingCallHandler282>();
     }
     case 283: {
-      return MakeUnique<ScaffoldingCallHandler283>();
+      return std::make_unique<ScaffoldingCallHandler283>();
     }
     case 284: {
-      return MakeUnique<ScaffoldingCallHandler284>();
+      return std::make_unique<ScaffoldingCallHandler284>();
     }
     case 285: {
-      return MakeUnique<ScaffoldingCallHandler285>();
+      return std::make_unique<ScaffoldingCallHandler285>();
     }
     case 286: {
-      return MakeUnique<ScaffoldingCallHandler286>();
+      return std::make_unique<ScaffoldingCallHandler286>();
     }
-    case 288: {
-      return MakeUnique<ScaffoldingCallHandler288>();
+    case 287: {
+      return std::make_unique<ScaffoldingCallHandler287>();
     }
     case 289: {
-      return MakeUnique<ScaffoldingCallHandler289>();
+      return std::make_unique<ScaffoldingCallHandler289>();
     }
     case 290: {
-      return MakeUnique<ScaffoldingCallHandler290>();
+      return std::make_unique<ScaffoldingCallHandler290>();
     }
     case 291: {
-      return MakeUnique<ScaffoldingCallHandler291>();
+      return std::make_unique<ScaffoldingCallHandler291>();
     }
     case 292: {
-      return MakeUnique<ScaffoldingCallHandler292>();
+      return std::make_unique<ScaffoldingCallHandler292>();
     }
     case 293: {
-      return MakeUnique<ScaffoldingCallHandler293>();
+      return std::make_unique<ScaffoldingCallHandler293>();
     }
     case 294: {
-      return MakeUnique<ScaffoldingCallHandler294>();
+      return std::make_unique<ScaffoldingCallHandler294>();
     }
     case 295: {
-      return MakeUnique<ScaffoldingCallHandler295>();
+      return std::make_unique<ScaffoldingCallHandler295>();
     }
     case 296: {
-      return MakeUnique<ScaffoldingCallHandler296>();
+      return std::make_unique<ScaffoldingCallHandler296>();
     }
     case 297: {
-      return MakeUnique<ScaffoldingCallHandler297>();
+      return std::make_unique<ScaffoldingCallHandler297>();
     }
     case 298: {
-      return MakeUnique<ScaffoldingCallHandler298>();
+      return std::make_unique<ScaffoldingCallHandler298>();
     }
     case 299: {
-      return MakeUnique<ScaffoldingCallHandler299>();
+      return std::make_unique<ScaffoldingCallHandler299>();
     }
     case 300: {
-      return MakeUnique<ScaffoldingCallHandler300>();
+      return std::make_unique<ScaffoldingCallHandler300>();
     }
     case 301: {
-      return MakeUnique<ScaffoldingCallHandler301>();
+      return std::make_unique<ScaffoldingCallHandler301>();
     }
     case 302: {
-      return MakeUnique<ScaffoldingCallHandler302>();
+      return std::make_unique<ScaffoldingCallHandler302>();
     }
     case 303: {
-      return MakeUnique<ScaffoldingCallHandler303>();
+      return std::make_unique<ScaffoldingCallHandler303>();
     }
     case 304: {
-      return MakeUnique<ScaffoldingCallHandler304>();
+      return std::make_unique<ScaffoldingCallHandler304>();
     }
     case 305: {
-      return MakeUnique<ScaffoldingCallHandler305>();
+      return std::make_unique<ScaffoldingCallHandler305>();
     }
     case 306: {
-      return MakeUnique<ScaffoldingCallHandler306>();
+      return std::make_unique<ScaffoldingCallHandler306>();
     }
     case 307: {
-      return MakeUnique<ScaffoldingCallHandler307>();
+      return std::make_unique<ScaffoldingCallHandler307>();
     }
     case 308: {
-      return MakeUnique<ScaffoldingCallHandler308>();
+      return std::make_unique<ScaffoldingCallHandler308>();
     }
     case 309: {
-      return MakeUnique<ScaffoldingCallHandler309>();
+      return std::make_unique<ScaffoldingCallHandler309>();
+    }
+    case 310: {
+      return std::make_unique<ScaffoldingCallHandler310>();
     }
 
 #ifdef MOZ_UNIFFI_FIXTURES
-    case 334: {
-      return MakeUnique<ScaffoldingCallHandler334>();
-    }
     case 335: {
-      return MakeUnique<ScaffoldingCallHandler335>();
+      return std::make_unique<ScaffoldingCallHandler335>();
     }
     case 336: {
-      return MakeUnique<ScaffoldingCallHandler336>();
+      return std::make_unique<ScaffoldingCallHandler336>();
     }
     case 337: {
-      return MakeUnique<ScaffoldingCallHandler337>();
+      return std::make_unique<ScaffoldingCallHandler337>();
     }
     case 338: {
-      return MakeUnique<ScaffoldingCallHandler338>();
+      return std::make_unique<ScaffoldingCallHandler338>();
     }
     case 339: {
-      return MakeUnique<ScaffoldingCallHandler339>();
+      return std::make_unique<ScaffoldingCallHandler339>();
     }
     case 340: {
-      return MakeUnique<ScaffoldingCallHandler340>();
+      return std::make_unique<ScaffoldingCallHandler340>();
     }
     case 341: {
-      return MakeUnique<ScaffoldingCallHandler341>();
+      return std::make_unique<ScaffoldingCallHandler341>();
     }
-    case 350: {
-      return MakeUnique<ScaffoldingCallHandler350>();
+    case 342: {
+      return std::make_unique<ScaffoldingCallHandler342>();
     }
     case 351: {
-      return MakeUnique<ScaffoldingCallHandler351>();
+      return std::make_unique<ScaffoldingCallHandler351>();
     }
     case 352: {
-      return MakeUnique<ScaffoldingCallHandler352>();
+      return std::make_unique<ScaffoldingCallHandler352>();
     }
     case 353: {
-      return MakeUnique<ScaffoldingCallHandler353>();
+      return std::make_unique<ScaffoldingCallHandler353>();
     }
     case 354: {
-      return MakeUnique<ScaffoldingCallHandler354>();
+      return std::make_unique<ScaffoldingCallHandler354>();
     }
     case 355: {
-      return MakeUnique<ScaffoldingCallHandler355>();
+      return std::make_unique<ScaffoldingCallHandler355>();
     }
     case 356: {
-      return MakeUnique<ScaffoldingCallHandler356>();
+      return std::make_unique<ScaffoldingCallHandler356>();
     }
     case 357: {
-      return MakeUnique<ScaffoldingCallHandler357>();
+      return std::make_unique<ScaffoldingCallHandler357>();
     }
     case 358: {
-      return MakeUnique<ScaffoldingCallHandler358>();
+      return std::make_unique<ScaffoldingCallHandler358>();
     }
     case 359: {
-      return MakeUnique<ScaffoldingCallHandler359>();
+      return std::make_unique<ScaffoldingCallHandler359>();
     }
     case 360: {
-      return MakeUnique<ScaffoldingCallHandler360>();
+      return std::make_unique<ScaffoldingCallHandler360>();
     }
     case 361: {
-      return MakeUnique<ScaffoldingCallHandler361>();
+      return std::make_unique<ScaffoldingCallHandler361>();
     }
     case 362: {
-      return MakeUnique<ScaffoldingCallHandler362>();
+      return std::make_unique<ScaffoldingCallHandler362>();
     }
     case 363: {
-      return MakeUnique<ScaffoldingCallHandler363>();
+      return std::make_unique<ScaffoldingCallHandler363>();
     }
     case 364: {
-      return MakeUnique<ScaffoldingCallHandler364>();
+      return std::make_unique<ScaffoldingCallHandler364>();
     }
     case 365: {
-      return MakeUnique<ScaffoldingCallHandler365>();
+      return std::make_unique<ScaffoldingCallHandler365>();
     }
     case 366: {
-      return MakeUnique<ScaffoldingCallHandler366>();
+      return std::make_unique<ScaffoldingCallHandler366>();
     }
     case 367: {
-      return MakeUnique<ScaffoldingCallHandler367>();
+      return std::make_unique<ScaffoldingCallHandler367>();
     }
     case 368: {
-      return MakeUnique<ScaffoldingCallHandler368>();
+      return std::make_unique<ScaffoldingCallHandler368>();
     }
     case 369: {
-      return MakeUnique<ScaffoldingCallHandler369>();
+      return std::make_unique<ScaffoldingCallHandler369>();
     }
     case 370: {
-      return MakeUnique<ScaffoldingCallHandler370>();
+      return std::make_unique<ScaffoldingCallHandler370>();
     }
     case 371: {
-      return MakeUnique<ScaffoldingCallHandler371>();
+      return std::make_unique<ScaffoldingCallHandler371>();
     }
     case 372: {
-      return MakeUnique<ScaffoldingCallHandler372>();
+      return std::make_unique<ScaffoldingCallHandler372>();
     }
     case 373: {
-      return MakeUnique<ScaffoldingCallHandler373>();
+      return std::make_unique<ScaffoldingCallHandler373>();
     }
     case 374: {
-      return MakeUnique<ScaffoldingCallHandler374>();
+      return std::make_unique<ScaffoldingCallHandler374>();
     }
     case 375: {
-      return MakeUnique<ScaffoldingCallHandler375>();
+      return std::make_unique<ScaffoldingCallHandler375>();
     }
     case 376: {
-      return MakeUnique<ScaffoldingCallHandler376>();
+      return std::make_unique<ScaffoldingCallHandler376>();
     }
     case 377: {
-      return MakeUnique<ScaffoldingCallHandler377>();
+      return std::make_unique<ScaffoldingCallHandler377>();
     }
     case 378: {
-      return MakeUnique<ScaffoldingCallHandler378>();
+      return std::make_unique<ScaffoldingCallHandler378>();
     }
     case 379: {
-      return MakeUnique<ScaffoldingCallHandler379>();
+      return std::make_unique<ScaffoldingCallHandler379>();
     }
     case 380: {
-      return MakeUnique<ScaffoldingCallHandler380>();
+      return std::make_unique<ScaffoldingCallHandler380>();
     }
     case 381: {
-      return MakeUnique<ScaffoldingCallHandler381>();
+      return std::make_unique<ScaffoldingCallHandler381>();
     }
     case 382: {
-      return MakeUnique<ScaffoldingCallHandler382>();
+      return std::make_unique<ScaffoldingCallHandler382>();
     }
     case 383: {
-      return MakeUnique<ScaffoldingCallHandler383>();
+      return std::make_unique<ScaffoldingCallHandler383>();
     }
     case 384: {
-      return MakeUnique<ScaffoldingCallHandler384>();
+      return std::make_unique<ScaffoldingCallHandler384>();
     }
     case 385: {
-      return MakeUnique<ScaffoldingCallHandler385>();
+      return std::make_unique<ScaffoldingCallHandler385>();
     }
     case 386: {
-      return MakeUnique<ScaffoldingCallHandler386>();
+      return std::make_unique<ScaffoldingCallHandler386>();
     }
     case 387: {
-      return MakeUnique<ScaffoldingCallHandler387>();
+      return std::make_unique<ScaffoldingCallHandler387>();
     }
     case 388: {
-      return MakeUnique<ScaffoldingCallHandler388>();
+      return std::make_unique<ScaffoldingCallHandler388>();
     }
     case 389: {
-      return MakeUnique<ScaffoldingCallHandler389>();
+      return std::make_unique<ScaffoldingCallHandler389>();
     }
     case 390: {
-      return MakeUnique<ScaffoldingCallHandler390>();
+      return std::make_unique<ScaffoldingCallHandler390>();
     }
     case 391: {
-      return MakeUnique<ScaffoldingCallHandler391>();
+      return std::make_unique<ScaffoldingCallHandler391>();
     }
     case 392: {
-      return MakeUnique<ScaffoldingCallHandler392>();
+      return std::make_unique<ScaffoldingCallHandler392>();
     }
     case 393: {
-      return MakeUnique<ScaffoldingCallHandler393>();
+      return std::make_unique<ScaffoldingCallHandler393>();
     }
     case 394: {
-      return MakeUnique<ScaffoldingCallHandler394>();
+      return std::make_unique<ScaffoldingCallHandler394>();
     }
     case 395: {
-      return MakeUnique<ScaffoldingCallHandler395>();
+      return std::make_unique<ScaffoldingCallHandler395>();
     }
     case 396: {
-      return MakeUnique<ScaffoldingCallHandler396>();
+      return std::make_unique<ScaffoldingCallHandler396>();
     }
-    case 402: {
-      return MakeUnique<ScaffoldingCallHandler402>();
+    case 397: {
+      return std::make_unique<ScaffoldingCallHandler397>();
     }
     case 403: {
-      return MakeUnique<ScaffoldingCallHandler403>();
+      return std::make_unique<ScaffoldingCallHandler403>();
     }
     case 404: {
-      return MakeUnique<ScaffoldingCallHandler404>();
+      return std::make_unique<ScaffoldingCallHandler404>();
     }
     case 405: {
-      return MakeUnique<ScaffoldingCallHandler405>();
+      return std::make_unique<ScaffoldingCallHandler405>();
     }
     case 406: {
-      return MakeUnique<ScaffoldingCallHandler406>();
+      return std::make_unique<ScaffoldingCallHandler406>();
     }
     case 407: {
-      return MakeUnique<ScaffoldingCallHandler407>();
+      return std::make_unique<ScaffoldingCallHandler407>();
     }
     case 408: {
-      return MakeUnique<ScaffoldingCallHandler408>();
+      return std::make_unique<ScaffoldingCallHandler408>();
     }
     case 409: {
-      return MakeUnique<ScaffoldingCallHandler409>();
+      return std::make_unique<ScaffoldingCallHandler409>();
     }
     case 410: {
-      return MakeUnique<ScaffoldingCallHandler410>();
+      return std::make_unique<ScaffoldingCallHandler410>();
     }
     case 411: {
-      return MakeUnique<ScaffoldingCallHandler411>();
+      return std::make_unique<ScaffoldingCallHandler411>();
+    }
+    case 412: {
+      return std::make_unique<ScaffoldingCallHandler412>();
     }
 #endif /* MOZ_UNIFFI_FIXTURES */
 
@@ -21434,105 +21482,105 @@ UniquePtr<UniffiAsyncCallHandler> GetAsyncCallHandler(uint64_t aId) {
   switch (aId) {
 
     case 36: {
-      return MakeUnique<ScaffoldingCallHandler36>();
-    }
-    case 129: {
-      return MakeUnique<ScaffoldingCallHandler129>();
+      return std::make_unique<ScaffoldingCallHandler36>();
     }
     case 130: {
-      return MakeUnique<ScaffoldingCallHandler130>();
+      return std::make_unique<ScaffoldingCallHandler130>();
     }
     case 131: {
-      return MakeUnique<ScaffoldingCallHandler131>();
+      return std::make_unique<ScaffoldingCallHandler131>();
     }
-    case 287: {
-      return MakeUnique<ScaffoldingCallHandler287>();
+    case 132: {
+      return std::make_unique<ScaffoldingCallHandler132>();
+    }
+    case 288: {
+      return std::make_unique<ScaffoldingCallHandler288>();
     }
 
 #ifdef MOZ_UNIFFI_FIXTURES
-    case 319: {
-      return MakeUnique<ScaffoldingCallHandler319>();
-    }
     case 320: {
-      return MakeUnique<ScaffoldingCallHandler320>();
+      return std::make_unique<ScaffoldingCallHandler320>();
     }
     case 321: {
-      return MakeUnique<ScaffoldingCallHandler321>();
+      return std::make_unique<ScaffoldingCallHandler321>();
     }
     case 322: {
-      return MakeUnique<ScaffoldingCallHandler322>();
+      return std::make_unique<ScaffoldingCallHandler322>();
     }
     case 323: {
-      return MakeUnique<ScaffoldingCallHandler323>();
+      return std::make_unique<ScaffoldingCallHandler323>();
     }
     case 324: {
-      return MakeUnique<ScaffoldingCallHandler324>();
+      return std::make_unique<ScaffoldingCallHandler324>();
     }
     case 325: {
-      return MakeUnique<ScaffoldingCallHandler325>();
+      return std::make_unique<ScaffoldingCallHandler325>();
     }
     case 326: {
-      return MakeUnique<ScaffoldingCallHandler326>();
+      return std::make_unique<ScaffoldingCallHandler326>();
     }
     case 327: {
-      return MakeUnique<ScaffoldingCallHandler327>();
+      return std::make_unique<ScaffoldingCallHandler327>();
     }
     case 328: {
-      return MakeUnique<ScaffoldingCallHandler328>();
+      return std::make_unique<ScaffoldingCallHandler328>();
     }
     case 329: {
-      return MakeUnique<ScaffoldingCallHandler329>();
+      return std::make_unique<ScaffoldingCallHandler329>();
     }
     case 330: {
-      return MakeUnique<ScaffoldingCallHandler330>();
+      return std::make_unique<ScaffoldingCallHandler330>();
     }
     case 331: {
-      return MakeUnique<ScaffoldingCallHandler331>();
+      return std::make_unique<ScaffoldingCallHandler331>();
     }
     case 332: {
-      return MakeUnique<ScaffoldingCallHandler332>();
+      return std::make_unique<ScaffoldingCallHandler332>();
     }
     case 333: {
-      return MakeUnique<ScaffoldingCallHandler333>();
+      return std::make_unique<ScaffoldingCallHandler333>();
     }
-    case 342: {
-      return MakeUnique<ScaffoldingCallHandler342>();
+    case 334: {
+      return std::make_unique<ScaffoldingCallHandler334>();
     }
     case 343: {
-      return MakeUnique<ScaffoldingCallHandler343>();
+      return std::make_unique<ScaffoldingCallHandler343>();
     }
     case 344: {
-      return MakeUnique<ScaffoldingCallHandler344>();
+      return std::make_unique<ScaffoldingCallHandler344>();
     }
     case 345: {
-      return MakeUnique<ScaffoldingCallHandler345>();
+      return std::make_unique<ScaffoldingCallHandler345>();
     }
     case 346: {
-      return MakeUnique<ScaffoldingCallHandler346>();
+      return std::make_unique<ScaffoldingCallHandler346>();
     }
     case 347: {
-      return MakeUnique<ScaffoldingCallHandler347>();
+      return std::make_unique<ScaffoldingCallHandler347>();
     }
     case 348: {
-      return MakeUnique<ScaffoldingCallHandler348>();
+      return std::make_unique<ScaffoldingCallHandler348>();
     }
     case 349: {
-      return MakeUnique<ScaffoldingCallHandler349>();
+      return std::make_unique<ScaffoldingCallHandler349>();
     }
-    case 397: {
-      return MakeUnique<ScaffoldingCallHandler397>();
+    case 350: {
+      return std::make_unique<ScaffoldingCallHandler350>();
     }
     case 398: {
-      return MakeUnique<ScaffoldingCallHandler398>();
+      return std::make_unique<ScaffoldingCallHandler398>();
     }
     case 399: {
-      return MakeUnique<ScaffoldingCallHandler399>();
+      return std::make_unique<ScaffoldingCallHandler399>();
     }
     case 400: {
-      return MakeUnique<ScaffoldingCallHandler400>();
+      return std::make_unique<ScaffoldingCallHandler400>();
     }
     case 401: {
-      return MakeUnique<ScaffoldingCallHandler401>();
+      return std::make_unique<ScaffoldingCallHandler401>();
+    }
+    case 402: {
+      return std::make_unique<ScaffoldingCallHandler402>();
     }
 #endif /* MOZ_UNIFFI_FIXTURES */
 
@@ -21784,7 +21832,7 @@ extern "C" void callback_interface_method_0_0(
   void* aUniffiOutReturn,
   RustCallStatus* uniffiOutStatus
 ) {
-  UniquePtr<AsyncCallbackMethodHandlerBase> handler = MakeUnique<CallbackInterfaceMethod00>(aUniffiHandle, label, value);
+  UniquePtr<AsyncCallbackMethodHandlerBase> handler = std::make_unique<CallbackInterfaceMethod00>(aUniffiHandle, label, value);
   AsyncCallbackMethodHandlerBase::ScheduleAsyncCall(std::move(handler), &gUniffiCallbackHandler0);
 }
 /**
@@ -21848,7 +21896,7 @@ extern "C" void callback_interface_method_0_1(
   void* aUniffiOutReturn,
   RustCallStatus* uniffiOutStatus
 ) {
-  UniquePtr<AsyncCallbackMethodHandlerBase> handler = MakeUnique<CallbackInterfaceMethod01>(aUniffiHandle, label, value);
+  UniquePtr<AsyncCallbackMethodHandlerBase> handler = std::make_unique<CallbackInterfaceMethod01>(aUniffiHandle, label, value);
   AsyncCallbackMethodHandlerBase::ScheduleAsyncCall(std::move(handler), &gUniffiCallbackHandler0);
 }
 /**
@@ -21904,7 +21952,7 @@ extern "C" void callback_interface_method_0_2(
   void* aUniffiOutReturn,
   RustCallStatus* uniffiOutStatus
 ) {
-  UniquePtr<AsyncCallbackMethodHandlerBase> handler = MakeUnique<CallbackInterfaceMethod02>(aUniffiHandle, label);
+  UniquePtr<AsyncCallbackMethodHandlerBase> handler = std::make_unique<CallbackInterfaceMethod02>(aUniffiHandle, label);
   AsyncCallbackMethodHandlerBase::ScheduleAsyncCall(std::move(handler), &gUniffiCallbackHandler0);
 }
 /**
@@ -21968,7 +22016,7 @@ extern "C" void callback_interface_method_0_3(
   void* aUniffiOutReturn,
   RustCallStatus* uniffiOutStatus
 ) {
-  UniquePtr<AsyncCallbackMethodHandlerBase> handler = MakeUnique<CallbackInterfaceMethod03>(aUniffiHandle, label, value);
+  UniquePtr<AsyncCallbackMethodHandlerBase> handler = std::make_unique<CallbackInterfaceMethod03>(aUniffiHandle, label, value);
   AsyncCallbackMethodHandlerBase::ScheduleAsyncCall(std::move(handler), &gUniffiCallbackHandler0);
 }
 /**
@@ -22032,7 +22080,7 @@ extern "C" void callback_interface_method_0_4(
   void* aUniffiOutReturn,
   RustCallStatus* uniffiOutStatus
 ) {
-  UniquePtr<AsyncCallbackMethodHandlerBase> handler = MakeUnique<CallbackInterfaceMethod04>(aUniffiHandle, label, value);
+  UniquePtr<AsyncCallbackMethodHandlerBase> handler = std::make_unique<CallbackInterfaceMethod04>(aUniffiHandle, label, value);
   AsyncCallbackMethodHandlerBase::ScheduleAsyncCall(std::move(handler), &gUniffiCallbackHandler0);
 }
 
@@ -22041,7 +22089,7 @@ extern "C" void callback_free_0(uint64_t aUniffiHandle) {
    // Callback object handles are keys in a map stored in the JS handler. To
    // handle the free call, schedule a fire-and-forget JS call to remove the key.
    AsyncCallbackMethodHandlerBase::ScheduleAsyncCall(
-      MakeUnique<CallbackFreeHandler>("MozAdsTelemetry.uniffi_free", aUniffiHandle),
+      std::make_unique<CallbackFreeHandler>("MozAdsTelemetry.uniffi_free", aUniffiHandle),
       &gUniffiCallbackHandler0);
   }
 }
@@ -22122,7 +22170,7 @@ extern "C" void callback_interface_method_1_0(
   void* aUniffiOutReturn,
   RustCallStatus* uniffiOutStatus
 ) {
-  UniquePtr<AsyncCallbackMethodHandlerBase> handler = MakeUnique<CallbackInterfaceMethod10>(aUniffiHandle, contextId, creationDate);
+  UniquePtr<AsyncCallbackMethodHandlerBase> handler = std::make_unique<CallbackInterfaceMethod10>(aUniffiHandle, contextId, creationDate);
   AsyncCallbackMethodHandlerBase::ScheduleAsyncCall(std::move(handler), &gUniffiCallbackHandler1);
 }
 /**
@@ -22178,7 +22226,7 @@ extern "C" void callback_interface_method_1_1(
   void* aUniffiOutReturn,
   RustCallStatus* uniffiOutStatus
 ) {
-  UniquePtr<AsyncCallbackMethodHandlerBase> handler = MakeUnique<CallbackInterfaceMethod11>(aUniffiHandle, oldContextId);
+  UniquePtr<AsyncCallbackMethodHandlerBase> handler = std::make_unique<CallbackInterfaceMethod11>(aUniffiHandle, oldContextId);
   AsyncCallbackMethodHandlerBase::ScheduleAsyncCall(std::move(handler), &gUniffiCallbackHandler1);
 }
 
@@ -22187,7 +22235,7 @@ extern "C" void callback_free_1(uint64_t aUniffiHandle) {
    // Callback object handles are keys in a map stored in the JS handler. To
    // handle the free call, schedule a fire-and-forget JS call to remove the key.
    AsyncCallbackMethodHandlerBase::ScheduleAsyncCall(
-      MakeUnique<CallbackFreeHandler>("ContextIdCallback.uniffi_free", aUniffiHandle),
+      std::make_unique<CallbackFreeHandler>("ContextIdCallback.uniffi_free", aUniffiHandle),
       &gUniffiCallbackHandler1);
   }
 }
@@ -22249,7 +22297,7 @@ extern "C" void callback_interface_method_5_0(
   void* aUniffiOutReturn,
   RustCallStatus* uniffiOutStatus
 ) {
-  UniquePtr<AsyncCallbackMethodHandlerBase> handler = MakeUnique<CallbackInterfaceMethod50>(aUniffiHandle);
+  UniquePtr<AsyncCallbackMethodHandlerBase> handler = std::make_unique<CallbackInterfaceMethod50>(aUniffiHandle);
   AsyncCallbackMethodHandlerBase::ScheduleAsyncCall(std::move(handler), &gUniffiCallbackHandler5);
 }
 
@@ -22258,7 +22306,7 @@ extern "C" void callback_free_5(uint64_t aUniffiHandle) {
    // Callback object handles are keys in a map stored in the JS handler. To
    // handle the free call, schedule a fire-and-forget JS call to remove the key.
    AsyncCallbackMethodHandlerBase::ScheduleAsyncCall(
-      MakeUnique<CallbackFreeHandler>("ContainersCallback.uniffi_free", aUniffiHandle),
+      std::make_unique<CallbackFreeHandler>("ContainersCallback.uniffi_free", aUniffiHandle),
       &gUniffiCallbackHandler5);
   }
 }
@@ -22327,7 +22375,7 @@ extern "C" void callback_interface_method_6_0(
   void* aUniffiOutReturn,
   RustCallStatus* uniffiOutStatus
 ) {
-  UniquePtr<AsyncCallbackMethodHandlerBase> handler = MakeUnique<CallbackInterfaceMethod60>(aUniffiHandle, event);
+  UniquePtr<AsyncCallbackMethodHandlerBase> handler = std::make_unique<CallbackInterfaceMethod60>(aUniffiHandle, event);
   AsyncCallbackMethodHandlerBase::ScheduleAsyncCall(std::move(handler), &gUniffiCallbackHandler6);
 }
 
@@ -22336,7 +22384,7 @@ extern "C" void callback_free_6(uint64_t aUniffiHandle) {
    // Callback object handles are keys in a map stored in the JS handler. To
    // handle the free call, schedule a fire-and-forget JS call to remove the key.
    AsyncCallbackMethodHandlerBase::ScheduleAsyncCall(
-      MakeUnique<CallbackFreeHandler>("EventSink.uniffi_free", aUniffiHandle),
+      std::make_unique<CallbackFreeHandler>("EventSink.uniffi_free", aUniffiHandle),
       &gUniffiCallbackHandler6);
   }
 }
@@ -22458,7 +22506,7 @@ extern "C" void callback_free_2(uint64_t aUniffiHandle) {
    // Callback object handles are keys in a map stored in the JS handler. To
    // handle the free call, schedule a fire-and-forget JS call to remove the key.
    AsyncCallbackMethodHandlerBase::ScheduleAsyncCall(
-      MakeUnique<CallbackFreeHandler>("EncryptorDecryptor.uniffi_free", aUniffiHandle),
+      std::make_unique<CallbackFreeHandler>("EncryptorDecryptor.uniffi_free", aUniffiHandle),
       &gUniffiCallbackHandler2);
   }
 }
@@ -22522,7 +22570,7 @@ extern "C" void callback_free_3(uint64_t aUniffiHandle) {
    // Callback object handles are keys in a map stored in the JS handler. To
    // handle the free call, schedule a fire-and-forget JS call to remove the key.
    AsyncCallbackMethodHandlerBase::ScheduleAsyncCall(
-      MakeUnique<CallbackFreeHandler>("KeyManager.uniffi_free", aUniffiHandle),
+      std::make_unique<CallbackFreeHandler>("KeyManager.uniffi_free", aUniffiHandle),
       &gUniffiCallbackHandler3);
   }
 }
@@ -22611,7 +22659,7 @@ extern "C" void callback_interface_method_4_0(
   // it.
   ForeignFutureDroppedCallbackStruct *aUniffiOutForeignFuture
 ) {
-  UniquePtr<AsyncCallbackMethodHandlerBase> handler = MakeUnique<CallbackInterfaceMethod40>(
+  UniquePtr<AsyncCallbackMethodHandlerBase> handler = std::make_unique<CallbackInterfaceMethod40>(
         aUniffiHandle,
         aUniffiForeignFutureCallback,
         aUniffiForeignFutureCallbackData);
@@ -22691,7 +22739,7 @@ extern "C" void callback_interface_method_4_1(
   // it.
   ForeignFutureDroppedCallbackStruct *aUniffiOutForeignFuture
 ) {
-  UniquePtr<AsyncCallbackMethodHandlerBase> handler = MakeUnique<CallbackInterfaceMethod41>(
+  UniquePtr<AsyncCallbackMethodHandlerBase> handler = std::make_unique<CallbackInterfaceMethod41>(
         aUniffiHandle,
         aUniffiForeignFutureCallback,
         aUniffiForeignFutureCallbackData);
@@ -22771,7 +22819,7 @@ extern "C" void callback_interface_method_4_2(
   // it.
   ForeignFutureDroppedCallbackStruct *aUniffiOutForeignFuture
 ) {
-  UniquePtr<AsyncCallbackMethodHandlerBase> handler = MakeUnique<CallbackInterfaceMethod42>(
+  UniquePtr<AsyncCallbackMethodHandlerBase> handler = std::make_unique<CallbackInterfaceMethod42>(
         aUniffiHandle,
         aUniffiForeignFutureCallback,
         aUniffiForeignFutureCallbackData);
@@ -22784,7 +22832,7 @@ extern "C" void callback_free_4(uint64_t aUniffiHandle) {
    // Callback object handles are keys in a map stored in the JS handler. To
    // handle the free call, schedule a fire-and-forget JS call to remove the key.
    AsyncCallbackMethodHandlerBase::ScheduleAsyncCall(
-      MakeUnique<CallbackFreeHandler>("PrimaryPasswordAuthenticator.uniffi_free", aUniffiHandle),
+      std::make_unique<CallbackFreeHandler>("PrimaryPasswordAuthenticator.uniffi_free", aUniffiHandle),
       &gUniffiCallbackHandler4);
   }
 }
@@ -22891,7 +22939,7 @@ extern "C" void callback_interface_method_7_0(
   // it.
   ForeignFutureDroppedCallbackStruct *aUniffiOutForeignFuture
 ) {
-  UniquePtr<AsyncCallbackMethodHandlerBase> handler = MakeUnique<CallbackInterfaceMethod70>(
+  UniquePtr<AsyncCallbackMethodHandlerBase> handler = std::make_unique<CallbackInterfaceMethod70>(
         aUniffiHandle,
         request,
         settings,
@@ -22906,7 +22954,7 @@ extern "C" void callback_free_7(uint64_t aUniffiHandle) {
    // Callback object handles are keys in a map stored in the JS handler. To
    // handle the free call, schedule a fire-and-forget JS call to remove the key.
    AsyncCallbackMethodHandlerBase::ScheduleAsyncCall(
-      MakeUnique<CallbackFreeHandler>("Backend.uniffi_free", aUniffiHandle),
+      std::make_unique<CallbackFreeHandler>("Backend.uniffi_free", aUniffiHandle),
       &gUniffiCallbackHandler7);
   }
 }
@@ -22997,7 +23045,7 @@ extern "C" void callback_interface_method_8_0(
   // it.
   ForeignFutureDroppedCallbackStruct *aUniffiOutForeignFuture
 ) {
-  UniquePtr<AsyncCallbackMethodHandlerBase> handler = MakeUnique<CallbackInterfaceMethod80>(
+  UniquePtr<AsyncCallbackMethodHandlerBase> handler = std::make_unique<CallbackInterfaceMethod80>(
         aUniffiHandle,
         aUniffiForeignFutureCallback,
         aUniffiForeignFutureCallbackData);
@@ -23077,7 +23125,7 @@ extern "C" void callback_interface_method_8_1(
   // it.
   ForeignFutureDroppedCallbackStruct *aUniffiOutForeignFuture
 ) {
-  UniquePtr<AsyncCallbackMethodHandlerBase> handler = MakeUnique<CallbackInterfaceMethod81>(
+  UniquePtr<AsyncCallbackMethodHandlerBase> handler = std::make_unique<CallbackInterfaceMethod81>(
         aUniffiHandle,
         aUniffiForeignFutureCallback,
         aUniffiForeignFutureCallbackData);
@@ -23165,7 +23213,7 @@ extern "C" void callback_interface_method_8_2(
   // it.
   ForeignFutureDroppedCallbackStruct *aUniffiOutForeignFuture
 ) {
-  UniquePtr<AsyncCallbackMethodHandlerBase> handler = MakeUnique<CallbackInterfaceMethod82>(
+  UniquePtr<AsyncCallbackMethodHandlerBase> handler = std::make_unique<CallbackInterfaceMethod82>(
         aUniffiHandle,
         value,
         aUniffiForeignFutureCallback,
@@ -23254,7 +23302,7 @@ extern "C" void callback_interface_method_8_3(
   // it.
   ForeignFutureDroppedCallbackStruct *aUniffiOutForeignFuture
 ) {
-  UniquePtr<AsyncCallbackMethodHandlerBase> handler = MakeUnique<CallbackInterfaceMethod83>(
+  UniquePtr<AsyncCallbackMethodHandlerBase> handler = std::make_unique<CallbackInterfaceMethod83>(
         aUniffiHandle,
         numbers,
         aUniffiForeignFutureCallback,
@@ -23268,7 +23316,7 @@ extern "C" void callback_free_8(uint64_t aUniffiHandle) {
    // Callback object handles are keys in a map stored in the JS handler. To
    // handle the free call, schedule a fire-and-forget JS call to remove the key.
    AsyncCallbackMethodHandlerBase::ScheduleAsyncCall(
-      MakeUnique<CallbackFreeHandler>("TestAsyncCallbackInterface.uniffi_free", aUniffiHandle),
+      std::make_unique<CallbackFreeHandler>("TestAsyncCallbackInterface.uniffi_free", aUniffiHandle),
       &gUniffiCallbackHandler8);
   }
 }
@@ -23475,7 +23523,7 @@ extern "C" void callback_free_9(uint64_t aUniffiHandle) {
    // Callback object handles are keys in a map stored in the JS handler. To
    // handle the free call, schedule a fire-and-forget JS call to remove the key.
    AsyncCallbackMethodHandlerBase::ScheduleAsyncCall(
-      MakeUnique<CallbackFreeHandler>("TestCallbackInterface.uniffi_free", aUniffiHandle),
+      std::make_unique<CallbackFreeHandler>("TestCallbackInterface.uniffi_free", aUniffiHandle),
       &gUniffiCallbackHandler9);
   }
 }
@@ -23539,7 +23587,7 @@ extern "C" void callback_interface_method_12_0(
   RustBuffer* aUniffiOutReturn,
   RustCallStatus* uniffiOutStatus
 ) {
-  UniquePtr<AsyncCallbackMethodHandlerBase> handler = MakeUnique<CallbackInterfaceMethod120>(aUniffiHandle);
+  UniquePtr<AsyncCallbackMethodHandlerBase> handler = std::make_unique<CallbackInterfaceMethod120>(aUniffiHandle);
   AsyncCallbackMethodHandlerBase::ScheduleAsyncCall(std::move(handler), &gUniffiCallbackHandler12);
 }
 
@@ -23548,7 +23596,7 @@ extern "C" void callback_free_12(uint64_t aUniffiHandle) {
    // Callback object handles are keys in a map stored in the JS handler. To
    // handle the free call, schedule a fire-and-forget JS call to remove the key.
    AsyncCallbackMethodHandlerBase::ScheduleAsyncCall(
-      MakeUnique<CallbackFreeHandler>("TestCallbackInterface.uniffi_free", aUniffiHandle),
+      std::make_unique<CallbackFreeHandler>("TestCallbackInterface.uniffi_free", aUniffiHandle),
       &gUniffiCallbackHandler12);
   }
 }
@@ -23637,7 +23685,7 @@ extern "C" void callback_interface_method_10_0(
   // it.
   ForeignFutureDroppedCallbackStruct *aUniffiOutForeignFuture
 ) {
-  UniquePtr<AsyncCallbackMethodHandlerBase> handler = MakeUnique<CallbackInterfaceMethod100>(
+  UniquePtr<AsyncCallbackMethodHandlerBase> handler = std::make_unique<CallbackInterfaceMethod100>(
         aUniffiHandle,
         aUniffiForeignFutureCallback,
         aUniffiForeignFutureCallbackData);
@@ -23717,7 +23765,7 @@ extern "C" void callback_interface_method_10_1(
   // it.
   ForeignFutureDroppedCallbackStruct *aUniffiOutForeignFuture
 ) {
-  UniquePtr<AsyncCallbackMethodHandlerBase> handler = MakeUnique<CallbackInterfaceMethod101>(
+  UniquePtr<AsyncCallbackMethodHandlerBase> handler = std::make_unique<CallbackInterfaceMethod101>(
         aUniffiHandle,
         aUniffiForeignFutureCallback,
         aUniffiForeignFutureCallbackData);
@@ -23805,7 +23853,7 @@ extern "C" void callback_interface_method_10_2(
   // it.
   ForeignFutureDroppedCallbackStruct *aUniffiOutForeignFuture
 ) {
-  UniquePtr<AsyncCallbackMethodHandlerBase> handler = MakeUnique<CallbackInterfaceMethod102>(
+  UniquePtr<AsyncCallbackMethodHandlerBase> handler = std::make_unique<CallbackInterfaceMethod102>(
         aUniffiHandle,
         value,
         aUniffiForeignFutureCallback,
@@ -23894,7 +23942,7 @@ extern "C" void callback_interface_method_10_3(
   // it.
   ForeignFutureDroppedCallbackStruct *aUniffiOutForeignFuture
 ) {
-  UniquePtr<AsyncCallbackMethodHandlerBase> handler = MakeUnique<CallbackInterfaceMethod103>(
+  UniquePtr<AsyncCallbackMethodHandlerBase> handler = std::make_unique<CallbackInterfaceMethod103>(
         aUniffiHandle,
         numbers,
         aUniffiForeignFutureCallback,
@@ -23908,7 +23956,7 @@ extern "C" void callback_free_10(uint64_t aUniffiHandle) {
    // Callback object handles are keys in a map stored in the JS handler. To
    // handle the free call, schedule a fire-and-forget JS call to remove the key.
    AsyncCallbackMethodHandlerBase::ScheduleAsyncCall(
-      MakeUnique<CallbackFreeHandler>("AsyncTestTraitInterface.uniffi_free", aUniffiHandle),
+      std::make_unique<CallbackFreeHandler>("AsyncTestTraitInterface.uniffi_free", aUniffiHandle),
       &gUniffiCallbackHandler10);
   }
 }
@@ -24115,7 +24163,7 @@ extern "C" void callback_free_11(uint64_t aUniffiHandle) {
    // Callback object handles are keys in a map stored in the JS handler. To
    // handle the free call, schedule a fire-and-forget JS call to remove the key.
    AsyncCallbackMethodHandlerBase::ScheduleAsyncCall(
-      MakeUnique<CallbackFreeHandler>("TestTraitInterface.uniffi_free", aUniffiHandle),
+      std::make_unique<CallbackFreeHandler>("TestTraitInterface.uniffi_free", aUniffiHandle),
       &gUniffiCallbackHandler11);
   }
 }

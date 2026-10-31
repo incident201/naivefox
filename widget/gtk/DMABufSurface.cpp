@@ -2676,7 +2676,6 @@ already_AddRefed<DMABufSurfaceRGBA> DMABufSurfaceYUV::ConvertHLGToPQ(
 
   target->SetTransferFunction(gfx::TransferFunction::PQ);
   target->SetYUVColorSpace(gfx::YUVColorSpace::BT2020);
-  target->SetColorRange(gfx::ColorRange::FULL);
   target->SetColorPrimaries(gfx::ColorSpace2::BT2020);
   target->SetHDRMetadata(GetHDRMetadata());
 

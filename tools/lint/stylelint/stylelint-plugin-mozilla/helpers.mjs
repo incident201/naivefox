@@ -34,7 +34,10 @@ export const SYSTEM_COLORS = [
   // -moz- prefixed colors, used rarely but still valid
   "-moz-buttonactivetext",
   "-moz-buttonhovertext",
+  "-moz-cellhighlight",
+  "-moz-cellhighlighttext",
   "-moz-combobox",
+  "-moz-default-background-color",
   "-moz-dialog",
   "-moz-dialogtext",
   "-moz-menuhover",

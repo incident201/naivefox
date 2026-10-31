@@ -40,7 +40,7 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_END
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(ElementInternals)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mTarget, mSubmissionValue, mState,
                                     mValidity, mValidationAnchor,
-                                    mCustomStateSet);
+                                    mCustomStateSet, mForm);
 
   for (auto& tableEntry : tmp->mAttrElementsMap) {
     auto& [explicitlySetElements, cachedAttrElements] =
@@ -62,7 +62,6 @@ NS_INTERFACE_MAP_END
 ElementInternals::ElementInternals(HTMLElement* aTarget)
     : nsIFormControl(FormControlType::FormAssociatedCustomElement),
       mTarget(aTarget),
-      mForm(nullptr),
       mFieldSet(nullptr),
       mControlNumber(-1) {}
 

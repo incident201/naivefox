@@ -601,7 +601,7 @@ class PHC : public BaseAllocClass {
     // and we must setup the delay.  However once XPCOM starts it'll call
     // SetState() which will re-initialise the RNG and allocation delay.
 
-#ifdef EARLY_BETA_OR_EARLIER
+#ifdef NIGHTLY_BUILD
     const size_t array_size = 16 * 1024 * 1024;
 #else
     // Before Bug 1867191 PHC used no more than approximately 1.1MB when it was

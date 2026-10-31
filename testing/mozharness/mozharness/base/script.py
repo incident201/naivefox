@@ -91,30 +91,33 @@ class ContentLengthMismatch(Exception):
     pass
 
 
-def _validate_tar_member(member, path):
-    def _is_within_directory(directory, target):
-        real_directory = os.path.realpath(directory)
+def _validate_tar_member(member, path, real_path=None):
+    real_directory = real_path or os.path.realpath(path)
+
+    def _is_within_directory(target):
         real_target = os.path.realpath(target)
         prefix = os.path.commonprefix([real_directory, real_target])
         return prefix == real_directory
 
     member_path = os.path.join(path, member.name)
-    if not _is_within_directory(path, member_path):
+    if not _is_within_directory(member_path):
         raise Exception("Attempted path traversal in tar file: " + member.name)
     if member.issym():
         link_path = os.path.join(os.path.dirname(member_path), member.linkname)
-        if not _is_within_directory(path, link_path):
+        if not _is_within_directory(link_path):
             raise Exception("Attempted link path traversal in tar file: " + member.name)
     if member.mode & (stat.S_ISUID | stat.S_ISGID):
         raise Exception("Attempted setuid or setgid in tar file: " + member.name)
 
 
 def _safe_extract(tar, path=".", *, numeric_owner=False, member_filter=None):
+    real_path = os.path.realpath(path)
+
     def _files(tar, path):
         for member in tar:
             if member_filter and not member_filter(member.name):
                 continue
-            _validate_tar_member(member, path)
+            _validate_tar_member(member, path, real_path)
             yield member
 
     tar.extractall(path, members=_files(tar, path), numeric_owner=numeric_owner)
@@ -1989,8 +1992,11 @@ class ScriptMixin(PlatformMixin):
             try:
                 self.info(f"Using TarFile to extract {filename} to {extract_to}")
                 with tarfile.open(filename) as bundle:
+                    real_extract_to = os.path.realpath(extract_to)
                     for entry in self._filter_entries(bundle.getnames(), extract_dirs):
-                        _validate_tar_member(bundle.getmember(entry), extract_to)
+                        _validate_tar_member(
+                            bundle.getmember(entry), extract_to, real_extract_to
+                        )
                         if verbose:
                             self.info(" %s" % entry)
                         bundle.extract(entry, path=extract_to)

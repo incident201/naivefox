@@ -35,6 +35,15 @@ function isBackgroundTaskMode() {
   return bts?.isBackgroundTaskMode ?? false;
 }
 
+function getLegacyStorePath() {
+  if (Cu.isInAutomation) {
+    try {
+      return Services.prefs.getStringPref("nimbus.persistence.legacyStorePath");
+    } catch {}
+  }
+  return PathUtils.join(PathUtils.profileDir, "ExperimentDataStore.json");
+}
+
 /**
  * A named migration.
  *
@@ -154,12 +163,8 @@ async function migrateRemoveNormandyDatabases() {
 }
 
 async function migrateEnrollmentsToSql() {
-  if (!lazy.NimbusEnrollments.databaseEnabled) {
-    // We are in an xpcshell test that has not initialized the
-    // ProfilesDatastoreService.
-    //
-    // TODO(bug 1967779): require the ProfilesDatastoreService to be initialized
-    // and remove this check.
+  if (!lazy.NimbusEnrollments.persistenceEnabled) {
+    // We are in a test.
     return;
   }
 
@@ -174,12 +179,21 @@ async function migrateEnrollmentsToSql() {
 
   await lazy.ExperimentAPI.manager.store.ready();
 
+  let legacyStoreData = null;
+
+  try {
+    legacyStoreData = await IOUtils.readJSON(getLegacyStorePath());
+  } catch (e) {
+    if (DOMException.isInstance(e) && e.name === "NotFoundError") {
+      // The legacy store does not exist. There is nothing to migrate.
+      return;
+    }
+  }
+
   // Ensure we are copying the data from the JSONFile explicitly because if the
   // NimbusEnrollments table is the source of truth, then getAll() will return
   // an empty array.
-  const enrollments = Object.values(
-    lazy.ExperimentAPI.manager.store._jsonFile.data
-  );
+  const enrollments = Object.values(legacyStoreData);
 
   // If there are no enrollments we can skip the rest of the migration.
   if (enrollments.length === 0) {
@@ -285,19 +299,13 @@ async function migrateEnrollmentsToSql() {
     }
   });
 
-  if (lazy.NimbusEnrollments.readFromDatabaseEnabled) {
-    // These now exist in the database and in the ExperimentStore's JSONFile
-    // data. However, the regular ExperimentStore data will not have been
-    // populated yet (because it will have read zero rows from the database
-    // during `SharedDataMap.init()`.
-    const store = lazy.ExperimentAPI.manager.store;
-    store._data = structuredClone(store._jsonFile.data);
-    store._syncToChildren({ flush: true });
-  }
-
-  await lazy.ExperimentAPI.manager.store._reportStartupDatabaseConsistency(
-    "migration"
-  );
+  // These now exist in the database and in the ExperimentStore's JSONFile
+  // data. However, the regular ExperimentStore data will not have been
+  // populated yet (because it will have read zero rows from the database
+  // during `SharedDataMap.init()`.
+  const store = lazy.ExperimentAPI.manager.store;
+  store._data = legacyStoreData;
+  store._syncToChildren({ flush: true });
 }
 
 /**
@@ -442,6 +450,12 @@ function migrateGraduateFirefoxLabsJPEGXLAllChannels(migration) {
   ]);
 }
 
+async function migrateRemoveLegacyStore() {
+  try {
+    await IOUtils.remove(getLegacyStorePath(), { ignoreAbsent: true });
+  } catch {}
+}
+
 /**
  * Migrate the pre-Nimbus Firefox Labs experiences into Nimbus enrollments.
  *
@@ -464,8 +478,6 @@ async function migrateFirefoxLabsEnrollments() {
   await lazy.ExperimentAPI._rsLoader.withUpdateLock(
     async () => {
       const labs = await lazy.FirefoxLabs.create();
-
-      let didEnroll = false;
 
       for (const [feature, slug] of Object.entries(
         LABS_MIGRATION_FEATURE_MAP
@@ -508,16 +520,20 @@ async function migrateFirefoxLabsEnrollments() {
           continue;
         }
 
-        didEnroll = true;
-        prefEntry.originalValue = false;
-      }
+        // Set the original value to `null` instead of `false` so that it will
+        // restore by removing the user branch value instead of setting it to
+        // false if the default branch value changes.
+        prefEntry.originalValue = null;
 
-      if (didEnroll) {
-        // Trigger a save of the ExperimentStore since we've changed some data
-        // structures without using set().
+        // Trigger a save of the ExperimentStore since we've updated the
+        // enrollment.
+        //
+        // The changes due to enroll() probably haven't been flushed, but this
+        // will ensure that they do not get lost.
+        //
         // We do not have to sync these changes to child processes because the
         // data is only used in the parent process.
-        lazy.ExperimentAPI.manager.store._jsonFile.saveSoon();
+        lazy.ExperimentAPI.manager.store._db?.updateEnrollment(slug);
       }
     },
     { mode: "shared" }
@@ -673,6 +689,7 @@ export const NimbusMigrations = {
         "graduate-firefox-labs-jpeg-xl-all-channels",
         migrateGraduateFirefoxLabsJPEGXLAllChannels
       ),
+      migration("remove-legacy-store", migrateRemoveLegacyStore),
     ],
 
     [Phase.AFTER_REMOTE_SETTINGS_UPDATE]: [

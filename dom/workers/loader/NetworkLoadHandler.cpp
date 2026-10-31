@@ -45,8 +45,8 @@ NetworkLoadHandler::NetworkLoadHandler(WorkerScriptLoader* aLoader,
   MOZ_ASSERT(mLoader);
 
   // Worker scripts are always decoded as UTF-8 per spec.
-  mDecoder = MakeUnique<ScriptDecoder>(UTF_8_ENCODING,
-                                       ScriptDecoder::BOMHandling::Remove);
+  mDecoder = std::make_unique<ScriptDecoder>(
+      UTF_8_ENCODING, ScriptDecoder::BOMHandling::Remove);
 }
 
 NS_IMETHODIMP
@@ -279,18 +279,14 @@ nsresult NetworkLoadHandler::DataReceivedFromNetwork(nsIStreamLoader* aLoader,
     // URL must exactly match the final worker script URL in order to
     // properly set the referrer header on fetch/xhr requests.  If bug 1340694
     // is ever fixed this can be removed.
-    rv = mWorkerRef->Private()->SetPrincipalsAndCSPFromChannel(channel);
-    NS_ENSURE_SUCCESS(rv, rv);
+    MOZ_TRY(mWorkerRef->Private()->SetPrincipalsAndPolicyContainerFromChannel(
+        channel));
 
-    nsCOMPtr<nsIContentSecurityPolicy> csp = mWorkerRef->Private()->GetCsp();
-    // We did inherit CSP in bug 1223647. If we do not already have a CSP, we
-    // should get it from the HTTP headers on the worker script.
-    if (!csp) {
-      rv = mWorkerRef->Private()->SetCSPFromHeaderValues(tCspHeaderValue,
-                                                         tCspROHeaderValue);
-      NS_ENSURE_SUCCESS(rv, rv);
-    } else {
-      csp->EnsureEventTarget(mWorkerRef->Private()->MainThreadEventTarget());
+    // Set CSP from the header if we don't inherit the Policy-Container from the
+    // channel.
+    if (!CSP_ShouldResponseInheritCSP(channel)) {
+      MOZ_TRY(mWorkerRef->Private()->SetCSPFromHeaderValues(tCspHeaderValue,
+                                                            tCspROHeaderValue));
     }
 
     mWorkerRef->Private()->UpdateReferrerInfoFromHeader(tRPHeaderCValue);

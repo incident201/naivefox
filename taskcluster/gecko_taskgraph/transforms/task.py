@@ -2185,7 +2185,8 @@ def add_github_checks_route(config, tasks):
         return
 
     for task in tasks:
-        if task.get("attributes", {}).get("code-review"):
+        attrs = task.get("attributes", {})
+        if attrs.get("code-review") or attrs.get("code-review-build-test"):
             routes = task.setdefault("routes", [])
             tier = task.get("treeherder", {}).get("tier", 3)
             if "checks" not in routes and tier == 1:
@@ -2608,19 +2609,6 @@ def check_task_dependencies(config, tasks):
                     MAX_DEPENDENCIES,
                 )
             )
-        yield task
-
-
-@transforms.add
-def check_perf_task_fission_filtering(config, tasks):
-    for task in tasks:
-        if (
-            ("chrome-m" in task["label"] or "cstm-car-m" in task["label"])
-            and "nofis" not in task["label"]
-            and "android" in task["label"]
-            and "startup" not in task["label"]
-        ):
-            continue
         yield task
 
 

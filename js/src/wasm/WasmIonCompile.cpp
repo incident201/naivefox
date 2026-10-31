@@ -1902,6 +1902,9 @@ class FunctionCompiler {
         || (js::jit::CPUInfo::IsAVX2Present() &&
             (viewType == Scalar::Uint8 || viewType == Scalar::Uint16 ||
              viewType == Scalar::Float32))
+#  elif defined(JS_CODEGEN_LOONG64)
+        || viewType == Scalar::Uint8 || viewType == Scalar::Uint16 ||
+        viewType == Scalar::Float32
 #  endif
     ) {
       access.setSplatSimd128Load();

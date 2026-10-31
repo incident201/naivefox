@@ -146,6 +146,8 @@ Follow the [upgrade documentation](https://searchfox.org/firefox-main/source/dev
 
 Check that xpcshell tests can be debugged using the `--jsdebugger` option.
 
+This check is automated by `browser_backward_compat_xpcshell.js`, which runs in the daily `DTbc(same)` job (see [Remote debugging backward compatibility tests](./tests/backward-compat-tests.md)). If this job is green, you can skip the manual steps below.
+
 1. Run Firefox from `mozilla-central` using `./mach run`
 1. Open an `about:debugging` tab
 1. If you don't have a `localhost:6000` item on the left sidebar, click on `Setup`

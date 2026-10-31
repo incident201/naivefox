@@ -18,6 +18,7 @@
 #include "LulElfExt.h"
 #include "LulMainInt.h"
 #include "mozilla/Assertions.h"
+#include "mozilla/Attributes.h"
 #include "mozilla/CheckedInt.h"
 #include "mozilla/DebugOnly.h"
 #include "mozilla/MemoryChecking.h"
@@ -931,8 +932,7 @@ void LUL::NotifyAfterMap(uintptr_t aRXavma, size_t aSize, const char* aFileName,
   // Ignore obviously-stupid notifications.
   if (aSize > 0) {
     // Here's a new mapping, for this object.
-    mozilla::UniquePtr<SecMap> smap =
-        mozilla::MakeUnique<SecMap>(aRXavma, (uint32_t)aSize, mLog);
+    auto smap = std::make_unique<SecMap>(aRXavma, (uint32_t)aSize, mLog);
 
     // Read CFI or EXIDX unwind data into |smap|.
     if (!aMappedImage) {
@@ -1018,7 +1018,8 @@ size_t LUL::CountMappings() {
 }
 
 // RUNS IN NO-MALLOC CONTEXT
-static TaggedUWord DerefTUW(TaggedUWord aAddr, const StackImage* aStackImg) {
+MOZ_ASAN_IGNORE static TaggedUWord DerefTUW(TaggedUWord aAddr,
+                                            const StackImage* aStackImg) {
   if (!aAddr.Valid()) {
     return TaggedUWord();
   }
@@ -2048,8 +2049,8 @@ static __attribute__((noinline)) bool GetAndCheckStackTrace(
   stackImg->mStartAvma = start;
   if (nToCopy > 0) {
     MOZ_MAKE_MEM_DEFINED((void*)start, nToCopy);
-    memcpy(&stackImg->mContents[0], (void*)start, nToCopy);
   }
+  stackImg->mContents = reinterpret_cast<uint8_t*>(start);
 
   // Unwind it.
   const int MAX_TEST_FRAMES = 64;

@@ -63,7 +63,7 @@ UniquePtr<SurfaceFactory_DMABUF> SurfaceFactory_DMABUF::Create(GLContext& gl) {
     return nullptr;
   }
 
-  auto dmabufFactory = MakeUnique<SurfaceFactory_DMABUF>(gl);
+  auto dmabufFactory = std::make_unique<SurfaceFactory_DMABUF>(gl);
   if (dmabufFactory->CanCreateSurface(gl)) {
     return dmabufFactory;
   }

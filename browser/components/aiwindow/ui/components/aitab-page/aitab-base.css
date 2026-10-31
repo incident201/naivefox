@@ -148,7 +148,9 @@ p {
 
 section {
   /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
-  margin-block: var(--aitab-section-vertical-gap);
+  margin-block-start: var(--aitab-section-vertical-gap);
+  /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+  margin-block-end: var(--aitab-section-margin-block-end, var(--aitab-section-vertical-gap));
   /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
   padding-inline: var(--aitab-section-horizontal-padding);
 }

@@ -6,11 +6,13 @@
 #define mozilla_dom_SpeculationRules_h
 
 #include "mozilla/UniquePtr.h"
+#include "mozilla/dom/SpeculationRuleSet.h"
 #include "mozilla/dom/speculationrules_ffi_generated.h"
 #include "nsCOMPtr.h"
 #include "nsClassHashtable.h"
 #include "nsCycleCollectionParticipant.h"
 #include "nsHashKeys.h"
+#include "nsStringFwd.h"
 #include "nsTArrayForwardDeclare.h"
 #include "nsTHashSet.h"
 
@@ -36,6 +38,7 @@ class SpeculationRules final {
 
   explicit SpeculationRules(Document* aDocument);
 
+  void RegisterFromHeader(UniquePtr<SpeculationRuleSet> aRuleSet);
   void RegisterFromScript(nsIScriptElement* aScriptElement,
                           UniquePtr<SpeculationRuleSet> aRuleSet);
   void Unregister(nsIScriptElement* aScriptElement);
@@ -50,6 +53,8 @@ class SpeculationRules final {
 
   void HoverContentChanged(nsIContent* aContent);
   void PointerDown(Element* aContent);
+
+  void ProcessSpeculationRulesHeader(const nsACString& aHeader);
 
  private:
   virtual ~SpeculationRules();
@@ -80,9 +85,12 @@ class SpeculationRules final {
   void CancelHoverTimer();
   static void HoverTimerFired(nsITimer* aTimer, void* aClosure);
 
+  bool HasRuleSets() const;
+
   RefPtr<Document> mDocument;
 
   // https://html.spec.whatwg.org/#document-sr-sets
+  nsTArray<UniquePtr<SpeculationRuleSet>> mRuleSetsFromHeader;
   nsClassHashtable<nsRefPtrHashKey<nsIScriptElement>, SpeculationRuleSet>
       mRuleSetsFromScript;
 

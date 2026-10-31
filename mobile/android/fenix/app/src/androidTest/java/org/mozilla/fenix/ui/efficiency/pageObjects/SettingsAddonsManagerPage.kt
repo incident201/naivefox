@@ -37,7 +37,7 @@ class SettingsAddonsManagerPage(composeRule: AndroidComposeTestRule<HomeActivity
             to = pageName,
             steps =
                 listOf(
-                    NavigationStep.Click(MainMenuSelectors.EXTENSIONS_BUTTON_UIAUTOMATOR),
+                    NavigationStep.Click(MainMenuSelectors.EXTENSIONS_BUTTON),
                     NavigationStep.Click(MainMenuSelectors.MANAGE_EXTENSIONS_BUTTON),
                 ),
         )

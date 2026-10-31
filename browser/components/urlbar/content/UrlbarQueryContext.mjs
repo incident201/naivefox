@@ -12,6 +12,16 @@ import UrlbarPrefs from "chrome://browser/content/urlbar/UrlbarContentPrefs.mjs"
 import { UrlbarShared } from "chrome://browser/content/urlbar/UrlbarShared.mjs";
 import { UrlbarResult } from "chrome://browser/content/urlbar/UrlbarResult.mjs";
 
+const { XPCOMUtils } =
+  typeof ChromeUtils == "undefined"
+    ? { XPCOMUtils: null }
+    : ChromeUtils.importESModule("resource://gre/modules/XPCOMUtils.sys.mjs");
+
+const lazy = XPCOMUtils?.declareLazy({
+  TemporalSuggestions:
+    "moz-src:///browser/components/urlbar/private/TemporalSuggestions.sys.mjs",
+});
+
 /**
  * @import {UrlbarSearchStringTokenData} from "moz-src:///browser/components/urlbar/UrlbarTokenizer.sys.mjs"
  * @import {SearchMode} from "moz-src:///browser/components/urlbar/content/UrlbarInputBase.mjs"
@@ -193,9 +203,94 @@ export class UrlbarQueryContext {
 
   /**
    * @type {number}
-   *   The maximum number of results that will be displayed for this query.
+   *   The `maxResults` value passed to the constructor or last assigned.
    */
-  maxResults;
+  _maxResults;
+
+  /**
+   * The maximum number of results that should be displayed for this query.
+   *
+   * @type {number}
+   */
+  get maxResults() {
+    // When temporal suggestions are active and the SAP is urlbar, override the
+    // usual `maxRichResults` unless the user modified it.
+    if (
+      this.isTemporalZeroPrefix &&
+      this._maxResults == UrlbarPrefs.get("maxRichResults") &&
+      !UrlbarPrefs.hasUserValue("maxRichResults")
+    ) {
+      return UrlbarPrefs.get("temporal.zeroPrefixMaxRichResults");
+    }
+    return this._maxResults;
+  }
+
+  set maxResults(value) {
+    this._maxResults = value;
+  }
+
+  /**
+   * Whether the zero prefix layout and result count for temporal search
+   * suggestions apply to this query. They only apply to the urlbar SAP, and
+   * only when `TemporalSuggestions.isEnabled` is true.
+   *
+   * @type {boolean}
+   */
+  get isTemporalZeroPrefix() {
+    return (
+      this.sapName == "urlbar" &&
+      !!lazy?.TemporalSuggestions.isEnabled &&
+      !this.searchString &&
+      !this.searchMode
+    );
+  }
+
+  /**
+   * Whether search suggestions should be shown before general results.
+   *
+   * @type {boolean}
+   */
+  get showSearchSuggestionsFirst() {
+    switch (this.sapName) {
+      case "urlbar":
+        return this._getShowSearchSuggestionsFirst(
+          "showSearchSuggestionsFirst"
+        );
+      case "smartbar":
+        return this._getShowSearchSuggestionsFirst(
+          "smartbar.showSearchSuggestionsFirst"
+        );
+      default:
+        return true;
+    }
+  }
+
+  /**
+   * Returns whether search suggestions should be shown before general results.
+   *
+   * @param {string} pref
+   *   The SAP's `showSearchSuggestionsFirst` pref.
+   * @returns {boolean}
+   */
+  _getShowSearchSuggestionsFirst(pref) {
+    if (this.isTemporalZeroPrefix) {
+      return false;
+    }
+
+    let showSearchSuggestionsFirst =
+      !!this.searchString ||
+      (!UrlbarPrefs.get("suggest.trending") &&
+        !UrlbarPrefs.get("suggest.recentsearches"));
+
+    let inSearchEngineMode = !!this.searchMode?.engineName;
+
+    // If we're in a case were search suggestions would be shown first, but not
+    // in search engine mode, then just use the preference.
+    if (!inSearchEngineMode && showSearchSuggestionsFirst) {
+      showSearchSuggestionsFirst = UrlbarPrefs.get(pref);
+    }
+    return showSearchSuggestionsFirst;
+  }
 
   /**
    * @type {string}

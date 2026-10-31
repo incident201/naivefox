@@ -7,8 +7,8 @@ use crate::db::models::address::{
     UpdatableAddressFields, UpdatableAddressFieldsWithMeta,
 };
 use crate::db::models::credit_card::{
-    CreditCard, CreditCardBulkResultEntry, CreditCardBulkTombstoneResultEntry, CreditCardTombstone,
-    UpdatableCreditCardFields, UpdatableCreditCardFieldsWithMeta,
+    CreditCard, CreditCardBulkResultEntry, CreditCardBulkTombstoneResultEntry, CreditCardCandidate,
+    CreditCardTombstone, UpdatableCreditCardFields, UpdatableCreditCardFieldsWithMeta,
 };
 use crate::db::models::passport::{Passport, UpdatablePassportFields};
 use crate::db::{
@@ -212,6 +212,20 @@ impl Store {
             .into_iter()
             .map(|x| x.into_external(db.encdec.as_ref()))
             .collect()
+    }
+
+    /// List every credit card without decrypting it.
+    ///
+    /// Unlike `get_all_credit_cards()` this never touches the encryption key,
+    /// so listing cards cannot prompt for a primary password. Read the one
+    /// card whose secrets are needed with `get_credit_card()`.
+    #[handle_error(Error)]
+    pub fn list_credit_card_candidates(&self) -> ApiResult<Vec<CreditCardCandidate>> {
+        let db = self.lock_db()?;
+        Ok(credit_cards::get_all_credit_cards(&db.writer)?
+            .into_iter()
+            .map(CreditCardCandidate::from)
+            .collect())
     }
 
     #[handle_error(Error)]
@@ -658,12 +672,44 @@ mod tests {
             .update_credit_card(
                 card.guid.clone(),
                 UpdatableCreditCardFields {
-                    cc_cvv: None,
+                    cc_cvv: Some(String::new()),
                     ..fields
                 },
             )
             .unwrap();
         assert_eq!(store.get_credit_card(card.guid).unwrap().cc_cvv, None);
+    }
+
+    #[test]
+    fn test_update_without_cvv_keeps_it() {
+        ensure_initialized();
+        let store = Store::new_shared_memory("cvv-kept-on-update", test_encdec()).unwrap();
+        let fields = UpdatableCreditCardFields {
+            cc_name: "jane doe".to_string(),
+            cc_number: "4111111111117629".to_string(),
+            cc_cvv: Some("123".to_string()),
+            cc_exp_month: 1,
+            cc_exp_year: 2030,
+            cc_type: "visa".to_string(),
+        };
+        let card = store.add_credit_card(fields.clone()).unwrap();
+
+        // A caller that does not know about CVVs edits other fields.
+        store
+            .update_credit_card(
+                card.guid.clone(),
+                UpdatableCreditCardFields {
+                    cc_name: "jane q doe".to_string(),
+                    cc_exp_year: 2031,
+                    cc_cvv: None,
+                    ..fields
+                },
+            )
+            .unwrap();
+        let updated = store.get_credit_card(card.guid.clone()).unwrap();
+        assert_eq!(updated.cc_name, "jane q doe");
+        assert_eq!(updated.cc_exp_year, 2031);
+        assert_eq!(updated.cc_cvv.as_deref(), Some("123"));
     }
 
     #[test]
@@ -712,6 +758,63 @@ mod tests {
                 .unwrap();
             assert_eq!(enc, "");
         }
+    }
+
+    #[test]
+    fn test_candidates_do_not_decrypt() {
+        ensure_initialized();
+        let store = Store::new_shared_memory("candidates", test_encdec()).unwrap();
+        // A foreign key: any attempt to decrypt fails, so a successful read
+        // proves none was made.
+        let foreign = crate::db::test::random_key_encryptor().unwrap();
+        let with_cvv = crate::db::models::credit_card::InternalCreditCard {
+            guid: sync_guid::Guid::random(),
+            cc_name: "jane doe".to_string(),
+            cc_number_enc: crate::db::models::credit_card::encrypt_str(
+                &foreign,
+                "4111111111117629",
+            )
+            .unwrap(),
+            cc_cvv_enc: crate::db::models::credit_card::encrypt_str(&foreign, "123").unwrap(),
+            cc_number_last_4: "7629".to_string(),
+            cc_exp_month: 1,
+            cc_exp_year: 2030,
+            cc_type: "visa".to_string(),
+            ..Default::default()
+        };
+        let without_cvv = crate::db::models::credit_card::InternalCreditCard {
+            guid: sync_guid::Guid::random(),
+            cc_name: "john doe".to_string(),
+            cc_number_enc: crate::db::models::credit_card::encrypt_str(
+                &foreign,
+                "4111111111111111",
+            )
+            .unwrap(),
+            cc_number_last_4: "1111".to_string(),
+            cc_exp_month: 2,
+            cc_exp_year: 2031,
+            cc_type: "visa".to_string(),
+            ..Default::default()
+        };
+        {
+            let db = store.lock_db().unwrap();
+            let tx = db.unchecked_transaction().unwrap();
+            crate::db::credit_cards::add_internal_credit_card(&tx, &with_cvv).unwrap();
+            crate::db::credit_cards::add_internal_credit_card(&tx, &without_cvv).unwrap();
+            tx.commit().unwrap();
+        }
+
+        let mut candidates = store.list_credit_card_candidates().unwrap();
+        candidates.sort_by(|a, b| a.cc_name.cmp(&b.cc_name));
+        assert_eq!(candidates.len(), 2);
+        assert_eq!(candidates[0].guid, with_cvv.guid.to_string());
+        assert_eq!(candidates[0].cc_name, "jane doe");
+        assert_eq!(candidates[0].cc_number_last_4, "7629");
+        assert_eq!(candidates[0].cc_exp_month, 1);
+        assert_eq!(candidates[0].cc_type, "visa");
+        assert!(candidates[0].has_cvv);
+        assert_eq!(candidates[1].cc_name, "john doe");
+        assert!(!candidates[1].has_cvv);
     }
 
     #[test]

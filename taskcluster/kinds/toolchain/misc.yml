@@ -250,7 +250,7 @@ linux64-marannon:
     fetches:
         toolchain:
             - linux64-clang-toolchain
-            - linux64-rust
+            - linux64-rust-toolchain
             - sysroot-x86_64-linux-gnu
     run:
         script: build-rust-based-toolchain.sh

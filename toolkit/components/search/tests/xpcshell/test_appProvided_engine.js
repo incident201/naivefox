@@ -96,6 +96,18 @@ let CONFIG = [
       },
     ],
   },
+  {
+    identifier: "deprecatedEngine",
+    base: {
+      deprecated: true,
+    },
+  },
+  {
+    identifier: "notDeprecatedEngine",
+    base: {
+      deprecated: false,
+    },
+  },
 ];
 
 add_setup(async function () {
@@ -345,6 +357,20 @@ add_task(async function test_isNew_variant() {
     "getURLOfType should return nothing for unsupported type VISUAL_SEARCH"
   );
 });
+
+add_task(
+  { skip_if: () => !SearchUtils.configV3FeatureGate },
+  async function test_deprecated_engine_not_loaded() {
+    Assert.ok(
+      !SearchService.getEngineById("deprecatedEngine"),
+      "Should not have loaded the deprecated engine"
+    );
+    Assert.ok(
+      SearchService.getEngineById("notDeprecatedEngine"),
+      "Should have loaded the engine with deprecated set to false"
+    );
+  }
+);
 
 function checkUrlOfType(engine) {
   for (let [key, type] of Object.entries(SearchUtils.URL_TYPE)) {

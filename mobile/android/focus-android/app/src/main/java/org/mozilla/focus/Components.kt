@@ -320,7 +320,7 @@ class Components(
     val appLinksInterceptor by lazy {
         AppLinksInterceptor(
             context,
-            launchInApp = {
+            launchInApp = { _ ->
                 context.settings.openLinksInExternalApp
             },
         )
@@ -420,7 +420,7 @@ private fun getLocaleTag(context: Context): String {
 
 /** Gets a [SearchEngineSelectorConfig] for the app and device. */
 private fun getSearchEngineSelectorConfig(context: Context): SearchEngineSelectorConfig? {
-    if (!context.settings.useRemoteSearchConfiguration) {
+    if (!context.settings.useRemoteSearchConfiguration && !context.settings.useSearchConfigV3) {
         return null
     }
 
@@ -450,6 +450,7 @@ private fun getSearchEngineSelectorConfig(context: Context): SearchEngineSelecto
         experiment = "",
         updateChannel = updateChannel,
         service = context.components.remoteSettingsService,
+        useSearchConfigV3 = context.settings.useSearchConfigV3,
     )
 }
 

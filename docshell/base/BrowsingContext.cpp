@@ -1267,9 +1267,9 @@ void BrowsingContext::SetOpener(BrowsingContext* aOpener) {
     // Inherit color scheme overrides from parent window. This is to inherit the
     // color scheme of dark themed PBM windows in dialogs opened by such
     // windows.
-    auto openerOverride = aOpener->Top()->PrefersColorSchemeOverride();
-    if (openerOverride != PrefersColorSchemeOverride()) {
-      MOZ_ALWAYS_SUCCEEDS(SetPrefersColorSchemeOverride(openerOverride));
+    if (auto* doc = aOpener->GetExtantDocument()) {
+      MOZ_ALWAYS_SUCCEEDS(SetPrefersColorSchemeOverride(
+          doc->GetOverriddenOrEmbedderColorScheme()));
     }
   }
 }
@@ -1311,9 +1311,22 @@ void BrowsingContext::SetIsEnteringBFCache(bool aIsEnteringBFCache) {
   mIsEnteringBFCache = aIsEnteringBFCache;
 }
 
-void BrowsingContext::DeactivateDocuments() {
+// https://html.spec.whatwg.org/#deactivate-a-document-for-a-cross-document-navigation
+void BrowsingContext::DeactivateDocuments(
+    const SessionHistoryInfo* aPageSwapTargetInfo,
+    NavigationType aNavigationType, bool aForUnload) {
   MOZ_RELEASE_ASSERT(mozilla::BFCacheInParent());
   MOZ_DIAGNOSTIC_ASSERT(IsTop());
+
+  if (aForUnload) {
+    // The old document can't enter BFCache. Only fire pageswap, since
+    // Destroy() unloads the document right after.
+    if (mDocShell) {
+      nsDocShell::Cast(mDocShell)->MaybeFirePageSwapOnDeactivate(
+          aPageSwapTargetInfo, aNavigationType);
+    }
+    return;
+  }
 
   if (XRE_IsContentProcess() && mDocShell) {
     nsDocShell::Cast(mDocShell)->MaybeDisconnectChildListenersOnPageHide();
@@ -1324,7 +1337,11 @@ void BrowsingContext::DeactivateDocuments() {
     aContext->SetIsEnteringBFCache(/* aIsEnteringBFCache */ true);
 
     if (shell) {
-      nsDocShell::Cast(shell)->FirePageHideShowNonRecursive(false);
+      // Only the top document fires pageswap.
+      const bool isTop = aContext == this;
+      nsDocShell::Cast(shell)->FirePageHideShowNonRecursive(
+          false, isTop ? aPageSwapTargetInfo : nullptr,
+          isTop ? aNavigationType : NavigationType::Push);
     }
   });
 
@@ -1345,19 +1362,8 @@ void BrowsingContext::DeactivateDocuments() {
   });
 }
 
-static void GetSubframeReactivationData(
-    BrowsingContext* aBrowsingContext,
-    Maybe<SessionHistoryInfo>& aReactivatedEntry,
-    nsTArray<SessionHistoryInfo>& aNewSHEs,
-    const Maybe<PreviousSessionHistoryInfo>& aPreviousEntryForActivation) {
-  // See bug 1991680
-  MOZ_LOG_FMT(gNavigationAPILog, LogLevel::Debug,
-              "We currently don't know how to reactivate subframes");
-}
-
 void BrowsingContext::ReactivateDocuments(
-    const Maybe<SessionHistoryInfo>& aReactivatedEntry,
-    const nsTArray<SessionHistoryInfo>& aNewSHEs,
+    const nsTArray<NavigationReactivationData>& aReactivationData,
     const Maybe<PreviousSessionHistoryInfo>& aPreviousEntryForActivation) {
   UpdateCurrentTopByBrowserId(this);
   PreOrderWalk(
@@ -1375,16 +1381,14 @@ void BrowsingContext::ReactivateDocuments(
         // We need to restore our navigation object state before calling
         // pageshow. This is ok, since we will fire any
         // NavigationHistoryEntry.dispose events async.
-        if (aContext->IsTop()) {
-          aContext->UpdateForReactivation(aReactivatedEntry, aNewSHEs,
-                                          aPreviousEntryForActivation);
-        } else {
-          Maybe<SessionHistoryInfo> reactivatedEntry;
-          nsTArray<SessionHistoryInfo> newSHEs;
-          GetSubframeReactivationData(aContext, reactivatedEntry, newSHEs,
-                                      aPreviousEntryForActivation);
-          aContext->UpdateForReactivation(reactivatedEntry, newSHEs,
-                                          aPreviousEntryForActivation);
+        for (auto& data : aReactivationData) {
+          if (data.context().ContextId() == aContext->Id()) {
+            aContext->UpdateForReactivation(
+                Some(data.reactivatedEntry()), data.newSHEs(),
+                aContext->IsTop() ? aPreviousEntryForActivation
+                                  : Maybe<PreviousSessionHistoryInfo>());
+            break;
+          }
         }
       });
 
@@ -1775,9 +1779,9 @@ JSObject* BrowsingContext::WrapObject(JSContext* aCx,
   return BrowsingContext_Binding::Wrap(aCx, this, aGivenProto);
 }
 
-bool BrowsingContext::WriteStructuredClone(JSContext* aCx,
+bool BrowsingContext::WriteStructuredClone(JSContext* /*aCx*/,
                                            JSStructuredCloneWriter* aWriter,
-                                           StructuredCloneHolder* aHolder) {
+                                           StructuredCloneHolder* /*aHolder*/) {
   MOZ_DIAGNOSTIC_ASSERT(mEverAttached);
   return (JS_WriteUint32Pair(aWriter, SCTAG_DOM_BROWSING_CONTEXT, 0) &&
           JS_WriteUint32Pair(aWriter, uint32_t(Id()), uint32_t(Id() >> 32)));
@@ -2761,11 +2765,11 @@ WindowProxyHolder BrowsingContext::Window() {
   return WindowProxyHolder(Self());
 }
 
-WindowProxyHolder BrowsingContext::GetFrames(ErrorResult& aError) {
+WindowProxyHolder BrowsingContext::GetFrames(ErrorResult& /*aError*/) {
   return Window();
 }
 
-void BrowsingContext::Close(CallerType aCallerType, ErrorResult& aError) {
+void BrowsingContext::Close(CallerType aCallerType, ErrorResult& /*aError*/) {
   if (mIsDiscarded) {
     return;
   }
@@ -2967,7 +2971,7 @@ std::tuple<bool, bool> BrowsingContext::CanFocusCheck(CallerType aCallerType) {
   return {canFocus, isActive};
 }
 
-void BrowsingContext::Focus(CallerType aCallerType, ErrorResult& aError) {
+void BrowsingContext::Focus(CallerType aCallerType, ErrorResult& /*aError*/) {
   // These checks need to happen before the RequestFrameFocus call, which
   // is why they are done in an untrusted process. If we wanted to enforce
   // these in the parent, we'd need to do the checks there _also_.
@@ -3000,7 +3004,7 @@ bool BrowsingContext::CanBlurCheck(CallerType aCallerType) {
          !Preferences::GetBool("dom.disable_window_flip", true);
 }
 
-void BrowsingContext::Blur(CallerType aCallerType, ErrorResult& aError) {
+void BrowsingContext::Blur(CallerType aCallerType, ErrorResult& /*aError*/) {
   if (!CanBlurCheck(aCallerType)) {
     return;
   }
@@ -3019,7 +3023,7 @@ Nullable<WindowProxyHolder> BrowsingContext::GetWindow() {
   return WindowProxyHolder(this);
 }
 
-Nullable<WindowProxyHolder> BrowsingContext::GetTop(ErrorResult& aError) {
+Nullable<WindowProxyHolder> BrowsingContext::GetTop(ErrorResult& /*aError*/) {
   if (mIsDiscarded) {
     return nullptr;
   }
@@ -3045,7 +3049,8 @@ void BrowsingContext::GetOpener(JSContext* aCx,
 
 // We never throw an error, but the implementation in nsGlobalWindow does and
 // we need to use the same signature.
-Nullable<WindowProxyHolder> BrowsingContext::GetParent(ErrorResult& aError) {
+Nullable<WindowProxyHolder> BrowsingContext::GetParent(
+    ErrorResult& /*aError*/) {
   if (mIsDiscarded) {
     return nullptr;
   }
@@ -3306,7 +3311,7 @@ void BrowsingContext::ActivenessChanged(bool aIsActive) {
 }
 
 void BrowsingContext::DidSet(FieldIndex<IDX_SessionStoreEpoch>,
-                             uint32_t aOldValue) {
+                             uint32_t /*aOldValue*/) {
   if (!mCurrentWindowContext) {
     return;
   }
@@ -3483,7 +3488,8 @@ void BrowsingContext::DidSet(FieldIndex<IDX_PageAwakeRequestCount>,
   Group()->UpdateToplevelsSuspendedIfNeeded();
 }
 
-void BrowsingContext::DidSet(FieldIndex<IDX_AllowJavascript>, bool aOldValue) {
+void BrowsingContext::DidSet(FieldIndex<IDX_AllowJavascript>,
+                             bool /*aOldValue*/) {
   RecomputeCanExecuteScripts();
 }
 
@@ -3590,7 +3596,7 @@ void BrowsingContext::DidSet(FieldIndex<IDX_AnimationsPlayBackRateMultiplier>,
 }
 
 void BrowsingContext::DidSet(FieldIndex<IDX_LanguageOverride>,
-                             nsCString&& aOldValue) {
+                             nsCString&& /*aOldValue*/) {
   MOZ_ASSERT(IsTop());
 
   const nsCString& languageOverride = GetLanguageOverride();
@@ -3754,7 +3760,7 @@ auto BrowsingContext::LegacyRevertIfNotOwningOrParentProcess(
 }
 
 void BrowsingContext::DidSet(FieldIndex<IDX_IsActiveBrowserWindowInternal>,
-                             bool aOldValue) {
+                             bool /*aOldValue*/) {
   bool isActivateEvent = GetIsActiveBrowserWindowInternal();
   // The browser window containing this context has changed
   // activation state so update window inactive document states
@@ -3788,7 +3794,7 @@ void BrowsingContext::DidSet(FieldIndex<IDX_IsActiveBrowserWindowInternal>,
 
 bool BrowsingContext::CanSet(FieldIndex<IDX_OpenerPolicy>,
                              nsILoadInfo::CrossOriginOpenerPolicy aPolicy,
-                             ContentParent* aSource) {
+                             ContentParent* /*aSource*/) {
   // A potentially cross-origin isolated BC can't change opener policy, nor can
   // a BC become potentially cross-origin isolated. An unchanged policy is
   // always OK.
@@ -3802,13 +3808,13 @@ bool BrowsingContext::CanSet(FieldIndex<IDX_OpenerPolicy>,
 }
 
 auto BrowsingContext::CanSet(FieldIndex<IDX_AllowContentRetargeting>,
-                             const bool& aAllowContentRetargeting,
+                             const bool& /*aAllowContentRetargeting*/,
                              ContentParent* aSource) -> CanSetResult {
   return LegacyRevertIfNotOwningOrParentProcess(aSource);
 }
 
 auto BrowsingContext::CanSet(FieldIndex<IDX_AllowContentRetargetingOnChildren>,
-                             const bool& aAllowContentRetargetingOnChildren,
+                             const bool& /*aAllowContentRetargetingOnChildren*/,
                              ContentParent* aSource) -> CanSetResult {
   return LegacyRevertIfNotOwningOrParentProcess(aSource);
 }
@@ -3892,7 +3898,7 @@ void BrowsingContext::SetGeolocationServiceOverride(
 }
 
 void BrowsingContext::DidSet(FieldIndex<IDX_TimezoneOverride>,
-                             nsString&& aOldValue) {
+                             nsString&& /*aOldValue*/) {
   MOZ_ASSERT(IsTop());
 
   const nsString& timezoneOverride = GetTimezoneOverride();
@@ -3922,7 +3928,7 @@ void BrowsingContext::DidSet(FieldIndex<IDX_TimezoneOverride>,
 }
 
 auto BrowsingContext::CanSet(FieldIndex<IDX_DefaultLoadFlags>,
-                             const uint32_t& aDefaultLoadFlags,
+                             const uint32_t& /*aDefaultLoadFlags*/,
                              ContentParent* aSource) -> CanSetResult {
   // Bug 1623565 - Are these flags only used by the debugger, which makes it
   // possible that this field can only be settable by the parent process?
@@ -3946,14 +3952,14 @@ void BrowsingContext::DidSet(FieldIndex<IDX_DefaultLoadFlags>) {
 }
 
 auto BrowsingContext::CanSet(FieldIndex<IDX_UserAgentOverride>,
-                             const nsCString& aUserAgent,
+                             const nsCString& /*aUserAgent*/,
                              ContentParent* aSource) -> CanSetResult {
   return LegacyRevertIfNotOwningOrParentProcess(aSource);
 }
 
 auto BrowsingContext::CanSet(FieldIndex<IDX_PlatformOverride>,
-                             const nsString& aPlatform, ContentParent* aSource)
-    -> CanSetResult {
+                             const nsString& /*aPlatform*/,
+                             ContentParent* aSource) -> CanSetResult {
   return LegacyRevertIfNotOwningOrParentProcess(aSource);
 }
 
@@ -4020,13 +4026,17 @@ void BrowsingContext::DidSet(FieldIndex<IDX_CurrentInnerWindowId>) {
         Canonical()->MaybeScheduleSessionStoreUpdate();
         mCurrentWindowContext->Canonical()->DidBecomeCurrentWindowGlobal(true);
       }
+      if (prevWindowContext && mCurrentWindowContext) {
+        Canonical()->MaybeRebindActiveEntry(prevWindowContext->Canonical(),
+                                            mCurrentWindowContext->Canonical());
+      }
     }
     BrowserParent::UpdateFocusFromBrowsingContext();
   }
 }
 
 bool BrowsingContext::CanSet(FieldIndex<IDX_IsPopupSpam>, const bool& aValue,
-                             ContentParent* aSource) {
+                             ContentParent* /*aSource*/) {
   // Ensure that we only mark a browsing context as popup spam once and never
   // unmark it.
   return aValue && !GetIsPopupSpam();
@@ -4260,7 +4270,7 @@ bool BrowsingContext::CanSet(FieldIndex<IDX_BrowserId>, const uint64_t& aValue,
 }
 
 bool BrowsingContext::CanSet(FieldIndex<IDX_PendingInitialization>,
-                             bool aNewValue, ContentParent* aSource) {
+                             bool aNewValue, ContentParent* /*aSource*/) {
   // Can only be cleared from `true` to `false`, and should only ever be set on
   // the toplevel BrowsingContext.
   return GetPendingInitialization() && !aNewValue;
@@ -4454,8 +4464,8 @@ void BrowsingContext::SetActiveSessionHistoryEntry(
       }
     }
     ContentChild::GetSingleton()->SendSetActiveSessionHistoryEntry(
-        this, aPreviousScrollPos, *aInfo, aLoadType, aUpdatedCacheKey,
-        changeID);
+        GetCurrentWindowContext(), aPreviousScrollPos, *aInfo, aLoadType,
+        aUpdatedCacheKey, changeID, aInfo->NewSharedStateRequest());
   } else {
     Canonical()->SetActiveSessionHistoryEntry(
         aPreviousScrollPos, aInfo, aLoadType, aUpdatedCacheKey, nsID());
@@ -4465,8 +4475,8 @@ void BrowsingContext::SetActiveSessionHistoryEntry(
 void BrowsingContext::ReplaceActiveSessionHistoryEntry(
     SessionHistoryInfo* aInfo) {
   if (XRE_IsContentProcess()) {
-    ContentChild::GetSingleton()->SendReplaceActiveSessionHistoryEntry(this,
-                                                                       *aInfo);
+    ContentChild::GetSingleton()->SendReplaceActiveSessionHistoryEntry(
+        GetCurrentWindowContext(), *aInfo, aInfo->NewSharedStateRequest());
   } else {
     Canonical()->ReplaceActiveSessionHistoryEntry(aInfo);
   }

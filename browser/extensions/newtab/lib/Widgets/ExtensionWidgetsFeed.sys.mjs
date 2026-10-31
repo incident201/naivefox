@@ -31,8 +31,8 @@ function isWidgetManagerSupported() {
  * @typedef {object} ExtensionWidget
  * @property {string} src - URL of the widget's document
  * @property {string} name - display name of the widget
- * @property {string} [customizeL10nId] - Fluent id of the widget's display
- *   name, for its customize panel toggle
+ * @property {string} telemetryName - name sent in Glean events, the widget's id
+ * @property {string[]} validSizes - sizes the widget supports
  */
 
 /**
@@ -66,7 +66,8 @@ export class ExtensionWidgetsFeed {
         extensionWidgets[extensionID] = {
           src: widget.src,
           name: widget.name,
-          ...(widget.l10nId && { customizeL10nId: widget.l10nId }),
+          telemetryName: widget.id,
+          validSizes: widget.sizes,
         };
       }
     }

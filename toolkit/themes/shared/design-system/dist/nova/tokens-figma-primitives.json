@@ -43,7 +43,6 @@
   "message-bar/icon/container/margin/block/start": 0,
   "message-bar/icon/container/margin/block/start/offset": 0,
   "message-bar/icon/container/padding": "{Primitives$space/small}",
-  "message-bar/icon/container/padding/offset": 1,
   "message-bar/icon/container/padding-block-start": "1rem",
   "message-bar/text/container/padding/block": 0,
   "page-nav/button/border/radius": "{Primitives$border/radius/circle}",

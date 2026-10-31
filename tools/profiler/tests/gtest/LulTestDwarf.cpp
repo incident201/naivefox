@@ -2544,6 +2544,7 @@ struct EvaluatePfxExprFixture {
     // The test stack.
     si.mStartAvma = 0x12345678;
     si.mLen = 0;
+    si.mContents = mBacking;
 #define XX(_byte)                      \
   do {                                 \
     si.mContents[si.mLen++] = (_byte); \
@@ -2581,6 +2582,7 @@ struct EvaluatePfxExprFixture {
     regs.TESTED_REG_STRUCT_NAME = TaggedUWord(0x14141356);
   }
 
+  uint8_t mBacking[64]{};
   StackImage si;
   TaggedUWord initialCFA;
   UnwindRegs regs;

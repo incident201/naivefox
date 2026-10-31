@@ -31,6 +31,11 @@
     inline-size: 100%;
     // stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens -- Using newtab variables from _variables.scss.
     block-size: var(--newtab-card-height-small);
+    transition: block-size var(--widget-size-transition-duration) var(--widget-size-transition-easing);
+
+    @media (prefers-reduced-motion: reduce) {
+      transition: none;
+    }
   }
 
   &.large-widget > moz-widget {

@@ -722,8 +722,11 @@ void AudioSinkWrapper::Stop(StopReason aReason) {
   mAudioEnded = true;
   mClockPausedDuringSeek = false;
   if (mAudioSink) {
+    // A stopped stream's position still counts the audio queued before the
+    // stop, which the rebased clock can't account for.
     if (aReason == StopReason::Seeking && mReuseStreamOnSeek &&
-        !mAudioSink->IsErrored() && !mAudioSink->IsStreamDrained()) {
+        mAudioSink->IsCubebStarted() && !mAudioSink->IsErrored() &&
+        !mAudioSink->IsStreamDrained()) {
       // Keep the sink and its still-running audio stream alive so the next
       // start can reset and reuse them instead of paying for a destroy +
       // recreate.

@@ -110,6 +110,7 @@ open class BaseSessionTest(
         const val IFRAME_UNKNOWN_PROTOCOL = "/assets/www/iframe_unknown_protocol.html"
         const val MEDIA_SESSION_DOM1_PATH = "/assets/www/media_session_dom1.html"
         const val MEDIA_SESSION_DEFAULT1_PATH = "/assets/www/media_session_default1.html"
+        const val AUDIO_FOCUS_INTERRUPT_PATH = "/assets/www/audio_focus_interrupt.html"
         const val AUDIO_SESSION_TYPE_PLAYBACK_PATH = "/assets/www/audio_session_type_playback.html"
         const val AUDIO_SESSION_TYPE_WEBAUDIO_PATH = "/assets/www/audio_session_type_webaudio.html"
         const val AUDIO_SESSION_TYPE_WEBSPEECH_PATH = "/assets/www/audio_session_type_webspeech.html"

@@ -670,6 +670,7 @@ class nsCocoaWindow final : public nsIWidget {
   // period, we presume the window is visible, which prevents us from sending
   // unnecessary OcclusionStateChanged events.
   bool mHasStartedNativeFullscreen;
+  bool mIsWaitingForFullscreenVisibility = false;
 
   bool mModal = false;
   bool mIsAnimationSuppressed = false;

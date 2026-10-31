@@ -28,7 +28,12 @@ class ProviderTabGroups extends ActionsProvider {
     return "ActionsProviderTabGroups";
   }
 
-  isActive(queryContext) {
+  /**
+   * @param {UrlbarQueryContext} queryContext
+   * @param {UrlbarParentController} _controller
+   * @returns {boolean}
+   */
+  isActive(queryContext, _controller) {
     return (
       (queryContext.sapName == "urlbar" ||
         queryContext.sapName == "smartbar") &&
@@ -41,7 +46,12 @@ class ProviderTabGroups extends ActionsProvider {
     );
   }
 
-  async queryActions(queryContext) {
+  /**
+   * @param {UrlbarQueryContext} queryContext
+   * @param {UrlbarParentController} _controller
+   * @returns {Promise<ActionsResult[]>}
+   */
+  async queryActions(queryContext, _controller) {
     // We need a non-private window here to call gBrowser.getAllTabGroups()
     // on, and it's OK if it's not on the current workspace.
     let window = lazy.BrowserWindowTracker.getTopWindow({

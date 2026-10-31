@@ -10,12 +10,16 @@ import { WIDGET_REGISTRY, resolveWidgetSize } from "common/WidgetsRegistry.mjs";
 import { SizeSubmenu } from "../SizeSubmenu";
 import { WidgetMenuButton } from "../WidgetMenuButton";
 import { WidgetMenuFooter } from "../WidgetMenuFooter";
+import { WidgetMenuPoweredBy } from "../WidgetMenuPoweredBy";
 import { useWidgetTelemetry } from "../useWidgetTelemetry";
 
 const USER_ACTION_TYPES = {
   CHANGE_SIZE: "change_size",
   LEARN_MORE: "learn_more",
+  POWERED_BY_KAYAK: "powered_by_kayak",
 };
+
+const KAYAK_URL = "https://www.kayak.com/";
 
 const TRAVEL_ENTRY = WIDGET_REGISTRY.find(w => w.id === "travel");
 
@@ -105,6 +109,14 @@ function Travel({
             l10nId="newtab-travel-widget-open-menu-button"
           />
           <panel-list className="panel-list-no-icons" id="travel-context-menu">
+            <WidgetMenuPoweredBy
+              dispatch={dispatch}
+              url={KAYAK_URL}
+              l10nId="newtab-travel-menu-powered-by-kayak"
+              recordUserAction={recordUserAction}
+              userAction={USER_ACTION_TYPES.POWERED_BY_KAYAK}
+              onClick={handleInteraction}
+            />
             <WidgetMenuFooter
               dispatch={dispatch}
               widgetId={TRAVEL_ENTRY.id}
@@ -114,7 +126,6 @@ function Travel({
               widgetSize={widgetSize}
               learnMoreL10nId="newtab-travel-menu-learn-more"
               onLearnMore={handleLearnMore}
-              showDivider={false}
               sizeSubmenu={
                 widgetsMayBeMaximized ? (
                   <SizeSubmenu

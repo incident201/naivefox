@@ -2,6 +2,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+XPCOMUtils.defineLazyPreferenceGetter(
+  this,
+  "NATIVE_MENU_MAX_RESULTS",
+  "browser.places.nativeMenu.maxResults",
+  100
+);
+
 /**
  * The base view implements everything that's common to all the views.
  * It should not be instanced directly, use a derived class instead.
@@ -2175,8 +2182,69 @@ class PlacesMenu extends PlacesViewBase {
     this._viewElt._placesView = this;
   }
 
-  _removeChild(aChild) {
-    super._removeChild(aChild);
+  _onPopupShowing(event) {
+    let popup = event.originalTarget;
+    if (
+      this._nativeView &&
+      popup != this._rootElt &&
+      PlacesUIUtils.getViewForNode(popup) == this &&
+      popup._placesNode &&
+      PlacesUtils.nodeIsQuery(popup._placesNode) &&
+      !PlacesUtils.nodeIsFolderOrShortcut(popup._placesNode)
+    ) {
+      let options = PlacesUtils.asQuery(popup._placesNode).queryOptions;
+      if (popup._originalMaxResults === undefined) {
+        let originalOptions = {};
+        PlacesUtils.history.queryStringToQuery(
+          popup._placesNode.uri,
+          {},
+          originalOptions
+        );
+        popup._originalMaxResults = originalOptions.value.maxResults;
+      }
+      let originalMaxResults = popup._originalMaxResults;
+      let isLimited = options.maxResults != originalMaxResults;
+      let shouldLimit =
+        NATIVE_MENU_MAX_RESULTS > 0 &&
+        (!originalMaxResults || originalMaxResults > NATIVE_MENU_MAX_RESULTS);
+      // Keep the applied limit because the node may still have cached children.
+      if (!isLimited && shouldLimit) {
+        options.maxResults = NATIVE_MENU_MAX_RESULTS + 1;
+        isLimited = true;
+      }
+      popup._queryResultLimit = isLimited ? options.maxResults : 0;
+    }
+    super._onPopupShowing(event);
+  }
+
+  _mayAddCommandsItems(popup) {
+    super._mayAddCommandsItems(popup);
+    if (!this._nativeView || popup == this._rootElt) {
+      return;
+    }
+    let node = popup._placesNode;
+    let hasMore =
+      popup._queryResultLimit > 0 && node.childCount >= popup._queryResultLimit;
+    if (hasMore && !popup._moreMenuitem) {
+      popup._moreMenuitem = document.createXULElement("menuitem");
+      document.l10n.setAttributes(
+        popup._moreMenuitem,
+        "menu-places-show-more-in-sidebar"
+      );
+      popup._moreMenuitem.addEventListener("command", () => {
+        PlacesUIUtils.showSidebarForQuery(popup._placesNode).catch(
+          console.error
+        );
+      });
+      // Keep the command after removals. Recheck on the next popupshowing.
+      popup.insertBefore(
+        popup._moreMenuitem,
+        popup._endMarker.nextElementSibling
+      );
+    } else if (!hasMore && popup._moreMenuitem) {
+      popup._moreMenuitem.remove();
+      popup._moreMenuitem = null;
+    }
   }
 
   uninit() {

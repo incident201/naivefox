@@ -281,9 +281,9 @@ void MacroAssembler::checkAllocatorState(Register temp, gc::AllocKind allocKind,
       realm()->zone()->hasRealmWithAllocMetadataBuilder()) {
     loadJSContext(temp);
     loadPtr(Address(temp, JSContext::offsetOfRealm()), temp);
-    branchPtr(Assembler::NotEqual,
-              Address(temp, Realm::offsetOfAllocationMetadataBuilder()),
-              ImmWord(0), fail);
+    branch32(Assembler::NotEqual,
+             Address(temp, Realm::offsetOfHasAllocationMetadataBuilder()),
+             Imm32(0), fail);
   }
 }
 
@@ -880,6 +880,13 @@ void MacroAssembler::fillSlotsWithConstantValue(Address base, Register temp,
     store32(temp, ToType(addr));
   }
 #else
+  if (v.asRawBits() == 0) {
+    for (uint32_t i = start; i < end;
+         ++i, base.offset += sizeof(GCPtr<Value>)) {
+      storePtr(ImmWord(0), base);
+    }
+    return;
+  }
   moveValue(v, ValueOperand(temp));
   for (uint32_t i = start; i < end; ++i, base.offset += sizeof(GCPtr<Value>)) {
     storePtr(temp, base);
@@ -8033,10 +8040,10 @@ void MacroAssembler::wasmNewStructObject(Register instance, Register result,
 
   // Don't execute the inline path if there is an allocation metadata builder
   // on the realm.
-  branchPtr(
+  branch32(
       Assembler::NotEqual,
-      Address(instance, wasm::Instance::offsetOfAllocationMetadataBuilder()),
-      ImmWord(0), fail);
+      Address(instance, wasm::Instance::offsetOfHasAllocationMetadataBuilder()),
+      Imm32(0), fail);
 
 #ifdef JS_GC_ZEAL
   // Don't execute the inline path if gc zeal or tracing are active.
@@ -8089,10 +8096,10 @@ void MacroAssembler::wasmNewArrayObject(Register instance, Register result,
 
   // Don't execute the inline path if there is an allocation metadata builder
   // on the realm.
-  branchPtr(
+  branch32(
       Assembler::NotEqual,
-      Address(instance, wasm::Instance::offsetOfAllocationMetadataBuilder()),
-      ImmWord(0), fail);
+      Address(instance, wasm::Instance::offsetOfHasAllocationMetadataBuilder()),
+      Imm32(0), fail);
 
 #ifdef JS_GC_ZEAL
   // Don't execute the inline path if gc zeal or tracing are active.
@@ -8248,10 +8255,10 @@ void MacroAssembler::wasmNewArrayObjectFixed(
 
   // Don't execute the inline path if there is an allocation metadata builder
   // on the realm.
-  branchPtr(
+  branch32(
       Assembler::NotEqual,
-      Address(instance, wasm::Instance::offsetOfAllocationMetadataBuilder()),
-      ImmWord(0), fail);
+      Address(instance, wasm::Instance::offsetOfHasAllocationMetadataBuilder()),
+      Imm32(0), fail);
 
 #ifdef JS_GC_ZEAL
   // Don't execute the inline path if gc zeal or tracing are active.

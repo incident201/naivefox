@@ -214,7 +214,15 @@ export class SessionFile {
         // Always attempt decryption: encrypted files written while the
         // encryption pref was on must be readable even when it is off, and
         // unencrypted/legacy files pass through untouched.
-        let options = { decrypt: DEK_NAME_SESSIONSTORE };
+        let options = {};
+        if (
+          Services.prefs.getBoolPref(
+            "browser.sessionstore.encryption.available",
+            false
+          )
+        ) {
+          options.decrypt = DEK_NAME_SESSIONSTORE;
+        }
         if (useOldExtension) {
           path = SessionFile.Paths[key]
             .replace("jsonlz4", "js")

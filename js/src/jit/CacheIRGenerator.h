@@ -105,6 +105,7 @@ class MOZ_RAII IRGenerator {
 
   StringOperandId emitToStringGuard(ValOperandId id, const Value& v);
 
+  bool calleeGuardIsIdentity(JSFunction* callee) const;
   void emitCalleeGuard(ObjOperandId calleeId, JSFunction* callee);
 
   void emitOptimisticClassGuard(ObjOperandId objId, JSObject* obj,

@@ -741,7 +741,9 @@ function openClearHistoryDialog(window) {
   if (lazy.PrivateBrowsingUtils.isWindowPrivate(window)) {
     return;
   }
-  lazy.Sanitizer.showUI(window);
+  lazy.Sanitizer.showUI(window, undefined, {
+    entryPoint: lazy.Sanitizer.DIALOG_ENTRY_POINTS.ADDRESS_BAR_SUGGESTION,
+  });
 }
 
 function restartBrowser() {

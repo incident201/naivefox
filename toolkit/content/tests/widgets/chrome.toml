@@ -1,5 +1,4 @@
 [DEFAULT]
-dupe-manifest = true
 support-files = [
   "tree_shared.js",
   "popup_shared.js",
@@ -10,7 +9,6 @@ support-files = [
 ]
 prefs = [
   "app.support.baseURL='https://support.mozilla.org/'",
-  "browser.nova.enabled=false",
 ]
 
 ["test_contextmenu_menugroup.xhtml"]

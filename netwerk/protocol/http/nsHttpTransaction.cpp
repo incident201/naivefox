@@ -194,7 +194,6 @@ nsresult nsHttpTransaction::Init(
     HttpTrafficCategory trafficCategory, nsIRequestContext* requestContext,
     ClassOfService classOfService, uint32_t initialRwin,
     bool responseTimeoutEnabled, uint64_t channelId,
-    TransactionObserverFunc&& transactionObserver,
     nsILoadInfo::IPAddressSpace aParentIpAddressSpace,
     const struct LNAPerms& aLnaPermissionStatus) {
   nsresult rv;
@@ -229,7 +228,6 @@ nsresult nsHttpTransaction::Init(
   MOZ_ASSERT(target->IsOnCurrentThread());
 
   mChannelId = channelId;
-  mTransactionObserver = std::move(transactionObserver);
   mBrowserId = browserId;
 
   mTrafficCategory = trafficCategory;
@@ -1132,8 +1130,6 @@ nsresult nsHttpTransaction::WriteSegments(nsAHttpSegmentWriter* writer,
 
 bool nsHttpTransaction::ProxyConnectFailed() { return mProxyConnectFailed; }
 
-bool nsHttpTransaction::DataSentToChildProcess() { return false; }
-
 already_AddRefed<nsITransportSecurityInfo> nsHttpTransaction::SecurityInfo() {
   MutexAutoLock lock(mLock);
   return do_AddRef(mSecurityInfo);
@@ -1169,10 +1165,6 @@ already_AddRefed<nsHttpConnectionInfo> nsHttpTransaction::GetConnInfo() const {
 }
 
 nsHttpTransaction* nsHttpTransaction::AsHttpTransaction() { return this; }
-
-HttpTransactionParent* nsHttpTransaction::AsHttpTransactionParent() {
-  return nullptr;
-}
 
 nsHttpTransaction::HTTPSSVC_CONNECTION_FAILED_REASON
 nsHttpTransaction::ErrorCodeToFailedReason(nsresult aErrorCode) {
@@ -1535,8 +1527,6 @@ void nsHttpTransaction::Close(nsresult reason) {
     LOG(("  already closed\n"));
     return;
   }
-
-  NotifyTransactionObserver(reason);
 
   // report the reponse is complete if not already reported
   if (!mResponseIsComplete) {
@@ -3632,8 +3622,7 @@ void nsHttpTransaction::SetHttpTrailers(nsCString& aTrailers) {
   LOG(("[\n    %s\n]", aTrailers.get()));
 
   // Introduce a local variable to minimize the critical section.
-  UniquePtr<nsHttpHeaderArray> httpTrailers =
-      std::make_unique<nsHttpHeaderArray>();
+  auto httpTrailers = std::make_unique<nsHttpHeaderArray>();
   {
     MutexAutoLock lock(mLock);
     if (mForTakeResponseTrailers) {
@@ -3733,47 +3722,6 @@ void nsHttpTransaction::SetFlat407Headers(const nsACString& aHeaders) {
 
   LOG(("nsHttpTransaction::SetFlat407Headers %p", this));
   mFlat407Headers = aHeaders;
-}
-
-void nsHttpTransaction::NotifyTransactionObserver(nsresult reason) {
-  MOZ_ASSERT(OnSocketThread());
-
-  if (!mTransactionObserver) {
-    return;
-  }
-
-  bool versionOk = false;
-  bool authOk = false;
-
-  LOG(("nsHttpTransaction::NotifyTransactionObserver %p reason %" PRIx32
-       " conn %p\n",
-       this, static_cast<uint32_t>(reason), mConnection.get()));
-
-  if (mConnection) {
-    HttpVersion version = mConnection->Version();
-    versionOk = (((reason == NS_BASE_STREAM_CLOSED) || (reason == NS_OK)) &&
-                 ((mConnection->Version() == HttpVersion::v2_0) ||
-                  (mConnection->Version() == HttpVersion::v3_0)));
-
-    nsCOMPtr<nsITLSSocketControl> socketControl;
-    mConnection->GetTLSSocketControl(getter_AddRefs(socketControl));
-    LOG(
-        ("nsHttpTransaction::NotifyTransactionObserver"
-         " version %u socketControl %p\n",
-         static_cast<int32_t>(version), socketControl.get()));
-    if (socketControl) {
-      authOk = !socketControl->GetFailedVerification();
-    }
-  }
-
-  TransactionObserverResult result;
-  result.versionOk() = versionOk;
-  result.authOk() = authOk;
-  result.closeReason() = reason;
-
-  TransactionObserverFunc obs = nullptr;
-  std::swap(obs, mTransactionObserver);
-  obs(std::move(result));
 }
 
 void nsHttpTransaction::UpdateConnectionInfo(nsHttpConnectionInfo* aConnInfo) {
@@ -4262,6 +4210,21 @@ void nsHttpTransaction::GetHashKeyOfConnectionEntry(nsACString& aResult) {
 
 void nsHttpTransaction::SetIsForWebTransport(bool aIsForWebTransport) {
   mIsForWebTransport = aIsForWebTransport;
+}
+
+void nsHttpTransaction::GetWebTransportAnticipatedStreams(uint16_t* aUni,
+                                                          uint16_t* aBidi) {
+  *aUni = 0;
+  *aBidi = 0;
+  nsCOMPtr<WebTransportSessionEventListener> listener;
+  {
+    MutexAutoLock lock(mLock);
+    listener = mWebTransportSessionEventListener;
+  }
+  if (nsCOMPtr<WebTransportSessionEventListenerInternal> internal =
+          do_QueryInterface(listener)) {
+    internal->GetAnticipatedConcurrentIncomingStreams(aUni, aBidi);
+  }
 }
 
 void nsHttpTransaction::RemoveConnection() {

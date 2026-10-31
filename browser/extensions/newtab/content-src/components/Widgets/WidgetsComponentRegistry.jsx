@@ -15,6 +15,7 @@ import { PictureOfTheDay } from "./PictureOfTheDay/PictureOfTheDay";
 import { RecentSearches } from "./RecentSearches/RecentSearches";
 import { Horoscopes } from "./Horoscopes/Horoscopes";
 import { Travel } from "./Travel/Travel";
+import { Solitaire } from "./Solitaire/Solitaire";
 import { WIDGET_REGISTRY, resolveWidgetSize } from "common/WidgetsRegistry.mjs";
 
 const weatherEntry = WIDGET_REGISTRY.find(w => w.id === "weather");
@@ -51,8 +52,10 @@ export const WIDGET_ROW_COMPONENTS = {
   recentSearches: RecentSearches,
   horoscopes: Horoscopes,
   travel: Travel,
+  solitaire: Solitaire,
 };
 
 export const WIDGET_SIDEBAR_COMPONENTS = {
   weather: WeatherSidebarWidget,
+  privacy: Privacy,
 };

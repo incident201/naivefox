@@ -26,8 +26,10 @@ class GeckoProfile(RaptorProfiling):
     This allows us to collect Gecko profiling data and to zip results into one file.
     """
 
-    def __init__(self, upload_dir, raptor_config, test_config):
-        super().__init__(upload_dir, raptor_config, test_config)
+    def __init__(
+        self, upload_dir, raptor_config, test_config, source_path_mappings=None
+    ):
+        super().__init__(upload_dir, raptor_config, test_config, source_path_mappings)
 
         # define the key in the results json for gecko profiles
         self.profile_entry_string = "geckoProfiles"
@@ -78,7 +80,11 @@ class GeckoProfile(RaptorProfiling):
 
     def _symbolicate_profile(self, profile_path, out_path):
         try:
-            return symbolicate_profile_file(profile_path, out_path)
+            return symbolicate_profile_file(
+                profile_path,
+                out_path,
+                source_path_mappings=self.source_path_mappings,
+            )
         except Exception:
             LOG.critical(
                 "Encountered an exception during profile symbolication.", exc_info=True

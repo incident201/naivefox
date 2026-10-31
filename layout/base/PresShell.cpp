@@ -254,8 +254,7 @@ struct RangePaintInfo {
   float mResolution = 1.0;
 
   explicit RangePaintInfo(nsIFrame* aFrame)
-      : mBuilder(aFrame, nsDisplayListBuilderMode::Painting, false),
-        mList(&mBuilder) {
+      : mBuilder(aFrame, nsDisplayListBuilderMode::Painting, false) {
     MOZ_COUNT_CTOR(RangePaintInfo);
     mBuilder.BeginFrame();
   }
@@ -742,7 +741,7 @@ PresShell::PresShell(Document* aDocument)
   MOZ_ASSERT(aDocument);
 
 #ifdef MOZ_REFLOW_PERF
-  mReflowCountMgr = MakeUnique<ReflowCountMgr>();
+  mReflowCountMgr = std::make_unique<ReflowCountMgr>();
   mReflowCountMgr->SetPresContext(mPresContext);
   mReflowCountMgr->SetPresShell(this);
 #endif
@@ -786,8 +785,6 @@ PresShell::~PresShell() {
                    mLastCallbackEventRequest == nullptr,
                "post-reflow queues not empty.  This means we're leaking");
 
-  MOZ_ASSERT(!mAllocatedPointers || mAllocatedPointers->IsEmpty(),
-             "Some pres arena objects were not freed");
   MOZ_ASSERT(mContentVisibilityAutoFrames.IsEmpty(),
              "All content-visibility:auto frames should be unregistered");
   MOZ_ASSERT(mContentVisibilityHiddenCount == 0,
@@ -806,7 +803,7 @@ void PresShell::Init(nsPresContext* aPresContext) {
   MOZ_ASSERT(aPresContext);
   MOZ_ASSERT(!mWidgetListener, "Already initialized");
 
-  mWidgetListener = MakeUnique<PresShellWidgetListener>(this);
+  mWidgetListener = std::make_unique<PresShellWidgetListener>(this);
 
   // mDocument is now set.  It might have a display document whose "need layout/
   // style" flush flags are not set, but ours will be set.  To keep these
@@ -816,7 +813,7 @@ void PresShell::Init(nsPresContext* aPresContext) {
   SetNeedStyleFlush();
 
   // Create our frame constructor.
-  mFrameConstructor = MakeUnique<nsCSSFrameConstructor>(mDocument, this);
+  mFrameConstructor = std::make_unique<nsCSSFrameConstructor>(mDocument, this);
 
   // Bind the context to the presentation shell.
   // FYI: We cannot initialize mPresContext in the constructor because we
@@ -1565,6 +1562,14 @@ Selection* PresShell::GetSelection(RawSelectionType aRawSelectionType) {
   return mSelection->GetSelection(ToSelectionType(aRawSelectionType));
 }
 
+Selection* PresShell::GetExistingSelection(RawSelectionType aRawSelectionType) {
+  if (!mSelection) {
+    return nullptr;
+  }
+
+  return mSelection->GetExistingSelection(ToSelectionType(aRawSelectionType));
+}
+
 Selection* PresShell::GetCurrentSelection(SelectionType aSelectionType) {
   if (!mSelection) {
     return nullptr;
@@ -1692,6 +1697,8 @@ nsresult PresShell::Initialize() {
   // time we do this!
   MOZ_ASSERT(!mFrameConstructor->GetRootFrame(),
              "How did that happen, exactly?");
+  FrameArena::SortFreeLists();
+
   ViewportFrame* rootFrame;
   {
     nsAutoScriptBlocker scriptBlocker;
@@ -4224,7 +4231,9 @@ bool PresShell::ScrollFrameIntoView(
         int32_t parentAPD = parent->PresContext()->AppUnitsPerDevPixel();
         rect = rect.ScaleToOtherAppUnitsRoundOut(APD, parentAPD);
         rect += extraOffset;
-      } else {
+      } else if (!container->PresContext()
+                      ->Document()
+                      ->IsTopLevelContentDocument()) {
         nsCOMPtr<nsIDocShell> docShell =
             container->PresContext()->GetDocShell();
         if (BrowserChild* browserChild = BrowserChild::GetFrom(docShell)) {
@@ -4350,12 +4359,12 @@ void PresShell::UnsuppressAndInvalidate() {
   }
 
   if (mPresContext->IsRootContentDocumentCrossProcess()) {
-    if (auto* bc = BrowserChild::GetFrom(mDocument->GetDocShell())) {
-      if (mDocument->IsInitialDocument()) {
-        bc->SendDidUnsuppressPaintingNormalPriority();
-      } else {
-        bc->SendDidUnsuppressPainting();
-      }
+    // Deferred for an inbound view transition, see Document::Reveal.
+    // TODO(bug 1971055): Defer also for other navigations.
+    if (mDocument->HasPendingInboundCrossDocumentViewTransition()) {
+      mPresContext->DeferReadyToReplaceRetainedPaint();
+    } else {
+      mPresContext->SendReadyToReplaceRetainedPaint();
     }
   }
 
@@ -4397,8 +4406,8 @@ void PresShell::UnsuppressPainting() {
 
 // Post a request to handle an arbitrary callback after reflow has finished.
 nsresult PresShell::PostReflowCallback(nsIReflowCallback* aCallback) {
-  void* result = AllocateByObjectID(eArenaObjectID_nsCallbackEventRequest,
-                                    sizeof(nsCallbackEventRequest));
+  void* result = FrameArena::Allocate(eArenaObjectID_nsCallbackEventRequest,
+                                      sizeof(nsCallbackEventRequest));
   nsCallbackEventRequest* request = (nsCallbackEventRequest*)result;
 
   request->callback = aCallback;
@@ -4435,7 +4444,7 @@ void PresShell::CancelReflowCallback(nsIReflowCallback* aCallback) {
         mLastCallbackEventRequest = before;
       }
 
-      FreeByObjectID(eArenaObjectID_nsCallbackEventRequest, toFree);
+      FrameArena::Free(eArenaObjectID_nsCallbackEventRequest, toFree);
     } else {
       before = node;
       node = node->next;
@@ -4451,7 +4460,7 @@ void PresShell::CancelPostedReflowCallbacks() {
       mLastCallbackEventRequest = nullptr;
     }
     nsIReflowCallback* callback = node->callback;
-    FreeByObjectID(eArenaObjectID_nsCallbackEventRequest, node);
+    FrameArena::Free(eArenaObjectID_nsCallbackEventRequest, node);
     if (callback) {
       callback->ReflowCallbackCanceled();
     }
@@ -4469,7 +4478,7 @@ void PresShell::HandlePostedReflowCallbacks(bool aInterruptible) {
         mLastCallbackEventRequest = nullptr;
       }
       nsIReflowCallback* callback = node->callback;
-      FreeByObjectID(eArenaObjectID_nsCallbackEventRequest, node);
+      FrameArena::Free(eArenaObjectID_nsCallbackEventRequest, node);
       if (callback && callback->ReflowFinished()) {
         shouldFlush = true;
       }
@@ -5266,7 +5275,7 @@ UniquePtr<RangePaintInfo> PresShell::CreateRangePaintInfo(
   }
 
   // get a display list containing the range
-  auto info = MakeUnique<RangePaintInfo>(ancestorFrame);
+  auto info = std::make_unique<RangePaintInfo>(ancestorFrame);
   info->mBuilder.SetIncludeAllOutOfFlows();
   if (aForPrimarySelection) {
     info->mBuilder.SetSelectedFramesOnly();
@@ -5338,7 +5347,7 @@ UniquePtr<RangePaintInfo> PresShell::CreateRangePaintInfo(
     ViewID zoomedId = nsLayoutUtils::FindOrCreateIDFor(
         rootScrollContainerFrame->GetContent());
 
-    nsDisplayList wrapped(&info->mBuilder);
+    nsDisplayList wrapped;
     wrapped.AppendNewToTop<nsDisplayAsyncZoom>(
         &info->mBuilder, rootScrollContainerFrame, &info->mList, nullptr,
         nsDisplayItem::ContainerASRType::Constant, zoomedId);
@@ -5653,7 +5662,7 @@ already_AddRefed<SourceSurface> PresShell::RenderSelection(
 
 static void AddDisplayItemToBottom(nsDisplayListBuilder* aBuilder,
                                    nsDisplayList* aList, nsDisplayItem* aItem) {
-  nsDisplayList list(aBuilder);
+  nsDisplayList list;
   list.AppendToTop(aItem);
   list.AppendToTop(aList);
   aList->AppendToTop(&list);
@@ -6779,7 +6788,11 @@ void PresShell::PaintInternal(nsIFrame* aFrame, WindowRenderer* aRenderer,
   }
 
   if (aFrame) {
+    // A view transition capture must build a display list, also when an
+    // iframe is captured from an ancestor root frame that has no pending
+    // layer tree update.
     if (!(aFlags & PaintInternalFlags::PaintSyncDecodeImages) &&
+        !(aFlags & PaintInternalFlags::PaintCompositeOffscreen) &&
         !aFrame->HasAnyStateBits(NS_FRAME_UPDATE_LAYER_TREE)) {
       if (layerManager) {
         layerManager->SetTransactionIdAllocator(presContext->RefreshDriver());
@@ -8704,8 +8717,8 @@ bool PresShell::EventHandler::MaybeDiscardOrDelayKeyboardEvent(
   if (aGUIEvent->mMessage == eKeyDown) {
     mPresShell->mNoDelayedKeyEvents = true;
   } else if (!mPresShell->mNoDelayedKeyEvents) {
-    UniquePtr<DelayedKeyEvent> delayedKeyEvent =
-        MakeUnique<DelayedKeyEvent>(aGUIEvent->AsKeyboardEvent());
+    auto delayedKeyEvent =
+        std::make_unique<DelayedKeyEvent>(aGUIEvent->AsKeyboardEvent());
     mPresShell->mDelayedEvents.AppendElement(std::move(delayedKeyEvent));
   }
   aGUIEvent->mFlags.mIsSuppressedOrDelayed = true;
@@ -8777,8 +8790,8 @@ bool PresShell::EventHandler::MaybeDiscardOrDelayMouseEvent(
       if (ps->mNoDelayedMouseEvents) {
         break;
       }
-      UniquePtr<DelayedMouseEvent> delayedMouseEvent =
-          MakeUnique<DelayedMouseEvent>(aGUIEvent->AsMouseEvent());
+      auto delayedMouseEvent =
+          std::make_unique<DelayedMouseEvent>(aGUIEvent->AsMouseEvent());
       ps->mDelayedEvents.AppendElement(std::move(delayedMouseEvent));
       break;
     }
@@ -8788,8 +8801,8 @@ bool PresShell::EventHandler::MaybeDiscardOrDelayMouseEvent(
       }
       // contextmenu is triggered after right mouseup on Windows and right
       // mousedown on other platforms.
-      UniquePtr<DelayedPointerEvent> delayedPointerEvent =
-          MakeUnique<DelayedPointerEvent>(aGUIEvent->AsPointerEvent());
+      auto delayedPointerEvent =
+          std::make_unique<DelayedPointerEvent>(aGUIEvent->AsPointerEvent());
       ps->mDelayedEvents.AppendElement(std::move(delayedPointerEvent));
       break;
     }
@@ -10685,12 +10698,21 @@ void PresShell::DidDoReflow(bool aInterruptible) {
     return;
   }
 
+  if (nsCOMPtr<nsIDocShell> docShell = mPresContext->GetDocShell()) {
+    DOMHighResTimeStamp now = GetPerformanceNowUnclamped();
+    docShell->NotifyReflowObservers(aInterruptible, mLastReflowStart, now);
+  }
+
+  if (mIsDestroying) {
+    return;
+  }
+
   {
     nsAutoScriptBlocker scriptBlocker;
     AutoAssertNoFlush noReentrantFlush(*this);
-    if (nsCOMPtr<nsIDocShell> docShell = mPresContext->GetDocShell()) {
-      DOMHighResTimeStamp now = GetPerformanceNowUnclamped();
-      docShell->NotifyReflowObservers(aInterruptible, mLastReflowStart, now);
+
+    if (RefPtr hub = mAccessibleCaretEventHub) {
+      hub->DidReflow();
     }
 
     SynthesizeMouseMove(false);
@@ -11375,7 +11397,7 @@ void ReflowCountMgr::Add(const char* aName, nsIFrame* aFrame) {
             .LookupOrInsertWith(key,
                                 [&aName, &aFrame, this]() {
                                   auto counter =
-                                      MakeUnique<IndiReflowCounter>(this);
+                                      std::make_unique<IndiReflowCounter>(this);
                                   counter->mFrame = aFrame;
                                   counter->mName.AssignASCII(aName);
                                   return counter;
@@ -11464,7 +11486,7 @@ void ReflowCountMgr::PaintCount(const char* aName,
 void ReflowCountMgr::DoGrandTotals() {
   mCounts.WithEntryHandle(kGrandTotalsStr, [this](auto&& entry) {
     if (!entry) {
-      entry.Insert(MakeUnique<ReflowCounter>(this));
+      entry.Insert(std::make_unique<ReflowCounter>(this));
     } else {
       entry.Data()->ClearTotals();
     }
@@ -11535,7 +11557,7 @@ void ReflowCountMgr::DoIndiTotalsTree() {
 void ReflowCountMgr::DoGrandHTMLTotals() {
   mCounts.WithEntryHandle(kGrandTotalsStr, [this](auto&& entry) {
     if (!entry) {
-      entry.Insert(MakeUnique<ReflowCounter>(this));
+      entry.Insert(std::make_unique<ReflowCounter>(this));
     } else {
       entry.Data()->ClearTotals();
     }
@@ -11605,7 +11627,7 @@ void ReflowCountMgr::ClearTotals() {
 void ReflowCountMgr::ClearGrandTotals() {
   mCounts.WithEntryHandle(kGrandTotalsStr, [&](auto&& entry) {
     if (!entry) {
-      entry.Insert(MakeUnique<ReflowCounter>(this));
+      entry.Insert(std::make_unique<ReflowCounter>(this));
     } else {
       entry.Data()->ClearTotals();
       entry.Data()->SetTotalsCache();
@@ -12254,7 +12276,6 @@ PresShell* PresShell::GetRootPresShell() const {
 
 void PresShell::AddSizeOfIncludingThis(nsWindowSizes& aSizes) const {
   MallocSizeOf mallocSizeOf = aSizes.mState.mMallocSizeOf;
-  mFrameArena.AddSizeOfExcludingThis(aSizes, Arena::ArenaKind::PresShell);
   aSizes.mLayoutPresShellSize += mallocSizeOf(this);
   if (mCaret) {
     aSizes.mLayoutPresShellSize += mCaret->SizeOfIncludingThis(mallocSizeOf);
@@ -13096,6 +13117,7 @@ void PresShell::EndPaint() {
       if (PerformanceMainThread* perf =
               presContext->GetPerformanceMainThread()) {
         perf->FinalizeLCPEntriesForText();
+        perf->QueuePendingLCPCandidate();
         perf->FinalizeContainerTimingEntries();
       }
     }

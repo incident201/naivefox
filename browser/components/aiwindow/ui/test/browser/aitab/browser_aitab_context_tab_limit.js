@@ -7,11 +7,15 @@ const { AITab, MAX_AITAB_CONTEXT_TABS } = ChromeUtils.importESModule(
   "moz-src:///browser/components/aiwindow/models/aitab/AITab.sys.mjs"
 );
 
-const { createAITab } = ChromeUtils.importESModule(
+const { Chat } = ChromeUtils.importESModule(
+  "moz-src:///browser/components/aiwindow/models/Chat.sys.mjs"
+);
+
+const { GENERATE_AITAB } = ChromeUtils.importESModule(
   "moz-src:///browser/components/aiwindow/models/Tools.sys.mjs"
 );
 
-const { MockEngineManager, newConversation } = ChromeUtils.importESModule(
+const { MockEngineManager, newChatConversation } = ChromeUtils.importESModule(
   "resource://testing-common/AIWindowTestUtils.sys.mjs"
 );
 
@@ -65,7 +69,7 @@ describe("when selecting URLs to build an AITab", () => {
 
   afterEach(async () => {
     gSandbox.restore();
-    gMockEngineManager.rejectAllRequests();
+    await gMockEngineManager.rejectAllRequests();
     gMockEngineManager.cleanupMocks();
     gRestoreSignIn();
     await BrowserTestUtils.closeWindow(gWin);
@@ -147,16 +151,19 @@ describe("when selecting URLs to build an AITab", () => {
   it("should pass generateAITab the selected context URLs", async () => {
     const generate = gSandbox.spy(AITab, "generateAITab");
 
-    const toolResult = createAITab(
-      { url_list: [CHAT_URL, ...gUrlsOldestFirst] },
-      newConversation()
-    );
-    const { respond } = await gMockEngineManager.captureRequest({
+    const conversation = await newChatConversation();
+    conversation.addUserMessage("Make a page from these tabs");
+    conversation.addAssistantMessage("text", "");
+    Chat.fetchWithHistory({ conversation });
+    await gMockEngineManager.respondToWithToolCall({
+      toolName: GENERATE_AITAB,
+      toolParams: { url_list: [CHAT_URL, ...gUrlsOldestFirst] },
+    });
+    // Generation has started once it asks for the page; afterEach's
+    // rejectAllRequests() ends the turn.
+    await gMockEngineManager.captureRequest({
       purpose: MODEL_FEATURES.AITAB,
     });
-    // Responding with an invalid page as we just want to check the generateAITab method args
-    respond("invalid JSON");
-    await toolResult;
 
     Assert.deepEqual(
       generate.firstCall.args[0].urlList,

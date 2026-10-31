@@ -8,14 +8,13 @@ import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
 const lazy = {};
 
 ChromeUtils.defineESModuleGetters(lazy, {
+  ERRORS: "moz-src:///toolkit/components/ipprotection/IPPProxyManager.sys.mjs",
   IPPPrincipalRules:
     "moz-src:///toolkit/components/ipprotection/IPPSiteRuleManager.sys.mjs",
   IPPSiteRuleManager:
     "moz-src:///toolkit/components/ipprotection/IPPSiteRuleManager.sys.mjs",
   IPPMode:
     "moz-src:///toolkit/components/ipprotection/IPPChannelFilter.sys.mjs",
-  IPProtectionServerlist:
-    "moz-src:///toolkit/components/ipprotection/IPProtectionServerlist.sys.mjs",
   IPPProxyManager:
     "moz-src:///toolkit/components/ipprotection/IPPProxyManager.sys.mjs",
   IPPProxyStates:
@@ -40,6 +39,7 @@ const AUTOSTART_PREF = "browser.ipProtection.autoStartEnabled";
 const AUTO_RESTORE_PREF = "browser.ipProtection.autoRestoreEnabled";
 const USER_ENABLED_PREF = "browser.ipProtection.userEnabled";
 const RESTORING_ON_STARTUP = "sessionstore-restoring-on-startup";
+const OFFLINE_STATUS_CHANGED = "network:offline-status-changed";
 
 /**
  * Brings the proxy up without the user asking: auto-start, auto-restore, and
@@ -123,9 +123,6 @@ export class IPPAutoActivationSingleton {
    * @returns {import("./IPPChannelFilter.sys.mjs").IPPProxyMode | null}
    */
   desiredMode() {
-    if (!lazy.IPProtectionServerlist.hasList) {
-      return null;
-    }
     if (this.#fullProtectionOwed) {
       return lazy.IPPMode.MODE_FULL;
     }
@@ -153,6 +150,7 @@ export class IPPAutoActivationSingleton {
       "SiteRuleManager:RuleChanged",
       this.handleRuleEvent
     );
+    Services.obs.addObserver(this, OFFLINE_STATUS_CHANGED);
 
     if (this.autoStart) {
       this.#fullProtectionOwed = true;
@@ -193,20 +191,35 @@ export class IPPAutoActivationSingleton {
       "SiteRuleManager:RuleChanged",
       this.handleRuleEvent
     );
+    Services.obs.removeObserver(this, OFFLINE_STATUS_CHANGED);
     this.#stopObservingRestore();
   }
 
   observe(_subject, topic) {
+    if (topic === OFFLINE_STATUS_CHANGED) {
+      if (Services.io.offline) {
+        return;
+      }
+      // A connection for included sites that failed on going offline is
+      // brought back up rather than left holding their traffic.
+      if (
+        lazy.IPPProxyManager.state === lazy.IPPProxyStates.ERROR &&
+        lazy.IPPProxyManager.mode === lazy.IPPMode.MODE_INCLUSION &&
+        lazy.IPPProxyManager.errorType === lazy.ERRORS.NETWORK
+      ) {
+        lazy.IPPProxyManager.stop(false).then(() => this.#maybeActivate());
+        return;
+      }
+      this.#maybeActivate();
+      return;
+    }
     if (topic !== RESTORING_ON_STARTUP) {
       return;
     }
     this.#stopObservingRestore();
 
     // Only worth holding traffic if the carried-over state says it could work.
-    if (
-      lazy.IPProtectionService.state !== lazy.IPProtectionStates.READY ||
-      !lazy.IPProtectionServerlist.hasList
-    ) {
+    if (lazy.IPProtectionService.state !== lazy.IPProtectionStates.READY) {
       return;
     }
 
@@ -224,7 +237,11 @@ export class IPPAutoActivationSingleton {
 
   #maybeActivate() {
     const mode = this.desiredMode();
-    if (mode === null) {
+    // Included sites can wait for the network to come back.
+    if (
+      mode === null ||
+      (mode === lazy.IPPMode.MODE_INCLUSION && Services.io.offline)
+    ) {
       return;
     }
 
@@ -266,16 +283,26 @@ export class IPPAutoActivationSingleton {
     });
   }
 
-  #handleProxyEvent() {
+  #handleProxyEvent(event) {
     switch (lazy.IPPProxyManager.state) {
       case lazy.IPPProxyStates.ACTIVE:
         this.#activation = null;
         break;
 
       case lazy.IPPProxyStates.READY:
-        // Not when an activation of ours is what just failed.
-        if (!this.#activation) {
-          this.#maybeActivate();
+        // Only after a working connection goes away: a failed activation, or
+        // the user stopping a failed connection, is not retried.
+        if (
+          event.detail?.prevState === lazy.IPPProxyStates.ACTIVE ||
+          event.detail?.prevState === lazy.IPPProxyStates.PAUSED
+        ) {
+          // Starting dispatches ACTIVATING, so let every listener see READY
+          // first.
+          Promise.resolve().then(() => {
+            if (this.#initialized) {
+              this.#maybeActivate();
+            }
+          });
         }
         break;
 

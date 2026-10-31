@@ -622,7 +622,6 @@ class MOZ_RAII CacheIRWriter : public JS::CustomAutoRooter {
 
   void callClassHook(ObjOperandId calleeId, Int32OperandId argc, JSNative hook,
                      CallFlags flags, uint32_t argcFixed) {
-    MOZ_ASSERT(!flags.isSameRealm());
     void* target = JS_FUNC_TO_DATA_PTR(void*, hook);
 #ifdef JS_SIMULATOR
     // The simulator requires VM calls to be redirected to a special

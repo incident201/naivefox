@@ -1,5 +1,5 @@
 import pytest
-from webdriver.bidi.error import NoSuchFrameException
+from webdriver.bidi.error import NoSuchFrameException, UnsupportedOperationException
 
 from bidi.support.container_isolation import container_isolation
 
@@ -30,3 +30,11 @@ async def test_root(bidi_session, new_tab):
 async def test_root_outside_container(bidi_session, tab_outside_container):
     with pytest.raises(NoSuchFrameException):
         await bidi_session.browsing_context.get_tree(root=tab_outside_container)
+
+
+@pytest.mark.geckodriver(allow_system_access=True)
+async def test_chrome_scope(bidi_session):
+    with pytest.raises(UnsupportedOperationException):
+        await bidi_session.browsing_context.get_tree(
+            _extension_params={"moz:scope": "chrome"}
+        )

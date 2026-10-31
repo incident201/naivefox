@@ -180,7 +180,8 @@ if CONFIG["OS_TARGET"] == "Android":
     DEFINES["__STDC_FORMAT_MACROS"] = True
 
     OS_LIBS += [
-        "log"
+        "log",
+        "nativewindow"
     ]
 
 if CONFIG["OS_TARGET"] == "Darwin":
@@ -291,7 +292,7 @@ if CONFIG["OS_TARGET"] == "WINNT":
         "/third_party/angle/src/compiler/translator/tree_ops/hlsl/WrapSwitchStatementsInBlocks.cpp"
     ]
 
-if CONFIG["OS_TARGET"] == "Darwin" and CONFIG["TARGET_OS"] == "OSX":
+if CONFIG["TARGET_OS"] == "OSX":
 
     DEFINES["ANGLE_ENABLE_METAL"] = True
 

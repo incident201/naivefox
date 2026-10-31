@@ -4,9 +4,11 @@
 
 package mozilla.components.feature.listentopage.ui
 
+import android.icu.text.MeasureFormat
+import android.icu.util.Measure
+import android.icu.util.MeasureUnit
 import android.text.format.DateUtils
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -22,19 +24,27 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.hideFromAccessibility
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.offset
+import java.util.Locale
+import kotlin.math.roundToLong
+import kotlin.time.Duration.Companion.seconds
 import mozilla.components.compose.base.button.IconButton
 import mozilla.components.compose.base.theme.AcornTheme
 import mozilla.components.feature.listentopage.ArticleProgress
@@ -42,9 +52,11 @@ import mozilla.components.feature.listentopage.ListenAction
 import mozilla.components.feature.listentopage.PlaybackSpeed
 import mozilla.components.feature.listentopage.R
 import mozilla.components.feature.listentopage.VoiceState
+import mozilla.components.feature.listentopage.playback.shownDurationMs
 import mozilla.components.ui.icons.R as iconsR
 
 private const val MS_PER_SECOND = 1000L
+internal const val ELAPSED_TIME_TEST_TAG_EXPANDED = "PlayerExpandedElapsedTime"
 
 /** Listen to page audio player in expanded state */
 @Composable
@@ -80,11 +92,16 @@ internal fun PlayerExpanded(
             ArticleHeading(
                 article = article,
                 playbackUiState = playbackUiState,
-                shouldScrollTitle = playbackUiState is PlaybackUiState.Playing,
+                shouldScrollTitle =
+                    playbackUiState is PlaybackUiState.Playing || playbackUiState is PlaybackUiState.Buffering,
             )
         }
 
-        AudioProgress(articleProgressState = articleProgressState, onAction = onAction)
+        AudioProgress(
+            articleProgressState = articleProgressState,
+            isEnabled = playbackUiState !is PlaybackUiState.Error,
+            onAction = onAction,
+        )
 
         val locale = LocalConfiguration.current.locales[0]
         val labelPattern = stringResource(R.string.mozac_feature_listentopage_playback_speed_option)
@@ -105,16 +122,35 @@ internal fun PlayerExpanded(
 }
 
 @Composable
-private fun AudioProgress(articleProgressState: State<ArticleProgress>, onAction: (ListenAction) -> Unit) {
+private fun AudioProgress(
+    articleProgressState: State<ArticleProgress>,
+    isEnabled: Boolean,
+    onAction: (ListenAction) -> Unit,
+) {
     // Reading articleProgressState here instead of inside the lambda would defeat the point of hoisting it as a State.
     val progress = { articleProgressState.value.fraction }
+    // Where the user is dragging the thumb to. The thumb and the elapsed time follow it until the seek is asked for.
+    var scrubFraction by remember { mutableStateOf<Float?>(null) }
     val elapsedTime by remember {
-        derivedStateOf { DateUtils.formatElapsedTime(articleProgressState.value.positionMs / MS_PER_SECOND) }
+        derivedStateOf {
+            DateUtils.formatElapsedTime(articleProgressState.value.positionMsAt(scrubFraction) / MS_PER_SECOND)
+        }
     }
-    val totalTime by remember {
-        derivedStateOf { DateUtils.formatElapsedTime(articleProgressState.value.durationMs / MS_PER_SECOND) }
-    }
-
+    // Seeking needs a length to seek in, which the article only has once its opening has been made.
+    val isSeekable by remember { derivedStateOf { articleProgressState.value.durationMs > 0 } }
+    // Format the duration to be spoken as "$minutes minutes, $seconds seconds of $minutes minutes, $seconds"
+    val locale = LocalConfiguration.current.locales[0]
+    val spokenElapsedTime by
+        remember(locale) {
+            derivedStateOf { formatSpokenDuration(articleProgressState.value.positionMs / MS_PER_SECOND, locale) }
+        }
+    val spokenTotalTime by
+        remember(locale) {
+            derivedStateOf {
+                formatSpokenDuration(articleProgressState.value.shownDurationMs() / MS_PER_SECOND, locale)
+            }
+        }
+    val seekState = stringResource(R.string.mozac_feature_listentopage_seek_state, spokenElapsedTime, spokenTotalTime)
     // Media player controls are always LTR:
     // https://m3.material.io/foundations/layout/bidirectionality-rtl
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
@@ -131,29 +167,37 @@ private fun AudioProgress(articleProgressState: State<ArticleProgress>, onAction
                 progress = progress,
                 type = AudioProgressBarType.Full,
                 onSeek = {
+                    scrubFraction = null
                     onAction(ListenAction.Playback.SeekRequested(it))
                 },
-                modifier = Modifier.extendTrackLength(thumbWidth = AcornTheme.layout.size.static200),
+                modifier =
+                    Modifier.extendTrackLength(thumbWidth = AcornTheme.layout.size.static200).semantics {
+                        stateDescription = seekState
+                    },
+                isSeekable = isSeekable,
+                isEnabled = isEnabled,
+                scrubFraction = { scrubFraction },
+                onSliderDrag = { scrubFraction = it },
             )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text(
-                    text = elapsedTime,
-                    style = AcornTheme.typography.caption,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    text = totalTime,
-                    style = AcornTheme.typography.caption,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            val textColor =
+                if (isEnabled) {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = DISABLED_ALPHA)
+                }
+            Text(
+                text = elapsedTime,
+                style = AcornTheme.typography.caption,
+                color = textColor,
+                modifier = Modifier.testTag(ELAPSED_TIME_TEST_TAG_EXPANDED).semantics { hideFromAccessibility() },
+            )
         }
     }
 }
+
+/** Where in the article [scrubFraction] of it is, or the playback position when the user is not scrubbing. */
+private fun ArticleProgress.positionMsAt(scrubFraction: Float?): Long =
+    scrubFraction?.let { (durationMs * it).roundToLong() } ?: positionMs
 
 /**
  * Extends the component's width by the Thumb's width, and then places it in the center. This allows the track to run up
@@ -188,6 +232,19 @@ private fun PlayerExpandedPreview(@PreviewParameter(PlaybackUIStatePreviewProvid
                 voiceState = VoiceState(),
                 onAction = {},
             )
+        }
+    }
+}
+
+internal fun formatSpokenDuration(totalSeconds: Long, locale: Locale): String {
+    val format = MeasureFormat.getInstance(locale, MeasureFormat.FormatWidth.WIDE)
+    return totalSeconds.seconds.toComponents { hours, minutes, seconds, _ ->
+        val spokenMinutes = Measure(minutes, MeasureUnit.MINUTE)
+        val spokenSeconds = Measure(seconds, MeasureUnit.SECOND)
+        if (hours > 0) {
+            format.formatMeasures(Measure(hours, MeasureUnit.HOUR), spokenMinutes, spokenSeconds)
+        } else {
+            format.formatMeasures(spokenMinutes, spokenSeconds)
         }
     }
 }

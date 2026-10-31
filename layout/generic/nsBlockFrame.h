@@ -444,11 +444,11 @@ class nsBlockFrame : public nsContainerFrame {
   }
 
   nsLineBox* NewLineBox(nsIFrame* aFrame, bool aIsBlock) {
-    return NS_NewLineBox(PresShell(), aFrame, aIsBlock);
+    return NS_NewLineBox(aFrame, aIsBlock);
   }
   nsLineBox* NewLineBox(nsLineBox* aFromLine, nsIFrame* aFrame,
                         int32_t aCount) {
-    return NS_NewLineBox(PresShell(), aFromLine, aFrame, aCount);
+    return NS_NewLineBox(aFromLine, aFrame, aCount);
   }
   void FreeLineBox(nsLineBox* aLine) {
     if (aLine == GetLineCursorForDisplay()) {
@@ -457,7 +457,7 @@ class nsBlockFrame : public nsContainerFrame {
     if (aLine == GetLineCursorForQuery()) {
       ClearLineCursorForQuery();
     }
-    aLine->Destroy(PresShell());
+    aLine->Destroy();
   }
   /**
    * Helper method for StealFrame.
@@ -602,6 +602,9 @@ class nsBlockFrame : public nsContainerFrame {
     bool mUsedOverflowWrap = false;
     // Settings for the current trial.
     bool mBalancing = false;
+    // Set when we are auto line clamping, driven by
+    // ReflowInput::mFlags::mDimensionsReadyForLineClampAuto
+    bool mLineClamping = false;
     nscoord mInset = 0;
     // Results computed during the trial reflow. Values from the final trial
     // will be used by the remainder of Reflow().
@@ -763,11 +766,9 @@ class nsBlockFrame : public nsContainerFrame {
   };
   nsBlockFrame* GetLineClampRoot() const;
   Maybe<LineClampTarget> FindLineClampAutoTarget(
-      nscoord aContentBlockEndEdge, const ReflowInput& aReflowInput,
-      nscoord aCollapsingBEndMargin, nsBlockFrame* aLineClampRoot);
+      const ReflowInput& aReflowInput, nsBlockFrame* aLineClampRoot);
   Maybe<LineClampTarget> FindLineClampNumberedTarget(
-      nscoord aContentBlockEndEdge, nscoord aCollapsingBEndMargin,
-      nsBlockFrame* aLineClampRoot) const;
+      nscoord aCollapsingBEndMargin, nsBlockFrame* aLineClampRoot) const;
   void ApplyLineClamp(LineClampTarget aLineClampTarget,
                       nsBlockFrame* aLineClampRoot);
   // Helper for calling ApplyLineClamp with automatic and line-based sizing.

@@ -39,6 +39,11 @@ skip-if = [
 
 ["browser_sessionstore.js"]
 
+["browser_sessionstore_taskbartabs.js"]
+run-if = [
+  "os == 'win'",
+]
+
 ["browser_sidebar.js"]
 
 ["browser_telemetry.js"]
@@ -46,3 +51,5 @@ skip-if = [
 ["browser_toolbar.js"]
 
 ["browser_toolbar_button.js"]
+
+["browser_zoom.js"]

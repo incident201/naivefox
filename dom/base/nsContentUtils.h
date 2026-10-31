@@ -2009,6 +2009,8 @@ class nsContentUtils {
   // setHTML().
   static const int32_t kParseFragmentNoSanitization = -2;
 
+  enum class SanitizerMode { Safe, Unsafe };
+
   /**
    * Invoke the fragment parsing algorithm (innerHTML) using the HTML parser.
    *
@@ -2036,7 +2038,7 @@ class nsContentUtils {
    * @param aSanitizer the Sanitizer API configuration to apply while parsing
    * (the spec's "parser sanitizer configuration"), or nullptr not to sanitize
    * while parsing.
-   * @param aSanitizerSafe safely sanitize, i.e.
+   * @param aSanitizerMode whether to safely sanitize, i.e.
    * "remove javascript navigation URLs".
    * @return NS_ERROR_DOM_INVALID_STATE_ERR if a re-entrant attempt to parse
    *         fragments is made, NS_ERROR_OUT_OF_MEMORY if aSourceBuffer is too
@@ -2049,7 +2051,7 @@ class nsContentUtils {
       mozilla::Maybe<RefPtr<mozilla::dom::CustomElementRegistry>>
           aCustomElementRegistry,
       mozilla::dom::Sanitizer* aSanitizer = nullptr,
-      bool aSanitizerSafe = false);
+      SanitizerMode aSanitizerMode = SanitizerMode::Unsafe);
 
   /**
    * Invoke the fragment parsing algorithm (innerHTML) using the XML parser.
@@ -2090,7 +2092,7 @@ class nsContentUtils {
    * @param aSanitizer the Sanitizer API configuration to apply while parsing
    * (the spec's "parser sanitizer configuration"), or nullptr not to sanitize
    * while parsing.
-   * @param aSanitizerSafe safely sanitize, i.e.
+   * @param aSanitizerMode whether to safely sanitize, i.e.
    * "remove javascript navigation URLs".
    * @return NS_ERROR_DOM_INVALID_STATE_ERR if a re-entrant attempt to parse
    *         fragments is made, NS_ERROR_OUT_OF_MEMORY if aSourceBuffer is too
@@ -2100,7 +2102,7 @@ class nsContentUtils {
       const nsAString& aSourceBuffer, Document* aTargetDocument,
       bool aScriptingEnabledForNoscriptParsing,
       mozilla::dom::Sanitizer* aSanitizer = nullptr,
-      bool aSanitizerSafe = false);
+      SanitizerMode aSanitizerMode = SanitizerMode::Unsafe);
 
   /**
    * Converts HTML source to plain text by parsing the source and using the
@@ -4013,6 +4015,7 @@ nsContentUtils::InternalContentPolicyTypeToExternal(nsContentPolicyType aType) {
       return ExtContentPolicy::TYPE_FETCH;
 
     case nsIContentPolicy::TYPE_INTERNAL_EXTERNAL_RESOURCE:
+    case nsIContentPolicy::TYPE_INTERNAL_SPECULATION_RULES:
       return ExtContentPolicy::TYPE_OTHER;
 
     case nsIContentPolicy::TYPE_INTERNAL_JSON_PRELOAD:

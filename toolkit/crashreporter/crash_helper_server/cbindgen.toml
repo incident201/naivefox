@@ -23,7 +23,10 @@ exclude = [
   "CrashGenerationServer_set_path",
   "WriteMinidumpForProcess",
 ]
-include = ["BreakpadChar"]
+include = ["BreakpadChar", "RawHandle"]
+
+[export.rename]
+"RawHandle" = "HANDLE"
 
 [parse]
 parse_deps = true

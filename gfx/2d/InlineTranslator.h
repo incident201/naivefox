@@ -61,6 +61,11 @@ class InlineTranslator : public Translator {
   };
   void SaveState(State& aState) const;
   void RestoreState(const State& aState);
+  void ForgetDrawTargets() {
+    mBaseDT = nullptr;
+    mCurrentDT = nullptr;
+    mDrawTargets.Clear();
+  }
 
   DrawTarget* LookupDrawTarget(ReferencePtr aRefPtr) final {
     DrawTarget* result = mDrawTargets.GetWeak(aRefPtr);

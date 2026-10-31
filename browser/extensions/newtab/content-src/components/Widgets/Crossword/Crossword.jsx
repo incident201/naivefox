@@ -10,7 +10,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { useSelector, batch } from "react-redux";
+import { useSelector } from "react-redux";
 import { actionCreators as ac, actionTypes as at } from "common/Actions.mjs";
 import { useSizeSubmenu } from "../../../lib/utils";
 import {
@@ -21,10 +21,14 @@ import {
 import { MoveSubmenu } from "../MoveSubmenu";
 import { useWidgetTelemetry } from "../useWidgetTelemetry";
 import { WidgetMenuButton } from "../WidgetMenuButton";
+import { WidgetMenuPoweredBy } from "../WidgetMenuPoweredBy";
 
 const USER_ACTION_TYPES = {
   CHANGE_SIZE: "change_size",
+  POWERED_BY_PARTICLE: "powered_by_particle",
 };
+
+const PARTICLE_URL = "https://particle.news";
 
 // postMessage contract with the Particle crossword bundle (per the widget's
 // postMessage API doc). Every message travels on a single channel; the widget
@@ -301,32 +305,28 @@ function Crossword({
   );
 
   function handleCrosswordHide() {
-    batch(() => {
-      dispatch(
-        ac.OnlyToMain({
-          type: at.SET_PREF,
-          data: { name: CROSSWORD_ENTRY.enabledPref, value: false },
-        })
-      );
-      recordEnabled(false, { source: "context_menu" });
-    });
+    dispatch(
+      ac.OnlyToMain({
+        type: at.SET_PREF,
+        data: { name: CROSSWORD_ENTRY.enabledPref, value: false },
+      })
+    );
+    recordEnabled(false, { source: "context_menu" });
   }
 
   const handleChangeSize = useCallback(
     size => {
       handleInteraction();
-      batch(() => {
-        dispatch(
-          ac.OnlyToMain({
-            type: at.SET_PREF,
-            data: { name: CROSSWORD_ENTRY.sizePref, value: size },
-          })
-        );
-        recordUserAction(USER_ACTION_TYPES.CHANGE_SIZE, {
-          source: "context_menu",
-          value: size,
-          size,
-        });
+      dispatch(
+        ac.OnlyToMain({
+          type: at.SET_PREF,
+          data: { name: CROSSWORD_ENTRY.sizePref, value: size },
+        })
+      );
+      recordUserAction(USER_ACTION_TYPES.CHANGE_SIZE, {
+        source: "context_menu",
+        value: size,
+        size,
       });
     },
     [dispatch, handleInteraction, recordUserAction]
@@ -336,32 +336,15 @@ function Crossword({
 
   function handleLearnMore() {
     handleInteraction();
-    batch(() => {
-      dispatch(
-        ac.OnlyToMain({
-          type: at.OPEN_LINK,
-          data: {
-            url: "https://support.mozilla.org/kb/firefox-new-tab-widgets",
-          },
-        })
-      );
-      recordUserAction("learn_more", { source: "context_menu" });
-    });
-  }
-
-  function handlePoweredByParticle() {
-    handleInteraction();
-    batch(() => {
-      dispatch(
-        ac.OnlyToMain({
-          type: at.OPEN_LINK,
-          data: {
-            url: "https://particle.news",
-          },
-        })
-      );
-      recordUserAction("powered_by_particle", { source: "context_menu" });
-    });
+    dispatch(
+      ac.OnlyToMain({
+        type: at.OPEN_LINK,
+        data: {
+          url: "https://support.mozilla.org/kb/firefox-new-tab-widgets",
+        },
+      })
+    );
+    recordUserAction("learn_more", { source: "context_menu" });
   }
 
   return (
@@ -403,12 +386,14 @@ function Crossword({
               </panel-item>
             ))}
 
-            <panel-item
-              className="powered-by-particle"
-              onClick={handlePoweredByParticle}
-            >
-              Powered by Particle
-            </panel-item>
+            <WidgetMenuPoweredBy
+              dispatch={dispatch}
+              url={PARTICLE_URL}
+              l10nId="newtab-crossword-menu-powered-by-particle"
+              recordUserAction={recordUserAction}
+              userAction={USER_ACTION_TYPES.POWERED_BY_PARTICLE}
+              onClick={handleInteraction}
+            />
 
             <hr />
 

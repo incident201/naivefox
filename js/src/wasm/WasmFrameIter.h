@@ -576,10 +576,13 @@ void GenerateJitEntryPrologue(jit::MacroAssembler& masm,
 void GenerateJitEntryEpilogue(jit::MacroAssembler& masm,
                               CallableOffsets* offsets);
 
+// If `badSigTrap` is non-null and a signature check is generated, the
+// location of the IndirectCallBadSig trap instruction is written there.
 void GenerateFunctionPrologue(jit::MacroAssembler& masm,
                               const CallIndirectId& callIndirectId,
                               const mozilla::Maybe<uint32_t>& tier1FuncIndex,
-                              FuncOffsets* offsets);
+                              FuncOffsets* offsets,
+                              FaultingCodeRange* badSigTrap = nullptr);
 void GenerateFunctionEpilogue(jit::MacroAssembler& masm, unsigned framePushed,
                               FuncOffsets* offsets);
 

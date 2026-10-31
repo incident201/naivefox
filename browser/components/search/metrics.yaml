@@ -298,6 +298,22 @@ sap.impression_counts:
       - fx-search-telemetry@mozilla.com
       - rev-data@mozilla.com
     expires: never
+  text_selection:
+    type: labeled_counter
+    description: |
+      Count of impressions of the search action in the text selection menu. The
+      counter's label is the engine's identifier if it's an app-provided
+      engine. Otherwise the label is "none".
+    data_sensitivity:
+      - interaction
+    bugs:
+      - https://bugzil.la/2069157
+    data_reviews:
+      - https://bugzil.la/2069157
+    notification_emails:
+      - fx-search-telemetry@mozilla.com
+      - rev-data@mozilla.com
+    expires: never
 
 serp:
   impression:
@@ -436,6 +452,7 @@ serp:
       - https://bugzilla.mozilla.org/show_bug.cgi?id=1816735
       - https://bugzilla.mozilla.org/show_bug.cgi?id=1849371
       - https://bugzilla.mozilla.org/show_bug.cgi?id=1901839
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2079978
     data_reviews:
       - https://bugzilla.mozilla.org/show_bug.cgi?id=1814773
       - https://bugzilla.mozilla.org/show_bug.cgi?id=1816730
@@ -463,6 +480,7 @@ serp:
         description: |
           The target component used to trigger the action.
           Possible values are:
+          `ad_brand_zone` (added in Firefox 160),
           `ad_carousel`,
           `ad_image_row`,
           `ad_link`,
@@ -493,6 +511,7 @@ serp:
       - https://bugzilla.mozilla.org/show_bug.cgi?id=1849371
       - https://bugzilla.mozilla.org/show_bug.cgi?id=1909979
       - https://bugzilla.mozilla.org/show_bug.cgi?id=2074916
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2079978
     data_reviews:
       - https://bugzilla.mozilla.org/show_bug.cgi?id=1816728
       - https://bugzilla.mozilla.org/show_bug.cgi?id=1849371
@@ -508,6 +527,7 @@ serp:
       component:
         description: |
           Type of components on a SERP. Possible values are:
+          `ad_brand_zone` (added in Firefox 160),
           `ad_carousel`,
           `ad_image_row`,
           `ad_link`,

@@ -238,7 +238,7 @@ APZEventResult InputQueue::ReceiveTouchInput(
       result.SetStatusForTouchEvent(*block, aFlags, consumableFlags, target);
     }
   }
-  mQueuedInputs.AppendElement(MakeUnique<QueuedInput>(aEvent, *block));
+  mQueuedInputs.AppendElement(std::make_unique<QueuedInput>(aEvent, *block));
   ProcessQueue();
 
   // If this block just started and is waiting for a content response, but
@@ -328,7 +328,7 @@ APZEventResult InputQueue::ReceiveMouseInput(
 
   result.mInputBlockId = block->GetBlockId();
 
-  mQueuedInputs.AppendElement(MakeUnique<QueuedInput>(aEvent, *block));
+  mQueuedInputs.AppendElement(std::make_unique<QueuedInput>(aEvent, *block));
   ProcessQueue();
 
   if (DragTracker::EndsDrag(aEvent)) {
@@ -377,7 +377,7 @@ APZEventResult InputQueue::ReceiveScrollWheelInput(
   // null) should take priority. This is equivalent to just always using the
   // target (confirmed or not) from the block, which is what
   // ProcessQueue() does.
-  mQueuedInputs.AppendElement(MakeUnique<QueuedInput>(aEvent, *block));
+  mQueuedInputs.AppendElement(std::make_unique<QueuedInput>(aEvent, *block));
 
   // The WheelBlockState needs to affix a counter to the event before we process
   // it. Note that the counter is affixed to the copy in the queue rather than
@@ -415,7 +415,7 @@ APZEventResult InputQueue::ReceiveKeyboardInput(
 
   result.mInputBlockId = block->GetBlockId();
 
-  mQueuedInputs.AppendElement(MakeUnique<QueuedInput>(aEvent, *block));
+  mQueuedInputs.AppendElement(std::make_unique<QueuedInput>(aEvent, *block));
 
   ProcessQueue();
 
@@ -450,7 +450,8 @@ APZEventResult InputQueue::ReceivePanGestureInput(
 
   if (aEvent.mType == PanGestureInput::PANGESTURE_INTERRUPTED) {
     if (RefPtr<PanGestureBlockState> block = mActivePanGestureBlock.get()) {
-      mQueuedInputs.AppendElement(MakeUnique<QueuedInput>(aEvent, *block));
+      mQueuedInputs.AppendElement(
+          std::make_unique<QueuedInput>(aEvent, *block));
       ProcessQueue();
     }
     result.SetStatusAsIgnore();
@@ -568,7 +569,7 @@ APZEventResult InputQueue::ReceivePanGestureInput(
   // null) should take priority. This is equivalent to just always using the
   // target (confirmed or not) from the block, which is what
   // ProcessQueue() does.
-  mQueuedInputs.AppendElement(MakeUnique<QueuedInput>(event, *block));
+  mQueuedInputs.AppendElement(std::make_unique<QueuedInput>(event, *block));
   if (terminateSynthesizedBlock) {
     // Immediately end the block we just synthesized from a pan-end so OnPanEnd
     // runs and snaps back any overscroll, rather than leaving the block active.
@@ -576,7 +577,8 @@ APZEventResult InputQueue::ReceivePanGestureInput(
     terminator.mType = PanGestureInput::PANGESTURE_END;
     terminator.mPanDisplacement = ScreenPoint{};
     terminator.mLocalPanDisplacement = ParentLayerPoint{};
-    mQueuedInputs.AppendElement(MakeUnique<QueuedInput>(terminator, *block));
+    mQueuedInputs.AppendElement(
+        std::make_unique<QueuedInput>(terminator, *block));
   }
   ProcessQueue();
 
@@ -625,7 +627,7 @@ APZEventResult InputQueue::ReceivePinchGestureInput(
   // null) should take priority. This is equivalent to just always using the
   // target (confirmed or not) from the block, which is what
   // ProcessQueue() does.
-  mQueuedInputs.AppendElement(MakeUnique<QueuedInput>(aEvent, *block));
+  mQueuedInputs.AppendElement(std::make_unique<QueuedInput>(aEvent, *block));
   ProcessQueue();
 
   return result;

@@ -100,7 +100,7 @@ void VRService::Start() {
         "VRService", getter_AddRefs(thread),
         NS_NewRunnableFunction("VRService::ServiceThreadStartup", [self]() {
           self->mBackgroundHangMonitor =
-              MakeUnique<mozilla::BackgroundHangMonitor>(
+              std::make_unique<mozilla::BackgroundHangMonitor>(
                   "VRService",
                   /* Timeout values are powers-of-two to enable us get better
                      data. 128ms is chosen for transient hangs because 8Hz
@@ -181,7 +181,7 @@ void VRService::ServiceInitialize() {
   if (StaticPrefs::dom_vr_puppet_enabled()) {
     // When the VR Puppet is enabled, we don't want
     // to enumerate any real devices
-    session = MakeUnique<PuppetSession>();
+    session = std::make_unique<PuppetSession>();
     if (!session->Initialize(mSystemState, mBrowserState.detectRuntimesOnly)) {
       session = nullptr;
     }
@@ -192,7 +192,7 @@ void VRService::ServiceInitialize() {
 #if defined(XP_WIN)
     // Try Oculus
     if (!session) {
-      session = MakeUnique<OculusSession>();
+      session = std::make_unique<OculusSession>();
       if (!session->Initialize(mSystemState,
                                mBrowserState.detectRuntimesOnly)) {
         session = nullptr;
@@ -204,7 +204,7 @@ void VRService::ServiceInitialize() {
     (defined(XP_LINUX) && !defined(MOZ_WIDGET_ANDROID))
     // Try OpenVR
     if (!session) {
-      session = MakeUnique<OpenVRSession>();
+      session = std::make_unique<OpenVRSession>();
       if (!session->Initialize(mSystemState,
                                mBrowserState.detectRuntimesOnly)) {
         session = nullptr;
@@ -214,7 +214,7 @@ void VRService::ServiceInitialize() {
 #if !defined(MOZ_WIDGET_ANDROID)
     // Try OSVR
     if (!session) {
-      session = MakeUnique<OSVRSession>();
+      session = std::make_unique<OSVRSession>();
       if (!session->Initialize(mSystemState,
                                mBrowserState.detectRuntimesOnly)) {
         session = nullptr;

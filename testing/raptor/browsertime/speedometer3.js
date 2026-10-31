@@ -28,7 +28,10 @@ module.exports = logTest(
       true
     );
 
-    if (context.options.browser === "firefox" && !context.options.android) {
+    if (
+      context.options.browser === "firefox" &&
+      !context.options.android?.enabled
+    ) {
       context.log.info("Deferring background tasks before Speedometer");
       await deferBackgroundTasks(context, commands);
     } else {

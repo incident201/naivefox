@@ -42,13 +42,13 @@ add_task(async function test_all() {
 
   const { cleanup } = await setupTest({
     init: false,
-    storePath: await NimbusTestUtils.createStoreWith(async store => {
-      await NimbusTestUtils.addEnrollmentForRecipe(preexisting, { store });
-      await NimbusTestUtils.addEnrollmentForRecipe(alreadyEnrolled, { store });
-      await NimbusTestUtils.addEnrollmentForRecipe(preexistingPaused, {
+    populateStore: store => {
+      NimbusTestUtils.addEnrollmentForRecipe(preexisting, { store });
+      NimbusTestUtils.addEnrollmentForRecipe(alreadyEnrolled, { store });
+      NimbusTestUtils.addEnrollmentForRecipe(preexistingPaused, {
         store,
       });
-    }),
+    },
     experiments: [
       NimbusTestUtils.factories.recipe("opt-in-rollout", {
         isFirefoxLabsOptIn: true,

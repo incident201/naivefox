@@ -2608,23 +2608,6 @@ void ReflowInput::CalculateBlockSideMargins() {
   }
 }
 
-// For "normal" we use the font's normal line height (em height + leading).
-// If both internal leading and  external leading specified by font itself are
-// zeros, we should compensate this by creating extra (external) leading.
-// This is necessary because without this compensation, normal line height might
-// look too tight.
-static nscoord GetNormalLineHeight(nsFontMetrics* aFontMetrics) {
-  MOZ_ASSERT(aFontMetrics, "no font metrics");
-  nscoord externalLeading = aFontMetrics->ExternalLeading();
-  nscoord internalLeading = aFontMetrics->InternalLeading();
-  nscoord emHeight = aFontMetrics->EmHeight();
-  if (!internalLeading && !externalLeading) {
-    return NSToCoordRound(static_cast<float>(emHeight) *
-                          ReflowInput::kNormalLineHeightFactor);
-  }
-  return emHeight + internalLeading + externalLeading;
-}
-
 static inline nscoord ComputeLineHeight(const StyleLineHeight& aLh,
                                         const nsFont& aFont, nsAtom* aLanguage,
                                         bool aExplicitLanguage,
@@ -2664,10 +2647,15 @@ static inline nscoord ComputeLineHeight(const StyleLineHeight& aLh,
     params.textPerf = aPresContext->GetTextPerfMetrics();
     params.featureValueLookup = aPresContext->GetFontFeatureValuesLookup();
     RefPtr<nsFontMetrics> fm = aPresContext->GetMetricsFor(font, params);
-    return GetNormalLineHeight(fm);
+    // For "normal" we use the font's normal line height (em height + leading).
+    // If both internal leading and  external leading specified by font itself
+    // are zeros, we compensate for this by creating extra (external) leading.
+    // This is necessary because without this compensation, normal line height
+    // might look too tight.
+    return fm->CalcNormalLineHeight();
   }
   // If we don't have a pres context, use a 1.2em fallback.
-  size.ScaleBy(ReflowInput::kNormalLineHeightFactor);
+  size.ScaleBy(nsFontMetrics::kNormalLineHeightFactor);
   return size.ToAppUnits();
 }
 

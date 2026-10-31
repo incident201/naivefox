@@ -2538,10 +2538,11 @@ class ArchivedOriginScope {
     UniquePtr<OriginAttributesPattern> mPattern;
 
     explicit Pattern(const OriginAttributesPattern& aPattern)
-        : mPattern(MakeUnique<OriginAttributesPattern>(aPattern)) {}
+        : mPattern(std::make_unique<OriginAttributesPattern>(aPattern)) {}
 
     Pattern(const Pattern& aOther)
-        : mPattern(MakeUnique<OriginAttributesPattern>(*aOther.mPattern)) {}
+        : mPattern(
+              std::make_unique<OriginAttributesPattern>(*aOther.mPattern)) {}
 
     Pattern(Pattern&& aOther) = default;
 
@@ -2664,7 +2665,7 @@ class QuotaClient final : public mozilla::dom::quota::Client {
     return mShadowDatabaseMutex;
   }
 
-  RefPtr<LSCipherKeyManager> GetOrCreateCipherKeyManager(
+  Result<RefPtr<LSCipherKeyManager>, nsresult> GetOrCreateCipherKeyManager(
       const OriginMetadata& aOriginMetadata);
 
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(mozilla::dom::QuotaClient, override)
@@ -2867,7 +2868,7 @@ nsresult LoadArchivedOrigins() {
           "SELECT DISTINCT originAttributes, originKey "
           "FROM webappsstore2;"_ns));
 
-  auto archivedOrigins = MakeUnique<ArchivedOriginHashtable>();
+  auto archivedOrigins = std::make_unique<ArchivedOriginHashtable>();
 
   // XXX Actually, this could use a hashtable variant of
   // CollectElementsWhileHasResult
@@ -2888,8 +2889,8 @@ nsresult LoadArchivedOrigins() {
                Err(NS_ERROR_FAILURE));
 
         archivedOrigins->InsertOrUpdate(
-            hashKey,
-            MakeUnique<ArchivedOriginInfo>(originAttributes, originNoSuffix));
+            hashKey, std::make_unique<ArchivedOriginInfo>(originAttributes,
+                                                          originNoSuffix));
 
         return Ok{};
       }));
@@ -3614,7 +3615,7 @@ void DatastoreWriteOptimizer::ApplyAndReset(
             // about the UpdateWithMove flag.
 
             aOrderedItems.RemoveElementAt(index);
-            entry.Data() = MakeUnique<InsertItemInfo>(
+            entry.Data() = std::make_unique<InsertItemInfo>(
                 updateItemInfo->SerialNumber(), updateItemInfo->GetKey(),
                 updateItemInfo->GetValue());
           } else {
@@ -6889,13 +6890,17 @@ nsresult PrepareDatastoreOp::DatabaseWork() {
     QuotaManager* quotaManager = QuotaManager::Get();
     MOZ_ASSERT(quotaManager);
 
-    if (mOriginMetadata.mIsPrivate) {
+    mOriginMetadata.mIsEncrypted =
+        quotaManager->IsOriginEncrypted(mOriginMetadata);
+
+    if (mOriginMetadata.ShouldEncrypt()) {
       auto* lsClient =
           static_cast<QuotaClient*>(quotaManager->GetClient(quota::Client::LS));
-      auto cipherKeyManager =
-          lsClient->GetOrCreateCipherKeyManager(mOriginMetadata);
+      QM_TRY_UNWRAP(auto cipherKeyManager,
+                    lsClient->GetOrCreateCipherKeyManager(mOriginMetadata));
       MOZ_RELEASE_ASSERT(cipherKeyManager);
-      mMaybeCipherKey = Some(cipherKeyManager->Ensure());
+      QM_TRY_UNWRAP(auto key, cipherKeyManager->Ensure("db"_ns));
+      mMaybeCipherKey = Some(key);
     }
 
     const UsageInfo usageInfo = quotaManager->GetUsageForClient(
@@ -7432,7 +7437,7 @@ void PrepareDatastoreOp::GetResponse(LSRequestResponse& aResponse) {
     gPreparedDatastores = new PreparedDatastoreHashtable();
   }
   const auto& preparedDatastore = gPreparedDatastores->InsertOrUpdate(
-      mDatastoreId, MakeUnique<PreparedDatastore>(
+      mDatastoreId, std::make_unique<PreparedDatastore>(
                         mDatastore, ContentParentHandle(), Origin(),
                         mDatastoreId, /* aForPreload */ mForPreload));
 
@@ -8304,22 +8309,33 @@ QuotaClient::~QuotaClient() {
   sInstance = nullptr;
 }
 
-RefPtr<LSCipherKeyManager> QuotaClient::GetOrCreateCipherKeyManager(
+Result<RefPtr<LSCipherKeyManager>, nsresult>
+QuotaClient::GetOrCreateCipherKeyManager(
     const OriginMetadata& aOriginMetadata) {
   AssertIsOnIOThread();
 
-  // We intentionally return nullptr (rather than MOZ_ASSERT) for non-private
-  // origins so this can be called unconditionally from code paths shared
-  // between private and non-private modes; callers treat a nullptr return as
-  // "no cipher key needed". Asserting here would also make it harder for
-  // tests to exercise the unencrypted path through the same entry point.
-  if (!aOriginMetadata.mIsPrivate) {
-    return nullptr;
+  auto& cipherKeyManagers = IOThreadData()->mCipherKeyManagers;
+  const auto& origin = aOriginMetadata.mOrigin;
+  if (aOriginMetadata.mIsPrivate) {
+    return RefPtr<LSCipherKeyManager>(
+        cipherKeyManagers.LookupOrInsertWith(origin, [] {
+          return LSCipherKeyManager::CreateEphemeral("LSCipherKeyManager");
+        }));
   }
 
-  const auto& origin = aOriginMetadata.mOrigin;
-  return IOThreadData()->mCipherKeyManagers.LookupOrInsertWith(
-      origin, [] { return new LSCipherKeyManager("LSCipherKeyManager"); });
+  if (!aOriginMetadata.mIsEncrypted) {
+    return RefPtr<LSCipherKeyManager>(nullptr);
+  }
+
+  if (auto entry = cipherKeyManagers.Lookup(origin)) {
+    return RefPtr<LSCipherKeyManager>(entry.Data());
+  }
+
+  QM_TRY_UNWRAP(auto cipherKeyManager,
+                quota::QuotaManager::Get()->GetOrCreateCipherKeyManager(
+                    origin, quota::Client::LS));
+  cipherKeyManagers.InsertOrUpdate(origin, cipherKeyManager);
+  return cipherKeyManager;
 }
 
 mozilla::dom::quota::Client::Type QuotaClient::GetType() {
@@ -8383,10 +8399,12 @@ Result<UsageInfo, nsresult> QuotaClient::InitOrigin(
   QM_TRY_INSPECT(const bool& fileExists, ExistsAsFile(*file));
 
   Maybe<CipherKey> maybeCipherKey;
-  if (aOriginMetadata.mIsPrivate) {
-    auto cipherKeyManager = GetOrCreateCipherKeyManager(aOriginMetadata);
+  if (aOriginMetadata.ShouldEncrypt()) {
+    QM_TRY_UNWRAP(auto cipherKeyManager,
+                  GetOrCreateCipherKeyManager(aOriginMetadata));
     MOZ_RELEASE_ASSERT(cipherKeyManager);
-    maybeCipherKey = Some(cipherKeyManager->Ensure());
+    QM_TRY_UNWRAP(auto key, cipherKeyManager->Ensure("db"_ns));
+    maybeCipherKey = Some(key);
   }
 
   QM_TRY_INSPECT(

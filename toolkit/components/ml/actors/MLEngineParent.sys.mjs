@@ -1351,13 +1351,28 @@ export class MLEngine {
         if (this.#port && this.#port.onmessage) {
           this.#port.removeEventListener("message", this.#port.onmessage);
         }
-      } catch {}
+      } catch (e) {
+        lazy.console.warn("Failed to remove port message listener", e);
+      }
       try {
-        this.#port?.close?.();
-      } catch {}
+        this.#port?.postMessage({
+          type: "EnginePort:Terminate",
+          shutdown: true,
+          replacement: false,
+        });
+      } catch (e) {
+        lazy.console.warn("Failed to send terminate message to port", e);
+      }
+      try {
+        this.discardPort();
+      } catch (e) {
+        lazy.console.warn("Failed to discard port", e);
+      }
       try {
         childPort.close();
-      } catch {}
+      } catch (e) {
+        lazy.console.warn("Failed to close child port", e);
+      }
       this.#port = null;
 
       // Make sure the awaiting code is released
@@ -1421,11 +1436,20 @@ export class MLEngine {
         break;
       }
       case "EnginePort:RunResponse": {
-        const { response, error, requestId, resourcesBefore, resourcesAfter } =
-          data;
+        const {
+          response,
+          error,
+          errorDetails,
+          requestId,
+          resourcesBefore,
+          resourcesAfter,
+        } = data;
         const request = this.#requests.get(requestId);
         if (request) {
           if (error) {
+            if (errorDetails && typeof error === "object") {
+              Object.assign(error, errorDetails);
+            }
             this.telemetry.recordRunInferenceFailure(error);
             request.reject(error);
           } else if (response) {

@@ -586,12 +586,22 @@ void DecryptingInputStream<CipherStrategy>::Serialize(
     mozilla::ipc::InputStreamParams& aParams, uint32_t aMaxSize,
     uint32_t* aSizeUsed) {
   MutexAutoLock lock(mMutex);
-  MOZ_ASSERT(mBaseStream);
-  MOZ_ASSERT(mBaseIPCSerializableInputStream);
 
   mozilla::ipc::EncryptedFileInputStreamParams encryptedFileInputStreamParams;
+
+  // A closed stream is sent without its base stream, key or block size, and is
+  // deserialized as a closed stream.
+  if (!mBaseStream) {
+    *aSizeUsed = 0;
+    aParams = std::move(encryptedFileInputStreamParams);
+    return;
+  }
+
+  MOZ_ASSERT(mBaseIPCSerializableInputStream);
+
+  encryptedFileInputStreamParams.inputStreamParams().emplace();
   mozilla::ipc::InputStreamHelper::SerializeInputStream(
-      *mBaseStream, encryptedFileInputStreamParams.inputStreamParams(),
+      *mBaseStream, encryptedFileInputStreamParams.inputStreamParams().ref(),
       aMaxSize, aSizeUsed);
 
   encryptedFileInputStreamParams.key().AppendElements(
@@ -606,9 +616,13 @@ bool DecryptingInputStream<CipherStrategy>::Deserialize(
     const mozilla::ipc::InputStreamParams& aParams) {
   const auto& params = aParams.get_EncryptedFileInputStreamParams();
 
+  if (params.inputStreamParams().isNothing()) {
+    return true;
+  }
+
   nsCOMPtr<nsIInputStream> stream =
       mozilla::ipc::InputStreamHelper::DeserializeInputStream(
-          params.inputStreamParams());
+          params.inputStreamParams().ref());
   if (NS_WARN_IF(!stream)) {
     return false;
   }

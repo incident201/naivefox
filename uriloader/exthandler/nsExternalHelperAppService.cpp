@@ -2399,9 +2399,8 @@ nsresult nsExternalAppHandler::CreateTransfer() {
   // Also, release our reference to mDialog. We don't need it anymore, and we
   // need to break the reference cycle.
   mDialog = nullptr;
-  if (!mDialogProgressListener) {
-    NS_WARNING("The dialog should nullify the dialog progress listener");
-  }
+  MOZ_ASSERT(!mDialogProgressListener,
+             "The dialog should nullify the dialog progress listener");
   // In case of a non acceptable download, we need to cancel the request and
   // pass a FailedTransfer for the Download UI.
   if (mDownloadClassification != nsITransfer::DOWNLOAD_ACCEPTABLE) {

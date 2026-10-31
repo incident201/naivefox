@@ -418,20 +418,30 @@ static bool ReadAsCString(JSContext* aCx, JSStructuredCloneReader* aReader,
   return AssignJSString(aCx, aString, jsMessage);
 }
 
+/* static */
+bool DOMException::ReadStructuredCloneFields(JSContext* aCx,
+                                             JSStructuredCloneReader* aReader,
+                                             nsresult& aRv, nsCString& aMessage,
+                                             nsCString& aName,
+                                             uint16_t& aCode) {
+  uint32_t reserved;
+  return JS_ReadBytes(aReader, &reserved, 4) &&
+         JS_ReadBytes(aReader, &aRv, 4) &&
+         ReadAsCString(aCx, aReader, aMessage) &&
+         ReadAsCString(aCx, aReader, aName) && JS_ReadBytes(aReader, &aCode, 2);
+}
+
 already_AddRefed<DOMException> DOMException::ReadStructuredClone(
     JSContext* aCx, nsIGlobalObject* aGlobal,
     JSStructuredCloneReader* aReader) {
-  uint32_t reserved;
   nsresult rv;
   nsCString message;
   nsCString name;
   uint16_t code;
 
-  if (!JS_ReadBytes(aReader, &reserved, 4) || !JS_ReadBytes(aReader, &rv, 4) ||
-      !ReadAsCString(aCx, aReader, message) ||
-      !ReadAsCString(aCx, aReader, name) || !JS_ReadBytes(aReader, &code, 2)) {
+  if (!ReadStructuredCloneFields(aCx, aReader, rv, message, name, code)) {
     return nullptr;
-  };
+  }
 
   return do_AddRef(
       new DOMException(rv, std::move(message), std::move(name), code));

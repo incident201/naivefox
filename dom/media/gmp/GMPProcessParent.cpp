@@ -90,7 +90,7 @@ bool GMPProcessParent::Launch(int32_t aTimeoutMs) {
           mMonitor("GMPProcessParent::PrefSerializerRunnable::mMonitor") {}
 
     NS_IMETHOD Run() override {
-      auto prefSerializer = MakeUnique<ipc::SharedPreferenceSerializer>();
+      auto prefSerializer = std::make_unique<ipc::SharedPreferenceSerializer>();
       bool success =
           prefSerializer->SerializeToSharedMemory(GeckoProcessType_GMPlugin,
                                                   /* remoteType */ {});
@@ -246,22 +246,6 @@ bool GMPProcessParent::Launch(int32_t aTimeoutMs) {
         name, NS_LITERAL_STRING_FROM_CSTRING(__FILE__), __LINE__);
   }
   return launched;
-}
-
-void GMPProcessParent::Delete(nsCOMPtr<nsIRunnable> aCallback) {
-  mDeletedCallback = std::move(aCallback);
-  XRE_GetAsyncIOEventTarget()->Dispatch(NewNonOwningRunnableMethod(
-      "gmp::GMPProcessParent::DoDelete", this, &GMPProcessParent::DoDelete));
-}
-
-void GMPProcessParent::DoDelete() {
-  MOZ_ASSERT(XRE_GetAsyncIOEventTarget()->IsOnCurrentThread());
-
-  if (mDeletedCallback) {
-    mDeletedCallback->Run();
-  }
-
-  Destroy();
 }
 
 #if defined(XP_MACOSX) && defined(MOZ_SANDBOX)

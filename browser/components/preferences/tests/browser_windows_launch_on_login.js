@@ -22,7 +22,7 @@ let profileService = Cc["@mozilla.org/toolkit/profile-service;1"].getService(
 let startWithLastProfileOriginal = profileService.startWithLastProfile;
 let registry = null;
 
-const STARTUP_PANE = SRD_PREF_VALUE ? "paneHome" : "paneGeneral";
+const STARTUP_PANE = "paneHome";
 
 add_setup(() => {
   registry = new MockRegistry();

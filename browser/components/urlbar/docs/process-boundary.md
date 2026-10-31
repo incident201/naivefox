@@ -63,8 +63,7 @@ replaces the commands of a row that is already shown.
 
 DOM nodes and events never cross. The engagement data sent to the parent drops
 `details.element` and `details.event`, so a provider's `onEngagement()` sees
-`null` for both on the message path. `onBeforeSelection()` receives no element
-there either.
+`null` for both on the message path.
 
 ## Loads
 

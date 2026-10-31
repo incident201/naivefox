@@ -1,20 +1,10 @@
 import pytest
 from bidi.support.container_isolation import container_isolation
-from webdriver.bidi.error import NoSuchFrameException
+from webdriver.bidi.error import UnsupportedOperationException
 
 pytestmark = [pytest.mark.asyncio, container_isolation]
 
 
-async def test_contexts(bidi_session, new_tab):
-    intercept = await bidi_session.network.add_intercept(
-        phases=["beforeRequestSent"], contexts=[new_tab["context"]]
-    )
-
-    await bidi_session.network.remove_intercept(intercept=intercept)
-
-
-async def test_contexts_outside_container(bidi_session, tab_outside_container):
-    with pytest.raises(NoSuchFrameException):
-        await bidi_session.network.add_intercept(
-            phases=["beforeRequestSent"], contexts=[tab_outside_container]
-        )
+async def test_add_intercept(bidi_session):
+    with pytest.raises(UnsupportedOperationException):
+        await bidi_session.network.add_intercept(phases=["beforeRequestSent"])

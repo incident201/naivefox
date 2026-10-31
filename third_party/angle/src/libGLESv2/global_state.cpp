@@ -123,7 +123,7 @@ void SetCurrentThreadTLS(Thread *thread)
     gCurrentThread = thread;
 }
 #else
-thread_local Thread *gCurrentThread = nullptr;
+constinit thread_local Thread *gCurrentThread = nullptr;
 #endif
 
 gl::Context *GetGlobalLastContext()

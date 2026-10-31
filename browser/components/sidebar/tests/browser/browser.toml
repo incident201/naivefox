@@ -86,6 +86,8 @@ tags = "vertical-tabs"
 
 ["browser_sidebar_animation.js"]
 
+["browser_sidebar_backup_state.js"]
+
 ["browser_sidebar_collapsed_close_tab_button.js"]
 
 ["browser_sidebar_context_menu.js"]
@@ -102,9 +104,6 @@ run-if = [
 ]
 
 ["browser_sidebar_max_width.js"]
-skip-if = [
-  "os == 'linux' && os_version == '24.04' && arch == 'x86_64' && display == 'x11' && opt && socketprocess_networking", # Bug 1935442
-]
 
 ["browser_sidebar_menubar_item_commands.js"]
 

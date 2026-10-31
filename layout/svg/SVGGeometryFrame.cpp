@@ -38,8 +38,7 @@ using namespace mozilla::image;
 
 nsIFrame* NS_NewSVGGeometryFrame(mozilla::PresShell* aPresShell,
                                  mozilla::ComputedStyle* aStyle) {
-  return new (aPresShell)
-      mozilla::SVGGeometryFrame(aStyle, aPresShell->GetPresContext());
+  return new mozilla::SVGGeometryFrame(aStyle, aPresShell->GetPresContext());
 }
 
 namespace mozilla {
@@ -694,13 +693,21 @@ bool SVGGeometryFrame::IsInvisible() const {
   return true;
 }
 
+// Whether aMatrix maps a rect to a parallelogram that is not a rectangle.
+static bool HasSkew(const Matrix& aMatrix) {
+  // The images of the x and y axes are not orthogonal.
+  double x1 = aMatrix._11, y1 = aMatrix._12, x2 = aMatrix._21, y2 = aMatrix._22;
+  double dot = x1 * x2 + y1 * y2;
+  return dot * dot > 1e-8 * (x1 * x1 + y1 * y1) * (x2 * x2 + y2 * y2);
+}
+
 WebRenderCommandsResult SVGGeometryFrame::CreateWebRenderCommands(
     mozilla::wr::DisplayListBuilder& aBuilder,
     mozilla::wr::IpcResourceUpdateQueue& aResources,
     const mozilla::layers::StackingContextHelper& aSc,
     mozilla::layers::RenderRootStateManager* aManager,
     nsDisplayListBuilder* aDisplayListBuilder, DisplaySVGGeometry* aItem,
-    bool aDryRun) {
+    bool aDryRun, const Matrix& aTransform) {
   MOZ_ASSERT(StyleVisibility()->IsVisible());
 
   SVGGeometryElement* element = static_cast<SVGGeometryElement*>(GetContent());
@@ -715,8 +722,14 @@ WebRenderCommandsResult SVGGeometryFrame::CreateWebRenderCommands(
   // Rounded corners and borders are rendered by WebRender from axis aligned
   // cached images; under a rotation or a skew their edges come out blurry, so
   // only plain rect fills are drawn in that case.
-  const bool axisAligned =
-      !aSc.GetInheritedTransform().HasNonAxisAlignedTransform();
+  const Matrix transform = aTransform * aSc.GetInheritedTransform();
+  const bool axisAligned = !transform.HasNonAxisAlignedTransform();
+
+  // WebRender anti-aliases each edge separately, which bleeds past the acute
+  // corners that a skew gives to a rect.
+  if (!axisAligned && HasSkew(transform)) {
+    return Err("shape under a skew");
+  }
 
   if (!shape.IsRect()) {
     if (!StaticPrefs::gfx_webrender_svg_shapes_ellipses()) {

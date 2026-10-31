@@ -659,7 +659,7 @@ void SetCurrentValidContextTLS(Context *context)
     gCurrentValidContext = context;
 }
 #else
-thread_local Context *gCurrentValidContext = nullptr;
+constinit thread_local Context *gCurrentValidContext = nullptr;
 #endif
 
 // Handle setting the current context in TLS on different platforms

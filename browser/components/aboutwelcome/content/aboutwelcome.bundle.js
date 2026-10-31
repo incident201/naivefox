@@ -1862,6 +1862,23 @@ class ProtonScreen extends (react__WEBPACK_IMPORTED_MODULE_0___default().PureCom
       className: "center-image"
     }) : null);
   }
+
+  // Draws the front card plus one back card for each screen still to come, up
+  // to two.
+  renderCardStackLayers() {
+    const {
+      order = 0,
+      totalNumberOfScreens = 1
+    } = this.props;
+    const cardsBehind = totalNumberOfScreens - order - 1;
+    return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement((react__WEBPACK_IMPORTED_MODULE_0___default().Fragment), null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
+      className: "card-stack-front"
+    }), cardsBehind >= 1 ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
+      className: "card-stack-layer-1"
+    }) : null, cardsBehind >= 2 ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
+      className: "card-stack-layer-2"
+    }) : null);
+  }
   renderCornerImage(anchor) {
     const cornerImage = this.props.content.corner_image;
     const position = resolveCornerImagePosition(cornerImage.position);
@@ -1969,7 +1986,7 @@ class ProtonScreen extends (react__WEBPACK_IMPORTED_MODULE_0___default().PureCom
     return !!(content.background && content.background_static || content.hero_image?.url && content.hero_image?.static_url);
   }
   getEffectiveBackground(content) {
-    if (content.position !== "split") {
+    if (!["split", "card-stack"].includes(content.position)) {
       const gradient = content.zap_border_gradient || "linear-gradient(96deg, #B89CFF 20.68%, #FF9565 79.34%)";
       const combinedBackground = content.background && content.zap_border ? `${gradient} border-box border-area, image(${content.background}) padding-box` : content.background;
       const combinedBackgroundStatic = content.background_static && content.zap_border ? `${gradient} border-box border-area, image(${content.background_static}) padding-box` : content.background_static;
@@ -2000,17 +2017,31 @@ class ProtonScreen extends (react__WEBPACK_IMPORTED_MODULE_0___default().PureCom
   renderSecondarySection(content) {
     const background = this.getEffectiveBackground(content);
     const heroImageUrl = this.getEffectiveHeroImageUrl(content);
-    // pinnable_sites exposes its background through a custom property so the
-    // stylesheet can swap the wide-layout image for a narrow gradient without
-    // overriding an inline `background` shorthand.
+    const cardStackImageClass = content.card_stack_image ? `card-stack-image-${content.card_stack_image.type ?? "float"}` : "";
     const tiles = Array.isArray(content.tiles) ? content.tiles : [content.tiles];
     const isPinnableSites = tiles.some(tile => tile?.type === "pinnable_sites");
-    return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
-      className: `section-secondary ${content.hide_secondary_section ? "with-secondary-section-hidden" : ""}`,
-      style: background ? {
+    let style = {};
+    // compute the style prop depending on the message type
+    if (content.position === "card-stack" && content.card_stack_image) {
+      // set variables to use in the CSS
+      style = {
+        "--card-stack-bkg": background,
+        "--card-stack-bkg-uncropped": content.card_stack_image.background_uncropped ?? background,
+        "--card-stack-bkg-medium": content.card_stack_image.background_medium ?? background,
+        "--card-stack-bkg-small": content.card_stack_image.background_small ?? background
+      };
+    } else {
+      // pinnable_sites exposes its background through a custom property so the
+      // stylesheet can swap the wide-layout image for a narrow gradient without
+      // overriding an inline `background` shorthand.
+      style = background ? {
         [isPinnableSites ? "--pinnable-sites-bkg" : "background"]: background,
         "--mr-secondary-background-position-y": content.split_narrow_bkg_position
-      } : {}
+      } : {};
+    }
+    return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
+      className: `section-secondary ${content.hide_secondary_section ? "with-secondary-section-hidden" : ""} ${cardStackImageClass}`,
+      style: style
     }, content.dismiss_button && content.reverse_split ? this.renderDismissButton() : null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement(_MSLocalized__WEBPACK_IMPORTED_MODULE_1__.Localized, {
       text: content.image_alt_text
     }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
@@ -2196,9 +2227,10 @@ class ProtonScreen extends (react__WEBPACK_IMPORTED_MODULE_0___default().PureCom
         this.mainContentHeader = input;
       },
       "no-rdm": content.no_rdm ? "" : null
-    }, content.position === "card-stack" ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
-      className: "card-stack-front"
-    }) : null, cornerImageAnchor === "screen" ? this.renderCornerImage("screen") : null, isCenterPosition ? null : this.renderSecondarySection(content), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
+      // eslint-disable-next-line react/no-unknown-property
+      ,
+      "initial-card": content.position === "card-stack" && this.props.isFirstScreen && this.props.previousOrder < 0 ? "" : null
+    }, content.position === "card-stack" ? this.renderCardStackLayers() : null, cornerImageAnchor === "screen" ? this.renderCornerImage("screen") : null, isCenterPosition ? null : this.renderSecondarySection(content), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
       className: `section-main ${isEmbeddedMigration ? "embedded-migration" : ""}${isSystemPromptStyleSpotlight ? "system-prompt-spotlight" : ""}`,
       "hide-secondary-section": content.hide_secondary_section ? String(content.hide_secondary_section) : null,
       role: "document",
@@ -2354,6 +2386,25 @@ const screenContentShape = {
     // The URL of the static hero image, provided if the default hero image
     // has animated content.
     url: (prop_types_prop_types__WEBPACK_IMPORTED_MODULE_13___default().string)
+  }),
+  // The image to insert into the secondary section background
+  // if the screen is a card stack. "Float" is the default
+  // and uses the "background" property under the hood, so no
+  // extra URLs are needed.
+  card_stack_image: prop_types_prop_types__WEBPACK_IMPORTED_MODULE_13___default().shape({
+    // The image type; 'float' is a centered floating image (default),
+    // 'bleed' is an image designed to bleed over the bottom edge of the
+    // card, and 'banner' is a wider image that will bleed over two edges,
+    // and convert to a centered image at smaller widths.
+    type: prop_types_prop_types__WEBPACK_IMPORTED_MODULE_13___default().oneOf(["float", "bleed", "banner"]),
+    // The static CSS background to use with the 'bleed' image type
+    background_uncropped: (prop_types_prop_types__WEBPACK_IMPORTED_MODULE_13___default().string),
+    // The static CSS background to use at the middle breakpoint
+    // for the 'banner' image type
+    background_medium: (prop_types_prop_types__WEBPACK_IMPORTED_MODULE_13___default().string),
+    // The static CSS background to use at the smallest breakpoint
+    // for the 'banner' image type
+    background_small: (prop_types_prop_types__WEBPACK_IMPORTED_MODULE_13___default().string)
   }),
   // A single checkbox action.
   checkbox: prop_types_prop_types__WEBPACK_IMPORTED_MODULE_13___default().shape({
@@ -2604,7 +2655,11 @@ const screenContentShape = {
     // CSS overrides of the tile container. Any CSS properties starting with
     // '--' are also allowed.
     style: (prop_types_prop_types__WEBPACK_IMPORTED_MODULE_13___default().object),
-    // Accessible name for the optional carousel pill navigation.
+    // Optional, currently for single-select tiles only. Visual layout for
+    // the tile's items.
+    layout: prop_types_prop_types__WEBPACK_IMPORTED_MODULE_13___default().oneOf(["carousel"]),
+    // Optional, currently for single-select tiles only. Accessible name for
+    // the carousel pill navigation.
     pill_nav_label: localizableThingPropTypes,
     // Array of tile configurations needed for the tile type.
     data: prop_types_prop_types__WEBPACK_IMPORTED_MODULE_13___default().oneOfType([(prop_types_prop_types__WEBPACK_IMPORTED_MODULE_13___default().array), (prop_types_prop_types__WEBPACK_IMPORTED_MODULE_13___default().object)])
@@ -5194,7 +5249,8 @@ const ContentTiles = props => {
       handleAction: props.handleAction,
       activeSingleSelectSelections: props.activeSingleSelectSelections,
       setActiveSingleSelectSelection: props.setActiveSingleSelectSelection,
-      singleSelectId: `single-select-${index}`
+      singleSelectId: `single-select-${index}`,
+      messageId: props.messageId
     }), tile.type === "mobile_downloads" && tile.data && /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement(_MobileDownloads__WEBPACK_IMPORTED_MODULE_4__.MobileDownloads, {
       data: tile.data,
       handleAction: props.handleAction
@@ -5553,21 +5609,21 @@ const SingleSelect = ({
   activeTheme,
   content,
   handleAction,
+  messageId,
   setActiveSingleSelectSelection,
   singleSelectId
 }) => {
   const category = content.tiles?.category?.type || content.tiles?.type;
   const isSingleSelect = category === "single-select";
-  const cardRefs = (0,react__WEBPACK_IMPORTED_MODULE_0__.useRef)(new Map());
+  const isCarousel = isSingleSelect && content.tiles?.layout === "carousel";
+  const {
+    scrollerRef,
+    registerCard,
+    isSmallLayout
+  } = (0,_CarouselNav__WEBPACK_IMPORTED_MODULE_5__.useCarouselScroll)(activeSingleSelectSelections[singleSelectId], isCarousel);
   const handlePillSelect = id => {
     setActiveSingleSelectSelection(id, singleSelectId);
-    const card = cardRefs.current.get(id);
-    const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
-    card?.scrollIntoView?.({
-      behavior: reduceMotion ? "auto" : "smooth",
-      inline: "center",
-      block: "nearest"
-    });
+    _lib_multistage_utils_mjs__WEBPACK_IMPORTED_MODULE_4__.MultiStageUtils.sendActionTelemetry(messageId, `carousel-pill-${id}`, "CLICK_BUTTON");
   };
   const autoTriggerAllowed = itemAction => {
     // Currently only enabled for sidebar experiment prefs
@@ -5610,14 +5666,18 @@ const SingleSelect = ({
 
   const CONFIGURABLE_STYLES = ["background", "border", "borderRadius", "height", "marginBlock", "marginBlockStart", "marginBlockEnd", "marginInline", "paddingBlock", "paddingBlockStart", "paddingBlockEnd", "paddingInline", "paddingInlineStart", "paddingInlineEnd", "width"];
   return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
-    className: `tiles-single-select-container`
-  }, isSingleSelect ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement(_CarouselNav__WEBPACK_IMPORTED_MODULE_5__.CarouselNav, {
+    className: `tiles-single-select-container ${isCarousel ? "carousel" : ""}`
+  }, isCarousel ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement(_CarouselNav__WEBPACK_IMPORTED_MODULE_5__.CarouselNav, {
     items: content.tiles?.data,
     activeId: activeSingleSelectSelections[singleSelectId],
     onSelect: handlePillSelect,
-    navLabel: content.tiles?.pill_nav_label
-  }) : null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("fieldset", {
-    className: `tiles-single-select-section ${category}`
+    navLabel: content.tiles?.pill_nav_label,
+    compact: isSmallLayout
+  }) : null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
+    className: "tiles-single-select-wrapper"
+  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("fieldset", {
+    className: `tiles-single-select-section ${category} ${isCarousel ? "carousel" : ""}`,
+    ref: scrollerRef
   }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement(_MSLocalized__WEBPACK_IMPORTED_MODULE_1__.Localized, {
     text: content.tiles?.subtitle || content.subtitle
   }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("legend", {
@@ -5650,6 +5710,9 @@ const SingleSelect = ({
       iconStyle["--single-select-icon-background-dark"] = icon.darkModeBackground;
       delete iconStyle.background;
     }
+    if (isCarousel && iconStyle) {
+      iconStyle.backgroundSize = "100% 100%";
+    }
     const handleClick = evt => {
       if (isSingleSelect) {
         setActiveSingleSelectSelection(value, singleSelectId); // Update selection for the specific component
@@ -5668,13 +5731,7 @@ const SingleSelect = ({
       text: valOrObj(tooltip)
     }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("label", {
       className: `select-item ${type} ${selected ? " selected" : ""}`,
-      ref: el => {
-        if (el) {
-          cardRefs.current.set(value, el);
-        } else {
-          cardRefs.current.delete(value);
-        }
-      },
+      ref: el => registerCard(value, el),
       onKeyDown: e => handleKeyDown(e),
       style: {
         ..._lib_multistage_utils_mjs__WEBPACK_IMPORTED_MODULE_4__.MultiStageUtils.getValidStyle(style, CONFIGURABLE_STYLES),
@@ -5716,7 +5773,8 @@ const SingleSelect = ({
     })) : "", tilebutton ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement(_TileButton__WEBPACK_IMPORTED_MODULE_2__.TileButton, {
       content: tilebutton,
       handleAction: handleAction,
-      inputName: inputName
+      inputName: inputName,
+      inert: isCarousel && !selected
     }) : ""));
   }))));
 };
@@ -5743,7 +5801,8 @@ const TileButton = props => {
   const {
     content,
     handleAction,
-    inputName
+    inputName,
+    inert
   } = props;
   const ref = (0,react__WEBPACK_IMPORTED_MODULE_0__.useRef)(null);
   if (!content) {
@@ -5764,6 +5823,7 @@ const TileButton = props => {
     onClick: onClick,
     value: "tile_button",
     ref: ref,
+    inert: inert ? "" : undefined,
     className: `${content.style} tile-button slim`
   }));
 };
@@ -5827,7 +5887,8 @@ const TileList = props => {
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   CarouselNav: () => (/* binding */ CarouselNav)
+/* harmony export */   CarouselNav: () => (/* binding */ CarouselNav),
+/* harmony export */   useCarouselScroll: () => (/* binding */ useCarouselScroll)
 /* harmony export */ });
 /* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(1);
 /* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_0__);
@@ -5837,11 +5898,157 @@ function _extends() { return _extends = Object.assign ? Object.assign.bind() : f
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 
+
+// Matches --carousel-resize-duration, so the card finishes growing and
+// arriving at the same moment.
+const CAROUSEL_SCROLL_MS = 500;
+
+/**
+ * Centres the selected carousel card and reports which layout the row is in.
+ * Belongs in the component that owns the row, since it needs the scroller and
+ * every card element; the pill row only says which card to centre.
+ */
+function useCarouselScroll(activeId, isCarousel) {
+  const cardRefs = (0,react__WEBPACK_IMPORTED_MODULE_0__.useRef)(new Map());
+  const scrollerRef = (0,react__WEBPACK_IMPORTED_MODULE_0__.useRef)(null);
+  const glidingRef = (0,react__WEBPACK_IMPORTED_MODULE_0__.useRef)(false);
+  const [isSmallLayout, setIsSmallLayout] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(false);
+  const registerCard = (0,react__WEBPACK_IMPORTED_MODULE_0__.useCallback)((id, el) => {
+    if (el) {
+      cardRefs.current.set(id, el);
+    } else {
+      cardRefs.current.delete(id);
+    }
+  }, []);
+
+  // The scroll position that centres a card. Measured such that
+  // it holds regardless of text direction, padding or offset parent.
+  const centredScrollLeft = (0,react__WEBPACK_IMPORTED_MODULE_0__.useCallback)(id => {
+    const card = cardRefs.current.get(id);
+    const scroller = scrollerRef.current;
+    if (!card || !scroller) {
+      return null;
+    }
+    const cardRect = card.getBoundingClientRect();
+    const rowRect = scroller.getBoundingClientRect();
+    const offset = cardRect.left + cardRect.width / 2 - (rowRect.left + rowRect.width / 2);
+    return {
+      scroller,
+      left: scroller.scrollLeft + offset
+    };
+  }, []);
+  const settle = (0,react__WEBPACK_IMPORTED_MODULE_0__.useCallback)(id => {
+    const end = centredScrollLeft(id);
+    end?.scroller.scrollTo({
+      left: end.left,
+      behavior: "auto"
+    });
+  }, [centredScrollLeft]);
+
+  // Glide the selected card to the centre, re-measures the destination each
+  // frame because the card is still growing. Progress comes from elapsed time
+  // so the journey takes the same duration whatever its length or the display
+  // refresh rate.
+  (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(() => {
+    if (!isCarousel || !activeId) {
+      return undefined;
+    }
+    let frame;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches || !window.performance) {
+      frame = window.requestAnimationFrame(() => settle(activeId));
+      return () => window.cancelAnimationFrame(frame);
+    }
+    const start = window.performance.now();
+    let easedBefore = 0;
+    glidingRef.current = true;
+    const step = now => {
+      const elapsed = Math.max(0, now - start);
+      const progress = Math.min(1, elapsed / CAROUSEL_SCROLL_MS);
+      if (progress >= 1) {
+        settle(activeId);
+        glidingRef.current = false;
+        return;
+      }
+      const target = centredScrollLeft(activeId);
+      if (target) {
+        const eased = 1 - Math.pow(1 - progress, 3);
+        // Cover this frame's share of whatever distance is left.
+        // Both follow the same curve, but this one still
+        // converges if something else scrolls the row.
+        const share = (eased - easedBefore) / (1 - easedBefore);
+        easedBefore = eased;
+        const current = target.scroller.scrollLeft;
+        target.scroller.scrollTo({
+          left: current + (target.left - current) * share,
+          behavior: "auto"
+        });
+      }
+      frame = window.requestAnimationFrame(step);
+    };
+    frame = window.requestAnimationFrame(step);
+    return () => {
+      glidingRef.current = false;
+      window.cancelAnimationFrame(frame);
+    };
+  }, [activeId, isCarousel, centredScrollLeft, settle]);
+  (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(() => {
+    const scroller = scrollerRef.current;
+    if (!isCarousel || !scroller || !activeId || !window.ResizeObserver) {
+      return undefined;
+    }
+    let frame = 0;
+    // Which layout the row is in is decided by a container query, read the
+    // marker it sets rather than duplicating the breakpoint here.
+    const readLayout = () => setIsSmallLayout(window.getComputedStyle(scroller).getPropertyValue("--carousel-layout").trim() === "small");
+    readLayout();
+    // Re-centre the card when the row is resized.
+    // Initialize a observer to watch for size changes and ignore callbacks
+    // that do not reflect an actual change.
+    let {
+      width,
+      height
+    } = scroller.getBoundingClientRect();
+    const observer = new window.ResizeObserver(() => {
+      readLayout();
+      const box = scroller.getBoundingClientRect();
+      if (glidingRef.current || box.width === width && box.height === height) {
+        return;
+      }
+      ({
+        width,
+        height
+      } = box);
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => {
+        settle(activeId);
+        // Crossing the breakpoint restarts the card's size transition which causes the
+        // centre keeps moving after this frame so settle again once it stops.
+        const running = cardRefs.current.get(activeId)?.getAnimations?.() ?? [];
+        if (running.length) {
+          Promise.allSettled(running.map(anim => anim.finished)).then(() => settle(activeId));
+        }
+      });
+    });
+    observer.observe(scroller, {
+      box: "border-box"
+    });
+    return () => {
+      observer.disconnect();
+      window.cancelAnimationFrame(frame);
+    };
+  }, [activeId, isCarousel, settle]);
+  return {
+    scrollerRef,
+    registerCard,
+    isSmallLayout
+  };
+}
 const CarouselNav = ({
   items = [],
   activeId,
   onSelect,
-  navLabel
+  navLabel,
+  compact
 }) => {
   const groupRef = (0,react__WEBPACK_IMPORTED_MODULE_0__.useRef)(null);
   const onSelectRef = (0,react__WEBPACK_IMPORTED_MODULE_0__.useRef)(onSelect);
@@ -5875,9 +6082,10 @@ const CarouselNav = ({
   }) => /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("moz-segmented-control-item", {
     key: id,
     value: id,
+    size: "small",
     label: pill.label?.raw,
     "data-l10n-id": pill.label?.string_id,
-    iconsrc: pill.icon
+    iconsrc: compact ? undefined : pill.icon
   }))));
 };
 

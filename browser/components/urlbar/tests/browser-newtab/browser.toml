@@ -6,7 +6,7 @@ support-files = [
   "head.js",
   "richSuggestionEngine.sjs",
 ]
-prefs = ["browser.nova.enabled=true", "browser.urlbar.newtab.featureGate=true"]
+prefs = ["browser.urlbar.newtab.featureGate=true"]
 
 ["browser_blur.js"]
 

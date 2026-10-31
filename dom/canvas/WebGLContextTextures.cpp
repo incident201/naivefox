@@ -167,6 +167,15 @@ void WebGLContext::TexStorage(GLenum texTarget, uint32_t levels,
   tex->TexStorage(texTarget, levels, internalFormat, size);
 }
 
+void WebGLContext::HintTexRenderTarget(GLenum texTarget) const {
+  const FuncScope funcScope(*this, "hintTexRenderTarget");
+  if (!gl->IsD3DANGLE()) return;
+  const auto tex = GetActiveTex(texTarget);
+  if (!tex) return;
+  gl->fTexParameteri(texTarget, LOCAL_GL_TEXTURE_USAGE_ANGLE,
+                     LOCAL_GL_FRAMEBUFFER_ATTACHMENT_ANGLE);
+}
+
 void WebGLContext::TexImage(uint32_t level, GLenum respecFormat, uvec3 offset,
                             const webgl::PackingInfo& pi,
                             const webgl::TexUnpackBlobDesc& src) const {

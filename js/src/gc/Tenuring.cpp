@@ -259,7 +259,8 @@ bool TenuringTracer::onScopeEdge(Scope** scopep, const char* name) {
   return true;
 }
 
-bool TenuringTracer::onBufferEdge(void** bufferp, const char* name) {
+JSTracer::TraceBufferResult TenuringTracer::onBufferEdge(void** bufferp,
+                                                         const char* name) {
   return BufferAllocator::PromoteBuffer(this, bufferp, name, sourceIsInNursery);
 }
 
@@ -1186,6 +1187,18 @@ JSString* js::gc::TenuringTracer::promoteString(JSString* src) {
   }
 #endif
 
+  MOZ_ASSERT(!src->isAtom());
+
+  // An atom ref already points to a tenured atom with the same characters and
+  // encoding, so forward to that instead of promoting a copy.
+  if (src->isAtomRef()) {
+    JSAtom* atom = src->atom();
+    MOZ_ASSERT(src->hasLatin1Chars() == atom->hasLatin1Chars());
+    StringRelocationOverlay::forwardString(src, atom);
+    gcprobes::PromoteToTenured(src, atom);
+    return atom;
+  }
+
   AllocKind dstKind = src->getAllocKind();
   Zone* zone = src->nurseryZone();
 
@@ -1193,7 +1206,6 @@ JSString* js::gc::TenuringTracer::promoteString(JSString* src) {
   // the atom. Don't do this for dependent strings because they're more
   // complicated. See StringRelocationOverlay and DeduplicationStringHasher
   // comments.
-  MOZ_ASSERT(!src->isAtom());
   if (src->isLinear() && src->inStringToAtomCache() &&
       src->isDeduplicatable() && !src->hasBase()) {
     JSLinearString* linear = &src->asLinear();
@@ -1294,11 +1306,13 @@ JSString* js::gc::TenuringTracer::promoteString(JSString* src) {
     JSLinearString* base = src->asDependent().rootBaseDuringMinorGC();
 
     // Limited recursion: the root base cannot be dependent, so this will not
-    // recurse again.
+    // recurse again. Preserve the value of |promotedToNursery|.
+    bool promotedToNurseryPrev = promotedToNursery;
     JSString* promotedBase =
         InCollectedNurseryRegion(base) ? promoteOrForward(base) : base;
-    MOZ_ASSERT(!promotedBase->isDependent());
+    promotedToNursery = promotedToNurseryPrev;
 
+    MOZ_ASSERT(!promotedBase->isDependent());
     dst->asDependent().setBase(&promotedBase->asLinear());
     if (base != promotedBase) {
       dst->asDependent().updateToPromotedBase(base);

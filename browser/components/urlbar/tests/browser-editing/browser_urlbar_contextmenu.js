@@ -219,8 +219,6 @@ add_task(async function menu_button_on_openable_rows() {
       ...["tab", "container-tab", "window", "private-window"].map(openIn => ({
         openIn,
       })),
-      "separator",
-      { command: "toggle-keyboard-accessible" },
     ],
     "The bookmark has no commands of its own, so its menu only opens it"
   );

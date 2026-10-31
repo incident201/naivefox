@@ -37,8 +37,7 @@ const MERINO_DYNAMIC_WIKIPEDIA_SUGGESTION = {
 };
 
 // Expected AMP icon sizes.
-const AMP_ICON_SIZE_TOP_PICK_LARGE_NOVA = 58;
-const AMP_ICON_SIZE_TOP_PICK_LARGE_PROTON = 52;
+const AMP_ICON_SIZE_TOP_PICK_LARGE = 58;
 const AMP_ICON_SIZE_TOP_PICK_SMALL = 28;
 const AMP_ICON_SIZE_NON_TOP_PICK = 16;
 
@@ -369,21 +368,8 @@ add_task(async function ampIconSize() {
       expectedSize = AMP_ICON_SIZE_NON_TOP_PICK;
     } else if (!useNovaIconSize) {
       expectedSize = AMP_ICON_SIZE_TOP_PICK_SMALL;
-    } else if (Services.prefs.getBoolPref("browser.nova.enabled")) {
-      expectedSize = AMP_ICON_SIZE_TOP_PICK_LARGE_NOVA;
     } else {
-      expectedSize = AMP_ICON_SIZE_TOP_PICK_LARGE_PROTON;
-    }
-
-    // The `icon-size` attribute is set in both Nova and Proton, but Nova
-    // doesn't use it, and when Nova is enabled it's set to 52 instead of the
-    // correct 58. We should stop setting it when Proton is removed.
-    if (!Services.prefs.getBoolPref("browser.nova.enabled")) {
-      Assert.equal(
-        icon.getAttribute("icon-size"),
-        expectedSize.toString(),
-        "icon-size attribute should have expected value"
-      );
+      expectedSize = AMP_ICON_SIZE_TOP_PICK_LARGE;
     }
 
     let { width, height } = window.getComputedStyle(icon);

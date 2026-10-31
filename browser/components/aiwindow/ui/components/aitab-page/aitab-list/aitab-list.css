@@ -8,7 +8,16 @@
   --aitab-list-group-gap: 36px;
   --aitab-list-column-gap: 32px;
   --aitab-list-row-gap: 48px;
-  --aitab-list-border-color: var(--color-gray-20);
+  --aitab-list-item-padding-block: 12px 14px;
+  --aitab-list-heading-border-color: var(--border-color);
+  --aitab-list-item-border-color: light-dark(var(--color-gray-20), var(--color-gray-50));
+
+  @media (not (-moz-pref("browser.nova.enabled"))) and (not (forced-colors)) {
+    --aitab-list-heading-border-color: light-dark(var(--color-gray-30), var(--color-gray-60));
+    /* The base gray-50 is lighter than gray-60, so dark mode needs a dimmer
+     * item border to keep the heading border the stronger one. */
+    --aitab-list-item-border-color: light-dark(var(--color-gray-20), var(--color-gray-70));
+  }
 
   @media (width > 900px) {
     --aitab-list-row-gap: 48px;
@@ -57,8 +66,7 @@
   display: grid;
   align-items: start;
   /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
-  row-gap: var(--aitab-list-group-gap);
-  column-gap: var(--space-xlarge);
+  gap: var(--aitab-list-group-gap);
   grid-template-columns: 1fr;
 
   @media (width > 900px) {
@@ -83,18 +91,20 @@
   list-style: none;
 }
 
-.aitab-list-group-heading,
-.aitab-list-item {
+.aitab-list-group-heading {
   padding-block: var(--space-small);
+  border-block-end: var(--border-width) solid var(--aitab-list-heading-border-color);
 }
 
-.aitab-list-group-heading,
 .aitab-list-item:not(:last-child) {
-  border-block-end: var(--border-width) solid var(--aitab-list-border-color);
+  border-block-end: var(--border-width) solid var(--aitab-list-item-border-color);
 }
 
 .aitab-list-item {
   /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
+  padding-block: var(--aitab-list-item-padding-block);
+  /* stylelint-disable-next-line stylelint-plugin-mozilla/use-design-tokens */
   font-size: var(--aitab-body);
-  line-height: 1.5;
+  /* With the padding and the separator, each row is 54px tall. */
+  line-height: 27px;
 }

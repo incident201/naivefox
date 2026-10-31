@@ -76,14 +76,15 @@ export class UrlbarProviderGlobalActions extends UrlbarProvider {
    * @param {UrlbarQueryContext} queryContext
    * @param {(provider: UrlbarProvider, result: UrlbarResult) => void} addCallback
    *   Callback invoked by the provider to add a new result.
+   * @param {UrlbarParentController} controller
    */
-  async startQuery(queryContext, addCallback) {
+  async startQuery(queryContext, addCallback, controller) {
     let actionsResults = [];
 
     for (let provider of globalActionsProviders) {
-      if (provider.isActive(queryContext)) {
+      if (provider.isActive(queryContext, controller)) {
         actionsResults.push(
-          ...((await provider.queryActions(queryContext)) || [])
+          ...((await provider.queryActions(queryContext, controller)) || [])
         );
       }
     }

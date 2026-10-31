@@ -308,6 +308,12 @@ gradle.ext.configureMavenRepositories = { handler ->
             if (gradle.mozconfig.substs.ALLOW_INSECURE_GRADLE_REPOSITORIES) {
                 allowInsecureProtocol = true
             }
+            if (repository =~ /maven\.mozilla\.org|\/mozilla\/?$/) {
+                content {
+                    includeGroupAndSubgroups("org.mozilla")
+                    includeGroupAndSubgroups("com.github.mozsearch")
+                }
+            }
         }
     }
 }

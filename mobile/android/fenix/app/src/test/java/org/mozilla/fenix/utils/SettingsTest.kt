@@ -28,8 +28,10 @@ import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.mozilla.fenix.R
 import org.mozilla.fenix.browser.browsingmode.BrowsingMode
 import org.mozilla.fenix.components.toolbar.ToolbarPosition
+import org.mozilla.fenix.nimbus.AutomotiveSensitiveData
 import org.mozilla.fenix.nimbus.DefaultBrowserPrompt
 import org.mozilla.fenix.nimbus.FakeNimbusEventStore
 import org.mozilla.fenix.nimbus.FxNimbus
@@ -343,6 +345,21 @@ class SettingsTest {
         assertFalse(automotiveSettings.shouldAutofillLogins)
         assertFalse(automotiveSettings.shouldAutofillCreditCardDetails)
         assertFalse(automotiveSettings.shouldAutofillAddressDetails)
+    }
+
+    @Test
+    fun `GIVEN Android Automotive and the sensitive data feature is enabled WHEN reading the autofill settings THEN they are all enabled by default`() {
+        shadowOf(testContext.packageManager).setSystemFeature(PackageManager.FEATURE_AUTOMOTIVE, true)
+        FxNimbus.features.automotiveSensitiveData.withCachedValue(AutomotiveSensitiveData(enabled = true))
+        val automotiveSettings = Settings(testContext)
+
+        assertTrue(automotiveSettings.isAutofillSupported)
+        assertTrue(automotiveSettings.shouldPromptToSaveLogins)
+        assertTrue(automotiveSettings.shouldAutofillLogins)
+        assertTrue(automotiveSettings.shouldAutofillCreditCardDetails)
+        assertTrue(automotiveSettings.shouldAutofillAddressDetails)
+
+        FxNimbus.features.automotiveSensitiveData.withCachedValue(null)
     }
 
     @Test
@@ -1574,5 +1591,38 @@ class SettingsTest {
 
         assertTrue(settings.powerSavingModeManuallyEnabled)
         assertFalse(settings.powerSavingModeAutoEnabled)
+    }
+
+    @Test
+    fun `WHEN reading menu customization preferences THEN default values are false`() {
+        assertFalse(settings.isMenuCustomizationScreenEnabled)
+    }
+
+    @Test
+    fun `GIVEN menu customization preferences WHEN modified THEN reflect stored values`() {
+        settings.isMenuCustomizationScreenEnabled = true
+
+        assertTrue(settings.isMenuCustomizationScreenEnabled)
+
+        settings.isMenuCustomizationScreenEnabled = false
+
+        assertFalse(settings.isMenuCustomizationScreenEnabled)
+    }
+
+    @Test
+    fun `GIVEN no value has been set WHEN reading openLinksInYoutube THEN it defaults to never`() {
+        assertEquals(
+            testContext.getString(R.string.pref_key_open_links_in_youtube_never),
+            settings.openLinksInYoutube,
+        )
+    }
+
+    @Test
+    fun `GIVEN openLinksInYoutube is written WHEN reading it back THEN the stored value is returned`() {
+        val never = testContext.getString(R.string.pref_key_open_links_in_youtube_never)
+
+        settings.openLinksInYoutube = never
+
+        assertEquals(never, settings.openLinksInYoutube)
     }
 }

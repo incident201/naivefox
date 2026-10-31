@@ -96,6 +96,7 @@
                   tbattr="tabbrowser-multiple-visible"/>
         <menuitem id="context_openTabInMiniWindow"
                   data-lazy-l10n-id="move-to-mini-window"
+                  data-l10n-args='{"tabCount": 1}'
                   hidden="true"/>
         <menuseparator id="moveTabSeparator" hidden="true"/>
         <menuseparator id="context_moveTabToGroupSeparator" hidden="true"/>
@@ -240,6 +241,17 @@
                        hidden="true"
                        type="icon ghost"
                        data-l10n-id="genai-shortcut-copy-button"/>
+      <html:span id="copy-action-confirmation"
+                  class="copy-action-confirmation"
+                  role="status"
+                  aria-live="polite">
+        <html:span class="copy-action-confirmation-icon" aria-hidden="true"/>
+        <html:span class="copy-action-confirmation-text"/>
+      </html:span>
+      <html:span id="more-actions-separator"
+                 class="more-actions-separator"
+                 hidden="true"
+                 aria-hidden="true"/>
       <html:moz-button id="more-actions-button"
                        hidden="true"
                        type="icon ghost"
@@ -256,6 +268,84 @@
          type="arrow">
     <vbox class="panel-subview-body"/>
   </panel>
+
+  <panel id="selection-more-actions-panel"
+         role="group"
+         data-l10n-id="genai-more-actions-panel"
+         noautofocus="true"
+         nonnative=""
+         type="arrow">
+    <vbox class="panel-subview-body">
+      <html:moz-toggle id="more-actions-ai-toggle"
+                       inputlayout="inline-end"
+                       data-l10n-attrs="label"/>
+      <html:moz-toggle id="more-actions-search-toggle"
+                       inputlayout="inline-end"
+                       data-l10n-id="genai-more-actions-search"
+                       data-l10n-attrs="label"/>
+      <html:moz-toggle id="more-actions-copy-toggle"
+                       inputlayout="inline-end"
+                       data-l10n-id="genai-more-actions-copy"
+                       data-l10n-attrs="label"/>
+      <html:p id="more-actions-all-off-notice"
+              class="more-actions-notice"
+              role="status"
+              hidden=""
+              data-l10n-id="genai-more-actions-all-off-notice">
+        <html:span class="more-actions-notice-chevron"
+                   data-l10n-name="chevron"/>
+      </html:p>
+      <toolbarseparator/>
+      <html:moz-button id="more-actions-manage-settings"
+                       type="ghost"
+                       data-l10n-id="genai-more-actions-manage-settings"
+                       data-l10n-attrs="label"/>
+    </vbox>
+  </panel>
+
+  <!-- Feature callout for the selection actions. -->
+  <html:template id="selectionCalloutTemplate">
+    <panel id="selection-callout-panel"
+           role="status"
+           noautofocus="true"
+           consumeoutsideclicks="never"
+           nonnative="">
+      <vbox class="panel-subview-body">
+        <svg xmlns="http://www.w3.org/2000/svg"
+             class="selection-callout-shape"
+             aria-hidden="true">
+          <defs>
+            <linearGradient id="selection-callout-edge"
+                            x1="0.2217" y1="-0.0354" x2="1.0972" y2="0.2903">
+              <stop class="selection-callout-gradient-start" offset="0"/>
+              <stop class="selection-callout-gradient-end" offset="0.711538"/>
+            </linearGradient>
+          </defs>
+          <path class="selection-callout-edge"/>
+        </svg>
+        <html:div class="selection-callout-content">
+          <html:p class="selection-callout-title"
+                  data-l10n-id="genai-selection-callout-title"/>
+          <html:div class="selection-callout-row">
+            <html:div class="selection-callout-mark-column">
+              <html:img class="selection-callout-mark"
+                        src="chrome://branding/content/about-logo.svg"
+                        alt=""/>
+              <html:moz-badge class="selection-callout-new-badge"
+                              type="new"/>
+            </html:div>
+            <html:p class="selection-callout-message"
+                    data-l10n-id="genai-selection-callout-text">
+              <html:span class="selection-callout-more-link"
+                         role="button"
+                         tabindex="0"
+                         data-l10n-name="more-actions"/>
+            </html:p>
+          </html:div>
+        </html:div>
+      </vbox>
+    </panel>
+  </html:template>
 
   <html:template id="screenshotsPagePanelTemplate">
     <box class="screenshotsPagePanel" hidden="true">

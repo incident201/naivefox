@@ -18,6 +18,11 @@
 
 #include <array>
 
+#ifndef CLOCK_MONOTONIC_RAW
+// CLOCK_MONOTONIC_RAW is undefined on Solaris.
+#    define CLOCK_MONOTONIC_RAW CLOCK_MONOTONIC
+#endif
+
 namespace angle
 {
 std::string GetExecutablePath()

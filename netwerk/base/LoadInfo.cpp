@@ -651,24 +651,9 @@ LoadInfo::LoadInfo(dom::WindowGlobalParent* aParentWGP,
 
   mBrowsingContextID = parentBC->Id();
 
-  // Special treatment for resources injected by add-ons if not document,
-  // iframe, workers.
-  if (!nsContentUtils::IsNonSubresourceInternalPolicyType(aContentPolicyType) &&
-      aTriggeringPrincipal &&
-      StaticPrefs::privacy_antitracking_isolateContentScriptResources() &&
-      nsContentUtils::IsExpandedPrincipal(aTriggeringPrincipal)) {
-    bool shouldResistFingerprinting =
-        nsContentUtils::ShouldResistFingerprinting_dangerous(
-            mLoadingPrincipal,
-            "CookieJarSettings can't exist yet, we're creating it",
-            RFPTarget::IsAlwaysEnabledForPrecompute);
-    mCookieJarSettings = CookieJarSettings::Create(
-        nsICookieService::BEHAVIOR_REJECT,
-        StoragePrincipalHelper::PartitionKeyForExpandedPrincipal(
-            aTriggeringPrincipal),
-        OriginAttributes::IsFirstPartyEnabled(), false,
-        shouldResistFingerprinting);
-  }
+  mCookieJarSettings =
+      StoragePrincipalHelper::MaybeCreateCookieJarSettingsForContentScript(
+          aTriggeringPrincipal, mLoadingPrincipal, aContentPolicyType);
 
   if (!mCookieJarSettings) {
     // Let's clone and inherit the cookie behavior and permission from the
@@ -1229,25 +1214,11 @@ LoadInfo::GetCookiePolicy(uint32_t* aResult) {
 namespace {
 
 already_AddRefed<nsICookieJarSettings> CreateCookieJarSettings(
-    nsIPrincipal* aTriggeringPrincipal, nsContentPolicyType aContentPolicyType,
-    bool aIsPrivate, bool aShouldResistFingerprinting) {
+    nsContentPolicyType aContentPolicyType, bool aIsPrivate,
+    bool aShouldResistFingerprinting) {
 #ifdef MOZ_NAIVEFOX
   return nullptr;
 #else
-  // Special treatment for resources injected by add-ons if not document,
-  // iframe, workers.
-  if (!nsContentUtils::IsNonSubresourceInternalPolicyType(aContentPolicyType) &&
-      aTriggeringPrincipal &&
-      StaticPrefs::privacy_antitracking_isolateContentScriptResources() &&
-      nsContentUtils::IsExpandedPrincipal(aTriggeringPrincipal)) {
-    return CookieJarSettings::Create(
-        nsICookieService::BEHAVIOR_REJECT,
-        StoragePrincipalHelper::PartitionKeyForExpandedPrincipal(
-            aTriggeringPrincipal),
-        OriginAttributes::IsFirstPartyEnabled(), false,
-        aShouldResistFingerprinting);
-  }
-
   if (StaticPrefs::network_cookieJarSettings_unblocked_for_testing()) {
     return aIsPrivate ? CookieJarSettings::Create(CookieJarSettings::ePrivate,
                                                   aShouldResistFingerprinting)
@@ -1276,17 +1247,21 @@ NS_IMETHODIMP
 LoadInfo::GetCookieJarSettings(nsICookieJarSettings** aCookieJarSettings) {
 #ifndef MOZ_NAIVEFOX
   if (!mCookieJarSettings) {
-    bool isPrivate = mOriginAttributes.IsPrivateBrowsing();
     nsCOMPtr<nsIPrincipal> loadingPrincipal;
     (void)this->GetLoadingPrincipal(getter_AddRefs(loadingPrincipal));
-    bool shouldResistFingerprinting =
-        nsContentUtils::ShouldResistFingerprinting_dangerous(
-            loadingPrincipal,
-            "CookieJarSettings can't exist yet, we're creating it",
-            RFPTarget::IsAlwaysEnabledForPrecompute);
-    mCookieJarSettings = CreateCookieJarSettings(
-        mTriggeringPrincipal, mInternalContentPolicyType, isPrivate,
-        shouldResistFingerprinting);
+    mCookieJarSettings =
+        StoragePrincipalHelper::MaybeCreateCookieJarSettingsForContentScript(
+            mTriggeringPrincipal, loadingPrincipal, mInternalContentPolicyType);
+    if (!mCookieJarSettings) {
+      bool isPrivate = mOriginAttributes.IsPrivateBrowsing();
+      bool shouldResistFingerprinting =
+          nsContentUtils::ShouldResistFingerprinting_dangerous(
+              loadingPrincipal,
+              "CookieJarSettings can't exist yet, we're creating it",
+              RFPTarget::IsAlwaysEnabledForPrecompute);
+      mCookieJarSettings = CreateCookieJarSettings(
+          mInternalContentPolicyType, isPrivate, shouldResistFingerprinting);
+    }
   }
 #endif
   nsCOMPtr<nsICookieJarSettings> cookieJarSettings = mCookieJarSettings;

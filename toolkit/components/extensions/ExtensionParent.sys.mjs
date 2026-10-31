@@ -308,10 +308,18 @@ const ProxyMessenger = {
       let browser = top.embedderElement;
       let data =
         browser && apiManager.global.tabTracker.getBrowserData(browser);
+
+      let windowId = data?.windowId;
       if (data?.tabId > 0) {
         sender.tab = extension.tabManager.get(data.tabId, null)?.convert();
         // frameId is documented to only be set if sender.tab is set.
         sender.frameId = source.frameId;
+        // preferring windowId from tab over data.windowId
+        windowId ??= sender.tab?.windowId;
+      }
+
+      if (windowId > 0) {
+        sender.windowId = windowId;
       }
 
       if (currentWindowContext?.innerWindowId) {

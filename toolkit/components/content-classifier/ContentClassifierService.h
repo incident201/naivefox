@@ -306,10 +306,12 @@ class ContentClassifierService final : public nsIAsyncShutdownBlocker,
   // This rebuilds the given features,
   // according to that preference snapshot. This also means that features that
   // aren't referenced by the current pref snapshot are going to have their
-  // engine destroyed.
-  void UpdateFeatures(
-      const nsTArray<const ContentClassifierFeature*>& aFeatures,
-      EnginesPrefsSnapshot aPreferenceSnapshot);
+  // engine destroyed. aFeatureVersions holds the version of each entry in
+  // aFeatures and aGeneration the update generation, both already bumped
+  // by ProcessListChanges.
+  void UpdateFeatures(nsTArray<const ContentClassifierFeature*> aFeatures,
+                      nsTArray<uint64_t> aFeatureVersions, uint64_t aGeneration,
+                      EnginesPrefsSnapshot aPreferenceSnapshot);
 
   // Put the given engine into the authoritative map. Doesn't update references
   // to this feature's engine elsewhere. See
@@ -364,7 +366,7 @@ class ContentClassifierService final : public nsIAsyncShutdownBlocker,
       MOZ_GUARDED_BY(mLock);
 
   // Per-feature monotonic version counter, bumped each time
-  // UpdateFeatures decides to rebuild that feature's engine. The
+  // ProcessListChanges decides to rebuild that feature's engine. The
   // version is captured into the build closure at dispatch time;
   // when the closure later runs it skips installation for any feature
   // whose recorded version no longer matches the current one (i.e. a
@@ -372,11 +374,12 @@ class ContentClassifierService final : public nsIAsyncShutdownBlocker,
   // can't write each other's stale results.
   nsTHashMap<nsCStringHashKey, uint64_t> mFeatureVersions MOZ_GUARDED_BY(mLock);
 
-  // Global update generation. Bumped under mLock on every UpdateFeatures
-  // call (including the empty-features path). Each closure captures
-  // its generation at dispatch time and only runs Populate / Prune /
-  // Notify when its generation equals mUpdateGeneration — i.e., no
-  // newer UpdateFeatures has been issued. This prevents an older
+  // Global update generation. Bumped under mLock on every
+  // ProcessListChanges call (including the empty-features path), under the
+  // same lock that decides which features to rebuild. Each
+  // closure captures its generation at dispatch time and only runs
+  // Populate / Prune / Notify when its generation equals mUpdateGeneration
+  // — i.e., no newer ProcessListChanges has been issued. This prevents an older
   // closure with a stale snapshot from clobbering active-engine lists
   // populated by a newer call's snapshot.
   uint64_t mUpdateGeneration MOZ_GUARDED_BY(mLock) = 0;

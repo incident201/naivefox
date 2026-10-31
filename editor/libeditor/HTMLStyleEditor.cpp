@@ -1289,9 +1289,9 @@ Result<CaretPoint, nsresult> HTMLEditor::AutoInlineStyleSetter::ApplyStyle(
                       // MOZ_CAN_RUN_SCRIPT_BOUNDARY due to bug 1758868
                       : [&](HTMLEditor& aHTMLEditor, Element& aNewElement,
                             const EditorDOMPoint&) MOZ_CAN_RUN_SCRIPT_BOUNDARY {
-                          nsresult rv =
-                              aNewElement.SetAttr(kNameSpaceID_None, mAttribute,
-                                                  attributeValue, false);
+                          nsresult rv = aNewElement.SetAttr(
+                              kNameSpaceID_None, mAttribute, attributeValue,
+                              false, IsKnownNewAttr::Yes);
                           NS_WARNING_ASSERTION(NS_SUCCEEDED(rv),
                                                "Element::SetAttr() failed");
                           return rv;
@@ -1960,7 +1960,8 @@ HTMLEditor::AutoInlineStyleSetter::ExtendOrShrinkRangeToApplyTheStyle(
             range.EndRef(),
             // We don't want to wrap only the padding line break into the new
             // styled element.
-            PaddingForEmptyBlock::Unnecessary, aEditingHost);
+            TreatAsUnnecessaryLineBreak{LineBreakFor::PaddingForEmptyBlock},
+            aEditingHost);
     if (nextThing.MaybeIgnoredLineBreak().isSome() &&
         nextThing.MaybeIgnoredLineBreak()->IsInclusiveDescendantOf(
             aEditingHost) &&

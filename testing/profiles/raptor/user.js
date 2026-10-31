@@ -26,6 +26,11 @@ user_pref("browser.backup.enabled", false);
 user_pref("browser.sessionstore.interval", 3600000);
 user_pref("browser.sessionstore.interval.idle", 3600000);
 
+// Match the release delay before the user-inactive shrinking GC. Nightly
+// uses 15s, which lets it run during the measurements since automation never
+// sends user input.
+user_pref("javascript.options.compact_on_user_inactive_delay", 300000);
+
 // Avoid the status panel indicating loading state which messes up
 // screenshots.
 user_pref("browser.tabs.hideStatusPanel", true);

@@ -41,7 +41,9 @@ class IPProtectionInfoPrompterTest {
             prompter.start()
             testDispatcher.scheduler.advanceUntilIdle()
 
-            ipProtectionStore.dispatch(IPProtectionAction.EligibilityChanged(EligibilityStatus.Eligible))
+            ipProtectionStore.dispatch(
+                IPProtectionAction.EligibilityAction.EligibilityChanged(EligibilityStatus.Eligible)
+            )
             testDispatcher.scheduler.advanceUntilIdle()
 
             val snackbarState = appStore.state.snackbarState
@@ -58,7 +60,9 @@ class IPProtectionInfoPrompterTest {
             prompter.start()
             testDispatcher.scheduler.advanceUntilIdle()
 
-            ipProtectionStore.dispatch(IPProtectionAction.EligibilityChanged(EligibilityStatus.Eligible))
+            ipProtectionStore.dispatch(
+                IPProtectionAction.EligibilityAction.EligibilityChanged(EligibilityStatus.Eligible)
+            )
             testDispatcher.scheduler.advanceUntilIdle()
 
             assertIs<SnackbarState.None>(appStore.state.snackbarState)
@@ -74,7 +78,9 @@ class IPProtectionInfoPrompterTest {
             prompter.start()
             testDispatcher.scheduler.advanceUntilIdle()
 
-            ipProtectionStore.dispatch(IPProtectionAction.EligibilityChanged(EligibilityStatus.Ineligible))
+            ipProtectionStore.dispatch(
+                IPProtectionAction.EligibilityAction.EligibilityChanged(EligibilityStatus.Ineligible)
+            )
             testDispatcher.scheduler.advanceUntilIdle()
 
             assertIs<SnackbarState.None>(appStore.state.snackbarState)

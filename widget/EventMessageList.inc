@@ -241,6 +241,7 @@ NS_EVENT_MESSAGE(ePageShow)
 NS_EVENT_MESSAGE(ePageHide)
 
 NS_EVENT_MESSAGE(ePageReveal)
+NS_EVENT_MESSAGE(ePageSwap)
 
 // Canvas events
 NS_EVENT_MESSAGE(eContextLost)

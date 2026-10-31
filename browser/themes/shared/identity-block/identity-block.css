@@ -339,6 +339,9 @@
   }
 
   #trust-icon-container {
+    --tracker-count-duration: 110ms;
+    --tracker-count-easing: cubic-bezier(0.2, 0.8, 0.2, 1);
+
     padding-inline: var(--urlbar-icon-padding);
     border-radius: var(--urlbar-inner-border-radius);
     -moz-context-properties: fill, fill-opacity, stroke;
@@ -387,6 +390,27 @@
       #trust-icon-tracker-count-longform-wrapper,
       #trust-icon-tracker-count-shortform-wrapper {
         display: none;
+      }
+    }
+
+    /* Set by browser-trustPanel.js when switching from a tab with a tracker
+       count to one without, to shrink the previous tab's pill to the shield. */
+    &[tracker-count-tab-switch]:not(.has-blocked-trackers, .breached, .insecure) {
+      --tracker-count-shrink-background: var(--urlbar-box-background-color);
+
+      &:hover:not([open="true"]) {
+        --tracker-count-shrink-background: var(--urlbar-box-background-color-hover);
+      }
+
+      &:hover:active,
+      &[open="true"] {
+        --tracker-count-shrink-background: var(--urlbar-box-background-color-active);
+      }
+
+      @media (prefers-reduced-motion: no-preference) {
+        animation: tracker-count-tab-switch-shrink var(--tracker-count-duration) var(--tracker-count-easing);
+        box-sizing: border-box;
+        overflow: clip;
       }
     }
     /*
@@ -438,8 +462,8 @@
 
         #trust-icon-tracker-count-shortform-wrapper {
           animation-name: show-shortform-tracker-count;
-          animation-duration: 230ms;
-          animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
+          animation-duration: var(--tracker-count-duration);
+          animation-timing-function: var(--tracker-count-easing);
           animation-fill-mode: forwards;
           display: grid;
           grid-template-columns: 0fr;
@@ -450,14 +474,29 @@
             min-width: 0;
           }
         }
+
+        /* Set by browser-trustPanel.js when switching tabs, to resize from the
+           previous tab's width while the count fades in. */
+        &[tracker-count-tab-switch] {
+          @media (prefers-reduced-motion: no-preference) {
+            animation: tracker-count-tab-switch-resize var(--tracker-count-duration) var(--tracker-count-easing);
+            box-sizing: border-box;
+            overflow: clip;
+
+            /* Keeps show-shortform-tracker-count in the list, so that it
+               doesn't restart once the attribute is removed. */
+            #trust-icon-tracker-count-shortform-wrapper {
+              animation-name: show-shortform-tracker-count, fade-in-tracker-count-tab-switch;
+            }
+          }
+        }
       }
       /* On a site's entry page, we first show "x trackers blocked" (the long form) for a few seconds,
-         after which we transition to just the number of blocked trackers (the short form) */
+         after which it crossfades into just the number of blocked trackers (the short form) */
       &.entry-page {
         @media (prefers-reduced-motion: no-preference) {
           --initial-delay: 1000ms;
           --longform-presence: 20s;
-          --collapse-duration: 230ms;
           --shield-scale-down-duration: 60ms;
           --shield-scale-up-duration: 260ms;
 
@@ -486,8 +525,8 @@
             animation-delay:
               calc(var(--initial-delay) + var(--shield-scale-down-duration) + var(--shield-scale-up-duration)),
               calc(var(--initial-delay) + var(--shield-scale-down-duration) + var(--shield-scale-up-duration) + var(--longform-presence));
-            animation-duration: var(--collapse-duration);
-            animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
+            animation-duration: var(--tracker-count-duration);
+            animation-timing-function: var(--tracker-count-easing);
             animation-fill-mode: both, forwards;
             animation-play-state: paused;
             min-width: 0;
@@ -507,12 +546,12 @@
             }
           }
           #trust-icon-tracker-count-shortform-wrapper {
+            /* Starts with hide-longform-tracker-count, so that the pill shrinks
+               straight to the short form instead of to the shield first. */
             animation-name: show-shortform-tracker-count;
-            animation-delay: calc(
-              var(--initial-delay) + var(--shield-scale-down-duration) + var(--shield-scale-up-duration) + var(--longform-presence) + var(--collapse-duration)
-            );
-            animation-duration: var(--collapse-duration);
-            animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
+            animation-delay: calc(var(--initial-delay) + var(--shield-scale-down-duration) + var(--shield-scale-up-duration) + var(--longform-presence));
+            animation-duration: var(--tracker-count-duration);
+            animation-timing-function: var(--tracker-count-easing);
             animation-fill-mode: forwards;
             animation-play-state: paused;
             display: grid;
@@ -684,9 +723,13 @@
  *
  * - Longform tracker count expands in
  * - Longform tracker count stays visible for a short period of time
- * - Longform tracker count collapses to width 0
- * - Shortform tracker count expands in
+ * - Longform tracker count collapses to width 0 while the shortform tracker
+ *   count expands in, so the pill's width changes in a single direction
  * - Shortform tracker count remains visble until next navigation
+ *
+ * Beyond a site's entry page, the shortform tracker count just expands in. When
+ * switching tabs, the pill also resizes from its width in the previous tab, or
+ * shrinks to the shield and fades out if the selected tab has no count.
  *
  * Because we can't animate to width: auto, we wrap it in a single-cell grid
  * whose column width in `fr` units we *can* animate. See
@@ -734,6 +777,35 @@
     opacity: 1;
     padding-block: var(--space-xxsmall);
     padding-inline: var(--space-xsmall);
+  }
+}
+
+@keyframes tracker-count-tab-switch-resize {
+  from {
+    width: var(--tracker-count-from-width);
+  }
+
+  to {
+    width: var(--tracker-count-to-width);
+  }
+}
+
+@keyframes tracker-count-tab-switch-shrink {
+  from {
+    width: var(--tracker-count-from-width);
+    background-color: var(--tracker-count-shrink-background);
+  }
+
+  to {
+    width: var(--tracker-count-to-width);
+  }
+}
+
+/* Restarts on every tab switch, unlike show-shortform-tracker-count, which
+   only plays when the count first appears. */
+@keyframes fade-in-tracker-count-tab-switch {
+  from {
+    opacity: 0;
   }
 }
 

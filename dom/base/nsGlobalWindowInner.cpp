@@ -276,7 +276,6 @@
 #include "nsISerialEventTarget.h"
 #include "nsISimpleEnumerator.h"
 #include "nsISizeOfEventTarget.h"
-#include "nsISlowScriptDebug.h"
 #include "nsISupportsPrimitives.h"
 #include "nsISupportsUtils.h"
 #include "nsIThread.h"
@@ -310,6 +309,8 @@
 #include "nsTLiteralString.h"
 #include "nsTObserverArray.h"
 #include "nsTStringRepr.h"
+#include "nsThread.h"
+#include "nsThreadManager.h"
 #include "nsThreadUtils.h"
 #include "nsWeakReference.h"
 #include "nsWindowMemoryReporter.h"
@@ -944,7 +945,7 @@ nsGlobalWindowInner::nsGlobalWindowInner(nsGlobalWindowOuter* aOuterWindow,
   // add this inner window to the outer window list of inners.
   PR_INSERT_AFTER(this, aOuterWindow);
 
-  mTimeoutManager = MakeUnique<dom::TimeoutManager>(
+  mTimeoutManager = std::make_unique<dom::TimeoutManager>(
       *this, StaticPrefs::dom_timeout_max_idle_defer_ms(),
       static_cast<nsISerialEventTarget*>(nsPIDOMWindowInner::From(this)
                                              ->GetBrowsingContextGroup()
@@ -3918,8 +3919,13 @@ already_AddRefed<BrowsingContext> nsGlobalWindowInner::GetChildWindow(
 }
 
 void nsGlobalWindowInner::RefreshRealmPrincipal() {
-  JS::SetRealmPrincipals(js::GetNonCCWObjectRealm(GetWrapperPreserveColor()),
-                         nsJSPrincipals::get(mDoc->NodePrincipal()));
+  JS::Realm* realm = js::GetNonCCWObjectRealm(GetWrapperPreserveColor());
+  nsJSPrincipals* existing = nsJSPrincipals::get(JS::GetRealmPrincipals(realm));
+  nsJSPrincipals* jsPrincipals = nsJSPrincipals::get(mDoc->NodePrincipal());
+  if (existing != jsPrincipals) {
+    HoldOldPrincipal(existing);
+  }
+  JS::SetRealmPrincipals(realm, jsPrincipals);
 }
 
 void nsGlobalWindowInner::RefreshReduceTimerPrecisionCallerType() {
@@ -5254,7 +5260,7 @@ nsGlobalWindowInner::ShowSlowScriptDialog(JSContext* aCx,
   // minified scripts which is more common in Web content that is loaded in the
   // content process.
   uint32_t* linenop = XRE_IsParentProcess() ? &lineno : nullptr;
-  bool hasFrame = JS::DescribeScriptedCaller(&filename, aCx, linenop);
+  JS::DescribeScriptedCaller(&filename, aCx, linenop);
 
   // Record the slow script event if we haven't done so already for this inner
   // window (which represents a particular page to the user).
@@ -5278,21 +5284,6 @@ nsGlobalWindowInner::ShowSlowScriptDialog(JSContext* aCx,
       return KillSlowScript;
     }
 
-    if (action == ProcessHangMonitor::StartDebugger) {
-      // Spin a nested event loop so that the debugger in the parent can fetch
-      // any information it needs. Once the debugger has started, return to the
-      // script.
-      RefPtr<nsGlobalWindowOuter> outer = GetOuterWindowInternal();
-      outer->EnterModalState();
-      SpinEventLoopUntil("nsGlobalWindowInner::ShowSlowScriptDialog"_ns, [&]() {
-        return monitor->IsDebuggerStartupComplete() ||
-               AppShutdown::IsShutdownImpending();
-      });
-      outer->LeaveModalState();
-      return (AppShutdown::IsShutdownImpending()) ? KillSlowScript
-                                                  : ContinueSlowScript;
-    }
-
     return ContinueSlowScriptAndKeepNotifying;
   }
 
@@ -5306,17 +5297,6 @@ nsGlobalWindowInner::ShowSlowScriptDialog(JSContext* aCx,
   nsCOMPtr<nsIPrompt> prompt = do_GetInterface(ds);
   NS_ENSURE_TRUE(prompt, KillSlowScript);
 
-  // Prioritize the SlowScriptDebug interface over JSD1.
-  nsCOMPtr<nsISlowScriptDebugCallback> debugCallback;
-
-  if (hasFrame) {
-    const char* debugCID = "@mozilla.org/dom/slow-script-debug;1";
-    nsCOMPtr<nsISlowScriptDebug> debugService = do_GetService(debugCID, &rv);
-    if (NS_SUCCEEDED(rv)) {
-      debugService->GetActivationHandler(getter_AddRefs(debugCallback));
-    }
-  }
-
   bool failed = false;
   auto getString = [&](const char* name, PropertiesFile propFile =
                                              PropertiesFile::DOM_PROPERTIES) {
@@ -5329,11 +5309,10 @@ nsGlobalWindowInner::ShowSlowScriptDialog(JSContext* aCx,
   };
 
   bool isAddonScript = !aAddonId.IsEmpty();
-  bool showDebugButton = debugCallback && !isAddonScript;
 
   // Get localizable strings
 
-  nsAutoString title, checkboxMsg, debugButton, msg;
+  nsAutoString title, checkboxMsg, msg;
   if (isAddonScript) {
     title = getString("KillAddonScriptTitle");
     checkboxMsg = getString("KillAddonScriptGlobalMessage");
@@ -5356,13 +5335,7 @@ nsGlobalWindowInner::ShowSlowScriptDialog(JSContext* aCx,
   } else {
     title = getString("KillScriptTitle");
     checkboxMsg = getString("DontAskAgain");
-
-    if (showDebugButton) {
-      debugButton = getString("DebugScriptButton");
-      msg = getString("KillScriptWithDebugMessage");
-    } else {
-      msg = getString("KillScriptMessage");
-    }
+    msg = getString("KillScriptMessage");
   }
 
   auto stopButton = getString("StopScriptButton");
@@ -5418,10 +5391,6 @@ nsGlobalWindowInner::ShowSlowScriptDialog(JSContext* aCx,
                          (nsIPrompt::BUTTON_TITLE_IS_STRING *
                           (nsIPrompt::BUTTON_POS_0 + nsIPrompt::BUTTON_POS_1));
 
-  // Add a third button if necessary.
-  if (showDebugButton)
-    buttonFlags += nsIPrompt::BUTTON_TITLE_IS_STRING * nsIPrompt::BUTTON_POS_2;
-
   bool checkboxValue = false;
   int32_t buttonPressed = 0;  // In case the user exits dialog by clicking X.
   {
@@ -5429,22 +5398,15 @@ nsGlobalWindowInner::ShowSlowScriptDialog(JSContext* aCx,
     AutoDisableJSInterruptCallback disabler(aCx);
 
     // Open the dialog.
-    rv = prompt->ConfirmEx(
-        title.get(), msg.get(), buttonFlags, waitButton.get(), stopButton.get(),
-        debugButton.get(), checkboxMsg.get(), &checkboxValue, &buttonPressed);
+    rv = prompt->ConfirmEx(title.get(), msg.get(), buttonFlags,
+                           waitButton.get(), stopButton.get(), nullptr,
+                           checkboxMsg.get(), &checkboxValue, &buttonPressed);
   }
 
   if (buttonPressed == 0) {
     if (checkboxValue && !isAddonScript && NS_SUCCEEDED(rv))
       return AlwaysContinueSlowScript;
     return ContinueSlowScript;
-  }
-
-  if (buttonPressed == 2) {
-    MOZ_RELEASE_ASSERT(debugCallback);
-
-    rv = debugCallback->HandleSlowScriptDebug(this);
-    return NS_SUCCEEDED(rv) ? ContinueSlowScript : KillSlowScript;
   }
 
   JS_ClearPendingException(aCx);
@@ -7401,8 +7363,8 @@ already_AddRefed<Promise> nsGlobalWindowInner::PromiseDocumentFlushed(
     return nullptr;
   }
 
-  auto flushResolver =
-      MakeUnique<PromiseDocumentFlushedResolver>(resultPromise, aCallback);
+  auto flushResolver = std::make_unique<PromiseDocumentFlushedResolver>(
+      resultPromise, aCallback);
 
   if (!presShell->NeedStyleFlush() && !presShell->NeedLayoutFlush()) {
     flushResolver->Call();
@@ -7975,6 +7937,25 @@ void nsGlobalWindowInner::NoteMediaSourceURL(const nsACString& aURL) {
 void nsGlobalWindowInner::UnnoteMediaSourceURL(const nsACString& aURL) {
   DebugOnly<bool> found = mMediaSourceURLs.RemoveElementSorted(aURL);
   MOZ_ASSERT(found, "MediaSourceURL should have been noted");
+}
+
+void nsGlobalWindowInner::HoldOldPrincipal(nsIPrincipal* aPrincipal) {
+  mOldPrincipals.AppendElement(aPrincipal);
+  Dispatch(NewRunnableMethod(
+      "nsGlobalWindowInner::ClearOldPrincipalsIfNotNestedEventLoop", this,
+      &nsGlobalWindowInner::ClearOldPrincipalsIfNotNestedEventLoop));
+}
+
+void nsGlobalWindowInner::ClearOldPrincipalsIfNotNestedEventLoop() {
+  MOZ_ASSERT(NS_IsMainThread());
+  nsThread* mainThread = nsThreadManager::get().GetCurrentThread();
+  if (mainThread && mainThread->RecursionDepth() > 1) {
+    // Not OK to clear old principals from a nested event loop. In order
+    // to avoid spamming the nested event loop with runnables, just give
+    // up and leave the old principals around.
+    return;
+  }
+  mOldPrincipals.Clear();
 }
 
 void nsPIDOMWindowInner::MaybeSetHasPointerRawUpdateEventListeners() {

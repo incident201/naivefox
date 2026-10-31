@@ -8,7 +8,6 @@ import androidx.navigation.NavController
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import mozilla.components.browser.state.selector.selectedTab
 import mozilla.components.browser.state.state.BrowserState
@@ -20,7 +19,7 @@ import org.mozilla.fenix.home.HomeFragment
 
 /**
  * A binding for observing [ContentState.url] and navigating to the [HomeFragment] if the current session's url is
- * updated to [ABOUT_HOME_URL].
+ * updated to [ABOUT_HOME_URL] and it was previously another URL.
  */
 class AboutHomeBinding(
     browserStore: BrowserStore,
@@ -28,13 +27,19 @@ class AboutHomeBinding(
     mainDispatcher: CoroutineDispatcher = Dispatchers.Main,
 ) : AbstractBinding<BrowserState>(browserStore, mainDispatcher) {
 
+    // Cache the last URL in the binding to have a memory of it in between the application being put to background
+    // and then resumed back which would start a new tab.url observer with no memory of the previous url.
+    private var lastSelectedTabUrl: String? = null
+
     override suspend fun onState(flow: Flow<BrowserState>) {
         flow
             .map { it.selectedTab?.content?.url }
-            .distinctUntilChanged()
             .collect { url ->
+                val isUrlChanged = url != lastSelectedTabUrl
+                lastSelectedTabUrl = url
                 if (
-                    url == ABOUT_HOME_URL &&
+                    isUrlChanged &&
+                        url == ABOUT_HOME_URL &&
                         listOf(
                                 R.id.browserFragment,
                                 R.id.menuFragment,

@@ -1089,7 +1089,9 @@ bool GLBlitHelper::Blit(layers::AndroidHardwareBuffer* const buffer,
   if (fenceFd) {
     const EGLint attribs[] = {
         LOCAL_EGL_SYNC_NATIVE_FENCE_FD_ANDROID,
-        fenceFd.get(),
+        // eglCreateSyncKHR takes ownership of the fd even on failure.
+        // Release it here to prevent the caller from closing it again.
+        fenceFd.release(),
         LOCAL_EGL_NONE,
     };
 
@@ -1100,9 +1102,6 @@ bool GLBlitHelper::Blit(layers::AndroidHardwareBuffer* const buffer,
           << "GLBlitHelper::Blit: Failed to create EGLSync from acquire fence";
       return false;
     }
-
-    // EGL owns the fd after a successful eglCreateSyncKHR().
-    (void)fenceFd.release();
 
     if (egl->IsExtensionSupported(EGLExtension::KHR_wait_sync)) {
       egl->fWaitSync(sync, 0);
@@ -1285,6 +1284,16 @@ bool GLBlitHelper::BlitPlanarYCbCr(const PlanarYCbCrData& yuvData,
                                    const OriginPos destOrigin,
                                    const gfx::IntSize& fbSize,
                                    Maybe<gfxAlphaType> convertAlpha) {
+  const auto sizes = yuvData.GetPlaneSizes();
+  if (!sizes || yuvData.mYSkip || yuvData.mCbSkip || yuvData.mCrSkip ||
+      yuvData.mYStride < 0 || yuvData.mCbCrStride < 0) {
+    gfxCriticalError() << "Unusual PlanarYCbCrData: " << yuvData.mYSkip << ","
+                       << yuvData.mCbSkip << "," << yuvData.mCrSkip << ", "
+                       << yuvData.mPictureRect << ", " << yuvData.mYStride
+                       << "," << yuvData.mCbCrStride;
+    return false;
+  }
+
   const auto& prog =
       GetDrawBlitProg({kFragHeader_Tex2D,
                        {kFragSample_ThreePlane, kFragConvert_ColorMatrix,
@@ -1301,19 +1310,6 @@ bool GLBlitHelper::BlitPlanarYCbCr(const PlanarYCbCrData& yuvData,
   }
 
   // --
-
-  auto ySize = yuvData.YDataSize();
-  auto cbcrSize = yuvData.CbCrDataSize();
-  if (yuvData.mYSkip || yuvData.mCbSkip || yuvData.mCrSkip || ySize.width < 0 ||
-      ySize.height < 0 || cbcrSize.width < 0 || cbcrSize.height < 0 ||
-      yuvData.mYStride < 0 || yuvData.mCbCrStride < 0) {
-    gfxCriticalError() << "Unusual PlanarYCbCrData: " << yuvData.mYSkip << ","
-                       << yuvData.mCbSkip << "," << yuvData.mCrSkip << ", "
-                       << ySize.width << "," << ySize.height << ", "
-                       << cbcrSize.width << "," << cbcrSize.height << ", "
-                       << yuvData.mYStride << "," << yuvData.mCbCrStride;
-    return false;
-  }
 
   gfx::IntSize divisors;
   switch (yuvData.mChromaSubsampling) {
@@ -1352,9 +1348,8 @@ bool GLBlitHelper::BlitPlanarYCbCr(const PlanarYCbCrData& yuvData,
 
   const ScopedSaveMultiTex saveTex(mGL, 3, LOCAL_GL_TEXTURE_2D);
   const ResetUnpackState reset(mGL);
-  const gfx::IntSize yTexSize(yuvData.mYStride, yuvData.YDataSize().height);
-  const gfx::IntSize uvTexSize(yuvData.mCbCrStride,
-                               yuvData.CbCrDataSize().height);
+  const gfx::IntSize yTexSize(yuvData.mYStride, sizes->mY.height);
+  const gfx::IntSize uvTexSize(yuvData.mCbCrStride, sizes->mCbCr.height);
 
   if (yTexSize != mYuvUploads_YSize || uvTexSize != mYuvUploads_UVSize) {
     mYuvUploads_YSize = yTexSize;

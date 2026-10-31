@@ -69,12 +69,26 @@ add_task(async function test_unknown_page_reports_unavailable() {
         "unavailable",
         "A name with no stored page renders the unavailable state"
       );
-      Assert.ok(
-        content.document
-          .querySelector("aitab-page")
-          .shadowRoot.querySelector("aitab-error"),
-        "The error component is rendered"
+      const error = content.document
+        .querySelector("aitab-page")
+        .shadowRoot.querySelector("aitab-error");
+      Assert.ok(error, "The error component is rendered");
+      await error.wrappedJSObject.updateComplete;
+
+      const reasons = error.shadowRoot.querySelectorAll(
+        ".aitab-error-reasons li"
       );
+      Assert.equal(reasons.length, 3, "Every possible reason is listed");
+      await ContentTaskUtils.waitForCondition(
+        () => [...reasons].every(reason => reason.querySelector("strong")),
+        "Each reason is localized with a bold lead-in"
+      );
+      for (const reason of reasons) {
+        Assert.ok(
+          !reason.textContent.includes("{"),
+          `Every term in ${reason.dataset.l10nId} resolves`
+        );
+      }
     });
   });
 
@@ -109,9 +123,12 @@ add_task(async function test_path_like_page_name_rejected() {
           "error",
           "A name shaped like a path is refused rather than looked up"
         );
+        const error = element.shadowRoot.querySelector("aitab-error");
+        Assert.ok(error, "The error message is rendered");
+        await error.wrappedJSObject.updateComplete;
         Assert.ok(
-          element.shadowRoot.querySelector("aitab-error"),
-          "The error message is rendered"
+          !error.shadowRoot.querySelector(".aitab-error-reasons"),
+          "The reasons a page goes missing are not offered for a refused name"
         );
         Assert.ok(
           !element.shadowRoot.querySelector(".aitab-sheet"),
@@ -198,14 +215,15 @@ add_task(async function test_renders_page_config() {
       const footer = shadowRoot.querySelector(".aitab-sheet + aitab-footer");
       Assert.ok(footer, "The footer is rendered after the page content");
       await footer.wrappedJSObject.updateComplete;
-      const madeWith = footer.shadowRoot.querySelector(".aitab-made-with");
+      const brand = footer.shadowRoot.querySelector(".aitab-footer-brand");
       await ContentTaskUtils.waitForCondition(
-        () => madeWith.textContent.trim(),
+        () => brand.textContent,
         "The footer credit is localized"
       );
-      Assert.ok(
-        madeWith.querySelector(".aitab-made-with-brand"),
-        "Localizing the credit keeps the brand element that carries the logo"
+      Assert.equal(
+        brand.textContent,
+        await content.document.l10n.formatValue("aitab-page-footer-brand"),
+        "The footer credit is the Smart Window brand alone"
       );
     });
   });

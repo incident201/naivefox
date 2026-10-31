@@ -47,7 +47,7 @@ export class MiniWindowUtils {
    *
    * First tries the screen's own four corners, preferring the one nearest to
    * where the window wanted to sit. If they're all taken, falls back to
-   * sitting flush against an obstacle's edge:
+   * sitting flush against an obstacle's edge::
    *
    *      +---+
    *      | 2 |          1  left:   flush to the obstacle's left
@@ -227,7 +227,7 @@ export class MiniWindowUtils {
    * size, scale 1), clamped down to the available screen when the crop is
    * larger, preserving aspect ratio, then corner it in the available rect.
    *
-   * Three pixel spaces meet here:
+   * Three pixel spaces meet here::
    *   desktop px      availRect
    *   screen CSS px   cropInfo, returned width/height
    *   originWin CSS   returned left/top (what openWindow features take)

@@ -24,9 +24,4 @@ head = "head.js"
 ["browser_RecipeRunner.js"]
 tags = "remote-settings"
 
-["browser_about_preferences.js"]
-
-["browser_about_studies.js"]
-https_first_disabled = true
-
 ["browser_actions_ShowHeartbeatAction.js"]

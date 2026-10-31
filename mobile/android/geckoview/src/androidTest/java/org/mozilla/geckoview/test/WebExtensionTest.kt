@@ -5,6 +5,7 @@ package org.mozilla.geckoview.test
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.MediumTest
+import androidx.test.platform.app.InstrumentationRegistry
 import java.nio.charset.Charset
 import java.util.Date
 import java.util.UUID
@@ -25,7 +26,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Assume.assumeThat
 import org.junit.Before
-import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mozilla.geckoview.AllowOrDeny
@@ -4751,60 +4751,23 @@ class WebExtensionTest : BaseSessionTest() {
         )
     }
 
-    @Ignore("https://bugzilla.mozilla.org/show_bug.cgi?id=2080467")
     @Test
     fun testExtensionProcessCrash() {
-        sessionRule.setPrefsUntilTestEnd(
-            mapOf(
-                "extensions.webextensions.remote" to true,
-                "dom.ipc.keepProcessesAlive.extension" to 1,
-                "xpinstall.signatures.required" to false,
+        val runtime =
+            ExtensionProcessCrashService.Instance.start(
+                InstrumentationRegistry.getInstrumentation().targetContext,
+                temporaryProfile.get(),
             )
-        )
-
-        sessionRule.delegateDuringNextWait(
-            object : WebExtensionController.PromptDelegate {
-                @AssertCalled(count = 1)
-                override fun onInstallPromptRequest(
-                    extension: WebExtension,
-                    permissions: Array<String>,
-                    origins: Array<String>,
-                    dataCollectionPermissions: Array<String>,
-                ): GeckoResult<PermissionPromptResponse>? {
-                    return GeckoResult.fromValue(
-                        PermissionPromptResponse(
-                            true, // isPermissionsGranted
-                            false, // isPrivateModeGranted
-                            false, // isTechnicalAndInteractionDataGranted
-                        )
-                    )
-                }
+        try {
+            sessionRule.waitForResult(runtime.waitForBackground())
+            sessionRule.waitForResult(runtime.loadUri("about:crashextensions"))
+            sessionRule.waitForResult(runtime.waitForDisabledSpawning())
+            sessionRule.waitForResult(runtime.quit())
+        } finally {
+            if (runtime.isConnected) {
+                runCatching { sessionRule.waitForResult(runtime.quit()) }
             }
-        )
-
-        sessionRule.addExternalDelegateUntilTestEnd(
-            WebExtensionController.ExtensionProcessDelegate::class,
-            { delegate -> controller.setExtensionProcessDelegate(delegate) },
-            { controller.setExtensionProcessDelegate(null) },
-            object : WebExtensionController.ExtensionProcessDelegate {
-                @AssertCalled(count = 1) override fun onDisabledProcessSpawning() {}
-            },
-        )
-
-        val borderify =
-            sessionRule.waitForResult(
-                controller.install(
-                    "resource://android/assets/web_extensions/borderify.xpi",
-                    null,
-                )
-            )
-
-        val list = extensionsMap(sessionRule.waitForResult(controller.list()))
-        assertTrue(list.containsKey(borderify.id))
-
-        mainSession.loadUri("about:crashextensions")
-
-        sessionRule.waitForResult(controller.uninstall(borderify))
+        }
     }
 
     @Test

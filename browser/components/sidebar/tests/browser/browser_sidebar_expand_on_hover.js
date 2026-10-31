@@ -3,8 +3,6 @@
 
 "use strict";
 
-const novaEnabled = Services.prefs.getBoolPref("browser.nova.enabled", false);
-
 add_setup(async () => {
   await SpecialPowers.pushPrefEnv({
     set: [
@@ -69,10 +67,7 @@ async function mouseOutSidebarToCollapse() {
         "sidebar-launcher-expanded"
       ) &&
       !SidebarController.sidebarMain.expanded &&
-      !SidebarController._state.launcherExpanded &&
-      (novaEnabled ||
-        window.getComputedStyle(SidebarController.sidebarContainer).position ===
-          "relative")
+      !SidebarController._state.launcherExpanded
     );
   }, "The sidebar launcher is collapsed");
 
@@ -123,9 +118,6 @@ add_task(async function test_enable_expand_on_hover() {
       ) &&
       !SidebarController._state.launcherExpanded &&
       SidebarController.sidebarRevampVisibility === "expand-on-hover" &&
-      (novaEnabled ||
-        window.getComputedStyle(SidebarController.sidebarContainer).position ===
-          "relative") &&
       panel.expandOnHoverInput.checked,
     { msg: "Expand on hover has been enabled" }
   );

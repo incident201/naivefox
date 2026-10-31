@@ -140,6 +140,8 @@ tags = "audiochannel"
 ["browser_delay_autoplay_webAudio.js"]
 tags = "audiochannel"
 
+["browser_drawSnapshot_failure.js"]
+
 ["browser_error_registry.js"]
 
 ["browser_f7_caret_browsing.js"]
@@ -200,14 +202,13 @@ support-files = [
 
 ["browser_moz_support_link_open_links_in_chrome.js"]
 
+["browser_panel_list_subframe_resize.js"]
+
 ["browser_quickfind_editable.js"]
 
 ["browser_remoteness_change_listeners.js"]
 
 ["browser_resume_bkg_video_on_tab_hover.js"]
-skip-if = [
-  "os == 'linux' && os_version == '24.04' && arch == 'x86_64' && display == 'x11' && debug && socketprocess_networking", # Bug 1775552
-]
 
 ["browser_richlistbox_keyboard.js"]
 
@@ -232,6 +233,9 @@ support-files = ["file_save_webpage_wrapping.html"]
 ["browser_starting_autoscroll_in_about_content.js"]
 fail-if = [
   "a11y_checks", # Bug 1854538 clicked body.wide-container may not be accessible
+]
+skip-if = [
+  "os == 'mac' && os_version == '15.30' && arch == 'aarch64' && debug", # Bug 2062699
 ]
 
 ["browser_suspend_videos_outside_viewport.js"]

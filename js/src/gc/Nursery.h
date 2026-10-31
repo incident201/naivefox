@@ -651,6 +651,8 @@ class Nursery {
 
     explicit Space(gc::ChunkKind kind);
 
+    void reset();
+
     inline bool isEmpty() const;
     inline bool isInside(const void* p) const;
 
@@ -679,7 +681,7 @@ class Nursery {
     void setKind(gc::ChunkKind newKind);
 
 #ifdef JS_CONTIGUOUS_NURSERY
-    void initializeRegion(ChunkRegion region, size_t initialCapacity);
+    void initializeRegion(ChunkRegion region);
     [[nodiscard]] bool grow(size_t oldCapacity, size_t newCapacity);
     void shrinkSynchronously(size_t oldCapacity, size_t newCapacity);
 #endif

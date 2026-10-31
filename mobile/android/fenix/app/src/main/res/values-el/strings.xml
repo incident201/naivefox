@@ -22,7 +22,7 @@
   <!-- Content description (not visible, for screen readers etc.): "Normal Browsing" menu button. -->
   <string name="content_description_normal_browsing">Κανονική περιήγηση</string>
   <!-- Placeholder text shown in the search bar before a user enters text for the default engine -->
-  <string name="search_hint">Αναζήτηση όρου ή εισαγωγή διεύθυνσης</string>
+  <string name="search_hint">Αναζήτηση ή εισαγωγή διεύθυνσης</string>
   <!-- Shorter placeholder text shown in the search bar when an additional action (voice search) is rendered alongside the hint. -->
   <string name="search_hint_short">Αναζήτηση</string>
   <!-- Placeholder text shown in the search bar before a user enters text for a general engine -->
@@ -77,7 +77,11 @@
   <string name="about_content" tools:ignore="BrandUsage">Το %1$s αναπτύσσεται από τη Mozilla.</string>
   <!-- Private Browsing -->
   <string name="private_browsing_common_myths">Συνήθεις παρανοήσεις σχετικά με την ιδιωτική περιήγηση</string>
-  <!-- Text to be announced by the accessibility service to inform the user that the private browsing mode is currently active. -->
+  <!--
+    Private Browsing
+
+    Text to be announced by the accessibility service to inform the user that the private browsing mode is currently active.
+  -->
   <string name="private_browsing_a11y_session_announcement">Συνεδρία ιδιωτικής περιήγησης</string>
   <!--
     True Private Browsing Mode
@@ -181,8 +185,10 @@
   <!--
     Browser Fragment
 
-    Content description (not visible, for screen readers etc.): Navigate backward (browsing history)
+    Label for popup button that appears when long-pressing the main menu. Tapping it allows the user to customize the main menu layout.
   -->
+  <string name="customize_menu">Προσαρμογή μενού</string>
+  <!-- Content description (not visible, for screen readers etc.): Navigate backward (browsing history) -->
   <string name="browser_menu_back">Πίσω</string>
   <!-- Content description (not visible, for screen readers etc.): Navigate forward (browsing history) -->
   <string name="browser_menu_forward">Εμπρός</string>
@@ -406,7 +412,7 @@
 
     Button in the search view that lets a user navigate to the site in their clipboard
   -->
-  <string name="awesomebar_clipboard_title">Συμπλήρωση συνδέσμου από το πρόχειρο</string>
+  <string name="awesomebar_clipboard_title">Εισαγωγή συνδέσμου από το πρόχειρο</string>
   <!-- Button in the search suggestions onboarding that allows search suggestions in private sessions -->
   <string name="search_suggestions_onboarding_allow_button">Αποδοχή</string>
   <!-- Button in the search suggestions onboarding that does not allow search suggestions in private sessions -->
@@ -707,13 +713,25 @@
   <string name="search_widget_text_long">Αναζήτηση στο διαδίκτυο</string>
   <!-- Content description (not visible, for screen readers etc.): Voice search -->
   <string name="search_widget_voice">Φωνητική αναζήτηση</string>
+  <!-- Content description (not visible, for screen readers etc.): Button in the search widget that starts a search in a private tab -->
+  <string name="search_widget_private_search">Ιδιωτική αναζήτηση</string>
+  <!-- Widget description in the widget picker screen for the search bar widget that includes buttons for private search and for voice search -->
+  <string name="search_bar_widget_description">Γραμμή αναζήτησης με ιδιωτική και φωνητική αναζήτηση</string>
+  <!-- Widget description in the widget picker screen for the search bar widget that includes buttons for image search, private search and voice search -->
+  <string name="search_bar_with_lens_widget_description">Γραμμή αναζήτησης με αναζήτηση εικόνων, ιδιωτική και φωνητική αναζήτηση</string>
+  <!-- Widget description in the widget picker screen for the compact search bar widget -->
+  <string name="compact_search_bar_widget_description">Μικρή γραμμή αναζήτησης</string>
   <!--
     Preferences
 
     Title for the settings page
   -->
   <string name="settings">Ρυθμίσεις</string>
-  <!-- Preference category for general settings -->
+  <!--
+    Preferences
+
+    Preference category for general settings
+  -->
   <string name="preferences_category_general">Γενικά</string>
   <!-- Preference category for all links about Fenix -->
   <string name="preferences_category_about">Πληροφορίες</string>
@@ -900,6 +918,10 @@
   <string name="preferences_open_links_in_apps_ask">Ερώτηση πριν από το άνοιγμα</string>
   <!-- Preference for open links in third party apps never open in apps option -->
   <string name="preferences_open_links_in_apps_never">Ποτέ</string>
+  <!-- Preference category header for media related open links in apps settings -->
+  <string name="preferences_media_category">Πολυμέσα</string>
+  <!-- Preference label for choosing whether links open in the YouTube app -->
+  <string name="preferences_open_links_in_youtube">Άνοιγμα συνδέσμων στην εφαρμογή YouTube</string>
   <!-- Preference category for file storage. -->
   <string name="preferences_category_file_storage">Αποθήκευση αρχείων</string>
   <!-- Preference title for downloads default location. -->
@@ -1694,6 +1716,11 @@
   <string name="close_tab_and_delete_group_confirmation_dialog_cancel">Ακύρωση</string>
   <!-- Content description for the three dot button next to a tab group" -->
   <string name="tab_group_three_dot_button_content_description">Περισσότερες επιλογές</string>
+  <!--
+    Content description for the Expand button on the contracted menu for a tab group:
+    when tapped, tabs are displayed in an expanded grid or list view, taking up the full screen.
+  -->
+  <string name="tab_groups_strip_expand_group_content_description">Αναπτύξτε τη για να δείτε τις καρτέλες σε πλήρη οθόνη</string>
   <!-- Text shown on the edit button for a tab group on the three dot menu -->
   <string name="tab_group_three_dot_menu_edit">Επεξεργασία</string>
   <!-- Text shown on the ungroup button for a tab group on the three dot menu -->
@@ -1939,6 +1966,8 @@
   <string name="download_search_no_results_found">Δεν βρέθηκαν αποτελέσματα</string>
   <!-- Text for the "Select all" button, which selects all downloaded items in the downloads list. -->
   <string name="download_select_all_items">Επιλογή όλων</string>
+  <!-- Shown in the downloads list in place of a website name when a file came from a data: or blob: URL that has no website address. "data" refers to the data: URL scheme. -->
+  <string name="download_item_source_data">(δεδομένα)</string>
   <!--
     Downloads Content Type Filters
 
@@ -2185,7 +2214,7 @@
   <!-- Text for the button to navigate to sync authentication -->
   <string name="bookmark_empty_list_guest_cta">Σύνδεση για συγχρονισμό</string>
   <!-- Description for the bookmark list empty state when you're in an empty folder. -->
-  <string name="bookmark_empty_list_folder_description">Προσθέστε σελιδοδείκτες καθώς περιηγείστε, ώστε να βρείτε αργότερα τις αγαπημένες σας ιστοσελίδες.</string>
+  <string name="bookmark_empty_list_folder_description">Προσθέστε σελιδοδείκτες καθώς περιηγείστε, ώστε να βρείτε αργότερα τους αγαπημένους σας ιστοτόπους.</string>
   <!-- Description for the add new folder button when selecting a folder. -->
   <string name="bookmark_select_folder_new_folder_button_title">Νέος φάκελος</string>
   <!-- Bookmark snackbar message for moving a single item. %1$s is the title of the item being moved and %2$s is the new parent folder of the bookmark -->
@@ -3461,7 +3490,7 @@
   -->
   <string name="homepage_shortcuts_show_less">Εμφάνιση λιγότερων</string>
   <!-- Label for the "Add shortcut" button displayed as a tile. -->
-  <string name="homepage_shortcuts_add_shortcut">Προσθήκη συντόμευσης</string>
+  <string name="homepage_shortcuts_add_shortcut">Νέα συντόμευση</string>
   <!-- Title for the "Add to homepage" bottom sheet. -->
   <string name="homepage_shortcuts_add_to_homepage">Προσθήκη στην αρχική σελίδα</string>
   <!-- Label for the "Add website" button in the "Add to homepage" bottom sheet. -->
@@ -4099,7 +4128,7 @@
   <!-- Uninstall survey answer option -->
   <string name="uninstall_survey_option_1_v2">Είναι αργό ή αναξιόπιστο</string>
   <!-- Uninstall survey answer option -->
-  <string name="uninstall_survey_option_2_v2">Οι ιστοσελίδες δεν λειτουργούσαν σωστά</string>
+  <string name="uninstall_survey_option_2_v2">Οι ιστότοποι δεν λειτουργούσαν σωστά</string>
   <!-- Uninstall survey answer option -->
   <string name="uninstall_survey_option_3_v2">Χρειάζομαι λειτουργίες που λείπουν</string>
   <!-- Uninstall survey answer option -->
@@ -4579,6 +4608,12 @@
 
     Content description for accessibility (used by screen readers): Description for the button that triggers the start of a signature workflow on the PDF displayed on the screen.
   -->
+  <string name="pdf_tools_sign_content_description_2">Προσθήκη υπογραφής</string>
+  <!--
+    PDF viewer toolbar and buttons
+
+    Content description for accessibility (used by screen readers): Description for the button that triggers the start of a signature workflow on the PDF displayed on the screen.
+  -->
   <string name="pdf_tools_sign_content_description">Υπογραφή PDF</string>
   <!-- Content description for accessibility (used by screen readers): Description of the button that downloads the PDF displayed on the screen to the user's device. -->
   <string name="pdf_tools_download_content_description">Λήψη PDF</string>
@@ -4600,14 +4635,24 @@
   <string name="pdf_tools_signature_clear_button">Απαλοιφή</string>
   <!-- The text for the button that adds the signature the user has typed to the PDF. -->
   <string name="pdf_tools_signature_add_button">Προσθήκη</string>
+  <!-- Content description for accessibility (used by screen readers): Description for the loading indicator when a signature is in the process of being added to a PDF. -->
+  <string name="pdf_tools_signature_adding_content_description">Προσθήκη υπογραφής</string>
+  <!--
+    Listen to page
+
+    Content description for the reader view panel: a group of buttons floating over the content, which allow customizing the reader view or activating the Listen to Page feature
+  -->
+  <string name="reader_mode_panel_content_description_2">Επιλογές προβολής ανάγνωσης</string>
   <!--
     Listen to page
 
     Content description for the reader mode panel: a group of buttons floating over the content
   -->
   <string name="reader_mode_panel_content_description">Επιλογές λειτουργίας ανάγνωσης</string>
-  <!-- Content description for the button in reader mode panel that turns on the read aloud feature (playback of content begins when button is pressed) -->
+  <!-- Content description for the button in the reader view panel that turns on the Listen to Page feature (playback of content begins when button is pressed) -->
   <string name="reader_mode_panel_listen_content_description">Εκφώνηση</string>
-  <!-- Content description for media player displayed in Reader Mode when the Listen to Page (Read Aloud) feature is selected -->
+  <!-- Content description for media player displayed in Reader view when the Listen to Page (Read Aloud) feature is selected -->
   <string name="reader_mode_panel_media_player_content_description">Αναπαραγωγή πολυμέσων</string>
+  <!-- Content description for the reader view button Reader view facilitates readability and has a Listen to Page feature. Button icon is a document with headphones, and is displayed next to the page URL when the feature is available. -->
+  <string name="browser_menu_read_or_listen">Προβολή ανάγνωσης, διαβάστε ή ακούστε τη σελίδα</string>
 </resources>

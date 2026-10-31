@@ -835,7 +835,7 @@ add_task(async function test_chat_tool_call_reads_smartpage_and_sets_flags() {
       response: "Stored page",
     });
   } finally {
-    mockEngine.rejectAllRequests();
+    await mockEngine.rejectAllRequests();
     mockEngine.cleanupMocks();
     if (win) {
       await BrowserTestUtils.closeWindow(win);

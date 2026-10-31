@@ -335,8 +335,9 @@ class nsGlobalWindowOuter final : public mozilla::dom::EventTarget,
   void ForceFullScreenInWidget() final;
   void MacFullscreenMenubarOverlapChanged(
       mozilla::DesktopCoord aOverlapAmount) final;
-  bool SetWidgetFullscreen(FullscreenReason aReason, bool aIsFullscreen,
-                           nsIWidget* aWidget);
+  MOZ_CAN_RUN_SCRIPT bool TryMakeWidgetFullscreen(FullscreenReason aReason,
+                                                  bool aIsFullscreen,
+                                                  nsIWidget* aWidget);
   bool Fullscreen() const;
 
   // nsIInterfaceRequestor
@@ -1129,6 +1130,11 @@ inline void nsGlobalWindowOuter::MaybeClearInnerWindow(
     nsPIDOMWindowInner* aExpectedInner) {
   if (mInnerWindow == aExpectedInner) {
     mInnerWindow = nullptr;
+
+    if (mBrowsingContext && mBrowsingContext->GetUnbarrieredWindowProxy() ==
+                                GetWrapperMaybeDead()) {
+      mBrowsingContext->ClearWindowProxy();
+    }
   }
 }
 

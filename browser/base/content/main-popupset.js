@@ -175,8 +175,8 @@ document.addEventListener(
           });
           break;
         case "context_openTabInMiniWindow":
-          lazy.MiniWindowManager.popTab(
-            TabContextMenu.contextTab,
+          lazy.MiniWindowManager.popTabs(
+            TabContextMenu.contextTabs,
             "tab_context_menu"
           );
           break;
@@ -399,7 +399,7 @@ document.addEventListener(
           gBrowser.selectAllTabs();
           break;
         case "toolbar-context-customize":
-          gCustomizeMode.enter();
+          gCustomizeMode.enter("toolbar_context_menu");
           break;
         case "toolbar-context-toggle-vertical-tabs":
           SidebarController.toggleVerticalTabs();

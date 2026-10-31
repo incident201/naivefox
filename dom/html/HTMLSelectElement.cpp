@@ -141,7 +141,7 @@ void HTMLSelectElement::SetupShadowTree() {
   {
     RefPtr slot = doc->CreateHTMLElement(nsGkAtoms::slot);
     slot->SetAttr(kNameSpaceID_None, nsGkAtoms::name,
-                  u"internal-select-button"_ns, false);
+                  u"internal-select-button"_ns, false, IsKnownNewAttr::Yes);
     sr->AppendChildTo(slot, false, IgnoreErrors());
   }
 
@@ -166,7 +166,8 @@ void HTMLSelectElement::SetupShadowTree() {
   picker->SetAttr(nsGkAtoms::name, u"select"_ns, IgnoreErrors());
   {
     nsAutoString popoverstate;
-    picker->SetAttr(kNameSpaceID_None, nsGkAtoms::popover, popoverstate, false);
+    picker->SetAttr(kNameSpaceID_None, nsGkAtoms::popover, popoverstate, false,
+                    IsKnownNewAttr::Yes);
     // SetAttr queues AfterSetPopoverAttr asynchronously, but
     // ShowPopoverInternal needs PopoverAttributeState set immediately.
     picker->EnsurePopoverData().SetPopoverAttributeState(
@@ -292,6 +293,11 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
 NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN_INHERITED(
     HTMLSelectElement, nsGenericHTMLFormControlElementWithState)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mValidity)
+  // NOTE(emilio): Unlinking mOptions is not quite needed to break the cycle
+  // (the own content list unlink removes the root node, and unlinking would
+  // force a bunch of null-checks). However, we mark it dirty so that the list
+  // is not in an inconsistent state.
+  tmp->mOptions->SetDirty();
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mSelectedOptions)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mListBoxSelection.mStart)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mListBoxSelection.mEnd)
@@ -1359,7 +1365,7 @@ bool HTMLSelectElement::RestoreState(PresState* aState) {
 void HTMLSelectElement::RestoreStateTo(const SelectContentData& aNewSelected) {
   if (!mIsDoneAddingChildren) {
     // Make a copy of the state for us to restore from in the future.
-    mRestoreState = MakeUnique<SelectContentData>(aNewSelected);
+    mRestoreState = std::make_unique<SelectContentData>(aNewSelected);
     return;
   }
 
@@ -2883,7 +2889,15 @@ void HTMLSelectElement::UpdateSelectedContentElement(
       selectedIndex >= 0 ? Item(static_cast<uint32_t>(selectedIndex)) : nullptr;
 
   // 2. If option is null, then clear a selectedcontent given selectedcontent.
-  if (!option) {
+  //
+  // NOTE(emilio): The IsDoneAddingChildren() check is a bit of a hack-around.
+  // If the option isn't done adding children, we shouldn't really have
+  // scheduled an update yet (the update was intended to be sync before the
+  // option was even here, e.g. like the ones on BindToTree, and the option
+  // wasn't supposed to be observable). But cloning an option before the parser
+  // is done is a fun way to maybe run scripts twice or so, so prevent that from
+  // happening explicitly.
+  if (!option || !option->IsDoneAddingChildren()) {
     aSelectedContent->ClearContent();
     return;
   }

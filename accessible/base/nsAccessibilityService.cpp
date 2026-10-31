@@ -777,7 +777,7 @@ void nsAccessibilityService::NotifyOfEditContextAttachmentChange(
 void nsAccessibilityService::AriaNotify(
     nsINode* aNode, const nsAString& aAnnouncement,
     const mozilla::dom::AriaNotificationOptions& aOptions) {
-  Document* doc = aNode->GetUncomposedDoc();
+  Document* doc = aNode->GetComposedDoc();
   if (!doc) {
     return;
   }

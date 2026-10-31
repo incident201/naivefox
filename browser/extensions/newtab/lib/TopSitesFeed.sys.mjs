@@ -689,22 +689,31 @@ export class ContileIntegration {
             .filter(item => item)
             .map(item => parseInt(item, 10));
 
+          const marsOhttpEnabled = Services.prefs.getBoolPref(
+            "browser.newtabpage.activity-stream.unifiedAds.ohttp.enabled",
+            false
+          );
+          const ohttpRelayURL = Services.prefs.getStringPref(
+            "browser.newtabpage.activity-stream.discoverystream.ohttp.relayURL",
+            ""
+          );
+          const ohttpConfigURL = Services.prefs.getStringPref(
+            "browser.newtabpage.activity-stream.discoverystream.ohttp.configURL",
+            ""
+          );
+          const useOhttp = marsOhttpEnabled && ohttpConfigURL && ohttpRelayURL;
+
+          const relevance = useOhttp
+            ? await SponsoredTopSitesScoreProvider.getScores()
+            : {};
+
           if (this._topSitesFeed.adsClient) {
-            body = await this._fetchSitesWithAdsClient(placementsArray);
+            body = await this._fetchSitesWithAdsClient(
+              placementsArray,
+              relevance
+            );
           } else {
             let fetchPromise;
-            const marsOhttpEnabled = Services.prefs.getBoolPref(
-              "browser.newtabpage.activity-stream.unifiedAds.ohttp.enabled",
-              false
-            );
-            const ohttpRelayURL = Services.prefs.getStringPref(
-              "browser.newtabpage.activity-stream.discoverystream.ohttp.relayURL",
-              ""
-            );
-            const ohttpConfigURL = Services.prefs.getStringPref(
-              "browser.newtabpage.activity-stream.discoverystream.ohttp.configURL",
-              ""
-            );
             const headers = new Headers();
             headers.append("content-type", "application/json");
 
@@ -758,23 +767,28 @@ export class ContileIntegration {
 
             const adsBackendConfig = state.Prefs.values?.adsBackendConfig || {};
 
+            const hasRelevance = !!Object.keys(relevance).length;
+
             const options = {
               method: "POST",
               headers,
               body: JSON.stringify({
-                context_id: await lazy.ContextId.request(),
+                ...(!hasRelevance && {
+                  context_id: await lazy.ContextId.request(),
+                }),
                 flags: adsBackendConfig,
                 placements: placementsArray.map((placement, index) => ({
                   placement,
                   count: countsArray[index],
                 })),
                 blocks: blocksList,
+                ...(hasRelevance && { relevance }),
               }),
               credentials: "omit",
               signal,
             };
 
-            if (marsOhttpEnabled && ohttpConfigURL && ohttpRelayURL) {
+            if (useOhttp) {
               const config =
                 await lazy.ObliviousHTTP.getOHTTPConfig(ohttpConfigURL);
               if (!config) {
@@ -926,12 +940,13 @@ export class ContileIntegration {
     return false;
   }
 
-  async _fetchSitesWithAdsClient(placements) {
+  async _fetchSitesWithAdsClient(placements, relevance) {
     const options = lazy.AdsClient.requestOptions(
       this._topSitesFeed.store.getState().Prefs.values,
       // Also block the user's current default search engine hostname so
       // MARS returns a substitute sponsor instead of leaving us short.
-      this._topSitesFeed._currentSearchHostname || []
+      this._topSitesFeed._currentSearchHostname || [],
+      relevance
     );
 
     const requests = placements.map(
@@ -2490,6 +2505,17 @@ export class TopSitesFeed {
     index = this._adjustPinIndexForSponsoredLinks(site, index);
     // If valid index provided, pin at that position
     if (index >= 0) {
+      const currentSite = this._linksWithDefaults?.[requestedIndex];
+      if (
+        this._groupedPinsEnabled &&
+        currentSite?.isPinned &&
+        currentSite.url !== site.url
+      ) {
+        // Bug 2073040: an edit changed a pin's URL, so swap it in place.
+        lazy.NewTabUtils.pinnedLinks.replace(currentSite.url, {
+          url: site.url,
+        });
+      }
       const prefs = this.store.getState().Prefs.values;
       // Classic add button on a full row: replace the last visible frecency tile,
       // matching how a grouped pin pushes the trailing frecency tile off the grid.

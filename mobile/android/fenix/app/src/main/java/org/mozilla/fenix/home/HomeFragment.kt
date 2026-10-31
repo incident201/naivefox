@@ -102,6 +102,7 @@ import org.mozilla.fenix.browser.TabPreview
 import org.mozilla.fenix.browser.browsingmode.BrowsingMode
 import org.mozilla.fenix.browser.tabstrip.TabStrip
 import org.mozilla.fenix.browser.tabstrip.TabStripColors
+import org.mozilla.fenix.browser.tabstrip.ext.handleTabStripLastTabClosed
 import org.mozilla.fenix.components.Components
 import org.mozilla.fenix.components.HomepageThumbnailIntegration
 import org.mozilla.fenix.components.LensFeature
@@ -190,6 +191,9 @@ import org.mozilla.fenix.search.awesomebar.AwesomeBarComposable
 import org.mozilla.fenix.snackbar.FenixSnackbarDelegate
 import org.mozilla.fenix.snackbar.SnackbarBinding
 import org.mozilla.fenix.tabgroups.TabGroupsStrip
+import org.mozilla.fenix.tabgroups.strip.redux.TabGroupsStripAction
+import org.mozilla.fenix.tabgroups.strip.redux.TabGroupsStripMiddleware
+import org.mozilla.fenix.tabgroups.strip.redux.TabGroupsStripStore
 import org.mozilla.fenix.tabstray.redux.state.Page
 import org.mozilla.fenix.tabstray.ui.AccessPoint
 import org.mozilla.fenix.termsofuse.store.DefaultPrivacyNoticeBannerRepository
@@ -248,6 +252,18 @@ class HomeFragment : Fragment(), UserInteractionHandler, OnLongPressedListener {
     }
 
     private val dateTimeProvider: DateTimeProvider by lazy { DefaultDateTimeProvider() }
+
+    private val tabGroupsStripStore by lazy {
+        TabGroupsStripStore(
+            middleware =
+                listOf(
+                    TabGroupsStripMiddleware(
+                        tabDataCoordinator = requireComponents.tabDataCoordinator,
+                        scope = lifecycleScope,
+                    )
+                )
+        )
+    }
 
     private lateinit var privacyNoticeBannerStore: PrivacyNoticeBannerStore
     private lateinit var collectionsMigrationCardStore: CollectionsMigrationCardStore
@@ -558,7 +574,7 @@ class HomeFragment : Fragment(), UserInteractionHandler, OnLongPressedListener {
                 .navigate(NavGraphDirections.actionGlobalUnlockPrivateTabsFragment(NavigationOrigin.HOME_PAGE))
         }
 
-        toolbarView.build(requireComponents.settings.enableHomepageSearchBar)
+        toolbarView.build(requireComponents.settings.isHomepageMiddleSearchEnabled)
 
         requireComponents.appStore.state.wasLastTabClosedPrivate?.also {
             showUndoSnackbar(requireContext().tabClosedUndoMessage(it))
@@ -583,6 +599,10 @@ class HomeFragment : Fragment(), UserInteractionHandler, OnLongPressedListener {
         initSnackbarBinding(view = view)
         initIpProtectionBindings(view = view)
         initContinuousOnboardingFeature()
+
+        if (requireComponents.settings.shouldShowTabGroupsStrip) {
+            tabGroupsStripStore.dispatch(TabGroupsStripAction.InitializeDataObservation)
+        }
 
         privacyNoticeBannerStore =
             PrivacyNoticeBannerStore(
@@ -857,7 +877,7 @@ class HomeFragment : Fragment(), UserInteractionHandler, OnLongPressedListener {
                     TabStrip()
                 }
                 if (settings.shouldShowTabGroupsStrip) {
-                    TabGroupsStrip(containerColor = colors.surface)
+                    TabGroupsStrip(store = tabGroupsStripStore, containerColor = colors.surface)
                 }
                 homeNavigationBar?.Content()
             }
@@ -878,7 +898,7 @@ class HomeFragment : Fragment(), UserInteractionHandler, OnLongPressedListener {
                 dividerColor = colors.outlineVariant,
             ) {
                 if (settings.shouldShowTabGroupsStrip) {
-                    TabGroupsStrip(containerColor = colors.surface)
+                    TabGroupsStrip(store = tabGroupsStripStore, containerColor = colors.surface)
                 }
                 toolbarView.Content()
             }
@@ -979,6 +999,9 @@ class HomeFragment : Fragment(), UserInteractionHandler, OnLongPressedListener {
                 },
                 onTopSitesItemBound = {
                     StartupTimeline.onTopSitesItemBound(activity = (requireActivity() as HomeActivity))
+                },
+                onMiddleSearchBarVisibilityChanged = { isVisible ->
+                    toolbarView.updateAddressBarVisibility(!isVisible)
                 },
                 modifier =
                     Modifier.thenConditional(Modifier.verticalFadingEdges(HOMEPAGE_EDGE_FADE_LENGTH)) {
@@ -1105,7 +1128,18 @@ class HomeFragment : Fragment(), UserInteractionHandler, OnLongPressedListener {
                         (requireActivity() as HomeActivity).openToBrowser(BrowserDirection.FromHome)
                     }
                 },
-                onLastTabClose = {},
+                onLastTabClose = { isPrivate ->
+                    handleTabStripLastTabClosed(
+                        isHomepageAsNewTabEnabled = requireComponents.settings.enableHomepageAsNewTab,
+                        isLastTabClosedPrivate = isPrivate,
+                        navigateFromId = R.id.homeFragment,
+                        appStore = requireComponents.appStore,
+                        browsingMode = browsingModeManager.mode,
+                        navController = findNavController(),
+                    ) {
+                        showUndoSnackbar(requireContext().tabClosedUndoMessage(isPrivate))
+                    }
+                },
                 onCloseTabClick = { isPrivate ->
                     showUndoSnackbar(requireContext().tabClosedUndoMessage(isPrivate))
                 },
@@ -1209,7 +1243,7 @@ class HomeFragment : Fragment(), UserInteractionHandler, OnLongPressedListener {
 
     @VisibleForTesting
     internal fun removeCollection(tabCollection: TabCollection) {
-        lifecycleScope.launch(IO) {
+        requireComponents.applicationScope.launch {
             requireComponents.core.tabCollectionStorage.removeCollection(tabCollection)
         }
     }
@@ -1368,9 +1402,6 @@ class HomeFragment : Fragment(), UserInteractionHandler, OnLongPressedListener {
      * This function should be called when the fragment's view is active (e.g., in response to a user interaction). It
      * launches a coroutine within the [viewLifecycleOwner]'s [androidx.lifecycle.LifecycleCoroutineScope] to display
      * the widget prompt using [showAddSearchWidgetPromptIfSupported].
-     *
-     * The actual display logic, including handling success and failure callbacks, is managed by
-     * [showAddSearchWidgetPromptIfSupported].
      */
     private fun showAddSearchWidgetPrompt() {
         viewLifecycleOwner.lifecycleScope.launch {
@@ -1743,6 +1774,7 @@ class HomeFragment : Fragment(), UserInteractionHandler, OnLongPressedListener {
                     appStore = requireComponents.appStore,
                     navControllerRef = WeakReference(findNavController()),
                     viewLifecycleScope = viewLifecycleOwner.lifecycleScope,
+                    applicationScope = requireComponents.applicationScope,
                     shareUseCases = requireComponents.useCases.shareUseCases,
                     showAddSearchWidgetPrompt = ::showAddSearchWidgetPrompt,
                     requestSetDefaultBrowserPrompt = {

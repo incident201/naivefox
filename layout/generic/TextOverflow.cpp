@@ -222,9 +222,9 @@ void nsDisplayTextOverflowMarker::PaintTextToContext(
 
   if (mTextRun) {
     gfx::Point gfxPt(pt.x, pt.y);
-    auto& paletteCache = mFrame->PresContext()->FontPaletteCache();
+    auto* paletteValueSet = mFrame->PresContext()->GetFontPaletteValueSet();
     mTextRun->Draw(gfxTextRun::Range(mTextRun), gfxPt,
-                   gfxTextRun::DrawParams(aCtx, paletteCache), aImgParams);
+                   gfxTextRun::DrawParams(aCtx, paletteValueSet), aImgParams);
     return;
   }
 
@@ -277,7 +277,6 @@ TextOverflow::TextOverflow(nsDisplayListBuilder* aBuilder,
       mBlock(aBlockFrame),
       mScrollContainerFrame(
           nsLayoutUtils::GetScrollContainerFrameFor(aBlockFrame)),
-      mMarkerList(aBuilder),
       mBlockSize(aBlockFrame->GetSize()),
       mBlockWM(aBlockFrame->GetWritingMode()),
       mCanHaveInlineAxisScrollbar(false),

@@ -34,8 +34,9 @@
   }
 
   .card {
+    border: var(--card-border);
     border-radius: var(--border-radius-medium);
-    box-shadow: $shadow-card;
+    box-shadow: var(--card-box-shadow);
     height: 100%;
   }
 
@@ -90,7 +91,7 @@
     position: relative;
 
     &::after {
-      border-block-end: 1px solid var(--newtab-card-hairline-color);
+      border-block-end: 1px solid var(--card-border-color);
       inset-block-end: 0;
       content: '';
       position: absolute;
@@ -291,7 +292,7 @@
       inset-inline-start: auto;
 
       &::after {
-        border: 1px solid var(--newtab-card-hairline-color);
+        border: 1px solid var(--card-border-color);
         border-block-end: 0;
         border-radius: var(--border-radius-medium);
         content: '';

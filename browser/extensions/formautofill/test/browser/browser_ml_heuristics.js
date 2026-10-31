@@ -30,6 +30,8 @@ let detectedFields = [
   "other",
   "tel",
   "given-name",
+  // sixth ML test
+  "given-name",
 ];
 
 let expectedDetectFieldsResult;
@@ -252,6 +254,39 @@ add_heuristic_tests([
           { fieldName: "email", reason: "regex-heuristic" },
           // The model returns 'given-name' which overrides the heuristics.
           { fieldName: "given-name", reason: "ml" },
+        ],
+      },
+    ],
+  },
+  // When a form has only two fields, the form isn't valid so don't load the ML inference.
+  {
+    fixtureData: `
+      <label for="firstName">First:</label>
+      <input id="firstName" name="firstName">
+      <label for="lastName">Last:</label>
+      <input id="lastName" name="lastName">`,
+    expectedResult: [
+      {
+        invalid: true,
+        fields: [
+          { fieldName: "given-name", reason: "regex-heuristic" },
+          { fieldName: "family-name", reason: "regex-heuristic" },
+        ],
+      },
+    ],
+  },
+  // However if one of the fields has an autocomplete attribute, it is valid.
+  {
+    fixtureData: `
+      <label for="firstName">First:</label>
+      <input id="firstName" name="firstName">
+      <label for="lastName">Last:</label>
+      <input id="lastName" name="lastName" autocomplete="family-name">`,
+    expectedResult: [
+      {
+        fields: [
+          { fieldName: "given-name", reason: "ml" },
+          { fieldName: "family-name", reason: "autocomplete" },
         ],
       },
     ],

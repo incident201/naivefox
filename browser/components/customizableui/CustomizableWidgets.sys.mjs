@@ -50,49 +50,53 @@ XPCOMUtils.defineLazyPreferenceGetter(
 );
 
 /**
- * A helper method to synchronize aNode's DOM attributes with the properties and
- * values in aAttrs. If aNode has an attribute that is false-y in aAttrs,
- * then this attribute is removed.
+ * Synchronizes aNode's DOM attributes with aAttrs: each key is set as an
+ * attribute with its value, or removed from aNode if the value is falsy.
  *
- * If aAttrs includes "shortcutId", the value is never set on aNode, but is
- * instead used when setting the "label" or "tooltiptext" attributes to include
- * the shortcut key combo. shortcutId should refer to the ID of the XUL <key>
- * element that acts as the shortcut.
+ * The following keys are not copied to aNode, but control how it is
+ * localized:
+ * - l10nId: Fluent identifier used to localize aNode.
+ * - tooltipL10nId: Fluent identifier of a message whose value is set,
+ *   asynchronously, as the "tooltiptext" attribute only. Use it instead of
+ *   l10nId when other localizable attributes, such as "label", are set by
+ *   other code, since Fluent would remove them.
+ * - shortcutId: ID of the XUL <key> element for the shortcut, passed to the
+ *   Fluent messages as the "$shortcut" variable.
  *
  * @param {Element} aNode
  *   The element to change the attributes of.
  * @param {object} aAttrs
- *   A set of key-value pairs where the key is set as the attribute name, and
- *   the value is set as the attribute value.
+ *   Attribute names mapped to their values, plus the special keys above.
  */
 function setAttributes(aNode, aAttrs) {
   let doc = aNode.ownerDocument;
   for (let [name, value] of Object.entries(aAttrs)) {
+    if (["l10nId", "tooltipL10nId", "shortcutId"].includes(name)) {
+      continue;
+    }
     if (!value) {
       if (aNode.hasAttribute(name)) {
         aNode.removeAttribute(name);
       }
     } else {
-      if (name == "shortcutId") {
-        continue;
-      }
-      if (name == "label" || name == "tooltiptext") {
-        let stringId = typeof value == "string" ? value : name;
-        let additionalArgs = [];
-        if (aAttrs.shortcutId) {
-          let shortcut = doc.getElementById(aAttrs.shortcutId);
-          if (shortcut) {
-            additionalArgs.push(lazy.ShortcutUtils.prettifyShortcut(shortcut));
-          }
-        }
-        value = lazy.CustomizableUI.getLocalizedProperty(
-          { id: aAttrs.id },
-          stringId,
-          additionalArgs
-        );
-      }
       aNode.setAttribute(name, value);
     }
+  }
+
+  let l10nArgs;
+  if (aAttrs.shortcutId) {
+    let shortcut = doc.getElementById(aAttrs.shortcutId);
+    if (shortcut) {
+      l10nArgs = { shortcut: lazy.ShortcutUtils.prettifyShortcut(shortcut) };
+    }
+  }
+  if (aAttrs.l10nId) {
+    doc.l10n.setAttributes(aNode, aAttrs.l10nId, l10nArgs);
+  }
+  if (aAttrs.tooltipL10nId) {
+    doc.l10n
+      .formatValue(aAttrs.tooltipL10nId, l10nArgs)
+      .then(tooltip => aNode.setAttribute("tooltiptext", tooltip));
   }
 }
 
@@ -107,8 +111,8 @@ export const CustomizableWidgets = [
     id: "history-panelmenu",
     type: "view",
     viewId: "PanelUI-history",
+    l10nId: "toolbar-button-history",
     shortcutId: "key_gotoHistory",
-    tooltiptext: "history-panelmenu.tooltiptext2",
     recentlyClosedTabsPanel: "appMenu-library-recentlyClosedTabs",
     recentlyClosedWindowsPanel: "appMenu-library-recentlyClosedWindows",
     handleEvent(event) {
@@ -277,8 +281,8 @@ export const CustomizableWidgets = [
   },
   {
     id: "find-button",
+    l10nId: "toolbar-button-find",
     shortcutId: "key_find",
-    tooltiptext: "find-button.tooltiptext3",
     onCommand(aEvent) {
       let win = aEvent.target.documentGlobal;
       if (win.gLazyFindCommand) {
@@ -332,15 +336,13 @@ export const CustomizableWidgets = [
   {
     id: "zoom-controls",
     type: "custom",
-    tooltiptext: "zoom-controls.tooltiptext2",
     onBuild(aDocument) {
       let buttons = [
         {
           id: "zoom-out-button",
           command: "cmd_fullZoomReduce",
-          label: true,
           closemenu: "none",
-          tooltiptext: "tooltiptext2",
+          l10nId: "toolbar-button-zoom-out",
           shortcutId: "key_fullZoomReduce",
           class: "toolbarbutton-1 toolbarbutton-combined",
         },
@@ -348,7 +350,7 @@ export const CustomizableWidgets = [
           id: "zoom-reset-button",
           command: "cmd_fullZoomReset",
           closemenu: "none",
-          tooltiptext: "tooltiptext2",
+          tooltipL10nId: "toolbar-button-zoom-reset-tooltip",
           shortcutId: "key_fullZoomReset",
           class: "toolbarbutton-1 toolbarbutton-combined",
         },
@@ -356,8 +358,7 @@ export const CustomizableWidgets = [
           id: "zoom-in-button",
           command: "cmd_fullZoomEnlarge",
           closemenu: "none",
-          label: true,
-          tooltiptext: "tooltiptext2",
+          l10nId: "toolbar-button-zoom-in",
           shortcutId: "key_fullZoomEnlarge",
           class: "toolbarbutton-1 toolbarbutton-combined",
         },
@@ -365,14 +366,7 @@ export const CustomizableWidgets = [
 
       let node = aDocument.createXULElement("toolbaritem");
       node.setAttribute("id", "zoom-controls");
-      node.setAttribute(
-        "label",
-        lazy.CustomizableUI.getLocalizedProperty(this, "label")
-      );
-      node.setAttribute(
-        "title",
-        lazy.CustomizableUI.getLocalizedProperty(this, "tooltiptext")
-      );
+      aDocument.l10n.setAttributes(node, "toolbar-zoom-controls");
       // Set this as an attribute in addition to the property to make sure we can style correctly.
       node.setAttribute("removable", "true");
       node.classList.add("chromeclass-toolbar-additional");
@@ -392,30 +386,26 @@ export const CustomizableWidgets = [
   {
     id: "edit-controls",
     type: "custom",
-    tooltiptext: "edit-controls.tooltiptext2",
     onBuild(aDocument) {
       let buttons = [
         {
           id: "cut-button",
           command: "cmd_cut",
-          label: true,
-          tooltiptext: "tooltiptext2",
+          l10nId: "toolbar-button-cut",
           shortcutId: "key_cut",
           class: "toolbarbutton-1 toolbarbutton-combined",
         },
         {
           id: "copy-button",
           command: "cmd_copy",
-          label: true,
-          tooltiptext: "tooltiptext2",
+          l10nId: "toolbar-button-copy",
           shortcutId: "key_copy",
           class: "toolbarbutton-1 toolbarbutton-combined",
         },
         {
           id: "paste-button",
           command: "cmd_paste",
-          label: true,
-          tooltiptext: "tooltiptext2",
+          l10nId: "toolbar-button-paste",
           shortcutId: "key_paste",
           class: "toolbarbutton-1 toolbarbutton-combined",
         },
@@ -423,14 +413,7 @@ export const CustomizableWidgets = [
 
       let node = aDocument.createXULElement("toolbaritem");
       node.setAttribute("id", "edit-controls");
-      node.setAttribute(
-        "label",
-        lazy.CustomizableUI.getLocalizedProperty(this, "label")
-      );
-      node.setAttribute(
-        "title",
-        lazy.CustomizableUI.getLocalizedProperty(this, "tooltiptext")
-      );
+      aDocument.l10n.setAttributes(node, "toolbar-edit-controls");
       // Set this as an attribute in addition to the property to make sure we can style correctly.
       node.setAttribute("removable", "true");
       node.classList.add("chromeclass-toolbar-additional");
@@ -731,6 +714,7 @@ if (Services.prefs.getBoolPref("privacy.panicButton.enabled")) {
     id: "panic-button",
     type: "view",
     viewId: "PanelUI-panicView",
+    l10nId: "toolbar-button-forget",
 
     forgetButtonCalled(aEvent) {
       let doc = aEvent.target.ownerDocument;
@@ -807,11 +791,14 @@ const kFireButtonFlowVariable = "flow";
 const kFireButtonFlowPanel = "panel";
 // Go straight to the clear-data dialog, which does its own confirming.
 const kFireButtonFlowDirect = "direct";
+// The event that last activated the fire button in each window, for the
+// direct flow's dialog, since ViewShowing doesn't carry it.
+const gFireButtonTriggeringEvents = new WeakMap();
 
 if (Services.prefs.getBoolPref("browser.fireButton.enabled", false)) {
   CustomizableWidgets.push({
     id: "fire-button",
-    l10nId: "fire-button-toolbar-button",
+    l10nId: "fire-button-toolbar-button2",
     type: "view",
     viewId: "fire-button-panel",
     defaultArea: "nav-bar",
@@ -844,6 +831,11 @@ if (Services.prefs.getBoolPref("browser.fireButton.enabled", false)) {
      */
     _panelsAwaitingChoice: new WeakSet(),
 
+    // Called without this.
+    onBeforeCommand(aEvent, aNode) {
+      gFireButtonTriggeringEvents.set(aNode.documentGlobal, aEvent);
+    },
+
     onCreated(aNode) {
       let doc = aNode.ownerDocument;
       let box = doc.createXULElement("box");
@@ -864,7 +856,7 @@ if (Services.prefs.getBoolPref("browser.fireButton.enabled", false)) {
         if (aEvent.target.id == "fire-button-panel-choose-link") {
           this._panelsAwaitingChoice.delete(panelview);
           Glean.fireButton.chooseClicked.record();
-          this.onChoose(aEvent.target).catch(console.error);
+          this.onChoose(aEvent).catch(console.error);
         }
         return;
       }
@@ -899,6 +891,9 @@ if (Services.prefs.getBoolPref("browser.fireButton.enabled", false)) {
 
     onViewShowing(aEvent) {
       let panelview = aEvent.target;
+      let win = panelview.documentGlobal;
+      let triggeringEvent = gFireButtonTriggeringEvents.get(win);
+      gFireButtonTriggeringEvents.delete(win);
 
       let flow = this.flow;
       Glean.fireButton.activated.record({ flow });
@@ -907,7 +902,9 @@ if (Services.prefs.getBoolPref("browser.fireButton.enabled", false)) {
         // Stop the panel from opening; the dialog is the confirmation.
         aEvent.preventDefault();
         lazy.CustomizableUI.hidePanelForNode(panelview);
-        this.openClearDataDialog(panelview, flow).catch(console.error);
+        this.openClearDataDialog(panelview, flow, triggeringEvent).catch(
+          console.error
+        );
         return;
       }
 
@@ -959,11 +956,15 @@ if (Services.prefs.getBoolPref("browser.fireButton.enabled", false)) {
      * so all this adds is the same completion toast the panel's own confirm
      * button shows.
      *
-     * @param {Element} aLink - The "Choose…" link that was activated.
+     * @param {Event} aEvent - The command event of the "Choose…" link.
      */
-    onChoose(aLink) {
-      lazy.CustomizableUI.hidePanelForNode(aLink);
-      return this.openClearDataDialog(aLink, kFireButtonFlowPanel);
+    onChoose(aEvent) {
+      lazy.CustomizableUI.hidePanelForNode(aEvent.target);
+      return this.openClearDataDialog(
+        aEvent.target,
+        kFireButtonFlowPanel,
+        aEvent
+      );
     },
 
     /**
@@ -972,8 +973,9 @@ if (Services.prefs.getBoolPref("browser.fireButton.enabled", false)) {
      *
      * @param {Element} aNode - Node identifying the window to parent to.
      * @param {string} aFlow - The kFireButtonFlow* value of this activation.
+     * @param {Event} [aTriggeringEvent] - See Sanitizer.showUI().
      */
-    async openClearDataDialog(aNode, aFlow) {
+    async openClearDataDialog(aNode, aFlow, aTriggeringEvent) {
       let win = aNode.documentGlobal;
 
       // Armed before the dialog opens because the dialog reports "accept" from
@@ -982,22 +984,20 @@ if (Services.prefs.getBoolPref("browser.fireButton.enabled", false)) {
       // from claiming the data is gone before it is.
       let observer;
       let cleared = new Promise(resolve => {
-        observer = (subject, topic, data) => resolve(data != "aborted");
+        observer = resolve;
         Services.obs.addObserver(observer, "sanitizer-sanitization-complete");
       });
 
       try {
         let result = await lazy.Sanitizer.showUI(win, "clearSiteData", {
-          closeWindowsWithHistory: true,
+          entryPoint: lazy.Sanitizer.DIALOG_ENTRY_POINTS.FIRE_BUTTON,
+          triggeringEvent: aTriggeringEvent,
         });
         if (result != "accept") {
           this.recordFlowCompleted(aFlow, "cancelled", "dialog");
           return;
         }
-        if (!(await cleared)) {
-          this.recordFlowCompleted(aFlow, "aborted", "dialog");
-          return;
-        }
+        await cleared;
         this.recordFlowCompleted(aFlow, "deleted", "dialog");
         this.notifyComplete();
       } finally {
@@ -1010,7 +1010,8 @@ if (Services.prefs.getBoolPref("browser.fireButton.enabled", false)) {
 
     /**
      * Clear the whole browsing session: history, cookies, cache, downloads and
-     * other site data, then close every browser window and open a new one.
+     * other site data, then close every browser window and open a new one
+     * that keeps the pinned tabs.
      *
      * @param {object} aProgress - Receives the Sanitizer's progress.
      * @returns {Promise<object>} The Sanitizer's progress object.
@@ -1019,14 +1020,15 @@ if (Services.prefs.getBoolPref("browser.fireButton.enabled", false)) {
       return lazy.Sanitizer.sanitize(this.itemsToClear, {
         ignoreTimespan: true,
         privateStateForNewWindow: "non-private",
+        keepPinnedTabs: true,
         progress: aProgress,
       });
     },
 
     /**
-     * Show the completion toast. Clearing replaced every browser window, so
-     * this anchors in whichever window is current now rather than the one the
-     * action was triggered from. Sanitizer.sanitize only resolves once that
+     * Show the completion toast. Clearing from the panel replaces every browser
+     * window, so this anchors in whichever window is current now rather than
+     * the one the action was triggered from. Sanitizer.sanitize only resolves once that
      * window has finished its delayed startup.
      */
     notifyComplete() {
@@ -1114,7 +1116,7 @@ if (PrivateBrowsingUtils.enabled) {
   });
 }
 
-if (Services.prefs.getBoolPref("browser.tabs.groups.alternateMenu", false)) {
+if (Services.prefs.getBoolPref("browser.toolbars.tab-groups.enabled", false)) {
   CustomizableWidgets.push({
     id: "tab-groups-button",
     type: "view",

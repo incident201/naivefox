@@ -385,7 +385,7 @@ export class MozTabSplitViewWrapper extends MozXULElement {
    *
    * @param {string} [trigger]
    *   The trigger method for ending the split view. Used for telemetry.
-   *   Valid values: "menu_separate", "icon_separate", "icon_close", "tab_close", "footer_separate".
+   *   Valid values: "menu_separate", "icon_separate", "icon_close", "tab_close", "footer_separate", "mini_window".
    */
   unsplitTabs(trigger = null) {
     if (this.#isUnsplitting) {

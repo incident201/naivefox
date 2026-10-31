@@ -27,7 +27,7 @@ know what you are doing.
 
 : Feature flag enabling the site exceptions capability.
 
-`browser.ipProtection.features.siteInclusions` (boolean, default: `false`)
+`browser.ipProtection.features.siteInclusions` (boolean, default: `true`)
 
 : Feature flag enabling the site inclusions capability.
 
@@ -60,11 +60,6 @@ know what you are doing.
 `browser.ipProtection.usageCache` (string, default: `""`)
 
 : Cached proxy usage JSON used during startup.
-
-`browser.ipProtection.locationListCache` (string, default: `""`)
-
-: Cached Guardian location list shared between `IPProtectionService` and
-  `GuardianClient`.
 
 `browser.ipProtection.hasUpgraded` (boolean, default: `false`)
 
@@ -159,10 +154,6 @@ know what you are doing.
 
 : Controls whether the VPN egress location is displayed in the status panel.
 
-`browser.ipProtection.siteExceptionsHintsEnabled` (boolean, default: `true`)
-
-: Controls whether site exception confirmation hints are shown in the toolbar button.
-
 `browser.ipProtection.onboardingMessageMask` (integer, default: `0`)
 
 : Bitmask tracking which onboarding messages have already been shown.
@@ -180,6 +171,10 @@ know what you are doing.
 `browser.ipProtection.everOpenedPanel` (boolean, default: `false`)
 
 : Tracks if the user has ever opened the VPN panel.
+
+`browser.ipProtection.openedPanelSince160` (boolean, default: `false`)
+
+: Tracks if the user has opened the VPN panel since release 160.
 
 `browser.ipProtection.siteInclusionPromptShown` (boolean, default: `false`)
 

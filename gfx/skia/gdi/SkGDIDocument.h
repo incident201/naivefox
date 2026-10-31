@@ -38,6 +38,9 @@ public:
      * Emits a page of |size| device units of the DC. The page contents need to be analyzed
      * before anything can be emitted, so |draw| is called multiple times, and must draw exactly
      * the same content every time. Nothing drawn needs to outlive each call.
+     *
+     * The canvas passed to |draw| may be transformed, and |draw| needs to draw relative to its
+     * initial transform.
      */
     virtual void drawPage(SkISize size, const std::function<void(SkCanvas*)>& draw) = 0;
 };

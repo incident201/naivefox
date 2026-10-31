@@ -7,4 +7,5 @@ with Files("**"):
 
 MOZ_SRC_FILES += [
     "JourneyManager.sys.mjs",
+    "JourneyStore.sys.mjs",
 ]

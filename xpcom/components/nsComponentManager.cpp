@@ -6,6 +6,8 @@
 
 #include <stdlib.h>
 
+#include <memory>
+
 #include "LogModulePrefWatcher.h"
 #include "ManifestParser.h"
 #include "StaticComponents.h"
@@ -20,7 +22,6 @@
 #ifndef MOZ_NAIVEFOX
 #  include "mozilla/URLPreloader.h"
 #endif
-#include "mozilla/UniquePtr.h"
 #include "mozilla/Variant.h"
 #include "nsArray.h"
 #include "nsCOMPtr.h"
@@ -73,10 +74,6 @@ bool ProcessSelectorMatches(ProcessSelector aSelector) {
 
   if (type == GeckoProcessType_RDD) {
     return !!(aSelector & Module::ALLOW_IN_RDD_PROCESS);
-  }
-
-  if (type == GeckoProcessType_Socket) {
-    return !!(aSelector & (Module::ALLOW_IN_SOCKET_PROCESS));
   }
 
   if (type == GeckoProcessType_VR) {
@@ -255,8 +252,6 @@ nsresult nsComponentManagerImpl::Init() {
         ProcessSelectorMatches(ProcessSelector::ALLOW_IN_GPU_PROCESS);
     gProcessMatchTable[size_t(ProcessSelector::ALLOW_IN_VR_PROCESS)] =
         ProcessSelectorMatches(ProcessSelector::ALLOW_IN_VR_PROCESS);
-    gProcessMatchTable[size_t(ProcessSelector::ALLOW_IN_SOCKET_PROCESS)] =
-        ProcessSelectorMatches(ProcessSelector::ALLOW_IN_SOCKET_PROCESS);
     gProcessMatchTable[size_t(ProcessSelector::ALLOW_IN_RDD_PROCESS)] =
         ProcessSelectorMatches(ProcessSelector::ALLOW_IN_RDD_PROCESS);
     gProcessMatchTable[size_t(ProcessSelector::ALLOW_IN_GMPLUGIN_PROCESS)] =
@@ -265,40 +260,16 @@ nsresult nsComponentManagerImpl::Init() {
         ProcessSelectorMatches(ProcessSelector::ALLOW_IN_GPU_AND_MAIN_PROCESS);
     gProcessMatchTable[size_t(ProcessSelector::ALLOW_IN_GPU_AND_VR_PROCESS)] =
         ProcessSelectorMatches(ProcessSelector::ALLOW_IN_GPU_AND_VR_PROCESS);
+    gProcessMatchTable[size_t(ProcessSelector::ALLOW_IN_GPU_AND_RDD_PROCESS)] =
+        ProcessSelectorMatches(ProcessSelector::ALLOW_IN_GPU_AND_RDD_PROCESS);
     gProcessMatchTable[size_t(
-        ProcessSelector::ALLOW_IN_GPU_AND_SOCKET_PROCESS)] =
+        ProcessSelector::ALLOW_IN_GPU_RDD_VR_AND_UTILITY_PROCESS)] =
         ProcessSelectorMatches(
-            ProcessSelector::ALLOW_IN_GPU_AND_SOCKET_PROCESS);
+            ProcessSelector::ALLOW_IN_GPU_RDD_VR_AND_UTILITY_PROCESS);
     gProcessMatchTable[size_t(
-        ProcessSelector::ALLOW_IN_GPU_VR_AND_SOCKET_PROCESS)] =
+        ProcessSelector::ALLOW_IN_GPU_RDD_VR_UTILITY_AND_GMPLUGIN_PROCESS)] =
         ProcessSelectorMatches(
-            ProcessSelector::ALLOW_IN_GPU_VR_AND_SOCKET_PROCESS);
-    gProcessMatchTable[size_t(
-        ProcessSelector::ALLOW_IN_RDD_AND_SOCKET_PROCESS)] =
-        ProcessSelectorMatches(
-            ProcessSelector::ALLOW_IN_RDD_AND_SOCKET_PROCESS);
-    gProcessMatchTable[size_t(
-        ProcessSelector::ALLOW_IN_GPU_RDD_AND_SOCKET_PROCESS)] =
-        ProcessSelectorMatches(
-            ProcessSelector::ALLOW_IN_GPU_RDD_AND_SOCKET_PROCESS);
-    gProcessMatchTable[size_t(
-        ProcessSelector::ALLOW_IN_GPU_RDD_SOCKET_AND_UTILITY_PROCESS)] =
-        ProcessSelectorMatches(
-            ProcessSelector::ALLOW_IN_GPU_RDD_SOCKET_AND_UTILITY_PROCESS);
-    gProcessMatchTable[size_t(
-        ProcessSelector::ALLOW_IN_GPU_RDD_VR_AND_SOCKET_PROCESS)] =
-        ProcessSelectorMatches(
-            ProcessSelector::ALLOW_IN_GPU_RDD_VR_AND_SOCKET_PROCESS);
-    gProcessMatchTable[size_t(
-        ProcessSelector::ALLOW_IN_GPU_RDD_VR_SOCKET_AND_UTILITY_PROCESS)] =
-        ProcessSelectorMatches(
-            ProcessSelector::ALLOW_IN_GPU_RDD_VR_SOCKET_AND_UTILITY_PROCESS);
-    gProcessMatchTable[size_t(
-        ProcessSelector::
-            ALLOW_IN_GPU_RDD_VR_SOCKET_UTILITY_AND_GMPLUGIN_PROCESS)] =
-        ProcessSelectorMatches(
-            ProcessSelector::
-                ALLOW_IN_GPU_RDD_VR_SOCKET_UTILITY_AND_GMPLUGIN_PROCESS);
+            ProcessSelector::ALLOW_IN_GPU_RDD_VR_UTILITY_AND_GMPLUGIN_PROCESS);
   }
 
   MOZ_ASSERT(NOT_INITIALIZED == mStatus);
@@ -994,7 +965,7 @@ nsComponentManagerImpl::RegisterFactory(const nsCID& aClass, const char* aName,
     return NS_ERROR_FACTORY_NOT_REGISTERED;
   }
 
-  auto f = MakeUnique<nsFactoryEntry>(aClass, aFactory);
+  auto f = std::make_unique<nsFactoryEntry>(aClass, aFactory);
 
   MonitorAutoLock lock(mLock);
   return mFactories.WithEntryHandle(&f->mCID, [&](auto&& entry) {

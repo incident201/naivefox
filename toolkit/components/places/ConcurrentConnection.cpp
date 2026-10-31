@@ -248,9 +248,10 @@ ConcurrentConnection::BlockShutdown(nsIAsyncShutdownClient* aBarrierClient) {
   if (mConn) {
     (void)mConn->Interrupt();
     CloseConnection();
-  } else {
+  } else if (!mIsOpening && !mIsClosing) {
     Shutdown();
   }
+  // Otherwise Complete() or CloseConnectionComplete() will unblock shutdown.
   return NS_OK;
 }
 
@@ -269,14 +270,16 @@ ConcurrentConnection::Complete(nsresult aRv, nsISupports* aData) {
   }
 #endif
 
-  // It's possible we got shutdown while the connection was being opened. We
-  // don't even assign the connection, just try to close it.
-  if (mIsShuttingDown && aData) {
-    nsCOMPtr<mozIStorageAsyncConnection> conn = do_QueryInterface(aData);
-    if (conn) {
-      (void)conn->AsyncClose(nullptr);
-    }
+  // It's possible we got shutdown while the connection was being opened. Close
+  // it before unblocking shutdown.
+  if (mIsShuttingDown) {
     mIsOpening = false;
+    mConn = do_QueryInterface(aData);
+    if (mConn) {
+      CloseConnection();
+    } else {
+      Shutdown();
+    }
     return NS_OK;
   }
 
@@ -384,6 +387,11 @@ void ConcurrentConnection::CloseConnection() {
     mIsConnectionReady = false;
     conn = mConn.forget();
   }
+  // The connection may already have been closed, for example by a statement
+  // error notified after shutdown started.
+  if (!conn) {
+    return;
+  }
 
   if (mAsyncStatements) {
     mAsyncStatements->FinalizeStatements();
@@ -401,13 +409,16 @@ void ConcurrentConnection::CloseConnection() {
   nsCOMPtr<mozIStorageCompletionCallback> cb =
       MakeAndAddRef<CallbackOnComplete>(
           this, &ConcurrentConnection::CloseConnectionComplete);
+  mIsClosing = true;
   if (NS_FAILED(conn->AsyncClose(cb))) {
+    mIsClosing = false;
     Shutdown();
   }
 }
 
 void ConcurrentConnection::CloseConnectionComplete(nsresult rv) {
   AssertIsOnMainThread();
+  mIsClosing = false;
   if (mIsShuttingDown || NS_FAILED(rv)) {
     Shutdown();
     return;
@@ -445,8 +456,8 @@ void ConcurrentConnection::SetupConnection() {
     MutexAutoLock lock(mConnectionReadyMutex.Lock());
     mConnectionReadyMutex.NoteExclusiveAccess();
     // Create the statements caches.
-    mAsyncStatements = MakeUnique<AsyncStatementCache>(mConn);
-    mHelperThreadStatements = MakeUnique<StatementCache>(mConn);
+    mAsyncStatements = std::make_unique<AsyncStatementCache>(mConn);
+    mHelperThreadStatements = std::make_unique<StatementCache>(mConn);
     mIsConnectionReady = true;
   }
 
@@ -602,7 +613,10 @@ void ConcurrentConnection::TryToOpenConnection() {
   mConnectionReadyMutex.NoteOnMainThread();
   // Avoid re-entering as this may be invoked multiple times. mIsOpening is
   // used until mConn is assigned.
-  if (mIsShuttingDown || mIsOpening || mConn) {
+  // Places notifies TOPIC_PLACES_INIT_COMPLETE again when shutdown starts, so
+  // check for shutdown too, as it's too late to open the connection.
+  if (mIsShuttingDown || mIsOpening || mConn ||
+      AppShutdown::IsInOrBeyond(ShutdownPhase::AppShutdownConfirmed)) {
     return;
   }
 
@@ -646,6 +660,9 @@ void ConcurrentConnection::PlacesInitFallbackTimerCallback(nsITimer*,
 }
 
 void ConcurrentConnection::Shutdown() {
+  if (mState == CLOSED) {
+    return;
+  }
   // Keep a strong reference: nulling sCCInstance below drops the singleton's
   // RefPtr, which could be the last one, destroying us mid-method.
 #ifdef DEBUG

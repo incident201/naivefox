@@ -92,7 +92,10 @@
 
         is(widget.title, "Test widget", "title property");
         ok(!widget.hasAttribute("title"), "title taken off the host");
-        is(widget.dataset.l10nAttrs, "title", "fluent may set title");
+        ok(
+          widget.dataset.l10nAttrs.split(",").includes("title"),
+          "fluent may set title"
+        );
         widget.remove();
       });
 

@@ -9,11 +9,9 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import mozilla.components.ExperimentalAndroidComponentsApi
 import mozilla.components.concept.engine.Engine
-import mozilla.components.concept.engine.ipprotection.IPProtectionHandler.StateInfo
 import mozilla.components.concept.engine.ipprotection.ServiceState
 import mozilla.components.feature.ipprotection.store.IPProtectionAction
 import mozilla.components.feature.ipprotection.store.IPProtectionStore
-import mozilla.components.feature.ipprotection.store.InternalAction
 import mozilla.components.feature.ipprotection.store.state.AccountStatus
 import mozilla.components.feature.ipprotection.store.state.EligibilityStatus
 import mozilla.components.feature.ipprotection.store.state.PendingActivationRequest
@@ -42,7 +40,7 @@ class IPProtectionFeatureTest {
                 )
             val handler = startFeature(store)
 
-            store.dispatch(InternalAction.AccountReadyForEnrollment)
+            store.dispatch(IPProtectionAction.AccountAction.AccountReadyForEnrollment)
             testScheduler.advanceUntilIdle()
 
             // Enrollment is only usable for an account the service already knows is signed in.
@@ -60,14 +58,12 @@ class IPProtectionFeatureTest {
             val (store, _) = buildStore(buildIPProtectionState(accountStatus = AccountStatus.Uninitialized))
             val handler = startFeature(store)
 
-            store.dispatch(InternalAction.AccountManagerStateChanged(AccountStatus.Authenticated))
-            store.dispatch(InternalAction.AccountManagerStateChanged(AccountStatus.WarmingUp))
+            store.dispatch(IPProtectionAction.AccountAction.AccountManagerStateChanged(AccountStatus.Authenticated))
+            store.dispatch(IPProtectionAction.AccountAction.AccountManagerStateChanged(AccountStatus.WarmingUp))
             testScheduler.advanceUntilIdle()
-            store.dispatch(IPProtectionAction.EligibilityChanged(EligibilityStatus.Eligible))
+            store.dispatch(IPProtectionAction.EligibilityAction.EligibilityChanged(EligibilityStatus.Eligible))
             testScheduler.advanceUntilIdle()
-            store.dispatch(
-                IPProtectionAction.EngineStateChanged(StateInfo(serviceState = ServiceState.Unauthenticated))
-            )
+            store.dispatch(IPProtectionAction.ServiceAction.ServiceStateChanged(ServiceState.Unauthenticated))
             testScheduler.advanceUntilIdle()
 
             assertEquals(
@@ -89,8 +85,8 @@ class IPProtectionFeatureTest {
 
             startFeature(store, failing = true)
 
-            middleware.assertFirstAction(IPProtectionAction.LocationSwitchFailed::class)
-            middleware.assertNotDispatched(IPProtectionAction.ToggleFailed::class)
+            middleware.assertFirstAction(IPProtectionAction.LocationAction.LocationSwitchFailed::class)
+            middleware.assertNotDispatched(IPProtectionAction.ActivationAction.ToggleFailed::class)
         }
 
     @Test
@@ -104,8 +100,8 @@ class IPProtectionFeatureTest {
 
             startFeature(store, failing = true)
 
-            middleware.assertFirstAction(IPProtectionAction.ToggleFailed::class)
-            middleware.assertNotDispatched(IPProtectionAction.LocationSwitchFailed::class)
+            middleware.assertFirstAction(IPProtectionAction.ActivationAction.ToggleFailed::class)
+            middleware.assertNotDispatched(IPProtectionAction.LocationAction.LocationSwitchFailed::class)
         }
 
     @Test
@@ -119,8 +115,8 @@ class IPProtectionFeatureTest {
 
             startFeature(store, failing = true)
 
-            middleware.assertFirstAction(IPProtectionAction.ToggleFailed::class)
-            middleware.assertNotDispatched(IPProtectionAction.LocationSwitchFailed::class)
+            middleware.assertFirstAction(IPProtectionAction.ActivationAction.ToggleFailed::class)
+            middleware.assertNotDispatched(IPProtectionAction.LocationAction.LocationSwitchFailed::class)
         }
 
     @Test

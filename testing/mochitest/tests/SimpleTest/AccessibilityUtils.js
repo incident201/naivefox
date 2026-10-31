@@ -1324,7 +1324,13 @@ this.AccessibilityUtils = (function () {
       // descendant, even if the test author targeted them at an interactive
       // element. For example, if there's a button with an image inside it,
       // node might be the image.
-      const acc = findInteractiveAccessible(node);
+      let acc = findInteractiveAccessible(node);
+      if (!acc) {
+        // Force refresh tick to find interactive accessible
+        forceRefreshDriverTick(node);
+        acc = findInteractiveAccessible(node);
+      }
+
       if (!acc) {
         if (isAccessibleGridcell(node) || isInaccessibleXulTreecol(node)) {
           return;

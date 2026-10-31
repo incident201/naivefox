@@ -16,7 +16,6 @@
 #include "mozilla/Maybe.h"
 #include "mozilla/MemoryReporting.h"
 #include "mozilla/RelativeTo.h"
-#include "mozilla/SVGImageContext.h"
 #include "mozilla/Span.h"
 #include "mozilla/StaticPrefs_nglayout.h"
 #include "mozilla/SurfaceFromElementResult.h"
@@ -67,6 +66,7 @@ class nsDisplayList;
 class nsDisplayListBuilder;
 enum class nsDisplayListBuilderMode : uint8_t;
 class RetainedDisplayListBuilder;
+class SVGImageContext;
 struct AspectRatio;
 class ComputedStyle;
 class DisplayPortUtils;
@@ -2863,8 +2863,7 @@ class nsLayoutUtils {
    * are likely to need special-case handling of the RCD-RSF.
    */
   static nsSize CalculateCompositionSizeForFrame(
-      nsIFrame* aFrame, bool aSubtractScrollbars = true,
-      const nsSize* aOverrideScrollPortSize = nullptr,
+      nsIFrame* aFrame, const nsSize* aOverrideScrollPortSize = nullptr,
       IncludeDynamicToolbar aIncludeDynamicToolbar =
           IncludeDynamicToolbar::Auto);
 

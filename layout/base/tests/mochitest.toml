@@ -609,6 +609,10 @@ support-files = [
   "chrome/blue-32x32.png",
   "caret-empty-contenteditable-overflow-click.html",
   "caret-empty-contenteditable-overflow-click-ref.html",
+  "caret-atomic-inline-with-non-initial-baseline.html",
+  "caret-atomic-inline-with-non-initial-baseline-ref.html",
+  "caret-atomic-inline-with-non-initial-baseline-vertical-rl.html",
+  "caret-atomic-inline-with-non-initial-baseline-vertical-rl-ref.html",
 ]
 
 ["test_resize_flush.html"]

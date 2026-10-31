@@ -8,6 +8,42 @@ import { ConversationStore } from "moz-src:///browser/components/aiwindow/ui/mod
 import { getSmartPageName } from "chrome://browser/content/aiwindow/modules/TrustedInternalURLs.mjs";
 import { A2UI } from "../modules/A2UI.mjs";
 
+/**
+ * A stored AI Tab record.
+ *
+ * @typedef {import("../modules/AITabStore.sys.mjs").AITabRow} AITabRow
+ */
+
+/**
+ * A page prepared for rendering.
+ *
+ * @typedef {import("../modules/A2UI.mjs").HydratedAITabData} HydratedAITabData
+ */
+
+/**
+ * A stored-page lookup and its URL identifiers.
+ *
+ * @typedef {object} AITabPageLookup
+ * @property {AITabRow|null} pageData - Latest stored version, if present.
+ * @property {string} pageName - Slug from the page URL.
+ * @property {string} url - Full page URL.
+ */
+
+/**
+ * Page data sent to the viewer, including hydrated content and a localized date.
+ *
+ * @typedef {AITabRow & HydratedAITabData & {
+ *   createdAtLabel: string
+ * }} AITabData
+ */
+
+/**
+ * Page lookup response sent to the child actor.
+ *
+ * @typedef {{success: true, page: AITabData|null} |
+ *   {success: false, error: string}} AITabPageLookupResponse
+ */
+
 const lazy = {};
 
 ChromeUtils.defineESModuleGetters(lazy, {
@@ -62,15 +98,50 @@ export function formatCreatedAt(createdAt, now = Date.now()) {
  */
 export class AITabParent extends JSWindowActorParent {
   #headingFontPromise = null;
+  #tab;
+  #pageUuid;
 
   actorCreated() {
     this.#headingFontPromise = this.#loadHeadingFont();
+
+    const browser = this.browsingContext.top.embedderElement;
+    this.#setTab(browser?.documentGlobal.gBrowser?.getTabForBrowser(browser));
+  }
+
+  didDestroy() {
+    this.#setTab(null);
+  }
+
+  #setTab(tab) {
+    this.#tab?.removeEventListener("TabSelect", this.#onTabSelect);
+    this.#tab?.linkedBrowser.removeEventListener(
+      "SwapDocShells",
+      this.#onSwapDocShells
+    );
+    this.#tab?.documentGlobal.removeEventListener(
+      "activate",
+      this.#onWindowActivate
+    );
+
+    this.#tab = tab;
+
+    this.#tab?.addEventListener("TabSelect", this.#onTabSelect);
+    this.#tab?.linkedBrowser.addEventListener(
+      "SwapDocShells",
+      this.#onSwapDocShells
+    );
+    this.#tab?.documentGlobal.addEventListener(
+      "activate",
+      this.#onWindowActivate
+    );
   }
 
   async receiveMessage({ data, name }) {
     switch (name) {
       case "AITab:GetPage":
         return this.#handleGetPage();
+      case "AITab:GetHeadingFont":
+        return { font: await this.#headingFontPromise };
       case "AITab:DeletePage":
         return this.#handleDeletePage();
       case "AITab:OpenLink":
@@ -103,15 +174,114 @@ export class AITabParent extends JSWindowActorParent {
     return pageName ? { pageName, url } : null;
   }
 
-  async #handleGetPage() {
+  /**
+   * Handles the activate event to trigger the tab refresh if the
+   * tab is already focused when the window is focused again.
+   */
+  #onWindowActivate = () => {
+    if (this.#tab?.selected) {
+      this.#onTabSelect();
+    }
+  };
+
+  /**
+   * Handles SwapDocShells event so the window can handle events from
+   * it's new tab host after switching windows.
+   *
+   * @param {Event} event
+   */
+  #onSwapDocShells = event => {
+    const oldBrowser = this.browsingContext.top.embedderElement;
+    if (event.currentTarget !== oldBrowser) {
+      return;
+    }
+
+    const browser = event.detail;
+    this.#setTab(browser.documentGlobal.gBrowser.getTabForBrowser(browser));
+  };
+
+  /**
+   * Handles TabSelect events to check whether the data for the
+   * Smart Page has changed. If it has a message is sent to the
+   * child actor to refresh the page.
+   *
+   * @returns {Promise<void>} Resolves after checking for an updated version.
+   */
+  #onTabSelect = async () => {
+    const pageDataResults = await this.#getPageData();
+    if (!this.#tab) {
+      return;
+    }
+
+    if (!pageDataResults || !pageDataResults.pageData) {
+      return;
+    }
+
+    const { pageData } = pageDataResults;
+    if (this.#pageUuid === pageData.uuid) {
+      return;
+    }
+
+    const page = this.#getPageForUI(pageData);
+    if (!page) {
+      return;
+    }
+
+    this.sendAsyncMessage("AITab:RefreshPageData", page);
+    this.#pageUuid = pageData.uuid;
+  };
+
+  /**
+   * Gets the page data for a Smart Page from the AITabStore
+   *
+   * @returns {Promise<AITabPageLookup|null>} Lookup result, or null for an invalid page URL.
+   */
+  async #getPageData() {
     const currentPage = this.#currentPage;
     if (!currentPage) {
-      return { success: false, error: "Invalid page name" };
+      return null;
     }
-    const { pageName, url } = currentPage;
 
+    const { pageName, url } = currentPage;
+    const pageData = await AITabStore.getBySlug(pageName);
+
+    return { pageData, pageName, url };
+  }
+
+  /**
+   * Gets the hydrated surface data for rendering the Smart Page
+   *
+   * @param {AITabRow} pageData - Stored version to hydrate.
+   *
+   * @returns {AITabData|null} Renderable page, or null when no surface exists.
+   */
+  #getPageForUI(pageData) {
+    const surface = pageData?.components?.surface;
+    if (!surface) {
+      return null;
+    }
+
+    const a2ui = new A2UI(surface);
+    const page = a2ui.toUI();
+
+    return {
+      ...pageData,
+      ...page,
+      createdAtLabel: formatCreatedAt(pageData.createdAt),
+    };
+  }
+
+  /**
+   * @returns {Promise<AITabPageLookupResponse>} Page data or a lookup error.
+   */
+  async #handleGetPage() {
     try {
-      const pageData = await AITabStore.getBySlug(pageName);
+      const pageDataResults = await this.#getPageData();
+      if (!pageDataResults) {
+        return { success: false, error: "Invalid page name" };
+      }
+
+      const { pageData, url, pageName } = pageDataResults;
       if (!pageData) {
         // Leftover slugs from deleted pages should not keep coming back as a
         // history or address bar result.
@@ -121,27 +291,17 @@ export class AITabParent extends JSWindowActorParent {
             error
           );
         });
-      }
 
-      const surface = pageData?.components?.surface;
-      if (!surface) {
         return { success: true, page: null };
       }
 
-      const a2ui = new A2UI(surface);
-      const page = a2ui.toUI();
+      const page = this.#getPageForUI(pageData);
+      if (!page) {
+        return { success: true, page: null };
+      }
 
-      return {
-        success: true,
-        font: await this.#headingFontPromise,
-        page: pageData &&
-          page && {
-            ...pageData,
-            ...page,
-            // Content renders the label as-is; it never sees the raw timestamp.
-            createdAtLabel: formatCreatedAt(pageData.createdAt),
-          },
-      };
+      this.#pageUuid = pageData.uuid;
+      return { success: true, page };
     } catch (error) {
       console.error("Failed to retrieve AI Tab page:", error);
       return { success: false, error: "Failed to retrieve page" };
@@ -149,8 +309,10 @@ export class AITabParent extends JSWindowActorParent {
   }
 
   /**
-   * Started when the actor is created and sent with the page, so content can
-   * install the font before it renders.
+   * Started when the actor is created so the download overlaps the page
+   * lookup. createAITab() usually started it during generation, in which case
+   * this reuses that download. Content asks for it separately and does not
+   * wait for it to render.
    *
    * @returns {Promise<?ArrayBuffer>} Null when the font is unavailable.
    */

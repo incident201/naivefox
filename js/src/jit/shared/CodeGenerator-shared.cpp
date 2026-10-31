@@ -1116,14 +1116,6 @@ bool CodeGeneratorShared::omitOverRecursedInterruptCheck() const {
   return !gen->needsOverrecursedCheck();
 }
 
-void CodeGeneratorShared::emitPreBarrier(Address address) {
-  masm.guardedCallPreBarrier(address, MIRType::Value);
-}
-
-void CodeGeneratorShared::emitPreBarrier(BaseObjectElementIndex address) {
-  masm.guardedCallPreBarrier(address, MIRType::Value);
-}
-
 void CodeGeneratorShared::jumpToBlock(MBasicBlock* mir) {
   // Skip past trivial blocks.
   mir = skipTrivialBlocks(mir);

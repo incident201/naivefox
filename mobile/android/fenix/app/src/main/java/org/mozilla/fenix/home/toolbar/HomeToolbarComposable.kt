@@ -198,7 +198,7 @@ internal class HomeToolbarComposable(
         }
 
         Box {
-            if (settings.enableHomepageSearchBar) {
+            if (settings.isHomepageMiddleSearchEnabled) {
                 BrowserSimpleToolbar(toolbarStore, appStore)
             }
 

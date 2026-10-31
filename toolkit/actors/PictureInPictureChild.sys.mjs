@@ -18,7 +18,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
 });
 
 import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
-import { WebVTT } from "resource://gre/modules/vtt.sys.mjs";
+import { WebVTT } from "moz-src:///dom/media/webvtt/vtt.sys.mjs";
 import { setTimeout, clearTimeout } from "resource://gre/modules/Timer.sys.mjs";
 import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
 

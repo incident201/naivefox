@@ -310,7 +310,8 @@ void nsGenericHTMLElement::SetHidden(
 
   // 7. Otherwise, set the hidden attribute to the empty string.
   if (isHidden) {
-    aRv = SetAttr(kNameSpaceID_None, nsGkAtoms::hidden, u""_ns, true);
+    aRv = SetAttr(kNameSpaceID_None, nsGkAtoms::hidden, u""_ns, true,
+                  IsKnownNewAttr::No);
   } else {
     aRv = UnsetAttr(kNameSpaceID_None, nsGkAtoms::hidden, true);
   }
@@ -549,7 +550,8 @@ nsresult nsGenericHTMLElement::BindToTree(BindContext& aContext,
         [self = RefPtr<nsGenericHTMLElement>(this)]() {
           nsAutoString nonce;
           self->GetNonce(nonce);
-          self->SetAttr(kNameSpaceID_None, nsGkAtoms::nonce, u""_ns, true);
+          self->SetAttr(kNameSpaceID_None, nsGkAtoms::nonce, u""_ns, true,
+                        IsKnownNewAttr::No);
           self->SetNonce(nonce);
         }));
   }
@@ -1114,7 +1116,7 @@ bool nsGenericHTMLElement::ParseAttribute(int32_t aNamespaceID,
                                           const nsAString& aValue,
                                           nsIPrincipal* aMaybeScriptedPrincipal,
                                           nsAttrValue& aResult) {
-  if (aNamespaceID == kNameSpaceID_None) {
+  if (aAttribute->IsStatic() && aNamespaceID == kNameSpaceID_None) {
     if (aAttribute == nsGkAtoms::dir) {
       return aResult.ParseEnumValue(aValue, kDirTable, false);
     }
@@ -1126,10 +1128,6 @@ bool nsGenericHTMLElement::ParseAttribute(int32_t aNamespaceID,
 
     if (aAttribute == nsGkAtoms::tabindex) {
       return aResult.ParseIntValue(aValue);
-    }
-
-    if (aAttribute == nsGkAtoms::referrerpolicy) {
-      return ParseReferrerAttribute(aValue, aResult);
     }
 
     if (aAttribute == nsGkAtoms::name) {
@@ -1785,7 +1783,7 @@ nsresult nsGenericHTMLElement::SetIntAttr(nsAtom* aAttr, int32_t aValue) {
   nsAutoString value;
   value.AppendInt(aValue);
 
-  return SetAttr(kNameSpaceID_None, aAttr, value, true);
+  return SetAttr(kNameSpaceID_None, aAttr, value, true, IsKnownNewAttr::No);
 }
 
 uint32_t nsGenericHTMLElement::GetUnsignedIntAttr(nsAtom* aAttr,
@@ -3469,8 +3467,10 @@ bool nsGenericHTMLElement::CheckPopoverValidity(
   }
 
   // 3. If any of the following are true:
-  //   - element is not connected;
-  if (!IsInComposedDoc()) {
+  //   - expectedToBeShowing is false and element is not connected;
+  const bool expectedToBeShowing =
+      aExpectedState == PopoverVisibilityState::Showing;
+  if (!expectedToBeShowing && !IsInComposedDoc()) {
     // 1. If throwExceptions is true, then throw an "InvalidStateError"
     //    DOMException.
     aRv.ThrowInvalidStateError("Element is not connected");
@@ -3478,8 +3478,9 @@ bool nsGenericHTMLElement::CheckPopoverValidity(
     return false;
   }
 
-  //   - element's node document is not fully active;
-  if (!OwnerDoc()->IsFullyActive()) {
+  //   - expectedToBeShowing is false and element's node document is not fully
+  //     active;
+  if (!expectedToBeShowing && !OwnerDoc()->IsFullyActive()) {
     aRv.ThrowInvalidStateError("Element's document is not fully active");
     return false;
   }

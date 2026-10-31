@@ -33,7 +33,12 @@ function handleRequest(request, response) {
     false
   );
 
-  const body = "<!DOCTYPE html><title>prefetch target</title>";
+  let body = "<!DOCTYPE html><title>prefetch target</title>";
+
+  // ?large=1: pad the body past a lowered max_body_bytes cap.
+  if (params.has("large")) {
+    body += "x".repeat(1024);
+  }
 
   // ?slow=<ms>: hold back the whole response, headers included, so a
   // prefetch of this target is still in flight when the test navigates.

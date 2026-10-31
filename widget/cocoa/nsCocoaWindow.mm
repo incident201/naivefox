@@ -600,7 +600,7 @@ nsresult nsCocoaWindow::SynthesizeNativeTouchPoint(
   }
 
   if (!mSynthesizedTouchInput) {
-    mSynthesizedTouchInput = MakeUnique<MultiTouchInput>();
+    mSynthesizedTouchInput = std::make_unique<MultiTouchInput>();
   }
 
   LayoutDeviceIntPoint pointInWindow = aPoint - WidgetToScreenOffset();
@@ -1379,8 +1379,8 @@ void nsCocoaWindow::UpdateVibrancy(
 mozilla::VibrancyManager& nsCocoaWindow::EnsureVibrancyManager() {
   MOZ_ASSERT(mChildView, "Only call this once we have a view!");
   if (!mVibrancyManager) {
-    mVibrancyManager =
-        MakeUnique<VibrancyManager>(*this, mChildView.vibrancyViewsContainer);
+    mVibrancyManager = std::make_unique<VibrancyManager>(
+        *this, mChildView.vibrancyViewsContainer);
   }
   return *mVibrancyManager;
 }
@@ -5036,6 +5036,8 @@ void nsCocoaWindow::DestroyNativeWindow() {
   // we clear our delegate.
   EndOurNativeTransition();
 
+  mIsWaitingForFullscreenVisibility = false;
+
   // We are about to destroy mWindow. Before we do that, make sure that we
   // hide the window using the Show() method, because it has several side
   // effects that our parent and listeners might be expecting. If we don't
@@ -6462,6 +6464,9 @@ void nsCocoaWindow::CocoaWindowWillEnterFullscreen(bool aFullscreen) {
 void nsCocoaWindow::CocoaWindowDidEnterFullscreen(bool aFullscreen) {
   EndOurNativeTransition();
   mHasStartedNativeFullscreen = false;
+  // AppKit can finish the transition before removing its occluding overlay.
+  mIsWaitingForFullscreenVisibility =
+      !([mWindow occlusionState] & NSWindowOcclusionStateVisible);
   DispatchOcclusionEvent();
 
   bool restoreKeyToPlayer = false;
@@ -7264,11 +7269,17 @@ void nsCocoaWindow::DispatchOcclusionEvent() {
       !mInFullScreenMode && !mHasStartedNativeFullscreen &&
       ([mWindow isKeyWindow] || [mWindow isMainWindow]);
 
+  bool isVisible = [mWindow occlusionState] & NSWindowOcclusionStateVisible;
+  if (mIsWaitingForFullscreenVisibility &&
+      (isVisible || ![NSApp isActive] || ![mWindow isKeyWindow])) {
+    mIsWaitingForFullscreenVisibility = false;
+  }
+
   // Our new occlusion state is true if the window is not visible.
-  bool newOcclusionState =
-      !IsOcclusionTrackingDisabledByEnv() && !keyOrMainNonFullscreen &&
-      !(mHasStartedNativeFullscreen ||
-        ([mWindow occlusionState] & NSWindowOcclusionStateVisible));
+  bool newOcclusionState = !IsOcclusionTrackingDisabledByEnv() &&
+                           !keyOrMainNonFullscreen &&
+                           !(mHasStartedNativeFullscreen ||
+                             mIsWaitingForFullscreenVisibility || isVisible);
 
   // Don't dispatch if the new occlustion state is the same as the current
   // state.
@@ -7516,7 +7527,10 @@ void nsCocoaWindow::SetWindowTransform(const gfx::Matrix& aTransform) {
     return;
   }
 
-  gfx::Matrix transform = aTransform;
+  bool isIdentity = aTransform.IsIdentity();
+  if (isIdentity && mWindowTransformIsIdentity) {
+    return;
+  }
 
   // aTransform is a transform that should be applied to the window relative
   // to its regular position: If aTransform._31 is 100, then we want the
@@ -7528,36 +7542,48 @@ void nsCocoaWindow::SetWindowTransform(const gfx::Matrix& aTransform) {
   // In the example above, this means that we need to call
   // CGSSetWindowTransform with a horizontal translation of -windowPos.x - 100.
   // So we need to invert the transform and adjust it by the window's position.
-  if (!transform.Invert()) {
-    // Treat non-invertible transforms as the identity transform.
-    transform = gfx::Matrix();
-  }
-
-  bool isIdentity = transform.IsIdentity();
-  if (isIdentity && mWindowTransformIsIdentity) {
-    return;
-  }
-
-  transform.PreTranslate(-mBounds.x, -mBounds.y);
-
-  // Snap translations to device pixels, to match what we do for CSS transforms
-  // and because the window server rounds down instead of to nearest.
-  if (!transform.HasNonTranslation() && transform.HasNonIntegerTranslation()) {
-    auto snappedTranslation = gfx::IntPoint::Round(transform.GetTranslation());
-    transform =
-        gfx::Matrix::Translation(snappedTranslation.x, snappedTranslation.y);
-  }
-
+  //
   // We also need to account for the backing scale factor: aTransform is given
   // in device pixels, but CGSSetWindowTransform works with logical display
   // pixels.
-  CGFloat backingScale = BackingScaleFactor();
-  transform.PreScale(backingScale, backingScale);
-  transform.PostScale(1 / backingScale, 1 / backingScale);
+  const DesktopToLayoutDeviceScale scale = GetDesktopToDeviceScale();
+  CGAffineTransform cgTransform;
+  if (!aTransform.HasNonAxisAlignedTransform() && aTransform._11 > 0 &&
+      aTransform._22 > 0 && !mBounds.IsEmpty()) {
+    // Snap the transformed window rect to logical display pixels: the window
+    // server places transformed windows on whole pixels, even on HiDPI
+    // displays, rounding outwards.
+    const DesktopRect snapped = [&] {
+      const LayoutDeviceRect bounds(mBounds);
+      const auto transformed =
+          LayoutDeviceRect::FromUnknownRect(aTransform.TransformBounds(
+              gfx::Rect(gfx::Point(), bounds.Size().ToUnknownSize()))) +
+          bounds.TopLeft();
+      DesktopRect result = transformed / scale;
+      result.Round();
+      result.width = std::max(result.width, 1.0f);
+      result.height = std::max(result.height, 1.0f);
+      return result;
+    }();
+    const DesktopSize untransformedSize = mBounds.Size() / scale;
+    const auto scaleX = CGFloat(untransformedSize.width) / snapped.width;
+    const auto scaleY = CGFloat(untransformedSize.height) / snapped.height;
+    cgTransform = CGAffineTransformMake(
+        scaleX, 0, 0, scaleY, -snapped.x * scaleX, -snapped.y * scaleY);
+  } else {
+    gfx::Matrix transform = aTransform;
+    if (!transform.Invert()) {
+      // Treat non-invertible transforms as the identity transform.
+      transform = gfx::Matrix();
+    }
+    transform.PreTranslate(-mBounds.x, -mBounds.y);
+    transform.PreScale(scale.scale, scale.scale);
+    transform.PostScale(1 / scale.scale, 1 / scale.scale);
+    cgTransform = GfxMatrixToCGAffineTransform(transform);
+  }
 
   CGSConnection cid = _CGSDefaultConnection();
-  CGSSetWindowTransform(cid, [mWindow windowNumber],
-                        GfxMatrixToCGAffineTransform(transform));
+  CGSSetWindowTransform(cid, [mWindow windowNumber], cgTransform);
 
   mWindowTransformIsIdentity = isIdentity;
 
@@ -8111,6 +8137,10 @@ LayoutDeviceIntPoint nsCocoaWindow::GetNativeLockedPoint() {
   NS_OBJC_BEGIN_TRY_IGNORE_BLOCK;
 
   RollUpPopups(nsIRollupListener::AllowAnimations::No);
+
+  if (mGeckoWindow) {
+    mGeckoWindow->DispatchOcclusionEvent();
+  }
 
   ChildViewMouseTracker::ReEvaluateMouseEnterState();
   TextInputHandler::EnsureSecureEventInputDisabled();

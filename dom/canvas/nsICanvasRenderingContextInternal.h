@@ -99,9 +99,11 @@ class nsICanvasRenderingContextInternal : public nsISupports,
   virtual int32_t GetWidth() = 0;
   virtual int32_t GetHeight() = 0;
 
-  // Sets the dimensions of the canvas, in pixels.  Called
-  // whenever the size of the element changes.
+  // Sets the dimensions of the canvas, in pixels.  Called whenever the size of
+  // the element changes.
   NS_IMETHOD SetDimensions(int32_t width, int32_t height) = 0;
+  // Trigger a deferred context creation error from SetDimensions.
+  NS_IMETHOD MaybeThrowContextCreationError() { return NS_OK; }
 
   // Initializes the canvas after the object is constructed.
   virtual nsresult Initialize() { return NS_OK; }
@@ -214,6 +216,14 @@ class nsICanvasRenderingContextInternal : public nsISupports,
 
   virtual void OnWindowDestroy() {}
 
+  // Notifications from CanvasShutdownManager, if registered with
+  // AddShutdownObserver.
+  virtual void OnShutdown() {}
+  virtual void OnRemoteCanvasLost() {}
+  virtual void OnRemoteCanvasRestored() {}
+  virtual void OnRemoteCanvasReset(
+      const nsTArray<mozilla::layers::RemoteTextureOwnerId>& aOwnerIds) {}
+
   virtual mozilla::layers::PersistentBufferProvider* GetBufferProvider() {
     return nullptr;
   }
@@ -247,6 +257,12 @@ class nsICanvasRenderingContextInternal : public nsISupports,
                          mozilla::CSSIntSize size) const;
 
  protected:
+  // Registers with CanvasShutdownManager to receive OnShutdown and
+  // OnRemoteCanvas* notifications. Returns false if the thread is shutting
+  // down.
+  bool AddShutdownObserver();
+  void RemoveShutdownObserver();
+
   RefPtr<mozilla::dom::HTMLCanvasElement> mCanvasElement;
   RefPtr<mozilla::dom::OffscreenCanvas> mOffscreenCanvas;
   RefPtr<nsRefreshDriver> mRefreshDriver;

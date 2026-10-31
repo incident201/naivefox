@@ -9,6 +9,8 @@ sealed class MenuItemsGroup {
     abstract val id: String
     abstract val items: List<MenuItem>
     abstract val isSticky: Boolean
+    abstract val isDisabled: Boolean
+    abstract val isHidden: Boolean
 
     /**
      * A group of menu items shown as a vertical list.
@@ -21,6 +23,8 @@ sealed class MenuItemsGroup {
         override val id: String,
         override val items: List<MenuItem>,
         override val isSticky: Boolean = false,
+        override val isDisabled: Boolean = false,
+        override val isHidden: Boolean = false,
     ) : MenuItemsGroup()
 
     /**
@@ -34,5 +38,7 @@ sealed class MenuItemsGroup {
         override val id: String,
         override val items: List<MenuItem>,
         override val isSticky: Boolean = false,
+        override val isDisabled: Boolean = false,
+        override val isHidden: Boolean = false,
     ) : MenuItemsGroup()
 }

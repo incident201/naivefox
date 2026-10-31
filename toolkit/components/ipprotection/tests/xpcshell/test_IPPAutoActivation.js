@@ -377,6 +377,218 @@ add_task(async function test_restore_replaces_a_pending_inclusion() {
 });
 
 /**
+ * Makes the next proxy pass request fail.
+ */
+function failProxyPass() {
+  IPPDummyAuthProvider.setProxyPass({
+    status: 500,
+    error: "test_error",
+    usage: null,
+  });
+}
+
+/**
+ * Tests that an inclusion activation that fails is not retried: the proxy
+ * stays in ERROR, even as more rules come in.
+ */
+add_task(async function test_failed_inclusion_is_not_retried() {
+  await withAutoActivation(async autoActivation => {
+    failProxyPass();
+    setSiteRule(IPPPrincipalRules.INCLUDED);
+    const startSpy = sinon.spy(IPPProxyManager, "start");
+
+    try {
+      const failed = waitForProxyState(IPPProxyStates.ERROR);
+      autoActivation.init();
+      await failed;
+
+      Services.prefs.setStringPref(
+        MATCH_PATTERNS_PREF,
+        JSON.stringify(["*://other.example.com/*"])
+      );
+
+      Assert.equal(startSpy.callCount, 1, "The proxy should be asked once");
+      Assert.equal(
+        IPPProxyManager.state,
+        IPPProxyStates.ERROR,
+        "The proxy should stay in ERROR"
+      );
+    } finally {
+      startSpy.restore();
+    }
+  });
+});
+
+/**
+ * Tests that the last inclusion going away clears a failed inclusion
+ * activation.
+ */
+add_task(async function test_failed_inclusion_cleared_by_last_rule() {
+  await withAutoActivation(async autoActivation => {
+    failProxyPass();
+    setSiteRule(IPPPrincipalRules.INCLUDED);
+    const failed = waitForProxyState(IPPProxyStates.ERROR);
+    autoActivation.init();
+    await failed;
+
+    const stopped = waitForProxyState(IPPProxyStates.READY);
+    setSiteRule(IPPPrincipalRules.DEFAULT);
+    await stopped;
+
+    Assert.ok(
+      !IPPProxyManager.channelFilter(),
+      "The channel filter should be gone"
+    );
+  });
+});
+
+/**
+ * Fails an inclusion activation, then stops the proxy out of ERROR with a
+ * working proxy pass back in place, so a restart would succeed.
+ *
+ * @param {IPPAutoActivationSingleton} autoActivation
+ */
+async function stopFailedInclusion(autoActivation) {
+  failProxyPass();
+  setSiteRule(IPPPrincipalRules.INCLUDED);
+  const startSpy = sinon.spy(IPPProxyManager, "start");
+  try {
+    autoActivation.init();
+    // Settled, not just in ERROR, so the activation is no longer in flight.
+    await startSpy.firstCall.returnValue;
+  } finally {
+    startSpy.restore();
+  }
+  Assert.equal(IPPProxyManager.state, IPPProxyStates.ERROR);
+
+  setupStubs();
+  await IPPProxyManager.stop(true);
+}
+
+/**
+ * Tests that a user retry out of ERROR that fails too is not followed by an
+ * inclusion attempt of its own.
+ */
+add_task(async function test_failed_user_retry_is_not_followed_up() {
+  await withAutoActivation(async autoActivation => {
+    failProxyPass();
+    setSiteRule(IPPPrincipalRules.INCLUDED);
+    const startSpy = sinon.spy(IPPProxyManager, "start");
+    try {
+      autoActivation.init();
+      await startSpy.firstCall.returnValue;
+      Assert.equal(IPPProxyManager.state, IPPProxyStates.ERROR);
+
+      await IPPProxyManager.start(true);
+      await new Promise(resolve => executeSoon(resolve));
+
+      Assert.equal(
+        startSpy.callCount,
+        2,
+        "Only the inclusion and the user retry should be attempted"
+      );
+      Assert.equal(IPPProxyManager.state, IPPProxyStates.READY);
+    } finally {
+      startSpy.restore();
+    }
+  });
+});
+
+/**
+ * Tests that stopping the proxy out of ERROR is not overruled by the
+ * inclusion that failed.
+ */
+add_task(async function test_stop_out_of_error_is_not_overruled() {
+  await withAutoActivation(async autoActivation => {
+    await stopFailedInclusion(autoActivation);
+
+    Assert.equal(
+      IPPProxyManager.state,
+      IPPProxyStates.READY,
+      "The proxy should stay idle"
+    );
+  });
+});
+
+/**
+ * Tests that a rule change after stopping out of ERROR asks for the narrow
+ * connection again.
+ */
+add_task(async function test_rule_change_after_error_stop_activates() {
+  await withAutoActivation(async autoActivation => {
+    await stopFailedInclusion(autoActivation);
+
+    const activated = waitForProxyState(IPPProxyStates.ACTIVE);
+    Services.prefs.setStringPref(
+      MATCH_PATTERNS_PREF,
+      JSON.stringify(["*://other.example.com/*"])
+    );
+    await activated;
+
+    Assert.equal(
+      IPPProxyManager.mode,
+      IPPMode.MODE_INCLUSION,
+      "A rule change should bring the narrow connection back"
+    );
+  });
+});
+
+/**
+ * Tests that a connection coming up after a failure re-arms the inclusion:
+ * turning that connection off brings the narrow one back.
+ */
+add_task(async function test_working_connection_rearms_after_error() {
+  await withAutoActivation(async autoActivation => {
+    await stopFailedInclusion(autoActivation);
+
+    await IPPProxyManager.start(true);
+    Assert.equal(IPPProxyManager.state, IPPProxyStates.ACTIVE);
+
+    const restarted = waitForProxyState(IPPProxyStates.ACTIVE);
+    await IPPProxyManager.stop(true);
+    await restarted;
+    Assert.equal(
+      IPPProxyManager.mode,
+      IPPMode.MODE_INCLUSION,
+      "Turning off a working connection should bring the narrow one back"
+    );
+  });
+});
+
+/**
+ * Tests that the restart after a stop does not leave later listeners with an
+ * event for a state the proxy has already left.
+ */
+add_task(async function test_restart_after_stop_sends_no_stale_events() {
+  await withAutoActivation(async autoActivation => {
+    setSiteRule(IPPPrincipalRules.INCLUDED);
+    const activated = waitForProxyState(IPPProxyStates.ACTIVE);
+    autoActivation.init();
+    await activated;
+
+    const stale = [];
+    const listener = event => {
+      if (event.detail.state !== IPPProxyManager.state) {
+        stale.push(event.detail.state);
+      }
+    };
+    IPPProxyManager.addEventListener("IPPProxyManager:StateChanged", listener);
+    try {
+      const restarted = waitForProxyState(IPPProxyStates.ACTIVE);
+      await IPPProxyManager.stop(true);
+      await restarted;
+    } finally {
+      IPPProxyManager.removeEventListener(
+        "IPPProxyManager:StateChanged",
+        listener
+      );
+    }
+
+    Assert.deepEqual(stale, [], "Every event should match the current state");
+  });
+});
+
+/**
  * Tests that rules changing mid-session are followed: the first included site
  * brings a narrow connection up, and the last one going away takes it down.
  */

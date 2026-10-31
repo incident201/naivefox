@@ -1,5 +1,9 @@
 {
-  "include": ["**/*.mjs", "types/*.ts"],
+  "include": [
+    "**/*.mjs",
+    "types/*.ts",
+    "../../../tools/@types/browser-window-globals.d.ts"
+  ],
   "exclude": [
     "content/SmartbarInput.mjs",
     "private/SuggestBackendRust.sys.mjs",

@@ -127,15 +127,7 @@ void TruncateFromLastDirectorySeparator(nsCString& path) {
   path.Truncate(index);
 }
 
-bool LoadIPCClientCerts() {
-  if (!LoadIPCClientCertsModule()) {
-    MOZ_LOG(gPIPNSSLog, LogLevel::Debug, ("failed to load ipcclientcerts"));
-    return false;
-  }
-  return true;
-}
-
-// This function can be called from chrome or content or socket processes
+// This function can be called from chrome or content processes
 // to ensure that NSS is initialized.
 bool EnsureNSSInitializedChromeOrContent() {
   static Atomic<bool> initialized(false);
@@ -179,18 +171,6 @@ bool EnsureNSSInitializedChromeOrContent() {
 
   if (NSS_NoDB_Init(nullptr) != SECSuccess) {
     return false;
-  }
-
-  if (XRE_IsSocketProcess()) {
-    if (NS_FAILED(CommonInit())) {
-      return false;
-    }
-    // If ipcclientcerts fails to load, client certificate authentication won't
-    // work (if networking is done on the socket process). This is preferable
-    // to stopping the program entirely, so treat this as best-effort.
-    (void)NS_WARN_IF(!LoadIPCClientCerts());
-    initialized = true;
-    return true;
   }
 
   if (NS_FAILED(mozilla::psm::InitializeCipherSuite())) {
@@ -892,14 +872,8 @@ nsresult CommonInit() {
   DisableMD5();
 
   mozilla::pkix::RegisterErrorTable();
-  nsSSLIOLayerHelpers::GlobalInit();
 
   return NS_OK;
-}
-
-void PrepareForShutdownInSocketProcess() {
-  MOZ_ASSERT(XRE_IsSocketProcess());
-  nsSSLIOLayerHelpers::GlobalCleanup();
 }
 
 bool HandleTLSPrefChange(const nsCString& prefName) {
@@ -1619,6 +1593,8 @@ nsresult nsNSSComponent::InitializeNSS() {
     return NS_ERROR_UNEXPECTED;
   }
 
+  nsSSLIOLayerHelpers::GlobalInit();
+
   nsCOMPtr<nsICertOverrideService> certOverrideService(
       do_GetService(NS_CERTOVERRIDE_CONTRACTID));
   nsCOMPtr<nsIClientAuthRememberService> clientAuthRememberService(
@@ -1809,7 +1785,7 @@ nsNSSComponent::Observe(nsISupports* aSubject, const char* aTopic,
     // in this context.
     SSL_ClearSessionCache();
     // SSLTokensCache observes this notification itself and clears PBM
-    // token-cache entries and forwards a scoped clear to the socket process.
+    // token-cache entries.
     return NS_OK;
   }
 

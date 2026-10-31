@@ -4,8 +4,10 @@
 
 // Globals that browser.xhtml's scripts define on the browser window. A project
 // with modules that run in that window names this file in its tsconfig
-// `include`. Objects that a subscript defines declare only the members read
-// from a checked module.
+// `include`. browser-window-globals.d.ts declares the types of those that are
+// not system modules.
+
+/// <reference path="./browser-window-globals.d.ts" />
 
 declare var AppConstants: typeof import("resource://gre/modules/AppConstants.sys.mjs").AppConstants;
 declare var BrowserUIUtils: typeof import("resource:///modules/BrowserUIUtils.sys.mjs").BrowserUIUtils;
@@ -19,47 +21,28 @@ declare var XPCOMUtils: typeof import("resource://gre/modules/XPCOMUtils.sys.mjs
 
 // The class and its instance, as a class declaration would provide them.
 declare var Tabbrowser: typeof import("moz-src:///browser/components/tabbrowser/Tabbrowser.sys.mjs").Tabbrowser;
-type Tabbrowser =
-  import("moz-src:///browser/components/tabbrowser/Tabbrowser.sys.mjs").Tabbrowser;
+type Tabbrowser = BrowserWindow.Tabbrowser;
 
-declare var gBrowser: Tabbrowser;
-declare var gMultiProcessBrowser: boolean;
-declare var RTL_UI: boolean;
+declare var gBrowser: BrowserWindow["gBrowser"];
+declare var gCustomizeMode: BrowserWindow["gCustomizeMode"];
+declare var gInitialPages: BrowserWindow["gInitialPages"];
+declare var gMultiProcessBrowser: BrowserWindow["gMultiProcessBrowser"];
+declare var gURLBar: BrowserWindow["gURLBar"];
+declare var delayedStartupPromise: BrowserWindow["delayedStartupPromise"];
+declare var RTL_UI: BrowserWindow["RTL_UI"];
 
-declare function isBlankPageURL(aURL: string): boolean;
-declare function CreateContainerTabMenu(event: Event): void;
+declare var isBlankPageURL: BrowserWindow["isBlankPageURL"];
+declare var isInitialPage: BrowserWindow["isInitialPage"];
+declare var CreateContainerTabMenu: BrowserWindow["CreateContainerTabMenu"];
+declare var UpdatePopupNotificationsVisibility: BrowserWindow["UpdatePopupNotificationsVisibility"];
+declare var openPreferences: BrowserWindow["openPreferences"];
 
-// browser-commands.js
-declare var BrowserCommands: {
-  openTab(options?: { event?: Event; url?: string }): void;
-};
-
-// browser-customtitlebar.js
-declare var CustomTitlebar: {
-  readonly enabled: boolean;
-};
-
-// browser-webrtc.js
-declare var gSharedTabWarning: {
-  willShowSharedTabWarning(
-    tab: import("moz-src:///browser/components/tabbrowser/content/tab.mjs").MozTabbrowserTab
-  ): boolean;
-};
-
-// browser.js
-declare const DynamicShortcutTooltip: {
-  nodeToTooltipMap: Record<string, string>;
-  cache: Map<string, string>;
-  getText(nodeId: string): string;
-};
-
-declare const gClickAndHoldListenersOnElement: {
-  add(aElm: Element): void;
-  remove(aButton: Element): void;
-};
-
-declare var FirefoxViewHandler: {
-  tab:
-    | import("moz-src:///browser/components/tabbrowser/content/tab.mjs").MozTabbrowserTab
-    | null;
-};
+declare var gBrowserInit: BrowserWindow["gBrowserInit"];
+declare var BrowserCommands: BrowserWindow["BrowserCommands"];
+declare var CustomTitlebar: BrowserWindow["CustomTitlebar"];
+declare var SidebarController: BrowserWindow["SidebarController"];
+declare var gSharedTabWarning: BrowserWindow["gSharedTabWarning"];
+declare var gKeywordURIFixup: BrowserWindow["gKeywordURIFixup"];
+declare const DynamicShortcutTooltip: BrowserWindow["DynamicShortcutTooltip"];
+declare const gClickAndHoldListenersOnElement: BrowserWindow["gClickAndHoldListenersOnElement"];
+declare var FirefoxViewHandler: BrowserWindow["FirefoxViewHandler"];

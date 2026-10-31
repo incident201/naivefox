@@ -2259,6 +2259,19 @@ void MacroAssembler::branchTestNull(Condition cond, const ValueOperand& value,
   branchTestNullImpl(cond, value, label);
 }
 
+void MacroAssembler::branchTestNullOrUndefined(Condition cond, Register tag,
+                                               Label* label) {
+  Condition c = testNullOrUndefined(cond, tag);
+  B(label, c);
+}
+
+void MacroAssembler::branchTestNullOrUndefined(Condition cond,
+                                               const ValueOperand& value,
+                                               Label* label) {
+  Condition c = testNullOrUndefined(cond, value);
+  B(label, c);
+}
+
 template <typename T>
 void MacroAssembler::branchTestNullImpl(Condition cond, const T& t,
                                         Label* label) {

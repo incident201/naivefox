@@ -390,8 +390,10 @@ permissions-addon-button = Permissions
 extension-enabled-heading = Enabled
 extension-disabled-heading = Disabled
 
-theme-enabled-heading = Enabled
-theme-disabled-heading2 = Saved Themes
+theme-enabled-heading2 =
+  .heading = Active Theme
+theme-disabled-heading3 =
+  .heading = Saved Themes
 
 plugin-enabled-heading = Enabled
 plugin-disabled-heading = Disabled
@@ -519,7 +521,9 @@ addon-permissions-learnmore = Learn more about permissions
 addon-permissions-managed-by-policy = Some permissions are managed by your organization.
 
 recommended-extensions-heading = Recommended Extensions
-recommended-themes-heading = Recommended Themes
+
+recommended-themes-card-heading =
+  .heading = Recommended Themes
 
 # Variables:
 #   $hostname (string) - Host where the permissions are granted

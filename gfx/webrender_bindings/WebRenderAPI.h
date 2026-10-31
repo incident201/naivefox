@@ -136,6 +136,11 @@ class TransactionBuilder final {
 
   void RemovePipeline(PipelineId aPipelineId);
 
+  // Sets the namespaces of the pipelines that aPipelineId may embed with
+  // iframe items. Nothing() lets it embed any pipeline.
+  void SetEmbedPolicy(PipelineId aPipelineId,
+                      const Maybe<nsTArray<uint32_t>>& aNamespaces);
+
   // aIdNamespace is the namespace whose resources the display list is allowed
   // to reference. It must be supplied by the compositor-side owner of the
   // pipeline.
@@ -207,6 +212,8 @@ class TransactionBuilder final {
   void AddSnapshotImage(wr::SnapshotImageKey aKey);
 
   void DeleteSnapshotImage(wr::SnapshotImageKey aKey);
+
+  void AdoptSnapshotImage(wr::SnapshotImageKey aFrom, wr::SnapshotImageKey aTo);
 
   void AddRawFont(wr::FontKey aKey, wr::Vec<uint8_t>& aBytes, uint32_t aIndex);
 
@@ -424,7 +431,7 @@ class WebRenderAPI final {
    public:
     static WrTransactionEvent Transaction(WebRenderAPI* aApi,
                                           TransactionBuilder& aTxn) {
-      auto transaction = MakeUnique<TransactionBuilder>(
+      auto transaction = std::make_unique<TransactionBuilder>(
           aApi, aTxn.Take(), aTxn.UseSceneBuilderThread(), /* aOwnsData */ true,
           aTxn.mRemoteTextureTxnScheduler, aTxn.mRemoteTextureTxnId);
       return WrTransactionEvent(Tag::Transaction, std::move(transaction));
@@ -440,7 +447,7 @@ class WebRenderAPI final {
         UniquePtr<layers::AsyncImagePipelineOps>&&
             aPendingAsyncImagePipelineOps,
         WebRenderAPI* aApi, const TransactionBuilder& aTxn) {
-      auto transaction = MakeUnique<TransactionBuilder>(
+      auto transaction = std::make_unique<TransactionBuilder>(
           aApi, aTxn.Raw(), aTxn.UseSceneBuilderThread(), /* aOwnsData */ false,
           aTxn.mRemoteTextureTxnScheduler, aTxn.mRemoteTextureTxnId);
       return WrTransactionEvent(Tag::PendingAsyncImagePipelineOps,
@@ -631,6 +638,15 @@ class DisplayListBuilder final {
   wr::WrClipId DefineRectClip(Maybe<wr::WrSpatialId> aSpace,
                               wr::LayoutRect aClipRect,
                               bool aAntiAliased = false);
+  // Clips to the inside of a path in the current space. See PathCommand for
+  // the number of points each command consumes. The points are relative to
+  // aRect's origin, aAabb contains all of them, and aRect also clips the
+  // path's content.
+  wr::WrClipId DefinePathClip(Span<const wr::PathCommand> aCommands,
+                              Span<const wr::LayoutPoint> aPoints,
+                              const wr::LayoutRect& aAabb,
+                              const wr::LayoutRect& aRect,
+                              wr::FillRule aFillRule);
 
   wr::WrSpatialId DefineStickyFrame(const ActiveScrolledRoot* aStickyAsr,
                                     Maybe<wr::WrSpatialId> aParentSpatialId,

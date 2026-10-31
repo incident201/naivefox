@@ -33,12 +33,19 @@ add_setup(async function () {
     msgs.find(msg => msg.id === TEST_MESSAGE_ID)
   );
   Assert.ok(message, "Found the card stack test message.");
+  // The newtab train-hop jobs run this test against an older Firefox, whose
+  // copy of the test message can have fewer screens. The stack draws one back
+  // card per remaining screen, so always give it two screens after the first.
+  const [firstScreen] = message.content.screens;
   gCardStackMessage = {
     ...message,
     content: {
       ...message.content,
       transitions: false,
-      screens: [message.content.screens[0]],
+      screens: [1, 2, 3].map(n => ({
+        ...firstScreen,
+        id: `${firstScreen.id}_${n}`,
+      })),
     },
   };
 });
@@ -89,7 +96,7 @@ async function checkCardStackPaintOrder(dir) {
           --card-stack-color-3: rgb(0, 255, 0) !important;
           --card-stack-border: 0 none !important;
         }
-        .screen[pos='card-stack'] > :not(.card-stack-front) {
+        .screen[pos='card-stack'] > :not(.card-stack-front, .card-stack-layer-1, .card-stack-layer-2) {
           visibility: hidden !important;
         }
       `;

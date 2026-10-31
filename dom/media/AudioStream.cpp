@@ -202,7 +202,7 @@ nsresult AudioStream::EnsureTimeStretcherInitialized() {
     });
 #endif
 
-    auto timestretcher = MakeUnique<RLBoxSoundTouch>();
+    auto timestretcher = std::make_unique<RLBoxSoundTouch>();
     if (!timestretcher || !timestretcher->Init()) {
       return NS_ERROR_FAILURE;
     }

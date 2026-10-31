@@ -51,7 +51,7 @@ class IPProtectionSnackbarMiddlewareTest {
 
     @Test
     fun `WHEN ActivationFailed is dispatched THEN ShowSnackbar action is dispatched`() {
-        ipProtectionStore.dispatch(IPProtectionAction.ToggleFailed(ActivationOperation.Activate))
+        ipProtectionStore.dispatch(IPProtectionAction.ActivationAction.ToggleFailed(ActivationOperation.Activate))
 
         captureMiddleware.assertLastAction(AppAction.IPProtectionSnackbarAction.ShowSnackbar::class) { action ->
             assertEquals(connectionError, action.title)
@@ -61,7 +61,7 @@ class IPProtectionSnackbarMiddlewareTest {
     @Test
     fun `WHEN LocationReset is dispatched THEN ShowActionSettingsSnackbar action is dispatched`() {
         ipProtectionStore.dispatch(
-            IPProtectionAction.LocationReset(countryCode = "JP", status = CachedLocationStatus.Missing)
+            IPProtectionAction.LocationAction.LocationReset(countryCode = "JP", status = CachedLocationStatus.Missing)
         )
 
         captureMiddleware.assertLastAction(AppAction.IPProtectionSnackbarAction.ShowActionSettingsSnackbar::class) {
@@ -72,7 +72,7 @@ class IPProtectionSnackbarMiddlewareTest {
 
     @Test
     fun `WHEN an unrelated action is dispatched THEN no snackbar action is dispatched`() {
-        ipProtectionStore.dispatch(IPProtectionAction.EligibilityChanged(EligibilityStatus.Eligible))
+        ipProtectionStore.dispatch(IPProtectionAction.EligibilityAction.EligibilityChanged(EligibilityStatus.Eligible))
 
         captureMiddleware.assertNotDispatched(AppAction.IPProtectionSnackbarAction.ShowSnackbar::class)
     }
@@ -83,7 +83,7 @@ class IPProtectionSnackbarMiddlewareTest {
             // Simulates HomeActivity recreation: the same process-scoped IPProtectionStore now has
             // a new observer (a freshly-instantiated IPProtectionInfoPrompter). With the snackbar
             // owned by middleware, the new observer does not re-fire on already-set state.
-            ipProtectionStore.dispatch(IPProtectionAction.ToggleFailed(ActivationOperation.Activate))
+            ipProtectionStore.dispatch(IPProtectionAction.ActivationAction.ToggleFailed(ActivationOperation.Activate))
             captureMiddleware.assertLastAction(AppAction.IPProtectionSnackbarAction.ShowSnackbar::class)
             captureMiddleware.reset()
 

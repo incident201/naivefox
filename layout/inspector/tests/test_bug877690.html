@@ -294,7 +294,7 @@ function do_test() {
   var expected = [ "normal", "none", "counter", "counters",
                    "open-quote", "close-quote", "no-open-quote",
                    ...CSS_WIDE_KEYWORDS, "no-close-quote",
-                   "-moz-alt-content", "-moz-label-content", ]
+                   "-moz-label-content", ]
     .concat(allImages);
   var values = InspectorUtils.getCSSValuesForProperty("content");
   ok(testValues(values, expected), "property content's values");

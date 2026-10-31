@@ -33,6 +33,10 @@ class SrcRepository(Repository):
     def head_rev(self):
         pass
 
+    @property
+    def is_shallow(self):
+        return False
+
     def is_cinnabar_repo(self) -> bool:
         return False
 

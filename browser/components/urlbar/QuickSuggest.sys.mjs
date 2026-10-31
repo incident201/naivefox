@@ -224,6 +224,11 @@ const SUGGEST_PREFS = Object.freeze({
       US: [EN_LOCALES, shouldOnlineBeAvailable],
     },
   },
+  "temporal.featureGate": {
+    defaultValues: {
+      US: [EN_LOCALES, false],
+    },
+  },
   "weather.featureGate": {
     defaultValues: {
       DE: [["de"], true],
@@ -280,6 +285,8 @@ const FEATURES = {
     "moz-src:///browser/components/urlbar/private/SuggestBackendMl.sys.mjs",
   SuggestBackendRust:
     "moz-src:///browser/components/urlbar/private/SuggestBackendRust.sys.mjs",
+  TemporalSuggestions:
+    "moz-src:///browser/components/urlbar/private/TemporalSuggestions.sys.mjs",
   WeatherSuggestions:
     "moz-src:///browser/components/urlbar/private/WeatherSuggestions.sys.mjs",
   WikipediaSuggestions:

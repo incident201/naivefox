@@ -19,12 +19,6 @@
 
 class gfxFT2FontBase;
 
-namespace mozilla {
-namespace gfx {
-class FTUserFontData;
-}
-}  // namespace mozilla
-
 class gfxFT2FontEntryBase : public gfxFontEntry {
  public:
   explicit gfxFT2FontEntryBase(const nsACString& aName) : gfxFontEntry(aName) {}
@@ -35,7 +29,7 @@ class gfxFT2FontEntryBase : public gfxFontEntry {
   static nsresult CopyFaceTable(mozilla::gfx::SharedFTFace*, uint32_t aTableTag,
                                 nsTArray<uint8_t>&);
 
-  virtual mozilla::gfx::FTUserFontData* GetUserFontData() = 0;
+  virtual FontData* GetUserFontData() = 0;
 
   size_t ComputedSizeOfExcludingThis(
       mozilla::MallocSizeOf aMallocSizeOf) override;
@@ -105,7 +99,11 @@ class gfxFT2FontBase : public gfxFont {
 
  protected:
   ~gfxFT2FontBase() override;
-  void InitMetrics();
+
+  // Called during font initialization, not yet shared with other threads.
+  bool InitMetricsFromPlatform() MOZ_NO_THREAD_SAFETY_ANALYSIS override;
+  void FinishInitFontMetrics() override;
+
   void InitExtraMetrics(gfxFloat aEmHeight, gfxFloat aLineHeight);
 
   FT_Vector GetEmboldenStrength(FT_Face aFace) const;

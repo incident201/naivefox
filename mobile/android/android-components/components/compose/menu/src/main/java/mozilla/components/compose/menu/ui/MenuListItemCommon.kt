@@ -23,6 +23,8 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.Hyphens
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -161,6 +163,8 @@ internal fun Modifier.menuItemClickableBehavior(
             onClick = { onInteraction(onClickEvent) },
             role = role,
         )
+    } else if (state == DISABLED) {
+        this.semantics { disabled() }
     } else {
         this
     }

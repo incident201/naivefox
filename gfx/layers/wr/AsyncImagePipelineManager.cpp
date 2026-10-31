@@ -119,7 +119,7 @@ void AsyncImagePipelineManager::AddPipeline(const wr::PipelineId& aPipelineId,
           return;
         }
 
-        holder.Insert(MakeUnique<PipelineTexturesHolder>())->mWrBridge =
+        holder.Insert(std::make_unique<PipelineTexturesHolder>())->mWrBridge =
             aWrBridge;
       });
 }
@@ -168,7 +168,7 @@ void AsyncImagePipelineManager::AddAsyncImagePipeline(
   uint64_t id = wr::AsUint64(aPipelineId);
 
   MOZ_ASSERT(!mAsyncImagePipelines.Contains(id));
-  auto holder = MakeUnique<AsyncImagePipeline>(
+  auto holder = std::make_unique<AsyncImagePipeline>(
       aPipelineId, mApi->GetCapabilities().mBackendType, aImageHost);
   mAsyncImagePipelines.InsertOrUpdate(id, std::move(holder));
   AddPipeline(aPipelineId, /* aWrBridge */ nullptr);
@@ -636,7 +636,7 @@ void AsyncImagePipelineManager::HoldExternalImage(
   if (aTexture->NeedsDeferredDeletion()) {
     // Hold WebRenderTextureHost until rendering completed.
     holder->mTextureHostsUntilRenderCompleted.emplace_back(
-        MakeUnique<ForwardingTextureHost>(aEpoch, aTexture));
+        std::make_unique<ForwardingTextureHost>(aEpoch, aTexture));
   } else {
     // Hold WebRenderTextureHost until submitted for rendering.
     holder->mTextureHostsUntilRenderSubmitted.emplace_back(aEpoch, aTexture);
@@ -660,7 +660,7 @@ void AsyncImagePipelineManager::HoldExternalImage(
   }
 
   holder->mExternalImages.emplace_back(
-      MakeUnique<ForwardingExternalImage>(aEpoch, aImageId));
+      std::make_unique<ForwardingExternalImage>(aEpoch, aImageId));
 }
 
 void AsyncImagePipelineManager::NotifyPipelinesUpdated(

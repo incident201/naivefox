@@ -4,9 +4,9 @@
 
 import { MozLitElement } from "chrome://global/content/lit-utils.mjs";
 import { html, nothing } from "chrome://global/content/vendor/lit.all.mjs";
-// eslint-disable-next-line import/no-unassigned-import
+// eslint-disable-next-line import-x/no-unassigned-import
 import "chrome://global/content/elements/moz-button.mjs";
-// eslint-disable-next-line import/no-unassigned-import
+// eslint-disable-next-line import-x/no-unassigned-import
 import "chrome://global/content/elements/panel-list.mjs";
 
 if (!window.MozXULElement) {
@@ -18,6 +18,7 @@ if (!window.MozXULElement) {
  *
  * @property {string} title - The heading text.
  * @property {string} menuLabel - The accessible name of the menu button. Defaults to "More options".
+ * @property {string} menuId - The id of the `panel-list` the menu button opens when the `menu` slot is empty. Set by `moz-widget` from its `menu` slot.
  * @slot leading - Content before the heading, such as a back button or badge.
  * @slot trailing - Content at the end of the header.
  * @slot menu - A `panel-list`.
@@ -27,6 +28,7 @@ export class MozWidgetHeader extends MozLitElement {
   static properties = {
     title: { type: String, fluent: true, mapped: true },
     menuLabel: { type: String, attribute: "menu-label", fluent: true },
+    menuId: { type: String, attribute: "menu-id" },
     _menuId: { state: true },
   };
 
@@ -34,6 +36,7 @@ export class MozWidgetHeader extends MozLitElement {
     super();
     this.title = null;
     this.menuLabel = null;
+    this.menuId = null;
     this._menuId = null;
   }
 
@@ -55,13 +58,13 @@ export class MozWidgetHeader extends MozLitElement {
     this._menuId = menu?.id || null;
   }
 
-  #renderMenuButton() {
+  #renderMenuButton(menuId) {
     return html`<moz-button
       id="menu-button"
       type="ghost"
       size="small"
       iconsrc="chrome://global/skin/icons/more.svg"
-      .menuId=${this._menuId}
+      .menuId=${menuId}
       data-l10n-id=${this.menuLabel ? nothing : "moz-button-more-options"}
       .ariaLabel=${this.menuLabel}
       .title=${this.menuLabel}
@@ -69,6 +72,7 @@ export class MozWidgetHeader extends MozLitElement {
   }
 
   render() {
+    const menuId = this._menuId || this.menuId;
     return html`
       <link
         rel="stylesheet"
@@ -80,8 +84,8 @@ export class MozWidgetHeader extends MozLitElement {
             ${this.title}
           </h2>`
         : nothing}
-      <slot name="trailing" class=${this._menuId ? "with-menu" : ""}></slot>
-      ${this._menuId ? this.#renderMenuButton() : nothing}
+      <slot name="trailing" class=${menuId ? "with-menu" : ""}></slot>
+      ${menuId ? this.#renderMenuButton(menuId) : nothing}
       <slot name="menu" @slotchange=${this.#onMenuSlotChange}></slot>
     `;
   }

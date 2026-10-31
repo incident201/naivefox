@@ -40,9 +40,6 @@ run-if = [
 ]
 
 ["test_bug517396.xhtml"]
-skip-if = [
-  "os == 'win' && standalone", # Bug 2026600
-]
 
 ["test_bug522217.xhtml"]
 tags = "fullscreen"
@@ -218,6 +215,11 @@ run-if = [
   "os == 'mac'", # Cocoa widget test
 ]
 support-files = ["native_menus_window.xhtml"]
+
+["test_nested_native_loop_wakeup_mac.html"]
+run-if = [
+  "os == 'mac'", # Cocoa widget test
+]
 
 ["test_panel_mouse_coords.xhtml"]
 

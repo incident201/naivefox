@@ -393,6 +393,12 @@ const StyleLockedDeclarationBlock* Gecko_GetViewTransitionDynamicRule(
   return vt->GetDynamicRuleFor(*aElement);
 }
 
+void Gecko_GetSubmitString(const Document* aDocument, nsAString* aResult) {
+  MOZ_ASSERT(NS_IsMainThread());
+  nsContentUtils::GetMaybeLocalizedString(PropertiesFile::FORMS_PROPERTIES,
+                                          "Submit", aDocument, *aResult);
+}
+
 const StyleLockedDeclarationBlock* Gecko_GetExtraContentStyleDeclarations(
     const Element* aElement) {
   if (const auto* cell = HTMLTableCellElement::FromNode(aElement)) {
@@ -1277,12 +1283,14 @@ void ShutdownServo() {
   URLExtraData::Shutdown();
 }
 
-void AssertIsMainThreadOrServoFontMetricsLocked() {
+#ifdef DEBUG
+void AssertIsMainThreadOrServoFFILocked() {
   if (!NS_IsMainThread()) {
     MOZ_ASSERT(sServoFFILock);
     sServoFFILock->AssertCurrentThreadOwns();
   }
 }
+#endif
 
 }  // namespace mozilla
 
@@ -1750,6 +1758,17 @@ nsAtom** Gecko_Element_ExportedParts(const nsAttrValue* aValue,
 
 uint64_t Gecko_Element_GetSubtreeBloomFilter(const Element* aElement) {
   return aElement->GetSubtreeBloomFilter();
+}
+
+uint64_t Gecko_Element_GetRandomSeed(const Element* aElement) {
+  return aElement->GetRandomSeed();
+}
+
+void Gecko_Document_GetRandomHasherKey(const Document* aDocument, uint64_t* aK0,
+                                       uint64_t* aK1) {
+  const Array<uint64_t, 2>& key = aDocument->GetRandomHasherKey();
+  *aK0 = key[0];
+  *aK1 = key[1];
 }
 
 bool StyleSingleFontFamily::IsNamedFamily(const nsAString& aFamilyName) const {

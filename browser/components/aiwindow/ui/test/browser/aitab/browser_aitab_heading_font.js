@@ -16,6 +16,12 @@ const { HEADING_FONT_RECORD_NAME, resetHeadingFontForTesting } =
 const { sinon } = ChromeUtils.importESModule(
   "resource://testing-common/Sinon.sys.mjs"
 );
+const { AITab } = ChromeUtils.importESModule(
+  "moz-src:///browser/components/aiwindow/models/aitab/AITab.sys.mjs"
+);
+const { createAITab } = ChromeUtils.importESModule(
+  "moz-src:///browser/components/aiwindow/models/Tools.sys.mjs"
+);
 
 const AITAB_PREF = "browser.smartwindow.aitab.enabled";
 // Any real font works; the page registers it under its heading font name.
@@ -87,16 +93,22 @@ async function seedCollection(withRecord) {
 
 /**
  * Opens the test page and reports which font its h1 renders with. The page
- * installs the font before it renders, so a ready page has settled it.
+ * renders without waiting for the font. This waits for the view event
+ * before inspecting the heading.
  *
  * @returns {Promise<object>} faces: families registered on the document,
  *   used: families the h1 actually renders with, fontFamily: its CSS value,
  *   family: the heading font name from aitab-base.css.
  */
 async function openPageAndReadHeadingFont() {
+  Services.fog.testResetFOG();
   return BrowserTestUtils.withNewTab(
     `about:smartpage?page=${pageSlug}`,
     async browser => {
+      await TestUtils.waitForCondition(
+        () => Glean.smartWindow.aitabView.testGetValue()?.length,
+        "The view is recorded"
+      );
       return SpecialPowers.spawn(browser, [], async () => {
         const page = content.document.querySelector("aitab-page");
         await ContentTaskUtils.waitForCondition(
@@ -165,6 +177,88 @@ describe("AI Tab heading font", () => {
         [family],
         "The h1 renders with the downloaded font"
       );
+    });
+
+    it("renders the page before the font finishes downloading", async () => {
+      Services.fog.testResetFOG();
+      const { promise, resolve } = Promise.withResolvers();
+      download.callsFake(() => promise);
+
+      await BrowserTestUtils.withNewTab(
+        `about:smartpage?page=${pageSlug}`,
+        async browser => {
+          await SpecialPowers.spawn(browser, [], async () => {
+            const page = content.document.querySelector("aitab-page");
+            await ContentTaskUtils.waitForCondition(
+              () => page.wrappedJSObject.status == "ready",
+              "The page renders while the font is still downloading"
+            );
+            const header = page.shadowRoot.querySelector("aitab-header");
+            await ContentTaskUtils.waitForCondition(
+              () => header.shadowRoot?.querySelector("h1")?.textContent,
+              "The header renders its title"
+            );
+            const family = content
+              .getComputedStyle(content.document.documentElement)
+              .getPropertyValue("--aitab-heading-font-family")
+              .trim()
+              .replace(/"/g, "");
+            Assert.ok(
+              ![...content.document.fonts].some(
+                face => face.family.replace(/"/g, "") == family
+              ),
+              "No heading font is registered yet"
+            );
+          });
+
+          await TestUtils.waitForCondition(
+            () => Glean.smartWindow.aitabView.testGetValue()?.length,
+            "The view is recorded while the font is still downloading"
+          );
+          Assert.equal(
+            Glean.smartWindow.aitabView.testGetValue()[0].extra.font,
+            "unavailable",
+            "The heading font was unavailable when the page rendered"
+          );
+
+          resolve(fontBytes);
+          await SpecialPowers.spawn(browser, [], async () => {
+            const family = content
+              .getComputedStyle(content.document.documentElement)
+              .getPropertyValue("--aitab-heading-font-family")
+              .trim()
+              .replace(/"/g, "");
+            await ContentTaskUtils.waitForCondition(
+              () =>
+                [...content.document.fonts].some(
+                  face => face.family.replace(/"/g, "") == family
+                ),
+              "The heading font is installed after the page rendered"
+            );
+          });
+          Assert.equal(
+            Glean.smartWindow.aitabView.testGetValue().length,
+            1,
+            "Installing the font does not record another view"
+          );
+        }
+      );
+    });
+
+    it("starts the download when page generation starts", async () => {
+      const generate = sinon
+        .stub(AITab, "generateAITab")
+        .resolves({ error: "test" });
+      try {
+        await createAITab({}, {});
+        await TestUtils.waitForCondition(
+          () => download.callCount,
+          "The font downloads without a page being opened"
+        );
+        Assert.equal(download.callCount, 1, "The font is downloaded once");
+      } finally {
+        generate.restore();
+      }
     });
 
     it("tries again on the next page after a failure", async () => {

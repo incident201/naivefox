@@ -41,6 +41,8 @@ prefs = ["browser.ipProtection.override.serverlist=[]"]
 
 ["test_IPPStartupCache.js"]
 
+["test_IPPTabRuleProvider.js"]
+
 ["test_IPProtectionServerlist.js"]
 
 ["test_IPProtectionService.js"]

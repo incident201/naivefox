@@ -14,6 +14,7 @@
 #include "mozilla/ScopeExit.h"
 #include "mozilla/StaticPrefs_gfx.h"
 #include "mozilla/gfx/Helpers.h"
+#include "nsHashtablesFwd.h"
 
 using namespace mozilla;
 using namespace mozilla::gfx;
@@ -157,6 +158,7 @@ struct PaintState {
   uint16_t mNumColors;
   uint16_t mCoordCount;
   nsTArray<uint32_t>* mVisited;
+  nsTHashMap<uint32_t, Rect>* mBoundsCache;
 
   const uint8_t* COLRv1BaseAddr() const {
     return reinterpret_cast<const uint8_t*>(mHeader.v1);
@@ -636,7 +638,7 @@ struct ColorLineT {
       return nullptr;
     }
     const auto* stop = colorStops();
-    return MakeUnique<ColorPattern>(
+    return std::make_unique<ColorPattern>(
         aState.GetColor(stop->GetPaletteIndex(), stop->GetAlpha(aState)));
   }
 
@@ -734,7 +736,7 @@ using VarColorLine = ColorLineT<VarColorStop>;
     return retval;                          \
   }                                         \
   aState.mVisited->AppendElement(aOffset);  \
-  ScopeExit e([aState]() { aState.mVisited->RemoveLastElement(); })
+  ScopeExit e([&aState]() { aState.mVisited->RemoveLastElement(); })
 
 struct PaintColrLayers {
   enum { kFormat = 1 };
@@ -816,7 +818,7 @@ struct PaintSolid : public PaintPatternBase {
   UniquePtr<Pattern> MakePattern(const PaintState& aState,
                                  uint32_t aOffset) const {
     MOZ_ASSERT(format == kFormat);
-    return MakeUnique<ColorPattern>(aState.GetColor(paletteIndex, alpha));
+    return std::make_unique<ColorPattern>(aState.GetColor(paletteIndex, alpha));
   }
 };
 
@@ -827,7 +829,7 @@ struct PaintVarSolid : public PaintSolid {
   UniquePtr<Pattern> MakePattern(const PaintState& aState,
                                  uint32_t aOffset) const {
     MOZ_ASSERT(format == kFormat);
-    return MakeUnique<ColorPattern>(aState.GetColor(
+    return std::make_unique<ColorPattern>(aState.GetColor(
         paletteIndex, ApplyVariation(aState, alpha, varIndexBase)));
   }
 };
@@ -864,7 +866,7 @@ struct PaintLinearGradient : public PaintPatternBase {
                                               Point p1, Point p2) const {
     // Ill-formed gradient should not be rendered.
     if (p1 == p0 || p2 == p0) {
-      return MakeUnique<ColorPattern>(DeviceColor());
+      return std::make_unique<ColorPattern>(DeviceColor());
     }
     UniquePtr<Pattern> solidColor = aColorLine->AsSolidColor(aState);
     if (solidColor) {
@@ -874,12 +876,12 @@ struct PaintLinearGradient : public PaintPatternBase {
     AutoTArray<GradientStop, 8> stopArray;
     aColorLine->CollectGradientStops(aState, stopArray, &firstStop, &lastStop);
     if (stopArray.IsEmpty()) {
-      return MakeUnique<ColorPattern>(DeviceColor());
+      return std::make_unique<ColorPattern>(DeviceColor());
     }
     if (firstStop != 0.0 || lastStop != 1.0) {
       if (firstStop == lastStop) {
         if (aColorLine->extend != T::EXTEND_PAD) {
-          return MakeUnique<ColorPattern>(DeviceColor());
+          return std::make_unique<ColorPattern>(DeviceColor());
         }
         // For extend-pad, when the color line is zero-length, we add a "fake"
         // color stop to create a [0.0..1.0]-normalized color line, so that the
@@ -916,8 +918,8 @@ struct PaintLinearGradient : public PaintPatternBase {
       p3 = Point(x3, y3);
     }
     RefPtr stops = aColorLine->MakeGradientStops(aState, stopArray);
-    return MakeUnique<LinearGradientPattern>(p0, p3, std::move(stops),
-                                             Matrix::Scaling(1.0, -1.0));
+    return std::make_unique<LinearGradientPattern>(p0, p3, std::move(stops),
+                                                   Matrix::Scaling(1.0, -1.0));
   }
 };
 
@@ -1058,7 +1060,7 @@ struct PaintRadialGradient : public PaintPatternBase {
                                               Point c2, float r1,
                                               float r2) const {
     if ((c1 == c2 && r1 == r2) || (r1 == 0.0 && r2 == 0.0)) {
-      return MakeUnique<ColorPattern>(DeviceColor());
+      return std::make_unique<ColorPattern>(DeviceColor());
     }
     UniquePtr<Pattern> solidColor = aColorLine->AsSolidColor(aState);
     if (solidColor) {
@@ -1068,14 +1070,14 @@ struct PaintRadialGradient : public PaintPatternBase {
     AutoTArray<GradientStop, 8> stopArray;
     aColorLine->CollectGradientStops(aState, stopArray, &firstStop, &lastStop);
     if (stopArray.IsEmpty()) {
-      return MakeUnique<ColorPattern>(DeviceColor());
+      return std::make_unique<ColorPattern>(DeviceColor());
     }
     // If the color stop offsets had to be normalized to the [0, 1] range,
     // adjust the circle positions and radii to match.
     if (firstStop != 0.0f || lastStop != 1.0f) {
       if (firstStop == lastStop) {
         if (aColorLine->extend != T::EXTEND_PAD) {
-          return MakeUnique<ColorPattern>(DeviceColor());
+          return std::make_unique<ColorPattern>(DeviceColor());
         }
         // For extend-pad, when the color line is zero-length, we add a "fake"
         // color stop to ensure we'll maintain the orientation of the cone,
@@ -1106,7 +1108,7 @@ struct PaintRadialGradient : public PaintPatternBase {
         // will appear in the projected positive cone (or if they're equal,
         // nothing will be visible at all).
         if (r1 == r2) {
-          return MakeUnique<ColorPattern>(DeviceColor());
+          return std::make_unique<ColorPattern>(DeviceColor());
         }
         // The defined range of the color line is entirely in the invisible
         // cone; all that will project into visible space is a single color.
@@ -1141,7 +1143,7 @@ struct PaintRadialGradient : public PaintPatternBase {
       // degenerated into a negative-radius cylinder, and does not project
       // into visible space at all.
       if (deltaR == 0.0f) {
-        return MakeUnique<ColorPattern>(DeviceColor());
+        return std::make_unique<ColorPattern>(DeviceColor());
       }
       Point vec = c2 - c1;
       if (aColorLine->extend == T::EXTEND_REFLECT) {
@@ -1163,10 +1165,10 @@ struct PaintRadialGradient : public PaintPatternBase {
     }
     RefPtr stops = aColorLine->MakeGradientStops(aState, stopArray);
     if (!stops) {
-      return MakeUnique<ColorPattern>(DeviceColor());
+      return std::make_unique<ColorPattern>(DeviceColor());
     }
-    return MakeUnique<RadialGradientPattern>(c1, c2, r1, r2, std::move(stops),
-                                             Matrix::Scaling(1.0, -1.0));
+    return std::make_unique<RadialGradientPattern>(
+        c1, c2, r1, r2, std::move(stops), Matrix::Scaling(1.0, -1.0));
   }
 };
 
@@ -1229,7 +1231,7 @@ struct PaintSweepGradient : public PaintPatternBase {
                                               Point aCenter, float aStart,
                                               float aEnd) const {
     if (aStart == aEnd && aColorLine->extend != T::EXTEND_PAD) {
-      return MakeUnique<ColorPattern>(DeviceColor());
+      return std::make_unique<ColorPattern>(DeviceColor());
     }
     UniquePtr<Pattern> solidColor = aColorLine->AsSolidColor(aState);
     if (solidColor) {
@@ -1248,7 +1250,7 @@ struct PaintSweepGradient : public PaintPatternBase {
     if (firstStop != 0.0 || lastStop != 1.0) {
       if (firstStop == lastStop) {
         if (aColorLine->extend != T::EXTEND_PAD) {
-          return MakeUnique<ColorPattern>(DeviceColor());
+          return std::make_unique<ColorPattern>(DeviceColor());
         }
       } else {
         float sweep = aEnd - aStart;
@@ -1259,9 +1261,9 @@ struct PaintSweepGradient : public PaintPatternBase {
     if (reverse) {
       std::swap(aStart, aEnd);
     }
-    return MakeUnique<ConicGradientPattern>(aCenter, M_PI / 2.0, aStart / 2.0,
-                                            aEnd / 2.0, std::move(stops),
-                                            Matrix::Scaling(1.0, -1.0));
+    return std::make_unique<ConicGradientPattern>(
+        aCenter, M_PI / 2.0, aStart / 2.0, aEnd / 2.0, std::move(stops),
+        Matrix::Scaling(1.0, -1.0));
   }
 };
 
@@ -2087,16 +2089,25 @@ static Rect DispatchGetBounds(const PaintState& aState, uint32_t aDepth,
     return Rect();
   }
 
+  // If bounds for this offset were already computed, return them.
+  Rect cached;
+  if (aState.mBoundsCache->Get(aOffset, &cached)) {
+    return cached;
+  }
+
   const uint8_t* paint = aState.COLRv1BaseAddr() + aOffset;
   // All paint table formats start with an 8-bit 'format' field.
   uint8_t format = *paint;
 
-#define DO_CASE(T)                                                   \
-  case T::kFormat:                                                   \
-    return aOffset + sizeof(T) <= aState.mCOLRLength                 \
-               ? reinterpret_cast<const T*>(paint)->GetBoundingRect( \
-                     aState, aDepth + 1, aOffset)                    \
-               : Rect();
+  Rect result;
+
+#define DO_CASE(T)                                                     \
+  case T::kFormat:                                                     \
+    result = aOffset + sizeof(T) <= aState.mCOLRLength                 \
+                 ? reinterpret_cast<const T*>(paint)->GetBoundingRect( \
+                       aState, aDepth + 1, aOffset)                    \
+                 : Rect();                                             \
+    break
 
   switch (format) {
     DO_CASE(PaintColrLayers);
@@ -2123,7 +2134,8 @@ static Rect DispatchGetBounds(const PaintState& aState, uint32_t aDepth,
 
 #undef DO_CASE
 
-  return Rect();
+  aState.mBoundsCache->InsertOrUpdate(aOffset, result);
+  return result;
 }
 
 #undef DO_CASE_VAR
@@ -2508,6 +2520,7 @@ bool COLRFonts::PaintGlyphLayers(
                    0.0,  // fontUnitsToPixels not needed
                    uint16_t(aColors->Length()),
                    0,
+                   nullptr,
                    nullptr};
   return glyphRecord->Paint(state, alpha, aPoint);
 }
@@ -2547,6 +2560,7 @@ bool COLRFonts::PaintGlyphGraph(
   const int* coords = hb_font_get_var_coords_normalized(aFont, &coordCount);
 
   AutoTArray<uint32_t, 32> visitedOffsets;
+  nsTHashMap<uint32_t, Rect> boundsCache;
   PaintState state{{nullptr},
                    aColors->Elements(),
                    aDrawTarget,
@@ -2558,7 +2572,8 @@ bool COLRFonts::PaintGlyphGraph(
                    aFontUnitsToPixels,
                    uint16_t(aColors->Length()),
                    uint16_t(coordCount),
-                   &visitedOffsets};
+                   &visitedOffsets,
+                   &boundsCache};
   state.mHeader.v1 =
       reinterpret_cast<const COLRv1Header*>(hb_blob_get_data(aCOLR, nullptr));
   AutoRestoreTransform saveTransform(aDrawTarget);
@@ -2576,6 +2591,7 @@ Rect COLRFonts::GetColorGlyphBounds(hb_blob_t* aCOLR, hb_font_t* aFont,
   const int* coords = hb_font_get_var_coords_normalized(aFont, &coordCount);
 
   AutoTArray<uint32_t, 32> visitedOffsets;
+  nsTHashMap<uint32_t, Rect> boundsCache;
   PaintState state{{nullptr},
                    nullptr,  // palette is not needed
                    aDrawTarget,
@@ -2587,7 +2603,8 @@ Rect COLRFonts::GetColorGlyphBounds(hb_blob_t* aCOLR, hb_font_t* aFont,
                    aFontUnitsToPixels,
                    0,  // numPaletteEntries
                    uint16_t(coordCount),
-                   &visitedOffsets};
+                   &visitedOffsets,
+                   &boundsCache};
   state.mHeader.v1 =
       reinterpret_cast<const COLRv1Header*>(hb_blob_get_data(aCOLR, nullptr));
   MOZ_ASSERT(uint16_t(state.mHeader.v1->base.version) == 1);

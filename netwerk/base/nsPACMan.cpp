@@ -17,7 +17,6 @@
 #include "nsIAuthPrompt.h"
 #include "nsIDHCPClient.h"
 #include "nsIHttpChannel.h"
-#include "nsIOService.h"
 #include "nsIPrefBranch.h"
 #ifndef MOZ_NAIVEFOX
 #  include "nsIPromptFactory.h"
@@ -384,17 +383,12 @@ nsPACMan::nsPACMan(nsISerialEventTarget* mainThreadEventTarget)
   MOZ_ASSERT(NS_IsMainThread(), "pacman must be created on main thread");
   mIncludePath = Preferences::GetBool(kPACIncludePath, false);
 #ifndef MOZ_NAIVEFOX
-  if (StaticPrefs::network_proxy_parse_pac_on_socket_process() &&
-      gIOService->SocketProcessReady()) {
-    mPAC = MakeUnique<RemoteProxyAutoConfig>();
-  } else {
-    mPAC = MakeUnique<ProxyAutoConfig>();
-    if (!sThreadLocalSetup) {
-      sThreadLocalSetup = true;
-      PR_NewThreadPrivateIndex(&sThreadLocalIndex, nullptr);
-    }
-    mPAC->SetThreadLocalIndex(sThreadLocalIndex);
+  mPAC = std::make_unique<ProxyAutoConfig>();
+  if (!sThreadLocalSetup) {
+    sThreadLocalSetup = true;
+    PR_NewThreadPrivateIndex(&sThreadLocalIndex, nullptr);
   }
+  mPAC->SetThreadLocalIndex(sThreadLocalIndex);
 #endif
 }
 
@@ -457,10 +451,6 @@ nsresult nsPACMan::DispatchToPAC(already_AddRefed<nsIRunnable> aEvent,
   // have to worry about threading issues here.
   if (!mPACThread) {
     MOZ_TRY(NS_NewNamedThread("ProxyResolution", getter_AddRefs(mPACThread)));
-    nsresult rv = mPAC->Init(mPACThread);
-    if (NS_FAILED(rv)) {
-      return rv;
-    }
   }
 
   if (aSync) {

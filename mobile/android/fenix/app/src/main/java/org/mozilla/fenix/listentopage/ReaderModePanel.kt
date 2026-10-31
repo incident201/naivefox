@@ -36,7 +36,7 @@ fun ReaderModePanel(
     onListenClicked: () -> Unit,
     onCustomizeReaderViewClicked: () -> Unit,
 ) {
-    val panelDescription = stringResource(id = R.string.reader_mode_panel_content_description)
+    val panelDescription = stringResource(id = R.string.reader_mode_panel_content_description_2)
 
     FloatingPanel(
         modifier =

@@ -105,6 +105,16 @@ async function waitForNoMiniWindowsOpen() {
 }
 
 /**
+ * Close every open mini window and wait until they've all torn down.
+ */
+async function closeAllMiniWindows() {
+  for (let mini of [...MiniWindowManager._miniwindows]) {
+    mini.close();
+  }
+  await waitForNoMiniWindowsOpen();
+}
+
+/**
  * Remove leftover test tabs (tabs get moved between windows, so tests track
  * them by URL rather than by reference).
  *

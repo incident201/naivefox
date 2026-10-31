@@ -37,7 +37,7 @@ internal class IPProtectionPreferencesMiddleware(private val preferences: IPProt
     ) {
         next(action)
 
-        if (action is IPProtectionAction.Toggle && !preferences.hasAlreadyUsedVpn) {
+        if (action is IPProtectionAction.ActivationAction.Toggle && !preferences.hasAlreadyUsedVpn) {
             preferences.hasAlreadyUsedVpn = true
         }
     }

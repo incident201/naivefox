@@ -9,6 +9,8 @@
 #ifndef mozilla_image_DecodePool_h
 #define mozilla_image_DecodePool_h
 
+#include "mozilla/AwakeTimeStamp.h"
+#include "mozilla/Maybe.h"
 #include "mozilla/Mutex.h"
 #include "mozilla/StaticPtr.h"
 #include "nsCOMArray.h"
@@ -85,6 +87,13 @@ class DecodePool final : public nsIObserver {
    */
   already_AddRefed<nsISerialEventTarget> GetIOEventTarget();
 
+#ifdef XP_WIN
+  /// Bracket Windows Shell calls made on the I/O thread, so that a call still
+  /// in flight at shutdown can be reported.
+  static void NoteShellCallStarted();
+  static void NoteShellCallFinished();
+#endif
+
  private:
   friend class DecodePoolWorker;
 
@@ -95,9 +104,14 @@ class DecodePool final : public nsIObserver {
   static uint32_t sNumCores;
   bool mShuttingDown = false;
 
-  // mMutex protects mIOThread.
+  // mMutex protects mIOThread and the shell call state.
   Mutex mMutex;
   nsCOMPtr<nsIThread> mIOThread MOZ_GUARDED_BY(mMutex);
+#ifdef XP_WIN
+  // Start time of the in-flight Windows Shell call, if any.
+  Maybe<AwakeTimeStamp> mShellCallStart MOZ_GUARDED_BY(mMutex);
+  bool mShellCallStartedInShutdown MOZ_GUARDED_BY(mMutex) = false;
+#endif
 };
 
 }  // namespace image

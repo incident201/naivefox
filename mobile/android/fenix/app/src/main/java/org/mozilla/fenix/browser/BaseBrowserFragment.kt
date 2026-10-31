@@ -187,6 +187,7 @@ import org.mozilla.fenix.browser.store.BrowserScreenMiddleware
 import org.mozilla.fenix.browser.store.BrowserScreenState
 import org.mozilla.fenix.browser.store.BrowserScreenStore
 import org.mozilla.fenix.browser.tabstrip.TabStrip
+import org.mozilla.fenix.browser.tabstrip.ext.handleTabStripLastTabClosed
 import org.mozilla.fenix.components.AppStore
 import org.mozilla.fenix.components.FenixAutocompletePrompt
 import org.mozilla.fenix.components.FenixEmailMaskPrompt
@@ -235,6 +236,7 @@ import org.mozilla.fenix.nimbus.FxNimbus
 import org.mozilla.fenix.pbmlock.BlackScreenOverlay
 import org.mozilla.fenix.pbmlock.NavigationOrigin
 import org.mozilla.fenix.pbmlock.observePrivateModeLock
+import org.mozilla.fenix.pdf.PdfToolsIntegration
 import org.mozilla.fenix.perf.MarkersFragmentLifecycleCallbacks
 import org.mozilla.fenix.search.awesomebar.AwesomeBarComposable
 import org.mozilla.fenix.settings.biometric.BiometricPromptFeature
@@ -242,6 +244,9 @@ import org.mozilla.fenix.settings.downloads.DownloadLocationManager
 import org.mozilla.fenix.snackbar.FenixSnackbarDelegate
 import org.mozilla.fenix.snackbar.SnackbarBinding
 import org.mozilla.fenix.tabgroups.TabGroupsStrip
+import org.mozilla.fenix.tabgroups.strip.redux.TabGroupsStripAction
+import org.mozilla.fenix.tabgroups.strip.redux.TabGroupsStripMiddleware
+import org.mozilla.fenix.tabgroups.strip.redux.TabGroupsStripStore
 import org.mozilla.fenix.tabstray.ext.toDisplayTitle
 import org.mozilla.fenix.tabstray.redux.state.Page
 import org.mozilla.fenix.theme.FirefoxTheme
@@ -317,6 +322,7 @@ abstract class BaseBrowserFragment :
 
     @VisibleForTesting internal val findInPageIntegration = ViewBoundFeatureWrapper<FindInPageIntegration>()
     private val toolbarsIntegration = ViewBoundFeatureWrapper<ToolbarsIntegration>()
+    private val pdfToolsIntegration = ViewBoundFeatureWrapper<PdfToolsIntegration>()
     private val bottomToolbarContainerIntegration = ViewBoundFeatureWrapper<BottomToolbarContainerIntegration>()
     private val sitePermissionsFeature = ViewBoundFeatureWrapper<SitePermissionsFeature>()
     private val fullScreenFeature = ViewBoundFeatureWrapper<FullScreenFeature>()
@@ -444,9 +450,9 @@ abstract class BaseBrowserFragment :
                     fragmentManager = parentFragmentManager,
                     sessionId = customTabSessionId,
                     dialog = appLinksPromptDialog(),
-                    launchInApp = { requireComponents.settings.shouldOpenLinksInApp(customTabSessionId != null) },
+                    launchInApp = { _ -> requireComponents.settings.shouldOpenLinksInApp(customTabSessionId != null) },
                     loadUrlUseCase = requireComponents.useCases.sessionUseCases.loadUrl,
-                    shouldPrompt = { requireComponents.settings.shouldPromptOpenLinksInApp() },
+                    shouldPrompt = { _ -> requireComponents.settings.shouldPromptOpenLinksInApp() },
                     alwaysOpenCheckboxAction = {
                         requireComponents.settings.openLinksInExternalApp =
                             requireContext().getString(R.string.pref_key_open_links_in_apps_always)
@@ -475,6 +481,10 @@ abstract class BaseBrowserFragment :
             requireComponents.core.store,
             isCustomTabSession = customTabSessionId != null,
         )
+
+        if (customTabSessionId == null) {
+            tabGroupsStripStore.dispatch(TabGroupsStripAction.InitializeDataObservation)
+        }
 
         observePrivateModeLock {
             findNavController()
@@ -1354,6 +1364,7 @@ abstract class BaseBrowserFragment :
                     },
                     shouldShowDoNotAskAgainCheckBox = context.components.appStore.state.mode != BrowsingMode.Private,
                     store = store,
+                    coroutineScope = requireComponents.applicationScope,
                     shouldHide = {
                         // if the fragment is detached,
                         // returning true will hide the site permission prompt rather than crash
@@ -1435,7 +1446,7 @@ abstract class BaseBrowserFragment :
                 .collect { tab -> pipModeChanged(tab) }
         }
 
-        binding.swipeRefresh.isEnabled = shouldPullToRefreshBeEnabled(false)
+        binding.swipeRefresh.isEnabled = shouldPullToRefreshBeEnabled()
 
         if (binding.swipeRefresh.isEnabled) {
             val primaryTextColor = ThemeManager.resolveAttribute(materialR.attr.colorOnSurface, context)
@@ -1479,7 +1490,27 @@ abstract class BaseBrowserFragment :
             bottomToolbarHeight = bottomToolbarHeight,
         )
 
+        initPdfTools(context = context, rootView = view)
         initializeMicrosurveyFeature(context)
+    }
+
+    private fun initPdfTools(context: Context, rootView: View) {
+        val settings = context.components.settings
+        if (!settings.enablePdfTools) {
+            return
+        }
+
+        pdfToolsIntegration.set(
+            feature =
+                PdfToolsIntegration(
+                    container = binding.browserLayout,
+                    browserStore = context.components.core.store,
+                    isAddressBarAtBottom = settings.toolbarPosition == ToolbarPosition.BOTTOM,
+                    customTabSessionId = customTabSessionId,
+                ),
+            owner = this,
+            view = rootView,
+        )
     }
 
     private fun initializeBrowserToolbar(
@@ -1601,8 +1632,17 @@ abstract class BaseBrowserFragment :
                     }
                 },
                 onLastTabClose = { isPrivate ->
-                    requireComponents.appStore.dispatch(AppAction.TabStripAction.UpdateLastTabClosed(isPrivate))
-                    findNavController().navigate(BrowserFragmentDirections.actionGlobalHome())
+                    handleTabStripLastTabClosed(
+                        isHomepageAsNewTabEnabled = settings.enableHomepageAsNewTab,
+                        isLastTabClosedPrivate = isPrivate,
+                        navigateFromId = R.id.browserFragment,
+                        appStore = requireComponents.appStore,
+                        browsingMode = requireComponents.appStore.state.mode,
+                        navController = findNavController(),
+                    ) {
+                        requireComponents.appStore.dispatch(AppAction.TabStripAction.UpdateLastTabClosed(isPrivate))
+                        findNavController().navigate(BrowserFragmentDirections.actionGlobalHome())
+                    }
                 },
                 onSelectedTabClick = {},
                 onCloseTabClick = { isPrivate ->
@@ -1613,7 +1653,19 @@ abstract class BaseBrowserFragment :
         }
     }
 
-    private fun buildTabGroupsStrip(): @Composable () -> Unit = { TabGroupsStrip() }
+    private val tabGroupsStripStore by lazy {
+        TabGroupsStripStore(
+            middleware =
+                listOf(
+                    TabGroupsStripMiddleware(
+                        tabDataCoordinator = requireComponents.tabDataCoordinator,
+                        scope = lifecycleScope,
+                    )
+                )
+        )
+    }
+
+    private fun buildTabGroupsStrip(): @Composable () -> Unit = { TabGroupsStrip(store = tabGroupsStripStore) }
 
     private fun buildAwesomeBar(
         activity: HomeActivity,
@@ -1784,10 +1836,8 @@ abstract class BaseBrowserFragment :
     }
 
     @VisibleForTesting
-    internal fun shouldPullToRefreshBeEnabled(inFullScreen: Boolean): Boolean {
-        return FeatureFlags.PULL_TO_REFRESH_ENABLED &&
-            requireComponents.settings.isPullToRefreshEnabledInBrowser &&
-            !inFullScreen
+    internal fun shouldPullToRefreshBeEnabled(): Boolean {
+        return FeatureFlags.PULL_TO_REFRESH_ENABLED && requireComponents.settings.isPullToRefreshEnabledInBrowser
     }
 
     /**
@@ -2329,8 +2379,6 @@ abstract class BaseBrowserFragment :
             }
             collapseBrowserView()
         }
-
-        binding.swipeRefresh.isEnabled = shouldPullToRefreshBeEnabled(inFullScreen)
     }
 
     @VisibleForTesting(otherwise = VisibleForTesting.PROTECTED)

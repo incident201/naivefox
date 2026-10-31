@@ -18,7 +18,6 @@ support-files = [
 ]
 prefs = [
   "accessibility.ariaNotify.enabled=true",
-  "dom.text_fragments.enabled=true",
   # Required for the eval in invokeContentTask in shared-head.js
   "security.allow_eval_with_system_principal=true",
   "accessibility.force_disabled=-1"

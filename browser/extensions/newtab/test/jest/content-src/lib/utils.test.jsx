@@ -5,7 +5,9 @@
 import { useEffect } from "react";
 import { render } from "@testing-library/react";
 import { stubGlobals } from "test/jest/test-utils";
+import { SpaceActiveContext } from "content-src/lib/SpaceActiveContext";
 import {
+  focusOnceRendered,
   useIntersectionObserver,
   getActiveCardSize,
   getActiveColumnLayout,
@@ -71,6 +73,21 @@ describe("useIntersectionObserver", () => {
   });
 
   it("should observe elements when mounted", () => {
+    const [observerInstance] = observerStub.mock.instances;
+    expect(observerInstance.observe).toHaveBeenCalled();
+  });
+
+  it("should not observe until the enclosing space is active", () => {
+    observerStub.mockClear();
+    const tree = spaceActive => (
+      <SpaceActiveContext.Provider value={spaceActive}>
+        <TestComponent callback={callback} threshold={threshold} />
+      </SpaceActiveContext.Provider>
+    );
+    const { rerender } = render(tree(false));
+    expect(observerStub).not.toHaveBeenCalled();
+
+    rerender(tree(true));
     const [observerInstance] = observerStub.mock.instances;
     expect(observerInstance.observe).toHaveBeenCalled();
   });
@@ -392,5 +409,22 @@ describe("useConfetti hook", () => {
     expect(fakeContext.clearRect).not.toHaveBeenCalled();
     expect(fakeContext.fillRect).not.toHaveBeenCalled();
     expect(rafStub).not.toHaveBeenCalled();
+  });
+});
+
+describe("focusOnceRendered", () => {
+  it("waits for a moz-button's first render before focusing it", async () => {
+    const focus = jest.fn();
+    focusOnceRendered({ updateComplete: Promise.resolve(), focus });
+    expect(focus).not.toHaveBeenCalled();
+    await Promise.resolve();
+    expect(focus).toHaveBeenCalledTimes(1);
+  });
+
+  it("focuses an element with no pending render straight away and ignores null", () => {
+    const focus = jest.fn();
+    focusOnceRendered({ focus });
+    expect(focus).toHaveBeenCalledTimes(1);
+    expect(() => focusOnceRendered(null)).not.toThrow();
   });
 });

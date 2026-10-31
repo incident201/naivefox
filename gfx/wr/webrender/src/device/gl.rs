@@ -2381,7 +2381,7 @@ impl GpuBackend for GlDevice {
     }
 
     fn shader_feature_flags(&self) -> ShaderFeatureFlags {
-        match self.gl.get_type() {
+        let mut flags = match self.gl.get_type() {
             gl::GlType::Gl => ShaderFeatureFlags::GL,
             gl::GlType::Gles => {
                 let mut flags = ShaderFeatureFlags::GLES;
@@ -2395,7 +2395,11 @@ impl GpuBackend for GlDevice {
                 }
                 flags
             }
+        };
+        if !self.is_software_webrender {
+            flags |= ShaderFeatureFlags::PATH_AA_ALL_MODES;
         }
+        flags
     }
 
     fn preferred_color_formats(&self) -> TextureFormatPair<ImageFormat> {
@@ -3629,7 +3633,15 @@ impl GpuBackend for GlDevice {
             size as _,
             gl::MAP_WRITE_BIT | gl::MAP_UNSYNCHRONIZED_BIT,
         );
-        assert!(!ptr.is_null());
+        if ptr.is_null() {
+            self.gl.buffer_sub_data_untyped(
+                target,
+                offset as _,
+                size as _,
+                data.as_ptr() as *const _,
+            );
+            return;
+        }
 
         unsafe {
             ptr::copy_nonoverlapping(data.as_ptr(), ptr as *mut u8, size);

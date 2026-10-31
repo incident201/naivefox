@@ -586,6 +586,15 @@ export class EngineURL {
     if (this.#partnerCodeMap.has(sapSource)) {
       return this.#partnerCodeMap.get(sapSource);
     }
+    if (sapSource in lazy.SearchUtils.SAP_SOURCE_TO_SEARCH_CONFIG_MAP) {
+      let partnerDetails = this.#partnerCodeMap.get(
+        lazy.SearchUtils.SAP_SOURCE_TO_SEARCH_CONFIG_MAP[sapSource]
+      );
+      if (partnerDetails) {
+        return partnerDetails;
+      }
+    }
+
     return this.#partnerCodeMap.get("default");
   }
 
@@ -1469,6 +1478,7 @@ export class SearchEngine {
    * - All query parameters of the URI have a matching name and value in the engine.
    * - An exception to the equality check is the engine's termsParameterName
    *   value, which contains a placeholder, i.e. {searchTerms}.
+   * - Parameters with a {partnerCode} value only need to be present.
    * - If an engine has query parameters with "null" values, they will be ignored.
    *
    * @param {nsIURI} uri
@@ -1512,6 +1522,14 @@ export class SearchEngine {
       engineParams = url1.searchParams;
     }
 
+    // The partner code can vary depending on the SAP source, so only check
+    // for the presence of its parameter.
+    let partnerCodeParamNames = new Set(
+      [...engineParams]
+        .filter(([, value]) => value == "{partnerCode}")
+        .map(([name]) => name)
+    );
+
     let uriParams = url2.searchParams;
     if (
       new Set([...uriParams.keys()]).size !=
@@ -1525,7 +1543,7 @@ export class SearchEngine {
     for (let [name, value] of uriParams.entries()) {
       // Don't check the name matching the search
       // query because its value will differ.
-      if (name == termsParameterName) {
+      if (name == termsParameterName || partnerCodeParamNames.has(name)) {
         continue;
       }
       // All params of an input must have a matching

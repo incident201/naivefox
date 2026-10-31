@@ -6,9 +6,9 @@ import { MozLitElement } from "chrome://global/content/lit-utils.mjs";
 import { html } from "chrome://global/content/vendor/lit.all.mjs";
 import { countryName } from "chrome://browser/content/ipprotection/ipprotection-utils.mjs";
 
-// eslint-disable-next-line import/no-unassigned-import
+// eslint-disable-next-line import-x/no-unassigned-import
 import "chrome://global/content/elements/moz-toggle.mjs";
-// eslint-disable-next-line import/no-unassigned-import
+// eslint-disable-next-line import-x/no-unassigned-import
 import "chrome://browser/content/ipprotection/bandwidth-usage.mjs";
 
 const lazy = {};
@@ -198,7 +198,7 @@ export default class IPProtectionStatusCard extends MozLitElement {
   render() {
     let type = "disconnected";
     let headerL10nId = "ipprotection-connection-status-disconnected-1";
-    let buttonL10nId = "ipprotection-button-turn-vpn-on";
+    let buttonL10nId = "ipprotection-button-turn-vpn-on-1";
     let buttonDisabled = false;
     let iconSrc = null;
 
@@ -218,7 +218,7 @@ export default class IPProtectionStatusCard extends MozLitElement {
     } else if (this.protectionEnabled) {
       type = "connected";
       headerL10nId = "ipprotection-connection-status-connected-1";
-      buttonL10nId = "ipprotection-button-turn-vpn-off";
+      buttonL10nId = "ipprotection-button-turn-vpn-off-1";
       iconSrc =
         "chrome://browser/content/ipprotection/assets/states/ipprotection-on.svg";
     }

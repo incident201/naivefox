@@ -128,6 +128,8 @@ Or for Raptor-Browsertime (use `chrome` for desktop, and `chrome-m` for mobile):
 ./mach raptor -t amazon --app chrome --browsertime-chromedriver <PATH/TO/CHROMEDRIVER>
 ```
 
+On desktop, Raptor uses Chrome from its default install location.
+
 ## Running on Safari Technology Preview
 
 Safari Technology Preview comes bundled with an appropriate `safaridriver` binary, and Browsertime (via selenium) automatically launches this.
@@ -143,8 +145,10 @@ You can launch vanilla Browsertime with Safari Technology Preview as follows:
 Or with Raptor-Browsertime
 
 ```
-./mach raptor -t speedometer3 --app safari-tp --binary "/Applications/Safari Technology Preview.app/Contents/MacOS/Safari Technology Preview"
+./mach raptor -t speedometer3 --app safari-tp
 ```
+
+Raptor uses Safari Technology Preview from `/Applications`.
 
 ## Running Page-load tests with third party WebExtensions
 

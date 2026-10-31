@@ -153,7 +153,8 @@ class ExtensionsMenuItemProviderTest {
     @Test
     fun `GIVEN extensions offer something for the page WHEN opening the menu THEN list what they offer right away`() =
         runTest {
-            val item = provider(browserStoreWith(extension(INSTALLED_ID))).itemFlow.value as ExpandableMenuItem
+            val item =
+                provider(browserStoreWith(extension(INSTALLED_ID))).itemsFlow.value.single() as ExpandableMenuItem
 
             assertEquals(MenuItemSummary(text = Text.String(ACTION_TITLE)), item.summary)
             assertEquals(Text.String("1"), item.actionButtonText)
@@ -161,7 +162,7 @@ class ExtensionsMenuItemProviderTest {
 
     @Test
     fun `GIVEN no extensions are installed WHEN opening the menu THEN suggest trying one right away`() = runTest {
-        val item = provider(browserStoreWith()).itemFlow.value
+        val item = provider(browserStoreWith()).itemsFlow.value.singleOrNull()
 
         assertEquals(
             MenuItemSummary(text = Text.Resource(R.string.browser_menu_try_a_recommended_extension_description)),
@@ -174,7 +175,7 @@ class ExtensionsMenuItemProviderTest {
         runTest {
             val builtInExtension = extension(INSTALLED_ID).copy(isBuiltIn = true, browserAction = null)
 
-            val item = provider(browserStoreWith(builtInExtension)).itemFlow.value
+            val item = provider(browserStoreWith(builtInExtension)).itemsFlow.value.singleOrNull()
 
             assertEquals(
                 MenuItemSummary(text = Text.Resource(R.string.browser_menu_try_a_recommended_extension_description)),
@@ -186,7 +187,7 @@ class ExtensionsMenuItemProviderTest {
     fun `GIVEN the installed extensions offer nothing WHEN opening the menu THEN say so right away`() = runTest {
         val disabledExtension = extension(INSTALLED_ID).copy(enabled = false)
 
-        val item = provider(browserStoreWith(disabledExtension)).itemFlow.value
+        val item = provider(browserStoreWith(disabledExtension)).itemsFlow.value.singleOrNull()
 
         assertIs<StandardMenuItem>(item)
         assertEquals(
@@ -199,7 +200,7 @@ class ExtensionsMenuItemProviderTest {
     fun `GIVEN extensions offer something WHEN their icons are loaded THEN keep listing the same`() = runTest {
         coEvery { addonManager.getAddons() } returns listOf(addon(INSTALLED_ID, installed = true, enabled = true))
         val browserStore = browserStoreWith(extension(INSTALLED_ID))
-        val beforeLoading = provider(browserStore).itemFlow.value
+        val beforeLoading = provider(browserStore).itemsFlow.value.singleOrNull()
 
         val afterLoading = resolvedItem(browserStore)
 
@@ -361,7 +362,7 @@ class ExtensionsMenuItemProviderTest {
 
         runCurrent()
 
-        return provider.itemFlow.value
+        return provider.itemsFlow.value.singleOrNull()
     }
 
     @Test
@@ -523,7 +524,7 @@ class ExtensionsMenuItemProviderTest {
                 icon = MenuItemIconRes(iconsR.drawable.mozac_ic_extension_24),
                 onClickEvent = MenuAction.Navigate.ManageExtensions,
             ),
-            provider.itemFlow.value,
+            provider.itemsFlow.value.single(),
         )
     }
 
@@ -541,7 +542,7 @@ class ExtensionsMenuItemProviderTest {
     fun `GIVEN the extensions process is disabled WHEN building the item for home THEN warn about it`() = runTest {
         val browserStore = browserStoreWith(extension(INSTALLED_ID), isExtensionsProcessDisabled = true)
 
-        val item = provider(browserStore, MenuTarget.Home).itemFlow.value as StandardMenuItem
+        val item = provider(browserStore, MenuTarget.Home).itemsFlow.value.single() as StandardMenuItem
 
         assertIs<MenuItemIconDrawable>(item.icon)
         assertNull(item.summary)

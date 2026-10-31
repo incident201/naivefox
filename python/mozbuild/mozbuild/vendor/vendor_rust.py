@@ -900,6 +900,18 @@ license file's hash.
             return False
         output = res.stdout.decode("UTF-8")
 
+        # cargo vendor extracts files with the fixed mtime stored in the crate
+        # archive. jj and hg detect changes by size and mtime, so a vendored
+        # file whose size doesn't change (e.g. a version bump in Cargo.toml)
+        # would go unnoticed. Stamp everything with the current time.
+        dirs = [vendor_dir]
+        while dirs:
+            for entry in os.scandir(dirs.pop()):
+                if entry.is_dir(follow_symlinks=False):
+                    dirs.append(entry.path)
+                elif entry.is_file(follow_symlinks=False):
+                    os.utime(entry.path)
+
         # Get the snippet of configuration that cargo vendor outputs, and
         # update .cargo/config.toml with it.
         # XXX(bug 1576765): Hopefully do something better after

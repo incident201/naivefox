@@ -11,7 +11,6 @@
 #ifndef MOZ_NAIVEFOX
 #  include "nsIGlobalObject.h"
 #endif
-#include "nsIOService.h"
 #include "nsIObserverService.h"
 #include "nsITimer.h"
 #ifndef MOZ_NAIVEFOX
@@ -1972,13 +1971,6 @@ nsresult nsMemoryReporterManager::StartGettingReports() {
 
   if (gfx::VRProcessManager* vr = gfx::VRProcessManager::Get()) {
     if (RefPtr<MemoryReportingProcess> proc = vr->GetProcessMemoryReporter()) {
-      s->mChildrenPending.AppendElement(proc.forget());
-    }
-  }
-
-  if (!IsRegistrationBlocked() && net::gIOService) {
-    if (RefPtr<MemoryReportingProcess> proc =
-            net::gIOService->GetSocketProcessMemoryReporter()) {
       s->mChildrenPending.AppendElement(proc.forget());
     }
   }

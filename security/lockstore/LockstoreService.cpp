@@ -308,7 +308,7 @@ nsresult ImplXpcomMethod(LockstoreService* aLockstore, JSContext* aCx,
   nsresult rv = NS_DispatchBackgroundTask(NS_NewRunnableFunction(
       "LockstoreService::ImplXpcomMethod",
       [self = RefPtr{aLockstore}, aMethod, domHandle,
-       ... args = std::forward<Storages>(aArgs)]() mutable {
+       ... args = std::move(aArgs)]() mutable {
         auto result = (self.get()->*aMethod)(Unwrap(args)...);
         NS_DispatchToMainThread(NS_NewRunnableFunction(
             "LockstoreService::ImplXpcomMethod::Resolve",

@@ -11,15 +11,13 @@
 #include "nsThreadUtils.h"
 #include "nsIFile.h"
 #include "nsIFileURL.h"
+#include "nsIThreadShutdown.h"
 #ifndef MOZ_NAIVEFOX
 #  include "nsIXPConnect.h"
 #endif
 #include "mozilla/AppShutdown.h"
 #include "mozilla/CheckedInt.h"
 #include "mozilla/glean/StorageMetrics.h"
-#ifndef MOZ_NAIVEFOX
-#  include "mozilla/Telemetry.h"
-#endif
 #include "mozilla/Mutex.h"
 #include "mozilla/CondVar.h"
 #include "mozilla/Attributes.h"
@@ -1198,6 +1196,7 @@ nsresult Connection::initialize(nsIFile* aDatabaseFile) {
       rv = initializeInternal();
       RecordOpenStatus(rv);
       NS_ENSURE_SUCCESS(rv, rv);
+      failGuard.release();
       return NS_OK;
     }
     // Plaintext (out-of-profile), or a read-only open of a missing database:
@@ -1662,15 +1661,18 @@ nsresult Connection::ensureOperationSupported(
 }
 
 bool Connection::isConnectionReadyOnThisThread() {
+  // The async thread may get here while holding sharedDBMutex, so it must not
+  // take sharedAsyncExecutionMutex, as Statement::internalFinalize takes the
+  // two in the opposite order.
+  if (mAsyncExecutionThread && mAsyncExecutionThread->IsOnCurrentThread()) {
+    return true;
+  }
 #ifdef DEBUG
   {
     MutexAutoLock lockedScope(sharedAsyncExecutionMutex);
     MOZ_ASSERT_IF(connectionReady(), !mConnectionClosed);
   }
 #endif
-  if (mAsyncExecutionThread && mAsyncExecutionThread->IsOnCurrentThread()) {
-    return true;
-  }
   return connectionReady();
 }
 
@@ -1705,8 +1707,25 @@ void Connection::shutdownAsyncThread() {
   }
 #endif
 
-  MOZ_ALWAYS_SUCCEEDS(mAsyncExecutionThread->Shutdown());
-  mAsyncExecutionThread = nullptr;
+  // Join the thread asynchronously: a blocking join would spin this thread's
+  // event loop, and connections are often closed while the browser is busy
+  // shutting down. nsThreadManager will reap any outstanding join at
+  // XPCOMShutdownThreads anyway.
+  nsCOMPtr<nsIThreadShutdown> shutdown;
+  if (NS_SUCCEEDED(
+          mAsyncExecutionThread->BeginShutdown(getter_AddRefs(shutdown)))) {
+    // We keep a strong reference to the connection, it keeps it alive until the
+    // thread is reaped, so mAsyncExecutionThread is cleared before
+    // ~Connection asserts on it and before the failsafe close in Release().
+    RefPtr event = NS_NewRunnableFunction(
+        "storage::Connection::asyncThreadShutdownComplete",
+        [self = RefPtr{this}] { self->mAsyncExecutionThread = nullptr; });
+    shutdown->OnCompletion(event);
+  } else {
+    // This ran late in XPCOM shutdown, after nsThreadManager already started
+    // shutting down and joining all the threads, including this one.
+    mAsyncExecutionThread = nullptr;
+  }
 }
 
 nsresult Connection::internalClose(sqlite3* aNativeConnection) {
@@ -1797,7 +1816,9 @@ int Connection::stepStatement(sqlite3* aNativeConnection,
                                    ::sqlite3_sql(aStatement));
 
   bool checkedMainThread = false;
+#ifdef NIGHTLY_BUILD
   TimeStamp startTime = TimeStamp::Now();
+#endif  // NIGHTLY_BUILD
 
   // The connection may have been closed if the executing statement has been
   // created and cached after a call to asyncClose() but before the actual
@@ -1826,24 +1847,17 @@ int Connection::stepStatement(sqlite3* aNativeConnection,
     ::sqlite3_reset(aStatement);
   }
 
-#ifndef MOZ_NAIVEFOX
+#if defined(NIGHTLY_BUILD) && !defined(MOZ_NAIVEFOX)
   // Report very slow SQL statements to Telemetry
   TimeDuration duration = TimeStamp::Now() - startTime;
   const uint32_t threshold = NS_IsMainThread()
-                                 ? Telemetry::kSlowSQLThresholdForMainThread
-                                 : Telemetry::kSlowSQLThresholdForHelperThreads;
+                                 ? Service::kSlowSQLThresholdForMainThread
+                                 : Service::kSlowSQLThresholdForHelperThreads;
   if (duration.ToMilliseconds() >= threshold) {
-    nsDependentCString statementString(::sqlite3_sql(aStatement));
-    Telemetry::RecordSlowSQLStatement(
-        statementString, mTelemetryFilename,
-        static_cast<uint32_t>(duration.ToMilliseconds()));
-
-#ifdef NIGHTLY_BUILD
     mStorageService->RecordSlowStatement(aStatement, duration,
                                          mTelemetryFilename);
-#endif  // NIGHTLY_BUILD
   }
-#endif
+#endif  // NIGHTLY_BUILD
 
   (void)::sqlite3_extended_result_codes(aNativeConnection, 0);
   // Drop off the extended result bits of the result code.
@@ -1908,24 +1922,9 @@ int Connection::executeSql(sqlite3* aNativeConnection, const char* aSqlString) {
 
   AUTO_PROFILER_LABEL_DYNAMIC_CSTR("Connection::executeSql", OTHER, aSqlString);
 
-  TimeStamp startTime = TimeStamp::Now();
   int srv =
       ::sqlite3_exec(aNativeConnection, aSqlString, nullptr, nullptr, nullptr);
   RecordQueryStatus(srv);
-
-#ifndef MOZ_NAIVEFOX
-  // Report very slow SQL statements to Telemetry
-  TimeDuration duration = TimeStamp::Now() - startTime;
-  const uint32_t threshold = NS_IsMainThread()
-                                 ? Telemetry::kSlowSQLThresholdForMainThread
-                                 : Telemetry::kSlowSQLThresholdForHelperThreads;
-  if (duration.ToMilliseconds() >= threshold) {
-    nsDependentCString statementString(aSqlString);
-    Telemetry::RecordSlowSQLStatement(
-        statementString, mTelemetryFilename,
-        static_cast<uint32_t>(duration.ToMilliseconds()));
-  }
-#endif
 
   return srv;
 }
@@ -3187,8 +3186,9 @@ Connection::LoadExtension(const nsACString& aExtensionName,
     if (!helperThread) {
       return NS_ERROR_NOT_INITIALIZED;
     }
-    MOZ_ALWAYS_SUCCEEDS(
-        helperThread->Dispatch(loadTask.forget(), NS_DISPATCH_NORMAL));
+    nsresult rv =
+        helperThread->Dispatch(loadTask.forget(), NS_DISPATCH_FALLIBLE);
+    NS_ENSURE_SUCCESS(rv, rv);
   } else {
     // In any other case we just load the extension on the current thread.
     MOZ_ALWAYS_SUCCEEDS(loadTask->Run());

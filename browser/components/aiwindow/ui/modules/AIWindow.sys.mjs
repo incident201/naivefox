@@ -50,10 +50,10 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "moz-src:///browser/components/aiwindow/models/Utils.sys.mjs",
   AIWindowTabStatesManager:
     "moz-src:///browser/components/aiwindow/ui/modules/AIWindowTabStatesManager.sys.mjs",
-  AIWindowAccountAuth:
-    "moz-src:///browser/components/aiwindow/ui/modules/AIWindowAccountAuth.sys.mjs",
   AIWindowMenu:
     "moz-src:///browser/components/aiwindow/ui/modules/AIWindowMenu.sys.mjs",
+  AuthProvider:
+    "moz-src:///browser/components/aiwindow/models/AuthProvider.sys.mjs",
   AutoTabGroupingSuggestions:
     "moz-src:///browser/components/aiwindow/ui/modules/AutoTabGroupingSuggestions.sys.mjs",
   BrowserWindowTracker: "resource:///modules/BrowserWindowTracker.sys.mjs",
@@ -69,7 +69,6 @@ ChromeUtils.defineESModuleGetters(lazy, {
   NewTabPagePreloading:
     "moz-src:///browser/components/tabbrowser/NewTabPagePreloading.sys.mjs",
   NimbusFeatures: "resource://nimbus/ExperimentAPI.sys.mjs",
-  ONLOGOUT_NOTIFICATION: "resource://gre/modules/FxAccountsCommon.sys.mjs",
   PanelMultiView:
     "moz-src:///browser/components/customizableui/PanelMultiView.sys.mjs",
   PlacesUtils: "resource://gre/modules/PlacesUtils.sys.mjs",
@@ -80,6 +79,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "moz-src:///browser/components/sessionstore/SessionStartup.sys.mjs",
   MemoriesSchedulers:
     "moz-src:///browser/components/aiwindow/models/memories/MemoriesSchedulers.sys.mjs",
+  MonitorAgent:
+    "moz-src:///browser/components/aiwindow/models/agents/MonitorAgent.sys.mjs",
   MONITOR_CONDITION_MET_TOPIC:
     "moz-src:///browser/components/aiwindow/models/agents/Monitor.sys.mjs",
   MONITOR_RUN_FAILED_TOPIC:
@@ -88,6 +89,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "moz-src:///browser/components/aiwindow/ui/modules/MonitorAttention.sys.mjs",
   MonitorUIUtils:
     "moz-src:///browser/components/aiwindow/ui/modules/MonitorUIUtils.sys.mjs",
+  SmartWindowLocation:
+    "moz-src:///browser/components/aiwindow/models/SmartWindowLocation.sys.mjs",
   SmartWindowTelemetry:
     "moz-src:///browser/components/aiwindow/ui/modules/SmartWindowTelemetry.sys.mjs",
   TelemetryScheduler:
@@ -211,7 +214,10 @@ export const AIWindow = {
     );
 
     ChromeUtils.defineLazyGetter(AIWindow, "chatStore", () => lazy.ChatStore);
-    Services.obs.addObserver(this, lazy.ONLOGOUT_NOTIFICATION);
+    lazy.AuthProvider.addEventListener(
+      "AuthProvider:Logout",
+      this.onAuthProviderLogout
+    );
     Services.obs.addObserver(this, "tabstrip-orientation-change");
     Services.obs.addObserver(this, "browser-region-updated");
     Services.prefs.addObserver(PREF_AGENT_SUPPORTED_REGIONS, this);
@@ -228,6 +234,7 @@ export const AIWindow = {
   _startSchedulers() {
     lazy.MemoriesSchedulers.maybeRunAndSchedule();
     lazy.TelemetryScheduler.maybeInit();
+    lazy.SmartWindowLocation.refresh();
   },
 
   handlePlacesEvents(events) {
@@ -255,7 +262,10 @@ export const AIWindow = {
     if (!this._initialized) {
       return;
     }
-    Services.obs.removeObserver(this, lazy.ONLOGOUT_NOTIFICATION);
+    lazy.AuthProvider.removeEventListener(
+      "AuthProvider:Logout",
+      this.onAuthProviderLogout
+    );
     Services.obs.removeObserver(this, "tabstrip-orientation-change");
     Services.obs.removeObserver(this, "browser-region-updated");
     Services.prefs.removeObserver(PREF_AGENT_SUPPORTED_REGIONS, this);
@@ -277,10 +287,12 @@ export const AIWindow = {
     }
   },
 
+  onAuthProviderLogout() {
+    AIWindow._onAccountLogout();
+  },
+
   observe(_subject, topic, data) {
-    if (topic === lazy.ONLOGOUT_NOTIFICATION) {
-      this._onAccountLogout();
-    } else if (topic === "tabstrip-orientation-change") {
+    if (topic === "tabstrip-orientation-change") {
       this._onTabstripOrientationChange();
     } else if (
       topic === "nsPref:changed" &&
@@ -302,8 +314,7 @@ export const AIWindow = {
     }
   },
 
-  // Switches all active AI Windows back to classic mode when the user signs out
-  // of their Firefox Account.
+  // Switches all active AI Windows back to classic mode when the user signs out.
   _onAccountLogout() {
     for (const win of Services.wm.getEnumerator("navigator:browser")) {
       if (!win.closed && this.isAIWindowActive(win)) {
@@ -399,6 +410,7 @@ export const AIWindow = {
     if (!this.isAvailable) {
       this._onAccountLogout();
     }
+    lazy.MonitorAgent.onBlockedStateChanged().catch(console.error);
   },
 
   _updateButtonVisibility(node) {
@@ -692,12 +704,10 @@ export const AIWindow = {
     if (this.isAIWindowActive(win)) {
       // Window already opened as Smart via the BrowserContentHandler
       // startup gate, which uses ToS consentTime as a synchronous proxy for
-      // "previously signed in". Verify the actual FxA state now and prompt
+      // "previously signed in". Verify the actual auth state now and prompt
       // sign-in if the user has since logged out — without this, signed-out
       // users would get a Smart Window with broken auth-gated features.
-      await lazy.AIWindowAccountAuth.ensureAIWindowAccess(
-        win.gBrowser.selectedBrowser
-      );
+      await lazy.AuthProvider.maybeSignIn(win.gBrowser.selectedBrowser);
       return;
     }
     await this._authorizeAndToggleWindow(win, "startup");
@@ -1124,7 +1134,7 @@ export const AIWindow = {
   recordOpenWindowTelemetry(trigger, win) {
     let signedIn = false;
     const opened_tabs = win?.gBrowser?.tabs.length ?? 0;
-    lazy.AIWindowAccountAuth.isSignedIn()
+    lazy.AuthProvider.isSignedIn()
       .then(result => {
         signedIn = result;
       })
@@ -1149,7 +1159,7 @@ export const AIWindow = {
    */
   recordLaunchCommandTelemetry(trigger, openNewWindow) {
     let signedIn = false;
-    lazy.AIWindowAccountAuth.isSignedIn()
+    lazy.AuthProvider.isSignedIn()
       .then(result => {
         signedIn = result;
       })
@@ -1291,7 +1301,7 @@ export const AIWindow = {
   },
 
   async _authorizeAndToggleWindow(win, trigger) {
-    const authorized = await lazy.AIWindowAccountAuth.ensureAIWindowAccess(
+    const authorized = await lazy.AuthProvider.maybeSignIn(
       win.gBrowser.selectedBrowser
     );
 
@@ -1344,7 +1354,7 @@ export const AIWindow = {
         return this._authorizeAndToggleWindow(browser.documentGlobal, trigger);
       }
 
-      const isAuthorized = await lazy.AIWindowAccountAuth.canAccessAIWindow();
+      const isAuthorized = await lazy.AuthProvider.hasAccess();
       const windowPromise = lazy.BrowserWindowTracker.promiseOpenWindow({
         aiWindow: isAuthorized,
         openerWindow: browser?.documentGlobal,
@@ -1367,14 +1377,14 @@ export const AIWindow = {
   },
 
   /**
-   * Launches the FxA sign-in auth flow for the given browser.
+   * Launches the sign-in auth flow for the given browser.
    *
    * @param {Browser} browser
    * @returns {Promise<boolean>} Whether the user signed in successfully
    */
   async launchSignInFlow(browser) {
     try {
-      return await lazy.AIWindowAccountAuth.promptSignIn(browser);
+      return await lazy.AuthProvider.promptSignIn(browser);
     } catch (e) {
       console.error("Error launching sign-in flow:", e);
       return false;
@@ -1667,7 +1677,7 @@ export const AIWindow = {
    * @returns {Promise<void>}
    */
   async makeAvailable() {
-    Services.prefs.clearUserPref(PREF_SMARTWINDOW_CONSENT_TIME);
+    lazy.AuthProvider.clearToSConsent();
     // Set memory generation pref to default
     Services.prefs.setBoolPref(PREF_MEMORIES_CONVERSATION, true);
     Services.prefs.setBoolPref(PREF_MEMORIES_HISTORY, true);

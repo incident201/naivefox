@@ -971,9 +971,11 @@ export class ChatConversation extends Conversation {
    * @returns {URL|null}
    */
   getMostRecentPageVisited() {
-    const sites = this.getSitesList();
+    const message = this.messages.findLast(m =>
+      m.pageUrl?.protocol.startsWith("http")
+    );
 
-    return sites.length ? sites.pop() : null;
+    return message?.pageUrl ?? null;
   }
 
   /**

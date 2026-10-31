@@ -39,7 +39,7 @@ class StorageStoreSyncTest {
 
         testScheduler.advanceUntilIdle()
 
-        captureMiddleware.assertFirstAction(IPProtectionAction.EligibilityChanged::class) {
+        captureMiddleware.assertFirstAction(IPProtectionAction.EligibilityAction.EligibilityChanged::class) {
             assertEquals(EligibilityStatus.Eligible, it.eligibility)
         }
         assertEquals(EligibilityStatus.Eligible, ipProtectionStore.state.eligibilityStatus)
@@ -66,7 +66,7 @@ class StorageStoreSyncTest {
 
             testScheduler.advanceUntilIdle()
 
-            captureMiddleware.assertLastAction(IPProtectionAction.EligibilityChanged::class) {
+            captureMiddleware.assertLastAction(IPProtectionAction.EligibilityAction.EligibilityChanged::class) {
                 assertEquals("Unexpected forwarded status for $eligibility", eligibility, it.eligibility)
             }
             assertEquals(
@@ -92,7 +92,7 @@ class StorageStoreSyncTest {
 
         testScheduler.advanceUntilIdle()
 
-        captureMiddleware.assertNotDispatched(IPProtectionAction.EligibilityChanged::class)
+        captureMiddleware.assertNotDispatched(IPProtectionAction.EligibilityAction.EligibilityChanged::class)
         assertEquals(EligibilityStatus.Eligible, ipProtectionStore.state.eligibilityStatus)
     }
 }

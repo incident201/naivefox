@@ -55,6 +55,7 @@ fun BrowserSimpleToolbar(
     val uiState by store.observeAsComposableState { it }
 
     val pageOrigin = uiState.displayState.pageOrigin
+    val browserActionsStart = uiState.displayState.browserActionsStart
     val browserActionsEnd = uiState.displayState.browserActionsEnd
     val onInteraction: (BrowserToolbarEvent) -> Unit = { store.dispatch(it) }
 
@@ -74,6 +75,13 @@ fun BrowserSimpleToolbar(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            if (browserActionsStart.isNotEmpty()) {
+                ActionContainer(
+                    actions = browserActionsStart,
+                    onInteraction = onInteraction,
+                )
+            }
+
             Spacer(
                 modifier =
                     Modifier.clickable { onInteraction(requireNotNull(pageOrigin.onClick)) }.height(64.dp).weight(1f)
@@ -123,7 +131,7 @@ private fun initialActions(): List<Action> {
             onClick = object : BrowserToolbarEvent {},
         ),
         ActionButtonRes(
-            drawableResId = iconsR.drawable.mozac_ic_ellipsis_vertical_24,
+            drawableResId = iconsR.drawable.mozac_ic_more_vertical_round_24,
             contentDescription = android.R.string.untitled,
             onClick =
                 BrowserToolbarMenu {

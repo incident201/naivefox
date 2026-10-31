@@ -1139,6 +1139,13 @@
             app:exitAnim="@anim/slide_out_left"
             app:popEnterAnim="@anim/slide_in_left"
             app:popExitAnim="@anim/slide_out_right" />
+        <action
+            android:id="@+id/action_customizationFragment_to_fenixCustomizeMenuFragment"
+            app:destination="@id/fenixCustomizeMenuFragment"
+            app:enterAnim="@anim/slide_in_right"
+            app:exitAnim="@anim/slide_out_left"
+            app:popEnterAnim="@anim/slide_in_left"
+            app:popExitAnim="@anim/slide_out_right" />
     </fragment>
     <fragment
         android:id="@+id/privateBrowsingFragment"
@@ -1514,6 +1521,11 @@
             android:id="@+id/searchEngineFragment"
             android:name="org.mozilla.fenix.settings.search.SearchEngineFragment"
             android:label="@string/preferences_search">
+            <argument
+                android:name="preference_to_scroll_to"
+                android:defaultValue="@null"
+                app:argType="string"
+                app:nullable="true" />
             <action
                 android:id="@+id/action_searchEngineFragment_to_defaultEngineFragment"
                 app:destination="@+id/defaultEngineFragment" />
@@ -1914,8 +1926,17 @@
         app:popUpTo="@id/storiesFragment"
         app:popUpToInclusive="false"
         app:launchSingleTop="true" />
+
+      <action
+        android:id="@+id/action_menuFragment_to_fenixCustomizeMenuFragment"
+        app:destination="@id/fenixCustomizeMenuFragment" />
     </dialog>
   </navigation>
+
+    <fragment
+      android:id="@+id/fenixCustomizeMenuFragment"
+      android:name="org.mozilla.fenix.components.menu.compose.customize.FenixCustomizeMenuFragment"
+      android:label="@string/customize_menu" />
 
     <navigation
         android:id="@+id/trust_panel_graph"

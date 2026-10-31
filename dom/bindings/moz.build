@@ -6,7 +6,7 @@ with Files("**"):
     BUG_COMPONENT = ("Core", "DOM: Bindings (WebIDL)")
 
 if CONFIG["MOZ_BUILD_APP"] != "netwerk/naivefox":
-    TEST_DIRS += ["test"]
+    TEST_DIRS += ["gtest", "test"]
 
 XPIDL_SOURCES += ["nsIScriptError.idl"]
 
@@ -35,6 +35,9 @@ EXPORTS.mozilla.dom += [
     "DOMJSClass.h",
     "DOMJSProxyHandler.h",
     "DOMString.h",
+    "ECMACollectionIterator.h",
+    "ECMACollectionMixin.h",
+    "ECMACollections.h",
     "Errors.msg",
     "Exceptions.h",
     "IterableIterator.h",

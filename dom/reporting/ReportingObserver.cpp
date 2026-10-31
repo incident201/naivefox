@@ -139,7 +139,7 @@ void ReportingObserver::MaybeNotify() {
 
   // We should report if this throws exception. But where?
   RefPtr<ReportingObserverCallback> callback(mCallback);
-  callback->Call(reports, *this);
+  callback->Call(this, reports, *this);
 }
 
 void ReportingObserver::ForgetReports() { mReports.Clear(); }

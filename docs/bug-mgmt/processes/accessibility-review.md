@@ -129,47 +129,31 @@ flag:
   accessibility review once changes are made to address the accessibility
   team's initial round of feedback.
 
-## Phabricator Review Group
+## Platform Phabricator Reviews
 
-There is also an
-[accessibility-frontend-reviewers](https://phabricator.services.mozilla.com/tag/accessibility-frontend-reviewers/)
-group on Phabricator. We recommend using the automated review tool described below before submitting
-to the review group. This group should only be used if:
+If you are making changes to the code inside of the `accessible/` module,
+you should request review from the module owners and/or peers via the
+`#accessibility-platform-reviewers` review group.
 
-1. The patch addresses a complex change requested
-   **by an accessibility team member** as part of an engineering review and
-   you aren't confident that the patch correctly addresses the change; or
-2. There is a very specific aspect of accessibility implemented in the patch and
-   you would like the accessibility team to confirm whether it has been
-   implemented correctly. You should first discuss your approach with the team
-   in the #accessibility channel on slack.
+This group should not be used to request review of accessibility-related
+changes outside the module. Please see the following section for additional
+guidance.
 
-After tagging the accessibility-frontend-reviewers group, review-bot will
-prompt you for some additional information about your patch. **Your patch
-will be removed from our queue until you post a comment with the requested
-information, and re-add the group.**
+## Frontend Phabricator Reviews
 
-Here's what you'll see:
+Many accessibility issues can be addressed and landed without code review from
+the accessibility team. Usually, it is sufficient to get review from the owners or
+peers of the module where the bug is filed. However:
 
-```markdown
-You've tagged the accessibility team for review. If you've already spoken
-to a team member about your request, please request review from the
-specific team member you spoke to.
+- If your patch addresses a complex change requested **by an accessibility team member**,
+and you aren't confident that the patch correctly addresses the change, please
+tag that specific team member for review.
 
-Otherwise, please do ALL of the following:
-
-    1. Post a comment describing the specific accessibility behaviour
-       you're looking for feedback about
-    2. Attach screenshots showing behaviour before and after your
-       patch (if this is a visual change)
-    3. Post a description of screen reader output/behaviour before
-       and after your patch (if this change affects assistive
-       technology users)
-
-Once you have posted all of the above, please re-add the group.
-The group will not be removed again after you re-add it if the
-above conditions are met.
-```
+- If there is a specific aspect of accessibility implemented in the patch, and
+you would like the accessibility team to confirm whether it has been
+implemented correctly, you should first discuss your approach with the team
+in the #accessibility channel on Slack or Matrix. We will discuss your approach there, and
+identify a reviewer if needed.
 
 If you would like the accessibility team to assess **whether a feature
 or change is sufficiently accessible**, this is not the right pathway.
@@ -178,6 +162,18 @@ Please request an accessibility **engineering** review as described above.
 Without this, the accessibility team will not have sufficient context or
 understanding of the change or how to test it.
 This is necessary to thoroughly assess its accessibility.
+
+When reaching out in the accessibility channel, or tagging a team member on Phabricator,
+please include the following information. This will help us complete your review in
+a timely fashion.
+
+1. Post a comment describing the specific accessibility behaviour
+you're looking for feedback about
+2. Attach screenshots showing behaviour before and after your
+patch (if this is a visual change)
+3. Post a description of screen reader output/behaviour before
+and after your patch (if this change affects assistive
+technology users)
 
 ## Automated Accessibility Review Skill
 

@@ -704,9 +704,6 @@ class ProcessesView extends RowSet {
       case "rdd":
         fluentName = "about-processes-rdd-process";
         break;
-      case "socket":
-        fluentName = "about-processes-socket-process";
-        break;
       case "forkServer":
         fluentName = "about-processes-fork-server-process";
         break;

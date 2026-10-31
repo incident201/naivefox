@@ -6,7 +6,7 @@ import { html } from "chrome://global/content/vendor/lit.all.mjs";
 import { MozLitElement } from "chrome://global/content/lit-utils.mjs";
 
 /**
- * "Made with Smart Window" credit at the bottom of a generated AI Tab page.
+ * Smart Window credit at the bottom of a generated Smart Page.
  */
 export class AITabFooter extends MozLitElement {
   render() {
@@ -20,9 +20,10 @@ export class AITabFooter extends MozLitElement {
         href="chrome://browser/content/aiwindow/components/aitab-footer.css"
       />
       <footer class="aitab-footer">
-        <p class="aitab-made-with" data-l10n-id="aitab-page-made-with">
-          <span class="aitab-made-with-brand" data-l10n-name="brand"></span>
-        </p>
+        <p
+          class="aitab-footer-brand"
+          data-l10n-id="aitab-page-footer-brand"
+        ></p>
       </footer>
     `;
   }

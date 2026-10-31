@@ -28,6 +28,7 @@
 #include "mozilla/ScrollContainerFrame.h"
 #include "mozilla/StaticPrefs_apz.h"
 #include "mozilla/StaticPrefs_dom.h"
+#include "mozilla/StaticPrefs_svg.h"
 #include "mozilla/TimeStamp.h"
 #include "mozilla/dom/AbortSignal.h"
 #include "mozilla/dom/BindingUtils.h"
@@ -1176,6 +1177,13 @@ nsresult EventListenerManager::CompileEventHandlerInternal(Listener* aListener,
     body.Assign(pendingSource->mBody);
     nameSpaceID = pendingSource->mNameSpaceID;
   } else {
+    if (element->IsInSVGUseShadowTree()) {
+      // These currently expose the internal <svg:use> shadow tree to script.
+      doc->WarnOnceAbout(DeprecatedOperations::eSVGUseInlineEventHandler);
+      if (StaticPrefs::svg_use_element_block_inline_event_handlers()) {
+        return NS_ERROR_DOM_SECURITY_ERR;
+      }
+    }
     if (aTypeAtom == nsGkAtoms::onSVGLoad) {
       attrName = nsGkAtoms::onload;
     } else if (aTypeAtom == nsGkAtoms::onSVGScroll) {

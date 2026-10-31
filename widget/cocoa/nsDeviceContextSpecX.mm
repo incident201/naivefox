@@ -79,8 +79,8 @@ NS_IMETHODIMP nsDeviceContextSpecX::Init(nsIPrintSettings* aPS,
   if (!settings) {
     return NS_ERROR_NO_INTERFACE;
   }
-  // Note: unlike other platforms, we don't set our base class's mPrintSettings
-  // here since we don't need it currently (we do set mPMPrintSettings below).
+
+  mPrintSettings = aPS;
 
   NSPrintInfo* printInfo = settings->CreateOrCopyPrintInfo();
   if (!printInfo) {
@@ -161,12 +161,12 @@ RefPtr<PrintEndDocumentPromise> nsDeviceContextSpecX::EndDocument() {
 nsresult nsDeviceContextSpecX::DoEndDocument() {
   NS_OBJC_BEGIN_TRY_BLOCK_RETURN;
 
-  if (mOutputStream) {
+  if (mOutputStream || mOutputFileIsFinal) {
     // Nothing to do. PrintTargetSkPDF will flush the stream.
     return NS_OK;
   }
 
-  nsCOMPtr<nsILocalFileMac> tmpPDFFile = do_QueryInterface(mTempFile);
+  nsCOMPtr<nsILocalFileMac> tmpPDFFile = do_QueryInterface(mOutputFile);
   if (!tmpPDFFile) {
     return NS_ERROR_FAILURE;
   }
@@ -175,6 +175,10 @@ nsresult nsDeviceContextSpecX::DoEndDocument() {
   // nsILocalFileMac.idl, even though we didn't follow the Core Foundation
   // naming conventions here (the method should've been called CopyCFURL).
   MOZ_TRY(tmpPDFFile->GetCFURL(pdfURL.Receive()));
+
+  if (StaticPrefs::print_macos_prefer_print_session()) {
+    return PrintPDFViaPrintSession(pdfURL);
+  }
 
   PMDestinationType destination;
   if (::PMSessionGetDestinationType(mPrintSession, mPMPrintSettings,
@@ -190,17 +194,17 @@ nsresult nsDeviceContextSpecX::DoEndDocument() {
       if (status != noErr) {
         return NS_ERROR_FAILURE;
       }
-      CFStringRef mimeType = CFSTR("application/pdf");
-      status = ::PMPrinterPrintWithFile(currentPrinter, mPMPrintSettings,
-                                        mPageFormat, mimeType, pdfURL);
-      break;
-    }
-    case kPMDestinationPreview: {
-      // XXXjwatt Or should we use CocoaFileUtils::RevealFileInFinder(pdfURL);
-      AutoCFTypeRef<CFStringRef> pdfPath(
-          CFURLCopyFileSystemPath(pdfURL, kCFURLPOSIXPathStyle));
-      NSString* path = (NSString*)CFStringRef(pdfPath);
-      [NSWorkspace.sharedWorkspace openFile:path];
+      // Some drivers output extra sheets unless we specify the right BeginPage
+      // count, see bug 2084053.
+      if (StaticPrefs::print_macos_driver_workarounds_begin_pages()) {
+        AutoCFTypeRef<CFNumberRef> n(
+            CFNumberCreate(nullptr, kCFNumberSInt32Type, &mCurrentPageCount));
+        ::PMPrintSettingsSetValue(mPMPrintSettings, kPMTotalBeginPagesKey, n,
+                                  false);
+      }
+      status = ::PMPrinterPrintWithFile(
+          currentPrinter, mPMPrintSettings, mPageFormat,
+          /* mimeType = */ CFSTR("application/pdf"), pdfURL);
       break;
     }
     case kPMDestinationFile: {
@@ -217,20 +221,32 @@ nsresult nsDeviceContextSpecX::DoEndDocument() {
       AutoCFTypeRef<CFStringRef> sourcePathRef(
           CFURLCopyFileSystemPath(pdfURL, kCFURLPOSIXPathStyle));
       NSString* sourcePath = (NSString*)CFStringRef(sourcePathRef);
-      NSFileManager* fileManager = [NSFileManager defaultManager];
-      if ([fileManager fileExistsAtPath:sourcePath]) {
-        NSURL* src = static_cast<NSURL*>(CFURLRef(pdfURL));
-        NSURL* dest = static_cast<NSURL*>(CFURLRef(destURL));
-        bool ok = [fileManager
-            replaceItemAtURL:dest
-               withItemAtURL:src
-              backupItemName:nil
-                     options:NSFileManagerItemReplacementUsingNewMetadataOnly
-            resultingItemURL:nil
-                       error:nil];
-        if (!ok) {
-          return NS_ERROR_FAILURE;
-        }
+      NSFileManager* fileManager = NSFileManager.defaultManager;
+      if (![fileManager fileExistsAtPath:sourcePath]) {
+        break;
+      }
+      NSURL* src = static_cast<NSURL*>(CFURLRef(pdfURL));
+      NSURL* dest = static_cast<NSURL*>(CFURLRef(destURL));
+      if ([fileManager
+              replaceItemAtURL:dest
+                 withItemAtURL:src
+                backupItemName:nil
+                       options:NSFileManagerItemReplacementUsingNewMetadataOnly
+              resultingItemURL:nil
+                         error:nil]) {
+        break;
+      }
+      // The move can fail, e.g. if the destination is on another volume, so
+      // fall back to a copy.
+      NSData* data = [NSData dataWithContentsOfURL:src
+                                           options:NSDataReadingMappedIfSafe
+                                             error:nil];
+      bool copied = data && [data writeToURL:dest
+                                     options:NSDataWritingAtomic
+                                       error:nil];
+      [fileManager removeItemAtURL:src error:nil];
+      if (!copied) {
+        return NS_ERROR_FAILURE;
       }
       break;
     }
@@ -247,6 +263,7 @@ nsresult nsDeviceContextSpecX::DoEndDocument() {
                                                  pdfURL);
       break;
     }
+    case kPMDestinationPreview:
     case kPMDestinationFax:
     default:
       return PrintPDFViaPrintSession(pdfURL);
@@ -310,48 +327,48 @@ nsresult nsDeviceContextSpecX::PrintPDFViaPrintSession(CFURLRef aPDFURL) {
   NS_OBJC_END_TRY_BLOCK_RETURN(NS_ERROR_FAILURE);
 }
 
-void nsDeviceContextSpecX::GetPaperRect(double* aTop, double* aLeft,
-                                        double* aBottom, double* aRight) {
-  NS_OBJC_BEGIN_TRY_IGNORE_BLOCK;
-
-  PMRect paperRect;
-  ::PMGetAdjustedPaperRect(mPageFormat, &paperRect);
-
-  *aTop = paperRect.top;
-  *aLeft = paperRect.left;
-  *aBottom = paperRect.bottom;
-  *aRight = paperRect.right;
-
-  NS_OBJC_END_TRY_IGNORE_BLOCK;
-}
-
 already_AddRefed<PrintTarget> nsDeviceContextSpecX::MakePrintTarget() {
-  double top, left, bottom, right;
-  GetPaperRect(&top, &left, &bottom, &right);
-  const double width = right - left;
-  const double height = bottom - top;
-  IntSize size = IntSize::Ceil(width, height);
   auto stream = [&]() -> nsCOMPtr<nsIOutputStream> {
     if (mOutputStream) {
       return mOutputStream;
     }
-    nsresult rv =
-        NS_GetSpecialDirectory(NS_OS_TEMP_DIR, getter_AddRefs(mTempFile));
-    NS_ENSURE_SUCCESS(rv, nullptr);
-    // FIXME(emilio): We don't seem to remove this file anywhere, and also it
-    // seems its name could collide, should we use a UUID or something, if we
-    // need it to be named?
-    nsAutoCString tempPath("tmp-printing.pdf");
-    mTempFile->AppendNative(tempPath);
-    rv = mTempFile->CreateUnique(nsIFile::NORMAL_FILE_TYPE, 0600);
-    NS_ENSURE_SUCCESS(rv, nullptr);
+    if (StaticPrefs::print_macos_stream_to_destination_file_enabled()) {
+      AutoCFTypeRef<CFURLRef> destURL(nullptr);
+      PMDestinationType destination;
+      if (::PMSessionGetDestinationType(mPrintSession, mPMPrintSettings,
+                                        &destination) == noErr &&
+          destination == kPMDestinationFile &&
+          ::PMSessionCopyDestinationLocation(mPrintSession, mPMPrintSettings,
+                                             destURL.Receive()) == noErr &&
+          destURL && IsPDFFileURL(destURL)) {
+        nsCOMPtr<nsILocalFileMac> destFile;
+        nsresult rv =
+            NS_NewLocalFileWithCFURL(destURL, getter_AddRefs(destFile));
+        NS_ENSURE_SUCCESS(rv, nullptr);
+        mOutputFile = std::move(destFile);
+        mOutputFileIsFinal = true;
+      }
+    }
+    if (!mOutputFileIsFinal) {
+      nsresult rv =
+          NS_GetSpecialDirectory(NS_OS_TEMP_DIR, getter_AddRefs(mOutputFile));
+      NS_ENSURE_SUCCESS(rv, nullptr);
+      // FIXME(emilio): We don't seem to remove this file anywhere, and also it
+      // seems its name could collide, should we use a UUID or something, if we
+      // need it to be named?
+      nsAutoCString tempPath("tmp-printing.pdf");
+      mOutputFile->AppendNative(tempPath);
+      rv = mOutputFile->CreateUnique(nsIFile::NORMAL_FILE_TYPE, 0600);
+      NS_ENSURE_SUCCESS(rv, nullptr);
+    }
 
-    nsCOMPtr<nsIFileOutputStream> stream =
-        do_CreateInstance("@mozilla.org/network/file-output-stream;1");
-    if (NS_FAILED(stream->Init(mTempFile, -1, -1, 0))) {
+    nsCOMPtr<nsIFileOutputStream> stream = do_CreateInstance(
+        mOutputFileIsFinal ? "@mozilla.org/network/atomic-file-output-stream;1"
+                           : "@mozilla.org/network/file-output-stream;1");
+    if (NS_FAILED(stream->Init(mOutputFile, -1, -1, 0))) {
       return nullptr;
     }
     return stream;
   }();
-  return PrintTargetSkPDF::CreateOrNull(stream, size);
+  return PrintTargetSkPDF::CreateOrNull(stream);
 }

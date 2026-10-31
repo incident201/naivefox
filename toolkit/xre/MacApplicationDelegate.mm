@@ -75,6 +75,7 @@ enum class LaunchStatus {
 };
 
 static LaunchStatus sLaunchStatus = LaunchStatus::Initial;
+static bool sHasFinishedLaunching = false;
 
 #ifdef EARLY_BETA_OR_EARLIER
 static mozilla::TimeStamp sStartupRunLoopStart;
@@ -215,14 +216,19 @@ void InitializeMacApp() {
     // Spin the event loop so that any URLs the app was launched to open are
     // buffered into StartupURLs(). Observer is released inside the callback.
     CFRunLoopObserverRef observer = CFRunLoopObserverCreate(
-        kCFAllocatorDefault, kCFRunLoopBeforeWaiting, /* repeats = */ false,
+        kCFAllocatorDefault, kCFRunLoopBeforeWaiting, /* repeats = */ true,
         /* order = */ 0,
         [](CFRunLoopObserverRef aObserver, CFRunLoopActivity, void*) {
-          CFRunLoopObserverInvalidate(aObserver);
-          CFRelease(aObserver);
-
           LOG_STARTUP_RUN_LOOP_EVENT("obs:n%u,r%d", EventloopNestingLevel(),
                                      [NSApp isRunning] ? 1 : 0);
+
+          // A native run loop can reach idle before launch finishes.
+          if (!sHasFinishedLaunching) {
+            return;
+          }
+
+          CFRunLoopObserverInvalidate(aObserver);
+          CFRelease(aObserver);
 
           // Stop the inner run loop. We'll call `run` again when the main event
           // loop should start.
@@ -404,11 +410,10 @@ nsTArray<nsCString> TakeStartupURLs() { return std::move(StartupURLs()); }
   NS_OBJC_END_TRY_BLOCK_RETURN(nil);
 }
 
-#ifdef EARLY_BETA_OR_EARLIER
 - (void)applicationDidFinishLaunching:(NSNotification*)notification {
+  sHasFinishedLaunching = true;
   LOG_STARTUP_RUN_LOOP_EVENT("didfinish");
 }
-#endif
 
 - (void)applicationWillFinishLaunching:(NSNotification*)notification {
   LOG_STARTUP_RUN_LOOP_EVENT("willfinish");
@@ -487,6 +492,20 @@ nsTArray<nsCString> TakeStartupURLs() { return std::move(StartupURLs()); }
   // Placeholder for unused program name.
   args.AppendElement(nullptr);
   bool bufferedURLs = false;
+  bool shouldOpenInBackground = false;
+#ifdef MOZ_BUILD_APP_IS_BROWSER
+  NSAppleEventDescriptor* event =
+      NSAppleEventManager.sharedAppleEventManager.currentAppleEvent;
+  if (event.eventClass == kInternetEventClass && event.eventID == kAEGetURL) {
+    if (@available(macOS 15.0, *)) {
+      constexpr AEKeyword kActivationExpected = 'aapd';
+      shouldOpenInBackground =
+          ![event paramDescriptorForKeyword:kActivationExpected].booleanValue;
+    } else {
+      shouldOpenInBackground = !NSApp.isActive;
+    }
+  }
+#endif
 
   for (NSURL* url in urls) {
     if (!url || !url.scheme ||
@@ -501,7 +520,7 @@ nsTArray<nsCString> TakeStartupURLs() { return std::move(StartupURLs()); }
       continue;
     }
 
-    args.AppendElement("-url");
+    args.AppendElement(shouldOpenInBackground ? "-url-background" : "-url");
     args.AppendElement(urlString);
   }
 

@@ -249,102 +249,29 @@ extension.
 A directory listed in `js_source_paths` has its JSDoc rendered as an API
 reference (`js:autoclass`, `js:autofunction`), which sphinx-js generates by
 running jsdoc over the source. The comment then has more than one reader, and
-they do not agree:
+they do not agree: descriptions render as reStructuredText, not Markdown, and
+jsdoc rejects some TypeScript type spellings that tsc accepts. Read
+`references/js-api-references.md` before writing or fixing a doc comment in
+one of those directories, adding a file to `js_source_paths`, or chasing a
+generated page that is missing a member or aborts the build.
 
--   **Descriptions render as reStructuredText.** The `[text](/path/index.md)`
-    form used elsewhere comes out literally, with only the bare URL autolinked.
-    Write the link as a role instead:
-
-        :doc:`Places </browser/places/index>`
-
-    A single backtick is the `title-reference` role, so `` `forceForeground` ``
-    comes out as italic prose; code needs double backticks. `|name|` is a
-    substitution reference, and an undefined one fails the build rather than
-    warning.
--   **A `@param` description renders as one paragraph.** sphinx-js replaces every
-    newline in one with a space, so a list or a heading written inside a
-    parameter's description arrives glued to the parameter above it. Structure
-    belongs in the function's own description, which keeps it.
--   **A JSDoc failure anywhere aborts every build.** `conf.py` hands sphinx-js
-    the whole `js_source_paths` list whatever directory `./mach doc` was pointed
-    at, so an aborting error names a file the change never touched and scoping
-    the build does not avoid it. `--no-autodoc` builds the page anyway, with the
-    generated API pages missing and `js:autoclass` warning as an unknown
-    directive.
--   **Write TypeScript types as TypeScript wants them.**
-    `docs/jsdoc-plugins/accept-typescript-types.mjs` passes predicates,
-    generics, indexed access, tuples, arrow and `import()` types through to the
-    page verbatim, though not as links.
--   **Prose under an `@type` tag is moved above it** by
-    `docs/jsdoc-plugins/keep-type-descriptions.mjs`, where jsdoc reads it, but
-    only when `@type` is the first tag and the prose has its own lines. A
-    one-line `/** @type {number} Seconds since the epoch. */` loses its text;
-    write it out over several lines.
--   **Give `@typedef` a type** -- `@typedef {object} Name` -- or jsdoc takes the
-    first `{` in the prose under it as the type and logs a build ERROR.
--   **A documented default value renders**, so `[options.animate=true]` is a
-    claim about the code. Write one only where the signature supplies that
-    default, and describe a computed default in the prose instead, where it can
-    be kept accurate.
--   **A destructured parameter's documented name is printed in front of every
-    property under it**, so the name a comment invents for an options bag is
-    part of the rendered API rather than a local choice.
--   **`@throws` renders** as a `throws` field carrying its type. On a class,
-    though, `js:autoclass` takes parameters, return values and exceptions from
-    the constructor only, so those tags render nowhere from the class's own
-    comment.
+**A JSDoc failure anywhere aborts every build.** `conf.py` hands sphinx-js the
+whole `js_source_paths` list whatever directory `./mach doc` was pointed at, so
+an aborting error names a file the change never touched and scoping the build
+does not avoid it. `--no-autodoc` builds the page anyway, with the generated API
+pages missing and `js:autoclass` warning as an unknown directive.
 
 ## Mermaid diagrams
 
 `sphinxcontrib.mermaid` is enabled, so a fenced `mermaid` block becomes a
 diagram. Sphinx only writes the diagram source into the page and mermaid renders
-it in the browser from a CDN. `tools/moztreedocs/docs/mermaid-integration.md`
-describes the directive and how a diagram renders.
-
-Besides mermaid's own diagram types, a block that starts with `zenuml` draws a
-ZenUML sequence diagram. It suits a call flow whose calls nest, such as a method
-that calls into other objects before it returns: the source is written like
-code, `A->B.method(arg) { B->C.other() return value }`, and a nested call is
-drawn inside the activation of the call that made it, where `sequenceDiagram`
-lists messages one after another and leaves the nesting to the reader. That page
-has a rendered example.
-
-Worth knowing:
-
--   **A mermaid block always builds.** `./mach doc` succeeding says nothing about
-    the diagram, since nothing has drawn it yet -- every failure below is
-    invisible until the built page is open in a browser.
--   **A diagram renders at its intrinsic size.** One narrower than the column is
-    centered in it, caption included, so the `:align:` option is redundant. One
-    wider than the column scrolls inside its own box, where an edge fade shows
-    that it continues. Its labels keep the size every other diagram's have, so
-    pick the direction the content reads in rather than the one that fits:
-    `flowchart LR` and `sequenceDiagram` cost no legibility at a width the
-    column cannot hold. A reader still has to scroll for whatever sits past the
-    column.
--   **A label holding a long unbroken word renders as an empty box in Firefox**
-    (mermaid#5785), which a `wrappingWidth` config block in the diagram's
-    frontmatter works around.
--   **A label starting with `1. ` renders as `Unsupported markdown: list`**,
-    because mermaid parses labels as markdown. A colon in place of the period
-    avoids it.
--   **A diagram follows the page's color scheme.** A `classDef` or `style` that
-    hardcodes a `fill` keeps that color in both schemes, so it needs an explicit
-    `color:` as well, or the theme's label color lands on it and comes out grey on
-    a light fill in dark mode. That page has the color rules, including what the
-    unstyled default fill means for prose that points at a node by color.
--   **A ZenUML diagram is inverted in the dark scheme**, because its plugin
-    ignores the theme and draws black on transparent. Avoid colors a
-    light-to-dark inversion would misrepresent.
--   **Do not distinguish two kinds of node by fill color alone**: it fails for
-    readers with a color vision deficiency and on poor displays. Vary the shape as
-    well -- a stadium `(["text"])` reads clearly against a plain `["text"]`,
-    while a rounded rectangle `("text")` is too close to it. `classDef` accepts
-    `rx` and `ry` for a radius in between, but only with a unit: `rx:14` is
-    silently ignored, `rx:14px` applies.
--   **Directive options have to be contiguous**, immediately under the opening
-    fence. A blank line between two of them ends the option block, and the rest
-    then render as diagram source.
+it in the browser from a CDN, so **a mermaid block always builds**: `./mach doc`
+succeeding says nothing about the diagram, and every failure in it is invisible
+until the built page is open in a browser. A block that starts with `zenuml`
+draws a ZenUML sequence diagram. `tools/moztreedocs/docs/mermaid-integration.md`
+describes the directive and how a diagram renders. Read `references/mermaid.md`
+before adding or changing a diagram, replacing a diagram image, or checking how
+one rendered.
 
 ## Best Practices
 

@@ -238,7 +238,7 @@ NS_IMETHODIMP FetchCompleteRunnable::RunOnWorkletThread() {
 
   nsresult rv;
   if (mScriptBuffer) {
-    UniquePtr<ScriptDecoder> decoder = MakeUnique<ScriptDecoder>(
+    auto decoder = std::make_unique<ScriptDecoder>(
         UTF_8_ENCODING, ScriptDecoder::BOMHandling::Remove);
     rv = decoder->DecodeRawData(request, mScriptBuffer.get(), mScriptLength,
                                 true);
@@ -636,7 +636,7 @@ NS_IMETHODIMP WorkletScriptHandler::OnStreamComplete(nsIStreamLoader* aLoader,
 
   // Copy the buffer and decode it on worklet thread, as we can only access
   // ModuleLoadRequest on worklet thread.
-  UniquePtr<uint8_t[]> scriptTextBuf = MakeUnique<uint8_t[]>(aStringLen);
+  auto scriptTextBuf = std::make_unique<uint8_t[]>(aStringLen);
   memcpy(scriptTextBuf.get(), aString, aStringLen);
 
   nsCOMPtr<nsIRunnable> runnable =

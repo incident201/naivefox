@@ -288,9 +288,8 @@ already_AddRefed<Response> TypeUtils::ToResponse(const CacheResponse& aIn) {
 
   ir->InitChannelInfo(aIn.securityInfo());
   if (aIn.principalInfo().isSome()) {
-    UniquePtr<mozilla::ipc::PrincipalInfo> info =
-        std::make_unique<mozilla::ipc::PrincipalInfo>(
-            aIn.principalInfo().ref());
+    auto info = std::make_unique<mozilla::ipc::PrincipalInfo>(
+        aIn.principalInfo().ref());
     ir->SetPrincipalInfo(std::move(info));
   }
 
@@ -381,7 +380,7 @@ already_AddRefed<InternalHeaders> TypeUtils::ToInternalHeaders(
 }
 
 bool TypeUtils::URLHasValidScheme(nsIURI* aUrl) {
-  return aUrl->SchemeIs("http") || aUrl->SchemeIs("https") ||
+  return net::SchemeIsHttpOrHttps(aUrl) ||
          (StaticPrefs::extensions_backgroundServiceWorker_enabled_AtStartup() &&
           aUrl->SchemeIs("moz-extension"));
 }

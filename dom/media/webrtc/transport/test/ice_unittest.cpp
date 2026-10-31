@@ -1557,8 +1557,8 @@ class WebRtcIceGatherTest : public StunTest {
 
   void EnsurePeer() {
     if (!peer_) {
-      peer_ =
-          MakeUnique<IceTestPeer>("P1", test_utils_, true, NrIceCtx::Config());
+      peer_ = std::make_unique<IceTestPeer>("P1", test_utils_, true,
+                                            NrIceCtx::Config());
     }
   }
 
@@ -1726,8 +1726,8 @@ class WebRtcIceConnectTest : public StunTest {
       return;
     }
 
-    p1_ = MakeUnique<IceTestPeer>("P1", test_utils_, true, config);
-    p2_ = MakeUnique<IceTestPeer>("P2", test_utils_, false, config);
+    p1_ = std::make_unique<IceTestPeer>("P1", test_utils_, true, config);
+    p2_ = std::make_unique<IceTestPeer>("P2", test_utils_, false, config);
     InitPeer(p1_.get(), setup_stun_servers);
     InitPeer(p2_.get(), setup_stun_servers);
 
@@ -2254,7 +2254,7 @@ TEST_F(WebRtcIceGatherTest, TestGatherStunServerIpAddressNoHost) {
 
   NrIceCtx::Config config;
   config.mPolicy = NrIceCtx::ICE_POLICY_NO_HOST;
-  peer_ = MakeUnique<IceTestPeer>("P1", test_utils_, true, config);
+  peer_ = std::make_unique<IceTestPeer>("P1", test_utils_, true, config);
   peer_->AddStream(1);
   peer_->SetStunServer(stun_server_address_, kDefaultStunServerPort);
   peer_->SetFakeResolver(stun_server_address_, stun_server_hostname_);
@@ -2306,7 +2306,7 @@ TEST_F(WebRtcIceGatherTest, TestGatherDNSStunServerIpAddress) {
   // discarded in this test.
   NrIceCtx::Config config;
   config.mPolicy = NrIceCtx::ICE_POLICY_NO_HOST;
-  peer_ = MakeUnique<IceTestPeer>("P1", test_utils_, true, config);
+  peer_ = std::make_unique<IceTestPeer>("P1", test_utils_, true, config);
 
   peer_->SetStunServer(stun_server_address_, kDefaultStunServerPort);
   peer_->SetDNSResolver();
@@ -2356,7 +2356,7 @@ TEST_F(WebRtcIceGatherTest, TestGatherDNSStunServerHostname) {
   // discarded in this test.
   NrIceCtx::Config config;
   config.mPolicy = NrIceCtx::ICE_POLICY_NO_HOST;
-  peer_ = MakeUnique<IceTestPeer>("P1", test_utils_, true, config);
+  peer_ = std::make_unique<IceTestPeer>("P1", test_utils_, true, config);
 
   peer_->SetStunServer(stun_server_hostname_, kDefaultStunServerPort);
   peer_->SetDNSResolver();
@@ -2538,7 +2538,7 @@ TEST_F(WebRtcIceGatherTest, TestGatherAllowLoopback) {
   NrIceCtx::Config config;
   config.mAllowLoopback = true;
   // Set up peer with loopback allowed.
-  peer_ = MakeUnique<IceTestPeer>("P1", test_utils_, true, config);
+  peer_ = std::make_unique<IceTestPeer>("P1", test_utils_, true, config);
   peer_->AddStream(1);
   Gather();
   ASSERT_TRUE(StreamHasMatchingCandidate(0, "127.0.0.1"));
@@ -2695,7 +2695,7 @@ TEST_F(WebRtcIceGatherTest, TestFakeStunServerNatedNoHost) {
 
   NrIceCtx::Config config;
   config.mPolicy = NrIceCtx::ICE_POLICY_NO_HOST;
-  peer_ = MakeUnique<IceTestPeer>("P1", test_utils_, true, config);
+  peer_ = std::make_unique<IceTestPeer>("P1", test_utils_, true, config);
   UseFakeStunUdpServerWithResponse("192.0.2.1", 3333);
   peer_->AddStream(1);
   Gather(0);
@@ -2720,7 +2720,7 @@ TEST_F(WebRtcIceGatherTest, TestFakeStunServerNoNatNoHost) {
 
   NrIceCtx::Config config;
   config.mPolicy = NrIceCtx::ICE_POLICY_NO_HOST;
-  peer_ = MakeUnique<IceTestPeer>("P1", test_utils_, true, config);
+  peer_ = std::make_unique<IceTestPeer>("P1", test_utils_, true, config);
   UseTestStunServer();
   peer_->AddStream(1);
   Gather(0);
@@ -2741,7 +2741,7 @@ TEST_F(WebRtcIceGatherTest,
   }
 
   NrIceCtx::Config config;
-  peer_ = MakeUnique<IceTestPeer>("P1", test_utils_, true, config);
+  peer_ = std::make_unique<IceTestPeer>("P1", test_utils_, true, config);
   UseTestStunServer();
   peer_->AddStream(1);
   Gather(0, false, false);
@@ -2762,7 +2762,7 @@ TEST_F(WebRtcIceGatherTest,
   }
 
   NrIceCtx::Config config;
-  peer_ = MakeUnique<IceTestPeer>("P1", test_utils_, true, config);
+  peer_ = std::make_unique<IceTestPeer>("P1", test_utils_, true, config);
   UseTestStunServer();
   peer_->AddStream(1);
   Gather(0, false, true);
@@ -2882,7 +2882,8 @@ TEST_F(WebRtcIceConnectTest, TestConnectRestartIce) {
   SendReceive(p1_.get(), p2_.get());
 
   mozilla::UniquePtr<IceTestPeer> p3_;
-  p3_ = MakeUnique<IceTestPeer>("P3", test_utils_, true, NrIceCtx::Config());
+  p3_ = std::make_unique<IceTestPeer>("P3", test_utils_, true,
+                                      NrIceCtx::Config());
   InitPeer(p3_.get());
   p3_->AddStream(1);
 
@@ -2917,7 +2918,8 @@ TEST_F(WebRtcIceConnectTest, TestConnectRestartIceThenAbort) {
   SendReceive(p1_.get(), p2_.get());
 
   mozilla::UniquePtr<IceTestPeer> p3_;
-  p3_ = MakeUnique<IceTestPeer>("P3", test_utils_, true, NrIceCtx::Config());
+  p3_ = std::make_unique<IceTestPeer>("P3", test_utils_, true,
+                                      NrIceCtx::Config());
   InitPeer(p3_.get());
   p3_->AddStream(1);
 
@@ -2951,7 +2953,8 @@ TEST_F(WebRtcIceConnectTest, TestConnectIceRestartRoleConflict) {
       << "ICE restart should not allow role to change, unless ice-lite happens";
 
   mozilla::UniquePtr<IceTestPeer> p3_;
-  p3_ = MakeUnique<IceTestPeer>("P3", test_utils_, true, NrIceCtx::Config());
+  p3_ = std::make_unique<IceTestPeer>("P3", test_utils_, true,
+                                      NrIceCtx::Config());
   InitPeer(p3_.get());
   p3_->AddStream(1);
   // Set control role for p3 accordingly (with role conflict)
@@ -3461,12 +3464,12 @@ TEST_F(WebRtcIceConnectTest, TestConnectSymmetricNatAndNoNat) {
   }
 
   NrIceCtx::Config config;
-  p1_ = MakeUnique<IceTestPeer>("P1", test_utils_, true, config);
+  p1_ = std::make_unique<IceTestPeer>("P1", test_utils_, true, config);
   p1_->UseNat();
   p1_->SetFilteringType(TestNat::PORT_DEPENDENT);
   p1_->SetMappingType(TestNat::PORT_DEPENDENT);
 
-  p2_ = MakeUnique<IceTestPeer>("P2", test_utils_, false, config);
+  p2_ = std::make_unique<IceTestPeer>("P2", test_utils_, false, config);
   initted_ = true;
 
   AddStream(1);

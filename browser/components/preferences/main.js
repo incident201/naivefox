@@ -693,12 +693,17 @@ var gMainPane = {
       return false;
     }
     if (subcategory == "migrate") {
-      this.showMigrationWizardDialog();
+      this.showMigrationWizardDialog({
+        entrypoint: this.getMigrationEntrypoint(),
+      });
       return true;
     }
 
     if (subcategory == "migrate-autoclose") {
-      this.showMigrationWizardDialog({ closeTabWhenDone: true });
+      this.showMigrationWizardDialog({
+        closeTabWhenDone: true,
+        entrypoint: this.getMigrationEntrypoint(),
+      });
     }
 
     return false;
@@ -1421,25 +1426,9 @@ var gMainPane = {
     // The next time the dialog is opened, a new gBrowserLanguagesDialog is created.
     let { selected } = this.gBrowserLanguagesDialog;
 
-    this.gBrowserLanguagesDialog.recordTelemetry(
-      selected ? "accept" : "cancel"
-    );
-
     if (!selected) {
       // No locales were selected. Cancel the operation.
       return;
-    }
-
-    // Track how often locale fallback order is changed.
-    // Drop the first locale and filter to only include the overlapping set
-    const prevLocales = Services.locale.requestedLocales.filter(
-      lc => selected.indexOf(lc) > 0
-    );
-    const newLocales = selected.filter(
-      (lc, i) => i > 0 && prevLocales.includes(lc)
-    );
-    if (prevLocales.some((lc, i) => newLocales[i] != lc)) {
-      this.gBrowserLanguagesDialog.recordTelemetry("setFallback");
     }
 
     switch (Multilingual.getTransitionType(selected)) {
@@ -1509,9 +1498,32 @@ var gMainPane = {
   },
 
   /**
-   * Displays the migration wizard dialog in an HTML dialog.
+   * Returns the entrypoint MigrationUtils.showMigrationWizard was called with
+   * when it opened about:preferences, if any.
+   *
+   * @returns {string}
    */
-  async showMigrationWizardDialog({ closeTabWhenDone = false } = {}) {
+  getMigrationEntrypoint() {
+    return (
+      MigrationUtils.consumePendingPreferencesEntrypoint() ??
+      MigrationUtils.MIGRATION_ENTRYPOINTS.PREFERENCES
+    );
+  },
+
+  /**
+   * Displays the migration wizard dialog in an HTML dialog.
+   *
+   * @param {object} [options]
+   * @param {boolean} [options.closeTabWhenDone=false]
+   *   True if the tab should close once the dialog is closed.
+   * @param {string} [options.entrypoint]
+   *   The MigrationUtils.MIGRATION_ENTRYPOINTS value for where the wizard
+   *   was opened from.
+   */
+  async showMigrationWizardDialog({
+    closeTabWhenDone = false,
+    entrypoint = MigrationUtils.MIGRATION_ENTRYPOINTS.PREFERENCES,
+  } = {}) {
     let migrationWizardDialog = document.getElementById(
       "migrationWizardDialog"
     );
@@ -1534,6 +1546,10 @@ var gMainPane = {
         }
       );
     }
+    migrationWizardDialog.firstElementChild.setAttribute(
+      "entrypoint",
+      entrypoint
+    );
     migrationWizardDialog.firstElementChild.requestState();
 
     migrationWizardDialog.addEventListener(

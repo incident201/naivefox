@@ -435,7 +435,8 @@ UniquePtr<RenderCompositor> RenderCompositorLayerNativeOGL::Create(
                     << gfx::hexa(gl.get());
     return nullptr;
   }
-  return MakeUnique<RenderCompositorLayerNativeOGL>(aWidget, std::move(gl));
+  return std::make_unique<RenderCompositorLayerNativeOGL>(aWidget,
+                                                          std::move(gl));
 }
 
 RenderCompositorLayerNativeOGL::RenderCompositorLayerNativeOGL(
@@ -495,7 +496,7 @@ void RenderCompositorLayerNativeOGL::InsertFrameDoneSync() {
     mGL->fDeleteSync(mThisFrameDoneFences->mSync);
   }
   mThisFrameDoneFences =
-      MakeUnique<BackPressureFences>(std::move(mPendingGpuFences));
+      std::make_unique<BackPressureFences>(std::move(mPendingGpuFences));
   mThisFrameDoneFences->mSync =
       mGL->fFenceSync(LOCAL_GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
 #endif

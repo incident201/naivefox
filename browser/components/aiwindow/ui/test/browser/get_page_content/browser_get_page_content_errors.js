@@ -23,7 +23,7 @@ describe("Get Page Content errors", () => {
     mockEngineManager = new MockEngineManager();
     ({ win, sidebarBrowser } = await openAIWindowWithSidebar());
 
-    mockEngineManager.rejectAllRequests();
+    await mockEngineManager.rejectAllRequests();
 
     await typeInSmartbar(sidebarBrowser, "What does that page say?");
     await submitSmartbar(sidebarBrowser);
@@ -35,7 +35,7 @@ describe("Get Page Content errors", () => {
   });
 
   afterEach(async () => {
-    mockEngineManager.rejectAllRequests();
+    await mockEngineManager.rejectAllRequests();
     mockEngineManager.cleanupMocks();
     if (win) {
       await BrowserTestUtils.closeWindow(win);

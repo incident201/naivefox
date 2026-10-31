@@ -24,10 +24,17 @@ import {
 } from "moz-src:///browser/components/aiwindow/models/ChatUtils.sys.mjs";
 import { openAIEngine } from "moz-src:///browser/components/aiwindow/models/openAIEngine.sys.mjs";
 import { Conversation } from "moz-src:///browser/components/aiwindow/models/Conversation.sys.mjs";
+import { SmartWindowLocation } from "moz-src:///browser/components/aiwindow/models/SmartWindowLocation.sys.mjs";
 
 /**
  * @typedef {import("moz-src:///browser/components/aiwindow/models/Utils.sys.mjs").InferenceParams} InferenceParams
  */
+
+const lazy = {};
+ChromeUtils.defineESModuleGetters(lazy, {
+  getSmartPageName:
+    "chrome://browser/content/aiwindow/modules/TrustedInternalURLs.mjs",
+});
 
 const CUSTOM_PROMPTS_PREF = "browser.smartwindow.customPrompts";
 const MODEL_CHOICE_PREF = "browser.smartwindow.firstrun.modelChoice";
@@ -43,6 +50,12 @@ const REQUIRED_CHAT_MODULES = new Set(["identity", "response-rules"]);
 const GATED_CHAT_MODULES = new Map([
   ["pages", "browser.smartwindow.aitab.enabled"],
 ]);
+// Browser-context fragments predate its params manifest. Without one at this
+// build's major, read the legacy 1.x "tab" fragment, which builds that do not
+// render `{#key}...{/key}` sections also read.
+const LEGACY_BROWSER_CONTEXT_VERSION = "1.0";
+const LEGACY_TAB_MODULE = "tab";
+const TAB_MODULE = "tab-conditional-fields";
 
 export const DEFAULT_PURPOSE = "default";
 export const FEATURE_PURPOSES = Object.freeze({
@@ -173,12 +186,21 @@ function listSkills(records, model) {
   return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
+/**
+ * Replaces each `{name}` placeholder that has a substitution with its value.
+ * Placeholders are replaced in a single pass, so substituted values are
+ * inserted literally and never expanded again.
+ *
+ * @param {string} rawContent - Template text.
+ * @param {object} [substitutions] - Values keyed by placeholder name.
+ * @returns {string} The rendered text.
+ */
 function renderTemplate(rawContent, substitutions = {}) {
-  let rendered = rawContent;
-  for (const [name, value] of Object.entries(substitutions)) {
-    rendered = rendered.replaceAll(`{${name}}`, value ?? "");
-  }
-  return rendered;
+  return rawContent.replace(/\{(\w+)\}/g, (placeholder, name) =>
+    Object.hasOwn(substitutions, name)
+      ? (substitutions[name] ?? "")
+      : placeholder
+  );
 }
 
 /**
@@ -254,10 +276,21 @@ export async function buildChatSystemPrompt(model) {
     )
     .join("\n");
 
+  // The location is read and fetched only when a module renders it.
+  let locationText = "Unavailable";
+  if (sections.some(section => section.includes("{location}"))) {
+    locationText = SmartWindowLocation.getCachedLocation() ?? locationText;
+    // Refreshed here as well as when a Smart Window opens, so that a long
+    // session or a feature enabled mid-session picks up the location. Not
+    // awaited so that prompt assembly never waits on the network.
+    SmartWindowLocation.refresh();
+  }
+
   const prompt = renderTemplate(sections.join("\n\n\n"), {
     skill_list: skillList,
     locale: Services.locale.appLocaleAsBCP47,
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    location: locationText,
     isoTimestamp,
     todayDate: isoTimestamp.split("T")[0],
   });
@@ -315,6 +348,10 @@ function renderMentionedUrls(mentionsWithUrl) {
         `${indent}- URL: ${url}`,
         `${indent}  Title: ${sanitizeUntrustedContent(label)}`
       );
+      const pageSlug = lazy.getSmartPageName(URL.parse(url));
+      if (pageSlug) {
+        lines.push(`${indent}  Page slug: ${pageSlug}`);
+      }
       return lines.join("\n");
     })
     .join("\n");
@@ -345,18 +382,27 @@ export async function buildBrowserContextPrompt(
   }
 
   const records = await loadV2Records();
+  const paramsRecord = findParams(records, {
+    feature: MODEL_FEATURES.BROWSER_CONTEXT,
+    model,
+  });
   const findFragment = fragment =>
     findModule(records, {
-      feature: "browser-context",
+      feature: MODEL_FEATURES.BROWSER_CONTEXT,
       module: fragment,
-      options: { model },
+      options: {
+        model,
+        version:
+          paramsRecord?.modules.find(m => m.name === fragment)?.version ??
+          LEGACY_BROWSER_CONTEXT_VERSION,
+      },
     });
 
   const fragments = [];
 
   if (browserContextMapping.hasTabInfo) {
     securityProperties.setPrivateData();
-    const record = findFragment("tab");
+    const record = findFragment(paramsRecord ? TAB_MODULE : LEGACY_TAB_MODULE);
     if (record?.prompts) {
       fragments.push(record.prompts);
     }
@@ -364,6 +410,7 @@ export async function buildBrowserContextPrompt(
     delete browserContextMapping.url;
     delete browserContextMapping.title;
     delete browserContextMapping.description;
+    delete browserContextMapping.pageSlug;
   }
   delete browserContextMapping.hasTabInfo;
 
@@ -479,7 +526,7 @@ export async function buildEngineForFeature(feature, opts = {}) {
   const { baseURL, apiKey } = openAIEngine.resolveEndpointConfig(modelChoiceId);
 
   // resolve the model to use for inference, this allows specific features to default to chat model
-  let model = mainConfig.model;
+  let model = mainConfig.inference_model || mainConfig.model;
   const CHAT_MODEL_FALLBACK_FEATURES = new Set([
     MODEL_FEATURES.AGENT_MONITOR,
     MODEL_FEATURES.AITAB,
@@ -493,7 +540,7 @@ export async function buildEngineForFeature(feature, opts = {}) {
     const chatConfig = await selectFeatureConfig(MODEL_FEATURES.CHAT, {
       modelChoiceIdOverride: opts.modelChoiceIdOverride,
     });
-    model = chatConfig.model;
+    model = chatConfig.inference_model || chatConfig.model;
   }
 
   const engine = await openAIEngine.build({

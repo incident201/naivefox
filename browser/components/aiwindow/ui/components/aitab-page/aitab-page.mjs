@@ -5,36 +5,42 @@
 import { html, nothing } from "chrome://global/content/vendor/lit.all.mjs";
 import { componentTypeName } from "chrome://browser/content/aiwindow/modules/AITabUtils.mjs";
 import { MozLitElement } from "chrome://global/content/lit-utils.mjs";
-// eslint-disable-next-line import/no-unassigned-import
+// eslint-disable-next-line import-x/no-unassigned-import
 import "chrome://browser/content/aiwindow/components/aitab-header.mjs";
-// eslint-disable-next-line import/no-unassigned-import
+// eslint-disable-next-line import-x/no-unassigned-import
 import "chrome://browser/content/aiwindow/components/aitab-list.mjs";
-// eslint-disable-next-line import/no-unassigned-import
+// eslint-disable-next-line import-x/no-unassigned-import
 import "chrome://browser/content/aiwindow/components/aitab-timeline.mjs";
-// eslint-disable-next-line import/no-unassigned-import
+// eslint-disable-next-line import-x/no-unassigned-import
 import "chrome://browser/content/aiwindow/components/aitab-table.mjs";
-// eslint-disable-next-line import/no-unassigned-import
+// eslint-disable-next-line import-x/no-unassigned-import
 import "chrome://browser/content/aiwindow/components/aitab-highlights.mjs";
 
-// eslint-disable-next-line import/no-unassigned-import
+// eslint-disable-next-line import-x/no-unassigned-import
 import "chrome://browser/content/aiwindow/components/aitab-error.mjs";
-// eslint-disable-next-line import/no-unassigned-import
+// eslint-disable-next-line import-x/no-unassigned-import
 import "chrome://browser/content/aiwindow/components/aitab-footer.mjs";
-// eslint-disable-next-line import/no-unassigned-import
+// eslint-disable-next-line import-x/no-unassigned-import
 import "chrome://browser/content/aiwindow/components/aitab-text-block.mjs";
 
 // The same names the child and parent actors use, so a message can be traced
 // straight through without a translation table.
 const GET_PAGE_EVENT = "AITab:GetPage";
+const GET_HEADING_FONT_EVENT = "AITab:GetHeadingFont";
 const DELETE_PAGE_EVENT = "AITab:DeletePage";
+
+/**
+ * Page data received from the parent actor.
+ *
+ * @typedef {import("../../actors/AITabParent.sys.mjs").AITabData} AITabData
+ */
 
 /**
  * Root component for about:smartpage. Looks up the page config for the
  * generated page named in the page URL and renders it.
  *
- * @property {?object} page - Page config to render, or null when there is none.
- * @property {string} status - One of "loading", "unavailable", "error" or
- *   "ready". Drives which of the states below is rendered.
+ * @property {AITabData|null} page - Page config to render, or null when there is none.
+ * @property {"loading"|"unavailable"|"error"|"ready"} status - Determines which page state is rendered.
  */
 export class AITabPage extends MozLitElement {
   #renderers;
@@ -64,19 +70,33 @@ export class AITabPage extends MozLitElement {
     this.#loadPage();
   }
 
+  disconnectedCallback() {
+    super.disconnectedCallback();
+
+    this.status = "loading";
+    this.page = null;
+
+    window.removeEventListener(
+      "AITab:RefreshPageData",
+      this.#onRefreshPageData
+    );
+  }
+
   /**
-   * Installs the heading font from bytes the parent sent with the page. A
-   * failure leaves headings on the fallback fonts. The returned status is
-   * recorded with the view and does not change what the page shows.
+   * Fetches the heading font from the parent and installs it. The page does
+   * not wait for this: headings use the fallback fonts until the face is
+   * added, and keep them if it fails. The returned status is recorded with
+   * the view and does not change what the page shows.
    *
-   * @param {?ArrayBuffer} buffer
    * @returns {Promise<"ready"|"unavailable"|"error">}
    */
-  async #installHeadingFont(buffer) {
-    if (!buffer) {
-      return "unavailable";
-    }
+  async #loadHeadingFont() {
     try {
+      const response = await this.#request(GET_HEADING_FONT_EVENT);
+      const buffer = response?.font;
+      if (!buffer) {
+        return "unavailable";
+      }
       // The name comes from aitab-base.css, so the CSS and the face match.
       const family = getComputedStyle(document.documentElement)
         .getPropertyValue("--aitab-heading-font-family")
@@ -103,7 +123,26 @@ export class AITabPage extends MozLitElement {
     return new URLSearchParams(window.location.search).get("page");
   }
 
+  /**
+   * Handles the AITab:RefreshPageData event so the page can be refreshed
+   *
+   * @param {CustomEvent<AITabData>} event - Updated page data from the parent actor.
+   */
+  #onRefreshPageData = event => {
+    this.page = event.detail;
+    this.status = this.page ? "ready" : "unavailable";
+  };
+
+  /**
+   * Loads the page data for the Smart Page and loads the
+   * custom font for Smart Page. Triggers a view telemetry
+   * event.
+   *
+   * @returns {Promise<void>} Resolves after loading the page and recording its view.
+   */
   async #loadPage() {
+    window.addEventListener("AITab:RefreshPageData", this.#onRefreshPageData);
+
     let font = "unavailable";
     try {
       if (!this.pageName) {
@@ -111,6 +150,9 @@ export class AITabPage extends MozLitElement {
         return;
       }
 
+      this.#loadHeadingFont().then(fontStatus => {
+        font = fontStatus;
+      });
       const response = await this.#request(GET_PAGE_EVENT);
       if (!response?.success) {
         throw new Error(
@@ -118,17 +160,18 @@ export class AITabPage extends MozLitElement {
         );
       }
 
-      font = await this.#installHeadingFont(response.font);
       this.page = response.page ?? null;
       this.status = this.page ? "ready" : "unavailable";
     } catch (error) {
       console.error("Failed to load AI Tab page:", error);
       this.status = "error";
     } finally {
+      const outcome = this.status;
+      await this.updateComplete;
       this.dispatchEvent(
         new CustomEvent("AITab:RecordView", {
           bubbles: true,
-          detail: { outcome: this.status, font },
+          detail: { outcome, font },
         })
       );
     }
@@ -285,7 +328,7 @@ export class AITabPage extends MozLitElement {
       return nothing;
     }
 
-    return html`<aitab-error></aitab-error>`;
+    return html`<aitab-error .status=${this.status}></aitab-error>`;
   }
 
   render() {

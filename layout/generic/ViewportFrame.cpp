@@ -44,7 +44,7 @@ enum class TopLayerIndex : uint16_t {
 
 ViewportFrame* NS_NewViewportFrame(PresShell* aPresShell,
                                    ComputedStyle* aStyle) {
-  return new (aPresShell) ViewportFrame(aStyle, aPresShell->GetPresContext());
+  return new ViewportFrame(aStyle, aPresShell->GetPresContext());
 }
 
 NS_IMPL_FRAMEARENA_HELPERS(ViewportFrame)
@@ -149,7 +149,7 @@ static void BuildDisplayListForTopLayerFrame(nsDisplayListBuilder* aBuilder,
   nsDisplayListBuilder::AutoBuildingDisplayList buildingForChild(
       aBuilder, aFrame, visible, dirty);
 
-  nsDisplayList list(aBuilder);
+  nsDisplayList list;
   aFrame->BuildDisplayListForStackingContext(aBuilder, &list);
   aList->AppendToTop(&list);
 }
@@ -219,7 +219,7 @@ nsDisplayWrapList* ViewportFrame::BuildDisplayListForContentTopLayer(
     return nullptr;
   }
 
-  nsDisplayList topLayerList(aBuilder);
+  nsDisplayList topLayerList;
   auto* doc = PresContext()->Document();
 
   nsTArray<dom::Element*> topLayer = doc->GetTopLayer();
@@ -286,7 +286,7 @@ ViewportFrame::BuildDisplayListForViewTransitionsAndNACTopLayer(
     return nullptr;
   }
 
-  nsDisplayList topLayerList(aBuilder);
+  nsDisplayList topLayerList;
   auto* doc = PresContext()->Document();
   if (dom::ViewTransition* vt = doc->GetActiveViewTransition()) {
     if (dom::Element* root = vt->GetSnapshotContainingBlock()) {

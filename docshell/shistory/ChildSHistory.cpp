@@ -212,7 +212,7 @@ void ChildSHistory::AsyncGo(const nsID& aKey, BrowsingContext* aNavigable,
 
 void ChildSHistory::GotoIndex(int32_t aIndex, int32_t aOffset,
                               bool aRequireUserInteraction,
-                              bool aUserActivation, ErrorResult& aRv) {
+                              bool aUserActivation, ErrorResult& /*aRv*/) {
   MOZ_LOG(gSHLog, LogLevel::Debug,
           ("ChildSHistory::GotoIndex(%d, %d), epoch %" PRIu64, aIndex, aOffset,
            mHistoryEpoch));
@@ -239,10 +239,10 @@ void ChildSHistory::GotoIndex(int32_t aIndex, int32_t aOffset,
 }
 
 void ChildSHistory::GotoKey(const nsID& aKey, BrowsingContext* aNavigable,
-                            bool aRequireUserInteraction, bool aUserActivation,
-                            bool aCheckForCancelation,
+                            bool /*aRequireUserInteraction*/,
+                            bool aUserActivation, bool aCheckForCancelation,
                             const std::function<void(nsresult)>& aResolver,
-                            ErrorResult& aRv) {
+                            ErrorResult& /*aRv*/) {
   if (!mPendingEpoch) {
     mPendingEpoch = true;
     RefPtr<ChildSHistory> self(this);

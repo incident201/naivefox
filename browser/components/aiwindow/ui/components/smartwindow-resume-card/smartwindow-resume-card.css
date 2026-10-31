@@ -41,7 +41,7 @@
 
 .resume-card-dismiss {
   position: absolute;
-  top: var(--space-large);
+  inset-block-start: var(--space-large);
   inset-inline-end: var(--space-large);
   display: flex;
   align-items: center;

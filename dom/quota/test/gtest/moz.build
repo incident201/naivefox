@@ -17,6 +17,7 @@ UNIFIED_SOURCES = [
     "QuotaManagerDependencyFixture.cpp",
     "QuotaManagerTestHelpers.cpp",
     "TestCheckedUnsafePtr.cpp",
+    "TestCipherKeyManager.cpp",
     "TestClientDirectoryLockHandle.cpp",
     "TestClientStorageScope.cpp",
     "TestClientUsageArray.cpp",

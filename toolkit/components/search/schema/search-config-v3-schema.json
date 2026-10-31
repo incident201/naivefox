@@ -152,7 +152,7 @@
     },
     "partner": {
       "title": "Partner Details Map",
-      "description": "A list of partner codes and telemetry suffixes per search access point (SAP). If no code is matched, the 'default' entry should be used.",
+      "description": "A list of partner codes and telemetry suffixes per search access point (SAP). Matching SAPs will use the value in this list. Otherwise a hard-coded map may be used on desktop (see SearchUtils). If no SAP is matched, the 'default' entry should be used.",
       "type": "object",
       "properties": {
         "default": {

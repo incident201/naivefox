@@ -20,11 +20,16 @@ origin:
 updatebot:
   maintainer-phab: ahale
   maintainer-bz: ahale@mozilla.com
+  try-preset: webgl
   tasks:
-    - type: commit-alert
+    - type: vendoring
       enabled: True
-      branch: chromium/7778
+      # Chromium Beta's ANGLE revision typically changes every ~7 days. Waiting
+      # 6 days folds faster bursts of Beta updates into one job, while still
+      # filing soon after each weekly change.
+      frequency: 6 days
       needinfo: ["ahale@mozilla.com"]
+      blocking: 1212878  # meta-angle-update
 
 vendoring:
   url: https://chromium.googlesource.com/angle/angle

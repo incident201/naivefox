@@ -14,6 +14,14 @@
   padding-inline-end: var(--space-small);
 }
 
+.input-model-select-button::part(moz-button-label) {
+  max-inline-size: 20ch;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 @container smartbar-controls (max-width: 340px) {
   .input-model-select-button {
     &::part(button) {

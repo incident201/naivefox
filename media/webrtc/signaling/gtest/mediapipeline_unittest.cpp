@@ -8,13 +8,16 @@
 
 #include "AudioSegment.h"
 #include "Canonicals.h"
+#include "ImageContainer.h"
 #include "MediaConduitInterface.h"
 #include "MediaPipelineFilter.h"
 #include "MediaTrackGraph.h"
 #include "MediaTrackListener.h"
 #include "MediaTransportHandler.h"
+#include "MockConduit.h"
 #include "PeerConnectionCtx.h"
 #include "SharedBuffer.h"
+#include "VideoSegment.h"
 #include "WebrtcCallWrapper.h"
 #include "WebrtcEnvironmentWrapper.h"
 #include "WebrtcTaskQueueWrapper.h"
@@ -22,6 +25,7 @@
 #include "api/audio_codecs/builtin_audio_decoder_factory.h"
 #include "api/environment/environment_factory.h"
 #include "api/scoped_refptr.h"
+#include "api/video/i420_buffer.h"
 #include "logging.h"
 #include "modules/audio_device/include/fake_audio_device.h"
 #include "modules/audio_mixer/audio_mixer_impl.h"
@@ -573,7 +577,7 @@ class MediaPipelineTest : public ::testing::Test {
       // Leaving refinedFilter not set implies we want to just update with
       // the other side's SSRC
       if (!refinedFilter) {
-        refinedFilter = MakeUnique<MediaPipelineFilter>();
+        refinedFilter = std::make_unique<MediaPipelineFilter>();
         // Might not be safe, strictly speaking.
         refinedFilter->AddRemoteSSRC(p1_.GetLocalSSRC());
       }
@@ -750,7 +754,7 @@ TEST_F(MediaPipelineTest, TestAudioSendMux) {
 }
 
 TEST_F(MediaPipelineTest, TestAudioSendBundle) {
-  auto filter = MakeUnique<MediaPipelineFilter>();
+  auto filter = std::make_unique<MediaPipelineFilter>();
   // These durations have to be _extremely_ long to have any assurance that
   // some RTCP will be sent at all. This is because the first RTCP packet
   // is sometimes sent before the transports are ready, which causes it to
@@ -769,15 +773,15 @@ TEST_F(MediaPipelineTest, TestAudioSendBundle) {
 }
 
 TEST_F(MediaPipelineTest, TestAudioSendEmptyBundleFilter) {
-  auto filter = MakeUnique<MediaPipelineFilter>();
-  auto bad_answer_filter = MakeUnique<MediaPipelineFilter>();
+  auto filter = std::make_unique<MediaPipelineFilter>();
+  auto bad_answer_filter = std::make_unique<MediaPipelineFilter>();
   TestAudioReceiverBundle(std::move(filter), std::move(bad_answer_filter));
   // Filter is empty, so should drop everything.
   ASSERT_EQ(0, p2_.GetAudioRtpCountReceived());
 }
 
 TEST_F(MediaPipelineTest, TestAudioInactiveNoRecv) {
-  auto filter = MakeUnique<MediaPipelineFilter>();
+  auto filter = std::make_unique<MediaPipelineFilter>();
   TestAudioReceiverBundle(std::move(filter), nullptr,
                           {.activate_receive = false,
                            .ms_until_filter_update = 200,
@@ -786,6 +790,137 @@ TEST_F(MediaPipelineTest, TestAudioInactiveNoRecv) {
   // Packets should have been sent but not received.
   ASSERT_NE(p1_.GetAudioRtpCountSent(), 0);
   ASSERT_EQ(p2_.GetAudioRtpCountReceived(), 0);
+}
+
+// A video SourceMediaTrack outside any graph, whose appended data the test
+// takes.
+class MockSourceMediaTrack : public SourceMediaTrack {
+ public:
+  MockSourceMediaTrack() : SourceMediaTrack(MediaSegment::VIDEO, 90000) {}
+
+  MOCK_METHOD(TrackTime, AppendData, (MediaSegment*, MediaSegment*),
+              (override));
+
+  void AddListener(MediaTrackListener* aListener) override {}
+  RefPtr<GenericPromise> RemoveListener(
+      MediaTrackListener* aListener) override {
+    return GenericPromise::CreateAndResolve(true, __func__);
+  }
+  void Destroy() override { mMainThreadDestroyed = true; }
+};
+
+// A frame libwebrtc decodes itself reaches the track as an I420 copy in the
+// color space the frame declares.
+TEST(MediaPipelineReceiveVideoTest, TestI420FrameColorSpace)
+{
+  MediaEventProducerExc<MediaPacket> rtcpSendEvent;
+  auto conduit = MakeRefPtr<testing::NiceMock<MockVideoConduit>>();
+  ON_CALL(*conduit, ReceiverRtcpSendEvent())
+      .WillByDefault(testing::ReturnRef(rtcpSendEvent));
+  RefPtr<VideoRenderer> renderer;
+  EXPECT_CALL(*conduit, AttachRenderer(testing::_))
+      .WillOnce(testing::DoAll(testing::SaveArg<0>(&renderer),
+                               testing::Return(kMediaConduitNoError)));
+  EXPECT_CALL(*conduit, DetachRenderer());
+
+  auto source = MakeRefPtr<testing::NiceMock<MockSourceMediaTrack>>();
+  RefPtr<layers::Image> image;
+  ON_CALL(*source, AppendData(testing::_, testing::_))
+      .WillByDefault([&](MediaSegment* aSegment, MediaSegment*) {
+        auto* segment = static_cast<VideoSegment*>(aSegment);
+        image = segment->GetLastFrame()->GetImage();
+        return segment->GetDuration();
+      });
+
+  auto pipeline = MakeRefPtr<MediaPipelineReceiveVideo>(
+      "", nullptr, AbstractThread::MainThread(), GetCurrentSerialEventTarget(),
+      conduit, source, TrackingId(), PRINCIPAL_HANDLE_NONE,
+      PrincipalPrivacy::NonPrivate);
+  ASSERT_TRUE(renderer);
+
+  auto receive = [&](const std::optional<webrtc::ColorSpace>& aColorSpace) {
+    image = nullptr;
+    renderer->RenderVideoFrame(
+        webrtc::VideoFrame::Builder()
+            .set_video_frame_buffer(webrtc::I420Buffer::Create(16, 16))
+            .set_color_space(aColorSpace)
+            .build());
+    MOZ_RELEASE_ASSERT(image);
+    RefPtr<layers::PlanarYCbCrImage> yuvImage = image->AsPlanarYCbCrImage();
+    MOZ_RELEASE_ASSERT(yuvImage);
+    return *yuvImage->GetData();
+  };
+
+  {
+    // A frame that declares no color space (e.g. VP8): BT.601 limited.
+    const layers::PlanarYCbCrData data = receive(std::nullopt);
+    EXPECT_EQ(data.mYUVColorSpace, gfx::YUVColorSpace::BT601);
+    EXPECT_EQ(data.mColorRange, gfx::ColorRange::LIMITED);
+    EXPECT_EQ(data.mColorPrimaries, gfx::ColorSpace2::UNKNOWN);
+    EXPECT_EQ(data.mTransferFunction, gfx::TransferFunction::BT709);
+  }
+  {
+    const layers::PlanarYCbCrData data =
+        receive(webrtc::ColorSpace(webrtc::ColorSpace::PrimaryID::kBT709,
+                                   webrtc::ColorSpace::TransferID::kBT709,
+                                   webrtc::ColorSpace::MatrixID::kBT709,
+                                   webrtc::ColorSpace::RangeID::kLimited));
+    EXPECT_EQ(data.mYUVColorSpace, gfx::YUVColorSpace::BT709);
+    EXPECT_EQ(data.mColorRange, gfx::ColorRange::LIMITED);
+    EXPECT_EQ(data.mColorPrimaries, gfx::ColorSpace2::BT709);
+    EXPECT_EQ(data.mTransferFunction, gfx::TransferFunction::BT709);
+  }
+  {
+    const layers::PlanarYCbCrData data =
+        receive(webrtc::ColorSpace(webrtc::ColorSpace::PrimaryID::kBT2020,
+                                   webrtc::ColorSpace::TransferID::kSMPTEST2084,
+                                   webrtc::ColorSpace::MatrixID::kBT2020_NCL,
+                                   webrtc::ColorSpace::RangeID::kFull));
+    EXPECT_EQ(data.mYUVColorSpace, gfx::YUVColorSpace::BT2020);
+    EXPECT_EQ(data.mColorRange, gfx::ColorRange::FULL);
+    EXPECT_EQ(data.mColorPrimaries, gfx::ColorSpace2::BT2020);
+    EXPECT_EQ(data.mTransferFunction, gfx::TransferFunction::PQ);
+  }
+  {
+    const layers::PlanarYCbCrData data = receive(
+        webrtc::ColorSpace(webrtc::ColorSpace::PrimaryID::kBT2020,
+                           webrtc::ColorSpace::TransferID::kARIB_STD_B67,
+                           webrtc::ColorSpace::MatrixID::kBT2020_NCL,
+                           webrtc::ColorSpace::RangeID::kLimited));
+    EXPECT_EQ(data.mYUVColorSpace, gfx::YUVColorSpace::BT2020);
+    EXPECT_EQ(data.mColorRange, gfx::ColorRange::LIMITED);
+    EXPECT_EQ(data.mColorPrimaries, gfx::ColorSpace2::BT2020);
+    EXPECT_EQ(data.mTransferFunction, gfx::TransferFunction::HLG);
+  }
+  {
+    // An unspecified matrix follows the primaries, as for the platform
+    // decoders.
+    const layers::PlanarYCbCrData data = receive(
+        webrtc::ColorSpace(webrtc::ColorSpace::PrimaryID::kBT709,
+                           webrtc::ColorSpace::TransferID::kIEC61966_2_1,
+                           webrtc::ColorSpace::MatrixID::kUnspecified,
+                           webrtc::ColorSpace::RangeID::kFull));
+    EXPECT_EQ(data.mYUVColorSpace, gfx::YUVColorSpace::BT709);
+    EXPECT_EQ(data.mColorRange, gfx::ColorRange::FULL);
+    EXPECT_EQ(data.mColorPrimaries, gfx::ColorSpace2::BT709);
+    EXPECT_EQ(data.mTransferFunction, gfx::TransferFunction::SRGB);
+  }
+  {
+    // With nothing to go by, BT.601 limited.
+    const layers::PlanarYCbCrData data =
+        receive(webrtc::ColorSpace(webrtc::ColorSpace::PrimaryID::kUnspecified,
+                                   webrtc::ColorSpace::TransferID::kUnspecified,
+                                   webrtc::ColorSpace::MatrixID::kUnspecified,
+                                   webrtc::ColorSpace::RangeID::kInvalid));
+    EXPECT_EQ(data.mYUVColorSpace, gfx::YUVColorSpace::BT601);
+    EXPECT_EQ(data.mColorRange, gfx::ColorRange::LIMITED);
+    EXPECT_EQ(data.mColorPrimaries, gfx::ColorSpace2::UNKNOWN);
+    EXPECT_EQ(data.mTransferFunction, gfx::TransferFunction::BT709);
+  }
+
+  pipeline->Shutdown();
+  NS_ProcessPendingEvents(nullptr);
+  source->Destroy();
 }
 
 }  // end namespace

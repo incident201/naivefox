@@ -252,6 +252,7 @@ class IPPProxyManagerSingleton extends EventTarget {
   /** @type {string | null} */
   #errorType = null;
   #refreshUsageAbortController = null;
+  #observingOfflineStatus = false;
 
   constructor() {
     super();
@@ -259,6 +260,7 @@ class IPPProxyManagerSingleton extends EventTarget {
     this.setErrorState = this.#setErrorState.bind(this);
     this.handleProxyErrorEvent = this.#handleProxyErrorEvent.bind(this);
     this.handleEvent = this.#handleEvent.bind(this);
+    this.observeOfflineStatus = this.#observeOfflineStatus.bind(this);
   }
 
   init() {
@@ -266,6 +268,13 @@ class IPPProxyManagerSingleton extends EventTarget {
       "IPProtectionService:StateChanged",
       this.handleEvent
     );
+    if (!this.#observingOfflineStatus) {
+      Services.obs.addObserver(
+        this.observeOfflineStatus,
+        "network:offline-status-changed"
+      );
+      this.#observingOfflineStatus = true;
+    }
 
     if (!this.#usage) {
       this.#usage = lazy.IPPStartupCache.usageInfo;
@@ -286,11 +295,19 @@ class IPPProxyManagerSingleton extends EventTarget {
       "IPProtectionService:StateChanged",
       this.handleEvent
     );
+    if (this.#observingOfflineStatus) {
+      Services.obs.removeObserver(
+        this.observeOfflineStatus,
+        "network:offline-status-changed"
+      );
+      this.#observingOfflineStatus = false;
+    }
 
     if (
       this.#activatingPromise ||
       this.#state === IPPProxyStates.ACTIVE ||
-      this.#state === IPPProxyStates.ACTIVATING
+      this.#state === IPPProxyStates.ACTIVATING ||
+      this.#state === IPPProxyStates.ERROR
     ) {
       this.stop(false);
     }
@@ -494,7 +511,12 @@ class IPPProxyManagerSingleton extends EventTarget {
     }
 
     if (this.#state === IPPProxyStates.ERROR) {
-      return { started: false, error: this.#errorType ?? ERRORS.GENERIC };
+      if (!userAction) {
+        return { started: false, error: this.#errorType ?? ERRORS.GENERIC };
+      }
+      // A user retry tears the failed connection down; the next state
+      // announced is ACTIVATING, not an idle READY in between.
+      this.#stopInternal();
     }
 
     const abortController = new AbortController();
@@ -503,6 +525,8 @@ class IPPProxyManagerSingleton extends EventTarget {
     try {
       serviceReady = this.#waitForService(abortSignal);
     } catch (error) {
+      // Settles a retry out of ERROR, which would stay in ERROR.
+      this.updateState();
       return { started: false, error };
     }
     this.#activationAbortController = abortController;
@@ -562,10 +586,19 @@ class IPPProxyManagerSingleton extends EventTarget {
         },
         error => {
           clearActivation();
-          this.#cancelChannelFilter();
           if (error === ERRORS.NOT_READY) {
+            this.#cancelChannelFilter();
             this.updateState();
+          } else if (error === ERRORS.CANCELED) {
+            this.#cancelChannelFilter();
+            this.#setErrorState(error);
+          } else if (userAction) {
+            this.#connection?.fail();
+            this.#cancelChannelFilter();
+            this.#setErrorState(error);
           } else {
+            // Nobody checks a system activation's result, so keep holding
+            // traffic in ERROR until stop() rather than retrying from READY.
             this.#setErrorState(error);
           }
           return { started: false, error };
@@ -675,16 +708,7 @@ class IPPProxyManagerSingleton extends EventTarget {
       return;
     }
 
-    if (this.#connection) {
-      this.#cancelChannelFilter();
-
-      lazy.clearTimeout(this.#rotationTimer);
-      this.#rotationTimer = 0;
-
-      this.#rotation?.controller.abort();
-
-      this.networkErrorObserver.stop();
-    }
+    this.#stopInternal();
 
     lazy.logConsole.info("Stopped");
 
@@ -696,6 +720,7 @@ class IPPProxyManagerSingleton extends EventTarget {
       userAction,
       duration: String(sessionLength),
     });
+
     this.updateState();
     if (
       userAction &&
@@ -704,6 +729,24 @@ class IPPProxyManagerSingleton extends EventTarget {
     ) {
       this.refreshUsage();
     }
+  }
+
+  /**
+   * Tears the connection down without announcing a state, for callers that
+   * move to the next state themselves.
+   */
+  #stopInternal() {
+    if (this.#connection) {
+      this.#cancelChannelFilter();
+
+      lazy.clearTimeout(this.#rotationTimer);
+      this.#rotationTimer = 0;
+
+      this.#rotation?.controller.abort();
+
+      this.networkErrorObserver.stop();
+    }
+    this.#errorType = null;
   }
 
   /**
@@ -1071,6 +1114,16 @@ class IPPProxyManagerSingleton extends EventTarget {
     return null;
   }
 
+  /**
+   * Fails an active connection when the user switches to offline mode, so it
+   * doesn't keep appearing connected.
+   */
+  #observeOfflineStatus() {
+    if (Services.io.offline && this.#state === IPPProxyStates.ACTIVE) {
+      this.#setErrorState(ERRORS.NETWORK);
+    }
+  }
+
   updateState() {
     // State must remain as error until the connection is stopped.
     if (this.#state === IPPProxyStates.ERROR && this.#connection?.active) {
@@ -1114,14 +1167,15 @@ class IPPProxyManagerSingleton extends EventTarget {
    */
   #setErrorState(error) {
     this.#rotation?.controller.abort();
+    this.#connection?.fail();
 
     const isString = typeof error === "string";
     // Keep the kind in a local: updateState() below clears #errorType.
     const errorType = isString ? ERRORS.from(error) : ERRORS.GENERIC;
     this.#errorType = errorType;
 
-    if (this.#state === IPPProxyStates.ACTIVE) {
-      // If the proxy is active, switch to the error state.
+    if (this.#state === IPPProxyStates.ACTIVE || this.#connection?.active) {
+      // If the proxy is active or holding traffic, switch to the error state.
       // Stop will need to be called to move out of the error state.
       this.#setState(IPPProxyStates.ERROR);
     } else {
@@ -1193,6 +1247,7 @@ class IPPProxyManagerSingleton extends EventTarget {
       return;
     }
 
+    const prevState = this.#state;
     this.#state = state;
 
     this.dispatchEvent(
@@ -1201,6 +1256,7 @@ class IPPProxyManagerSingleton extends EventTarget {
         composed: true,
         detail: {
           state,
+          prevState,
         },
       })
     );

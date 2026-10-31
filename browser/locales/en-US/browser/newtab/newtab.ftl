@@ -239,10 +239,11 @@ newtab-empty-section-topstories-generic = You’ve caught up. Check back later f
 
 newtab-discovery-empty-section-topstories-header = You are caught up!
 newtab-discovery-empty-section-topstories-content = Check back later for more stories.
-newtab-discovery-empty-section-topstories-try-again-button = Try Again
+newtab-discovery-empty-section-topstories-try-again-button = Try again
 newtab-discovery-empty-section-topstories-loading = Loading…
-# Displays when a layout in a section took too long to fetch articles.
-newtab-discovery-empty-section-topstories-timed-out = Oops! We almost loaded this section, but not quite.
+# Headline and body shown when stories fail to load, for example when offline or the server can’t be reached.
+newtab-discovery-empty-section-topstories-unavailable-header = Stories aren’t available right now
+newtab-discovery-empty-section-topstories-unavailable-body = Check your connection or try again later.
 
 ## Strings for the story cards carousel
 
@@ -340,6 +341,11 @@ newtab-custom-widget-horoscopes-toggle =
 # and car rentals.
 newtab-custom-widget-travel-toggle =
   .label = Travel
+# Solitaire is a widget on New Tab where you can play solitaire, a card game
+# for one player, also known as patience.
+# Game displays within an iframe with name “Yahoo Solitaire”
+newtab-custom-widget-solitaire-toggle =
+  .label = Solitaire
 newtab-custom-widget-section-title = Widgets
 newtab-custom-widget-section-toggle =
     .label = Widgets
@@ -538,6 +544,9 @@ newtab-wallpaper-firefox-peak-dark = A fox’s face at the left edge, on a dark 
 newtab-wallpaper-firefox-peak-light = A fox’s face at the left edge, on a light background
 newtab-wallpaper-firefox-sky-dark = Dark purple hills under a night sky
 newtab-wallpaper-firefox-sky-light = Light hills under a soft sky
+# “Wrexham AFC” is the name of a football club and should not be translated.
+# "crest" refers to the football club's logo (team badge).
+newtab-wallpaper-firefox-wrexham = The Wrexham AFC crest on a red background
 
 # Variables
 #   $author_string (String) - The name of the creator of the photo.
@@ -573,9 +582,14 @@ newtab-weather-menu-change-location = Change location
 newtab-weather-change-location-search-input-placeholder =
     .placeholder = Search location
     .aria-label = Search location
-newtab-weather-cancel-input =
-    .title = Cancel
-    .aria-label = Cancel
+# "Back" is an icon-only button next to the location search field that returns to the widget.
+newtab-weather-search-back-button =
+    .title = Back
+    .aria-label = Back
+# Screen reader label for the dropdown below the location search field that
+# lists matching locations as the user types.
+newtab-weather-location-search-results =
+    .aria-label = Location suggestions
 # "Current" refers to the user's physical/geographic location detected via geolocation.
 newtab-weather-change-location-search-use-current =
     .label = Use current location
@@ -883,10 +897,6 @@ newtab-widget-lists-menu-create = Create a new list
 newtab-widget-lists-menu-delete = Delete this list
 newtab-widget-lists-menu-copy = Copy list to clipboard
 newtab-widget-lists-menu-learn-more = Learn more
-# "Change" is a verb here: the button switches which list is shown
-newtab-widget-lists-change-list =
-    .title = Change list
-    .aria-label = Change list
 newtab-widget-lists-button-add-item = Add an item
 newtab-widget-lists-input-add-an-item2 =
     .placeholder = Add an item
@@ -947,14 +957,9 @@ newtab-crossword-widget-open-menu-button =
     .title = Open crossword menu
     .aria-label = Open crossword menu
 
-## World Cup wallpaper OMC messages
-## Shown as on-screen messages promoting the World Cup wallpapers.
-
-newtab-sports-widget-message-wallpapers-title = Kick off the World Cup with new wallpapers
-newtab-sports-widget-message-wallpapers-body = Bring some match-day energy to your browser for the tournament.
-newtab-sports-widget-message-wallpapers-cta = Choose wallpaper
-newtab-sports-widget-message-wallpapers-semifinals-title = Get a new wallpaper for the semi-finals
-newtab-sports-widget-message-wallpapers-semifinals-body = Set the stage for the World Cup’s biggest matches.
+# Context menu item linking to the Particle website, the provider of the
+# crossword. “Particle” is a brand name and should not be translated.
+newtab-crossword-menu-powered-by-particle = Powered by Particle
 
 ## Strings introduced by the Nova redesign of the Timer widget
 
@@ -1058,8 +1063,11 @@ newtab-clock-widget-menu-edit = Edit clocks
 newtab-clock-widget-menu-switch-to-12h = Switch to 12-hour format
 newtab-clock-widget-menu-switch-to-24h = Switch to 24-hour format
 newtab-clock-widget-label-your-clocks = Your clocks
-newtab-clock-widget-search-location-input =
-    .label = Location
+# "Back" is an icon-only button next to the city search field form that returns to the list of clocks.
+newtab-clock-widget-search-back-button =
+    .title = Back
+    .aria-label = Back
+newtab-clock-widget-search-location-input2 =
     .placeholder = Search for a city
     .aria-label = Search for a city
 # "Nickname (optional)" refers to a custom, user-defined label for a saved location
@@ -1652,6 +1660,11 @@ newtab-picture-header = Picture of the day · Wikimedia Commons
 # Shorter title shown at the top of the widget, without the source name.
 newtab-picture-header-main = Picture of the day
 
+# Title shown at the top of the widget, with the date of the picture shown.
+# $date (Date) - the day Wikimedia Commons featured the picture as its picture
+# of the day, shown in numbers (for example 10/8/2026).
+newtab-picture-header-date = Picture of the day: { DATETIME($date, year: "numeric", month: "numeric", day: "numeric") }
+
 # Attribution line shown under the title once a picture loads: an author
 # credit, a link to the picture's source page, and a link to its license.
 # "©" is the copyright symbol.
@@ -1674,30 +1687,30 @@ newtab-picture-widget-open-menu-button =
     .title = Open picture of the day menu
     .aria-label = Open picture of the day menu
 
-# Button that sets the current picture as the New Tab background wallpaper. The
-# button collapses to an icon when not hovered/focused, so .title is its tooltip.
-newtab-picture-set-wallpaper =
+# Button that sets the picture shown in the widget, which may be today’s or the
+# previous day’s, as the New Tab background wallpaper. The button collapses to an
+# icon when not hovered/focused, so .title is its tooltip.
+newtab-picture-set-wallpaper2 =
     .label = Set wallpaper
     .title = Set wallpaper
-    .aria-label = Set today’s picture as your wallpaper
+    .aria-label = Set this picture as your wallpaper
 
 # Context menu item that opens the New Tab customization panel.
 newtab-picture-menu-manage-wallpaper = Manage wallpaper
 
-# Context menu item that hides today’s picture, replacing it with an existing
-# wallpaper.
-newtab-picture-menu-hide-photo = Hide today’s picture
+# Context menu item that hides the picture shown in the widget.
+newtab-picture-menu-hide-photo2 = Hide this picture
 
-# Context menu item that restores today’s picture after it has been hidden.
-newtab-picture-menu-show-photo = Show today’s picture
+# Context menu item that restores the picture after it has been hidden.
+newtab-picture-menu-show-photo2 = Show picture
 
 # Context menu item linking to more information about the widget.
 newtab-picture-menu-learn-more = Learn more
 
 # Icon button shown on the widget once the picture is hidden; restores it.
-newtab-picture-show-button =
-    .title = Show today’s picture
-    .aria-label = Show today’s picture
+newtab-picture-show-button2 =
+    .title = Show picture
+    .aria-label = Show picture
 
 # Shown when there is no new picture to display yet.
 newtab-picture-check-back = Check back tomorrow for a new picture
@@ -1762,6 +1775,10 @@ newtab-horoscopes-widget-open-menu-button =
 # Context menu item linking to more information about the widget.
 newtab-horoscopes-menu-learn-more = Learn more
 
+# Context menu item linking to the Yahoo website, the provider of the
+# horoscopes. “Yahoo” is a brand name and should not be translated.
+newtab-horoscopes-menu-powered-by-yahoo = Powered by Yahoo
+
 ## Strings for the Travel widget
 
 # Widget heading; also the widget's accessible name. Travel (noun) is a
@@ -1776,6 +1793,26 @@ newtab-travel-widget-open-menu-button =
 
 # Context menu item linking to more information about the widget.
 newtab-travel-menu-learn-more = Learn more
+
+# Context menu item linking to the Kayak website, the provider of the
+# travel search. “Kayak” is a brand name and should not be translated.
+newtab-travel-menu-powered-by-kayak = Powered by Kayak
+
+## Strings for the Solitaire widget. Solitaire is a widget on New Tab where you
+## can play solitaire, a card game for one player, also known as patience.
+## Game displays within an iframe with name “Yahoo Solitaire”
+
+# Widget heading; also the widget's accessible name.
+newtab-solitaire-widget-title = Solitaire
+
+# Tooltip and screen reader label for the icon-only button that opens the
+# widget's menu.
+newtab-solitaire-widget-open-menu-button =
+    .title = Open solitaire menu
+    .aria-label = Open solitaire menu
+
+# Context menu item linking to more information about the widget.
+newtab-solitaire-menu-learn-more = Learn more
 
 ## Strings for the navigable panels that new tab content area can be
 ## split into.

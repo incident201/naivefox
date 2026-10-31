@@ -1483,18 +1483,7 @@ section. It is recommended that other options -- namely, top-level actors
 Background actors can only be used in limited circumstances:
 
 - `PBackground` only supports the following process connections (where
-  ordering is parent \<-> child): main \<-> main, main \<-> content,
-  main \<-> socket and socket \<-> content.
-
-:::{important}
-Socket process `PBackground` actor support was added after the other
-options. It has some rough edges that aren't easy to anticipate. In the
-future, their support may be broken out into a different actor or removed
-altogether. You are strongly encouraged to use new [Top Level Actors](#top-level-actors)
-instead of `PBackground` actor when communicating with socket process
-worker threads.
-:::
-
+  ordering is parent \<-> child): main \<-> main and main \<-> content.
 - Background actor creation is always initiated by the child. Of course, a
   request to create one can be sent to the child by any other means.
 - All parent background actors run in the same thread. This thread is

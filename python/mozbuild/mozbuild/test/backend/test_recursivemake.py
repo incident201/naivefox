@@ -1363,6 +1363,29 @@ class TestRecursiveMakeBackend(BackendTester):
         dist_bin = mozpath.join(env.topobjdir, "dist", "bin")
         self.assertEqual(edge["rustflags"], ["-C", f"link-arg=-Wl,-rpath,{dist_bin}"])
 
+    def test_rust_tests_command_spec_clang_cl(self):
+        env = self._get_environment(
+            "rust-library-flags", substs={"OS_TARGET": "WINNT", "CC_TYPE": "clang-cl"}
+        )
+        env = self._consume("rust-library-flags", RecursiveMakeBackend, env=env)
+        edge = self._cargo_spec(env, ".cargo-tests-spec.json")["edge"]
+        self.assertEqual(edge["rustflags"], ["-C", "link-arg=-FORCE:UNRESOLVED"])
+
+    def test_rust_tests_command_spec_mingw(self):
+        env = self._get_environment(
+            "rust-library-flags", substs={"OS_TARGET": "WINNT", "CC_TYPE": "clang"}
+        )
+        env = self._consume("rust-library-flags", RecursiveMakeBackend, env=env)
+        edge = self._cargo_spec(env, ".cargo-tests-spec.json")["edge"]
+        self.assertEqual(edge["rustflags"], [])
+
+    def test_rust_tests_index(self):
+        env = self._consume("rust-library-flags", RecursiveMakeBackend)
+        self.assertEqual(
+            self._cargo_spec(env, "rust-tests.json"),
+            {"crates": ["flags-tests"]},
+        )
+
     def test_rust_library_command_spec_computed_flags(self):
         """A directory's computed compile and link flags reach the spec."""
         env = self._consume("rust-library-flags", RecursiveMakeBackend)
@@ -2083,6 +2106,24 @@ class TestRecursiveMakeBackend(BackendTester):
                     if line.startswith(prefix)
                 ][0]
                 self.assertEqual(shared_lib, expected_shared_lib)
+
+    def test_shared_lib_import_lib_paths(self):
+        """On Windows, import libraries are installed to dist/lib, mirroring
+        DIST_SUBDIR so that same-named libraries don't collide."""
+        env = self._get_environment(
+            "shared-lib-paths-windows", srcdir_name="shared-lib-paths"
+        )
+        env = self._consume("shared-lib-paths", RecursiveMakeBackend, env=env)
+
+        def backend_mk(subdir):
+            with open(os.path.join(env.topobjdir, subdir, "backend.mk")) as fh:
+                return fh.read()
+
+        self.assertIn(
+            "IMPORT_LIB_DEST = $(DIST)/lib$(DIST_SUBDIR:%=/%)\n",
+            backend_mk("dist-subdir"),
+        )
+        self.assertNotIn("IMPORT_LIB_DEST", backend_mk("not-installed"))
 
     def test_licenses_json(self):
         """LICENSES declarations are aggregated into licenses.json."""

@@ -5330,8 +5330,8 @@ static UniquePtr<WidgetMouseEvent> CreateMouseOrPointerWidgetEvent(
   if (IsPointerEventMessage(aMessage)) {
     AUTO_PROFILER_LABEL("CreateMouseOrPointerWidgetEvent", OTHER);
 
-    newEvent = MakeUnique<WidgetPointerEvent>(aMouseEvent->IsTrusted(),
-                                              aMessage, aMouseEvent->mWidget);
+    newEvent = std::make_unique<WidgetPointerEvent>(
+        aMouseEvent->IsTrusted(), aMessage, aMouseEvent->mWidget);
     if (const WidgetPointerEvent* const sourcePointerEvent =
             aMouseEvent->AsPointerEvent()) {
       WidgetPointerEvent* const newPointerEvent =
@@ -5342,9 +5342,9 @@ static UniquePtr<WidgetMouseEvent> CreateMouseOrPointerWidgetEvent(
       // Not assigning mFromTouchEvent
     }
   } else {
-    newEvent = MakeUnique<WidgetMouseEvent>(aMouseEvent->IsTrusted(), aMessage,
-                                            aMouseEvent->mWidget,
-                                            WidgetMouseEvent::eReal);
+    newEvent = std::make_unique<WidgetMouseEvent>(
+        aMouseEvent->IsTrusted(), aMessage, aMouseEvent->mWidget,
+        WidgetMouseEvent::eReal);
   }
 
   // Inherit whether the event is synthesized by the test API or not.

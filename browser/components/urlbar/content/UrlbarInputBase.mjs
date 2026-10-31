@@ -19,7 +19,7 @@ import { UrlbarShared } from "chrome://browser/content/urlbar/UrlbarShared.mjs";
  * @import { BrowserSearchTelemetry } from "moz-src:///browser/components/search/BrowserSearchTelemetry.sys.mjs"
  * @import { UrlbarLoadRequest, LoadURLParams } from "chrome://browser/content/urlbar/UrlbarShared.mjs"
  * @import { UrlbarAutofillData } from "chrome://browser/content/urlbar/UrlbarResult.mjs"
- * @import { Tabbrowser } from "moz-src:///browser/components/tabbrowser/Tabbrowser.sys.mjs"
+ * @import { UrlbarSearchData } from "moz-src:///browser/components/urlbar/UrlbarParentController.sys.mjs"
  */
 
 /**
@@ -340,10 +340,6 @@ ${
   _untrimmedValue = "";
   _wwwIsTrimmed = false;
   _enableAutofillPlaceholder = true;
-
-  /**
-   * @typedef {ChromeWindow & {gBrowser: Tabbrowser}} BrowserWindow
-   */
 
   /**
    * The browser window or null in a child process.
@@ -722,7 +718,7 @@ ${
       return;
     }
 
-    this._initPasteAndGo();
+    this.#initPasteAndGo();
     if (this.#isAddressbar && UrlbarContentUtils.getPlatform() == "macosx") {
       // The share group handles the strip-on-share item on macOS.
       this.#initShareURL();
@@ -1436,28 +1432,29 @@ ${
 
   /**
    * Records the engagement and a search against an engine, adds it to form
-   * history, and opens its SERP through the parent controller, which builds the
-   * submission URL and annotates the load as a search visit. Shared by the
-   * one-off and search-mode Enter paths, which return once it's done. The engine
-   * only needs to carry an id and name -- the parent resolves the full engine
-   * from the id -- so this stays content-safe for a message-path `<moz-urlbar>`.
+   * history, and loads its SERP as a search visit. Shared by the one-off and
+   * search-mode Enter paths, which return once it's done. The engine only needs
+   * to carry an id and name -- the parent resolves the full engine and builds
+   * the submission URL -- so this stays content-safe for a message-path
+   * `<moz-urlbar>`.
    *
    * @param {PartialSearchEngine|SearchEngine} engine The engine to search.
    * @param {string} searchString The string to search for.
    * @param {string} where Where the SERP will open.
+   * @param {LoadURLParams} openParams The load's params.
    * @param {object} details
    * @param {?Event} details.event The triggering event.
    * @param {?HTMLElement} details.element The picked view element, if any.
    * @param {string} details.selType The engagement's selection type.
    * @param {string} details.typedValue The value the engagement records.
    * @param {?UrlbarResult} details.result The result Enter acted on, if any.
-   * @param {boolean} [details.inBackground] Whether to open in a background tab.
    */
   #openEngineSearch(
     engine,
     searchString,
     where,
-    { event, element, selType, typedValue, result, inBackground }
+    openParams,
+    { event, element, selType, typedValue, result }
   ) {
     this.#recordEngagementAndTrackBounce(event, {
       element,
@@ -1471,20 +1468,27 @@ ${
       searchSource: this.getSearchSource(event),
       windowMode: this.windowMode,
     });
-    this._recordSearch({
+    let searchData = this.#getSearchData({
       engine,
       event,
-      where,
       query: searchString,
     });
-    this.parentController.openSERP(
-      engine.id,
-      searchString,
+    openParams.allowInheritPrincipal = false;
+    openParams.globalHistoryOptions = {
+      ...openParams.globalHistoryOptions,
+      triggeringSource: this.#sapName,
+      triggeringSearchEngine: engine.name,
+    };
+    this.#loadURL({
+      loadRequest: {
+        engineSearch: { engineName: engine.name, query: searchString },
+      },
+      event,
       where,
-      inBackground,
-      this.#selectedBrowserId,
-      true
-    );
+      params: openParams,
+      browserId: this.#selectedBrowserId,
+      searchData,
+    });
   }
 
   /**
@@ -1581,13 +1585,13 @@ ${
         oneOffParams.engine,
         this.#engineSearchStringForResult(result),
         oneOffParams.openWhere,
+        openParams,
         {
           event,
           element,
           selType: "oneoff",
           typedValue: this._lastSearchString,
           result,
-          inBackground: openParams.inBackground,
         }
       );
       return;
@@ -1597,6 +1601,7 @@ ${
         searchModeEngine,
         typedValue,
         this.controller.whereToOpen(event),
+        openParams,
         { event, element, selType, typedValue, result }
       );
       return;
@@ -1678,8 +1683,8 @@ ${
     // TODO (Bug 1604927): If the urlbar results are restricted to a specific
     // engine, here we must search with that specific engine; indeed the
     // docshell wouldn't know about our engine restriction.
-    // Also remember to invoke this._recordSearch, after replacing url with
-    // the appropriate engine submission url.
+    // Also remember to pass the search data from this.#getSearchData to the
+    // load, after replacing url with the appropriate engine submission url.
     //
     // The heuristic fetch and its uriFixup fallback are parent-only, and they
     // depend on the current browser's per-tab data and navigation epoch, which
@@ -1991,6 +1996,7 @@ ${
     let loadRequest = resultUrl
       ? { urlLoad: { url: resultUrl, postData: null } }
       : UrlbarShared.getLoadRequestFromResult(result, { element });
+    let searchData = null;
 
     switch (result.type) {
       case UrlbarShared.RESULT_TYPE.URL: {
@@ -2127,10 +2133,9 @@ ${
           result.payload.engine
         );
 
-        this._recordSearch({
+        searchData = this.#getSearchData({
           engine,
           event,
-          where,
           query: result.payload.suggestion || result.payload.query,
           searchActionDetails: actionDetails,
           opensInPrivateWindow: result.payload.inPrivateWindow,
@@ -2341,6 +2346,7 @@ ${
       },
       keepViewOpen,
       browserId,
+      searchData,
     });
   }
 
@@ -2827,11 +2833,10 @@ ${
     let trimmedValue = value.trim();
     this._lastSearchString = trimmedValue;
     if (trimmedValue) {
-      this._recordSearch({
+      let searchData = this.#getSearchData({
         engine: searchEngine,
         query: trimmedValue,
         event,
-        where,
       });
 
       if (where == "current") {
@@ -2857,7 +2862,8 @@ ${
         trimmedValue,
         where,
         inBackground,
-        this.#selectedBrowserId
+        this.#selectedBrowserId,
+        searchData
       );
     } else {
       // Telemetry is handled by the function.
@@ -3529,12 +3535,8 @@ ${
       actionType = undefined,
     } = {}
   ) {
-    // Don't expose internal about:reader URLs to the user. `ReaderMode` is
-    // chrome-only, so a content realm shows such a URL as it is (bug 2064583).
-    let originalUrl = lazy?.ReaderMode.getOriginalUrlObjectForDisplay(val);
-    if (originalUrl) {
-      val = originalUrl.displaySpec;
-    }
+    // Don't expose internal about:reader URLs to the user.
+    val = UrlbarContentUtils.getReaderOriginalDisplaySpec(val) ?? val;
     this._untrimmedValue = untrimmedValue ?? val;
     this._protocolIsTrimmed = false;
     this._wwwIsTrimmed = false;
@@ -4000,7 +4002,8 @@ ${
    */
 
   /**
-   * Records search telemetry for a search and adds it to form history.
+   * Gets the data for recording search telemetry and adding the search to form
+   * history. The parent records it once the search's URL is being loaded.
    *
    * @param {object} options
    * @param {PartialSearchEngine|SearchEngine} options.engine
@@ -4009,40 +4012,30 @@ ${
    *   The search query.
    * @param {Event} options.event
    *   The event that triggered this query.
-   * @param {string} [options.where]
-   *   Where the search opens.
    * @param {SearchActionDetails} [options.searchActionDetails]
    *   The details associated with this search query.
    * @param {boolean} [options.opensInPrivateWindow]
    *   Whether the search opens in a new private window.
+   * @returns {UrlbarSearchData}
    */
-  _recordSearch({
+  #getSearchData({
     engine,
     query,
     event,
-    where = "current",
     searchActionDetails = {},
     opensInPrivateWindow = false,
   }) {
-    const isOneOff = this.view.oneOffSearchButtons?.eventTargetIsAOneOff(event);
-    const searchSource = this.getSearchSource(event);
-
-    let searchData = {
+    return {
       engineId: engine.id,
-      searchSource,
+      searchSource: this.getSearchSource(event),
       query,
       opensInPrivateWindow,
       details: {
         ...searchActionDetails,
-        isOneOff,
+        isOneOff: this.view.oneOffSearchButtons?.eventTargetIsAOneOff(event),
         newtabSessionId: this._handoffSession,
       },
     };
-    if (where.startsWith("tab")) {
-      this.parentController.recordSearchInOpenedTab(searchData);
-    } else {
-      this.parentController.recordSearch(searchData);
-    }
   }
 
   /**
@@ -4120,6 +4113,7 @@ ${
     }
 
     this.value = value;
+    this.parentController.recordCanonization();
     return value;
   }
 
@@ -4244,6 +4238,8 @@ ${
    *   The id of the browser to load into. Defaults to the parent resolving the
    *   selected browser at load time; pass it to pin an asynchronously-resolved
    *   load to the tab selected when it was committed.
+   * @param {?UrlbarSearchData} [options.searchData]
+   *   For a search, the data the parent records once the load has gone ahead.
    */
   async #loadURL({
     loadRequest,
@@ -4253,6 +4249,7 @@ ${
     resultDetails = null,
     keepViewOpen = false,
     browserId = null,
+    searchData = null,
   }) {
     let keyDownEnterDeferred;
     if (
@@ -4324,6 +4321,7 @@ ${
       params,
       browserId,
       userTypedValue,
+      searchData,
     });
     // Hand the loaded browser's id to the deferred-Enter key up handler so it
     // can focus it parent-side.
@@ -4565,17 +4563,13 @@ ${
     stripOnShare.removeAttribute("disabled");
   }
 
-  _initPasteAndGo() {
+  #initPasteAndGo() {
     this.addContextMenuItems({
       after: "edit-contextmenu-paste",
       createItems: () => {
         let fragment = document.createDocumentFragment();
         let pasteAndGo = document.createXULElement("menuitem");
         pasteAndGo.id = "paste-and-go";
-        let label = Services.strings
-          .createBundle("chrome://browser/locale/browser.properties")
-          .GetStringFromName("pasteAndGo.label");
-        pasteAndGo.setAttribute("label", label);
         pasteAndGo.setAttribute("anonid", "paste-and-go");
         pasteAndGo.addEventListener("command", () => {
           this._suppressStartQuery = true;
@@ -4592,7 +4586,7 @@ ${
         fragment.appendChild(pasteAndGo);
         return fragment;
       },
-      onShowing: (input, [pasteAndGo]) => {
+      onShowing: async (input, [pasteAndGo]) => {
         // Close the results pane, because paste and go doesn't want a result
         // selection. This has to happen before the menu opens: hiding the
         // popover once it's open keeps it from showing (bug 2037468).
@@ -4618,11 +4612,28 @@ ${
         let controller =
           document.commandDispatcher.getControllerForCommand("cmd_paste");
         let enabled = controller.isCommandEnabled("cmd_paste");
-        if (enabled) {
-          pasteAndGo.removeAttribute("disabled");
-        } else {
-          pasteAndGo.setAttribute("disabled", "true");
+        pasteAndGo.toggleAttribute("disabled", !enabled);
+        if (!enabled) {
+          return;
         }
+
+        let l10nId;
+        if (!this.#navigationEnabled || this.searchMode) {
+          l10nId = "urlbar-menuitem-paste-and-search";
+        } else if (!UrlbarShared.keywordEnabled(this.#sapName)) {
+          l10nId = "urlbar-menuitem-paste-and-go";
+        } else {
+          let text = await UrlbarContentUtils.getClipboardTextIfSmallerThan(
+            UrlbarShared.MAX_TEXT_LENGTH,
+            window
+          );
+          let fixup =
+            text && UrlbarContentUtils.getFixupPrimitives(text, this.isPrivate);
+          l10nId = fixup?.keywordAsSent
+            ? "urlbar-menuitem-paste-and-search"
+            : "urlbar-menuitem-paste-and-go";
+        }
+        pasteAndGo.ownerDocument.l10n.setAttributes(pasteAndGo, l10nId);
       },
     });
   }
@@ -5720,7 +5731,11 @@ ${
 
     lazy.ClipboardHelper.copyStringToClipboard(
       val,
-      Services.clipboard.kSelectionClipboard
+      Services.clipboard.kSelectionClipboard,
+      null,
+      this.isPrivate
+        ? Ci.nsIClipboardHelper.Sensitive
+        : Ci.nsIClipboardHelper.NotSensitive
     );
   }
 
@@ -5848,7 +5863,8 @@ ${
       options.searchMode = this.searchMode;
       if (
         this.searchMode.source &&
-        !UrlbarPrefs.get("unifiedSearchButton.historyInSearchMode")
+        (!this.searchMode.engineName ||
+          !UrlbarPrefs.get("unifiedSearchButton.historyInSearchMode"))
       ) {
         options.sources = [this.searchMode.source];
       }
@@ -6532,7 +6548,13 @@ class CopyCutController {
       urlbar.inputField.dispatchEvent(event);
     }
 
-    lazy.ClipboardHelper.copyString(val);
+    lazy.ClipboardHelper.copyString(
+      val,
+      null,
+      urlbar.isPrivate
+        ? Ci.nsIClipboardHelper.Sensitive
+        : Ci.nsIClipboardHelper.NotSensitive
+    );
   }
 
   /**

@@ -14,10 +14,14 @@ UNIFIED_SOURCES = [
 
 if CONFIG["MOZ_WIDGET_TOOLKIT"] == "cocoa":
     UNIFIED_SOURCES += [
+        "TestCocoaFilePickerQueue.mm",
         "TestCocoaStaleDragSession.mm",
         "TestMOZShareURLPasteboardItem.mm",
         "TestNativeKeyBindings.cpp",
         "TestPiPWindowSpaceBehavior.mm",
+    ]
+    SOURCES += [
+        "TestCocoaKeyCodeNames.mm",
     ]
 
 if CONFIG["OS_ARCH"] == "WINNT":

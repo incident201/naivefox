@@ -24,7 +24,6 @@ namespace net {
 
 struct DnsMetadata {
   bool mIsTRR = false;
-  bool mResolvedInSocketProcess = false;
   double mTrrFetchDuration = 0.0;
   double mTrrFetchDurationNetworkOnly = 0.0;
   nsIRequest::TRRMode mEffectiveTRRMode = nsIRequest::TRR_DEFAULT_MODE;

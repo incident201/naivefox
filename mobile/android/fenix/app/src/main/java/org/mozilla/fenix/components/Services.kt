@@ -46,7 +46,7 @@ class Services(
     val appLinksInterceptor by lazyMonitored {
         AppLinksInterceptor(
             context = context,
-            launchInApp = { context.components.settings.shouldOpenLinksInApp() },
+            launchInApp = { _ -> context.components.settings.shouldOpenLinksInApp() },
             launchFromInterceptor = false,
             store = store,
         )

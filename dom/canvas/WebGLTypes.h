@@ -34,6 +34,7 @@
 #include "mozilla/gfx/Logging.h"
 #include "mozilla/gfx/Point.h"
 #include "mozilla/gfx/Rect.h"
+#include "mozilla/ipc/SharedMemoryHandle.h"
 #include "mozilla/ipc/Shmem.h"
 #include "mozilla/layers/LayersSurfaces.h"
 #include "nsString.h"
@@ -899,7 +900,7 @@ struct GetUniformData final {
 struct FrontBufferSnapshotIpc final {
   uvec2 surfSize = {};
   size_t byteStride = 0;
-  Maybe<mozilla::ipc::Shmem> shmem = {};
+  mozilla::ipc::MutableSharedMemoryHandle shmem;
 };
 
 struct ReadPixelsResult {

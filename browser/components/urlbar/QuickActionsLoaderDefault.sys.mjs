@@ -12,6 +12,7 @@ const lazy = XPCOMUtils.declareLazy({
   DevToolsShim: "chrome://devtools-startup/content/DevToolsShim.sys.mjs",
   ExperimentAPI: "resource://nimbus/ExperimentAPI.sys.mjs",
   ResetProfile: "resource://gre/modules/ResetProfile.sys.mjs",
+  Sanitizer: "resource:///modules/Sanitizer.sys.mjs",
   ScreenshotsUtils:
     "moz-src:///browser/components/screenshots/ScreenshotsUtils.sys.mjs",
   TranslationsParent: "resource://gre/actors/TranslationsParent.sys.mjs",
@@ -93,9 +94,16 @@ const DEFAULT_ACTIONS = {
     icon: "chrome://browser/skin/forget.svg",
     label: "quickactions-clearrecenthistory",
     onPick: (_queryContext, controller) => {
-      controller.browserWindow.document
-        .getElementById("Tools:Sanitize")
-        .doCommand();
+      let win = controller.browserWindow;
+      // The command is disabled where clearing isn't available, for example
+      // in permanent private browsing.
+      if (
+        !win.document.getElementById("Tools:Sanitize").hasAttribute("disabled")
+      ) {
+        lazy.Sanitizer.showUI(win, undefined, {
+          entryPoint: lazy.Sanitizer.DIALOG_ENTRY_POINTS.QUICK_ACTION,
+        });
+      }
     },
   },
   manageai: {

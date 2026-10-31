@@ -720,7 +720,7 @@ function parseCodeFile(fileUri) {
         }
 
         // This handles `import` lines which may be multi-line.
-        // We have an ESLint rule, `import/no-unassigned-import` which prevents
+        // We have an ESLint rule, `import-x/no-unassigned-import` which prevents
         // using bare `import "foo.js"`, so we don't need to handle that case
         // here.
         match = line.match(/from\W*['"](.*?)['"]/);

@@ -311,7 +311,12 @@ describe("AboutPreferences Feed", () => {
     it("shows the widgets group when the container is enabled via trainhopConfig even if the system pref is off", () => {
       fakeServices.prefs.getBoolPref.mockReturnValue(false);
       instance.store.getState = () => ({
-        Prefs: { values: { trainhopConfig: { widgets: { enabled: true } } } },
+        Prefs: {
+          values: {
+            region: "US",
+            trainhopConfig: { widgets: { enabled: true } },
+          },
+        },
       });
 
       instance._setupHomeGroup({ Preferences });
@@ -347,7 +352,10 @@ describe("AboutPreferences Feed", () => {
       fakeServices.prefs.getBoolPref.mockReturnValue(false);
       instance.store.getState = () => ({
         Prefs: {
-          values: { trainhopConfig: { widgetsSettings: { enabled: true } } },
+          values: {
+            region: "US",
+            trainhopConfig: { widgetsSettings: { enabled: true } },
+          },
         },
       });
 
@@ -527,7 +535,12 @@ describe("AboutPreferences Feed", () => {
     it("manages Weather with the other widgets when only trainhopConfig shows the container", () => {
       setBoolPrefs({ "browser.newtabpage.activity-stream.nova.enabled": true });
       instance.store.getState = () => ({
-        Prefs: { values: { trainhopConfig: { widgets: { enabled: true } } } },
+        Prefs: {
+          values: {
+            region: "US",
+            trainhopConfig: { widgets: { enabled: true } },
+          },
+        },
       });
 
       const group = instance._setupHomeGroup({ Preferences });
@@ -552,7 +565,10 @@ describe("AboutPreferences Feed", () => {
       setBoolPrefs({ "browser.newtabpage.activity-stream.nova.enabled": true });
       instance.store.getState = () => ({
         Prefs: {
-          values: { trainhopConfig: { widgets: { weatherEnabled: true } } },
+          values: {
+            region: "US",
+            trainhopConfig: { widgets: { weatherEnabled: true } },
+          },
         },
       });
 

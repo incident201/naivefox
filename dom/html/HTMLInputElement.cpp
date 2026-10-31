@@ -1160,8 +1160,7 @@ HTMLInputElement::HTMLInputElement(already_AddRefed<dom::NodeInfo> aNodeInfo,
       mHasBeenTypePassword(false),
       mHasPatternAttribute(false),
       mUserChangedSinceFocus(false),
-      mIsUserInteracting(false),
-      mRadioGroupContainer(nullptr) {
+      mIsUserInteracting(false) {
   // If size is above 512, mozjemalloc allocates 1kB, see
   // memory/build/mozjemalloc.cpp
   static_assert(sizeof(HTMLInputElement) <= 512,
@@ -1250,6 +1249,7 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INHERITED(HTMLInputElement,
                                                   TextControlElement)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mValidity)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mControllers)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mRadioGroupContainer)
   if (tmp->IsSingleLineTextControl(false) && tmp->mInputData.mState) {
     tmp->mInputData.mState->Traverse(cb);
   }
@@ -1263,6 +1263,9 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN_INHERITED(HTMLInputElement,
                                                 TextControlElement)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mValidity)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mControllers)
+  // We don't need to unlink mRadioGroupContainer here, as it will call
+  // DisconnectRadioGroupContainer on us when it is unlinked. Otherwise we may
+  // end up re-added to the radio group before we've been properly removed.
   if (tmp->IsSingleLineTextControl(false) && tmp->mInputData.mState) {
     tmp->mInputData.mState->Unlink();
   }
@@ -2483,7 +2486,7 @@ void HTMLInputElement::OpenDateTimePicker(const DateTimeValue& aInitialValue) {
     return;
   }
 
-  mDateTimeInputBoxValue = MakeUnique<DateTimeValue>(aInitialValue);
+  mDateTimeInputBoxValue = std::make_unique<DateTimeValue>(aInitialValue);
   nsContentUtils::DispatchChromeEvent(this, u"MozOpenDateTimePicker"_ns,
                                       CanBubble::eYes, Cancelable::eYes);
 }
@@ -2997,7 +3000,8 @@ nsresult HTMLInputElement::SetValueInternal(
 
       // Treat value == defaultValue for other input elements.
       return nsGenericHTMLFormControlElementWithState::SetAttr(
-          kNameSpaceID_None, nsGkAtoms::value, aValue, true);
+          kNameSpaceID_None, nsGkAtoms::value, aValue, true,
+          IsKnownNewAttr::No);
 
     case VALUE_MODE_FILENAME:
       return NS_ERROR_UNEXPECTED;
@@ -4811,7 +4815,8 @@ void HTMLInputElement::HandleTypeChange(FormControlType aNewType,
       //    mode, then set the element's value content attribute to the
       //    element's value.
       if (oldValueMode == VALUE_MODE_VALUE && !oldValue.IsEmpty()) {
-        SetAttr(kNameSpaceID_None, nsGkAtoms::value, oldValue, true);
+        SetAttr(kNameSpaceID_None, nsGkAtoms::value, oldValue, true,
+                IsKnownNewAttr::No);
       }
       break;
     case VALUE_MODE_VALUE: {
@@ -4931,11 +4936,8 @@ void HTMLInputElement::HandleTypeChange(FormControlType aNewType,
       }
     }
     // We should update our mapped attribute mapping function.
-    if (mAttrs.HasAttrs() && !mAttrs.IsPendingMappedAttributeEvaluation()) {
-      mAttrs.InfallibleMarkAsPendingPresAttributeEvaluation();
-      if (auto* doc = GetComposedDoc()) {
-        doc->ScheduleForPresAttrEvaluation(this);
-      }
+    if (mAttrs.HasAttrs()) {
+      ScheduleForPresAttrEvaluationIfNeeded();
     }
   }
 

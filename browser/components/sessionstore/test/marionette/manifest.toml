@@ -24,6 +24,7 @@ skip-if = [
 ["test_restore_aiwindow.py"]
 
 ["test_restore_counts.py"]
+skip-if = ["debug"] # StartupPerformance is not initialized in debug builds
 
 ["test_restore_last_session_window_mismatch.py"]
 
@@ -37,6 +38,8 @@ skip-if = [
 ["test_restore_manually_with_pinned_tabs.py"]
 
 ["test_restore_manually_with_tab_groups.py"]
+
+["test_restore_saved_tab_groups.py"]
 
 ["test_restore_sidebar.py"]
 
@@ -62,11 +65,11 @@ skip-if = [
   "os == 'win' && os_version == '11.26200' && arch == 'x86_64'", # Bug 1727691
 ]
 
-["test_restore_with_encryption.py"]
-
 ["test_session_availability.py"]
 
 ["test_session_decision.py"]
+
+["test_session_outcome.py"]
 
 ["test_set_browser_state_window_features_mismatch.py"]
 

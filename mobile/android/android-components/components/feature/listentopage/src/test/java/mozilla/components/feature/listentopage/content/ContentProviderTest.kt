@@ -6,6 +6,7 @@ package mozilla.components.feature.listentopage.content
 
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -15,13 +16,78 @@ class ContentProviderTest {
         val provider =
             ContentProvider.fromPage(
                 pageContentExtractor = { Result.success("Article text") },
-                pageMetadataExtractor = { Result.success(PageMetadata(languageTag = "de")) },
+                pageMetadataExtractor = {
+                    Result.success(PageMetadata(languageTag = "de"))
+                },
+                fallbackLanguageTag = { "en-GB" },
             )
 
         val content = provider.getContent("tab-1").getOrThrow()
 
         assertEquals("Article text", content.text)
         assertEquals("de", content.languageTag)
+        assertEquals(LanguageSource.Page, content.languageSource)
+    }
+
+    @Test
+    fun `test that the declared language is normalized`() = runTest {
+        val provider =
+            ContentProvider.fromPage(
+                pageContentExtractor = { Result.success("Article text") },
+                pageMetadataExtractor = { Result.success(PageMetadata(languageTag = " de_DE ")) },
+                fallbackLanguageTag = { "en-US" },
+            )
+
+        assertEquals("de-DE", provider.getContent("tab-1").getOrThrow().languageTag)
+    }
+
+    @Test
+    fun `test that the fallback language is not requested when the page declares one`() = runTest {
+        var fallbackRequested = false
+        val provider =
+            ContentProvider.fromPage(
+                pageContentExtractor = { Result.success("Article text") },
+                pageMetadataExtractor = { Result.success(PageMetadata(languageTag = "de")) },
+                fallbackLanguageTag = {
+                    fallbackRequested = true
+                    "en-US"
+                },
+            )
+
+        assertEquals("de", provider.getContent("tab-1").getOrThrow().languageTag)
+        assertFalse(fallbackRequested)
+    }
+
+    @Test
+    fun `test that the fallback language is used when the page declares none`() = runTest {
+        val provider =
+            ContentProvider.fromPage(
+                pageContentExtractor = { Result.success("Article text") },
+                pageMetadataExtractor = { Result.success(PageMetadata(languageTag = "")) },
+                fallbackLanguageTag = { "en-US" },
+            )
+
+        val content = provider.getContent("tab-1").getOrThrow()
+
+        assertEquals("en-US", content.languageTag)
+        assertEquals(LanguageSource.Fallback, content.languageSource)
+    }
+
+    @Test
+    fun `test that the fallback language is used when the page declares no usable language`() = runTest {
+        listOf("-en", "e", "  ").forEach { tag ->
+            val provider =
+                ContentProvider.fromPage(
+                    pageContentExtractor = { Result.success("Article text") },
+                    pageMetadataExtractor = { Result.success(PageMetadata(languageTag = tag)) },
+                    fallbackLanguageTag = { "en-US" },
+                )
+
+            val content = provider.getContent("tab-1").getOrThrow()
+
+            assertEquals("en-US", content.languageTag)
+            assertEquals(LanguageSource.Fallback, content.languageSource)
+        }
     }
 
     @Test
@@ -31,6 +97,7 @@ class ContentProviderTest {
             ContentProvider.fromPage(
                 pageContentExtractor = { Result.failure(error) },
                 pageMetadataExtractor = { Result.success(PageMetadata(languageTag = "en")) },
+                fallbackLanguageTag = { "en" },
             )
 
         val result = provider.getContent("tab-1")
@@ -46,6 +113,7 @@ class ContentProviderTest {
             ContentProvider.fromPage(
                 pageContentExtractor = { Result.success("Article text") },
                 pageMetadataExtractor = { Result.failure(error) },
+                fallbackLanguageTag = { "en" },
             )
 
         val result = provider.getContent("tab-1")
@@ -64,6 +132,7 @@ class ContentProviderTest {
                     Result.success("Article text")
                 },
                 pageMetadataExtractor = { Result.failure(RuntimeException("Metadata failed")) },
+                fallbackLanguageTag = { "en" },
             )
 
         provider.getContent("tab-1")

@@ -43,6 +43,7 @@ extensions = [
     "sphinx.ext.todo",
     "mozbuild.sphinx",
     "sphinx_js",
+    "js_typedef",
     "sphinxcontrib.jquery",
     "sphinxcontrib.mermaid",
     "sphinx_copybutton",
@@ -238,8 +239,26 @@ def make_sphinx_js_skip_missing_objects():
 make_sphinx_js_skip_missing_objects()
 
 
+def reattach_nested_rst_nodes(app, doctree):
+    """Point nodes parsed from eval-rst blocks back at their own doctree.
+
+    MyST parses each eval-rst block into a temporary document sharing the
+    original settings object, and the moved nodes keep a reference to it. Sphinx
+    clears settings.env only on a copy, so without this every such doctree
+    pickle would carry the whole build environment.
+    """
+    for node in doctree.findall():
+        if node.document is not doctree:
+            node.document = doctree
+
+
 def setup(app):
+    # sphinx-js does not declare it, but it only reads the jsdoc analysis that
+    # runs once before the sources are read.
+    app.extensions["sphinx_js"].parallel_read_safe = True
+    app.extensions["sphinx_js"].parallel_write_safe = True
     app.add_css_file("custom_theme.css")
     app.add_js_file("scrollable_regions.js")
     app.connect("html-page-context", install_sphinx_design)
     app.connect("html-page-context", add_github_source_link)
+    app.connect("doctree-read", reattach_nested_rst_nodes)

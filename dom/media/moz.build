@@ -172,6 +172,7 @@ EXPORTS += [
     "FrameStatistics.h",
     "HDRUtils.h",
     "ImageConversion.h",
+    "ImagePixelFormat.h",
     "Intervals.h",
     "MediaCache.h",
     "MediaContainerType.h",
@@ -259,8 +260,6 @@ EXPORTS.mozilla.dom += [
     "VideoStreamTrack.h",
     "VideoTrack.h",
     "VideoTrackList.h",
-    "webrtc/MediaTransportChild.h",
-    "webrtc/MediaTransportParent.h",
 ]
 
 UNIFIED_SOURCES += [
@@ -358,8 +357,10 @@ if CONFIG["ENABLE_TESTS"] or CONFIG["FUZZING"]:
         "MockCubeb.h",
     ]
 
-# MediaData.cpp : ambiguous compilation error caused by Mac OS X headers.
+# ImagePixelFormat.cpp, MediaData.cpp : ambiguous compilation error caused by
+# Mac OS X headers.
 SOURCES += [
+    "ImagePixelFormat.cpp",
     "MediaData.cpp",
 ]
 

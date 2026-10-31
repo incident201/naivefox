@@ -905,7 +905,7 @@ void ShadowRoot::MaybeSlotHostChild(nsIContent& aChild) {
 
 ServoStyleRuleMap& ShadowRoot::ServoStyleRuleMap() {
   if (!mStyleRuleMap) {
-    mStyleRuleMap = MakeUnique<mozilla::ServoStyleRuleMap>();
+    mStyleRuleMap = std::make_unique<mozilla::ServoStyleRuleMap>();
   }
   mStyleRuleMap->EnsureTable(*this);
   return *mStyleRuleMap;

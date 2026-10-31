@@ -830,7 +830,8 @@ class nsGenericHTMLElement : public nsGenericHTMLElementBase {
   }
 
   void SetHTMLAttr(nsAtom* aName, const nsAString& aValue) {
-    SetAttr(kNameSpaceID_None, aName, aValue, true);
+    SetAttr(kNameSpaceID_None, aName, aValue, true,
+            mozilla::dom::IsKnownNewAttr::No);
   }
   void SetHTMLAttr(nsAtom* aName, const nsAString& aValue,
                    mozilla::ErrorResult& aError) {

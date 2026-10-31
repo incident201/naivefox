@@ -47,6 +47,9 @@ pref("extensions.getAddons.browserMappings.url", "https://services.addons.mozill
 // The URL for the privacy policy related to recommended extensions.
 pref("extensions.recommendations.privacyPolicyUrl", "https://www.mozilla.org/privacy/firefox/?utm_source=firefox-browser&utm_medium=firefox-browser&utm_content=privacy-policy-link#addons");
 // The URL for Firefox Color, recommended on the theme page in about:addons.
+// NOTE: the link to Firefox Color is always hidden when Nova is enabled,
+// consider removing it along with cleaning up about:addons parts conditioned
+// on the browser.nova.enabled pref.
 pref("extensions.recommendations.themeRecommendationUrl", "https://color.firefox.com/?utm_source=firefox-browser&utm_medium=firefox-browser&utm_content=theme-footer-link");
 
 pref("extensions.update.autoUpdateDefault", true);
@@ -516,8 +519,15 @@ pref("browser.urlbar.trustPanel.featureGate", true);
 pref("browser.urlbar.trustPanel.breachAlerts.featureGate", true);
 pref("browser.urlbar.trustPanel.breachAlerts", true);
 
-// Whether or not Unified Search Button is shown always.
-pref("browser.urlbar.unifiedSearchButton.always", false);
+#ifdef NIGHTLY_BUILD
+  // Whether or not Unified Search Button is shown always.
+  pref("browser.urlbar.unifiedSearchButton.always", true);
+  // Whether or not history is shown when in search mode.
+  pref("browser.urlbar.unifiedSearchButton.historyInSearchMode", true);
+#else
+  pref("browser.urlbar.unifiedSearchButton.always", false);
+  pref("browser.urlbar.unifiedSearchButton.historyInSearchMode", false);
+#endif
 
 // Enable trending suggestions and recent searches.
 pref("browser.urlbar.trending.featureGate", true);
@@ -562,6 +572,10 @@ pref("browser.urlbar.temporal.featureGate", false);
 // temporal search suggestions are turned on.
 pref("browser.urlbar.suggest.temporal", true);
 
+// If `browser.urlbar.suggest.temporal` is true, this controls whether seasonal
+// temporal search suggestions are shown.
+pref("browser.urlbar.suggest.temporal.seasonal", true);
+
 // Whether results that are part of the Firefox Suggest brand are shown in the
 // urlbar. This pref is exposed to the user in the UI, and it's sticky so that
 // its user-branch value persists regardless of whatever Firefox Suggest
@@ -601,30 +615,6 @@ pref("browser.urlbar.quicksuggest.online.available", false);
 // [3] browser.urlbar.merino.ohttpConfigURL
 // [4] browser.urlbar.merino.ohttpRelayURL
 pref("browser.urlbar.quicksuggest.online.enabled", true, sticky);
-
-// Whether the Firefox Suggest contextual opt-in result is enabled.
-pref("browser.urlbar.quicksuggest.contextualOptIn", false);
-
-// Number that the user dismissed the Firefox Suggest contextual opt-in result.
-pref("browser.urlbar.quicksuggest.contextualOptIn.dismissedCount", 0);
-
-// Period until reshow the Firefox Suggest contextual opt-in result when first dismissed.
-pref("browser.urlbar.quicksuggest.contextualOptIn.firstReshowAfterPeriodDays", 7);
-
-// Period until reshow the Firefox Suggest contextual opt-in result when second dismissed.
-pref("browser.urlbar.quicksuggest.contextualOptIn.secondReshowAfterPeriodDays", 14);
-
-// Period until reshow the Firefox Suggest contextual opt-in result when third dismissed.
-pref("browser.urlbar.quicksuggest.contextualOptIn.thirdReshowAfterPeriodDays", 60);
-
-// Number of impression for the Firefox Suggest contextual opt-in result.
-pref("browser.urlbar.quicksuggest.contextualOptIn.impressionCount", 0);
-
-// Limit for impression to dismiss the Firefox Suggest contextual opt-in result.
-pref("browser.urlbar.quicksuggest.contextualOptIn.impressionLimit", 20);
-
-// Days until dismiss the Firefox Suggest contextual opt-in result after first impression.
-pref("browser.urlbar.quicksuggest.contextualOptIn.impressionDaysLimit", 5);
 
 // Whether the quick suggest feature in the urlbar is enabled.
 pref("browser.urlbar.quicksuggest.enabled", false);
@@ -1030,6 +1020,20 @@ pref("browser.highlightToSearch.enabled", true);
 pref("browser.highlightToSearch.search.enabled", true);
 pref("browser.highlightToSearch.copy.enabled", true);
 
+// Comma-separated sites where the menu is not shown because the page has its
+// own menu for selected text. A site also matches its subdomains.
+pref(
+  "browser.highlightToSearch.ignoredSites",
+  "atlassian.net,docs.google.com,read.amazon.com,read.readwise.io,hypothes.is,chatgpt.com,github.com,notion.so,notion.site,office.com,sharepoint.com,canva.com,figma.com"
+);
+
+// Whether the menu is not shown, or is hidden, when the page shows its own
+// floating menu next to the selected text.
+pref("browser.highlightToSearch.detectPageMenus", true);
+
+// Whether the user has seen the feature callout on the actions menu.
+pref("browser.highlightToSearch.callout.seen", false);
+
 // Spin the cursor while the page is loading
 pref("browser.spin_cursor_while_busy", false);
 
@@ -1191,7 +1195,7 @@ pref("browser.tabs.hoverPreview.showThumbnails", true);
 
 pref("browser.tabs.groups.enabled", true);
 pref("browser.tabs.groups.hoverPreview.enabled", true);
-pref("browser.tabs.groups.alternateMenu", false);
+pref("browser.tabs.groups.alternateMenu", true);
 // Bug 2052293: temporarily disabled while tab groups move away from the list all tabs menu.
 pref("browser.tabs.groups.onboardingCallouts.enabled", false);
 // Number of times the "Tab group saved" confirmation hint has been shown
@@ -1666,6 +1670,12 @@ pref("places.frecency.origins.alternative.featureGate", false);
 // Whether to warm up network connections for places: menus and places: toolbar.
 pref("browser.places.speculativeConnect.enabled", true);
 
+#ifdef XP_MACOSX
+// Limit query results in the native macOS menu. Set to 0 to disable the limit.
+// Restart for changes to fully apply to cached queries.
+pref("browser.places.nativeMenu.maxResults", 100);
+#endif
+
 // if true, use full page zoom instead of text zoom
 pref("browser.zoom.full", true);
 
@@ -1762,13 +1772,6 @@ pref("browser.bookmarks.editDialog.maxRecentFolders", 7);
   pref("security.sandbox.content.write_path_whitelist", "");
   pref("security.sandbox.content.read_path_whitelist", "");
   pref("security.sandbox.content.syscall_whitelist", "");
-  // Introduced as part of bug 1608558.  Linux is currently the only platform
-  // that uses a sandbox level for the socket process.  The following levels
-  // are currently defined:
-  // 0 -> "no sandbox"
-  // 1 -> "sandboxed, allows socket operations and reading necessary certs"
-  // 2 -> default-deny for ioctl
-  pref("security.sandbox.socket.process.level", 2);
 #endif
 
 #if defined(XP_OPENBSD) && defined(MOZ_SANDBOX)
@@ -2015,10 +2018,10 @@ pref("browser.newtabpage.activity-stream.images.smart", true);
 pref("browser.newtabpage.activity-stream.weather.locationSearchEnabled", true);
 
 // List of regions that get weather by default.
-pref("browser.newtabpage.activity-stream.discoverystream.region-weather-config", "AT,BE,BG,CA,CH,CY,CZ,DE,DK,EE,ES,FI,FR,GB,GR,HR,HU,IE,IS,IT,LI,LT,LV,MT,NL,NO,PL,PT,RO,SE,SI,SK,US");
+pref("browser.newtabpage.activity-stream.discoverystream.region-weather-config", "AT,BE,BG,CA,CH,CY,CZ,DE,DK,EE,ES,FI,FR,GB,GL,GR,HK,HR,HU,IE,IQ,IS,IT,LI,LT,LV,MT,NL,NO,PL,PT,RO,RU,SE,SI,SK,US");
 
 // List of locales that weather widget supports.
-pref("browser.newtabpage.activity-stream.discoverystream.locale-weather-config", "bg,cs,da,de,el,en-CA,en-GB,en-US,es-ES,et,fi,fr,hr,hu,is,it,lv,nb-NO,nl,pl,pt-PT,ro,sk,sl,sv-SE,tr");
+pref("browser.newtabpage.activity-stream.discoverystream.locale-weather-config", "ar,bg,cs,da,de,el,en-CA,en-GB,en-US,es-ES,et,fi,fr,hr,hu,is,it,lv,nb-NO,nl,pl,pt-PT,ro,ru,sk,sl,sv-SE,tr,zh-CN,zh-TW");
 
 // Regions with no widgets at all. Everywhere else the container is available
 // and on, and each widget's own prefs decide what appears. Blank means no
@@ -2214,7 +2217,15 @@ pref("browser.newtabpage.activity-stream.telemetry.privatePing.enabled", true);
 // not leave any lingering preferences lying around.
 pref("browser.newtabpage.activity-stream.telemetry.privatePing.redactNewtabPing.enabled", true);
 
-pref("browser.newtabpage.activity-stream.telemetry.privatePing.maxSubmissionDelayMs", 5000);
+pref("browser.newtabpage.activity-stream.telemetry.privatePing.minSubmissionDelayMs", 1000);
+pref("browser.newtabpage.activity-stream.telemetry.privatePing.maxSubmissionDelayMs", 6000);
+
+// Report roughly how long the user read an organic story they opened from
+// New Tab, on the click event in the New Tab content Ping.
+pref("browser.newtabpage.activity-stream.telemetry.privatePing.dwellTime.enabled", false);
+// Scale of the Laplace noise each reported dwell time is multiplied by. A
+// string, since prefs have no floating point type.
+pref("browser.newtabpage.activity-stream.telemetry.privatePing.dwellTime.noiseScale", "0.05");
 
   // Include differentialy private inferred New Tab interests with New Tab content Ping. Only used when user has enabled personalization.
 pref("browser.newtabpage.activity-stream.telemetry.privatePing.inferredInterests.enabled", false);
@@ -2282,19 +2293,6 @@ pref("messaging-system.rsexperimentloader.collection_id", "nimbus-desktop-experi
 pref("nimbus.debug", false);
 pref("nimbus.validation.enabled", true);
 pref("nimbus.firstUpdateComplete", false);
-
-// Should Nimbus write to the shared ProfilesDatastoreService? Only used by tests.
-// TODO(bug 1967779): Require the ProfileDatastoreService by default and remove
-// this pref.
-pref("nimbus.profilesdatastoreservice.enabled", true);
-
-// Should Nimbus read from the shared ProfilesDatastoreService?
-// TODO(bug 2032586): Remove this pref.
-pref("nimbus.profilesdatastoreservice.read.enabled", true);
-
-// Should Nimbus sync experiment unenrollments from other profiles?
-// TODO(bug 2032586): Remove this pref.
-pref("nimbus.profilesdatastoreservice.sync.enabled", true);
 
 // Enable the targeting context telemetry by default, but allow it to be
 // disabled, e.g., for artifact builds.
@@ -2439,7 +2437,7 @@ pref("browser.smartwindow.memoriesLogLevel", "Warn");
 // Gates resume-activity ("pick up where you left off") starter generation.
 pref("browser.smartwindow.resumeActivity.enabled", true);
 // TODO Bug 2067871: remove once journey store is available.
-pref("browser.smartwindow.resumeCards.enabled", false);
+pref("browser.smartwindow.resumeCards.enabled", true);
 pref("browser.smartwindow.firstrun.autoAdvanceMS", 3000);
 pref("browser.smartwindow.firstrun.hasCompleted", false);
 pref("browser.smartwindow.showThemesNotice", true);
@@ -2477,6 +2475,12 @@ pref("browser.smartwindow.smartformfill.disallowedRegions", "FR");
 // something other than a form the user fills in.
 pref("browser.smartwindow.smartformfill.minFormFields", 4);
 
+#ifdef NIGHTLY_BUILD
+pref("browser.smartwindow.aitab.menus", true);
+#else
+pref("browser.smartwindow.aitab.menus", false);
+#endif
+
 // Smart Window Agent
 pref("browser.smartwindow.agent.enabled", true);
 pref("browser.smartwindow.agent.supportedRegions", "US,CA");
@@ -2505,6 +2509,10 @@ pref("browser.smartwindow.searchTheWebFast", true);
 // written answer and its citations in one call. Takes precedence over
 // browser.smartwindow.searchTheWebFast.
 pref("browser.smartwindow.searchTheWebAnswers", false);
+
+// Smart Window: approximate location (city, region, country) from Merino
+// geolocation, kept in memory.
+pref("browser.smartwindow.location.enabled", true);
 
 // Smart Window Logging
 pref("browser.smartwindow.aiTabHistory.logLevel", "Error");
@@ -2697,6 +2705,9 @@ pref("privacy.query_stripping.strip_on_share.enabled", true);
 pref("browser.contentblocking.cryptomining.preferences.ui.enabled", true);
 pref("browser.contentblocking.fingerprinting.preferences.ui.enabled", true);
 
+// Protections panel redesign experiment; enabled via Nimbus.
+pref("browser.protectionsPanelRedesign.enabled", false);
+
 // Possible values for browser.contentblocking.features.strict pref:
 //   Tracking Protection:
 //     "tp": tracking protection enabled
@@ -2886,9 +2897,6 @@ pref("extensions.webcompat.smartblockEmbeds.enabled", true);
 // leaks.
 pref("privacy.exposeContentTitleInWindow", true);
 pref("privacy.exposeContentTitleInWindow.pbm", true);
-
-// Run media transport in a separate process?
-pref("media.peerconnection.mtransport_process", true);
 
 // For speculatively warming up tabs to improve perceived
 // performance while using the async tab switcher.
@@ -3082,7 +3090,7 @@ pref("browser.screenshots.folderList", 4);
 pref("browser.screenshots.dir", "");
 
 // Enable/disable opening a tab into a mini window.
-pref("browser.mini-window.enabled", false);
+pref("browser.mini-window.enabled", true);
 pref("browser.mini-window.log", false);
 // How long the toolbar stays up before idling away.
 pref("browser.mini-window.toolbar.hide-delay-ms", 2000);
@@ -3172,6 +3180,10 @@ pref("browser.toolbars.share-button.enabled", true);
 
 // Visibility of the share button in the url bar.
 pref("browser.urlbar.share-button.enabled", false);
+
+// Toggles the availability of the Tab Groups toolbar button.
+// Requires a restart to reflect state changes.
+pref("browser.toolbars.tab-groups.enabled", false);
 
 pref("security.certerrors.felt-privacy-v1", true);
 
@@ -3818,6 +3830,8 @@ pref("browser.ipProtection.userEnabled", false);
 pref("browser.ipProtection.userEnableCount", 0);
 // Pref to track if user has ever opened the VPN panel
 pref("browser.ipProtection.everOpenedPanel", false);
+// Pref to track if the user has opened the panel since release 160
+pref("browser.ipProtection.openedPanelSince160", false);
 // Pref to track if the VPN UI has ever been exposed to the user. Once it is
 // true the UI is shown regardless of the l10n coverage of
 // browser/ipProtection.ftl. A profile data upgrade sets it to true on profiles
@@ -3835,11 +3849,9 @@ pref("browser.ipProtection.l10nGateVersion", 0);
 // Pref to enable support for site exceptions
 pref("browser.ipProtection.features.siteExceptions", true);
 // Pref to enable support for site inclusions
-pref("browser.ipProtection.features.siteInclusions", false);
+pref("browser.ipProtection.features.siteInclusions", true);
 // Pref to track if the site inclusion prompt has been shown in the VPN panel
 pref("browser.ipProtection.siteInclusionPromptShown", false);
-// Pref to show confirmation hints for site exceptions
-pref("browser.ipProtection.siteExceptionsHintsEnabled", true);
 pref("browser.ipProtection.log", false);
 pref("browser.ipProtection.guardian.endpoint", "https://vpn.mozilla.org/");
 pref("browser.ipProtection.added", false);
@@ -3872,7 +3884,12 @@ pref("toolkit.rust-components.logging.crates", "");
 pref("toolkit.rust-components.logging.internal-level", "Warn");
 
 // Settings Redesign 2025 prefs
-pref("browser.settings-redesign.enabled", true);
+pref("browser.settings-redesign.enabled", true, locked);
+
+// Gates the in-progress Notifications sub-page and its entry card in
+// Permissions and data. Not part of the settings-redesign section scheme, since
+// those are all enabled by browser.settings-redesign.enabled being true.
+pref("browser.preferences.notifications-section.enabled", false);
 
 // A preference that will be locked to reflect whether this build has support
 // for XDG Config Home handling. Mostly used to be able to keep tests around

@@ -148,6 +148,7 @@ IPPSiteRuleManager
 
 : Classifies a principal as included/excluded/default for the proxy, and is the
   single source of truth for that decision. It consults multiple rule-providers like permissions, prefs, enterprise-policies and others.
+  `getRule(principal, browserId)` takes an optional `browserId`; when it is given, tab-specific rules are applied too.
 
 ### Additional proxy/telemetry components
 

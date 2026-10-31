@@ -589,19 +589,13 @@ HTMLCanvasElement::CreateContext(CanvasContextType aContextType) {
   return ret.forget();
 }
 
-bool HTMLCanvasElement::UpdateContext(
-    const CanvasRenderingContextOptions* aOptions) {
-  if (!CanvasRenderingContextHelper::UpdateContext(aOptions)) {
-    return false;
-  }
-
+void HTMLCanvasElement::AfterUpdateContext() {
   // If we have a mRequestedFrameRefreshObserver that wasn't fully registered,
   // retry that now.
   if (mRequestedFrameRefreshObserver.get() &&
       !mRequestedFrameRefreshObserver->IsRegisteredAndWatching()) {
     mRequestedFrameRefreshObserver->Register();
   }
-  return true;
 }
 
 CSSIntSize HTMLCanvasElement::GetWidthHeight() {

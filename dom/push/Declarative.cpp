@@ -36,8 +36,10 @@ class DWPNotificationCallbacks final : public NotificationCallbacksCommon {
     return NS_OK;
   }
 
-  NS_IMETHODIMP OnAlertClick(nsIAlertAction* aAction) override {
-    MOZ_TRY(NotificationCallbacksCommon::OnAlertClick(aAction));
+  NS_IMETHODIMP OnAlertClick(
+      nsIAlertAction* aAction,
+      nsIAlertCallbacks::ApplicationState aState) override {
+    MOZ_TRY(NotificationCallbacksCommon::OnAlertClick(aAction, aState));
     return RespondOnClick(aAction);
   }
 
@@ -222,13 +224,13 @@ RefPtr<DeclarativePushPromise> ParseDeclarativePushAndShowNotification(
     // Not a declarative push message.
     return nullptr;
   }
+  RecordTelemetry(declarativePush);
   Result options =
       GetNotificationOptionsForDeclarativePush(std::move(declarativePush));
   if (NS_WARN_IF(options.isErr())) {
     return DeclarativePushPromise::CreateAndReject(options.unwrapErr(),
                                                    __func__);
   }
-  RecordTelemetry(declarativePush);
   RefPtr permissionPromise = notification::EnsureValidNotificationPermission(
       aPrincipal, aPrincipal, aPrincipal->GetIsOriginPotentiallyTrustworthy());
   return permissionPromise->Then(

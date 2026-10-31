@@ -163,7 +163,7 @@ add_task(async function test_import() {
     "Sanity check the source exists"
   );
 
-  await promiseMigration(
+  let availableQuantity = await promiseMigration(
     migrator,
     MigrationUtils.resourceTypes.HISTORY,
     PROFILE
@@ -175,6 +175,16 @@ add_task(async function test_import() {
     });
     assertEntryMatches(entry, urlInfo);
   }
+  Assert.equal(
+    availableQuantity,
+    TEST_URLS.length,
+    "Available history entries reported correctly."
+  );
+  Assert.equal(
+    MigrationUtils.getImportedCount("history"),
+    TEST_URLS.length,
+    "Migrated history entries counted correctly."
+  );
 });
 
 add_task(async function test_import_future_date() {

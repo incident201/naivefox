@@ -14,7 +14,7 @@
 #include "NetworkConnectivityService.h"
 #include "PendingTransactionInfo.h"
 #include "mozilla/StaticPrefs_network.h"
-#include "mozilla/net/NeckoChannelParams.h"
+#include "mozilla/net/HttpActivityArgs.h"
 #include "nsDNSService2.h"
 #include "nsHttpConnectionMgr.h"
 #include "nsHttpHandler.h"
@@ -47,8 +47,9 @@ static void NotifyConnectionActivity(nsHttpConnectionInfo* aConnInfo,
       aConnInfo->HashKey(), aConnInfo->GetOrigin(), aConnInfo->OriginPort(),
       aConnInfo->EndToEndSSL(), !aConnInfo->GetEchConfig().IsEmpty(),
       aConnInfo->IsHttp3());
-  gHttpHandler->ObserveHttpActivityWithArgs(
-      activity, NS_ACTIVITY_TYPE_HTTP_CONNECTION, aSubtype, PR_Now(), 0, ""_ns);
+  gHttpHandler->ObserveHttpActivityWithArgs(HttpActivityArgs(activity),
+                                            NS_ACTIVITY_TYPE_HTTP_CONNECTION,
+                                            aSubtype, PR_Now(), 0, ""_ns);
 }
 
 NS_IMPL_ADDREF_INHERITED(HappyEyeballsConnectionAttempt, ConnectionAttempt)

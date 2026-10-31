@@ -29,6 +29,24 @@ import {
   toJSONOrNull,
 } from "moz-src:///browser/components/aiwindow/ui/modules/ChatUtils.sys.mjs";
 
+/**
+ * Represents a row from the aitab_pages table in the
+ * ai-tab-pages-store.sqlite database.
+ *
+ * @typedef {object} AITabRow
+ * @property {string} uuid - Identifier for this version.
+ * @property {string} convId - Conversation that owns the page.
+ * @property {string|null} toolConvId - Conversation used to generate the page.
+ * @property {string} slug - URL identifier shared across versions.
+ * @property {number} version - Sequential version number.
+ * @property {string} title - Page title.
+ * @property {number} createdAt - Creation time in microseconds since the Unix epoch.
+ * @property {number} updatedAt - Update time in microseconds since the Unix epoch.
+ * @property {object|null} context - Inputs used to generate the page.
+ * @property {*} components - Component data decoded from stored JSON.
+ * @property {object|null} localState - Saved component state, such as checkboxes.
+ */
+
 // How far #mintSlug will count before giving up on a readable slug.
 const MAX_SLUG_SUFFIX = 50;
 
@@ -115,7 +133,7 @@ class AITabStore extends SQLiteStoreBase {
    * "load the page" query: a slug-only URL implies the newest version.
    *
    * @param {string} slug
-   * @returns {Promise<?object>} The latest version, or null if no tab matches
+   * @returns {Promise<AITabRow|null>} The latest version, or null if no tab matches
    */
   async getBySlug(slug) {
     await this.#ensureConnection();

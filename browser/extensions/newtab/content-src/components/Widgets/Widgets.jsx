@@ -10,7 +10,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { useDispatch, useSelector, batch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { BaseContext } from "content-src/lib/BaseContext";
 // Bug 2034542: these per-widget imports can be removed once the non-Nova render
 // path (@nova-cleanup) is gone and all widgets render via WIDGET_ROW_COMPONENTS.
@@ -33,6 +33,7 @@ import {
   resolveWidgetOrder,
   resolveWidgetHasSidebar,
   resolveWidgetSrc,
+  resolveSidebarWidget,
   getHideAllTargets,
 } from "common/WidgetsRegistry.mjs";
 import {
@@ -41,12 +42,13 @@ import {
   isSpaceOverridden,
   isSpacesActive,
   resolveAutoMinimizeDelayMs,
-  selectFirstSlotWidget,
+  selectFirstSlotWidgetIds,
   selectWidgetsRowAd,
   SPACE_IDS,
 } from "common/PageLayoutVariants.mjs";
 import { WIDGET_ROW_COMPONENTS } from "./WidgetsComponentRegistry.jsx";
 import { WidgetWrapper } from "./WidgetWrapper";
+import { MozWidgetCard } from "./MozWidgetCard";
 // @experiment(remove) { bug 2069496 }
 import { WidgetsRowAd } from "./WidgetsRowAd.jsx";
 import { ErrorBoundary } from "content-src/components/ErrorBoundary/ErrorBoundary";
@@ -217,7 +219,7 @@ function Widgets({ widgetIds }) {
 
   // Bug 2034542: these per-widget lookups and all the derived consts below
   // (listsEnabled, timerEnabled, weatherBase, weatherEnabled, weatherSize,
-  // weatherGoesToSidebar, widgetEnabledMap) can be replaced with a single
+  // widgetEnabledMap) can be replaced with a single
   // registry-driven loop once weather's extra enabled conditions
   // (weatherData.initialized, isWeatherEnabled) are either folded into the
   // registry or handled inside the Weather component itself.
@@ -259,12 +261,6 @@ function Widgets({ widgetIds }) {
     weatherBase && weatherData?.initialized && isWeatherEnabled;
 
   const weatherSize = resolveWidgetSize(weatherWidget, prefs);
-  // Weather renders in the sidebar when its effective size is "small" AND the
-  // sidebar placement is active. If a trainhopSidebar override sets hasSidebar
-  // to false, weatherGoesToSidebar is false and the widget falls through to the
-  // row here instead of disappearing.
-  const weatherGoesToSidebar =
-    resolveWidgetHasSidebar(weatherWidget, prefs) && weatherSize === "small";
   const widgetEnabledMap = {};
   for (const widget of widgets) {
     widgetEnabledMap[widget.id] = isWidgetEnabled(
@@ -273,7 +269,13 @@ function Widgets({ widgetIds }) {
       widgetsEnabled
     );
   }
-  widgetEnabledMap.weather = weatherEnabled && !weatherGoesToSidebar;
+  widgetEnabledMap.weather = weatherEnabled;
+
+  // The widget WidgetsSidebar renders must not render in the row as well.
+  const sidebarWidget = resolveSidebarWidget(prefs, widgetsEnabled);
+  if (sidebarWidget) {
+    widgetEnabledMap[sidebarWidget.id] = false;
+  }
 
   // Given an explicit list, keep only those. Callers wanting every enabled
   // widget pass none, which is everything but a thematic space. This map is the
@@ -285,11 +287,11 @@ function Widgets({ widgetIds }) {
     }
   }
 
-  // @experiment(remove) { bug 2078816 }
-  // The first stories card slot shows this widget instead.
-  const firstSlotWidget = selectFirstSlotWidget(prefs);
-  if (firstSlotWidget) {
-    widgetEnabledMap[firstSlotWidget] = false;
+  // @experiment(remove-conditional) { bug 2078816 }
+  // Keep for spaces-thematic-v1.
+  // A first stories card slot shows these widgets instead.
+  for (const id of selectFirstSlotWidgetIds(prefs)) {
+    widgetEnabledMap[id] = false;
   }
 
   const widgetOrder = resolveWidgetOrder(prefs);
@@ -413,16 +415,6 @@ function Widgets({ widgetIds }) {
         container?.getBoundingClientRect().height ?? null;
       rowToggleToHeightRef.current = 0;
       setAutoCollapsed(true);
-      dispatch(
-        ac.OnlyToMain({
-          type: at.WIDGETS_CONTAINER_ACTION,
-          data: {
-            action_type: CONTAINER_ACTION_TYPES.AUTO_MINIMIZE,
-            action_value: "collapse_section",
-            widget_size: widgetSize,
-          },
-        })
-      );
     }, autoMinimizeDelayMs);
     return () => globalThis.clearTimeout(timer);
   }, [
@@ -430,8 +422,6 @@ function Widgets({ widgetIds }) {
     autoCollapsed,
     autoMinimizeDelayMs,
     isPageVisible,
-    dispatch,
-    widgetSize,
     widgetsContainerRef,
   ]);
 
@@ -464,49 +454,47 @@ function Widgets({ widgetIds }) {
   }, [showsMozWidget]);
 
   function hideAllWidgets() {
-    batch(() => {
-      const targets = getHideAllTargets(prefs, widgetEnabledMap);
-      for (const target of targets) {
-        dispatch(ac.SetPref(target.enabledPref, false));
-      }
-      // @nova-cleanup(remove-conditional): Remove the !novaEnabled guard and this branch
-      if (!novaEnabled && weatherForecastEnabled) {
-        dispatch(ac.SetPref("showWeather", false));
-      }
+    const targets = getHideAllTargets(widgets, prefs, widgetEnabledMap);
+    for (const target of targets) {
+      dispatch(ac.SetPref(target.enabledPref, false));
+    }
+    // @nova-cleanup(remove-conditional): Remove the !novaEnabled guard and this branch
+    if (!novaEnabled && weatherForecastEnabled) {
+      dispatch(ac.SetPref("showWeather", false));
+    }
 
+    dispatch(
+      ac.OnlyToMain({
+        type: at.WIDGETS_HIDE_ALL,
+        data: { targets, widget_size: widgetSize },
+      })
+    );
+    // @nova-cleanup(remove-conditional): Remove once weatherForecastEnabled path is removed
+    if (!novaEnabled && weatherForecastEnabled) {
       dispatch(
         ac.OnlyToMain({
-          type: at.WIDGETS_HIDE_ALL,
-          data: { targets, widget_size: widgetSize },
+          type: at.WIDGETS_ENABLED,
+          data: {
+            widget_name: "weather",
+            widget_source: "widget",
+            enabled: false,
+            widget_size: widgetSize,
+          },
         })
       );
-      // @nova-cleanup(remove-conditional): Remove once weatherForecastEnabled path is removed
-      if (!novaEnabled && weatherForecastEnabled) {
-        dispatch(
-          ac.OnlyToMain({
-            type: at.WIDGETS_ENABLED,
-            data: {
-              widget_name: "weather",
-              widget_source: "widget",
-              enabled: false,
-              widget_size: widgetSize,
-            },
-          })
-        );
-      }
+    }
 
-      if (hideAllToastEnabled) {
-        dispatch(
-          ac.OnlyToOneContent(
-            {
-              type: at.SHOW_TOAST_MESSAGE,
-              data: { toastId: "hideWidgetsToast", showNotifications: true },
-            },
-            "ActivityStream:Content"
-          )
-        );
-      }
-    });
+    if (hideAllToastEnabled) {
+      dispatch(
+        ac.OnlyToOneContent(
+          {
+            type: at.SHOW_TOAST_MESSAGE,
+            data: { toastId: "hideWidgetsToast", showNotifications: true },
+          },
+          "ActivityStream:Content"
+        )
+      );
+    }
   }
 
   function handleHideAllWidgetsClick(e) {
@@ -532,20 +520,22 @@ function Widgets({ widgetIds }) {
 
     // When Nova is enabled, treat the shared header control as a toggle
     // between the default/full widget presentation and the compact one.
-    // Only widgets actually rendered in the sidebar are skipped — that is the
-    // same hasSidebar + size === "small" test used in WidgetsSidebar and by
-    // weatherGoesToSidebar above, not "any small widget". A "small" widget
-    // sitting in the row is resized along with the others so it isn't left
-    // behind by the row toggle. On minimize such a widget lands at "medium"
-    // rather than returning to "small", since the size pref holds the display
-    // state directly and the pre-maximize size isn't retained.
+    // The sidebar widget keeps its "small", and so does a disabled widget
+    // whose placement resolves to the sidebar, so it can return there when
+    // re-enabled. Any other "small" widget sitting in the row, including one
+    // that lost the single sidebar slot, is resized along with the others so
+    // it isn't left behind by the row toggle. On minimize such a widget lands
+    // at "medium" rather than returning to "small", since the size pref holds
+    // the display state directly and the pre-maximize size isn't retained.
     if (novaEnabled) {
       const targetSize = newMaximizedState ? "large" : "medium";
       for (const widget of WIDGET_REGISTRY) {
-        const inSidebar =
+        const keepsSmall =
           resolveWidgetHasSidebar(widget, prefs) &&
-          resolveWidgetSize(widget, prefs) === "small";
-        if (!inSidebar) {
+          resolveWidgetSize(widget, prefs) === "small" &&
+          (widget === sidebarWidget ||
+            !isWidgetEnabled(widget, prefs, widgetsEnabled));
+        if (!keepsSmall) {
           prefUpdates[widget.sizePref] = targetSize;
         }
       }
@@ -557,15 +547,13 @@ function Widgets({ widgetIds }) {
       widget_size: newWidgetSize,
     };
 
-    batch(() => {
-      dispatch(ac.SetMultiplePrefs(prefUpdates));
-      dispatch(
-        ac.OnlyToMain({
-          type: at.WIDGETS_CONTAINER_ACTION,
-          data: telemetryData,
-        })
-      );
-    });
+    dispatch(ac.SetMultiplePrefs(prefUpdates));
+    dispatch(
+      ac.OnlyToMain({
+        type: at.WIDGETS_CONTAINER_ACTION,
+        data: telemetryData,
+      })
+    );
   }
 
   function handleToggleMaximizeClick(e) {
@@ -594,19 +582,17 @@ function Widgets({ widgetIds }) {
     if (container && !prefersReducedMotion) {
       rowToggleFromHeightRef.current = container.getBoundingClientRect().height;
     }
-    batch(() => {
-      dispatch(ac.SetPref(PREF_WIDGETS_ROW_EXPANDED, next));
-      dispatch(
-        ac.OnlyToMain({
-          type: at.WIDGETS_CONTAINER_ACTION,
-          data: {
-            action_type: CONTAINER_ACTION_TYPES.CHANGE_ROW_VISIBILITY,
-            action_value: next ? "expand_row" : "collapse_row",
-            widget_size: widgetSize,
-          },
-        })
-      );
-    });
+    dispatch(ac.SetPref(PREF_WIDGETS_ROW_EXPANDED, next));
+    dispatch(
+      ac.OnlyToMain({
+        type: at.WIDGETS_CONTAINER_ACTION,
+        data: {
+          action_type: CONTAINER_ACTION_TYPES.CHANGE_ROW_VISIBILITY,
+          action_value: next ? "expand_row" : "collapse_row",
+          widget_size: widgetSize,
+        },
+      })
+    );
   }
 
   function handleToggleRowExpandedClick(e) {
@@ -621,19 +607,17 @@ function Widgets({ widgetIds }) {
     rowToggleFromHeightRef.current =
       widgetsContainerRef.current?.getBoundingClientRect().height ?? null;
     setAutoCollapsed(false);
-    batch(() => {
-      dispatch(ac.SetPref(PREF_WIDGETS_AUTO_MINIMIZE_OVERRIDE, true));
-      dispatch(
-        ac.OnlyToMain({
-          type: at.WIDGETS_CONTAINER_ACTION,
-          data: {
-            action_type: CONTAINER_ACTION_TYPES.AUTO_MINIMIZE,
-            action_value: "expand_section",
-            widget_size: widgetSize,
-          },
-        })
-      );
-    });
+    dispatch(ac.SetPref(PREF_WIDGETS_AUTO_MINIMIZE_OVERRIDE, true));
+    dispatch(
+      ac.OnlyToMain({
+        type: at.WIDGETS_CONTAINER_ACTION,
+        data: {
+          action_type: CONTAINER_ACTION_TYPES.AUTO_MINIMIZE,
+          action_value: "expand_section",
+          widget_size: widgetSize,
+        },
+      })
+    );
   }
 
   function handleExpandAutoMinimizedClick(e) {
@@ -650,26 +634,24 @@ function Widgets({ widgetIds }) {
 
   function handleFeedbackClick(e) {
     e.preventDefault();
-    batch(() => {
-      dispatch(
-        ac.OnlyToMain({
-          type: at.OPEN_LINK,
-          data: {
-            url: feedbackUrl,
-            ...(novaEnabled ? { where: "tab" } : {}),
-          },
-        })
-      );
-      dispatch(
-        ac.OnlyToMain({
-          type: at.WIDGETS_CONTAINER_ACTION,
-          data: {
-            action_type: CONTAINER_ACTION_TYPES.FEEDBACK,
-            widget_size: widgetSize,
-          },
-        })
-      );
-    });
+    dispatch(
+      ac.OnlyToMain({
+        type: at.OPEN_LINK,
+        data: {
+          url: feedbackUrl,
+          ...(novaEnabled ? { where: "tab" } : {}),
+        },
+      })
+    );
+    dispatch(
+      ac.OnlyToMain({
+        type: at.WIDGETS_CONTAINER_ACTION,
+        data: {
+          action_type: CONTAINER_ACTION_TYPES.FEEDBACK,
+          widget_size: widgetSize,
+        },
+      })
+    );
   }
 
   function handleUserInteraction(widgetName) {
@@ -937,11 +919,12 @@ function Widgets({ widgetIds }) {
                           widgetEnabledMap={widgetEnabledMap}
                         />
                       ) : (
-                        <moz-widget
-                          widget-id={id}
+                        <MozWidgetCard
+                          dispatch={dispatch}
+                          entry={entry}
                           size={size}
-                          padded={true}
                           src={resolveWidgetSrc(entry, prefs)}
+                          widgetEnabledMap={widgetEnabledMap}
                         />
                       )}
                     </ErrorBoundary>

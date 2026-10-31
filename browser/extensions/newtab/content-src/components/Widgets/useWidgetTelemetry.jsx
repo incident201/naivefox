@@ -2,9 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { useCallback, useEffect, useRef } from "react";
-import { batch } from "react-redux";
+import { useCallback, useContext, useEffect, useRef } from "react";
 import { actionCreators as ac, actionTypes as at } from "common/Actions.mjs";
+import { SpaceActiveContext } from "content-src/lib/SpaceActiveContext";
 
 const IMPRESSION_THRESHOLD = 0.3;
 
@@ -90,14 +90,12 @@ export const useWidgetTelemetry = ({
       const data = buildPayload({ size });
       const legacyTypes = legacyImpressionTypesRef.current;
       if (legacyTypes && legacyTypes.length) {
-        batch(() => {
-          // Legacy first, then unified, matching the pre-hook dispatch order
-          // in FocusTimer / Lists so existing tests don't need to flip.
-          for (const type of legacyTypes) {
-            dispatch(ac.AlsoToMain({ type }));
-          }
-          dispatch(ac.AlsoToMain({ type: at.WIDGETS_IMPRESSION, data }));
-        });
+        // Legacy first, then unified, matching the pre-hook dispatch order
+        // in FocusTimer / Lists so existing tests don't need to flip.
+        for (const type of legacyTypes) {
+          dispatch(ac.AlsoToMain({ type }));
+        }
+        dispatch(ac.AlsoToMain({ type: at.WIDGETS_IMPRESSION, data }));
       } else {
         dispatch(ac.AlsoToMain({ type: at.WIDGETS_IMPRESSION, data }));
       }
@@ -113,9 +111,10 @@ export const useWidgetTelemetry = ({
   // rendering on a Redux pref or async data).
   const observerRef = useRef(null);
   const observedEl = useRef(null);
+  const spaceActive = useContext(SpaceActiveContext);
 
   useEffect(() => {
-    if (typeof IntersectionObserver === "undefined") {
+    if (typeof IntersectionObserver === "undefined" || !spaceActive) {
       return undefined;
     }
     const observer = new IntersectionObserver(
@@ -139,7 +138,7 @@ export const useWidgetTelemetry = ({
       observer.disconnect();
       observerRef.current = null;
     };
-  }, [fireImpression]);
+  }, [fireImpression, spaceActive]);
 
   const impressionRef = useCallback(el => {
     if (observedEl.current === el) {
@@ -182,10 +181,8 @@ export const useWidgetTelemetry = ({
           type: legacyType,
           data: { userAction },
         });
-        batch(() => {
-          dispatch(legacyAction);
-          dispatch(main);
-        });
+        dispatch(legacyAction);
+        dispatch(main);
       } else {
         dispatch(main);
       }

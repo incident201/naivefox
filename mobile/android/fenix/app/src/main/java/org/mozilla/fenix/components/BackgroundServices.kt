@@ -31,7 +31,6 @@ import mozilla.components.feature.accounts.push.CloseTabsCommandReceiver
 import mozilla.components.feature.accounts.push.CloseTabsFeature
 import mozilla.components.feature.accounts.push.FxaPushSupportFeature
 import mozilla.components.feature.accounts.push.SendTabFeature
-import mozilla.components.feature.automotive.isAndroidAutomotiveAvailable
 import mozilla.components.feature.syncedtabs.SyncedTabsAutocompleteProvider
 import mozilla.components.feature.syncedtabs.commands.SyncedTabsCommands
 import mozilla.components.feature.syncedtabs.commands.SyncedTabsCommandsFlushScheduler
@@ -89,7 +88,7 @@ class BackgroundServices(
     creditCardsStorage: Lazy<AutofillCreditCardsAddressesStorage>,
     strictMode: StrictModeManager,
     private val applicationScope: CoroutineScope,
-    isAndroidAutomotiveAvailable: Boolean = context.isAndroidAutomotiveAvailable(),
+    areCredentialsSyncable: Boolean = settings.isAutofillSupported,
 ) {
     // Allows executing tasks which depend on the account manager, but do not need to eagerly initialize it.
     val accountManagerAvailableQueue = RunWhenReadyQueue()
@@ -121,10 +120,6 @@ class BackgroundServices(
             secureStateAtRest = Config.channel.isNightlyOrDebug,
         )
 
-    // Password and credit card syncing is disabled on Android Automotive until we implement the UX Google
-    // requires for handling sensitive information there. See bug 2060936.
-    private val areCredentialsSyncable = !isAndroidAutomotiveAvailable
-
     @VisibleForTesting
     val supportedEngines =
         setOfNotNull(
@@ -135,7 +130,13 @@ class BackgroundServices(
             if (areCredentialsSyncable) SyncEngine.CreditCards else null,
             if (settings.isAddressSyncEnabled) SyncEngine.Addresses else null,
         )
-    private val syncConfig = SyncConfig(supportedEngines, PeriodicSyncConfig(periodMinutes = 240)) // four hours
+    private val syncConfig by lazyMonitored {
+        SyncConfig(
+            supportedEngines = supportedEngines,
+            periodicSyncConfig = PeriodicSyncConfig(periodMinutes = 240), // four hours
+            syncDecouplingEnabled = settings.syncDecouplingEnabled,
+        )
+    }
 
     /**
      * A set of [FxaCapability] that Fenix supports, which we use in our

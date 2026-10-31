@@ -4152,6 +4152,149 @@ add_task(async function test_ContileIntegration() {
     sandbox.restore();
   }
 
+  {
+    info(
+      "TopSitesFeed._fetchSites should send relevance scores without the context_id"
+    );
+    let { feed, fetchStub } = prepFeed(getTopSitesFeedForTest(sandbox));
+    const contextIdStub = sandbox
+      .stub(ContextId, "request")
+      .returns("ContextId");
+    const RELEVANCE = { t1: 0.3, t2: 0.1 };
+    sandbox
+      .stub(SponsoredTopSitesScoreProvider, "getScores")
+      .resolves(RELEVANCE);
+
+    Services.prefs.setStringPref(
+      "browser.newtabpage.activity-stream.discoverystream.ohttp.relayURL",
+      "https://relay.url"
+    );
+    Services.prefs.setStringPref(
+      "browser.newtabpage.activity-stream.discoverystream.ohttp.configURL",
+      "https://config.url"
+    );
+    Services.prefs.setBoolPref(
+      "browser.newtabpage.activity-stream.unifiedAds.ohttp.enabled",
+      true
+    );
+    feed.store.state.Prefs.values["unifiedAds.tiles.enabled"] = true;
+    feed.store.state.Prefs.values["unifiedAds.adsFeed.enabled"] = false;
+    feed.store.state.Prefs.values["unifiedAds.endpoint"] =
+      "https://test.endpoint/";
+    feed.store.state.Prefs.values["discoverystream.placements.tiles"] = "1";
+    feed.store.state.Prefs.values["discoverystream.placements.tiles.counts"] =
+      "1";
+    feed.store.state.Prefs.values["unifiedAds.blockedAds"] = "";
+
+    fetchStub.resolves({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({}),
+    });
+    sandbox
+      .stub(ObliviousHTTP, "getOHTTPConfig")
+      .resolves({ config: "config" });
+    const ohttpRequestStub = sandbox
+      .stub(ObliviousHTTP, "ohttpRequest")
+      .resolves({
+        ok: true,
+        status: 200,
+        headers: new Map(),
+        json: () => Promise.resolve({ 1: [] }),
+      });
+
+    await feed._contile._fetchSites();
+
+    Services.prefs.clearUserPref(
+      "browser.newtabpage.activity-stream.discoverystream.ohttp.relayURL"
+    );
+    Services.prefs.clearUserPref(
+      "browser.newtabpage.activity-stream.discoverystream.ohttp.configURL"
+    );
+    Services.prefs.clearUserPref(
+      "browser.newtabpage.activity-stream.unifiedAds.ohttp.enabled"
+    );
+
+    Assert.ok(
+      ohttpRequestStub.calledOnce,
+      "ohttpRequest should be called once"
+    );
+    Assert.ok(contextIdStub.notCalled, "The context_id was not requested");
+    Assert.equal(
+      ohttpRequestStub.getCall(0).args[3].body,
+      JSON.stringify({
+        flags: {},
+        placements: [
+          {
+            placement: "1",
+            count: 1,
+          },
+        ],
+        blocks: ["duckduckgo"],
+        relevance: RELEVANCE,
+      }),
+      "The body should include the relevance scores and no context_id"
+    );
+    sandbox.restore();
+  }
+
+  {
+    info(
+      "TopSitesFeed._fetchSites should not send relevance scores without OHTTP"
+    );
+    let { feed, fetchStub } = prepFeed(getTopSitesFeedForTest(sandbox));
+    const CONTEXT_ID = "ContextId";
+    sandbox.stub(ContextId, "request").returns(CONTEXT_ID);
+    const getScoresStub = sandbox
+      .stub(SponsoredTopSitesScoreProvider, "getScores")
+      .resolves({ t1: 0.3 });
+
+    Services.prefs.setBoolPref(
+      "browser.newtabpage.activity-stream.unifiedAds.ohttp.enabled",
+      false
+    );
+    feed.store.state.Prefs.values["unifiedAds.tiles.enabled"] = true;
+    feed.store.state.Prefs.values["unifiedAds.adsFeed.enabled"] = false;
+    feed.store.state.Prefs.values["unifiedAds.endpoint"] =
+      "https://test.endpoint/";
+    feed.store.state.Prefs.values["discoverystream.placements.tiles"] = "1";
+    feed.store.state.Prefs.values["discoverystream.placements.tiles.counts"] =
+      "1";
+    feed.store.state.Prefs.values["unifiedAds.blockedAds"] = "";
+
+    fetchStub.resolves({
+      ok: true,
+      status: 200,
+      headers: new Map(),
+      json: () => Promise.resolve({ 1: [] }),
+    });
+
+    await feed._contile._fetchSites();
+
+    Services.prefs.clearUserPref(
+      "browser.newtabpage.activity-stream.unifiedAds.ohttp.enabled"
+    );
+
+    Assert.ok(fetchStub.calledOnce, "The tiles were requested without OHTTP");
+    Assert.ok(getScoresStub.notCalled, "The scores were not read");
+    Assert.equal(
+      fetchStub.getCall(0).args[1].body,
+      JSON.stringify({
+        context_id: CONTEXT_ID,
+        flags: {},
+        placements: [
+          {
+            placement: "1",
+            count: 1,
+          },
+        ],
+        blocks: ["duckduckgo"],
+      }),
+      "The body should include the context_id and no relevance scores"
+    );
+    sandbox.restore();
+  }
+
   Services.prefs.clearUserPref(TOP_SITES_BLOCKED_SPONSORS_PREF);
 });
 
@@ -4401,6 +4544,51 @@ add_task(async function test_pinSiteAtGrouped_clears_stale_custom_screenshot() {
   sandbox.restore();
 });
 
+// Editing a grouped pin's URL must replace that pin in place rather than
+// appending a second tile and leaving the original behind (bug 2073040).
+add_task(async function test_pin_grouped_edit_changed_url_replaces_pin() {
+  let sandbox = sinon.createSandbox();
+  let feed = getTopSitesFeedForTest(sandbox);
+  feed.store.state.Prefs.values = {
+    topSitesRows: 1,
+    topSitesMaxSitesPerRow: 8,
+    topSitesGroupedPins: true,
+  };
+  sandbox.stub(feed, "_broadcastPinnedSitesUpdated");
+  let pinnedLinks = [];
+  sandbox.stub(NewTabUtils.pinnedLinks, "links").get(() => pinnedLinks);
+  sandbox.stub(NewTabUtils.pinnedLinks, "save");
+  let saved;
+  sandbox.stub(feed, "_saveGroupedPins").callsFake(pins => (saved = pins));
+
+  const A = { url: "https://a.com" };
+  const B = { url: "https://b.com" };
+  const C = { url: "https://c.com" };
+  const B2 = { url: "https://b2.com" };
+  const S = { url: "https://search.com", searchTopSite: true };
+  const setPins = (links, rows) => {
+    pinnedLinks = links;
+    feed._linksWithDefaults = rows.map(link => ({ ...link, isPinned: true }));
+  };
+
+  info("changing a pin's URL replaces it at the same group position");
+  setPins([A, B, C], [A, B, C]);
+  await feed.pin({ data: { site: B2, index: 1 } });
+  Assert.deepEqual(saved, [A, B2, C]);
+
+  info("a hidden pin ahead of the edited one doesn't shift the target");
+  setPins([S, A, B], [A, B]);
+  await feed.pin({ data: { site: B2, index: 1 } });
+  Assert.deepEqual(saved, [S, A, B2]);
+
+  info("editing to a URL that's already pinned leaves one copy");
+  setPins([A, B, C], [A, B, C]);
+  await feed.pin({ data: { site: C, index: 1 } });
+  Assert.deepEqual(saved, [A, C]);
+
+  sandbox.restore();
+});
+
 add_task(async function test_fetchSites_callsAdsClientWhenEnabled() {
   let sandbox = sinon.createSandbox();
 
@@ -4435,6 +4623,22 @@ add_task(async function test_fetchSites_callsAdsClientWhenEnabled() {
     ohttp: true,
   };
   sandbox.stub(AdsClient, "requestOptions").returns(REQUEST_OPTIONS);
+  const RELEVANCE = { t1: 0.3 };
+  const getScoresStub = sandbox
+    .stub(SponsoredTopSitesScoreProvider, "getScores")
+    .resolves(RELEVANCE);
+  Services.prefs.setBoolPref(
+    "browser.newtabpage.activity-stream.unifiedAds.ohttp.enabled",
+    true
+  );
+  Services.prefs.setStringPref(
+    "browser.newtabpage.activity-stream.discoverystream.ohttp.relayURL",
+    "https://relay.url"
+  );
+  Services.prefs.setStringPref(
+    "browser.newtabpage.activity-stream.discoverystream.ohttp.configURL",
+    "https://config.url"
+  );
 
   sandbox.stub(TopSitesFeed.prototype, "_readDefaults").returns();
   sandbox.stub(NimbusFeatures.newtab, "getVariable").returns(true);
@@ -4461,9 +4665,12 @@ add_task(async function test_fetchSites_callsAdsClientWhenEnabled() {
   Assert.ok(
     AdsClient.requestOptions.calledOnceWithExactly(
       feed.store.getState().Prefs.values,
-      "duckduckgo"
-    )
+      "duckduckgo",
+      RELEVANCE
+    ),
+    "The prefs, blocks, and relevance scores were passed to requestOptions"
   );
+  Assert.ok(getScoresStub.calledOnce, "The scores were read once");
   Assert.ok(
     ADS_CLIENT.requestTileAds.calledOnceWithExactly(
       sinon.match.any,
@@ -4471,6 +4678,15 @@ add_task(async function test_fetchSites_callsAdsClientWhenEnabled() {
     )
   );
 
+  Services.prefs.clearUserPref(
+    "browser.newtabpage.activity-stream.unifiedAds.ohttp.enabled"
+  );
+  Services.prefs.clearUserPref(
+    "browser.newtabpage.activity-stream.discoverystream.ohttp.relayURL"
+  );
+  Services.prefs.clearUserPref(
+    "browser.newtabpage.activity-stream.discoverystream.ohttp.configURL"
+  );
   sandbox.restore();
 });
 

@@ -795,7 +795,7 @@ Document includes NonElementParentNode;
  * https://wicg.github.io/scroll-to-text-fragment/#feature-detectability
  */
 partial interface Document {
-    [Pref="dom.text_fragments.enabled", SameObject]
+    [SameObject]
     readonly attribute FragmentDirective fragmentDirective;
 };
 

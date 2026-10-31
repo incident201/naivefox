@@ -280,11 +280,18 @@ JITFrameInfoForBufferRange JITFrameInfoForBufferRange::Clone() const {
       jitAddressToJITFramesMap.reserve(mJITAddressToJITFramesMap.count()));
   for (auto iter = mJITAddressToJITFramesMap.iter(); !iter.done();
        iter.next()) {
-    const mozilla::Vector<JITFrameKey>& srcKeys = iter.get().value();
-    mozilla::Vector<JITFrameKey> destKeys;
-    MOZ_RELEASE_ASSERT(destKeys.appendAll(srcKeys));
+    const mozilla::Vector<JITFramesUntilSamplePos>& srcFrames =
+        iter.get().value();
+    mozilla::Vector<JITFramesUntilSamplePos> destFrames;
+    MOZ_RELEASE_ASSERT(destFrames.initCapacity(srcFrames.length()));
+    for (const JITFramesUntilSamplePos& src : srcFrames) {
+      mozilla::Vector<JITFrameKey> destKeys;
+      MOZ_RELEASE_ASSERT(destKeys.appendAll(src.mFrameKeys));
+      destFrames.infallibleAppend(
+          JITFramesUntilSamplePos{src.mLastSamplePos, std::move(destKeys)});
+    }
     jitAddressToJITFramesMap.putNewInfallible(iter.get().key(),
-                                              std::move(destKeys));
+                                              std::move(destFrames));
   }
 
   JITFrameInfoForBufferRange::JITFrameToFrameJSONMap jitFrameToFrameJSONMap;
@@ -386,7 +393,8 @@ Maybe<uint32_t> UniqueStacks::GetOrAddStackIndex(const StackKey& aStack) {
 
 Maybe<Vector<UniqueStacks::FrameKey>>
 UniqueStacks::LookupFramesForJITAddressFromBufferPos(void* aJITAddress,
-                                                     uint64_t aBufferPos) {
+                                                     uint64_t aBufferPos,
+                                                     uint64_t aSamplePos) {
   JITFrameInfoForBufferRange* rangeIter =
       std::lower_bound(mJITInfoRanges.begin(), mJITInfoRanges.end(), aBufferPos,
                        [](const JITFrameInfoForBufferRange& aRange,
@@ -398,22 +406,35 @@ UniqueStacks::LookupFramesForJITAddressFromBufferPos(void* aJITAddress,
       "Buffer position of jit address needs to be in one of the ranges");
 
   using JITFrameKey = JITFrameInfoForBufferRange::JITFrameKey;
+  using JITFramesUntilSamplePos =
+      JITFrameInfoForBufferRange::JITFramesUntilSamplePos;
 
   const JITFrameInfoForBufferRange& jitFrameInfoRange = *rangeIter;
-  auto jitFrameKeys =
+  auto jitFrames =
       jitFrameInfoRange.mJITAddressToJITFramesMap.lookup(aJITAddress);
-  if (!jitFrameKeys) {
+  if (!jitFrames) {
+    return Nothing();
+  }
+
+  // Find the frames for the code that was at aJITAddress in this sample.
+  const auto& framesList = jitFrames->value();
+  const auto* framesIter = std::lower_bound(
+      framesList.begin(), framesList.end(), aSamplePos,
+      [](const JITFramesUntilSamplePos& aFrames, uint64_t aPos) {
+        return aFrames.mLastSamplePos < aPos;
+      });
+  if (framesIter == framesList.end()) {
     return Nothing();
   }
 
   // Map the array of JITFrameKeys to an array of FrameKeys, and ensure that
   // each of the FrameKeys exists in mFrameToIndexMap.
   Vector<FrameKey> frameKeys;
-  MOZ_RELEASE_ASSERT(frameKeys.initCapacity(jitFrameKeys->value().length()));
-  for (const JITFrameKey& jitFrameKey : jitFrameKeys->value()) {
+  MOZ_RELEASE_ASSERT(frameKeys.initCapacity(framesIter->mFrameKeys.length()));
+  for (const JITFrameKey& jitFrameKey : framesIter->mFrameKeys) {
     FrameKey frameKey(jitFrameKey.mCanonicalAddress, jitFrameKey.mDepth,
                       rangeIter - mJITInfoRanges.begin(), jitFrameKey.mLine,
-                      jitFrameKey.mColumn);
+                      jitFrameKey.mColumn, jitFrameKey.mLastSamplePos);
     uint32_t index = mFrameToIndexMap.count();
     auto entry = mFrameToIndexMap.lookupForAdd(frameKey);
     if (!entry) {
@@ -543,11 +564,11 @@ void UniqueStacks::StreamNonJITFrame(const FrameKey& aFrame) {
   }
 }
 
-static void StreamJITFrame(JSContext* aContext, SpliceableJSONWriter& aWriter,
-                           UniqueJSONStrings& aUniqueStrings,
-                           const JS::ProfiledFrameHandle& aJITFrame,
-                           const nsTHashMap<SourceId, IndexIntoSourceTable>*
-                               aSourceIdToIndexMap = nullptr) {
+static void StreamJITFrame(
+    JSContext* /*aContext*/, SpliceableJSONWriter& aWriter,
+    UniqueJSONStrings& aUniqueStrings, const JS::ProfiledFrameHandle& aJITFrame,
+    const nsTHashMap<SourceId, IndexIntoSourceTable>* aSourceIdToIndexMap =
+        nullptr) {
   enum Schema : uint32_t {
     LOCATION = 0,
     RELEVANT_FOR_JS = 1,
@@ -617,7 +638,7 @@ static nsCString JSONForJITFrame(
 
 void JITFrameInfo::AddInfoForRange(
     uint64_t aRangeStart, uint64_t aRangeEnd, JSContext* aCx,
-    const std::function<void(const std::function<void(void*)>&)>&
+    const std::function<void(const std::function<void(void*, uint64_t)>&)>&
         aJITAddressProvider,
     const nsTHashMap<SourceId, IndexIntoSourceTable>* aSourceIdToIndexMap) {
   if (mLocalFailureLatchSource.Failed()) {
@@ -637,43 +658,60 @@ void JITFrameInfo::AddInfoForRange(
   }
 
   using JITFrameKey = JITFrameInfoForBufferRange::JITFrameKey;
+  using JITFramesUntilSamplePos =
+      JITFrameInfoForBufferRange::JITFramesUntilSamplePos;
 
   JITFrameInfoForBufferRange::JITAddressToJITFramesMap jitAddressToJITFrameMap;
   JITFrameInfoForBufferRange::JITFrameToFrameJSONMap jitFrameToFrameJSONMap;
 
-  aJITAddressProvider([&](void* aJITAddress) {
-    // Make sure that we have cached data for aJITAddress.
+  aJITAddressProvider([&](void* aJITAddress, uint64_t aSamplePos) {
+    // Make sure that we have cached data for aJITAddress in this sample.
     auto addressEntry = jitAddressToJITFrameMap.lookupForAdd(aJITAddress);
     if (!addressEntry) {
-      Vector<JITFrameKey> jitFrameKeys;
-      for (JS::ProfiledFrameHandle handle :
-           JS::GetProfiledFrames(aCx, aJITAddress)) {
-        uint32_t depth = jitFrameKeys.length();
-        JITFrameKey jitFrameKey{handle.canonicalAddress(), depth, handle.line(),
-                                handle.column()};
-        auto frameEntry = jitFrameToFrameJSONMap.lookupForAdd(jitFrameKey);
-        if (!frameEntry) {
-          if (!jitFrameToFrameJSONMap.add(
-                  frameEntry, jitFrameKey,
-                  JSONForJITFrame(aCx, handle, *mUniqueStrings,
-                                  aSourceIdToIndexMap))) {
-            mLocalFailureLatchSource.SetFailure(
-                "OOM in JITFrameInfo::AddInfoForRange adding jit->frame map");
-            return;
-          }
-        }
-        if (!jitFrameKeys.append(jitFrameKey)) {
-          mLocalFailureLatchSource.SetFailure(
-              "OOM in JITFrameInfo::AddInfoForRange adding jit frame key");
-          return;
-        }
-      }
       if (!jitAddressToJITFrameMap.add(addressEntry, aJITAddress,
-                                       std::move(jitFrameKeys))) {
+                                       Vector<JITFramesUntilSamplePos>())) {
         mLocalFailureLatchSource.SetFailure(
             "OOM in JITFrameInfo::AddInfoForRange adding addr->jit map");
         return;
       }
+    }
+    Vector<JITFramesUntilSamplePos>& framesList = addressEntry->value();
+    // Sample positions are increasing, so earlier entries in framesList are
+    // for earlier samples.
+    if (!framesList.empty() && aSamplePos <= framesList.back().mLastSamplePos) {
+      return;
+    }
+
+    JS::ProfiledFrameRange frames =
+        JS::GetProfiledFrames(aCx, aJITAddress, aSamplePos);
+    uint64_t lastSamplePos = frames.lastSamplePosition();
+    Vector<JITFrameKey> jitFrameKeys;
+    for (JS::ProfiledFrameHandle handle : frames) {
+      uint32_t depth = jitFrameKeys.length();
+      JITFrameKey jitFrameKey{handle.canonicalAddress(), depth, handle.line(),
+                              handle.column(), lastSamplePos};
+      auto frameEntry = jitFrameToFrameJSONMap.lookupForAdd(jitFrameKey);
+      if (!frameEntry) {
+        if (!jitFrameToFrameJSONMap.add(
+                frameEntry, jitFrameKey,
+                JSONForJITFrame(aCx, handle, *mUniqueStrings,
+                                aSourceIdToIndexMap))) {
+          mLocalFailureLatchSource.SetFailure(
+              "OOM in JITFrameInfo::AddInfoForRange adding jit->frame map");
+          return;
+        }
+      }
+      if (!jitFrameKeys.append(jitFrameKey)) {
+        mLocalFailureLatchSource.SetFailure(
+            "OOM in JITFrameInfo::AddInfoForRange adding jit frame key");
+        return;
+      }
+    }
+    if (!framesList.append(
+            JITFramesUntilSamplePos{lastSamplePos, std::move(jitFrameKeys)})) {
+      mLocalFailureLatchSource.SetFailure(
+          "OOM in JITFrameInfo::AddInfoForRange adding jit frames");
+      return;
     }
   });
 
@@ -1301,7 +1339,7 @@ ProfilerThreadId ProfileBuffer::DoStreamSamplesAndMarkersToJSON(
         aGetStreamingParametersForThreadCallback,
     double aSinceTime, ProcessStreamingContext* aStreamingContextForMarkers,
     mozilla::ProgressLogger aProgressLogger) const {
-  UniquePtr<char[]> dynStrBuf = MakeUnique<char[]>(kMaxFrameKeyLength);
+  auto dynStrBuf = std::make_unique<char[]>(kMaxFrameKeyLength);
 
   return mEntries.Read([&](ProfileChunkedBuffer::Reader* aReader) {
     MOZ_ASSERT(aReader,
@@ -1361,7 +1399,7 @@ ProfilerThreadId ProfileBuffer::DoStreamSamplesAndMarkersToJSON(
           streamingParameters->mPreviousStackState;
       uint32_t& previousStack = streamingParameters->mPreviousStack;
 
-      auto ReadStack = [&](EntryGetter& e, double time, uint64_t entryPosition,
+      auto ReadStack = [&](EntryGetter& e, double time, uint64_t stackPosition,
                            const Maybe<double>& unresponsiveDuration,
                            const RunningTimes& runningTimes) {
         if (writer.Failed()) {
@@ -1505,7 +1543,8 @@ ProfilerThreadId ProfileBuffer::DoStreamSamplesAndMarkersToJSON(
             void* pc = e.Get().GetPtr();
             const Maybe<Vector<UniqueStacks::FrameKey>>& frameKeys =
                 uniqueStacks.LookupFramesForJITAddressFromBufferPos(
-                    pc, entryPosition ? entryPosition : e.CurPos());
+                    pc, stackPosition ? stackPosition : e.CurPos(),
+                    entryPosition);
             MOZ_RELEASE_ASSERT(
                 frameKeys,
                 "Attempting to stream samples for a buffer range "
@@ -1793,7 +1832,7 @@ void ProfileBuffer::AddJITInfoForRange(
   aRangeStart = std::max(aRangeStart, BufferRangeStart());
   aJITFrameInfo.AddInfoForRange(
       aRangeStart, BufferRangeEnd(), aContext,
-      [&](const std::function<void(void*)>& aJITAddressConsumer) {
+      [&](const std::function<void(void*, uint64_t)>& aJITAddressConsumer) {
         // Find all JitReturnAddr entries in the given range for the given
         // thread, and call aJITAddressConsumer with those addresses.
 
@@ -1816,6 +1855,9 @@ void ProfileBuffer::AddJITInfoForRange(
 
             MOZ_ASSERT(e.Get().IsThreadId());
             ProfilerThreadId threadId = e.Get().GetThreadId();
+            // The sampler identifies JIT code by this position, see
+            // JS::GetProfiledFrames.
+            const uint64_t samplePos = e.CurPos();
             e.Next();
 
             // Ignore samples that are for a different thread.
@@ -1828,7 +1870,7 @@ void ProfileBuffer::AddJITInfoForRange(
               e.Next();
               while (e.Has() && !e.Get().IsThreadId()) {
                 if (e.Get().IsJitReturnAddr()) {
-                  aJITAddressConsumer(e.Get().GetPtr());
+                  aJITAddressConsumer(e.Get().GetPtr(), samplePos);
                 }
                 e.Next();
               }
@@ -1856,7 +1898,8 @@ void ProfileBuffer::AddJITInfoForRange(
                         *aReader, aJITFrameInfo.LocalFailureLatchSource());
                     while (stackEntryGetter.Has()) {
                       if (stackEntryGetter.Get().IsJitReturnAddr()) {
-                        aJITAddressConsumer(stackEntryGetter.Get().GetPtr());
+                        aJITAddressConsumer(stackEntryGetter.Get().GetPtr(),
+                                            samplePos);
                       }
                       stackEntryGetter.Next();
                     }
@@ -1886,9 +1929,9 @@ void ProfileBuffer::AddJITInfoForRange(
 
 void ProfileBuffer::StreamMarkersToJSON(
     SpliceableJSONWriter& aWriter, ProfilerThreadId aThreadId,
-    const TimeStamp& aProcessStartTime, double aSinceTime,
+    const TimeStamp& aProcessStartTime, double /*aSinceTime*/,
     UniqueStacks& aUniqueStacks,
-    mozilla::ProgressLogger aProgressLogger) const {
+    mozilla::ProgressLogger /*aProgressLogger*/) const {
   mEntries.ReadEach([&](ProfileBufferEntryReader& aER) {
     auto type = static_cast<ProfileBufferEntry::Kind>(
         aER.ReadObject<ProfileBufferEntry::KindUnderlyingType>());
@@ -1935,7 +1978,7 @@ void ProfileBuffer::StreamMarkersToJSON(
 }
 
 void ProfileBuffer::StreamProfilerOverheadToJSON(
-    SpliceableJSONWriter& aWriter, const TimeStamp& aProcessStartTime,
+    SpliceableJSONWriter& aWriter, const TimeStamp& /*aProcessStartTime*/,
     double aSinceTime, mozilla::ProgressLogger aProgressLogger) const {
   const char* recordOverheads = getenv("MOZ_PROFILER_RECORD_OVERHEADS");
   if (!recordOverheads || recordOverheads[0] == '\0') {
@@ -2089,7 +2132,7 @@ static auto& LookupOrAdd(HashM& aMap, Key&& aKey) {
 }
 
 void ProfileBuffer::StreamCountersToJSON(
-    SpliceableJSONWriter& aWriter, const TimeStamp& aProcessStartTime,
+    SpliceableJSONWriter& aWriter, const TimeStamp& /*aProcessStartTime*/,
     double aSinceTime, mozilla::ProgressLogger aProgressLogger) const {
   // Because this is a format entirely internal to the Profiler, any parsing
   // error indicates a bug in the ProfileBuffer writing or the parser itself,
@@ -2297,7 +2340,7 @@ static void AddPausedRange(SpliceableJSONWriter& aWriter, const char* aReason,
 }
 
 void ProfileBuffer::StreamPausedRangesToJSON(
-    SpliceableJSONWriter& aWriter, double aSinceTime,
+    SpliceableJSONWriter& aWriter, double /*aSinceTime*/,
     mozilla::ProgressLogger aProgressLogger) const {
   mEntries.Read([&](ProfileChunkedBuffer::Reader* aReader) {
     MOZ_ASSERT(aReader,
@@ -2342,6 +2385,7 @@ void ProfileBuffer::StreamPausedRangesToJSON(
 bool ProfileBuffer::DuplicateLastSample(ProfilerThreadId aThreadId,
                                         double aSampleTimeMs,
                                         Maybe<uint64_t>& aLastSample,
+                                        bool aLastSampleHasJitReturnAddrs,
                                         const RunningTimes& aRunningTimes) {
   if (!aLastSample) {
     return false;
@@ -2391,6 +2435,15 @@ bool ProfileBuffer::DuplicateLastSample(ProfilerThreadId aThreadId,
     mEntries.PutObjects(ProfileBufferEntry::Kind::SameSample);
 
     return true;
+  }
+
+  // The JS engine keeps the JitcodeGlobalTable entry for a JitReturnAddr alive,
+  // and distinguishes it from later code at the same address, by the position
+  // of the last sample that referenced it. A copy would reference the entry
+  // from a later position without the JS engine knowing about it, so take a
+  // new sample instead.
+  if (aLastSampleHasJitReturnAddrs) {
+    return false;
   }
 
   AUTO_PROFILER_STATS(DuplicateLastSample_copy);

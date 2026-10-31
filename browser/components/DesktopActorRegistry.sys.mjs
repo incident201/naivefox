@@ -251,6 +251,7 @@ let JSWINDOWACTORS = {
         "AIChatContent:RequestAssets": { wantUntrusted: true },
         "AIChatContent:HistoryGridRender": { wantUntrusted: true },
         "AIChatContent:HistoryGridItemClick": { wantUntrusted: true },
+        "AIChatContent:FirstCharacterDisplayed": { wantUntrusted: true },
         "AIChatContent:ClientError": { wantUntrusted: true },
       },
     },
@@ -286,6 +287,7 @@ let JSWINDOWACTORS = {
         "moz-src:///browser/components/aiwindow/ui/actors/AITabChild.sys.mjs",
       events: {
         "AITab:GetPage": { wantUntrusted: true },
+        "AITab:GetHeadingFont": { wantUntrusted: true },
         "AITab:DeletePage": { wantUntrusted: true },
         "AITab:OpenLink": { wantUntrusted: true },
         "AITab:RecordView": { wantUntrusted: true },
@@ -948,12 +950,14 @@ let JSWINDOWACTORS = {
     safeForUntrustedWebProcess: true,
   },
 
-  ShieldFrame: {
+  AboutStudies: {
     parent: {
-      esModuleURI: "resource://normandy-content/ShieldFrameParent.sys.mjs",
+      esModuleURI:
+        "moz-src:///browser/components/nimbus/AboutStudiesParent.sys.mjs",
     },
     child: {
-      esModuleURI: "resource://normandy-content/ShieldFrameChild.sys.mjs",
+      esModuleURI:
+        "moz-src:///browser/components/nimbus/AboutStudiesChild.sys.mjs",
       events: {
         pageshow: {},
         pagehide: {},
@@ -961,7 +965,7 @@ let JSWINDOWACTORS = {
       },
     },
     matches: ["about:studies*"],
-    safeForUntrustedWebProcess: true,
+    remoteTypes: ["privilegedabout"],
   },
 
   SmartFormFill: {

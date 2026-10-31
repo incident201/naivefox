@@ -143,8 +143,10 @@ sysroot-wasm32-wasi-clang-trunk:
         script: build-wasi-sdk.sh
         arguments:
             - wasi-sdk-compat.patch
+            - wasi-sdk-clang_24.patch
         resources:
             - taskcluster/scripts/misc/wasi-sdk-compat.patch
+            - taskcluster/scripts/misc/wasi-sdk-clang_24.patch
         toolchain-alias:
             by-project:
                 toolchains: sysroot-wasm32-wasi

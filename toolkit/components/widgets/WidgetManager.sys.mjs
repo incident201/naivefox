@@ -4,12 +4,30 @@
 
 import { EventEmitter } from "resource://gre/modules/EventEmitter.sys.mjs";
 
+const lazy = {};
+ChromeUtils.defineESModuleGetters(lazy, {
+  ExtensionCommon: "resource://gre/modules/ExtensionCommon.sys.mjs",
+});
+
+const PREF_ROOT = "extensions.widgets.";
+
+/**
+ * @param {string} id - the id of a widget's extension
+ * @returns {string} the key naming the widget's prefs
+ */
+function prefKeyFor(id) {
+  return lazy.ExtensionCommon.makeWidgetId(id.replace(/@mozilla\.org$/, ""));
+}
+
 /**
  * @typedef {object} WidgetOptions
  * @property {string} id - the widget id (from the extension that provides it)
  * @property {string} src - moz-extension: URL of the widget page
  * @property {string} name - display name for the widget
  * @property {Array<string>} sizes - sizes the widget supports
+ * @property {string} [defaultSize] - size used until one is chosen
+ * @property {string} [prefBranch] - pref branch storing whether the widget is
+ *   enabled and its size, in `<prefBranch>.enabled` and `<prefBranch>.size`
  * @property {string} [l10nId] - Fluent id of the display name
  */
 
@@ -54,6 +72,36 @@ class Widget {
   get l10nId() {
     return this.#properties.l10nId ?? null;
   }
+
+  /**
+   * Whether the widget is enabled.
+   *
+   * @type {boolean}
+   */
+  get enabled() {
+    return Services.prefs.getBoolPref(this.#properties.enabledPref, false);
+  }
+
+  set enabled(enabled) {
+    Services.prefs.setBoolPref(this.#properties.enabledPref, Boolean(enabled));
+  }
+
+  /**
+   * The widget's chosen or default size.
+   *
+   * @type {string}
+   */
+  get size() {
+    const { defaultSize, sizePref, sizes } = this.#properties;
+    const chosen = Services.prefs.getStringPref(sizePref, "");
+    return [chosen, defaultSize].find(size => sizes.includes(size)) ?? sizes[0];
+  }
+
+  set size(size) {
+    if (this.#properties.sizes.includes(size)) {
+      Services.prefs.setStringPref(this.#properties.sizePref, size);
+    }
+  }
 }
 
 const REQUIRED_OPTIONS = ["id", "src", "name", "sizes"];
@@ -61,12 +109,19 @@ const REQUIRED_OPTIONS = ["id", "src", "name", "sizes"];
 /**
  * Manages the widgets registered by extensions.
  *
- * Emits "change" with a widget's id when the widget registers or
- * unregisters after init, and at init for each widget registered before it.
+ * Each widget's enabled state and size are stored in prefs under its pref
+ * branch, by default `extensions.widgets.<key>`.
+ *
+ * Emits "change" with a widget's id when the widget registers, unregisters,
+ * or one of its prefs changes after init, and at init for each widget
+ * registered before it.
  */
 export class _WidgetManager {
   /** @type {Map<string, Widget>} registered widgets keyed by widget id */
   #widgets = new Map();
+
+  /** @type {Map<string, string>} widget ids keyed by pref name */
+  #prefHolders = new Map();
 
   /** @type {boolean} whether init has run */
   #isReady = false;
@@ -92,6 +147,10 @@ export class _WidgetManager {
   uninit() {
     this.#isReady = false;
     this.#ready = Promise.withResolvers();
+    for (const pref of this.#prefHolders.keys()) {
+      Services.prefs.removeObserver(pref, this.#onPrefChanged);
+    }
+    this.#prefHolders.clear();
     this.#widgets.clear();
   }
 
@@ -115,11 +174,23 @@ export class _WidgetManager {
   }
 
   /**
+   * @param {nsISupports} subject - the pref branch
+   * @param {string} topic - "nsPref:changed"
+   * @param {string} name - the changed pref
+   */
+  #onPrefChanged = (subject, topic, name) => {
+    const id = this.#prefHolders.get(name);
+    if (id) {
+      this.#emitChange(id);
+    }
+  };
+
+  /**
    * Register a new widget.
    *
    * @param {WidgetOptions} options
    * @returns {Widget} the registered widget
-   * @throws {TypeError} if the ID has already been registered
+   * @throws {TypeError} if the ID or one of its prefs is already registered
    * @throws {TypeError} if a required option is missing
    */
   register(options) {
@@ -132,8 +203,27 @@ export class _WidgetManager {
     if (this.#widgets.has(id)) {
       throw new TypeError(`"${id}" is already registered`);
     }
-    const widget = new Widget(options);
+    const prefBranch = options.prefBranch ?? `${PREF_ROOT}${prefKeyFor(id)}`;
+    const properties = {
+      ...options,
+      enabledPref: `${prefBranch}.enabled`,
+      sizePref: `${prefBranch}.size`,
+    };
+    const prefs = [properties.enabledPref, properties.sizePref];
+    for (const pref of prefs) {
+      const holder = this.#prefHolders.get(pref);
+      if (holder) {
+        throw new TypeError(
+          `The pref "${pref}" of "${id}" is used by "${holder}"`
+        );
+      }
+    }
+    const widget = new Widget(properties);
     this.#widgets.set(id, widget);
+    for (const pref of prefs) {
+      this.#prefHolders.set(pref, id);
+      Services.prefs.addObserver(pref, this.#onPrefChanged);
+    }
     this.#emitChange(id);
     return widget;
   }
@@ -144,9 +234,16 @@ export class _WidgetManager {
    * @param {string} id - a widget id
    */
   unregister(id) {
-    if (this.#widgets.delete(id)) {
-      this.#emitChange(id);
+    if (!this.#widgets.delete(id)) {
+      return;
     }
+    for (const [pref, holder] of this.#prefHolders) {
+      if (holder === id) {
+        Services.prefs.removeObserver(pref, this.#onPrefChanged);
+        this.#prefHolders.delete(pref);
+      }
+    }
+    this.#emitChange(id);
   }
 
   /**

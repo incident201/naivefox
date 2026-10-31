@@ -24,11 +24,13 @@
 #include "mozilla/dom/NavigationTransition.h"
 #include "mozilla/dom/NavigationUtils.h"
 #include "mozilla/dom/PContent.h"
+#include "mozilla/dom/PageSwapEvent.h"
 #include "mozilla/dom/PermissionsPolicy.h"
 #include "mozilla/dom/Promise-inl.h"
 #include "mozilla/dom/Promise.h"
 #include "mozilla/dom/RootedDictionary.h"
 #include "mozilla/dom/SessionHistoryEntry.h"
+#include "mozilla/dom/ViewTransition.h"
 #include "mozilla/dom/WindowContext.h"
 #include "mozilla/dom/WindowGlobalChild.h"
 #include "nsContentUtils.h"
@@ -1463,7 +1465,7 @@ void LogEntry(NavigationHistoryEntry* aEntry, uint64_t aIndex, uint64_t aTotal,
 }  // namespace
 
 // https://html.spec.whatwg.org/#fire-a-traverse-navigate-event
-bool Navigation::FireTraverseNavigateEvent(
+Navigation::FinalStatus Navigation::FireTraverseNavigateEvent(
     JSContext* aCx, nsDocShellLoadState* aLoadState,
     Maybe<UserNavigationInvolvement> aUserInvolvement) {
   // aDestinationSessionHistoryInfo corresponds to
@@ -1558,11 +1560,11 @@ bool Navigation::FirePushReplaceReloadNavigateEvent(
 
   // Step 8
   return InnerFireNavigateEvent(
-      aCx, aNavigationType, destination,
-      aUserInvolvement.valueOr(UserNavigationInvolvement::None), aSourceElement,
-      aFormDataEntryList, aClassicHistoryAPIState,
-      /* aDownloadRequestFilename */ VoidString(),
-      aApiMethodTrackerForNavigateOrReload);
+             aCx, aNavigationType, destination,
+             aUserInvolvement.valueOr(UserNavigationInvolvement::None),
+             aSourceElement, aFormDataEntryList, aClassicHistoryAPIState,
+             /* aDownloadRequestFilename */ VoidString(),
+             aApiMethodTrackerForNavigateOrReload) == FinalStatus::Continue;
 }
 
 // https://html.spec.whatwg.org/#fire-a-download-request-navigate-event
@@ -1585,10 +1587,11 @@ bool Navigation::FireDownloadRequestNavigateEvent(
                                            /* aIsSameDocument */ false);
 
   // Step 8
-  return InnerFireNavigateEvent(
-      aCx, NavigationType::Push, destination, aUserInvolvement, aSourceElement,
-      /* aFormDataEntryList */ nullptr,
-      /* aClassicHistoryAPIState */ nullptr, aFilename);
+  return InnerFireNavigateEvent(aCx, NavigationType::Push, destination,
+                                aUserInvolvement, aSourceElement,
+                                /* aFormDataEntryList */ nullptr,
+                                /* aClassicHistoryAPIState */ nullptr,
+                                aFilename) == FinalStatus::Continue;
 }
 
 static bool HasHistoryActionActivation(
@@ -1693,7 +1696,7 @@ nsresult Navigation::FireErrorEvent(const nsAString& aName,
 }
 
 // https://html.spec.whatwg.org/#inner-navigate-event-firing-algorithm
-bool Navigation::InnerFireNavigateEvent(
+Navigation::FinalStatus Navigation::InnerFireNavigateEvent(
     JSContext* aCx, NavigationType aNavigationType,
     NavigationDestination* aDestination,
     UserNavigationInvolvement aUserInvolvement, Element* aSourceElement,
@@ -1713,7 +1716,7 @@ bool Navigation::InnerFireNavigateEvent(
     MOZ_DIAGNOSTIC_ASSERT(!aNavigationAPIMethodTracker);
 
     // Step 1.5
-    return true;
+    return FinalStatus::Continue;
   }
 
   RootedDictionary<NavigateEventInit> init(RootingCx());
@@ -1793,7 +1796,10 @@ bool Navigation::InnerFireNavigateEvent(
       HasUAVisualTransition(ToMaybeRef(GetAssociatedDocument()));
 
   // Step 16
-  init.mSourceElement = aSourceElement;
+  if (aSourceElement &&
+      aSourceElement->NodePrincipal()->Equals(document->NodePrincipal())) {
+    init.mSourceElement = aSourceElement;
+  }
 
   // Step 17
   RefPtr<AbortController> abortController = new AbortController(globalObject);
@@ -1853,7 +1859,7 @@ bool Navigation::InnerFireNavigateEvent(
     }
 
     // Step 28.3
-    return false;
+    return FinalStatus::Prevent;
   }
 
   // Step 29
@@ -1867,8 +1873,9 @@ bool Navigation::InnerFireNavigateEvent(
     // Step 29.3
     RefPtr<Promise> committedPromise = Promise::CreateInfallible(globalObject);
     RefPtr<Promise> finishedPromise = Promise::CreateInfallible(globalObject);
+    const RefPtr<NavigationDestination> destination = event->Destination();
     mTransition = MakeAndAddRef<NavigationTransition>(
-        globalObject, aNavigationType, fromNHE, committedPromise,
+        globalObject, aNavigationType, fromNHE, destination, committedPromise,
         finishedPromise);
 
     // Step 29.4
@@ -1923,7 +1930,9 @@ bool Navigation::InnerFireNavigateEvent(
         scope);
   }
   // Step 32 and 33
-  return event->InterceptionState() == NavigateEvent::InterceptionState::None;
+  return event->InterceptionState() == NavigateEvent::InterceptionState::None
+             ? FinalStatus::Continue
+             : FinalStatus::Intercept;
 }
 
 NavigationHistoryEntry* Navigation::FindNavigationHistoryEntry(
@@ -2224,6 +2233,67 @@ Navigation::AddUpcomingTraverseAPIMethodTracker(const nsID& aKey,
 
   // 5. Return apiMethodTracker.
   return methodTracker;
+}
+
+// https://html.spec.whatwg.org/#fire-the-pageswap-event
+void Navigation::FirePageSwapEvent(const SessionHistoryInfo* aTargetSHInfo,
+                                   NavigationType aType,
+                                   bool aCanHaveActivation,
+                                   ViewTransition* aViewTransition) {
+  // PageSwapEvent is only exposed when cross-document view transitions are
+  // enabled, so there is nothing observable to dispatch otherwise.
+  if (!StaticPrefs::dom_viewTransitions_cross_document_enabled()) {
+    return;
+  }
+
+  nsCOMPtr<nsIGlobalObject> global = GetRelevantGlobal();
+  nsPIDOMWindowInner* inner = global ? global->GetAsInnerWindow() : nullptr;
+  if (!inner) {
+    return;
+  }
+
+  // Steps 3-4. The callers check the step 4 conditions and pass the result as
+  // aCanHaveActivation.
+  RefPtr<NavigationActivation> activation;
+  if (aCanHaveActivation) {
+    // Step 4.1: Determine destinationEntry based on the navigation type.
+    RefPtr<NavigationHistoryEntry> oldEntry = GetCurrentEntry();
+    RefPtr<NavigationHistoryEntry> newEntry;
+    switch (aType) {
+      case NavigationType::Reload:
+        newEntry = oldEntry;
+        break;
+      case NavigationType::Traverse:
+        newEntry = aTargetSHInfo ? FindNavigationHistoryEntry(*aTargetSHInfo)
+                                 : nullptr;
+        break;
+      case NavigationType::Push:
+      case NavigationType::Replace:
+        if (aTargetSHInfo) {
+          newEntry =
+              MakeRefPtr<NavigationHistoryEntry>(global, aTargetSHInfo, -1);
+        }
+        break;
+    }
+    // Step 4.2: Create the activation. The entry of an activation can not be
+    // null. A traversal target is not in the entry list if script changed the
+    // session history before the traversal completed, so then fire pageswap
+    // without an activation.
+    if (newEntry) {
+      activation =
+          MakeRefPtr<NavigationActivation>(global, newEntry, oldEntry, aType);
+    }
+  }
+
+  // Step 5: Fire the event.
+  RefPtr<nsGlobalWindowInner> window = nsGlobalWindowInner::Cast(inner);
+  PageSwapEventInit init;
+  init.mActivation = activation;
+  init.mViewTransition = aViewTransition;
+  RefPtr<PageSwapEvent> event =
+      PageSwapEvent::Constructor(window, u"pageswap"_ns, init);
+  event->SetTrusted(true);
+  window->DispatchEvent(*event);
 }
 
 // https://html.spec.whatwg.org/#update-document-for-history-step-application

@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { html } from "chrome://global/content/vendor/lit.all.mjs";
-// eslint-disable-next-line import/no-unassigned-import
+// eslint-disable-next-line import-x/no-unassigned-import
 import "chrome://browser/content/aiwindow/components/aitab-header.mjs";
 import { withHeadingFont } from "../aitab-story-font.mjs";
 
@@ -30,7 +30,7 @@ aitab-page-refreshing-sources =
 aitab-page-delete =
     .aria-label = Delete page
     .title = Delete page
-aitab-page-delete-dialog-title = Delete this [AI Tab]?
+aitab-page-delete-dialog-title = Delete this [Smart Page]?
 aitab-page-delete-dialog-message = This generated page will be removed. The sources it was built from aren't affected.
 aitab-page-delete-dialog-cancel =
     .label = Cancel

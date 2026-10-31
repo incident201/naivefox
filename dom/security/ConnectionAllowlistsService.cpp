@@ -9,6 +9,7 @@
 #include "mozilla/RefPtr.h"
 #include "nsCOMPtr.h"
 #include "nsILoadInfo.h"
+#include "nsNetUtil.h"
 
 namespace mozilla::dom {
 
@@ -30,6 +31,8 @@ ConnectionAllowlistsService::ShouldLoad(nsIURI* aContentLocation,
 
   if (!allowlists->ShouldLoad(aContentLocation, aLoadInfo)) {
     *aDecision = nsIContentPolicy::REJECT_REQUEST;
+    NS_SetRequestBlockingReason(
+        aLoadInfo, nsILoadInfo::BLOCKING_REASON_CONNECTION_ALLOWLIST);
   }
 
   return NS_OK;

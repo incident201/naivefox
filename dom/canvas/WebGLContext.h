@@ -817,6 +817,12 @@ class WebGLContext : public VRefCounted, public SupportsWeakPtr {
   void TexStorage(GLenum texTarget, uint32_t levels, GLenum sizedFormat,
                   uvec3 size) const;
 
+  // Hint that the texture bound to texTarget will be used as a framebuffer
+  // attachment, so that ANGLE D3D allocates render target storage up front
+  // instead of converting the storage on first use. Must be called before
+  // TexStorage to have any effect. Only for internal use by DrawTargetWebgl.
+  void HintTexRenderTarget(GLenum texTarget) const;
+
   ////////////////////////////////////
   // WebGLTextureUpload.cpp
  protected:

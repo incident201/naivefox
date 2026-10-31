@@ -142,12 +142,6 @@ var localProviderModules = [
     supportedSAPs: ["newtab_searchbar", "smartbar", "urlbar"],
   },
   {
-    name: "UrlbarProviderQuickSuggestContextualOptIn",
-    module:
-      "moz-src:///browser/components/urlbar/UrlbarProviderQuickSuggestContextualOptIn.sys.mjs",
-    supportedSAPs: ["urlbar"],
-  },
-  {
     name: "UrlbarProviderRecentSearches",
     module:
       "moz-src:///browser/components/urlbar/UrlbarProviderRecentSearches.sys.mjs",

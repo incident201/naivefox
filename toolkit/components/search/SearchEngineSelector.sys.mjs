@@ -6,7 +6,8 @@
  * @import {
  *   RefinedSearchConfig,
  *   RefinedSearchConfigV3,
- *   SearchEngineDefinition
+ *   SearchEngineDefinition,
+ *   SearchEngineDefinitionV3,
  * } from "../uniffi-bindgen-gecko-js/components/generated/RustSearch.sys.mjs";
  */
 
@@ -81,10 +82,10 @@ export class SearchEngineSelector {
   /**
    * Handles getting the configuration from remote settings.
    *
-   * @param {boolean} skipSetSearchConfigForSchemaTests
+   * @param {boolean} [skipSetSearchConfigForSchemaTests]
    *   For tests only. Skips setting the search configuration on the Rust
-   *   search engine selector. Useful for testing schemas without Rust also
-   *   testing.
+   *   search engine selector. Useful for testing schemas without the Rust
+   *   validation getting in the way.
    * @returns {Promise<object>}
    *   The configuration data.
    */
@@ -133,7 +134,7 @@ export class SearchEngineSelector {
    * @param {string} host
    *   The host to match.
    *
-   * @returns {Promise<?SearchEngineDefinition>}
+   * @returns {Promise<?SearchEngineDefinition|SearchEngineDefinitionV3>}
    *   The configuration data for an engine.
    */
   async findContextualSearchEngineByHost(host) {
@@ -148,6 +149,7 @@ export class SearchEngineSelector {
       if (searchHost.startsWith(host)) {
         let engine = structuredClone(config.base);
         engine.identifier = config.identifier;
+        this.#convertPartnerDetailsToMap(config, engine);
         return engine;
       }
     }
@@ -160,7 +162,7 @@ export class SearchEngineSelector {
    * @param {string} id
    *   The identifier to match.
    *
-   * @returns {Promise<?SearchEngineDefinition>}
+   * @returns {Promise<?SearchEngineDefinition|SearchEngineDefinitionV3>}
    *   The configuration data for an engine.
    */
   async findContextualSearchEngineById(id) {
@@ -171,6 +173,7 @@ export class SearchEngineSelector {
       if (config.identifier == id) {
         let engine = structuredClone(config.base);
         engine.identifier = config.identifier;
+        this.#convertPartnerDetailsToMap(config, engine);
         return engine;
       }
     }
@@ -280,6 +283,23 @@ export class SearchEngineSelector {
     }
 
     return refinedSearchConfig;
+  }
+
+  /**
+   * Converts the partner field of a v3 search configuration to a Map.
+   * This is needed to match the field types returned by the search engine
+   * selector.
+   *
+   * @param {object} config
+   * @param {SearchEngineDefinition|SearchEngineDefinitionV3} engine
+   */
+  #convertPartnerDetailsToMap(config, engine) {
+    if ("partner" in engine) {
+      engine.partner = new Map();
+      for (let [sap, partnerDetails] of Object.entries(config.base.partner)) {
+        engine.partner.set(sap, structuredClone(partnerDetails));
+      }
+    }
   }
 
   /**

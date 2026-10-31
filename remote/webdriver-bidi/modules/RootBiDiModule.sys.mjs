@@ -32,6 +32,17 @@ XPCOMUtils.defineLazyPreferenceGetter(
 
 export class RootBiDiModule extends Module {
   /**
+   * Check if the current WebDriver BiDi session owning the RootBiDiModule is
+   * restricted to a single user context.
+   *
+   * @returns {boolean}
+   *     True if the session is restricted to a user context, false otherwise.
+   */
+  get _isSessionRestricted() {
+    return this._sessionUserContext !== null;
+  }
+
+  /**
    * The user context id the WebDriver session is restricted to.
    *
    * @returns {string|null}
@@ -242,5 +253,37 @@ export class RootBiDiModule extends Module {
       ...args,
       params,
     });
+  }
+
+  /**
+   * Commands which can be used in a session restricted to a single user
+   * context. All other commands are rejected in such a session.
+   *
+   * Should be overridden by individual root bidi modules which want to expose
+   * commands.
+   *
+   * @returns {Array<string>}
+   *     The command names.
+   */
+  static get supportedCommandsInRestrictedSession() {
+    return [];
+  }
+
+  supportsMethod(methodName, fromContentProcess) {
+    if (
+      // Internal commands (starting with "_") are always allowed because they
+      // cannot be triggered directly by external clients.
+      !methodName.startsWith("_") &&
+      this._isSessionRestricted &&
+      !this.constructor.supportedCommandsInRestrictedSession.includes(
+        methodName
+      )
+    ) {
+      throw new lazy.error.UnsupportedOperationError(
+        `${this.moduleName}.${methodName} is not supported in a session restricted to a single user context`
+      );
+    }
+
+    return super.supportsMethod(methodName, fromContentProcess);
   }
 }

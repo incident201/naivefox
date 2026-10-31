@@ -61,7 +61,12 @@ add_task(function test_init_and_unregister() {
     "INIT broadcasts are startup actions"
   );
   Assert.deepEqual(lastExtensionWidgets(feed), {
-    [EXTENSION_ID]: { src: SRC, name: "Tally" },
+    [EXTENSION_ID]: {
+      src: SRC,
+      name: "Tally",
+      telemetryName: EXTENSION_ID,
+      validSizes: ["medium"],
+    },
   });
 
   WidgetManager.unregister(EXTENSION_ID);
@@ -70,26 +75,6 @@ add_task(function test_init_and_unregister() {
     {},
     "Unregistered widget removed"
   );
-  feed.onAction({ type: actionTypes.UNINIT });
-});
-
-add_task(function test_l10n_widget() {
-  registerWidget(EXTENSION_ID, { l10nId: "tally-name" });
-
-  const feed = initFeed();
-  Assert.deepEqual(
-    lastExtensionWidgets(feed),
-    {
-      [EXTENSION_ID]: {
-        src: SRC,
-        name: "Tally",
-        customizeL10nId: "tally-name",
-      },
-    },
-    "Name and Fluent ids"
-  );
-
-  WidgetManager.unregister(EXTENSION_ID);
   feed.onAction({ type: actionTypes.UNINIT });
 });
 

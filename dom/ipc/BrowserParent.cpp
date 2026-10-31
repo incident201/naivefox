@@ -781,7 +781,7 @@ void BrowserParent::Destroy() {
   }
 }
 
-mozilla::ipc::IPCResult BrowserParent::RecvDidUnsuppressPainting() {
+mozilla::ipc::IPCResult BrowserParent::RecvReadyToReplaceRetainedPaint() {
   if (!mFrameElement) {
     return IPC_OK();
   }
@@ -791,6 +791,24 @@ mozilla::ipc::IPCResult BrowserParent::RecvDidUnsuppressPainting() {
     subdocFrame->ClearRetainedPaintData();
   }
   return IPC_OK();
+}
+
+mozilla::ipc::IPCResult
+BrowserParent::RecvReadyToReplaceRetainedPaintNormalPriority() {
+  // Only an initial about:blank document sends this. The frame retains the
+  // paint of the previous document only while a BFCache swap waits for a
+  // document that has been loaded or restored, so the initial document must not
+  // replace it. If that document never comes, for example because the load
+  // fails after the swap, the previous document stays visible until this
+  // BrowserParent is destroyed.
+  if (mFrameElement) {
+    nsSubDocumentFrame* subdocFrame =
+        do_QueryFrame(mFrameElement->GetPrimaryFrame());
+    if (subdocFrame && subdocFrame->HasRetainedPaintData()) {
+      return IPC_OK();
+    }
+  }
+  return RecvReadyToReplaceRetainedPaint();
 }
 
 mozilla::ipc::IPCResult BrowserParent::RecvEnsureLayersConnected(
@@ -1335,27 +1353,15 @@ IPCResult BrowserParent::RecvNewWindowGlobal(
     return IPC_FAIL(this, "Cannot create without valid documentURI");
   }
 
-  nsCOMPtr<nsIURI> docURI = aInit.documentURI();
-
   // Ensure we never load a document with a content principal in
   // the wrong type of webIsolated process
   // NOTE: Keep the AllowSystem condition in sync with the similar check in
   // DocumentLoadListener::TriggerRedirectToRealChannel.
   EnumSet<ValidatePrincipalOptions> validationOptions = {};
-  if (xpc::IsInAutomation()) {
-    // Automation-Only: chrome://reftest/** + blank subframes
-    bool isChromeReftest = false;
-    if (docURI->SchemeIs("chrome")) {
-      nsAutoCString host;
-      docURI->GetHost(host);
-      isChromeReftest = host.EqualsLiteral("reftest");
-    }
-
-    if (isChromeReftest ||
-        (NS_IsAboutBlank(docURI) && parentWgp && parentWgp->Manager() == this &&
-         parentWgp->DocumentPrincipal()->IsSystemPrincipal())) {
-      validationOptions += ValidatePrincipalOptions::AllowSystemIfLoaded;
-    }
+  if (StaticPrefs::
+          dom_ipc_validatePrincipal_testing_allowContentSystemDocuments() &&
+      xpc::IsInAutomation()) {
+    validationOptions += ValidatePrincipalOptions::AllowSystemIfLoaded;
   }
   if (!Manager()->ValidatePrincipal(aInit.principal(), validationOptions)) {
     return ContentParent::PrincipalValidationIpcFail(aInit.principal(), this,
@@ -2848,12 +2854,21 @@ mozilla::ipc::IPCResult BrowserParent::RecvReplyKeyEvent(
     localEvent.GetAccessKeyCandidates(accessCharCodes);
     if (esm->HandleAccessKey(&localEvent, presContext, accessCharCodes)) {
       status = nsEventStatus_eConsumeNoDefault;
+      // If there is a keyboard event listener, localEvent.PreventDefault() will
+      // be called by EventListenerManager. However, otherwise, the default
+      // shortcut keys in OS may be executed later unless we explicitly consume
+      // the event itself here. To prevent to execute both access key and
+      // shortcut key in OS, we should call PreventDefault() explicitly here.
+      localEvent.PreventDefault();
     }
   }
 
-  RefPtr<Element> frameElement = mFrameElement;
-  EventDispatcher::Dispatch(frameElement, presContext, &localEvent, nullptr,
-                            &status);
+  if (const RefPtr<Element> frameElement = mFrameElement) {
+    EventDispatcher::Dispatch(frameElement, presContext, &localEvent, nullptr,
+                              &status);
+  } else {
+    MOZ_ASSERT(localEvent.DefaultPrevented());
+  }
 
   if (!localEvent.DefaultPrevented() &&
       !localEvent.mFlags.mIsSynthesizedForTests) {
@@ -4163,7 +4178,10 @@ mozilla::ipc::IPCResult BrowserParent::RecvVisitURI(
   }
   nsCOMPtr<IHistory> history = components::History::Service();
   if (history) {
-    (void)history->VisitURI(widget, aURI, aLastVisitedURI, aFlags, aBrowserId);
+    // The container isn't sent by the content process, so it can't be forged.
+    (void)history->VisitURI(
+        widget, aURI, aLastVisitedURI, aFlags, aBrowserId,
+        mBrowsingContext->OriginAttributesRef().mUserContextId);
   }
   return IPC_OK();
 }

@@ -23,6 +23,7 @@
 #include "mozilla/layers/CompositorManagerParent.h"
 #include "mozilla/layers/CompositorOptions.h"
 #include "mozilla/layers/CompositorThread.h"
+#include "mozilla/layers/LayerTreeLog.h"
 #include "mozilla/layers/LayerTreeOwnerTracker.h"
 #include "mozilla/layers/RemoteContentController.h"
 #include "mozilla/layers/WebRenderBridgeParent.h"
@@ -36,6 +37,8 @@ namespace mozilla::layers {
 void EraseLayerState(LayersId aId);
 
 void ContentCompositorBridgeParent::ActorDestroy(ActorDestroyReason aWhy) {
+  LAYERTREE_LOG("Compositor bridge for content {} destroyed, reason {}",
+                GetContentId(), fmt::enums::format_as(aWhy));
   mCanSend = false;
 
   // We must keep this object alive untill the code handling message
@@ -67,6 +70,10 @@ ContentCompositorBridgeParent::AllocPAPZCTreeManagerParent(
         // chance yet to unmap our layers id, and we could get here without a
         // parent compositor. In this case return an empty APZCTM.
         if (!state.mParent) {
+          LAYERTREE_LOG(
+              "Layer tree {:x} for content {} has no parent compositor, "
+              "using a dummy APZ tree manager",
+              aLayersId, GetContentId());
           // Note: we immediately call ClearTree since otherwise the APZCTM will
           // retain a reference to itself, through the checkerboard observer.
           LayersId dummyId{0};
@@ -104,7 +111,9 @@ already_AddRefed<PAPZParent> ContentCompositorBridgeParent::AllocPAPZParent(
         CompositorBridgeParent::LayerTreeState& state =
             CompositorBridgeParent::EnsureLayerTreeStateUnderLock(aLayersId,
                                                                   aProofOfLock);
-        MOZ_ASSERT(!state.mController);
+        LAYERTREE_LOG("APZ controller created for layer tree {:x}, content {}",
+                      aLayersId, GetContentId());
+        MOZ_RELEASE_ASSERT(!state.mController);
         state.mController = controller;
       });
 
@@ -129,12 +138,12 @@ ContentCompositorBridgeParent::AllocPWebRenderBridgeParent(
 
   CompositorBridgeParent::WithIndirectLayerTreesLock(
       [&](const StaticMonitorAutoLock& aProofOfLock) {
-        MOZ_ASSERT(CompositorBridgeParent::GetLayerTreeStateUnderLock(
+        MOZ_RELEASE_ASSERT(CompositorBridgeParent::GetLayerTreeStateUnderLock(
             layersId, aProofOfLock));
         CompositorBridgeParent::LayerTreeState& state =
             CompositorBridgeParent::EnsureLayerTreeStateUnderLock(layersId,
                                                                   aProofOfLock);
-        MOZ_ASSERT(state.mWrBridge == nullptr);
+        MOZ_RELEASE_ASSERT(state.mWrBridge == nullptr);
         cbp = state.mParent;
         if (cbp) {
           root = CompositorBridgeParent::EnsureLayerTreeStateUnderLock(
@@ -156,6 +165,8 @@ ContentCompositorBridgeParent::AllocPWebRenderBridgeParent(
         nsPrintfCString("Created child without a matching parent? root %p",
                         root.get())
             .get());
+    LAYERTREE_LOG("Layer tree {:x} for content {} has no parent compositor",
+                  layersId, GetContentId());
     nsCString error("NO_PARENT");
     return WebRenderBridgeParent::CreateDestroyed(aPipelineId,
                                                   std::move(error));
@@ -176,6 +187,8 @@ ContentCompositorBridgeParent::AllocPWebRenderBridgeParent(
         state.mWrBridge = parent;
       });
 
+  LAYERTREE_LOG("Layer tree {:x} for content {} connected to root {:x}",
+                layersId, GetContentId(), cbp->RootLayerTreeId());
   return parent.forget();
 }
 
@@ -255,66 +268,67 @@ void ContentCompositorBridgeParent::DidCompositeLocked(
     TimeStamp& aCompositeEnd, const StaticMonitorAutoLock& aProofOfLock) {
   if (CompositorBridgeParent::EnsureLayerTreeStateUnderLock(aId, aProofOfLock)
           .mWrBridge) {
-    MOZ_ASSERT(false);  // this should never get called for a WR compositor
+    MOZ_RELEASE_ASSERT(
+        false);  // this should never get called for a WR compositor
   }
 }
 
 bool ContentCompositorBridgeParent::SetTestSampleTime(const LayersId& aId,
                                                       const TimeStamp& aTime) {
-  MOZ_ASSERT(aId.IsValid());
+  MOZ_RELEASE_ASSERT(aId.IsValid());
   const CompositorBridgeParent::LayerTreeState* state =
       CompositorBridgeParent::GetLayerTreeState(aId);
   if (!state) {
     return false;
   }
 
-  MOZ_ASSERT(state->mParent);
+  MOZ_RELEASE_ASSERT(state->mParent);
   return state->mParent->SetTestSampleTime(aId, aTime);
 }
 
 void ContentCompositorBridgeParent::LeaveTestMode(const LayersId& aId) {
-  MOZ_ASSERT(aId.IsValid());
+  MOZ_RELEASE_ASSERT(aId.IsValid());
   const CompositorBridgeParent::LayerTreeState* state =
       CompositorBridgeParent::GetLayerTreeState(aId);
   if (!state) {
     return;
   }
 
-  MOZ_ASSERT(state->mParent);
+  MOZ_RELEASE_ASSERT(state->mParent);
   state->mParent->LeaveTestMode(aId);
 }
 
 void ContentCompositorBridgeParent::SetTestAsyncScrollOffset(
     const LayersId& aLayersId, const ScrollableLayerGuid::ViewID& aScrollId,
     const CSSPoint& aPoint) {
-  MOZ_ASSERT(aLayersId.IsValid());
+  MOZ_RELEASE_ASSERT(aLayersId.IsValid());
   const CompositorBridgeParent::LayerTreeState* state =
       CompositorBridgeParent::GetLayerTreeState(aLayersId);
   if (!state) {
     return;
   }
 
-  MOZ_ASSERT(state->mParent);
+  MOZ_RELEASE_ASSERT(state->mParent);
   state->mParent->SetTestAsyncScrollOffset(aLayersId, aScrollId, aPoint);
 }
 
 void ContentCompositorBridgeParent::SetTestAsyncZoom(
     const LayersId& aLayersId, const ScrollableLayerGuid::ViewID& aScrollId,
     const LayerToParentLayerScale& aZoom) {
-  MOZ_ASSERT(aLayersId.IsValid());
+  MOZ_RELEASE_ASSERT(aLayersId.IsValid());
   const CompositorBridgeParent::LayerTreeState* state =
       CompositorBridgeParent::GetLayerTreeState(aLayersId);
   if (!state) {
     return;
   }
 
-  MOZ_ASSERT(state->mParent);
+  MOZ_RELEASE_ASSERT(state->mParent);
   state->mParent->SetTestAsyncZoom(aLayersId, aScrollId, aZoom);
 }
 
 void ContentCompositorBridgeParent::FlushApzRepaints(
     const LayersId& aLayersId) {
-  MOZ_ASSERT(aLayersId.IsValid());
+  MOZ_RELEASE_ASSERT(aLayersId.IsValid());
   const CompositorBridgeParent::LayerTreeState* state =
       CompositorBridgeParent::GetLayerTreeState(aLayersId);
   if (!state || !state->mParent) {
@@ -326,7 +340,7 @@ void ContentCompositorBridgeParent::FlushApzRepaints(
 
 void ContentCompositorBridgeParent::GetAPZTestData(const LayersId& aLayersId,
                                                    APZTestData* aOutData) {
-  MOZ_ASSERT(aLayersId.IsValid());
+  MOZ_RELEASE_ASSERT(aLayersId.IsValid());
   const CompositorBridgeParent::LayerTreeState* state =
       CompositorBridgeParent::GetLayerTreeState(aLayersId);
   if (!state || !state->mParent) {
@@ -338,7 +352,7 @@ void ContentCompositorBridgeParent::GetAPZTestData(const LayersId& aLayersId,
 
 void ContentCompositorBridgeParent::GetFrameUniformity(
     const LayersId& aLayersId, FrameUniformityData* aOutData) {
-  MOZ_ASSERT(aLayersId.IsValid());
+  MOZ_RELEASE_ASSERT(aLayersId.IsValid());
   const CompositorBridgeParent::LayerTreeState* state =
       CompositorBridgeParent::GetLayerTreeState(aLayersId);
   if (!state || !state->mParent) {
@@ -351,7 +365,7 @@ void ContentCompositorBridgeParent::GetFrameUniformity(
 void ContentCompositorBridgeParent::SetConfirmedTargetAPZC(
     const LayersId& aLayersId, const uint64_t& aInputBlockId,
     nsTArray<ScrollableLayerGuid>&& aTargets) {
-  MOZ_ASSERT(aLayersId.IsValid());
+  MOZ_RELEASE_ASSERT(aLayersId.IsValid());
   const CompositorBridgeParent::LayerTreeState* state =
       CompositorBridgeParent::GetLayerTreeState(aLayersId);
   if (!state || !state->mParent) {
@@ -365,7 +379,7 @@ void ContentCompositorBridgeParent::SetConfirmedTargetAPZC(
 void ContentCompositorBridgeParent::EndWheelTransaction(
     const LayersId& aLayersId,
     PWebRenderBridgeParent::EndWheelTransactionResolver&& aResolve) {
-  MOZ_ASSERT(aLayersId.IsValid());
+  MOZ_RELEASE_ASSERT(aLayersId.IsValid());
   const CompositorBridgeParent::LayerTreeState* state =
       CompositorBridgeParent::GetLayerTreeState(aLayersId);
   if (!state || !state->mParent) {
@@ -381,7 +395,7 @@ void ContentCompositorBridgeParent::EndWheelTransaction(
 void ContentCompositorBridgeParent::DeferredDestroy() { mSelfRef = nullptr; }
 
 ContentCompositorBridgeParent::~ContentCompositorBridgeParent() {
-  MOZ_ASSERT(XRE_GetAsyncIOEventTarget());
+  MOZ_RELEASE_ASSERT(XRE_GetAsyncIOEventTarget());
 }
 
 already_AddRefed<PTextureParent>
@@ -426,7 +440,7 @@ bool ContentCompositorBridgeParent::IsSameProcess() const {
 
 void ContentCompositorBridgeParent::ObserveLayersUpdate(LayersId aLayersId,
                                                         bool aActive) {
-  MOZ_ASSERT(aLayersId.IsValid());
+  MOZ_RELEASE_ASSERT(aLayersId.IsValid());
 
   CompositorBridgeParent::LayerTreeState* state =
       CompositorBridgeParent::GetLayerTreeState(aLayersId);

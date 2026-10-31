@@ -57,10 +57,17 @@ add_task(async function test_autocomplete_footer_onclick() {
         return !EventUtils.isHidden(footer);
       }, "Waiting for footer to become visible");
 
+      Services.fog.testResetFOG();
       let openingFunc = () => EventUtils.synthesizeMouseAtCenter(footer, {});
       let passwordManager = await openPasswordManager(openingFunc, false);
 
       info("Password Manager was opened");
+
+      Assert.equal(
+        Glean.autocomplete.recordInteraction.testGetValue(),
+        null,
+        "The footer does not record a secondary action interaction"
+      );
 
       Assert.ok(
         !passwordManager.filterValue,

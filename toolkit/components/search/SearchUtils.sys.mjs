@@ -228,6 +228,29 @@ export var SearchUtils = {
   }),
 
   /**
+   * A map of SAP sources to their sources as defined by the search configuration.
+   *
+   * If a source is directly listed in the search configuration, we will use the
+   * value from the configuration, overriding this map.
+   * If a source is not directly listed in the search configuration, but is listed
+   * in this map, then we will look up the mapped name from the search configuration.
+   * If a source is not listed in the search configuration, and not listed in this
+   * map, then we will use the "default" value in the search configuration.
+   *
+   * @readonly
+   */
+  SAP_SOURCE_TO_SEARCH_CONFIG_MAP: Object.freeze({
+    contextmenu: "context",
+    text_selection: "context",
+    newtab_searchbar: "newtab",
+    about_home: "newtab",
+    about_newtab: "newtab",
+    urlbar_handoff: "urlbar",
+    urlbar_searchmode: "urlbar",
+    urlbar_persisted: "urlbar",
+  }),
+
+  /**
    * An arbitrary cap on the maximum icon size. Without this, large icons can
    * cause big delays when loading them at startup. The unit is the number of
    * bytes.

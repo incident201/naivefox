@@ -341,6 +341,9 @@ add_setup(async function setupVPN() {
   setupService();
 
   await putServerInRemoteSettings();
+  await ChromeUtils.importESModule(
+    "moz-src:///toolkit/components/ipprotection/IPProtectionServerlist.sys.mjs"
+  ).IPProtectionServerlist.maybeFetchList(true);
 
   await SpecialPowers.pushPrefEnv({
     set: [["browser.ipProtection.enabled", true]],
@@ -359,10 +362,10 @@ add_setup(async function setupVPN() {
     CustomizableUI.reset();
     Services.prefs.clearUserPref(IPProtectionWidget.ADDED_PREF);
     Services.prefs.clearUserPref("browser.ipProtection.everOpenedPanel");
+    Services.prefs.clearUserPref("browser.ipProtection.openedPanelSince160");
     Services.prefs.clearUserPref("browser.ipProtection.userEnableCount");
     Services.prefs.clearUserPref("browser.ipProtection.stateCache");
     Services.prefs.clearUserPref("browser.ipProtection.entitlementCache");
-    Services.prefs.clearUserPref("browser.ipProtection.locationListCache");
     Services.prefs.clearUserPref("browser.ipProtection.usageCache");
     Services.prefs.clearUserPref("browser.ipProtection.onboardingMessageMask");
     Services.prefs.clearUserPref("browser.ipProtection.bandwidthThreshold");

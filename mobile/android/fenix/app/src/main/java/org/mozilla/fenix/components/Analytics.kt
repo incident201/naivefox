@@ -9,6 +9,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import androidx.work.WorkManager
 import mozilla.components.lib.crash.CrashReporter
 import mozilla.components.lib.crash.runtimetagproviders.BuildRuntimeTagProvider
 import mozilla.components.lib.crash.runtimetagproviders.EnvironmentRuntimeProvider
@@ -36,6 +37,7 @@ import org.mozilla.fenix.components.metrics.GleanMetricsService
 import org.mozilla.fenix.components.metrics.GleanProfileIdPreferenceStore
 import org.mozilla.fenix.components.metrics.GleanUsageReportingMetricsService
 import org.mozilla.fenix.components.metrics.InstallReferrerMetricsService
+import org.mozilla.fenix.components.metrics.InstallationMetricsService
 import org.mozilla.fenix.components.metrics.MetricController
 import org.mozilla.fenix.components.metrics.MetricsStorage
 import org.mozilla.fenix.crashes.CrashFactCollector
@@ -186,6 +188,7 @@ class Analytics(
                 FirstSessionMetricsService(context),
                 InstallReferrerMetricsService(context, settings),
                 GleanUsageReportingMetricsService(gleanProfileIdStore = GleanProfileIdPreferenceStore(context)),
+                InstallationMetricsService(runWhenReadyQueue, { WorkManager.getInstance(context) }),
             ),
             isDataTelemetryEnabled = { settings.isTelemetryEnabled },
             isMarketingDataTelemetryEnabled = {

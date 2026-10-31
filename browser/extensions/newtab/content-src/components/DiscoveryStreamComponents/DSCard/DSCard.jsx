@@ -297,7 +297,7 @@ export class _DSCard extends React.PureComponent {
     return "false";
   }
 
-  getClickEventData() {
+  getClickEventData(dwellId) {
     const matchesSelectedTopic = this.doesLinkTopicMatchSelectedTopic();
     const cardColumn = getCardColumn(this.contextMenuButtonHostElement);
     return {
@@ -308,6 +308,10 @@ export class _DSCard extends React.PureComponent {
         event_source: "card",
         card_type: this.props.flightId ? "spoc" : "organic",
         tile_id: this.props.id,
+        // Matches the dwell_id SafeAnchor put on the OPEN_LINK it dispatched a
+        // moment ago, so TelemetryFeed can attach this story's identity to the
+        // dwell measurement already in flight.
+        ...(dwellId ? { dwell_id: dwellId } : {}),
         ...(this.props.shim && this.props.shim.click
           ? { shim: this.props.shim.click }
           : {}),
@@ -346,10 +350,10 @@ export class _DSCard extends React.PureComponent {
     };
   }
 
-  onLinkClick() {
+  onLinkClick(event, dwellId) {
     if (this.props.dispatch) {
       this.props.dispatch(
-        ac.DiscoveryStreamUserEvent(this.getClickEventData())
+        ac.DiscoveryStreamUserEvent(this.getClickEventData(dwellId))
       );
     }
   }
@@ -754,6 +758,9 @@ export class _DSCard extends React.PureComponent {
               shim={this.props.shim}
               bookmarkGuid={this.props.bookmarkGuid}
               flightId={this.props.flightId}
+              dwellLabel={
+                this.props.flightId ? "story_sponsored" : "story_organic"
+              }
               showPrivacyInfo={!!this.props.flightId}
               onMenuUpdate={this.onMenuUpdate}
               onMenuShow={this.onMenuShow}

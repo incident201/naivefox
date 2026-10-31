@@ -22,6 +22,12 @@ The server is setup by the python module found in
 the logic to download, install and start the server. This server will be driven
 by Marionette, and a few command wrappers are exposed through control.py.
 
+`browser_backward_compat_xpcshell.js` is a special case. It does not use the
+server Firefox. Instead it starts an xpcshell test with `--jsdebugger`, through
+the `start-xpcshell` command of the control channel, and debugs it. The xpcshell
+harness comes from the build under test, so this test only runs with the `local`
+server, and returns early with the other servers.
+
 ## Running the tests
 
 Locally you can run the whole test suite with:

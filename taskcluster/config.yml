@@ -219,6 +219,7 @@ treeherder:
         'SS': 'Shadow scheduler'
         'Sentry': 'Sentry synchronization'
         'test-info': 'Test manifest skip/fail information'
+        'testrail': 'TestRail release milestone creation'
         'condprof': 'Conditioned Profile Builder'
         'doc': 'Documentation'
         'perftest': 'Performance tests'
@@ -290,6 +291,7 @@ treeherder:
         'compose-base': 'compose-base'
         'concept-bookmarks-parser': 'concept-bookmarks-parser'
         'compose-cfr': 'compose-cfr'
+        'compose-draggable': 'compose-draggable'
         'concept-engine': 'concept-engine'
         'concept-fetch': 'concept-fetch'
         'concept-llm': 'concept-llm'
@@ -428,6 +430,7 @@ treeherder:
         'feature-webcompat-reporte': 'feature-webcompat-reporter'
         'feature-protection-dashbo': 'feature-protection-dashboard'
         'feature-tabdata-coordinat': 'feature-tabdata-coordinator'
+        'lib-installation-blocksto': 'lib-installation-blockstore'
 
         # Groups aren't generated off buildconfig.yml:
         'samples-browser': 'samples-browser'
@@ -479,7 +482,6 @@ try:
 release-promotion:
     products:
         - 'devedition'
-        - 'fennec'
         - 'firefox'
         - 'firefox-android'
     rebuild-kinds:

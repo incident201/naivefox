@@ -28,7 +28,6 @@
 #include "mozilla/TypedEnumBits.h"
 #include "mozilla/UniquePtr.h"
 #include "mozilla/gfx/2D.h"
-#include "mozilla/gfx/FontPaletteCache.h"
 #include "mozilla/gfx/MatrixFwd.h"
 #include "mozilla/gfx/Point.h"
 #include "mozilla/intl/UnicodeScriptCodes.h"
@@ -1518,6 +1517,10 @@ class gfxFont {
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING_WITH_DESTROY(gfxFont, MaybeDestroy())
   int32_t GetRefCount() { return int32_t(mRefCnt); }
 
+  // Call immediately after creating an instance of a gfxFont subclass.
+  // Caller must then check IsValid() to confirm if the instance is usable.
+  void InitMetrics();
+
   // options to specify the kind of AA to be used when creating a font
   typedef enum : uint8_t {
     kAntialiasDefault,
@@ -2061,6 +2064,7 @@ class gfxFont {
       int32_t aAppUnitsPerDevPixel) const;
 
   bool HasColorGlyphFor(uint32_t aCh, uint32_t aNextCh);
+  bool HasMetricsOverride() const { return mHasMetricsOverride; }
 
  protected:
   const Metrics& GetHorizontalMetrics() const { return mMetrics; }
@@ -2396,14 +2400,22 @@ class gfxFont {
   bool mKerningSet;      // kerning explicitly set?
   bool mKerningEnabled;  // if set, on or off?
 
+  bool mHasMetricsOverride = false;  // ascent/descent/line-gap override used
+
   mozilla::Atomic<bool> mMathInitialized;  // TryGetMathTable() called?
+
+  // Must be implemented by platform subclasses: initialize mMetrics if not
+  // being done via Skrifa.
+  virtual bool InitMetricsFromPlatform() = 0;
+
+  // Optional: allow subclass to do any necessary finalization after metrics
+  // have been set up.
+  virtual void FinishInitFontMetrics() {}
 
   // Helper for subclasses that want to initialize standard metrics from the
   // tables of sfnt (TrueType/OpenType) fonts.
   // This will use mFUnitsConvFactor if it is already set, else compute it
   // from mAdjustedSize and the unitsPerEm in the font's 'head' table.
-  // Returns TRUE and sets mIsValid=TRUE if successful;
-  // Returns TRUE but leaves mIsValid=FALSE if the font seems to be broken.
   // Returns FALSE if the font does not appear to be an sfnt at all,
   // and should be handled (if possible) using other APIs.
   bool InitMetricsFromSfntTables();
@@ -2479,10 +2491,10 @@ class gfxFont {
 // are dependent on the specific font, so they are set per GlyphRun.
 
 struct MOZ_STACK_CLASS TextRunDrawParams {
-  explicit TextRunDrawParams(mozilla::gfx::PaletteCache& aPaletteCache)
-      : paletteCache(aPaletteCache) {}
+  explicit TextRunDrawParams(
+      mozilla::gfx::FontPaletteValueSet* aPaletteValueSet)
+      : paletteValueSet(aPaletteValueSet) {}
 
-  mozilla::gfx::PaletteCache& paletteCache;
   RefPtr<mozilla::gfx::DrawTarget> dt;
   gfxContext* context = nullptr;
   gfxFont::Spacing* spacing = nullptr;
@@ -2498,12 +2510,30 @@ struct MOZ_STACK_CLASS TextRunDrawParams {
   const mozilla::gfx::StrokeOptions* strokeOpts = nullptr;
   const mozilla::gfx::DrawOptions* drawOpts = nullptr;
   nsAtom* fontPalette = nullptr;
+  mozilla::gfx::FontPaletteValueSet* paletteValueSet = nullptr;
+  // The source text, as provided by
+  // gfxTextRun::PropertyProvider::GetSourceText, converted to UTF-8.
+  // GetSourceText may be called with a narrower range than the one passed to
+  // gfxFont::Draw, if a ligature spans multiple PropertyProviders; see
+  // sourceCharToByte. Only set if needsSourceText is true and the provider
+  // returned the text.
+  const nsACString* sourceText = nullptr;
+  // The byte offset in sourceText for each character in the range passed to
+  // gfxFont::Draw, which may be wider than the range sourceText itself covers.
+  // Characters outside sourceText's own range map to the byte offset at its
+  // nearest edge. The final element should be the length of sourceText. This
+  // must only be set if sourceText is also set.
+  const uint32_t* sourceCharToByte = nullptr;
   DrawMode drawMode = DrawMode::GLYPH_FILL;
   bool isVerticalRun = false;
   bool isRTL = false;
   bool paintSVGGlyphs = true;
   bool allowGDI = true;
   bool hasTextShadow = false;
+  // Whether the target of this draw might want per-glyph source text for
+  // ToUnicode/ActualText purposes. See gfx::GlyphBuffer and
+  // DrawTarget::SupportsGlyphSourceText.
+  bool needsSourceText = false;
 };
 
 struct MOZ_STACK_CLASS FontDrawParams {
@@ -2525,10 +2555,10 @@ struct MOZ_STACK_CLASS FontDrawParams {
 
 struct MOZ_STACK_CLASS EmphasisMarkDrawParams {
   EmphasisMarkDrawParams(gfxContext* aContext,
-                         mozilla::gfx::PaletteCache& aPaletteCache)
-      : context(aContext), paletteCache(aPaletteCache) {}
+                         mozilla::gfx::FontPaletteValueSet* aPaletteValueSet)
+      : context(aContext), paletteValueSet(aPaletteValueSet) {}
   gfxContext* context;
-  mozilla::gfx::PaletteCache& paletteCache;
+  mozilla::gfx::FontPaletteValueSet* paletteValueSet;
   gfxFont::Spacing* spacing;
   gfxTextRun* mark;
   gfxFloat advance;

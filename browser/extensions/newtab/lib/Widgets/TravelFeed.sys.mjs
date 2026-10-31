@@ -23,6 +23,7 @@ const ENABLEMENT_PREFS = new Set([
   PREF_WIDGETS_ENABLED,
   TRAVEL_ENTRY.enabledPref,
   TRAVEL_ENTRY.systemEnabledPref,
+  "region",
   "trainhopConfig",
 ]);
 

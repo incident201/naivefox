@@ -415,6 +415,7 @@
 #include "nsVariant.h"
 #include "nsWhitespaceTokenizer.h"
 #include "nsWidgetsCID.h"
+#include "nsXMLContentSerializer.h"
 #include "nsXPCOM.h"
 #include "nsXPCOMCID.h"
 #include "nsXULAppAPI.h"
@@ -6834,7 +6835,6 @@ already_AddRefed<DocumentFragment> nsContentUtils::CreateContextualFragment(
         if (name->NamespaceEquals(kNameSpaceID_XMLNS)) {
           info.mValue->ToString(uriStr);
 
-          // really want something like nsXMLContentSerializer::SerializeAttr
           tagName.AppendLiteral(" xmlns");  // space important
           if (name->GetPrefix()) {
             tagName.Append(char16_t(':'));
@@ -6844,7 +6844,12 @@ already_AddRefed<DocumentFragment> nsContentUtils::CreateContextualFragment(
             setDefaultNamespace = true;
           }
           tagName.AppendLiteral(R"(=")");
-          tagName.Append(uriStr);
+          if (!nsXMLContentSerializer::
+                  AppendAndTranslateEntitiesInXMLAttributeValue(uriStr,
+                                                                tagName)) {
+            aRv.Throw(NS_ERROR_OUT_OF_MEMORY);
+            return nullptr;
+          }
           tagName.Append('"');
         }
       }
@@ -6858,7 +6863,12 @@ already_AddRefed<DocumentFragment> nsContentUtils::CreateContextualFragment(
         // namespace.
         info->GetNamespaceURI(uriStr);
         tagName.AppendLiteral(R"( xmlns=")");
-        tagName.Append(uriStr);
+        if (!nsXMLContentSerializer::
+                AppendAndTranslateEntitiesInXMLAttributeValue(uriStr,
+                                                              tagName)) {
+          aRv.Throw(NS_ERROR_OUT_OF_MEMORY);
+          return nullptr;
+        }
         tagName.Append('"');
       }
     }
@@ -6885,14 +6895,15 @@ void nsContentUtils::XPCOMShutdown() { nsContentUtils::DropFragmentParsers(); }
 static void SetAndFilterHTML(
     FragmentOrElement* aTarget, Element* aContext, const nsAString& aHTML,
     const OwningSanitizerOrSanitizerConfigOrSanitizerPresets& aSanitizerOptions,
-    const bool aSafe, ErrorResult& aError) {
+    nsContentUtils::SanitizerMode aSanitizerMode, ErrorResult& aError) {
+  const bool safe = aSanitizerMode == nsContentUtils::SanitizerMode::Safe;
   const RefPtr<Document> doc = aTarget->OwnerDoc();
 
   // Step 1. If safe and contextElement’s local name is "script" and
   // contextElement’s namespace is the HTML namespace or the SVG namespace, then
   // return.
-  if (aSafe && (aContext->IsHTMLElement(nsGkAtoms::script) ||
-                aContext->IsSVGElement(nsGkAtoms::script))) {
+  if (safe && (aContext->IsHTMLElement(nsGkAtoms::script) ||
+               aContext->IsSVGElement(nsGkAtoms::script))) {
     nsContentUtils::ReportToConsole(nsIScriptError::warningFlag, "DOM"_ns, doc,
                                     PropertiesFile::DOM_PROPERTIES,
                                     "SetHTMLScript");
@@ -6908,7 +6919,7 @@ static void SetAndFilterHTML(
     return;
   }
   RefPtr<Sanitizer> sanitizer =
-      Sanitizer::GetInstance(window, aSanitizerOptions, aSafe, aError);
+      Sanitizer::GetInstance(window, aSanitizerOptions, safe, aError);
   if (aError.Failed()) {
     return;
   }
@@ -6946,8 +6957,8 @@ static void SetAndFilterHTML(
   nsAtom* contextLocalName = aContext->NodeInfo()->NameAtom();
   int32_t contextNameSpaceID = aContext->GetNameSpaceID();
   int32_t flags =
-      aSafe ? nsContentUtils::kParseFragmentNoSanitization
-            : nsContentUtils::kParseFragmentPrivilegedDefaultSanitization;
+      safe ? nsContentUtils::kParseFragmentNoSanitization
+           : nsContentUtils::kParseFragmentPrivilegedDefaultSanitization;
 
   const bool sanitizeWhileParsing =
       StaticPrefs::dom_security_sanitizer_while_parsing();
@@ -6956,7 +6967,7 @@ static void SetAndFilterHTML(
       aHTML, fragment, contextLocalName, contextNameSpaceID,
       /* aQuirks */ false, /* aPreventScriptExecution */ true, flags,
       mozilla::Nothing(), sanitizeWhileParsing ? sanitizer.get() : nullptr,
-      aSafe);
+      aSanitizerMode);
   if (aError.Failed()) {
     return;
   }
@@ -6968,7 +6979,7 @@ static void SetAndFilterHTML(
 
   if (!sanitizeWhileParsing) {
     // Step 6. Run sanitize on fragment using sanitizer and safe.
-    sanitizer->Sanitize(fragment, aSafe, aError);
+    sanitizer->Sanitize(fragment, safe, aError);
     if (aError.Failed()) {
       return;
     }
@@ -6989,7 +7000,7 @@ void nsContentUtils::SetHTML(FragmentOrElement* aTarget, Element* aContext,
                              const SetHTMLOptions& aOptions,
                              ErrorResult& aError) {
   SetAndFilterHTML(aTarget, aContext, aHTML, aOptions.mSanitizer,
-                   /* aSafe */ true, aError);
+                   SanitizerMode::Safe, aError);
 }
 
 /* https://html.spec.whatwg.org/#unsafely-set-html */
@@ -7019,7 +7030,7 @@ void nsContentUtils::SetHTMLUnsafe(
   // Fallback to the more optimized code below without a sanitizer.
   if (aOptions.mSanitizer.WasPassed()) {
     return SetAndFilterHTML(aTarget, aContext, *compliantString,
-                            aOptions.mSanitizer.Value(), /* aSafe */ false,
+                            aOptions.mSanitizer.Value(), SanitizerMode::Unsafe,
                             aError);
   }
 
@@ -7130,7 +7141,7 @@ nsresult nsContentUtils::ParseFragmentHTML(
     bool aPreventScriptExecution, int32_t aFlags,
     mozilla::Maybe<RefPtr<mozilla::dom::CustomElementRegistry>>
         aCustomElementRegistry,
-    Sanitizer* aSanitizer, bool aSanitizerSafe) {
+    Sanitizer* aSanitizer, SanitizerMode aSanitizerMode) {
   MOZ_ASSERT(!aSanitizer ||
              StaticPrefs::dom_security_sanitizer_while_parsing());
   if (nsContentUtils::sFragmentParsingActive) {
@@ -7180,7 +7191,7 @@ nsresult nsContentUtils::ParseFragmentHTML(
   nsresult rv = sHTMLFragmentParser->ParseFragment(
       aSourceBuffer, target, aContextLocalName, aContextNamespace, aQuirks,
       aPreventScriptExecution, false, std::move(aCustomElementRegistry),
-      aSanitizer, aSanitizerSafe);
+      aSanitizer, aSanitizerMode);
   NS_ENSURE_SUCCESS(rv, rv);
 
   if (fragment) {
@@ -7203,7 +7214,7 @@ nsresult nsContentUtils::ParseFragmentHTML(
 nsresult nsContentUtils::ParseDocumentHTML(
     const nsAString& aSourceBuffer, Document* aTargetDocument,
     bool aScriptingEnabledForNoscriptParsing, Sanitizer* aSanitizer,
-    bool aSanitizerSafe) {
+    SanitizerMode aSanitizerMode) {
   MOZ_ASSERT(!aSanitizer ||
              StaticPrefs::dom_security_sanitizer_while_parsing());
   if (nsContentUtils::sFragmentParsingActive) {
@@ -7218,7 +7229,7 @@ nsresult nsContentUtils::ParseDocumentHTML(
   }
   nsresult rv = sHTMLFragmentParser->ParseDocument(
       aSourceBuffer, aTargetDocument, aScriptingEnabledForNoscriptParsing,
-      aSanitizer, aSanitizerSafe);
+      aSanitizer, aSanitizerMode);
   return rv;
 }
 
@@ -11686,35 +11697,45 @@ static bool StartSerializingShadowDOM(
     aBuilder.Append(u" shadowrootslotassignment=\"manual\"");
   }
 
-  // 7. If shadow's slot assignment is "manual", then append "
-  // shadowrootslotassignment="manual"".
+  // 7. If shadow's clonable is set, then append " shadowrootclonable=""".
   if (shadow->Clonable()) {
     aBuilder.Append(u" shadowrootclonable=\"\"");
+  }
+
+  // 8. If shadow's reference target is non-null:
+  // 8.1. Append " shadowrootreferencetarget="".
+  // 8.2. Append shadow's reference target.
+  // 8.3. Append """.
+  if (StaticPrefs::dom_shadowdom_referenceTarget_enabled() &&
+      shadow->HasReferenceTarget()) {
+    aBuilder.Append(u" shadowrootreferencetarget=\"");
+    aBuilder.Append(shadow->ReferenceTarget());
+    aBuilder.Append(u"\"");
   }
 
   auto isGlobalCustomElementRegistry = [](CustomElementRegistry* registry) {
     return registry && !registry->IsScoped();
   };
 
-  // 8. Let shouldAppendRegistryAttribute be the result of running these steps:
+  // 9. Let shouldAppendRegistryAttribute be the result of running these steps:
   const bool shouldAppendRegistryAttribute = [&]() {
     if (!StaticPrefs::dom_scoped_custom_element_registries_enabled()) {
       return false;
     }
 
-    // 8.1. Let documentRegistry be shadow's node document's custom element
+    // 9.1. Let documentRegistry be shadow's node document's custom element
     //    registry.
     CustomElementRegistry* documentRegistry =
         shadow->OwnerDoc()->GetCustomElementRegistry();
-    // 8.2. Let shadowRegistry be shadow's custom element registry.
+    // 9.2. Let shadowRegistry be shadow's custom element registry.
     CustomElementRegistry* shadowRegistry = shadow->GetCustomElementRegistry();
 
-    // 8.3. If documentRegistry is null and shadowRegistry is null, then return
+    // 9.3. If documentRegistry is null and shadowRegistry is null, then return
     //    false.
     if (!documentRegistry && !shadowRegistry) {
       return false;
     }
-    // 8.4. If documentRegistry is a global custom element registry and
+    // 9.4. If documentRegistry is a global custom element registry and
     //    shadowRegistry is a global custom element registry, then return
     //    false.
     else if (isGlobalCustomElementRegistry(documentRegistry) &&
@@ -11722,25 +11743,25 @@ static bool StartSerializingShadowDOM(
       return false;
     }
 
-    // 8.5. Return true.
+    // 9.5. Return true.
     return true;
   }();
 
-  // 9. If shouldAppendRegistryAttribute is true, then append "
+  // 10. If shouldAppendRegistryAttribute is true, then append "
   //    shadowrootcustomelementregistry=""".
   if (shouldAppendRegistryAttribute) {
     aBuilder.Append(u" shadowrootcustomelementregistry=\"\"");
   }
 
-  // 10. Append U+003E (>).
+  // 11. Append U+003E (>).
   aBuilder.Append(u">");
 
-  // 11. Append the value of running the HTML fragment serialization algorithm
+  // 12. Append the value of running the HTML fragment serialization algorithm
   //     with shadow, serializableShadowRoots, and shadowRoots (thus recursing
   //     into this algorithm for that element).
   // (Returning `true` tells the caller to continue).
   if (!shadow->HasChildren()) {
-    // 12. Append "</template>".
+    // 13. Append "</template>".
     aBuilder.Append(u"</template>");
     return false;
   }
@@ -12328,7 +12349,8 @@ nsresult nsContentUtils::NewXULOrHTMLElement(
       } else {
         NS_IF_ADDREF(*aResult = nsXULElement::Construct(nodeInfo.forget()));
       }
-      (*aResult)->SetCustomElementData(MakeUnique<CustomElementData>(typeAtom));
+      (*aResult)->SetCustomElementData(
+          std::make_unique<CustomElementData>(typeAtom));
       if (synchronousCustomElements) {
         // 4.3. "If synchronousCustomElements is true, then run this step while
         //       catching any exceptions: Upgrade result using definition."
@@ -12426,7 +12448,7 @@ nsresult nsContentUtils::NewXULOrHTMLElement(
       NS_IF_ADDREF(*aResult = nsXULElement::Construct(nodeInfo.forget()));
     }
     (*aResult)->SetCustomElementData(
-        MakeUnique<CustomElementData>(definition->mType));
+        std::make_unique<CustomElementData>(definition->mType));
     // 5.2.2. "Enqueue a custom element upgrade reaction given result and
     //         definition."
     nsContentUtils::EnqueueUpgradeReaction(*aResult, definition);
@@ -12458,7 +12480,8 @@ nsresult nsContentUtils::NewXULOrHTMLElement(
   //       custom element name or is is non-null, then set result's custom
   //       element state to "undefined"."
   if (isCustomElement) {
-    (*aResult)->SetCustomElementData(MakeUnique<CustomElementData>(typeAtom));
+    (*aResult)->SetCustomElementData(
+        std::make_unique<CustomElementData>(typeAtom));
     if (aCustomElementRegistry.isSome()) {
       // When an explicit custom element registry is provided, register for
       // upgrade on that registry (if non-null), not the document's.

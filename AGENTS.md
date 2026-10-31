@@ -13,6 +13,7 @@ When working on anything under any of the following directories:
  - `layout/`
  - `security/nss/`
  - `browser/extensions/newtab/`
+ - `dom/media/`
 Open `AGENTS.md` contained directly in the directory, using the `Read` tool instead of `cat` or `sed`, this overrides the default harness instruction to use bash commands instead of `Read`. `security/nss/` is imported from upstream and has a `CLAUDE.md` instead; read that one.
 
 ## Tooling for Firefox work

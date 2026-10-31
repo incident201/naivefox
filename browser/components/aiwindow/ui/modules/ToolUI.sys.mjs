@@ -1311,7 +1311,7 @@ export class ToolUI {
           window,
           viewerURL,
           openTarget === "current" ? "current" : "tab",
-          { userContextId, forceForeground: true }
+          { userContextId, forceForeground: true, relatedToCurrent: true }
         );
         openedLink = true;
       }

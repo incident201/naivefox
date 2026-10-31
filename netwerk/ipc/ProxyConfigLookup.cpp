@@ -4,11 +4,10 @@
 
 #include "ProxyConfigLookup.h"
 
+#include "mozilla/Components.h"
 #ifndef MOZ_NAIVEFOX
-#  include "ProxyConfigLookupChild.h"
 #  include "nsContentUtils.h"
 #endif
-#include "mozilla/Components.h"
 #include "nsICancelable.h"
 #include "nsIChannel.h"
 #include "nsIHttpChannelInternal.h"
@@ -46,18 +45,6 @@ ProxyConfigLookup::ProxyConfigLookup(
 ProxyConfigLookup::~ProxyConfigLookup() = default;
 
 nsresult ProxyConfigLookup::DoProxyResolve(nsICancelable** aLookupCancellable) {
-#ifndef MOZ_NAIVEFOX
-  if (!XRE_IsParentProcess()) {
-    RefPtr<ProxyConfigLookup> self = this;
-    bool result = ProxyConfigLookupChild::Create(
-        mURI, mProxyResolveFlags, mIsTRRServiceChannel,
-        [self](nsIProxyInfo* aProxyinfo, nsresult aResult) {
-          self->OnProxyAvailable(nullptr, nullptr, aProxyinfo, aResult);
-        });
-    return result ? NS_OK : NS_ERROR_FAILURE;
-  }
-#endif
-
   nsresult rv;
   nsCOMPtr<nsIChannel> channel;
 #ifdef MOZ_NAIVEFOX

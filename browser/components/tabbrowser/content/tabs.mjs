@@ -898,7 +898,7 @@ export class MozTabbrowserTabs extends MozElements.TabsBase {
         );
       }
     }
-    return splitViews;
+    return /** @type {MozTabSplitViewWrapper[]} */ (splitViews);
   }
 
   /**
@@ -1384,6 +1384,12 @@ export class MozTabbrowserTabs extends MozElements.TabsBase {
    * @param {boolean} [aInstant]
    */
   _handleTabSelect(aInstant) {
+    if (this.tabDragAndDrop.isAnimatingDrop) {
+      // ensureElementIsVisible would scroll to where the drop animation
+      // currently draws the selected tab.
+      this.tabDragAndDrop.scrollSelectedTabIntoViewAfterDrop();
+      return;
+    }
     let selectedTab = /** @type {MozTabbrowserTab} */ (this.selectedItem);
     this.#ensureTabIsVisible(selectedTab, aInstant);
   }

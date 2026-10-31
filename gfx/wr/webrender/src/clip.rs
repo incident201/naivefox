@@ -93,7 +93,7 @@
 //!
 
 use api::{BorderRadius, ClipMode, ImageMask, ClipId, ClipChainId};
-use api::{FillRule, ImageKey, ImageRendering};
+use api::{FillRule, ImageKey, ImageRendering, Path};
 use api::units::*;
 use crate::image_tiling::{self, Repetition};
 use crate::border::BorderRadiusAu;
@@ -101,7 +101,9 @@ use crate::renderer::GpuBufferBuilderF;
 use crate::spatial_tree::{SceneSpatialTree, SpatialTree, SpatialNodeIndex};
 use crate::surface::SurfaceInfo;
 use crate::ellipse::Ellipse;
-use crate::intern;
+use crate::dl_interner::DlHandle;
+use crate::render_backend::DlStores;
+use crate::intern::{self, ItemUid};
 use crate::internal_types::{FastHashMap, FastHashSet};
 use crate::prim_store::{VisibleMaskImageTile};
 use crate::quad_clip::{QuadClipStack, QuadMaskTile};
@@ -548,6 +550,17 @@ impl ClipTreeBuilder {
         self.clip_map.insert(id, ClipEntry { handle, spatial_node_index, clip_rect: clip_rect.into(), snap_outset: 0.0, anti_aliased: false });
     }
 
+    /// Define a path clip
+    pub fn define_path_clip(
+        &mut self,
+        id: ClipId,
+        handle: ClipDataHandle,
+        spatial_node_index: SpatialNodeIndex,
+        clip_rect: LayoutRect,
+    ) {
+        self.clip_map.insert(id, ClipEntry { handle, spatial_node_index, clip_rect: clip_rect.into(), snap_outset: 0.0, anti_aliased: false });
+    }
+
     /// Define a clip-chain
     pub fn define_clip_chain<I: Iterator<Item = ClipId>>(
         &mut self,
@@ -555,10 +568,23 @@ impl ClipTreeBuilder {
         parent: Option<ClipChainId>,
         clips: I,
     ) {
-        let parent = parent.map(|ref id| self.clip_chain_map[id]);
+        let parent = parent.map(|ref parent_id| match self.clip_chain_map.get(parent_id) {
+            Some(index) => *index,
+            None => panic!(
+                "webrender: missing clip-chain {:?} in define_clip_chain parent of {:?} (defined_chains={})",
+                parent_id,
+                id,
+                self.clip_chain_map.len(),
+            ),
+        });
         let index = self.clip_chains.len();
-        let clips = clips.map(|clip_id| {
-            self.clip_map[&clip_id]
+        let clips = clips.map(|clip_id| match self.clip_map.get(&clip_id) {
+            Some(entry) => *entry,
+            None => panic!(
+                "webrender: missing clip {:?} in define_clip_chain (defined_clips={})",
+                clip_id,
+                self.clip_map.len(),
+            ),
         }).collect();
         self.clip_chains.push(ClipChain {
             parent,
@@ -588,7 +614,14 @@ impl ClipTreeBuilder {
             if clip_chain_id != ClipChainId::INVALID {
                 self.clip_handles_buffer.clear();
 
-                let clip_chain_index = self.clip_chain_map[&clip_chain_id];
+                let clip_chain_index = match self.clip_chain_map.get(&clip_chain_id) {
+                    Some(index) => *index,
+                    None => panic!(
+                        "webrender: missing clip-chain {:?} in push_clip_chain (defined_chains={})",
+                        clip_chain_id,
+                        self.clip_chain_map.len(),
+                    ),
+                };
                 ClipTreeBuilder::add_clips(
                     clip_chain_index,
                     &mut seen_clips,
@@ -625,7 +658,14 @@ impl ClipTreeBuilder {
         };
 
         self.clip_handles_buffer.clear();
-        let clip_entry = self.clip_map[&clip_id];
+        let clip_entry = match self.clip_map.get(&clip_id) {
+            Some(entry) => *entry,
+            None => panic!(
+                "webrender: missing clip {:?} in push_clip_id (defined_clips={})",
+                clip_id,
+                self.clip_map.len(),
+            ),
+        };
 
         if seen_clips.insert(clip_entry) {
             self.clip_handles_buffer.push(clip_entry);
@@ -883,7 +923,14 @@ impl ClipTreeBuilder {
         self.clip_handles_buffer.clear();
 
         for clip_id in extra_clips {
-            let entry = self.clip_map[clip_id];
+            let entry = match self.clip_map.get(clip_id) {
+                Some(entry) => *entry,
+                None => panic!(
+                    "webrender: missing clip {:?} in build_for_tile_cache (defined_clips={})",
+                    clip_id,
+                    self.clip_map.len(),
+                ),
+            };
             self.clip_handles_buffer.push(entry);
         }
 
@@ -994,6 +1041,13 @@ impl From<ClipItemKey> for ClipNode {
             ClipItemKeyKind::ImageMask(image, _) => {
                 ClipItemKind::Image {
                     image,
+                }
+            }
+            ClipItemKeyKind::Path(path, _, fill_rule, origin) => {
+                ClipItemKind::Path {
+                    path,
+                    fill_rule,
+                    origin: LayoutPoint::from_au(origin),
                 }
             }
         };
@@ -1399,8 +1453,9 @@ impl ClipStore {
         clip_chain: &ClipChainInstance,
         surface: &SurfaceInfo,
         interned_clips: &ClipDataStore,
+        dl_stores: &DlStores,
     ) {
-        self.fill_quad_clips_from_range(dest, clip_chain.clips_range, interned_clips);
+        self.fill_quad_clips_from_range(dest, clip_chain.clips_range, interned_clips, dl_stores);
 
         dest.set_bounds(
             clip_chain.local_clip_rect,
@@ -1418,11 +1473,12 @@ impl ClipStore {
         dest: &mut QuadClipStack,
         range: ClipNodeRange,
         interned_clips: &ClipDataStore,
+        dl_stores: &DlStores,
     ) {
         dest.clear();
 
         for instance in &self.clip_node_instances[range.to_range()] {
-            self.push_quad_clip(dest, instance, interned_clips);
+            self.push_quad_clip(dest, instance, interned_clips, dl_stores);
         }
     }
 
@@ -1433,6 +1489,7 @@ impl ClipStore {
         dest: &mut QuadClipStack,
         instance: &ClipNodeInstance,
         interned_clips: &ClipDataStore,
+        dl_stores: &DlStores,
     ) {
         let uid = instance.handle.uid().get_uid();
 
@@ -1464,6 +1521,16 @@ impl ClipStore {
                         rect: tile.tile_rect,
                         task_id: tile.task_id,
                     }),
+                );
+            }
+            ClipItemKind::Path { path, fill_rule, origin } => {
+                dest.push_path(
+                    instance.clip_rect,
+                    dl_stores.path[path].clone(),
+                    fill_rule,
+                    origin,
+                    instance.spatial_node_index,
+                    uid,
                 );
             }
         }
@@ -1575,6 +1642,7 @@ impl ClipStore {
                 // inner rects for now
                 ClipItemKind::Rectangle { mode: ClipMode::ClipOut, .. } |
                 ClipItemKind::Image { .. } |
+                ClipItemKind::Path { .. } |
                 ClipItemKind::RoundedRectangle { mode: ClipMode::ClipOut, .. } => {
                     return None;
                 }
@@ -1708,7 +1776,8 @@ impl ClipStore {
                         needs_mask |= match node.item.kind {
                             ClipItemKind::Rectangle { mode: ClipMode::ClipOut, .. } |
                             ClipItemKind::RoundedRectangle { .. } |
-                            ClipItemKind::Image { .. } => {
+                            ClipItemKind::Image { .. } |
+                            ClipItemKind::Path { .. } => {
                                 true
                             }
 
@@ -1802,6 +1871,14 @@ pub enum ClipItemKeyKind {
     Rectangle(ClipMode),
     RoundedRectangle(BorderRadiusAu, LayoutSideOffsetsAu, ClipMode),
     ImageMask(ImageKey, Option<PolygonDataHandle>),
+    /// The uid is the path's `DlStore::uid`. The handle alone does not
+    /// identify the path: content recycles slots, and a retained clip entry
+    /// keyed on a recycled slot would keep the uid of the path it replaced.
+    ///
+    /// The point is the origin of the clip's rect, which positions the path.
+    /// Clip rects are snapped to the device pixel grid, but the path stays at
+    /// its unsnapped position.
+    Path(DlHandle<Path>, ItemUid, FillRule, LayoutPointAu),
 }
 
 impl ClipItemKeyKind {
@@ -1835,7 +1912,8 @@ impl ClipItemKeyKind {
 
             ClipItemKeyKind::Rectangle(ClipMode::ClipOut) |
             ClipItemKeyKind::RoundedRectangle(..) |
-            ClipItemKeyKind::ImageMask(..) => ClipNodeKind::Complex,
+            ClipItemKeyKind::ImageMask(..) |
+            ClipItemKeyKind::Path(..) => ClipNodeKind::Complex,
         }
     }
 }
@@ -1878,6 +1956,12 @@ pub enum ClipItemKind {
     },
     Image {
         image: ImageKey,
+    },
+    Path {
+        path: DlHandle<Path>,
+        fill_rule: FillRule,
+        /// See `ClipItemKeyKind::Path`.
+        origin: LayoutPoint,
     },
 }
 
@@ -1950,7 +2034,8 @@ impl ClipItemKind {
             ClipItemKind::Rectangle { mode: ClipMode::ClipOut } => None,
             ClipItemKind::RoundedRectangle { mode: ClipMode::Clip, .. } => Some(clip_rect),
             ClipItemKind::RoundedRectangle { mode: ClipMode::ClipOut, .. } => None,
-            ClipItemKind::Image { .. } => Some(clip_rect),
+            ClipItemKind::Image { .. } |
+            ClipItemKind::Path { .. } => Some(clip_rect),
         }
     }
 
@@ -1976,7 +2061,8 @@ impl ClipItemKind {
                 let inner_clip_rect = extract_inner_rect_safe(&clip_rect, &clamped, &inset);
                 (clip_rect, inner_clip_rect, mode)
             }
-            ClipItemKind::Image { .. } => {
+            ClipItemKind::Image { .. } |
+            ClipItemKind::Path { .. } => {
                 (clip_rect, None, ClipMode::Clip)
             }
         };
@@ -2092,7 +2178,8 @@ impl ClipItemKind {
                     }
                 }
             }
-            ClipItemKind::Image { .. } => {
+            ClipItemKind::Image { .. } |
+            ClipItemKind::Path { .. } => {
                 let rect = clip_rect;
                 match rect.intersection(prim_rect) {
                     Some(..) => {
@@ -2182,64 +2269,6 @@ fn rounded_rectangle_contains_box_quick(
     }
 
     true
-}
-
-/// Test where point p is relative to the infinite line that passes through the segment
-/// defined by p0 and p1. Point p is on the "left" of the line if the triangle (p0, p1, p)
-/// forms a counter-clockwise triangle.
-/// > 0 is left of the line
-/// < 0 is right of the line
-/// == 0 is on the line
-pub fn is_left_of_line(
-    p_x: f32,
-    p_y: f32,
-    p0_x: f32,
-    p0_y: f32,
-    p1_x: f32,
-    p1_y: f32,
-) -> f32 {
-    (p1_x - p0_x) * (p_y - p0_y) - (p_x - p0_x) * (p1_y - p0_y)
-}
-
-pub fn polygon_contains_point(
-    point: &LayoutPoint,
-    rect: &LayoutRect,
-    polygon: &PolygonKey,
-) -> bool {
-    if !rect.contains(*point) {
-        return false;
-    }
-
-    // p is a LayoutPoint that we'll be comparing to dimensionless PointKeys,
-    // which were created from LayoutPoints, so it all works out.
-    let p = LayoutPoint::new(point.x - rect.min.x, point.y - rect.min.y);
-
-    // Calculate a winding number for this point.
-    let mut winding_number: i32 = 0;
-
-    let count = polygon.point_count as usize;
-
-    for i in 0..count {
-        let p0 = polygon.points[i];
-        let p1 = polygon.points[(i + 1) % count];
-
-        if p0.y <= p.y {
-            if p1.y > p.y {
-                if is_left_of_line(p.x, p.y, p0.x, p0.y, p1.x, p1.y) > 0.0 {
-                    winding_number = winding_number + 1;
-                }
-            }
-        } else if p1.y <= p.y {
-            if is_left_of_line(p.x, p.y, p0.x, p0.y, p1.x, p1.y) < 0.0 {
-                winding_number = winding_number - 1;
-            }
-        }
-    }
-
-    match polygon.fill_rule {
-        FillRule::Nonzero => winding_number != 0,
-        FillRule::Evenodd => winding_number.abs() % 2 == 1,
-    }
 }
 
 pub fn projected_rect_contains(

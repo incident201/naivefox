@@ -423,7 +423,7 @@ add_task(async function test_a_non_web_link_is_refused() {
 });
 
 registerCleanupFunction(async () => {
-  gMockEngineManager.rejectAllRequests();
+  await gMockEngineManager.rejectAllRequests();
 
   // A task that throws never reaches its own closeWindow(), and a leftover
   // window fails the whole file with "Found an unexpected browser window",

@@ -8924,13 +8924,18 @@ void LIRGenerator::visitWasmStoreField(MWasmStoreField* ins) {
   LAllocation base = useRegister(ins->base());
   if (value->type() == MIRType::Int64) {
     MOZ_RELEASE_ASSERT(narrowingOp == MNarrowingOp::None);
-    add(new (alloc()) LWasmStoreSlotI64(useInt64Register(value), base, offs,
-                                        ins->maybeTrap()),
+    LInt64Allocation valueAlloc = canStoreConstantWithoutRegister(value)
+                                      ? useInt64RegisterOrConstant(value)
+                                      : useInt64Register(value);
+    add(new (alloc())
+            LWasmStoreSlotI64(valueAlloc, base, offs, ins->maybeTrap()),
         ins);
   } else {
-    add(new (alloc())
-            LWasmStoreSlot(useRegister(value), base, offs, value->type(),
-                           narrowingOp, ins->maybeTrap()),
+    LAllocation valueAlloc = canStoreConstantWithoutRegister(value)
+                                 ? useRegisterOrConstant(value)
+                                 : useRegister(value);
+    add(new (alloc()) LWasmStoreSlot(valueAlloc, base, offs, value->type(),
+                                     narrowingOp, ins->maybeTrap()),
         ins);
   }
   if (ins->keepAlive() != ins->base()) {

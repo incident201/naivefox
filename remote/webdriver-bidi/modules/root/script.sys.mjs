@@ -1321,6 +1321,10 @@ class ScriptModule extends RootBiDiModule {
     }
   }
 
+  static get supportedCommandsInRestrictedSession() {
+    return ["callFunction", "disown", "evaluate"];
+  }
+
   static get supportedEvents() {
     return ["script.message", "script.realmCreated", "script.realmDestroyed"];
   }

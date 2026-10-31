@@ -915,6 +915,19 @@ static bool IsLSImmediateOffset(uint64_t address, size_t accessByteSize) {
           MacroAssemblerCompat::IsImmLSScaled(int64_t(address), logAccessSize));
 }
 
+// If `address` is not an immediate offset but becomes one after adding its
+// high bits to the base with a single ADD, return those high bits.
+static mozilla::Maybe<uint64_t> LSImmediateOffsetHighBits(
+    uint64_t address, size_t accessByteSize) {
+  uint64_t high = address & ~uint64_t(0xfff);
+  if (address > INT64_MAX ||
+      !MacroAssemblerCompat::IsImmAddSub(int64_t(high)) ||
+      !IsLSImmediateOffset(address - high, accessByteSize)) {
+    return mozilla::Nothing();
+  }
+  return mozilla::Some(high);
+}
+
 void MacroAssemblerCompat::wasmLoadAbsolute(
     const wasm::MemoryAccessDesc& access, Register memoryBase, uint64_t address,
     AnyRegister output, Register64 out64) {
@@ -922,14 +935,17 @@ void MacroAssemblerCompat::wasmLoadAbsolute(
     // The access will require the constant to be loaded into a temp register.
     // Do so here, to keep the logic in wasmLoadImpl() tractable wrt emitting
     // trap information.
-    //
-    // Almost all constant addresses will in practice be handled by a single MOV
-    // so do not worry about additional optimizations here.
     vixl::UseScratchRegisterScope temps(this);
     ARMRegister scratch = temps.AcquireX();
-    Mov(scratch, address);
-    MemOperand srcAddr(X(memoryBase), scratch);
-    wasmLoadImpl(access, srcAddr, output, out64);
+    if (auto high = LSImmediateOffsetHighBits(address, access.byteSize())) {
+      Add(scratch, X(memoryBase), Operand(*high));
+      MemOperand srcAddr(scratch, address - *high);
+      wasmLoadImpl(access, srcAddr, output, out64);
+    } else {
+      Mov(scratch, address);
+      MemOperand srcAddr(X(memoryBase), scratch);
+      wasmLoadImpl(access, srcAddr, output, out64);
+    }
   } else {
     MemOperand srcAddr(X(memoryBase), address);
     wasmLoadImpl(access, srcAddr, output, out64);
@@ -1015,9 +1031,15 @@ void MacroAssemblerCompat::wasmStoreAbsolute(
                                IsImmLSUnscaled(int64_t(address)))) {
     vixl::UseScratchRegisterScope temps(this);
     ARMRegister scratch = temps.AcquireX();
-    Mov(scratch, address);
-    MemOperand destAddr(X(memoryBase), scratch);
-    wasmStoreImpl(access, destAddr, value, value64);
+    if (auto high = LSImmediateOffsetHighBits(address, access.byteSize())) {
+      Add(scratch, X(memoryBase), Operand(*high));
+      MemOperand destAddr(scratch, address - *high);
+      wasmStoreImpl(access, destAddr, value, value64);
+    } else {
+      Mov(scratch, address);
+      MemOperand destAddr(X(memoryBase), scratch);
+      wasmStoreImpl(access, destAddr, value, value64);
+    }
   } else {
     MemOperand destAddr(X(memoryBase), address);
     wasmStoreImpl(access, destAddr, value, value64);

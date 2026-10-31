@@ -974,17 +974,13 @@ intl.ui.browserLanguage:
       - manage
       - search
       - add
-      - remove
       - reorder
       - apply
-      - accept
-      - cancel
-      - set_fallback
     extra_keys:
       installId: The id for an install.
     products:
       - firefox
-    expiry_version: "161"
+    expiry_version: "185"
     notification_emails:
       - bolsson@mozilla.com
       - earo@mozilla.com
@@ -1003,6 +999,7 @@ intl.ui.browserLanguage:
       - 1911321
       - 1928262
       - 1999880
+      - 2076961
 
 security.doh.trrPerformance:
   resolved:

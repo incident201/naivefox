@@ -68,6 +68,36 @@ add_task(async function click_toolbar_button() {
   await panelHiddenPromise;
 
   Services.prefs.clearUserPref("browser.ipProtection.everOpenedPanel");
+  Services.prefs.clearUserPref("browser.ipProtection.openedPanelSince160");
+});
+
+/**
+ * Tests that opening the panel sets the
+ * browser.ipProtection.openedPanelSince160 pref.
+ */
+add_task(async function test_opened_panel_since_160_pref() {
+  let button = document.getElementById(lazy.IPProtectionWidget.WIDGET_ID);
+
+  Assert.ok(
+    !Services.prefs.getBoolPref("browser.ipProtection.openedPanelSince160"),
+    "openedPanelSince160 should be false"
+  );
+
+  let panelShownPromise = waitForPanelEvent(document, "popupshown");
+  button.click();
+  await panelShownPromise;
+
+  Assert.ok(
+    Services.prefs.getBoolPref("browser.ipProtection.openedPanelSince160"),
+    "openedPanelSince160 should be true"
+  );
+
+  let panelHiddenPromise = waitForPanelEvent(document, "popuphidden");
+  EventUtils.synthesizeKey("KEY_Escape");
+  await panelHiddenPromise;
+
+  Services.prefs.clearUserPref("browser.ipProtection.openedPanelSince160");
+  Services.prefs.clearUserPref("browser.ipProtection.everOpenedPanel");
 });
 
 /**

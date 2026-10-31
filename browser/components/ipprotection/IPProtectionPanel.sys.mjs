@@ -58,6 +58,7 @@ const BANDWIDTH_WARNING_DISMISSED_PREF =
 const BANDWIDTH_RESET_DATE_PREF = "browser.ipProtection.bandwidthResetDate";
 const EGRESS_LOCATION_PREF = "browser.ipProtection.egressLocation";
 const USER_OPENED_PREF = "browser.ipProtection.everOpenedPanel";
+const USER_OPENED_SINCE_160_PREF = "browser.ipProtection.openedPanelSince160";
 const UPGRADE_NOT_AVAILABLE_PREF = "browser.ipProtection.upgradeNotAvailable";
 const SITE_INCLUSION_PROMPT_SHOWN_PREF =
   "browser.ipProtection.siteInclusionPromptShown";
@@ -151,6 +152,8 @@ export class IPProtectionPanel {
    *  An object containing the current and max usage
    * @property {boolean} isActivating
    *  True if the VPN service is in the process of connecting, else false.
+   * @property {boolean} isActive
+   *  True if the VPN proxy is active, else false.
    * @property {boolean} isPremium
    * True if the current device has Firefox set as the default browser or the user has a Mozilla VPN subscription and/or unlimited bandwidth
    * Initially false; recomputed asynchronously before the panel is shown.
@@ -428,6 +431,7 @@ export class IPProtectionPanel {
       bandwidthUsage: this.#getBandwidthUsage(),
       isActivating:
         lazy.IPPProxyManager.state === lazy.IPPProxyStates.ACTIVATING,
+      isActive: lazy.IPPProxyManager.state === lazy.IPPProxyStates.ACTIVE,
       isEnrolling: lazy.IPProtectionService.authProvider.isEnrolling,
       isPremium: false,
       showSiteInclusionPrompt: false,
@@ -454,6 +458,7 @@ export class IPProtectionPanel {
 
         if (this.active && aLocationURI) {
           this.#updateSiteData();
+          this.#updateProxyError();
         }
       },
     };
@@ -632,6 +637,8 @@ export class IPProtectionPanel {
     }
 
     this.#updateSiteData();
+    this.#updateProxyError();
+    lazy.IPProtectionServerlist.maybeFetchList();
 
     if (this.state.paused) {
       lazy.IPPProxyManager.refreshUsage();
@@ -669,6 +676,13 @@ export class IPProtectionPanel {
     let hasUserEverOpenedPanel = Services.prefs.getBoolPref(USER_OPENED_PREF);
     if (!hasUserEverOpenedPanel) {
       Services.prefs.setBoolPref(USER_OPENED_PREF, true);
+    }
+
+    let openedPanelSince160 = Services.prefs.getBoolPref(
+      USER_OPENED_SINCE_160_PREF
+    );
+    if (!openedPanelSince160) {
+      Services.prefs.setBoolPref(USER_OPENED_SINCE_160_PREF, true);
     }
 
     // The function has fully completed, until now hiding() treats the panel
@@ -859,6 +873,7 @@ export class IPProtectionPanel {
       { once: true }
     );
 
+    await lazy.IPProtectionServerlist.maybeFetchList();
     this.panelMultiView?.showSubView(IPProtectionPanel.LOCATIONS_PANELVIEW);
     this.#createPanel(view, IPProtectionPanel.LOCATIONS_TAGNAME);
 
@@ -1212,6 +1227,38 @@ export class IPProtectionPanel {
     this.setState({ siteData });
   }
 
+  /**
+   * The error to show for the proxy state. A failed connection that only
+   * carries included sites is not shown on a tab it does not carry.
+   *
+   * @returns {string}
+   */
+  #getProxyErrorType() {
+    if (lazy.IPPProxyManager.state !== lazy.IPPProxyStates.ERROR) {
+      return "";
+    }
+    if (
+      lazy.IPPProxyManager.mode === lazy.IPPMode.MODE_INCLUSION &&
+      lazy.IPPSiteRuleManager.getRule(
+        getSitePrincipal(this.gBrowser),
+        this.gBrowser?.selectedBrowser.browserId
+      ) !== lazy.IPPPrincipalRules.INCLUDED
+    ) {
+      return "";
+    }
+    return this.#errorMessage(lazy.IPPProxyManager.errorType);
+  }
+
+  /**
+   * Re-evaluates a proxy state error for the selected tab. Errors from a
+   * failed start in this panel are left alone.
+   */
+  #updateProxyError() {
+    if (lazy.IPPProxyManager.state === lazy.IPPProxyStates.ERROR) {
+      this.setState({ error: this.#getProxyErrorType() });
+    }
+  }
+
   #handleEvent(event) {
     if (event.type == "IPProtection:Init") {
       this.updateComponentState(event.target);
@@ -1252,10 +1299,7 @@ export class IPProtectionPanel {
       event.type == "IPProtectionService:StateChanged" ||
       event.type === "IPPAuthProvider:StateChanged"
     ) {
-      let errorType = "";
-      if (lazy.IPPProxyManager.state === lazy.IPPProxyStates.ERROR) {
-        errorType = lazy.ERRORS.GENERIC;
-      }
+      const errorType = this.#getProxyErrorType();
       const paused = lazy.IPPProxyManager.state === lazy.IPPProxyStates.PAUSED;
 
       this.setState({
@@ -1267,6 +1311,7 @@ export class IPProtectionPanel {
         error: errorType,
         isActivating:
           lazy.IPPProxyManager.state === lazy.IPPProxyStates.ACTIVATING,
+        isActive: lazy.IPPProxyManager.state === lazy.IPPProxyStates.ACTIVE,
         isEnrolling: lazy.IPProtectionService.authProvider.isEnrolling,
         bandwidthUsage: this.#getBandwidthUsage(),
         bandwidthWarning:
@@ -1279,6 +1324,7 @@ export class IPProtectionPanel {
       });
     } else if (event.type == "SiteRuleManager:RuleChanged") {
       this.#updateSiteData();
+      this.#updateProxyError();
     } else if (event.type == "IPProtectionServerlist:ListChanged") {
       this.setState({
         locationsList: lazy.IPProtectionServerlist.countries,

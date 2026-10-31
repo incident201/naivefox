@@ -1455,14 +1455,23 @@ public class GeckoSession {
       int width;
       int height;
       float devicePixelRatio;
+      float scrollX;
+      float scrollY;
 
       /* package */ ContentMetrics() {}
 
       @WrapForJNI
-      /* package */ void set(final int width, final int height, final float devicePixelRatio) {
+      /* package */ void set(
+          final int width,
+          final int height,
+          final float devicePixelRatio,
+          final float scrollX,
+          final float scrollY) {
         this.width = width;
         this.height = height;
         this.devicePixelRatio = devicePixelRatio;
+        this.scrollX = scrollX;
+        this.scrollY = scrollY;
       }
     }
 
@@ -1550,6 +1559,16 @@ public class GeckoSession {
         final int width,
         final int height,
         final float renderingScale);
+
+    @WrapForJNI(calledFrom = "ui", dispatchTo = "proxy")
+    public native void requestRegionToSurface(
+        GeckoResult<Void> result,
+        final Surface surface,
+        final int x,
+        final int y,
+        final int width,
+        final int height,
+        final float scale);
 
     @WrapForJNI(calledFrom = "ui", dispatchTo = "proxy")
     public native void requestContentMetrics(
@@ -2174,6 +2193,9 @@ public class GeckoSession {
    */
   @AnyThread
   public static class Loader {
+    /** Public constructor for Loader. */
+    public Loader() {}
+
     private String mUri;
     private GeckoSession mReferrerSession;
     private String mReferrerUri;
@@ -3701,9 +3723,7 @@ public class GeckoSession {
     mHistoryHandler.setDelegate(delegate, this);
   }
 
-  /**
-   * @return The history tracking delegate for this session.
-   */
+  /** {@return the history tracking delegate for this session} */
   @AnyThread
   public @Nullable HistoryDelegate getHistoryDelegate() {
     return mHistoryHandler.getDelegate();
@@ -4962,6 +4982,8 @@ public class GeckoSession {
     }
 
     /**
+     * A request has failed to load.
+     *
      * @param session The GeckoSession that initiated the callback.
      * @param uri The URI that failed to load.
      * @param error A WebRequestError containing details about the error
@@ -5340,6 +5362,9 @@ public class GeckoSession {
 
     /** Contains all the Identity credential prompts (FedCM) */
     final class IdentityCredential {
+      /** Public constructor for IdentityCredential. */
+      public IdentityCredential() {}
+
       /**
        * ProviderSelectorPrompt contains the information necessary to represent a prompt that allows
        * the user to select the identity credential provider they would like to use.
@@ -6570,7 +6595,11 @@ public class GeckoSession {
       }
     }
 
-    /** Request containing information required to resolve Autocomplete prompt requests. */
+    /**
+     * Request containing information required to resolve Autocomplete prompt requests.
+     *
+     * @param <T> The type of the Autocomplete options.
+     */
     class AutocompleteRequest<T extends Autocomplete.Option<?>> extends BasePrompt {
       /**
        * The Autocomplete options for this request. This can contain a single or multiple entries.
@@ -8568,9 +8597,7 @@ public class GeckoSession {
     getAutofillSupport().setDelegate(delegate);
   }
 
-  /**
-   * @return The current {@link Autofill.Delegate} for this session, if any.
-   */
+  /** {@return the current {@link Autofill.Delegate} for this session, if any} */
   @UiThread
   public @Nullable Autofill.Delegate getAutofillDelegate() {
     return getAutofillSupport().getDelegate();

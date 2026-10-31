@@ -18,6 +18,7 @@
 #include "mozilla/StaticPrefs_image.h"
 #include "mozilla/TaskController.h"
 #include "mozilla/TimeStamp.h"
+#include "mozilla/gfx/Logging.h"
 #include "nsCOMPtr.h"
 #include "nsIObserverService.h"
 #include "nsIURI.h"
@@ -123,6 +124,15 @@ DecodePool::Observe(nsISupports*, const char* aTopic, const char16_t*) {
   {
     MutexAutoLock lock(mMutex);
     ioThread.swap(mIOThread);
+#ifdef XP_WIN
+    if (mShellCallStart) {
+      gfxCriticalNote << "ImageIO shell call in flight for "
+                      << (AwakeTimeStamp::Now() - *mShellCallStart).ToSeconds()
+                      << "s"
+                      << (mShellCallStartedInShutdown ? ", started in shutdown"
+                                                      : "");
+    }
+#endif
   }
 
   if (ioThread) {
@@ -206,6 +216,27 @@ already_AddRefed<nsISerialEventTarget> DecodePool::GetIOEventTarget() {
   nsCOMPtr<nsISerialEventTarget> target = mIOThread;
   return target.forget();
 }
+
+#ifdef XP_WIN
+/* static */ void DecodePool::NoteShellCallStarted() {
+  if (!sSingleton) {
+    return;
+  }
+  MutexAutoLock lock(sSingleton->mMutex);
+  sSingleton->mShellCallStart = Some(AwakeTimeStamp::Now());
+  sSingleton->mShellCallStartedInShutdown =
+      AppShutdown::IsInOrBeyond(ShutdownPhase::AppShutdownConfirmed);
+}
+
+/* static */ void DecodePool::NoteShellCallFinished() {
+  if (!sSingleton) {
+    return;
+  }
+  MutexAutoLock lock(sSingleton->mMutex);
+  sSingleton->mShellCallStart.reset();
+  sSingleton->mShellCallStartedInShutdown = false;
+}
+#endif
 
 }  // namespace image
 }  // namespace mozilla

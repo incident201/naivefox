@@ -80,8 +80,7 @@ MediaResult RemoteAudioDecoderChild::InitIPDL(
   }
 
   if (!manager->SendPRemoteDecoderConstructor(this, aAudioInfo, aOptions,
-                                              Nothing(), aMediaEngineId,
-                                              Nothing(), cdm)) {
+                                              aMediaEngineId, Nothing(), cdm)) {
     return MediaResult(
         NS_ERROR_DOM_MEDIA_FATAL_ERR,
         RESULT_DETAIL("RemoteMediaManager unable to construct."));
@@ -101,6 +100,10 @@ RemoteAudioDecoderParent::RemoteAudioDecoderParent(
 
 IPCResult RemoteAudioDecoderParent::RecvConstruct(
     ConstructResolver&& aResolver) {
+  if (XRE_IsGPUProcess() && !mCDM) {
+    return IPC_FAIL(this, "Audio decoding in GPU process requires a CDM");
+  }
+
   if (mDecoder || mShutdown) {
     aResolver(MediaResult(NS_ERROR_ALREADY_INITIALIZED, __func__));
     return IPC_OK();

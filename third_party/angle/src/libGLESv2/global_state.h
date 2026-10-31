@@ -36,7 +36,7 @@ class Thread;
 extern Thread *GetCurrentThreadTLS();
 extern void SetCurrentThreadTLS(Thread *thread);
 #else
-extern thread_local Thread *gCurrentThread;
+extern constinit thread_local Thread *gCurrentThread;
 #endif
 
 gl::Context *GetGlobalLastContext();

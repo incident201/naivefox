@@ -38,6 +38,9 @@ ChromeUtils.defineESModuleGetters(lazy, {
 
 const IMAGE_TO_TEXT_TASK = "moz-image-to-text";
 const ML_ENGINE_MAX_TIMEOUT = 60000;
+// Lets a test run the real alt-text model in automation.
+const ALT_TEXT_INFERENCE_IN_AUTOMATION_PREF =
+  "pdfjs.altText.inferenceInAutomation";
 const PDFJS_DB_NAME = "pdfjs";
 const PDFJS_DB_VERSION = 1;
 const PDFJS_STORE_NAME = "signatures";
@@ -120,6 +123,13 @@ export function filterCertsForView(data) {
       BASE64_RE.test(d)
   );
   return certs.length ? certs : null;
+}
+
+function stubAltTextInference() {
+  return (
+    Cu.isInAutomation &&
+    !Services.prefs.getBoolPref(ALT_TEXT_INFERENCE_IN_AUTOMATION_PREF, false)
+  );
 }
 
 /**
@@ -592,7 +602,7 @@ export class PdfJsParent extends JSWindowActorParent {
       const now = ChromeUtils.now();
 
       let response;
-      if (Cu.isInAutomation) {
+      if (stubAltTextInference()) {
         response = { output: "In Automation" };
       } else {
         const engine = await this.#createAIEngine(service, null);
@@ -621,7 +631,7 @@ export class PdfJsParent extends JSWindowActorParent {
       throw new Error("Invalid service");
     }
 
-    if (Cu.isInAutomation) {
+    if (stubAltTextInference()) {
       PdfJsTelemetry.report({
         type: "editing",
         data: {
@@ -949,6 +959,13 @@ export class PdfJsParent extends JSWindowActorParent {
       throw new Error(
         "FindEventManager was not bound for the current browser."
       );
+    }
+    // Open and focus the findbar so Escape can clear PDF highlights.
+    const findbar = aEvent.currentTarget;
+    if (type === "findagain" && findbar.hidden) {
+      findbar.open(findbar.FIND_NORMAL);
+      findbar._findField.select();
+      findbar._findField.focus();
     }
     browser.sendMessageToActor(
       "PDFJS:Child:handleEvent",

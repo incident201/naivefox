@@ -58,6 +58,11 @@ class PdfToolsIntegrationGleanTest {
     private fun integrationWith(engineSession: EngineSession) =
         integration(store = storeOf(tab.copy(engineState = EngineState(engineSession = engineSession))))
 
+    private fun PdfToolsIntegration.addSignature() {
+        handleSignClick()
+        handleSignAddClick()
+    }
+
     @Test
     fun `GIVEN download has not been activated THEN nothing is recorded`() {
         integration()
@@ -110,7 +115,7 @@ class PdfToolsIntegrationGleanTest {
 
     @Test
     fun `WHEN the signature is added THEN the interaction is recorded`() {
-        integration().handleSignAddClick()
+        integration().addSignature()
 
         val event = assertNotNull(PdfViewer.signDialogAddTapped.testGetValue())
         assertEquals(SignatureType.Typed.telemetryName, event.single().extra!!["signature_type"])
@@ -129,7 +134,7 @@ class PdfToolsIntegrationGleanTest {
         val engineSession = mockk<EngineSession>()
         val onResult = slot<() -> Unit>()
         every { engineSession.addSignatureToPdf(any(), capture(onResult), any()) } returns Unit
-        integrationWith(engineSession).handleSignAddClick()
+        integrationWith(engineSession).addSignature()
 
         onResult.captured()
 
@@ -143,7 +148,7 @@ class PdfToolsIntegrationGleanTest {
         val engineSession = mockk<EngineSession>()
         val onException = slot<(Throwable) -> Unit>()
         every { engineSession.addSignatureToPdf(any(), any(), capture(onException)) } returns Unit
-        integrationWith(engineSession).handleSignAddClick()
+        integrationWith(engineSession).addSignature()
 
         onException.captured(RuntimeException())
 
@@ -155,7 +160,7 @@ class PdfToolsIntegrationGleanTest {
 
     @Test
     fun `GIVEN the selected tab has no engine session WHEN the signature is added THEN the failure is recorded`() {
-        integration().handleSignAddClick()
+        integration().addSignature()
 
         val extra = assertNotNull(PdfViewer.signDialogAddFailure.testGetValue()).single().extra!!
         assertEquals(SignatureFailure.NoEngineSession.telemetryName, extra["reason"])

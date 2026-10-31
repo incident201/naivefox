@@ -729,8 +729,7 @@ TEST(HappyEyeballsConnectionAttempt, ZeroRttWinnerUsesItsOwnStreamOffset)
         /*eventsink*/ nullptr, /*browserId*/ 0, HttpTrafficCategory::eInvalid,
         /*requestContext*/ nullptr, ClassOfService(), /*initialRwin*/ 0,
         /*responseTimeoutEnabled*/ false, /*channelId*/ 0,
-        /*transactionObserver*/ nullptr, nsILoadInfo::IPAddressSpace::Unknown,
-        LNAPerms{});
+        nsILoadInfo::IPAddressSpace::Unknown, LNAPerms{});
     ASSERT_TRUE(NS_SUCCEEDED(rv));
 
     // The serialized GET request is the (seekable) request stream; pick two
@@ -808,8 +807,7 @@ static already_AddRefed<nsHttpTransaction> MakeRealTransaction(
       /*eventsink*/ nullptr, /*browserId*/ 0, HttpTrafficCategory::eInvalid,
       /*requestContext*/ nullptr, ClassOfService(), /*initialRwin*/ 0,
       /*responseTimeoutEnabled*/ false, /*channelId*/ 0,
-      /*transactionObserver*/ nullptr, nsILoadInfo::IPAddressSpace::Unknown,
-      LNAPerms{});
+      nsILoadInfo::IPAddressSpace::Unknown, LNAPerms{});
   MOZ_RELEASE_ASSERT(NS_SUCCEEDED(rv));
   return trans.forget();
 }

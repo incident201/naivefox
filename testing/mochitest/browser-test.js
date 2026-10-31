@@ -14,6 +14,7 @@ var { AppConstants } = ChromeUtils.importESModule(
 var {
   uploadProfileArtifact,
   installProfilerDumpAndQuit,
+  saveProfileToUploadDir,
   shouldSaveFailureProfile,
 } = ChromeUtils.importESModule(
   "resource://testing-common/TestProfilerArtifact.sys.mjs"
@@ -861,6 +862,20 @@ Tester.prototype = {
         );
       } catch (ex) {
         dump("ShutdownLeakPathFinder failed: " + ex + "\n");
+      }
+
+      if (shouldSaveFailureProfile()) {
+        let tests = [...new Set(leaked.map(info => info.test))];
+        let message = await saveProfileToUploadDir(tests[0]);
+        for (let test of tests) {
+          this.structuredLogger.logData("test_status", {
+            test,
+            subtest: "Shutdown",
+            status: "FAIL",
+            expected: "PASS",
+            message,
+          });
+        }
       }
     }
   },

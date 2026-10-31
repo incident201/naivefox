@@ -649,11 +649,13 @@ class Talos(TestingMixin, MercurialScript, TooltoolMixin, CodeCoverageMixin):
         webextension_dest = os.path.join(self.talos_path, "talos", "webextensions")
 
         if self.query_pagesets_name():
-            tooltool_artifacts.append({
-                "name": self.pagesets_name,
-                "manifest": self.pagesets_name_manifest,
-                "dest": src_talos_pageset_dest,
-            })
+            # DAMP only loads pages from the fis/ copy.
+            if self.talos_json_config["suites"][self.suite]["tests"] != ["damp"]:
+                tooltool_artifacts.append({
+                    "name": self.pagesets_name,
+                    "manifest": self.pagesets_name_manifest,
+                    "dest": src_talos_pageset_dest,
+                })
             tooltool_artifacts.append({
                 "name": self.pagesets_name,
                 "manifest": self.pagesets_name_manifest,
@@ -741,6 +743,15 @@ class Talos(TestingMixin, MercurialScript, TooltoolMixin, CodeCoverageMixin):
         return super().download_and_extract(
             extract_dirs=extract_dirs, suite_categories=["common", "talos"]
         )
+
+    def query_python_constraints(self):
+        return [
+            os.path.abspath(
+                os.path.join(
+                    self.talos_path, "..", "config", "requirements-mozbase.txt"
+                )
+            )
+        ]
 
     def create_virtualenv(self, **kwargs):
         """VirtualenvMixin.create_virtualenv() assuemes we're using

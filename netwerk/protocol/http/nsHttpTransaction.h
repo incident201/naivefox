@@ -244,6 +244,7 @@ class nsHttpTransaction final : public nsAHttpTransaction,
   void GetHashKeyOfConnectionEntry(nsACString& aResult);
 
   bool IsForWebTransport() override { return mIsForWebTransport; }
+  void GetWebTransportAnticipatedStreams(uint16_t* aUni, uint16_t* aBidi);
   bool IsResettingForTunnelConn() override { return mIsResettingForTunnelConn; }
   void SetResettingForTunnelConn(bool aValue) override {
     mIsResettingForTunnelConn = aValue;
@@ -324,8 +325,6 @@ class nsHttpTransaction final : public nsAHttpTransaction,
   // reading the content.  When this returns true, WriteSegments returns
   // WOULD_BLOCK.
   bool ShouldThrottle();
-
-  void NotifyTransactionObserver(nsresult reason);
 
   // When echConfig is enabled, this function put other available records
   // in mRecordsForRetry. Returns true when mRecordsForRetry is not empty,
@@ -656,7 +655,6 @@ class nsHttpTransaction final : public nsAHttpTransaction,
   void MaybeStartHttp3BackupTimer();
 
  private:
-  TransactionObserverFunc mTransactionObserver;
   NetAddr mSelfAddr;
   NetAddr mPeerAddr;
   nsILoadInfo::IPAddressSpace mTargetIpAddressSpace{

@@ -204,7 +204,7 @@ export class UrlbarProviderSearchTips extends UrlbarProvider {
    *
    * @param {UrlbarResult} result
    *   The result that was picked.
-   * @param {window} window
+   * @param {BrowserWindow} window
    *   The browser window in which the tip is being displayed.
    */
   #pickResult(result, window) {
@@ -239,7 +239,7 @@ export class UrlbarProviderSearchTips extends UrlbarProvider {
   /**
    * Called from `onLocationChange` in browser.js.
    *
-   * @param {window} window
+   * @param {BrowserWindow} window
    *  The browser window where the location change happened.
    * @param {nsIURI} uri
    *  The URI being navigated to.
@@ -262,7 +262,7 @@ export class UrlbarProviderSearchTips extends UrlbarProvider {
   /**
    * Called by the static function with the same name.
    *
-   * @param {window} window
+   * @param {BrowserWindow} window
    *  The browser window where the location change happened.
    * @param {nsIURI} uri
    *  The URI being navigated to.
@@ -336,7 +336,7 @@ export class UrlbarProviderSearchTips extends UrlbarProvider {
    *
    * @param {string} urlStr
    *   The URL of the page being loaded, in string form.
-   * @param {window} window
+   * @param {BrowserWindow} window
    *   The browser window in which the tip is being displayed.
    */
   async _maybeShowTipForUrl(urlStr, window) {

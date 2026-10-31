@@ -51,7 +51,7 @@ Result<UniquePtr<Calendar>, ICUError> Calendar::TryCreate(
     return Err(ToICUError(status));
   }
 
-  return MakeUnique<Calendar>(calendar);
+  return std::make_unique<Calendar>(calendar);
 }
 
 /* static */

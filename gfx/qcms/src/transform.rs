@@ -1033,6 +1033,17 @@ fn precache_create() -> Arc<PrecacheOuput> {
     Arc::new(PrecacheOuput::default())
 }
 
+#[cfg(target_arch = "aarch64")]
+fn f16_to_f32(h: u16) -> f32 {
+    let f: f32;
+    unsafe {
+        std::arch::asm!("fcvt {0:s}, {1:h}", out(vreg) f, in(vreg) h,
+                        options(pure, nomem, nostack, preserves_flags));
+    }
+    f
+}
+
+#[cfg(not(target_arch = "aarch64"))]
 fn f16_to_f32(h: u16) -> f32 {
     // IEEE 754 binary16 → binary32. Exact for all normal f16 values.
     // Subnormals are flushed to zero, which is fine for image data.

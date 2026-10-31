@@ -17,6 +17,7 @@ task-defaults:
     worker:
         env:
             PYTHONPATH: "testing/mozbase/mozdevice:third_party/python/six"
+            PYTHONUNBUFFERED: "1"
 
     run:
         clone-with: hg

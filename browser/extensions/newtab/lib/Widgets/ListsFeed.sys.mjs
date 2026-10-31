@@ -130,6 +130,7 @@ export class ListsFeed {
     switch (action.data.name) {
       case PREF_LISTS_ENABLED:
       case PREF_SYSTEM_LISTS_ENABLED:
+      case "region":
       case "trainhopConfig":
       case "widgetsConfig": {
         if (this.enabled && !this.initialized) {

@@ -532,6 +532,11 @@ static Maybe<nsRect> ComputeTheIntersection(
         target = containerFrame;
       }
     }
+    // Preserve the popup's own clip, but skip ancestor clips since popups
+    // can extend outside their embedding document's viewport.
+    if (containerFrame->IsMenuPopupFrame()) {
+      break;
+    }
     // 3.5 If container is the root element of a browsing context, update
     // container to be the browsing context’s document; otherwise, update
     // container to be the containing block of container.

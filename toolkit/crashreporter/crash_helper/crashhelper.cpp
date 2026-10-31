@@ -8,7 +8,8 @@
 #if defined(XP_WIN)
 #  include <windows.h>  // for HANDLE
 #elif defined(XP_DARWIN)
-#  include <mach/port.h>  // for mach_port_t
+#  include <mach/kern_return.h>  // for kern_return_t
+#  include <mach/port.h>         // for mach_port_t
 #elif defined(XP_LINUX)
 // For DirectAuxvDumpInfo
 #  include "mozilla/toolkit/crashreporter/rust_minidump_writer_linux_ffi_generated.h"
@@ -41,24 +42,22 @@ static BreakpadRawData parse_breakpad_data(const BreakpadChar* aArg) {
 #if defined(XP_MACOSX)
   return aArg;
 #elif defined(XP_WIN)
-  // This is always a wide string from program arguments, so we don't need a
-  // proper conversion.
-  size_t len = wcslen(BitwiseCast<const wchar_t*>(aArg));
-  uint16_t* data = new uint16_t[len + 1];
-  for (size_t i = 0; i < len; i++) {
-    data[i] = aArg[i];
+  errno = 0;
+  const wchar_t* str_start = BitwiseCast<const wchar_t*>(aArg);
+  wchar_t* str_end = nullptr;
+#  if defined(HAVE_64BIT_BUILD)
+  uint64_t value = wcstoull(str_start, &str_end, 10);
+#  else
+  uint32_t value = wcstoul(str_start, &str_end, 10);
+#  endif  // defined(HAVE_64BIT_BUILD)
+
+  if ((errno != 0) || (str_end == str_start)) {
+    exit(EXIT_FAILURE);
   }
-  data[len] = 0;
 
-  return data;
-#else  // Linux and friends
+  return BitwiseCast<HANDLE>(value);
+#else     // Linux and friends
   return parse_int_or_exit(aArg);
-#endif
-}
-
-static void free_breakpad_data(BreakpadRawData aData) {
-#if defined(XP_WIN)
-  delete aData;
 #endif
 }
 
@@ -103,6 +102,5 @@ int main(int argc, char* argv[])
   int res = crash_generator_logic_desktop(client_pid, client_handle,
                                           breakpad_data, minidump_path,
                                           build_id, listener, connector);
-  free_breakpad_data(breakpad_data);
   exit(res);
 }

@@ -6,7 +6,7 @@ use api::ColorF;
 use api::{ImageRendering, LineOrientation, PrimitiveFlags};
 use api::units::*;
 use crate::clip::ClipNodeId;
-use crate::render_backend::DataStores;
+use crate::render_backend::{DataStores, DlStores};
 use crate::space::SnapRounding;
 use crate::quad::QuadTileClassifier;
 use crate::renderer::GpuBufferHandle;
@@ -21,7 +21,7 @@ use crate::render_task_graph::RenderTaskId;
 use crate::resource_cache::ImageProperties;
 use crate::util::Recycler;
 use crate::internal_types::{FastHashSet, LayoutPrimitiveInfo};
-use crate::visibility::{PrimitiveDrawHeader, PrimitiveDrawIndex};
+use crate::visibility::{BackdropCaptures, PrimitiveDrawHeader, PrimitiveDrawIndex};
 use std::ops;
 
 pub mod backdrop;
@@ -40,11 +40,12 @@ use backdrop::{BackdropCaptureDataHandle, BackdropRenderDataHandle};
 use borders::{ImageBorderDataHandle, NormalBorderDataHandle};
 use gradient::{LinearGradientDataHandle, RadialGradientDataHandle, ConicGradientDataHandle};
 use image::{ImageDataHandle, YuvImageDataHandle};
-use line_dec::LineDecorationDataHandle;
+use line_dec::LineDecorationKey;
 use picture::PictureDataHandle;
-use rectangle::RectangleDataHandle;
+use rectangle::RectangleKey;
+use crate::dl_interner::DlHandle;
 use text_run::{TextRunDataHandle, TextRunScratch};
-use crate::box_shadow::BoxShadowDataHandle;
+use crate::box_shadow::BoxShadowKey;
 
 #[cfg_attr(feature = "capture", derive(Serialize))]
 #[cfg_attr(feature = "replay", derive(Deserialize))]
@@ -142,7 +143,7 @@ pub use api::interned_prims::PrimKey;
 #[cfg_attr(feature = "capture", derive(Serialize))]
 #[cfg_attr(feature = "replay", derive(Deserialize))]
 #[derive(MallocSizeOf)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PrimTemplateCommonData {
     pub flags: PrimitiveFlags,
     pub aligned_aa_edges: EdgeMask,
@@ -167,9 +168,31 @@ impl PrimTemplateCommonData {
     }
 }
 
+/// What scene building reads of an interned primitive: where its instance goes.
+/// The display item carries only the spatial id, the clip chain and the handle,
+/// so this is resolved from the key's common data for every primitive type.
 #[cfg_attr(feature = "capture", derive(Serialize))]
 #[cfg_attr(feature = "replay", derive(Deserialize))]
-#[derive(MallocSizeOf)]
+#[derive(Debug, MallocSizeOf)]
+pub struct PrimPlacement {
+    pub rect: LayoutRect,
+    pub clip_rect: LayoutRect,
+    pub flags: PrimitiveFlags,
+}
+
+impl<T: malloc_size_of::MallocSizeOf> crate::dl_interner::DlResolve<PrimKey<T>> for PrimPlacement {
+    fn resolve(key: &PrimKey<T>, _ctx: &crate::dl_interner::DlResolveContext) -> Self {
+        PrimPlacement {
+            rect: key.common.prim_rect.into(),
+            clip_rect: key.common.local_clip_rect.into(),
+            flags: key.common.flags,
+        }
+    }
+}
+
+#[cfg_attr(feature = "capture", derive(Serialize))]
+#[cfg_attr(feature = "replay", derive(Deserialize))]
+#[derive(MallocSizeOf, Clone)]
 pub struct PrimTemplate<T> {
     pub common: PrimTemplateCommonData,
     pub kind: T,
@@ -217,8 +240,9 @@ pub enum PrimitiveKind {
     /// A line decoration. cache_handle refers to a cached render
     /// task handle, if this line decoration is not a simple solid.
     LineDecoration {
-        /// Handle to the common interned data for this primitive.
-        data_handle: LineDecorationDataHandle,
+        /// Handle into the follower store fed by the content display list
+        /// builder.
+        handle: DlHandle<LineDecorationKey>,
     },
     NormalBorder {
         /// Handle to the common interned data for this primitive.
@@ -229,8 +253,9 @@ pub enum PrimitiveKind {
         data_handle: ImageBorderDataHandle,
     },
     Rectangle {
-        /// Handle to the common interned data for this primitive.
-        data_handle: RectangleDataHandle,
+        /// Handle into the follower store fed by the content display list
+        /// builder.
+        handle: DlHandle<RectangleKey>,
     },
     YuvImage {
         /// Handle to the common interned data for this primitive.
@@ -261,7 +286,9 @@ pub enum PrimitiveKind {
         pic_index: PictureIndex,
     },
     BoxShadow {
-        data_handle: BoxShadowDataHandle,
+        /// Handle into the follower store fed by the content display list
+        /// builder.
+        handle: DlHandle<BoxShadowKey>,
     },
 }
 
@@ -380,16 +407,16 @@ impl PrimitiveInstance {
     /// rounds out (a conservative, grid-aligned footprint for surface / cluster
     /// allocation) while its clips stay exact, at the sub-pixel position
     /// matching its contents (bug 2050692).
-    pub fn snap_policy(&self, data_stores: &DataStores) -> SnapPolicy {
-        if data_stores.prim_has_anti_aliasing(self) {
+    pub fn snap_policy(&self, data_stores: &DataStores, dl_stores: &DlStores) -> SnapPolicy {
+        if data_stores.prim_has_anti_aliasing(self, dl_stores) {
             return SnapPolicy { rect: SnapRounding::Exact, clip: ClipSnap::Nearest };
         }
         if !self.kind.snaps() {
             return SnapPolicy { rect: SnapRounding::RoundOut, clip: ClipSnap::Exact };
         }
         let rect = match self.kind {
-            PrimitiveKind::LineDecoration { data_handle, .. } => SnapRounding::Line {
-                horizontal: data_stores.line_decoration[data_handle].kind.orientation
+            PrimitiveKind::LineDecoration { handle } => SnapRounding::Line {
+                horizontal: dl_stores.line_decorations[handle].kind.orientation
                     == LineOrientation::Horizontal,
             },
             PrimitiveKind::NormalBorder { data_handle, .. } => SnapRounding::BorderInner {
@@ -400,10 +427,10 @@ impl PrimitiveInstance {
         SnapPolicy { rect, clip: ClipSnap::Nearest }
     }
 
-    pub fn uid(&self) -> intern::ItemUid {
+    pub fn uid(&self, dl_stores: &DlStores) -> intern::ItemUid {
         match &self.kind {
-            PrimitiveKind::Rectangle { data_handle, .. } => {
-                data_handle.uid()
+            PrimitiveKind::Rectangle { handle } => {
+                dl_stores.rectangles.uid(*handle)
             }
             PrimitiveKind::Image { data_handle, .. } => {
                 data_handle.uid()
@@ -411,8 +438,8 @@ impl PrimitiveInstance {
             PrimitiveKind::ImageBorder { data_handle, .. } => {
                 data_handle.uid()
             }
-            PrimitiveKind::LineDecoration { data_handle, .. } => {
-                data_handle.uid()
+            PrimitiveKind::LineDecoration { handle } => {
+                dl_stores.line_decorations.uid(*handle)
             }
             PrimitiveKind::LinearGradient { data_handle, .. } => {
                 data_handle.uid()
@@ -441,8 +468,8 @@ impl PrimitiveInstance {
             PrimitiveKind::BackdropRender { data_handle, .. } => {
                 data_handle.uid()
             }
-            PrimitiveKind::BoxShadow { data_handle, .. } => {
-                data_handle.uid()
+            PrimitiveKind::BoxShadow { handle } => {
+                dl_stores.box_shadows.uid(*handle)
             }
 
         }
@@ -482,6 +509,9 @@ pub struct PrimitiveFrameScratch {
     /// visit ends.
     pending_picture_draws: Vec<PrimitiveDrawIndex>,
 
+    /// The backdrop-filter captures reachable this frame.
+    pub backdrop_captures: BackdropCaptures,
+
     /// Per-frame scratch for Picture primitives. Holds the picture's
     /// primary/secondary render task ids and any per-composite-mode
     /// extra GPU buffer addresses. Indexed by `scratch_handle` on
@@ -509,8 +539,9 @@ pub struct PrimitiveFrameScratch {
     /// into it for on-screen display).
     pub debug_items: Vec<DebugItem>,
 
-    /// Set of sub-graphs that are required, determined during visibility pass
-    pub required_sub_graphs: FastHashSet<PictureIndex>,
+    /// The backdrop-filter chains whose `BackdropRender` is drawn this frame,
+    /// determined during the visibility pass
+    pub required_backdrop_chains: FastHashSet<PictureIndex>,
 
     /// Temporary buffers for building segments in to during prepare pass
     pub quad_direct_segments: Vec<QuadSegment>,
@@ -524,12 +555,13 @@ impl Default for PrimitiveFrameScratch {
             picture_draws: Vec::new(),
             picture_draw_ranges: Vec::new(),
             pending_picture_draws: Vec::new(),
+            backdrop_captures: BackdropCaptures::default(),
             pictures: storage::Storage::new(0),
             text_runs: storage::Storage::new(0),
             glyph_keys: GlyphKeyStorage::new(0),
             clip_mask_instances: Vec::new(),
             debug_items: Vec::new(),
-            required_sub_graphs: FastHashSet::default(),
+            required_backdrop_chains: FastHashSet::default(),
             quad_direct_segments: Vec::new(),
             quad_indirect_segments: Vec::new(),
         }
@@ -623,6 +655,7 @@ impl PrimitiveFrameScratch {
         recycler.recycle_vec(&mut self.draws);
         recycler.recycle_vec(&mut self.picture_draws);
         recycler.recycle_vec(&mut self.picture_draw_ranges);
+        self.backdrop_captures.recycle(recycler);
         self.pictures.recycle(recycler);
         self.text_runs.recycle(recycler);
         self.glyph_keys.recycle(recycler);
@@ -645,7 +678,7 @@ impl PrimitiveFrameScratch {
         self.quad_direct_segments.clear();
         self.quad_indirect_segments.clear();
 
-        self.required_sub_graphs.clear();
+        self.required_backdrop_chains.clear();
 
         self.debug_items.clear();
     }
@@ -922,7 +955,9 @@ fn device_text_runs_do_not_snap_their_clips() {
     // Everything else snaps, including pictures - an image-mask clip has to
     // stay aligned with the mask it rasterizes to.
     assert!(
-        PrimitiveKind::Rectangle { data_handle: Handle::INVALID }.snaps(),
+        PrimitiveKind::Rectangle {
+            handle: DlHandle::new(crate::dl_interner::DlNamespace(0), 0, 0),
+        }.snaps(),
         "a snapping primitive must snap its clips",
     );
     assert!(

@@ -1040,17 +1040,11 @@ interface GleanImpl {
   }
 
   intlUiBrowserLanguage: {
-    acceptDialog: GleanEventWithExtras<{ value?: string }>;
     addDialog: GleanEventWithExtras<{ installId?: string, value?: string }>;
     applyMain: GleanEventNoExtras;
-    cancelDialog: GleanEventWithExtras<{ value?: string }>;
     manageMain: GleanEventWithExtras<{ value?: string }>;
-    removeDialog: GleanEventWithExtras<{ value?: string }>;
-    reorderDialog: GleanEventWithExtras<{ value?: string }>;
     reorderMain: GleanEventNoExtras;
-    searchDialog: GleanEventWithExtras<{ value?: string }>;
     searchMain: GleanEventWithExtras<{ value?: string }>;
-    setFallbackDialog: GleanEventWithExtras<{ value?: string }>;
   }
 
   networkProxySettings: {
@@ -1347,6 +1341,7 @@ interface GleanImpl {
     startupSessionAutoRestored: GleanEventWithExtras<{ new_tab_action?: string }>;
     startupSessionAvailability: GleanEventWithExtras<{ clean?: string, clean_backup?: string, format?: string, origin?: string, recovery?: string, recovery_backup?: string, restarted_by_os?: string|boolean, resume_from_crash?: string|boolean, resume_session_once?: string|boolean, resuming_after_os_restart?: string|boolean, startup_page_is_resume?: string|boolean, upgrade_backup?: string }>;
     startupSessionDecision: GleanEventWithExtras<{ action?: string, init_error?: string, interstitial_reason?: string, permanent_private?: string|boolean, previous_session_crashed?: string|boolean, resume_reason?: string, session_type?: string }>;
+    startupSessionOutcome: GleanEventWithExtras<{ outcome?: string }>;
     startupTimeline: Record<"sessionRestoreInitialized"|"sessionRestoreRestoring", GleanQuantity>;
     windowFeaturesMismatchIgnored: GleanEventWithExtras<{ entry_point?: string, existing_features?: string, requested_features?: string }>;
     writeAttempts: GleanCounter;

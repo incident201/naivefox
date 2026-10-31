@@ -40,13 +40,13 @@ use webrender::render_backend_pool::{PoolMemberSetup, RenderBackendPool};
 use webrender::sw_compositor::SwCompositor;
 use webrender::{
     api::units::*, api::*, create_webrender_instance, render_api::*, set_profiler_hooks, AsyncPropertySampler,
-    AsyncScreenshotHandle, ClipRadius, Compositor, CompositorCapabilities, CompositorConfig, CompositorInputConfig,
-    CompositorKind, CompositorSurfaceTransform, CompositorSurfaceUsage, Device, DeviceOptions, FrameBuilderConfig,
-    GlBackendConfig, GpuBackendConfig, LayerCompositor, MappableCompositor, MappedTileInfo, NativeSurfaceHandle,
-    NativeSurfaceId, NativeSurfaceInfo, NativeTileId, PartialPresentCompositor, PendingShadersToPrecache, PipelineInfo,
-    ProfilerHooks, RecordedFrameHandle, RenderBackendHooks, Renderer, RendererStats, SWGLCompositeSurfaceInfo,
-    SceneBuilderHooks, ShaderPrecacheFlags, Shaders, SharedShaders, TextureCacheConfig, UploadMethod, WebRenderOptions,
-    WindowProperties, WindowVisibility, ONE_TIME_USAGE_HINT,
+    AsyncScreenshotHandle, ClipRadius, Compositor, CompositorCapabilities, CompositorConfig, CompositorKind,
+    CompositorSurfaceTransform, Device, DeviceOptions, FrameBuilderConfig, GlBackendConfig, GpuBackendConfig,
+    MappableCompositor, MappedTileInfo, NativeSurfaceHandle, NativeSurfaceId, NativeSurfaceInfo, NativeTileId,
+    PartialPresentCompositor, PendingShadersToPrecache, PipelineInfo, ProfilerHooks, RecordedFrameHandle,
+    RenderBackendHooks, Renderer, RendererStats, SWGLCompositeSurfaceInfo, SceneBuilderHooks, ShaderPrecacheFlags,
+    Shaders, SharedShaders, TextureCacheConfig, UploadMethod, WebRenderOptions, WindowProperties, WindowVisibility,
+    ONE_TIME_USAGE_HINT,
 };
 use wr_malloc_size_of::MallocSizeOfOps;
 
@@ -185,12 +185,17 @@ pub struct DocumentHandle {
 
 impl DocumentHandle {
     pub fn new(
-        api: RenderApi,
+        mut api: RenderApi,
         hit_tester: Option<Arc<dyn ApiHitTester>>,
         size: DeviceIntSize,
         id: u32,
     ) -> DocumentHandle {
         let doc = api.add_document_with_id(size, id);
+        if static_prefs::pref!("gfx.webrender.enforce-embed-policy") {
+            let mut txn = Transaction::new();
+            txn.set_embed_policy_enforcement(true);
+            api.send_transaction(doc, txn);
+        }
         let hit_tester_request = if hit_tester.is_none() {
             // Request the hit tester early to reduce the likelihood of blocking on the
             // first hit testing query.
@@ -1099,6 +1104,15 @@ impl SceneBuilderHooks for APZCallbacks {
     fn deregister(&self) {
         unsafe { apz_deregister_updater(self.window_id) }
     }
+
+    fn embed_policy_violation(&self, _document_id: DocumentId, embedder: PipelineId, child: PipelineId) {
+        let msg = CString::new(format!(
+            "WebRender ignored an iframe of pipeline {:?} in pipeline {:?}",
+            child, embedder
+        ))
+        .unwrap();
+        unsafe { gfx_critical_note(msg.as_ptr()) };
+    }
 }
 
 struct RenderBackendCallbacks;
@@ -1672,324 +1686,42 @@ impl Compositor for WrCompositor {
             visibility
         }
     }
-}
 
-struct NativeLayer {
-    id: NativeSurfaceId,
-    size: DeviceIntSize,
-    is_opaque: bool,
-    frames_since_used: usize,
-    usage: CompositorSurfaceUsage,
-}
-
-pub struct WrLayerCompositor {
-    compositor: *mut c_void,
-    next_layer_id: u64,
-    surface_pool: Vec<NativeLayer>,
-    visual_tree: Vec<NativeLayer>,
-    enable_screenshot: bool,
-    frames_since_using_multiple_layers: Option<u32>,
-}
-
-impl WrLayerCompositor {
-    fn new(compositor: *mut c_void) -> Self {
-        WrLayerCompositor {
-            compositor,
-            next_layer_id: 0,
-            surface_pool: Vec::new(),
-            visual_tree: Vec::new(),
-            enable_screenshot: false,
-            frames_since_using_multiple_layers: None,
-        }
-    }
-
-    fn reuse_same_tree(&mut self, input: &CompositorInputConfig) -> bool {
-        if input.layers.len() != self.visual_tree.len() {
-            return false;
-        }
-
-        for (request, layer) in input.layers.iter().zip(self.visual_tree.iter()) {
-            if layer.is_opaque != request.is_opaque || !layer.usage.matches(&request.usage) {
-                return false;
-            }
-
-            match layer.usage {
-                CompositorSurfaceUsage::Content => {
-                    if layer.size != request.clip_rect.size() {
-                        return false;
-                    }
-                },
-                CompositorSurfaceUsage::External { .. } => {},
-                CompositorSurfaceUsage::DebugOverlay => {},
-            };
-        }
-
-        for (request, layer) in input.layers.iter().zip(self.visual_tree.iter_mut()) {
-            layer.frames_since_used = 0;
-
-            // Copy across (potentially) updated external image id
-            layer.usage = request.usage;
-            match layer.usage {
-                CompositorSurfaceUsage::Content | CompositorSurfaceUsage::DebugOverlay => {},
-                CompositorSurfaceUsage::External { external_image_id, .. } => unsafe {
-                    wr_compositor_attach_external_image(self.compositor, layer.id, external_image_id);
-                },
-            }
-        }
-
-        true
-    }
-
-    fn use_multiple_layers_except_debug_layer(&mut self, input: &CompositorInputConfig) -> bool {
-        let is_debug_layer = |usage: &CompositorSurfaceUsage| -> bool {
-            match usage {
-                CompositorSurfaceUsage::DebugOverlay => true,
-                CompositorSurfaceUsage::Content | CompositorSurfaceUsage::External { .. } => false,
-            }
-        };
-
-        let count = input
-            .layers
-            .iter()
-            .filter(|layer| !is_debug_layer(&layer.usage))
-            .count();
-
-        count > 1
-    }
-}
-
-impl LayerCompositor for WrLayerCompositor {
-    // Begin compositing a frame with the supplied input config
-    fn begin_frame(&mut self, input: &CompositorInputConfig) -> bool {
-        const FRAME_COUNT_BEFORE_DISABLING_SYNC_DCOMP_COMMIT: u32 = 60;
-
-        let mut destroy_all_layers = false;
-        if self.enable_screenshot != input.enable_screenshot {
-            if input.enable_screenshot {
-                // Screenshot should not use multiple layers.
-                assert!(!self.use_multiple_layers_except_debug_layer(input));
-                // Force to disable requesting sync dcomp commit.
-                self.frames_since_using_multiple_layers = None;
-            } else {
-                assert!(self.frames_since_using_multiple_layers.is_none());
-            }
-            self.enable_screenshot = input.enable_screenshot;
-            destroy_all_layers = true;
-        }
-
-        if self.use_multiple_layers_except_debug_layer(input) {
-            assert!(!self.enable_screenshot);
-
-            if self.frames_since_using_multiple_layers.is_none() {
-                destroy_all_layers = true;
-            }
-            // Use of multiple layers requests sync dcomp commit.
-            self.frames_since_using_multiple_layers = Some(0);
-        } else {
-            match self.frames_since_using_multiple_layers {
-                None => {
-                    // Do not request sync dcomp commit.
-                },
-                Some(count) => {
-                    if count < FRAME_COUNT_BEFORE_DISABLING_SYNC_DCOMP_COMMIT {
-                        // Keep to requet sync dcomp commit to avoid frequent layers creation.
-                        self.frames_since_using_multiple_layers = Some(count + 1);
-                    } else {
-                        destroy_all_layers = true;
-                        // Stop to requet sync dcomp commit.
-                        self.frames_since_using_multiple_layers = None;
-                    }
-                },
-            }
-        };
-
-        // Request sync dcomp commit if multiple layers are using/used.
-        let needs_sync_dcomp_commit = self.frames_since_using_multiple_layers.is_some();
-
-        // Discard all layers to recreate them
-        if destroy_all_layers {
-            let mut layers_to_destroy = Vec::new();
-            self.surface_pool.append(&mut self.visual_tree);
-            assert!(self.visual_tree.is_empty());
-            mem::swap(&mut self.surface_pool, &mut layers_to_destroy);
-            for layer in layers_to_destroy {
-                unsafe {
-                    wr_compositor_destroy_surface(self.compositor, layer.id);
-                }
-            }
-        }
-
-        unsafe {
-            wr_compositor_begin_frame(self.compositor);
-        }
-
-        let reuse = self.reuse_same_tree(input);
-        if reuse {
-            // Do not request full render.
-            return false;
-        }
-
-        self.surface_pool.append(&mut self.visual_tree);
-        assert!(self.visual_tree.is_empty());
-
-        for request in input.layers {
-            let size = request.clip_rect.size();
-
-            let existing_index = self
-                .surface_pool
-                .iter()
-                .position(|layer| layer.is_opaque == request.is_opaque && layer.usage.matches(&request.usage));
-
-            let mut layer = match existing_index {
-                Some(existing_index) => {
-                    let mut layer = self.surface_pool.swap_remove(existing_index);
-
-                    layer.frames_since_used = 0;
-
-                    // Copy across (potentially) updated external image id
-                    layer.usage = request.usage;
-
-                    layer
-                },
-                None => {
-                    let id = NativeSurfaceId(self.next_layer_id);
-                    self.next_layer_id += 1;
-
-                    unsafe {
-                        match request.usage {
-                            CompositorSurfaceUsage::Content | CompositorSurfaceUsage::DebugOverlay => {
-                                wr_compositor_create_swapchain_surface(
-                                    self.compositor,
-                                    id,
-                                    size,
-                                    request.is_opaque,
-                                    needs_sync_dcomp_commit,
-                                );
-                            },
-                            CompositorSurfaceUsage::External { .. } => {
-                                wr_compositor_create_external_surface(self.compositor, id, request.is_opaque);
-                            },
-                        }
-                    }
-
-                    NativeLayer {
-                        id,
-                        size,
-                        is_opaque: request.is_opaque,
-                        frames_since_used: 0,
-                        usage: request.usage,
-                    }
-                },
-            };
-
-            match layer.usage {
-                CompositorSurfaceUsage::Content | CompositorSurfaceUsage::DebugOverlay => {
-                    if layer.size.width != size.width || layer.size.height != size.height {
-                        unsafe {
-                            wr_compositor_resize_swapchain(self.compositor, layer.id, size);
-                        }
-                        layer.size = size;
-                    }
-                },
-                CompositorSurfaceUsage::External { external_image_id, .. } => unsafe {
-                    wr_compositor_attach_external_image(self.compositor, layer.id, external_image_id);
-                },
-            }
-
-            self.visual_tree.push(layer);
-        }
-
-        for layer in &mut self.surface_pool {
-            layer.frames_since_used += 1;
-        }
-
-        // Request full render.
-        true
-    }
-
-    // Bind a layer by index for compositing into
-    fn bind_layer(&mut self, index: usize, dirty_rects: &[DeviceIntRect]) {
-        let layer = &self.visual_tree[index];
-
-        unsafe {
-            wr_compositor_bind_swapchain(self.compositor, layer.id, dirty_rects.as_ptr(), dirty_rects.len());
-        }
-    }
-
-    // Finish compositing a layer and present the swapchain
-    fn present_layer(&mut self, index: usize, dirty_rects: &[DeviceIntRect]) {
-        let layer = &self.visual_tree[index];
-
-        unsafe {
-            wr_compositor_present_swapchain(self.compositor, layer.id, dirty_rects.as_ptr(), dirty_rects.len());
-        }
-    }
-
-    fn add_surface(
+    fn create_swapchain_surface(
         &mut self,
-        index: usize,
-        transform: CompositorSurfaceTransform,
-        clip_rect: DeviceIntRect,
-        image_rendering: ImageRendering,
-        rounded_clip_rect: DeviceIntRect,
-        rounded_clip_radii: ClipRadius,
+        id: NativeSurfaceId,
+        size: DeviceIntSize,
+        is_opaque: bool,
+        needs_sync_commit: bool,
     ) {
-        let layer = &self.visual_tree[index];
-
         unsafe {
-            wr_compositor_add_surface(
-                self.compositor,
-                layer.id,
-                &transform,
-                clip_rect,
-                image_rendering,
-                rounded_clip_rect,
-                rounded_clip_radii,
-            );
+            wr_compositor_create_swapchain_surface(self.0, id, size, is_opaque, needs_sync_commit);
         }
     }
 
-    // Finish compositing this frame
-    fn end_frame(&mut self) {
+    fn resize_swapchain(&mut self, id: NativeSurfaceId, size: DeviceIntSize) {
         unsafe {
-            wr_compositor_end_frame(self.compositor);
+            wr_compositor_resize_swapchain(self.0, id, size);
         }
+    }
 
-        // Destroy any unused surface pool entries
-        let mut layers_to_destroy = Vec::new();
+    fn bind_swapchain(&mut self, id: NativeSurfaceId, dirty_rects: &[DeviceIntRect]) {
+        unsafe {
+            wr_compositor_bind_swapchain(self.0, id, dirty_rects.as_ptr(), dirty_rects.len());
+        }
+    }
 
-        self.surface_pool.retain(|layer| {
-            let keep = layer.frames_since_used < 3;
-
-            if !keep {
-                layers_to_destroy.push(layer.id);
-            }
-
-            keep
-        });
-
-        for layer_id in layers_to_destroy {
-            unsafe {
-                wr_compositor_destroy_surface(self.compositor, layer_id);
-            }
+    fn present_swapchain(&mut self, id: NativeSurfaceId, dirty_rects: &[DeviceIntRect]) {
+        unsafe {
+            wr_compositor_present_swapchain(self.0, id, dirty_rects.as_ptr(), dirty_rects.len());
         }
     }
 
     fn get_window_properties(&self) -> WindowProperties {
         unsafe {
             let mut props: WindowProperties = Default::default();
-            wr_compositor_get_window_properties(self.compositor, &mut props);
+            wr_compositor_get_window_properties(self.0, &mut props);
             props
-        }
-    }
-}
-
-impl Drop for WrLayerCompositor {
-    fn drop(&mut self) {
-        for layer in self.surface_pool.iter().chain(self.visual_tree.iter()) {
-            unsafe {
-                wr_compositor_destroy_surface(self.compositor, layer.id);
-            }
         }
     }
 }
@@ -2218,7 +1950,7 @@ pub extern "C" fn wr_window_new(
         }
     } else if use_layer_compositor {
         CompositorConfig::Layer {
-            compositor: Box::new(WrLayerCompositor::new(compositor)),
+            compositor: Box::new(WrCompositor(compositor)),
         }
     } else if use_native_compositor {
         CompositorConfig::Native {
@@ -2534,6 +2266,22 @@ pub extern "C" fn wr_transaction_set_root_pipeline(txn: &mut Transaction, pipeli
 #[no_mangle]
 pub extern "C" fn wr_transaction_remove_pipeline(txn: &mut Transaction, pipeline_id: WrPipelineId) {
     txn.remove_pipeline(pipeline_id);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn wr_transaction_set_embed_policy(
+    txn: &mut Transaction,
+    pipeline_id: WrPipelineId,
+    restricted: bool,
+    namespaces: *const u32,
+    namespace_count: usize,
+) {
+    let policy = if restricted {
+        webrender::api::EmbedPolicy::Restricted(make_slice(namespaces, namespace_count).to_vec())
+    } else {
+        webrender::api::EmbedPolicy::Unrestricted
+    };
+    txn.set_embed_policy(pipeline_id, policy);
 }
 
 #[no_mangle]
@@ -2872,6 +2620,15 @@ pub extern "C" fn wr_resource_updates_add_snapshot_image(txn: &mut Transaction, 
 #[no_mangle]
 pub extern "C" fn wr_resource_updates_delete_snapshot_image(txn: &mut Transaction, key: SnapshotImageKey) {
     txn.delete_snapshot_image(key);
+}
+
+#[no_mangle]
+pub extern "C" fn wr_resource_updates_adopt_snapshot_image(
+    txn: &mut Transaction,
+    from: SnapshotImageKey,
+    to: SnapshotImageKey,
+) {
+    txn.adopt_snapshot_image(from, to);
 }
 
 #[no_mangle]
@@ -3463,11 +3220,38 @@ pub extern "C" fn wr_dp_define_rect_clip(
     WrClipId::from_webrender(clip_id)
 }
 
+/// Define a clip to the inside of a path. The commands and points are in the
+/// layout of a `Path`, and the points are relative to `rect`'s origin. `aabb`
+/// contains every point, and `rect` also clips the path's content.
 #[no_mangle]
-pub extern "C" fn wr_dp_get_accumulated_scroll_offset(
+pub extern "C" fn wr_dp_define_path_clip(
     state: &mut WrState,
     space: WrSpatialId,
-) -> LayoutVector2D {
+    commands: *const PathCommand,
+    command_count: usize,
+    points: *const LayoutPoint,
+    point_count: usize,
+    aabb: LayoutRect,
+    rect: LayoutRect,
+    fill_rule: FillRule,
+) -> WrClipId {
+    debug_assert!(unsafe { is_in_main_thread() });
+
+    let commands = unsafe { make_slice(commands, command_count) };
+    let points = unsafe { make_slice(points, point_count) };
+    let space = space.to_webrender(state.pipeline_id);
+
+    let clip_id = state.frame_builder.dl_builder.define_clip_path(
+        space,
+        &Path::from_slices(commands, points, aabb),
+        rect,
+        fill_rule,
+    );
+    WrClipId::from_webrender(clip_id)
+}
+
+#[no_mangle]
+pub extern "C" fn wr_dp_get_accumulated_scroll_offset(state: &mut WrState, space: WrSpatialId) -> LayoutVector2D {
     debug_assert!(unsafe { is_in_main_thread() });
 
     let space = space.to_webrender(state.pipeline_id);
@@ -4737,6 +4521,7 @@ extern "C" {
     // TODO: figure out the API for tiled blob images.
     pub fn wr_moz2d_render_cb(
         blob: ByteSlice,
+        id_namespace: WrIdNamespace,
         format: ImageFormat,
         render_rect: &LayoutIntRect,
         visible_rect: &DeviceIntRect,

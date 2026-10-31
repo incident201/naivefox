@@ -1244,6 +1244,336 @@ export class FfiConverterTypeCreditCard extends FfiConverterArrayBuffer {
         }
     }
 }
+
+
+/**
+ * A credit card stored in the database, minus the encrypted fields.
+ * 
+ * Reading these never needs the encryption key, so consumers listing cards by name,
+ * last four digits and expiry can do so without forcing the user to authenticate.
+ * See `list_credit_card_candidates()`.
+ */
+export class CreditCardCandidate {
+    constructor(
+        {
+            guid, 
+            ccName, 
+            ccNumberLast4, 
+            hasCvv, 
+            ccExpMonth, 
+            ccExpYear, 
+            ccType, 
+            timeCreated, 
+            timeLastUsed, 
+            timeLastModified, 
+            timesUsed
+        } = {
+            guid: undefined, 
+            ccName: undefined, 
+            ccNumberLast4: undefined, 
+            hasCvv: undefined, 
+            ccExpMonth: undefined, 
+            ccExpYear: undefined, 
+            ccType: undefined, 
+            timeCreated: undefined, 
+            timeLastUsed: undefined, 
+            timeLastModified: undefined, 
+            timesUsed: undefined
+        }
+    ) {
+        try {
+            FfiConverterString.checkType(guid)
+        } catch (e) {
+            if (e instanceof UniFFITypeError) {
+                e.addItemDescriptionPart("guid");
+            }
+            throw e;
+        }
+        try {
+            FfiConverterString.checkType(ccName)
+        } catch (e) {
+            if (e instanceof UniFFITypeError) {
+                e.addItemDescriptionPart("ccName");
+            }
+            throw e;
+        }
+        try {
+            FfiConverterString.checkType(ccNumberLast4)
+        } catch (e) {
+            if (e instanceof UniFFITypeError) {
+                e.addItemDescriptionPart("ccNumberLast4");
+            }
+            throw e;
+        }
+        try {
+            FfiConverterBoolean.checkType(hasCvv)
+        } catch (e) {
+            if (e instanceof UniFFITypeError) {
+                e.addItemDescriptionPart("hasCvv");
+            }
+            throw e;
+        }
+        try {
+            FfiConverterInt64.checkType(ccExpMonth)
+        } catch (e) {
+            if (e instanceof UniFFITypeError) {
+                e.addItemDescriptionPart("ccExpMonth");
+            }
+            throw e;
+        }
+        try {
+            FfiConverterInt64.checkType(ccExpYear)
+        } catch (e) {
+            if (e instanceof UniFFITypeError) {
+                e.addItemDescriptionPart("ccExpYear");
+            }
+            throw e;
+        }
+        try {
+            FfiConverterString.checkType(ccType)
+        } catch (e) {
+            if (e instanceof UniFFITypeError) {
+                e.addItemDescriptionPart("ccType");
+            }
+            throw e;
+        }
+        try {
+            FfiConverterInt64.checkType(timeCreated)
+        } catch (e) {
+            if (e instanceof UniFFITypeError) {
+                e.addItemDescriptionPart("timeCreated");
+            }
+            throw e;
+        }
+        try {
+            FfiConverterOptionalInt64.checkType(timeLastUsed)
+        } catch (e) {
+            if (e instanceof UniFFITypeError) {
+                e.addItemDescriptionPart("timeLastUsed");
+            }
+            throw e;
+        }
+        try {
+            FfiConverterInt64.checkType(timeLastModified)
+        } catch (e) {
+            if (e instanceof UniFFITypeError) {
+                e.addItemDescriptionPart("timeLastModified");
+            }
+            throw e;
+        }
+        try {
+            FfiConverterInt64.checkType(timesUsed)
+        } catch (e) {
+            if (e instanceof UniFFITypeError) {
+                e.addItemDescriptionPart("timesUsed");
+            }
+            throw e;
+        }
+        /**
+         * @type {string}
+         */
+        this.guid = guid;
+        /**
+         * @type {string}
+         */
+        this.ccName = ccName;
+        /**
+         * @type {string}
+         */
+        this.ccNumberLast4 = ccNumberLast4;
+        /**
+         * @type {boolean}
+         */
+        this.hasCvv = hasCvv;
+        /**
+         * @type {number}
+         */
+        this.ccExpMonth = ccExpMonth;
+        /**
+         * @type {number}
+         */
+        this.ccExpYear = ccExpYear;
+        /**
+         * @type {string}
+         */
+        this.ccType = ccType;
+        /**
+         * @type {number}
+         */
+        this.timeCreated = timeCreated;
+        /**
+         * @type {?number}
+         */
+        this.timeLastUsed = timeLastUsed;
+        /**
+         * @type {number}
+         */
+        this.timeLastModified = timeLastModified;
+        /**
+         * @type {number}
+         */
+        this.timesUsed = timesUsed;
+    }
+
+    equals(other) {
+        return (
+            this.guid == other.guid
+            && this.ccName == other.ccName
+            && this.ccNumberLast4 == other.ccNumberLast4
+            && this.hasCvv == other.hasCvv
+            && this.ccExpMonth == other.ccExpMonth
+            && this.ccExpYear == other.ccExpYear
+            && this.ccType == other.ccType
+            && this.timeCreated == other.timeCreated
+            && this.timeLastUsed == other.timeLastUsed
+            && this.timeLastModified == other.timeLastModified
+            && this.timesUsed == other.timesUsed
+        )
+    }
+}
+
+// Export the FFIConverter object to make external types work.
+export class FfiConverterTypeCreditCardCandidate extends FfiConverterArrayBuffer {
+    static read(dataStream) {
+        return new CreditCardCandidate({
+            guid: FfiConverterString.read(dataStream),
+            ccName: FfiConverterString.read(dataStream),
+            ccNumberLast4: FfiConverterString.read(dataStream),
+            hasCvv: FfiConverterBoolean.read(dataStream),
+            ccExpMonth: FfiConverterInt64.read(dataStream),
+            ccExpYear: FfiConverterInt64.read(dataStream),
+            ccType: FfiConverterString.read(dataStream),
+            timeCreated: FfiConverterInt64.read(dataStream),
+            timeLastUsed: FfiConverterOptionalInt64.read(dataStream),
+            timeLastModified: FfiConverterInt64.read(dataStream),
+            timesUsed: FfiConverterInt64.read(dataStream),
+        });
+    }
+    static write(dataStream, value) {
+        FfiConverterString.write(dataStream, value.guid);
+        FfiConverterString.write(dataStream, value.ccName);
+        FfiConverterString.write(dataStream, value.ccNumberLast4);
+        FfiConverterBoolean.write(dataStream, value.hasCvv);
+        FfiConverterInt64.write(dataStream, value.ccExpMonth);
+        FfiConverterInt64.write(dataStream, value.ccExpYear);
+        FfiConverterString.write(dataStream, value.ccType);
+        FfiConverterInt64.write(dataStream, value.timeCreated);
+        FfiConverterOptionalInt64.write(dataStream, value.timeLastUsed);
+        FfiConverterInt64.write(dataStream, value.timeLastModified);
+        FfiConverterInt64.write(dataStream, value.timesUsed);
+    }
+
+    static computeSize(value) {
+        let totalSize = 0;
+        totalSize += FfiConverterString.computeSize(value.guid);
+        totalSize += FfiConverterString.computeSize(value.ccName);
+        totalSize += FfiConverterString.computeSize(value.ccNumberLast4);
+        totalSize += FfiConverterBoolean.computeSize(value.hasCvv);
+        totalSize += FfiConverterInt64.computeSize(value.ccExpMonth);
+        totalSize += FfiConverterInt64.computeSize(value.ccExpYear);
+        totalSize += FfiConverterString.computeSize(value.ccType);
+        totalSize += FfiConverterInt64.computeSize(value.timeCreated);
+        totalSize += FfiConverterOptionalInt64.computeSize(value.timeLastUsed);
+        totalSize += FfiConverterInt64.computeSize(value.timeLastModified);
+        totalSize += FfiConverterInt64.computeSize(value.timesUsed);
+        return totalSize
+    }
+
+    static checkType(value) {
+        super.checkType(value);
+        if (!(value instanceof CreditCardCandidate)) {
+            throw new UniFFITypeError(`Expected 'CreditCardCandidate', found '${typeof value}'`);
+        }
+        try {
+            FfiConverterString.checkType(value.guid);
+        } catch (e) {
+            if (e instanceof UniFFITypeError) {
+                e.addItemDescriptionPart(".guid");
+            }
+            throw e;
+        }
+        try {
+            FfiConverterString.checkType(value.ccName);
+        } catch (e) {
+            if (e instanceof UniFFITypeError) {
+                e.addItemDescriptionPart(".ccName");
+            }
+            throw e;
+        }
+        try {
+            FfiConverterString.checkType(value.ccNumberLast4);
+        } catch (e) {
+            if (e instanceof UniFFITypeError) {
+                e.addItemDescriptionPart(".ccNumberLast4");
+            }
+            throw e;
+        }
+        try {
+            FfiConverterBoolean.checkType(value.hasCvv);
+        } catch (e) {
+            if (e instanceof UniFFITypeError) {
+                e.addItemDescriptionPart(".hasCvv");
+            }
+            throw e;
+        }
+        try {
+            FfiConverterInt64.checkType(value.ccExpMonth);
+        } catch (e) {
+            if (e instanceof UniFFITypeError) {
+                e.addItemDescriptionPart(".ccExpMonth");
+            }
+            throw e;
+        }
+        try {
+            FfiConverterInt64.checkType(value.ccExpYear);
+        } catch (e) {
+            if (e instanceof UniFFITypeError) {
+                e.addItemDescriptionPart(".ccExpYear");
+            }
+            throw e;
+        }
+        try {
+            FfiConverterString.checkType(value.ccType);
+        } catch (e) {
+            if (e instanceof UniFFITypeError) {
+                e.addItemDescriptionPart(".ccType");
+            }
+            throw e;
+        }
+        try {
+            FfiConverterInt64.checkType(value.timeCreated);
+        } catch (e) {
+            if (e instanceof UniFFITypeError) {
+                e.addItemDescriptionPart(".timeCreated");
+            }
+            throw e;
+        }
+        try {
+            FfiConverterOptionalInt64.checkType(value.timeLastUsed);
+        } catch (e) {
+            if (e instanceof UniFFITypeError) {
+                e.addItemDescriptionPart(".timeLastUsed");
+            }
+            throw e;
+        }
+        try {
+            FfiConverterInt64.checkType(value.timeLastModified);
+        } catch (e) {
+            if (e instanceof UniFFITypeError) {
+                e.addItemDescriptionPart(".timeLastModified");
+            }
+            throw e;
+        }
+        try {
+            FfiConverterInt64.checkType(value.timesUsed);
+        } catch (e) {
+            if (e instanceof UniFFITypeError) {
+                e.addItemDescriptionPart(".timesUsed");
+            }
+            throw e;
+        }
+    }
+}
 /**
  * Metadata fields managed internally by the library: the guid, timestamps and
  * local sync state. These are automatically set on `add_credit_card` and
@@ -2393,6 +2723,8 @@ export class FfiConverterTypeUpdatableAddressFieldsWithMeta extends FfiConverter
 /**
  * What you pass to create or update a credit-card. The number is given in
  * cleartext; the store encrypts it and derives the last-4 digits itself.
+ * On update, a null `cc_cvv` keeps the stored CVV and an empty one clears
+ * it.
  */
 export class UpdatableCreditCardFields {
     constructor(
@@ -4582,8 +4914,6 @@ export class FfiConverterSequenceTypeCreditCardBulkResultEntry extends FfiConver
         })
     }
 }
-
-
 // Export the FFIConverter object to make external types work.
 export class FfiConverterSequenceTypeAddress extends FfiConverterArrayBuffer {
     static read(dataStream) {
@@ -4704,6 +5034,49 @@ export class FfiConverterSequenceTypePassport extends FfiConverterArrayBuffer {
         value.forEach((innerValue, idx) => {
             try {
                 FfiConverterTypePassport.checkType(innerValue);
+            } catch (e) {
+                if (e instanceof UniFFITypeError) {
+                    e.addItemDescriptionPart(`[${idx}]`);
+                }
+                throw e;
+            }
+        })
+    }
+}
+// Export the FFIConverter object to make external types work.
+export class FfiConverterSequenceTypeCreditCardCandidate extends FfiConverterArrayBuffer {
+    static read(dataStream) {
+        const len = dataStream.readInt32();
+        const arr = [];
+        for (let i = 0; i < len; i++) {
+            arr.push(FfiConverterTypeCreditCardCandidate.read(dataStream));
+        }
+        return arr;
+    }
+
+    static write(dataStream, value) {
+        dataStream.writeInt32(value.length);
+        value.forEach((innerValue) => {
+            FfiConverterTypeCreditCardCandidate.write(dataStream, innerValue);
+        })
+    }
+
+    static computeSize(value) {
+        // The size of the length
+        let size = 4;
+        for (const innerValue of value) {
+            size += FfiConverterTypeCreditCardCandidate.computeSize(innerValue);
+        }
+        return size;
+    }
+
+    static checkType(value) {
+        if (!Array.isArray(value)) {
+            throw new UniFFITypeError(`${value} is not an array`);
+        }
+        value.forEach((innerValue, idx) => {
+            try {
+                FfiConverterTypeCreditCardCandidate.checkType(innerValue);
             } catch (e) {
                 if (e instanceof UniFFITypeError) {
                     e.addItemDescriptionPart(`[${idx}]`);
@@ -4934,6 +5307,16 @@ export class StoreInterface {
     async getPassport(
         guid) {
       throw Error("getPassport not implemented");
+    }
+    /**
+     * Every stored credit card without its encrypted fields. Unlike
+     * `get_all_credit_cards` this never touches the key, so listing cannot
+     * prompt for a primary password; read the one card that needs its
+     * secrets with `get_credit_card`.
+     * @returns {Promise<Array.<CreditCardCandidate>>}}
+     */
+    async listCreditCardCandidates() {
+      throw Error("listCreditCardCandidates not implemented");
     }
     /**
      * registerWithSyncManager
@@ -5586,12 +5969,32 @@ export class Store extends StoreInterface {
     }
 
     /**
+     * Every stored credit card without its encrypted fields. Unlike
+     * `get_all_credit_cards` this never touches the key, so listing cannot
+     * prompt for a primary password; read the one card that needs its
+     * secrets with `get_credit_card`.
+     * @returns {Promise<Array.<CreditCardCandidate>>}}
+     */
+    async listCreditCardCandidates() {
+       
+        const result = await UniFFIScaffolding.callAsyncWrapper(
+            100, // uniffi_autofill_fn_method_store_list_credit_card_candidates
+            FfiConverterTypeStore.lowerReceiver(this),
+        )
+        return handleRustResult(
+            result,
+            FfiConverterSequenceTypeCreditCardCandidate.lift.bind(FfiConverterSequenceTypeCreditCardCandidate),
+            FfiConverterTypeAutofillApiError.lift.bind(FfiConverterTypeAutofillApiError),
+        )
+    }
+
+    /**
      * registerWithSyncManager
      */
     async registerWithSyncManager() {
        
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            100, // uniffi_autofill_fn_method_store_register_with_sync_manager
+            101, // uniffi_autofill_fn_method_store_register_with_sync_manager
             FfiConverterTypeStore.lowerReceiver(this),
         )
         return handleRustResult(
@@ -5610,7 +6013,7 @@ export class Store extends StoreInterface {
     async runMaintenance() {
        
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            101, // uniffi_autofill_fn_method_store_run_maintenance
+            102, // uniffi_autofill_fn_method_store_run_maintenance
             FfiConverterTypeStore.lowerReceiver(this),
         )
         return handleRustResult(
@@ -5626,7 +6029,7 @@ export class Store extends StoreInterface {
     async scrubEncryptedData() {
        
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            102, // uniffi_autofill_fn_method_store_scrub_encrypted_data
+            103, // uniffi_autofill_fn_method_store_scrub_encrypted_data
             FfiConverterTypeStore.lowerReceiver(this),
         )
         return handleRustResult(
@@ -5648,7 +6051,7 @@ export class Store extends StoreInterface {
     async scrubUndecryptableCreditCardDataForRemoteReplacement() {
        
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            103, // uniffi_autofill_fn_method_store_scrub_undecryptable_credit_card_data_for_remote_replacement
+            104, // uniffi_autofill_fn_method_store_scrub_undecryptable_credit_card_data_for_remote_replacement
             FfiConverterTypeStore.lowerReceiver(this),
         )
         return handleRustResult(
@@ -5664,7 +6067,7 @@ export class Store extends StoreInterface {
     async shutdown() {
        
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            104, // uniffi_autofill_fn_method_store_shutdown
+            105, // uniffi_autofill_fn_method_store_shutdown
             FfiConverterTypeStore.lowerReceiver(this),
         )
         return handleRustResult(
@@ -5683,7 +6086,7 @@ export class Store extends StoreInterface {
        
         FfiConverterString.checkType(guid);
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            105, // uniffi_autofill_fn_method_store_touch_address
+            106, // uniffi_autofill_fn_method_store_touch_address
             FfiConverterTypeStore.lowerReceiver(this),
             FfiConverterString.lower(guid),
         )
@@ -5703,7 +6106,7 @@ export class Store extends StoreInterface {
        
         FfiConverterString.checkType(guid);
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            106, // uniffi_autofill_fn_method_store_touch_credit_card
+            107, // uniffi_autofill_fn_method_store_touch_credit_card
             FfiConverterTypeStore.lowerReceiver(this),
             FfiConverterString.lower(guid),
         )
@@ -5723,7 +6126,7 @@ export class Store extends StoreInterface {
        
         FfiConverterString.checkType(guid);
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            107, // uniffi_autofill_fn_method_store_touch_passport
+            108, // uniffi_autofill_fn_method_store_touch_passport
             FfiConverterTypeStore.lowerReceiver(this),
             FfiConverterString.lower(guid),
         )
@@ -5746,7 +6149,7 @@ export class Store extends StoreInterface {
         FfiConverterString.checkType(guid);
         FfiConverterTypeUpdatableAddressFields.checkType(a);
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            108, // uniffi_autofill_fn_method_store_update_address
+            109, // uniffi_autofill_fn_method_store_update_address
             FfiConverterTypeStore.lowerReceiver(this),
             FfiConverterString.lower(guid),
             FfiConverterTypeUpdatableAddressFields.lower(a),
@@ -5767,7 +6170,7 @@ export class Store extends StoreInterface {
        
         FfiConverterTypeUpdatableAddressFieldsWithMeta.checkType(entryWithMeta);
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            109, // uniffi_autofill_fn_method_store_update_address_with_meta
+            110, // uniffi_autofill_fn_method_store_update_address_with_meta
             FfiConverterTypeStore.lowerReceiver(this),
             FfiConverterTypeUpdatableAddressFieldsWithMeta.lower(entryWithMeta),
         )
@@ -5790,7 +6193,7 @@ export class Store extends StoreInterface {
         FfiConverterString.checkType(guid);
         FfiConverterTypeUpdatableCreditCardFields.checkType(cc);
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            110, // uniffi_autofill_fn_method_store_update_credit_card
+            111, // uniffi_autofill_fn_method_store_update_credit_card
             FfiConverterTypeStore.lowerReceiver(this),
             FfiConverterString.lower(guid),
             FfiConverterTypeUpdatableCreditCardFields.lower(cc),
@@ -5811,7 +6214,7 @@ export class Store extends StoreInterface {
        
         FfiConverterTypeUpdatableCreditCardFieldsWithMeta.checkType(entryWithMeta);
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            111, // uniffi_autofill_fn_method_store_update_credit_card_with_meta
+            112, // uniffi_autofill_fn_method_store_update_credit_card_with_meta
             FfiConverterTypeStore.lowerReceiver(this),
             FfiConverterTypeUpdatableCreditCardFieldsWithMeta.lower(entryWithMeta),
         )
@@ -5834,7 +6237,7 @@ export class Store extends StoreInterface {
         FfiConverterString.checkType(guid);
         FfiConverterTypeUpdatablePassportFields.checkType(p);
         const result = await UniFFIScaffolding.callAsyncWrapper(
-            112, // uniffi_autofill_fn_method_store_update_passport
+            113, // uniffi_autofill_fn_method_store_update_passport
             FfiConverterTypeStore.lowerReceiver(this),
             FfiConverterString.lower(guid),
             FfiConverterTypeUpdatablePassportFields.lower(p),

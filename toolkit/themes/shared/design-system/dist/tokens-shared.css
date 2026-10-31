@@ -148,10 +148,10 @@
     --button-text-color-destructive-active: var(--button-text-color-destructive);
     --button-text-color-destructive-disabled: var(--button-text-color-destructive);
     --button-text-color-destructive-selected: var(--button-text-color-destructive-active);
-    --button-text-color-ghost: inherit;
-    --button-text-color-ghost-hover: inherit;
-    --button-text-color-ghost-active: inherit;
-    --button-text-color-ghost-disabled: inherit;
+    --button-text-color-ghost: currentColor;
+    --button-text-color-ghost-hover: currentColor;
+    --button-text-color-ghost-active: currentColor;
+    --button-text-color-ghost-disabled: currentColor;
     --button-text-color-ghost-selected: var(--button-text-color-ghost-active);
     --button-text-color-menu: var(--button-text-color-ghost);
     --button-text-color-menu-hover: var(--button-text-color-ghost-hover);
@@ -432,6 +432,10 @@
     /* Not using --force-outline-offset for links because that's intended for elements with a background, and we only want a slight offset here while not overlapping adjacent text */
     --link-focus-outline-offset: 1px;
 
+    /** motion **/
+    --motion-easing-emphasized: cubic-bezier(0.2, 0, 0, 1);
+    --motion-easing-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+
     /** opacity **/
     --opacity-deemphasized: 0.8;
     --opacity-deemphasized-strong: 0.6;
@@ -451,6 +455,12 @@
     --panel-menuitem-padding: var(--panel-menuitem-padding-block) var(--panel-menuitem-padding-inline);
     --panel-menuitem-padding-block: 8px;
     --panel-menuitem-padding-inline: 8px;
+    --panel-motion-duration-enter: 150ms;
+    --panel-motion-duration-exit: 120ms;
+    --panel-motion-duration-fade: 120ms;
+    --panel-motion-easing: var(--motion-easing-emphasized);
+    --panel-motion-scale: 0.96;
+    --panel-motion-translate-y: -4px;
     --panel-padding: 16px;
     --panel-padding-block: 4px;
     --panel-separator-color: color-mix(in srgb, currentColor 25%, transparent);
@@ -536,9 +546,10 @@
     --toolbarbutton-badge-padding-inline: 2px;
     --toolbarbutton-badge-size: 14px;
     --toolbarbutton-border-radius: var(--button-border-radius);
-    --toolbarbutton-icon-fill: light-dark(var(--color-gray-70), var(--color-gray-0));
+    --toolbarbutton-icon-fill: light-dark(color-mix(in srgb, currentColor 69%, transparent), currentColor);
     --toolbarbutton-icon-fill-hover: var(--toolbarbutton-icon-fill);
     --toolbarbutton-icon-fill-active: var(--toolbarbutton-icon-fill);
+    --toolbarbutton-icon-fill-disabled: var(--toolbarbutton-icon-fill);
     --toolbarbutton-icon-fill-attention: light-dark(var(--color-blue-60), var(--color-cyan-30));
     --toolbarbutton-icon-fill-attention-text: light-dark(var(--color-gray-20), var(--color-gray-90));
     --toolbarbutton-opacity-disabled: var(--button-opacity-disabled);
@@ -546,6 +557,7 @@
     --toolbarbutton-outline-color: transparent;
     --toolbarbutton-outline-color-hover: transparent;
     --toolbarbutton-outline-color-active: transparent;
+    --toolbarbutton-outline-color-disabled: var(--toolbarbutton-outline-color);
     --toolbarbutton-outline-color-selected: var(--toolbarbutton-outline-color-active);
     --toolbarbutton-outline-offset: calc(-1 * var(--border-width));
     --toolbarbutton-padding-inner: 8px;
@@ -593,6 +605,8 @@
       --button-text-color-ghost: var(--button-text-color);
       --button-text-color-ghost-hover: var(--button-text-color-hover);
       --button-text-color-ghost-active: var(--button-text-color-active);
+      --button-text-color-ghost-disabled: currentColor;
+      --button-text-color-menu: currentColor;
 
       /** card **/
       --card-border-color: color-mix(in srgb, currentColor 41%, transparent);
@@ -689,9 +703,11 @@
       --button-text-color-ghost: var(--button-text-color);
       --button-text-color-ghost-hover: var(--button-text-color-hover);
       --button-text-color-ghost-active: var(--button-text-color-active);
+      --button-text-color-ghost-disabled: var(--button-text-color-disabled);
       --button-text-color-menu: MenuText;
       --button-text-color-menu-hover: -moz-menuhovertext;
       --button-text-color-menu-active: var(--button-text-color-menu-hover);
+      --button-text-color-menu-disabled: var(--button-text-color-disabled);
       --button-text-color-menu-selected: var(--button-text-color-primary-selected);
       --button-text-color-primary: ButtonFace;
       --button-text-color-primary-hover: SelectedItemText;
@@ -749,9 +765,12 @@
       --toolbarbutton-icon-fill: var(--button-text-color);
       --toolbarbutton-icon-fill-hover: var(--button-text-color-ghost-hover);
       --toolbarbutton-icon-fill-active: var(--button-text-color-ghost-active);
+      --toolbarbutton-icon-fill-disabled: var(--button-text-color-disabled);
+      --toolbarbutton-opacity-disabled: var(--button-opacity-disabled);
       --toolbarbutton-outline-color: ButtonText;
       --toolbarbutton-outline-color-hover: SelectedItem;
       --toolbarbutton-outline-color-active: ButtonText;
+      --toolbarbutton-outline-color-disabled: var(--button-border-color-disabled);
       --toolbarbutton-outline-color-selected: SelectedItem;
     }
   }
@@ -829,10 +848,11 @@
       --button-text-color-ghost-hover: var(--button-text-color-ghost);
       --button-text-color-ghost-active: var(--button-text-color-ghost);
       --button-text-color-ghost-selected: var(--button-text-color-ghost-active);
-      --button-text-color-menu-hover: light-dark(var(--button-text-color-ghost-hover), var(--button-text-color-hover));
-      --button-text-color-menu-active: light-dark(var(--button-text-color-ghost-active), var(--button-text-color-active));
-      --button-text-color-menu-disabled: light-dark(var(--button-text-color-ghost-disabled), var(--button-text-color-disabled));
-      --button-text-color-menu-selected: light-dark(var(--button-text-color-ghost-selected), var(--button-text-color-selected));
+      --button-text-color-menu: var(--button-text-color-ghost);
+      --button-text-color-menu-hover: var(--button-text-color-ghost-hover);
+      --button-text-color-menu-active: var(--button-text-color-ghost-active);
+      --button-text-color-menu-disabled: var(--button-text-color-ghost-disabled);
+      --button-text-color-menu-selected: var(--button-text-color-ghost-selected);
       --button-text-color-muted: var(--button-text-color);
       --button-text-color-muted-hover: var(--button-text-color-muted);
       --button-text-color-muted-active: var(--button-text-color-muted);
@@ -1019,8 +1039,8 @@
 
       /** toolbar **/
       --toolbar-background-color: light-dark(rgba(255, 255, 255, 0.4), rgba(0, 0, 0, 0.2));
-      --toolbar-field-background-color: var(--toolbar-background-color);
       --toolbar-field-background-color-focus: var(--background-color-box);
+      --toolbar-field-background-color: light-dark(var(--color-white-alpha-40), var(--color-black-alpha-20));
       --toolbar-field-border-color: light-dark(var(--color-gray-20), var(--color-gray-60));
       --toolbar-field-border-color-focus: var(--focus-outline-color);
       --toolbar-field-text-color: light-dark(var(--color-violet-desaturated-70), var(--color-violet-desaturated-10));
@@ -1034,6 +1054,7 @@
       --toolbarbutton-icon-fill-attention: var(--color-accent-primary);
       --toolbarbutton-opacity-disabled: 0.4;
       --toolbarbutton-outline-color: transparent;
+      --toolbarbutton-outline-color-disabled: transparent;
       --toolbarbutton-outline-color-selected: var(--toolbarbutton-outline-color-active);
       --toolbarbutton-outline-offset: -1px;
 
@@ -1063,6 +1084,7 @@
         --text-color-error: inherit;
 
         /** toolbar **/
+        --toolbar-field-background-color: Field;
         --toolbar-field-border-color-focus: var(--focus-outline-color);
       }
     }
@@ -1117,7 +1139,9 @@
         --button-text-color-destructive-selected: var(--button-text-color-destructive-active);
         --button-text-color-ghost-hover: var(--button-text-color-ghost-active);
         --button-text-color-ghost-selected: var(--button-text-color-selected);
+        --button-text-color-menu: MenuText;
         --button-text-color-menu-hover: -moz-menuhovertext;
+        --button-text-color-menu-active: var(--button-text-color-menu-hover);
         --button-text-color-menu-disabled: var(--button-text-color-disabled);
         --button-text-color-menu-selected: var(--button-text-color-primary-selected);
         --button-text-color-muted: ButtonText;
@@ -1157,6 +1181,7 @@
         --toolbarbutton-outline-color: var(--button-border-color);
         --toolbarbutton-outline-color-hover: var(--button-border-color-hover);
         --toolbarbutton-outline-color-active: var(--button-border-color-active);
+        --toolbarbutton-outline-color-disabled: var(--button-border-color-disabled);
 
         /** toolbox **/
         /* This gradient is only used for Nova */

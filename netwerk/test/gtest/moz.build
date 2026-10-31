@@ -19,6 +19,7 @@ UNIFIED_SOURCES += [
     "TestHostRecordQueue.cpp",
     "TestHttp2WebTransport.cpp",
     "TestHttp3ConnectUDPStream.cpp",
+    "TestHttp3WebTransportSession.cpp",
     "TestHttpAuthUtils.cpp",
     "TestHttpChannel.cpp",
     "TestHttpResponseHead.cpp",
@@ -63,6 +64,7 @@ SOURCES += [
     "TestHappyEyeballsConnectionAttempt.cpp",
     "TestHappyEyeballsNetAddrArray.cpp",
     "TestHttpAtom.cpp",
+    "TestSOCKSProxyLookup.cpp",
 ]
 
 if CONFIG["OS_TARGET"] == "WINNT":

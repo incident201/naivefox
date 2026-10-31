@@ -9,7 +9,7 @@ import { MozLitElement } from "../lit-utils.mjs";
 
 window.MozXULElement?.insertFTLIfNeeded("toolkit/global/mozButton.ftl");
 
-// eslint-disable-next-line import/no-unassigned-import
+// eslint-disable-next-line import-x/no-unassigned-import
 import "chrome://global/content/elements/moz-label.mjs";
 
 /**

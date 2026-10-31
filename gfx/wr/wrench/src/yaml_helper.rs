@@ -4,7 +4,6 @@
 
 use euclid::{Angle, Size2D};
 use crate::parse_function::parse_function;
-use std::f32;
 use std::str::FromStr;
 use webrender::api::*;
 use webrender::api::units::*;
@@ -18,6 +17,7 @@ pub trait YamlHelper {
     fn as_vec_u32(&self) -> Option<Vec<u32>>;
     fn as_vec_u64(&self) -> Option<Vec<u64>>;
     fn as_pipeline_id(&self) -> Option<PipelineId>;
+    fn as_embed_policy(&self) -> Option<EmbedPolicy>;
     fn as_rect(&self) -> Option<LayoutRect>;
     fn as_size(&self) -> Option<LayoutSize>;
     fn as_side_offsets(&self) -> Option<LayoutSideOffsets>;
@@ -183,7 +183,7 @@ fn make_rotation(
     let pre_transform = LayoutTransform::translation(-origin.x, -origin.y, -0.0);
     let post_transform = LayoutTransform::translation(origin.x, origin.y, 0.0);
 
-    let theta = 2.0f32 * f32::consts::PI - degrees.to_radians();
+    let theta = std::f32::consts::TAU - degrees.to_radians();
     let transform =
         LayoutTransform::identity().pre_rotate(axis_x, axis_y, axis_z, Angle::radians(theta));
 
@@ -279,6 +279,19 @@ impl YamlHelper for Yaml {
 
     fn as_pt_to_f32(&self) -> Option<f32> {
         self.as_force_f32().map(|fv| fv * 16. / 12.)
+    }
+
+    fn as_embed_policy(&self) -> Option<EmbedPolicy> {
+        match *self {
+            Yaml::String(ref s) if s == "unrestricted" => Some(EmbedPolicy::Unrestricted),
+            Yaml::Array(ref v) => Some(EmbedPolicy::Restricted(
+                v.iter()
+                    .map(|ns| ns.as_i64().expect("embed-policy takes pipeline namespaces") as u32)
+                    .collect(),
+            )),
+            Yaml::BadValue => None,
+            _ => panic!("embed-policy is either `unrestricted` or a list of pipeline namespaces"),
+        }
     }
 
     fn as_rect(&self) -> Option<LayoutRect> {

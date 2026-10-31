@@ -116,6 +116,9 @@ class SessionModule extends RootBiDiModule {
    *     A unique subscription identifier.
    * @throws {InvalidArgumentError}
    *     If <var>events</var> or <var>contexts</var> are not valid types.
+   * @throws {UnsupportedOperationError}
+   *     If neither <var>contexts</var> nor <var>userContexts</var> are
+   *     provided in a session restricted to a single user context.
    */
   async subscribe(params = {}) {
     const { events, contexts: contextIds = null, userContexts = null } = params;
@@ -129,6 +132,16 @@ class SessionModule extends RootBiDiModule {
 
     if (userContexts !== null) {
       this.#assertNonEmptyArrayWithStrings(userContexts, "userContexts");
+    }
+
+    if (
+      contextIds === null &&
+      userContexts === null &&
+      this._isSessionRestricted
+    ) {
+      throw new lazy.error.UnsupportedOperationError(
+        `Subscribing without "contexts" or "userContexts" is not supported in a session restricted to a single user context`
+      );
     }
 
     const eventNames = new Set();
@@ -960,6 +973,10 @@ class SessionModule extends RootBiDiModule {
     }
 
     return listeners;
+  }
+
+  static get supportedCommandsInRestrictedSession() {
+    return ["end", "subscribe", "unsubscribe"];
   }
 }
 

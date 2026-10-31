@@ -104,6 +104,7 @@ add_task(async function test_isEnabled() {
       Prefs: {
         values: {
           [PREF_TIMER_ENABLED]: true,
+          region: "US",
           trainhopConfig: {
             widgets: {
               enabled: true,
@@ -132,6 +133,7 @@ add_task(async function test_isEnabled_via_trainhop_namespace() {
       Prefs: {
         values: {
           [PREF_TIMER_ENABLED]: true,
+          region: "US",
           trainhopConfig: { widgetFocusTimer: { visible: true } },
         },
       },
@@ -142,6 +144,40 @@ add_task(async function test_isEnabled_via_trainhop_namespace() {
     "TimerFeed should be enabled via trainhopConfig.widgetFocusTimer.visible"
   );
   Assert.ok(feed.enabled);
+});
+
+add_task(async function test_trainhopConfig_waits_for_region() {
+  let feed = new TimerFeed();
+
+  feed.store = {
+    getState() {
+      return this.state;
+    },
+    dispatch: sinon.spy(),
+    state: {
+      Prefs: {
+        values: {
+          [PREF_TIMER_ENABLED]: true,
+          trainhopConfig: { widgets: { timerEnabled: true } },
+        },
+      },
+    },
+  };
+
+  await feed.onAction({ type: actionTypes.INIT });
+  Assert.ok(
+    !feed.enabled,
+    "trainhop reveal ignored while region is unresolved"
+  );
+  Assert.ok(!feed.initialized, "not initialized without a region");
+
+  feed.store.state.Prefs.values.region = "FR";
+  await feed.onAction({
+    type: actionTypes.PREF_CHANGED,
+    data: { name: "region", value: "FR" },
+  });
+  Assert.ok(feed.enabled, "enabled once the region resolves");
+  Assert.ok(feed.initialized, "initialized when the region resolves");
 });
 
 add_task(async function test_isEnabled() {

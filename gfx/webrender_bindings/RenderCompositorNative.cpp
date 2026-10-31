@@ -518,7 +518,7 @@ UniquePtr<RenderCompositor> RenderCompositorNativeOGL::Create(
                     << gfx::hexa(gl.get());
     return nullptr;
   }
-  return MakeUnique<RenderCompositorNativeOGL>(aWidget, std::move(gl));
+  return std::make_unique<RenderCompositorNativeOGL>(aWidget, std::move(gl));
 }
 
 RenderCompositorNativeOGL::RenderCompositorNativeOGL(
@@ -593,7 +593,7 @@ void RenderCompositorNativeOGL::InsertFrameDoneSync() {
     mGL->fDeleteSync(mThisFrameDoneFences->mSync);
   }
   mThisFrameDoneFences =
-      MakeUnique<BackPressureFences>(std::move(mPendingGpuFences));
+      std::make_unique<BackPressureFences>(std::move(mPendingGpuFences));
   mThisFrameDoneFences->mSync =
       mGL->fFenceSync(LOCAL_GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
 #endif
@@ -652,7 +652,7 @@ UniquePtr<RenderCompositor> RenderCompositorNativeSWGL::Create(
     gfxCriticalNote << "Failed SWGL context creation for WebRender";
     return nullptr;
   }
-  return MakeUnique<RenderCompositorNativeSWGL>(aWidget, ctx);
+  return std::make_unique<RenderCompositorNativeSWGL>(aWidget, ctx);
 }
 
 RenderCompositorNativeSWGL::RenderCompositorNativeSWGL(

@@ -484,6 +484,9 @@ macosx64-devedition/opt:
             - artifact: sbom.json
               extract: false
               dest: x64
+            - artifact: sbom-build-tooling.json
+              extract: false
+              dest: x64
             - artifact: buildhub.json
               extract: false
               dest: ../artifacts
@@ -544,6 +547,8 @@ macosx64-devedition/opt:
               dest: x64/updater-dep
             - artifact: target.crashreporter-symbols.zip
               dest: x64/crashreporter-symbols
+            - artifact: target.crashreporter-symbols-gtest.zip
+              dest: x64/crashreporter-symbols-gtest
             - artifact: target.jsshell.zip
               dest: x64/jsshell
             - artifact: target.update_framework_artifacts.zip
@@ -565,6 +570,9 @@ macosx64-devedition/opt:
               extract: false
               dest: aarch64
             - artifact: sbom.json
+              extract: false
+              dest: aarch64
+            - artifact: sbom-build-tooling.json
               extract: false
               dest: aarch64
             - artifact: target.common.tests.tar.zst
@@ -597,6 +605,8 @@ macosx64-devedition/opt:
               dest: aarch64/updater-dep
             - artifact: target.crashreporter-symbols.zip
               dest: aarch64/crashreporter-symbols
+            - artifact: target.crashreporter-symbols-gtest.zip
+              dest: aarch64/crashreporter-symbols-gtest
             - artifact: target.jsshell.zip
               dest: aarch64/jsshell
             - artifact: target.update_framework_artifacts.zip
@@ -770,6 +780,8 @@ macosx64-add-on-devel/opt:
               dest: ../artifacts
             - artifact: target.crashreporter-symbols.zip
               dest: x64/crashreporter-symbols
+            - artifact: target.crashreporter-symbols-gtest.zip
+              dest: x64/crashreporter-symbols-gtest
             - artifact: target.jsshell.zip
               dest: x64/jsshell
             - artifact: target.generated-files.tar.gz
@@ -787,44 +799,12 @@ macosx64-add-on-devel/opt:
               dest: aarch64
             - artifact: target.crashreporter-symbols.zip
               dest: aarch64/crashreporter-symbols
+            - artifact: target.crashreporter-symbols-gtest.zip
+              dest: aarch64/crashreporter-symbols-gtest
             - artifact: target.jsshell.zip
               dest: aarch64/jsshell
         toolchain:
             - linux64-cctools-port
-            - onnxruntime-x86_64-apple-darwin
-
-macosx64-nightlyasrelease/opt:
-    description: "MacOS X Nightly-As-Release"
-    use-pgo: macosx64-shippable/opt
-    attributes:
-        enable-full-crashsymbols: true
-        skip-verify-test-packaging: true
-        upload-generated-sources: true
-    index:
-        job-name: macosx64-nightlyasrelease-opt
-    treeherder:
-        platform: osx-nightlyasrelease/opt
-        symbol: Bpgo(Bnar)
-        tier: 1
-    run-on-projects: [trunk-only]
-    worker:
-        max-run-time: 7200
-        env:
-            MOZ_AUTOMATION_PACKAGE_TESTS: "1"
-            PERFHERDER_EXTRA_OPTIONS: nightly-as-release
-    mozconfig:
-        variant: nightly-as-release
-    run:
-        config:
-            - builds/releng_base_firefox.py
-            - builds/releng_base_mac_64_cross_builds.py
-            - taskcluster_nightly.py
-    fetches:
-        toolchain:
-            - linux64-cctools-port
-            - linux64-clang
-            - macosx64-sdk
-            - sysroot-wasm32-wasi
             - onnxruntime-x86_64-apple-darwin
 
 macosx64-aarch64-nightlyasrelease/opt:
@@ -898,6 +878,37 @@ macosx64-x64-shippable/opt:
             - sysroot-wasm32-wasi
             - onnxruntime-x86_64-apple-darwin
 
+macosx64-reproduced/opt:
+    description: "MacOS X x64 Reproduced"
+    use-pgo: macosx64-shippable/opt
+    shipping-phase: build
+    shipping-product: firefox
+    index:
+        job-name: macosx64-reproduced-opt
+    treeherder:
+        platform: osx-shippable/opt
+        symbol: Bpgo(repr)
+        tier: 1
+    run-on-projects: ['mozilla-central', 'comm-central']
+    worker:
+        max-run-time: 7200
+        env:
+            PERFHERDER_EXTRA_OPTIONS: repr
+            MOZ_GENERATE_SBOM: "1"
+            SOURCE_DATE_EPOCH: "{build_date}"
+    run:
+        config:
+            - builds/releng_base_firefox.py
+            - builds/releng_base_mac_64_cross_builds.py
+            - taskcluster_nightly.py
+    fetches:
+        toolchain:
+            - linux64-cctools-port
+            - linux64-clang
+            - macosx64-sdk
+            - sysroot-wasm32-wasi
+            - onnxruntime-x86_64-apple-darwin
+
 macosx64-aarch64-shippable/opt:
     description: "MacOS X aarch64 Cross-compile"
     use-pgo: macosx64-aarch64-shippable/opt
@@ -937,6 +948,39 @@ macosx64-aarch64-shippable/opt:
             - sysroot-wasm32-wasi
             - onnxruntime-aarch64-apple-darwin
 
+macosx64-aarch64-reproduced/opt:
+    description: "MacOS X aarch64 Reproduced"
+    use-pgo: macosx64-aarch64-shippable/opt
+    shipping-phase: build
+    shipping-product: firefox
+    index:
+        job-name: macosx64-aarch64-reproduced-opt
+    treeherder:
+        platform: osx-aarch64-shippable/opt
+        symbol: Bpgo(repr)
+        tier: 1
+    run-on-projects: ['mozilla-central', 'comm-central']
+    worker:
+        max-run-time: 7200
+        env:
+            PERFHERDER_EXTRA_OPTIONS: repr
+            MOZ_GENERATE_SBOM: "1"
+            SOURCE_DATE_EPOCH: "{build_date}"
+    mozconfig:
+        platform: macosx64-aarch64
+    run:
+        config:
+            - builds/releng_base_firefox.py
+            - builds/releng_base_mac_64_cross_builds.py
+            - taskcluster_nightly.py
+    fetches:
+        toolchain:
+            - linux64-cctools-port
+            - linux64-clang
+            - macosx64-sdk
+            - sysroot-wasm32-wasi
+            - onnxruntime-aarch64-apple-darwin
+
 macosx64-shippable/opt:
     description: "MacOS X Universal"
     attributes:
@@ -957,7 +1001,8 @@ macosx64-shippable/opt:
     worker:
         # No MOZ_GENERATE_SBOM here: this task only recombines the
         # per-architecture builds, and re-uploads their SBOMs as
-        # sbom-x86_64.json and sbom-aarch64.json.
+        # sbom-x86_64.json and sbom-aarch64.json, along with their build
+        # tooling counterparts.
         max-run-time: 1800
     mozconfig: null
     run:
@@ -973,6 +1018,9 @@ macosx64-shippable/opt:
               extract: false
               dest: x64
             - artifact: sbom.json
+              extract: false
+              dest: x64
+            - artifact: sbom-build-tooling.json
               extract: false
               dest: x64
             - artifact: buildhub.json
@@ -1035,6 +1083,8 @@ macosx64-shippable/opt:
               dest: x64/updater-dep
             - artifact: target.crashreporter-symbols.zip
               dest: x64/crashreporter-symbols
+            - artifact: target.crashreporter-symbols-gtest.zip
+              dest: x64/crashreporter-symbols-gtest
             - artifact: target.jsshell.zip
               dest: x64/jsshell
             - artifact: target.update_framework_artifacts.zip
@@ -1056,6 +1106,9 @@ macosx64-shippable/opt:
               extract: false
               dest: aarch64
             - artifact: sbom.json
+              extract: false
+              dest: aarch64
+            - artifact: sbom-build-tooling.json
               extract: false
               dest: aarch64
             - artifact: target.common.tests.tar.zst
@@ -1088,6 +1141,8 @@ macosx64-shippable/opt:
               dest: aarch64/updater-dep
             - artifact: target.crashreporter-symbols.zip
               dest: aarch64/crashreporter-symbols
+            - artifact: target.crashreporter-symbols-gtest.zip
+              dest: aarch64/crashreporter-symbols-gtest
             - artifact: target.jsshell.zip
               dest: aarch64/jsshell
             - artifact: target.update_framework_artifacts.zip

@@ -1,7 +1,8 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useContext, useEffect, useRef } from "react";
+import { SpaceActiveContext } from "./SpaceActiveContext";
 
 /**
  * A custom react hook that sets up an IntersectionObserver to observe a single
@@ -19,7 +20,11 @@ import { useCallback, useEffect, useRef } from "react";
 function useIntersectionObserver(callback, threshold = 0.3) {
   const elementsRef = useRef([]);
   const triggeredElements = useRef(new WeakSet());
+  const spaceActive = useContext(SpaceActiveContext);
   useEffect(() => {
+    if (!spaceActive) {
+      return undefined;
+    }
     const observer = new IntersectionObserver(
       entries => {
         entries.forEach(entry => {
@@ -44,7 +49,7 @@ function useIntersectionObserver(callback, threshold = 0.3) {
 
     // Cleanup function to disconnect observer on unmount
     return () => observer.disconnect();
-  }, [callback, threshold]);
+  }, [callback, threshold, spaceActive]);
 
   return elementsRef;
 }
@@ -412,7 +417,26 @@ function formatRelativeTime(timestamp, locale, now, justNowL10nId) {
   return { text: null, l10nId: justNowL10nId };
 }
 
+/**
+ * Focus a moz-button that may have just been created. Its inner button only
+ * exists after the first render, and focus() on the host does nothing until
+ * then, so wait for that render if one is pending.
+ *
+ * @param {HTMLElement|null} el
+ */
+function focusOnceRendered(el) {
+  if (!el) {
+    return;
+  }
+  if (el.updateComplete) {
+    el.updateComplete.then(() => el.focus());
+  } else {
+    el.focus();
+  }
+}
+
 export {
+  focusOnceRendered,
   formatRelativeTime,
   useIntersectionObserver,
   useSizeSubmenu,

@@ -334,6 +334,7 @@ summary {
 
 .error-icon {
   content: url("chrome://global/skin/icons/error.svg");
+  list-style-image: none;
   -moz-context-properties: fill;
   fill: var(--icon-color-critical);
   margin-block: 0;

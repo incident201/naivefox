@@ -15,6 +15,7 @@
 #include "gfxUtils.h"
 #include "mozilla/ProfilerLabels.h"
 #include "mozilla/Range.h"
+#include "mozilla/SVGImageContext.h"
 #include "mozilla/gfx/2D.h"
 #include "mozilla/gfx/Helpers.h"
 #include "mozilla/gfx/PathHelpers.h"

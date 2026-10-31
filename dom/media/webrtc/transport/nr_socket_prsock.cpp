@@ -745,8 +745,7 @@ int NrSocket::sendto(const void* msg, size_t len, int flags,
   }
 
   // Block outgoing packets to ports that are not allowed for webrtc. This runs
-  // in whatever process opened the socket -- the socket process (socket-process
-  // mtransport) or the parent process -- never the content process, which uses
+  // in the parent process, never the content process, which uses
   // NrUdpSocketIpc/NrTcpSocket (gated in NrUdpSocketIpc::sendto and enforced by
   // STUNUDPSocketFilter in the parent process).
   if (IsForbiddenAddress(to)) {
@@ -1112,7 +1111,7 @@ NS_IMETHODIMP NrUdpSocketIpc::CallListenerReceivedData(
     }
   }
 
-  auto buf = MakeUnique<MediaPacket>();
+  auto buf = std::make_unique<MediaPacket>();
   buf->Copy(data.Elements(), data.Length());
   RefPtr msg = MakeRefPtr<nr_udp_message>(addr, std::move(buf));
 
@@ -1301,7 +1300,7 @@ int NrUdpSocketIpc::sendto(const void* msg, size_t len, int flags,
     return R_WOULDBLOCK;
   }
 
-  auto buf = MakeUnique<MediaPacket>();
+  auto buf = std::make_unique<MediaPacket>();
   buf->Copy(static_cast<const uint8_t*>(msg), len);
 
   RUN_ON_THREAD(
@@ -1600,12 +1599,6 @@ int NrSocketBase::CreateSocket(
   if (XRE_IsParentProcess()) {
     // TODO: Make NrTcpSocket work on the parent process
     *sock = new NrSocket();
-  } else if (XRE_IsSocketProcess()) {
-    if (addr->protocol == IPPROTO_TCP) {
-      *sock = new NrTcpSocket(config);
-    } else {
-      *sock = new NrSocket();
-    }
   } else {
     if (addr->protocol == IPPROTO_TCP) {
       *sock = new NrTcpSocket(config);

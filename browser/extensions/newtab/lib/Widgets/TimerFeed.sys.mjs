@@ -119,6 +119,7 @@ export class TimerFeed {
     switch (action.data.name) {
       case PREF_TIMER_ENABLED:
       case PREF_SYSTEM_TIMER_ENABLED:
+      case "region":
       case "trainhopConfig":
       case "widgetsConfig": {
         if (this.enabled && !this.initialized) {

@@ -749,12 +749,27 @@ class ChromeActions {
       ? await this.getNimbusExperimentData()
       : null;
 
+    // Stay within DrawTargetWebgl's size limit when requesting acceleration.
+    let maxCanvasDim = Services.prefs.getIntPref("gfx.canvas.max-size");
+    const acceleratedMaxSize = Services.prefs.getIntPref(
+      "gfx.canvas.accelerated.max-size",
+      0
+    );
+    if (
+      acceleratedMaxSize > 0 &&
+      Services.prefs.getBoolPref("pdfjs.enableHWA", false) &&
+      Cc["@mozilla.org/gfx/info;1"].getService(Ci.nsIGfxInfo)
+        .usingAcceleratedCanvas
+    ) {
+      maxCanvasDim = Math.min(maxCanvasDim, acceleratedMaxSize);
+    }
+
     return {
       allowedGlobalEvents: this.#allowedGlobalEvents,
       canvasMaxAreaInBytes: Services.prefs.getIntPref("gfx.max-alloc-size"),
       isInAutomation: Cu.isInAutomation,
       localeProperties: this.getLocaleProperties(),
-      maxCanvasDim: Services.prefs.getIntPref("gfx.canvas.max-size"),
+      maxCanvasDim,
       nimbusDataStr,
       supportsDocumentFonts:
         !!Services.prefs.getIntPref("browser.display.use_document_fonts") &&

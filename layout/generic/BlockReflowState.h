@@ -38,7 +38,8 @@ class BlockReflowState {
           mCanHaveOverflowMarkers(false),
           mShouldApplyTextBoxTrimStart(false),
           mShouldApplyTextBoxTrimAtBlockEnd(false),
-          mShouldApplyTextBoxTrimAtFragmentEnd(false) {}
+          mShouldApplyTextBoxTrimAtFragmentEnd(false),
+          mShouldApplyLineClampAuto(false) {}
 
     // Set in the BlockReflowState constructor when reflowing a "block margin
     // root" frame (i.e. a frame with any of the NS_BLOCK_BFC flag set, for
@@ -96,6 +97,11 @@ class BlockReflowState {
     bool mShouldApplyTextBoxTrimStart : 1;
     bool mShouldApplyTextBoxTrimAtBlockEnd : 1;
     bool mShouldApplyTextBoxTrimAtFragmentEnd : 1;
+
+    // Automatic line-clamp relies on certain dimensions, such as margins and
+    // BStart being available, so it should only be applied after the first
+    // reflow.
+    bool mShouldApplyLineClampAuto : 1;
   };
 
  public:

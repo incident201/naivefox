@@ -36,8 +36,10 @@ The easiest way to debug the Raptor web extension is to run the Raptor test loca
 Or on Chrome, for example:
 
 ```
-./mach raptor --test raptor-tp6-amazon-chrome --app=chrome --binary="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --debug-mode
+./mach raptor --test raptor-tp6-amazon-chrome --app=chrome --debug-mode
 ```
+
+Raptor uses Chrome from its default install location.
 
 Running Raptor with debug mode will:
 

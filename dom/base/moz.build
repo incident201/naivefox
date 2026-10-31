@@ -30,7 +30,6 @@ XPIDL_SOURCES += [
     "nsISelectionController.idl",
     "nsISelectionDisplay.idl",
     "nsISelectionListener.idl",
-    "nsISlowScriptDebug.idl",
 ]
 
 XPIDL_MODULE = "dom"
@@ -580,7 +579,6 @@ MOZ_SRC_FILES += [
     "ContentAreaDropListener.sys.mjs",
     "IndexedDBHelper.sys.mjs",
     "LocationHelper.sys.mjs",
-    "SlowScriptDebug.sys.mjs",
 ]
 
 XPCOM_MANIFESTS += [

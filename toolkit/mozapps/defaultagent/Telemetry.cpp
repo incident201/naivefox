@@ -161,7 +161,8 @@ HRESULT SendDefaultAgentPing(const DefaultBrowserInfo& browserInfo,
                              const DefaultPdfInfo& pdfInfo,
                              const NotificationActivities& activitiesPerformed,
                              uint32_t daysSinceLastAppLaunch,
-                             const std::string& isTaskbarPinned) {
+                             const std::string& isTaskbarPinned,
+                             const InstallInfo& installInfo) {
   std::string currentDefaultBrowser =
       GetStringForBrowser(browserInfo.currentDefaultBrowser);
   std::string currentDefaultPdf =
@@ -246,6 +247,21 @@ HRESULT SendDefaultAgentPing(const DefaultBrowserInfo& browserInfo,
         nsDependentCString(isTaskbarPinned.c_str()));
     mozilla::glean::system_pin::previous_is_taskbar_pinned.Set(
         nsDependentCString(prevIsTaskbarPinned.c_str()));
+
+    mozilla::glean::install::has_win_package_id.Set(
+        installInfo.hasWinPackageId);
+    if (!installInfo.winPackageFamilyName.empty()) {
+      mozilla::glean::install::win_package_family_name.Set(
+          nsDependentCString(installInfo.winPackageFamilyName.c_str()));
+    }
+    if (!installInfo.installerType.empty()) {
+      mozilla::glean::install::installer_type.Set(
+          nsDependentCString(installInfo.installerType.c_str()));
+    }
+    if (installInfo.installerType == "full") {
+      mozilla::glean::install::from_msi.Set(installInfo.fromMsi);
+      mozilla::glean::install::silent.Set(installInfo.silent);
+    }
   }
 
   mozilla::glean_pings::DefaultAgent.Submit("daily_ping"_ns);

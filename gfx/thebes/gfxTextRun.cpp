@@ -31,6 +31,7 @@
 #include "mozilla/intl/String.h"
 #include "mozilla/intl/UnicodeProperties.h"
 #include "nsLayoutUtils.h"
+#include "nsReadableUtils.h"
 #include "nsStyleConsts.h"
 #include "nsStyleUtil.h"
 #include "nsUnicodeProperties.h"
@@ -415,15 +416,82 @@ bool gfxTextRun::ShrinkToLigatureBoundaries(Range* aRange) const {
   return adjusted;
 }
 
+// Converts aText to UTF-8 in aUTF8, which must be empty, and fills aCharToByte
+// with the byte offset in aUTF8 of the source text for each UTF-16 code unit in
+// aText, followed by the length of aUTF8. The low half of a surrogate pair
+// shares the offset of the high half. Returns false if the conversion fails.
+static bool ConvertSourceTextToUTF8(const nsAString& aText, nsACString& aUTF8,
+                                    nsTArray<uint32_t>& aCharToByte) {
+  MOZ_ASSERT(aUTF8.IsEmpty());
+  aCharToByte.SetCapacity(aText.Length() + 1);
+  // Convert one code point at a time so we know where each one starts.
+  for (uint32_t unit = 0; unit < aText.Length();) {
+    uint32_t unitCount = 1;
+    if (unit + 1 < aText.Length() &&
+        IsSurrogatePair(aText[unit], aText[unit + 1])) {
+      unitCount = 2;
+    }
+    aCharToByte.AppendElement(aUTF8.Length());
+    if (unitCount == 2) {
+      // The low surrogate shares the offset of the high surrogate.
+      aCharToByte.AppendElement(aUTF8.Length());
+    }
+    if (!AppendUTF16toUTF8(Span<const char16_t>(aText).Subspan(unit, unitCount),
+                           aUTF8, fallible)) {
+      return false;
+    }
+    unit += unitCount;
+  }
+  aCharToByte.AppendElement(aUTF8.Length());
+  return true;
+}
+
 void gfxTextRun::DrawGlyphs(gfxFont* aFont, Range aRange, gfx::Point* aPt,
                             const PropertyProvider* aProvider,
-                            Range aSpacingRange, TextRunDrawParams& aParams,
+                            Range aProviderRange, TextRunDrawParams& aParams,
                             imgDrawingParams& aImgParams,
                             gfx::ShapedTextFlags aOrientation) const {
   AutoTArray<PropertyProvider::Spacing, 200> spacingBuffer;
-  bool haveSpacing =
-      GetAdjustedSpacingArray(aRange, aProvider, aSpacingRange, &spacingBuffer);
+  bool haveSpacing = GetAdjustedSpacingArray(aRange, aProvider, aProviderRange,
+                                             &spacingBuffer);
   aParams.spacing = haveSpacing ? spacingBuffer.Elements() : nullptr;
+  nsString sourceText16;
+  nsCString sourceText;
+  nsTArray<uint32_t> sourceCharToByte;
+  bool haveSourceText = aParams.needsSourceText && aProvider &&
+                        aProvider->GetSourceText(aProviderRange, sourceText16);
+  if (haveSourceText) {
+    MOZ_ASSERT(sourceText16.Length() == aProviderRange.Length());
+    sourceCharToByte.SetCapacity(aRange.Length() + 1);
+    haveSourceText =
+        sourceText16.Length() == aProviderRange.Length() &&
+        ConvertSourceTextToUTF8(sourceText16, sourceText, sourceCharToByte);
+    if (haveSourceText) {
+      // aProviderRange may be narrower than aRange. DrawPartialLigature
+      // always asks to draw the glyph for the full range of a ligature, but
+      // aProvider (e.g. an nsTextFrame) may only be able to supply source
+      // text for part of that range if the ligature is split across
+      // multiple providers. Map characters outside aProviderRange to the
+      // nearest edge of the provider's source text. Otherwise, we would read
+      // past the edge.
+      const uint32_t startPad = aProviderRange.start - aRange.start;
+      if (startPad > 0) {
+        // Copy the value first because InsertElementAt takes a reference and
+        // we're referencing a value in the array we're mutating.
+        const uint32_t firstByte = sourceCharToByte[0];
+        sourceCharToByte.InsertElementsAt(0, startPad, firstByte);
+      }
+      const uint32_t endPad = aRange.end - aProviderRange.end;
+      if (endPad > 0) {
+        const uint32_t lastByte = sourceCharToByte.LastElement();
+        sourceCharToByte.InsertElementsAt(sourceCharToByte.Length(), endPad,
+                                          lastByte);
+      }
+    }
+  }
+  aParams.sourceText = haveSourceText ? &sourceText : nullptr;
+  aParams.sourceCharToByte =
+      haveSourceText ? sourceCharToByte.Elements() : nullptr;
   aFont->Draw(this, aRange.start, aRange.end, aPt, aParams, aImgParams,
               aOrientation);
 }
@@ -609,7 +677,7 @@ void gfxTextRun::Draw(const Range aRange, const gfx::Point aPt,
 
   // Set up parameters that will be constant across all glyph runs we need
   // to draw, regardless of the font used.
-  TextRunDrawParams params(aParams.paletteCache);
+  TextRunDrawParams params(aParams.paletteValueSet);
   params.context = aParams.context;
   params.devPerApp = 1.0 / double(GetAppUnitsPerDevUnit());
   params.isVerticalRun = IsVertical();
@@ -627,6 +695,8 @@ void gfxTextRun::Draw(const Range aRange, const gfx::Point aPt,
   params.paintSVGGlyphs =
       !aParams.callbacks || aParams.callbacks->mShouldPaintSVGGlyphs;
   params.dt = aParams.context->GetDrawTarget();
+  params.needsSourceText =
+      aParams.provider && params.dt->SupportsGlyphSourceText();
   params.textDrawer = textDrawer;
   if (textDrawer) {
     params.clipRect = textDrawer->GeckoClipRect();
@@ -709,14 +779,15 @@ void gfxTextRun::Draw(const Range aRange, const gfx::Point aPt,
 }
 
 // This method is mostly parallel to Draw().
-void gfxTextRun::DrawEmphasisMarks(
-    gfxContext* aContext, gfxTextRun* aMark, gfxFloat aMarkAdvance,
-    gfx::Point aPt, Range aRange, const PropertyProvider* aProvider,
-    mozilla::gfx::PaletteCache& aPaletteCache,
-    mozilla::image::imgDrawingParams& aImgParams) const {
+void gfxTextRun::DrawEmphasisMarks(gfxContext* aContext, gfxTextRun* aMark,
+                                   gfxFloat aMarkAdvance, gfx::Point aPt,
+                                   Range aRange,
+                                   const PropertyProvider* aProvider,
+                                   gfx::FontPaletteValueSet* aPaletteValueSet,
+                                   image::imgDrawingParams& aImgParams) const {
   MOZ_ASSERT(aRange.end <= GetLength());
 
-  EmphasisMarkDrawParams params(aContext, aPaletteCache);
+  EmphasisMarkDrawParams params(aContext, aPaletteValueSet);
   params.mark = aMark;
   params.advance = aMarkAdvance;
   params.direction = GetDirection();
@@ -2554,7 +2625,7 @@ static const nsTHashMap<nsUint32HashKey, Script>* ScriptTagToCodeTable() {
   // "If multiple threads attempt to initialize the same static local variable
   // concurrently, the initialization occurs exactly once."
   static UniquePtr<TableT> sScriptTagToCode = []() {
-    auto tagToCode = MakeUnique<TableT>(size_t(Script::NUM_SCRIPT_CODES));
+    auto tagToCode = std::make_unique<TableT>(size_t(Script::NUM_SCRIPT_CODES));
     Script scriptCount =
         Script(std::min<int>(UnicodeProperties::GetMaxNumberOfScripts() + 1,
                              int(Script::NUM_SCRIPT_CODES)));
@@ -2698,7 +2769,7 @@ void gfxFontGroup::InitTextRun(DrawTarget* aDrawTarget, gfxTextRun* aTextRun,
       char16_t newCh = HandleNumberInChar(origCh, prevIsArabic, numOption);
       if (newCh != origCh) {
         if (!transformedString) {
-          transformedString = MakeUnique<char16_t[]>(aLength);
+          transformedString = std::make_unique<char16_t[]>(aLength);
           if constexpr (sizeof(T) == sizeof(char16_t)) {
             memcpy(transformedString.get(), aString, i * sizeof(char16_t));
           } else {

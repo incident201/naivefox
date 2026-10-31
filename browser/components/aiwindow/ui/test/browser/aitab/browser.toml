@@ -11,10 +11,13 @@ support-files = [
   "head.js",
 ]
 skip-if = [
-  "os == 'linux' && os_version == '24.04' && arch == 'x86_64' && display == 'x11' && tsan && nova", # Bug 2057552
+  "os == 'linux' && os_version == '24.04' && arch == 'x86_64' && display == 'x11' && tsan", # Bug 2057552
 ]
 
 ["browser_aitab_context_tab_limit.js"]
 ["browser_aitab_heading_font.js"]
+
+["browser_aitab_sidebar.js"]
+support-files = ["!/browser/components/aiwindow/ui/test/browser/head.js"]
 
 ["browser_aitab_telemetry.js"]

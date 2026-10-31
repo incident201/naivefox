@@ -2,6 +2,7 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+import gc
 import logging
 import os
 import shutil
@@ -147,6 +148,7 @@ PER_PROJECT_PARAMETERS = {
         "target_tasks_method": "kaios_tasks",
     },
     "toolchains": {
+        "head_git_repository": "https://github.com/mozilla-firefox/firefox",
         "target_tasks_method": "mozilla_central_tasks",
     },
     # git projects
@@ -156,6 +158,11 @@ PER_PROJECT_PARAMETERS = {
         "target_tasks_method": "firefox_pull_request_tasks",
     },
     "firefox-dev": {
+        "enable_always_target": True,
+        "target_tasks_method": "try_tasks",
+        "release_type": "nightly",
+    },
+    "firefox-dev-secure": {
         "enable_always_target": True,
         "target_tasks_method": "try_tasks",
         "release_type": "nightly",
@@ -267,7 +274,12 @@ def taskgraph_decision(options, parameters):
         )
 
         # write out the full graph for reference
-        full_task_json = tgg.full_task_graph.to_json()
+        full_task_graph = tgg.full_task_graph
+        # The generated graph is long-lived and taskgraph collects no garbage
+        # while generating it, so a collection triggered while serializing it
+        # would walk the whole heap for little gain.
+        gc.freeze()
+        full_task_json = full_task_graph.to_json()
         write_artifact("full-task-graph.json", full_task_json)
 
         # write out kind graph
@@ -308,6 +320,10 @@ def taskgraph_decision(options, parameters):
             taskgraph_dir / "run-task" / "run-task": f"{ARTIFACTS_DIR}/run-task-git",
             scripts_dir / "robustcheckout.py": ARTIFACTS_DIR,
             scripts_dir / "run-task-setup.py": ARTIFACTS_DIR,
+            scripts_dir / "run_task_resource_monitor.py": ARTIFACTS_DIR,
+            Path(GECKO, "testing", "mozbase", "mozsystemmonitor")
+            / "mozsystemmonitor"
+            / "resourcemonitor.py": ARTIFACTS_DIR,
         }
         for target, dest in to_copy.items():
             shutil.copy2(target, dest)

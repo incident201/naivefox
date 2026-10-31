@@ -1469,6 +1469,7 @@ def compiler(
         vc_compiler_version,
         multiarch_dir,
         winsysroot,
+        msvc_sysroot_flags,
         host,
         sccache_environment,
     )
@@ -1488,6 +1489,7 @@ def compiler(
         vc_compiler_version,
         multiarch_dir,
         winsysroot,
+        msvc_sysroot_flags,
         host,
         sccache_environment,
     ):
@@ -1632,6 +1634,8 @@ def compiler(
                 overlay = os.path.join(winsysroot, "overlay.yaml")
                 if os.path.exists(overlay):
                     flags.extend(["-Xclang", "-ivfsoverlay", "-Xclang", overlay])
+            if msvc_sysroot_flags:
+                flags.extend(msvc_sysroot_flags.cl)
 
         if (info.type, host_or_target.abi) in (
             ("clang", "msvc"),
@@ -3138,11 +3142,11 @@ set_config("MOZ_CODE_COVERAGE", code_coverage)
 set_define("MOZ_CODE_COVERAGE", code_coverage)
 
 
-@depends(target, c_compiler, build_environment, when=code_coverage)
+@depends(target, c_compiler, build_environment, moz_automation, when=code_coverage)
 @imports("os")
 @imports("re")
 @imports(_from="__builtin__", _import="open")
-def coverage_cflags(target, c_compiler, build_env):
+def coverage_cflags(target, c_compiler, build_env, moz_automation):
     cflags = ["--coverage"]
 
     # clang 11 no longer accepts this flag (its behavior became the default)
@@ -3152,8 +3156,12 @@ def coverage_cflags(target, c_compiler, build_env):
             "-coverage-no-function-names-in-data",
         ]
 
-    # We only apply the patch adding -fprofile-abs-path starting with Clang 22
-    if c_compiler.type in ("clang", "clang-cl") and c_compiler.version >= "22.0.0":
+    # In automation we have patch adding -fprofile-abs-path starting with Clang 22
+    # This patch was accepted upstream in Clang 24
+    if c_compiler.type in ("clang", "clang-cl") and (
+        c_compiler.version >= "24.0.0"
+        or (c_compiler.version >= "22.0.0" and moz_automation)
+    ):
         cflags += ["-fprofile-abs-path"]
 
     exclude = []
@@ -3210,6 +3218,12 @@ def as_info(target, c_compiler):
 
 assembler_is_masm = depends(as_info)(lambda info: info.type == "masm")
 assembler_is_armasm = depends(as_info)(lambda info: info.type == "armasm")
+
+
+@depends(msvc_include_dirs, asm_flags, when=assembler_is_masm)
+def masm_include_flags(msvc_include_dirs, asm_flags):
+    for path in msvc_include_dirs:
+        asm_flags.asflags.extend(["-I", path])
 
 
 # One would expect the assembler to be specified merely as a program.  But in

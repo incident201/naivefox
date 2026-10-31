@@ -80,8 +80,10 @@ static inline JSObject* GetJSObjectChild(nsWrapperCache* aCache) {
 }
 
 static bool NeedsScriptTraverse(nsINode* aNode) {
-  return aNode->PreservingWrapper() && aNode->GetWrapperPreserveColor() &&
-         !aNode->HasKnownLiveWrapperAndDoesNotNeedTracing(aNode);
+  if (aNode->PreservingWrapper() && aNode->GetWrapperPreserveColor()) {
+    return !aNode->HasKnownLiveWrapperAndDoesNotNeedTracing(aNode);
+  }
+  return aNode->IsDocument() && !aNode->HasNothingToTrace(aNode);
 }
 
 //----------------------------------------------------------------------
@@ -390,9 +392,8 @@ void FragmentOrElement::nsExtendedDOMSlots::TraverseExtendedSlots(
   if (mAnimations) {
     mAnimations->Traverse(aCb);
   }
-  if (mRadioGroupContainer) {
-    RadioGroupContainer::Traverse(mRadioGroupContainer.get(), aCb);
-  }
+  ImplCycleCollectionTraverse(aCb, mRadioGroupContainer,
+                              "mExtendedSlots->mRadioGroupContainer");
 }
 
 size_t FragmentOrElement::nsExtendedDOMSlots::SizeOfExcludingThis(

@@ -212,7 +212,7 @@ who = "Mark Hammond <mhammond@skippinet.com.au>"
 criteria = "safe-to-deploy"
 user-id = 43489 # JR Conlin (jrconlin)
 start = "2019-05-01"
-end = "2026-08-06"
+end = "2027-10-27"
 notes = "Crate lives under github.com/mozilla, is maintained by Mozilla and has the same review and publishing guidelines as mozilla-central."
 
 [[wildcard-audits.encoding_rs]]
@@ -445,7 +445,7 @@ who = "Alex Franchuk <afranchuk@mozilla.com>"
 criteria = "safe-to-deploy"
 user-id = 106639 # Alex Franchuk (afranchuk)
 start = "2023-07-25"
-end = "2026-11-13"
+end = "2027-10-27"
 notes = "This crate is written and solely maintained by a mozilla employee."
 
 [[wildcard-audits.qcms]]
@@ -5007,7 +5007,7 @@ delta = "0.3.0 -> 0.4.1"
 [[audits.mtu]]
 who = "Max Inden <mail@max-inden.de>"
 criteria = "safe-to-deploy"
-delta = "0.4.1 -> 0.4.1@git:1ec4c2a3ccd7ada264112d1b70b070381557d844"
+delta = "0.4.1 -> 0.4.1@git:e302b43503f44e09f4257573dd320621516d1560"
 importable = false
 
 [[audits.multiversion]]
@@ -5149,11 +5149,12 @@ delta = "29.0.0 -> 30.0.0"
 [[audits.naga]]
 who = [
     "Andy Leiserson <aleiserson@mozilla.com>",
+    "Jim Blandy <jimb@red-bean.com>",
     "Teodor Tanasoaia <ttanasoaia@mozilla.com>",
     "Erich Gubler <erichdongubler@gmail.com>",
 ]
 criteria = "safe-to-deploy"
-delta = "30.0.0 -> 30.0.0@git:db0782e398f7ba6f4f3f071d75deacec64ff84b0"
+delta = "30.0.0 -> 30.0.0@git:49325ca0a13bdc0787b1601138096cce743dd29e"
 importable = false
 
 [[audits.naga-types]]
@@ -5167,11 +5168,12 @@ version = "30.0.0"
 [[audits.naga-types]]
 who = [
     "Andy Leiserson <aleiserson@mozilla.com>",
+    "Jim Blandy <jimb@red-bean.com>",
     "Teodor Tanasoaia <ttanasoaia@mozilla.com>",
     "Erich Gubler <erichdongubler@gmail.com>",
 ]
 criteria = "safe-to-deploy"
-delta = "30.0.0 -> 30.0.0@git:db0782e398f7ba6f4f3f071d75deacec64ff84b0"
+delta = "30.0.0 -> 30.0.0@git:49325ca0a13bdc0787b1601138096cce743dd29e"
 importable = false
 
 [[audits.net2]]
@@ -6244,6 +6246,26 @@ delta = "0.5.3 -> 0.8.3"
 who = "Lars Eggert <lars@eggert.org>"
 criteria = "safe-to-deploy"
 delta = "0.1.7 -> 0.1.8"
+
+[[audits.ringbuf]]
+who = "Andreas Pehrson <apehrson@mozilla.com>"
+criteria = "safe-to-deploy"
+delta = "0.2.8 -> 0.5.3"
+importable = false
+notes = """
+Lock-free spsc ring buffer. Major rewrite after previous sec issue. A fair
+amount of unsafe blocks, most notable rawptr handling and raw management of the
+underlying buffer. The lock-free nature means data updates and atomic
+reads/writes to sync between consumer/producer are done in distinct steps,
+which is the fundamental reason why unsafe blocks are at all needed.
+Unsafe blocks look OK and safe. Reasonably well tested for thread safety
+including under TSan in cubeb-coreaudio-rs' CI.
+
+One soundness issue was found and reported as
+https://github.com/agerasev/ringbuf/issues/65. Gecko is not susceptible since
+there's no user that inspects elements through the producer or the ringbuffer
+itself.
+"""
 
 [[audits.rinja]]
 who = "Ben Dean-Kawamura <bdk@mozilla.com>"
@@ -8195,11 +8217,12 @@ delta = "29.0.0 -> 30.0.0"
 [[audits.wgpu-core]]
 who = [
     "Andy Leiserson <aleiserson@mozilla.com>",
+    "Jim Blandy <jimb@red-bean.com>",
     "Teodor Tanasoaia <ttanasoaia@mozilla.com>",
     "Erich Gubler <erichdongubler@gmail.com>",
 ]
 criteria = "safe-to-deploy"
-delta = "30.0.0 -> 30.0.0@git:db0782e398f7ba6f4f3f071d75deacec64ff84b0"
+delta = "30.0.0 -> 30.0.0@git:49325ca0a13bdc0787b1601138096cce743dd29e"
 importable = false
 
 [[audits.wgpu-core-deps-apple]]
@@ -8254,11 +8277,12 @@ delta = "29.0.0 -> 30.0.0"
 [[audits.wgpu-core-deps-apple]]
 who = [
     "Andy Leiserson <aleiserson@mozilla.com>",
+    "Jim Blandy <jimb@red-bean.com>",
     "Teodor Tanasoaia <ttanasoaia@mozilla.com>",
     "Erich Gubler <erichdongubler@gmail.com>",
 ]
 criteria = "safe-to-deploy"
-delta = "30.0.0 -> 30.0.0@git:db0782e398f7ba6f4f3f071d75deacec64ff84b0"
+delta = "30.0.0 -> 30.0.0@git:49325ca0a13bdc0787b1601138096cce743dd29e"
 importable = false
 
 [[audits.wgpu-core-deps-windows-linux-android]]
@@ -8446,11 +8470,12 @@ delta = "29.0.0 -> 30.0.0"
 [[audits.wgpu-hal]]
 who = [
     "Andy Leiserson <aleiserson@mozilla.com>",
+    "Jim Blandy <jimb@red-bean.com>",
     "Teodor Tanasoaia <ttanasoaia@mozilla.com>",
     "Erich Gubler <erichdongubler@gmail.com>",
 ]
 criteria = "safe-to-deploy"
-delta = "30.0.0 -> 30.0.0@git:db0782e398f7ba6f4f3f071d75deacec64ff84b0"
+delta = "30.0.0 -> 30.0.0@git:49325ca0a13bdc0787b1601138096cce743dd29e"
 importable = false
 
 [[audits.wgpu-naga-bridge]]
@@ -8475,11 +8500,12 @@ delta = "29.0.0 -> 30.0.0"
 [[audits.wgpu-naga-bridge]]
 who = [
     "Andy Leiserson <aleiserson@mozilla.com>",
+    "Jim Blandy <jimb@red-bean.com>",
     "Teodor Tanasoaia <ttanasoaia@mozilla.com>",
     "Erich Gubler <erichdongubler@gmail.com>",
 ]
 criteria = "safe-to-deploy"
-delta = "30.0.0 -> 30.0.0@git:db0782e398f7ba6f4f3f071d75deacec64ff84b0"
+delta = "30.0.0 -> 30.0.0@git:49325ca0a13bdc0787b1601138096cce743dd29e"
 importable = false
 
 [[audits.wgpu-types]]
@@ -8607,11 +8633,12 @@ delta = "29.0.0 -> 30.0.0"
 [[audits.wgpu-types]]
 who = [
     "Andy Leiserson <aleiserson@mozilla.com>",
+    "Jim Blandy <jimb@red-bean.com>",
     "Teodor Tanasoaia <ttanasoaia@mozilla.com>",
     "Erich Gubler <erichdongubler@gmail.com>",
 ]
 criteria = "safe-to-deploy"
-delta = "30.0.0 -> 30.0.0@git:db0782e398f7ba6f4f3f071d75deacec64ff84b0"
+delta = "30.0.0 -> 30.0.0@git:49325ca0a13bdc0787b1601138096cce743dd29e"
 importable = false
 
 [[audits.whatsys]]
@@ -8670,6 +8697,13 @@ who = "Lee Salzman <lsalzman@mozilla.com>"
 criteria = "safe-to-deploy"
 version = "0.1.0"
 notes = "Written and maintained by Gfx team at Mozilla."
+
+[[audits.wpf-gpu-raster]]
+who = "Alex Franchuk <afranchuk@mozilla.com>"
+criteria = "safe-to-deploy"
+delta = "0.1.0 -> 0.1.0@git:99979da091fd58fba8477e7fcdf5ec0727102916"
+importable = false
+notes = "All code written by Mozilla employees."
 
 [[audits.write16]]
 who = "Henri Sivonen <hsivonen@hsivonen.fi>"
@@ -9649,6 +9683,12 @@ criteria = "safe-to-deploy"
 user-id = 6743 # Ed Page (epage)
 start = "2023-02-22"
 end = "2026-05-05"
+
+[[trusted.xshell-venv]]
+criteria = "safe-to-deploy"
+user-id = 48 # Jan-Erik Rediger (badboy)
+start = "2022-04-26"
+end = "2027-10-21"
 
 [[trusted.zlib-rs]]
 criteria = "safe-to-deploy"

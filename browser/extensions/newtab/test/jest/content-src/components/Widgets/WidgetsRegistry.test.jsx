@@ -14,6 +14,8 @@ import {
   resolveWidgetSize,
   resolveWidgetOrder,
   resolveWidgetHasSidebar,
+  resolveSidebarWidget,
+  hasContentAreaWidgets,
   resolveCrosswordEndpoint,
   resolveWidgetSrc,
   resolvePrivacyBlankChance,
@@ -43,6 +45,7 @@ describe("isWidgetToggleVisible", () => {
   it("is true via trainhopConfig.widgets (addable)", () => {
     expect(
       isWidgetToggleVisible(listsWidget, {
+        region: "US",
         trainhopConfig: { widgets: { listsEnabled: true } },
       })
     ).toBe(true);
@@ -51,6 +54,7 @@ describe("isWidgetToggleVisible", () => {
   it("is true via the widgetsSettings.*Visible override", () => {
     expect(
       isWidgetToggleVisible(listsWidget, {
+        region: "US",
         trainhopConfig: { widgetsSettings: { listsVisible: true } },
       })
     ).toBe(true);
@@ -82,6 +86,7 @@ describe("privacy widget on a profile with no history", () => {
     "widgets.enabled": true,
     "widgets.privacy.enabled": true,
     "widgets.system.privacy.enabled": true,
+    region: "US",
     widgetsConfig: { privacyEnabled: true },
     trainhopConfig: {
       widgetPrivacy: { visible: true },
@@ -119,40 +124,114 @@ describe("privacy widget on a profile with no history", () => {
   });
 });
 
-// Bug 2063718: the recent searches widget requires Firefox 157, so the widget is
-// hidden outright when newtab train-hops onto an older host.
-describe("recent searches widget on a host that predates its search access point", () => {
-  const recentSearches = WIDGET_REGISTRY.find(w => w.id === "recentSearches");
-  const everythingOn = {
-    "widgets.enabled": true,
-    "widgets.recentSearches.enabled": true,
-    "widgets.system.recentSearches.enabled": true,
-    widgetsConfig: { recentSearchesEnabled: true },
-    trainhopConfig: {
-      widgets: { recentSearchesEnabled: true },
-      widgetsSettings: { recentSearchesVisible: true },
-    },
+describe("widgets on a profile with no resolved region", () => {
+  const trainhopReveal = {
+    [listsWidget.enabledPref]: true,
+    trainhopConfig: { widgets: { [listsWidget.trainhopEnabledKey]: true } },
   };
 
-  it("is not addable, visible or enabled on an older host", () => {
-    const prefs = { ...everythingOn, supportsWidgetSearchSap: false };
-    expect(isWidgetAddable(recentSearches, prefs)).toBe(false);
-    expect(isWidgetToggleVisible(recentSearches, prefs)).toBe(false);
-    expect(isWidgetEnabled(recentSearches, prefs, true)).toBe(false);
+  it("ignores a trainhopConfig.widgets reveal", () => {
+    expect(isWidgetAddable(listsWidget, trainhopReveal)).toBe(false);
+    expect(isWidgetToggleVisible(listsWidget, trainhopReveal)).toBe(false);
+    expect(isWidgetEnabled(listsWidget, trainhopReveal, true)).toBe(false);
   });
 
-  it("is unaffected on a host that knows the access point", () => {
-    const prefs = { ...everythingOn, supportsWidgetSearchSap: true };
-    expect(isWidgetAddable(recentSearches, prefs)).toBe(true);
-    expect(isWidgetToggleVisible(recentSearches, prefs)).toBe(true);
-    expect(isWidgetEnabled(recentSearches, prefs, true)).toBe(true);
+  it("ignores a widgetsSettings.*Visible reveal", () => {
+    const prefs = {
+      [listsWidget.enabledPref]: true,
+      trainhopConfig: {
+        widgetsSettings: { [listsWidget.widgetsSettingsVisibleKey]: true },
+      },
+    };
+    expect(isWidgetAddable(listsWidget, prefs)).toBe(false);
+    expect(isWidgetToggleVisible(listsWidget, prefs)).toBe(false);
+    expect(isWidgetEnabled(listsWidget, prefs, true)).toBe(false);
   });
 
-  it("leaves widgets that do not search alone", () => {
+  it("ignores a dedicated trainhopNamespace reveal", () => {
+    const potd = WIDGET_REGISTRY.find(w => w.id === "pictureOfTheDay");
+    const prefs = {
+      [potd.enabledPref]: true,
+      trainhopConfig: { [potd.trainhopNamespace]: { visible: true } },
+    };
+    expect(isWidgetAddable(potd, prefs)).toBe(false);
+    expect(isWidgetToggleVisible(potd, prefs)).toBe(false);
+    expect(isWidgetEnabled(potd, prefs, true)).toBe(false);
+  });
+
+  it("treats an empty or null region as unresolved", () => {
     expect(
-      isWidgetAddable(listsWidget, {
-        "widgets.system.lists.enabled": true,
-        supportsWidgetSearchSap: false,
+      isWidgetAddable(listsWidget, { ...trainhopReveal, region: "" })
+    ).toBe(false);
+    expect(
+      isWidgetAddable(listsWidget, { ...trainhopReveal, region: null })
+    ).toBe(false);
+  });
+
+  it("acts on the reveal as soon as any region resolves", () => {
+    const prefs = { ...trainhopReveal, region: "FR" };
+    expect(isWidgetAddable(listsWidget, prefs)).toBe(true);
+    expect(isWidgetToggleVisible(listsWidget, prefs)).toBe(true);
+    expect(isWidgetEnabled(listsWidget, prefs, true)).toBe(true);
+  });
+
+  it("leaves the system pref ungated, so a build or operator reveal still works", () => {
+    const prefs = {
+      [listsWidget.enabledPref]: true,
+      [listsWidget.systemEnabledPref]: true,
+    };
+    expect(isWidgetAddable(listsWidget, prefs)).toBe(true);
+    expect(isWidgetToggleVisible(listsWidget, prefs)).toBe(true);
+    expect(isWidgetEnabled(listsWidget, prefs, true)).toBe(true);
+  });
+
+  it("withholds the reveal without hiding a system-enabled widget", () => {
+    const prefs = {
+      ...trainhopReveal,
+      [listsWidget.systemEnabledPref]: true,
+    };
+    expect(isWidgetAddable(listsWidget, prefs)).toBe(true);
+    expect(isWidgetToggleVisible(listsWidget, prefs)).toBe(true);
+    expect(isWidgetEnabled(listsWidget, prefs, true)).toBe(true);
+    expect(
+      isWidgetsContainerVisible({
+        "widgets.system.enabled": true,
+        trainhopConfig: { widgets: { enabled: true } },
+      })
+    ).toBe(true);
+  });
+
+  it("leaves the legacy widgetsConfig toggle ungated", () => {
+    const prefs = {
+      [listsWidget.enabledPref]: true,
+      widgetsConfig: { [listsWidget.trainhopEnabledKey]: true },
+    };
+    expect(isWidgetToggleVisible(listsWidget, prefs)).toBe(true);
+    expect(isWidgetAddable(listsWidget, prefs)).toBe(false);
+    expect(isWidgetEnabled(listsWidget, prefs, true)).toBe(false);
+  });
+
+  it("gates the container's trainhop terms but not its pref terms", () => {
+    expect(
+      isWidgetsContainerVisible({
+        trainhopConfig: { widgets: { enabled: true } },
+      })
+    ).toBe(false);
+    expect(
+      isWidgetsContainerVisible({
+        trainhopConfig: { widgetsSettings: { enabled: true } },
+      })
+    ).toBe(false);
+    expect(isWidgetsContainerVisible({ "widgets.system.enabled": true })).toBe(
+      true
+    );
+    expect(
+      isWidgetsContainerVisible({ widgetsConfig: { enabled: true } })
+    ).toBe(true);
+    expect(
+      isWidgetsContainerVisible({
+        region: "FR",
+        trainhopConfig: { widgets: { enabled: true } },
       })
     ).toBe(true);
   });
@@ -172,6 +251,7 @@ describe("isWidgetsContainerVisible", () => {
   it("is true via trainhopConfig.widgets.enabled", () => {
     expect(
       isWidgetsContainerVisible({
+        region: "US",
         trainhopConfig: { widgets: { enabled: true } },
       })
     ).toBe(true);
@@ -180,6 +260,7 @@ describe("isWidgetsContainerVisible", () => {
   it("is true via widgetsSettings.enabled", () => {
     expect(
       isWidgetsContainerVisible({
+        region: "US",
         trainhopConfig: { widgetsSettings: { enabled: true } },
       })
     ).toBe(true);
@@ -211,6 +292,7 @@ describe("getWidgetOrder", () => {
       "recentSearches",
       "horoscopes",
       "travel",
+      "solitaire",
     ]);
   });
 
@@ -227,6 +309,7 @@ describe("getWidgetOrder", () => {
       "recentSearches",
       "horoscopes",
       "travel",
+      "solitaire",
     ]);
   });
 
@@ -243,6 +326,7 @@ describe("getWidgetOrder", () => {
       "recentSearches",
       "horoscopes",
       "travel",
+      "solitaire",
     ]);
   });
 
@@ -266,6 +350,7 @@ describe("getWidgetOrder", () => {
       "recentSearches",
       "horoscopes",
       "travel",
+      "solitaire",
     ]);
     expect(result.length).toBe(registryIds.length);
   });
@@ -293,6 +378,7 @@ describe("resolveWidgetOrder", () => {
       "recentSearches",
       "horoscopes",
       "travel",
+      "solitaire",
     ]);
   });
 
@@ -314,6 +400,7 @@ describe("resolveWidgetOrder", () => {
       "recentSearches",
       "horoscopes",
       "travel",
+      "solitaire",
     ]);
   });
 
@@ -335,6 +422,7 @@ describe("resolveWidgetOrder", () => {
       "recentSearches",
       "horoscopes",
       "travel",
+      "solitaire",
     ]);
   });
 });
@@ -354,6 +442,7 @@ describe("isWidgetAddable", () => {
     expect(
       isWidgetAddable(listsWidget, {
         [listsWidget.systemEnabledPref]: false,
+        region: "US",
         trainhopConfig: {
           widgets: { [listsWidget.trainhopEnabledKey]: true },
         },
@@ -373,6 +462,7 @@ describe("isWidgetAddable", () => {
     expect(
       isWidgetAddable(listsWidget, {
         [listsWidget.systemEnabledPref]: false,
+        region: "US",
         trainhopConfig: { widgetsSettings: { listsVisible: true } },
       })
     ).toBe(true);
@@ -392,6 +482,7 @@ describe("isWidgetAddable", () => {
     expect(
       isWidgetAddable(potd, {
         [potd.systemEnabledPref]: false,
+        region: "US",
         trainhopConfig: { widgetPictureOfTheDay: { visible: true } },
       })
     ).toBe(true);
@@ -402,6 +493,7 @@ describe("isWidgetAddable", () => {
     expect(
       isWidgetAddable(crossword, {
         [crossword.systemEnabledPref]: false,
+        region: "US",
         trainhopConfig: { widgetCrossword: { visible: true } },
       })
     ).toBe(true);
@@ -414,7 +506,7 @@ describe("isWidgetAddable", () => {
     "makes privacy addable via %s despite its preffed-off default",
     (type, payload) => {
       const privacy = WIDGET_REGISTRY.find(w => w.id === "privacy");
-      const prefs = { [privacy.systemEnabledPref]: false };
+      const prefs = { [privacy.systemEnabledPref]: false, region: "US" };
       expect(isWidgetAddable(privacy, prefs)).toBe(false);
       expect(
         isWidgetAddable(privacy, {
@@ -430,6 +522,7 @@ describe("isWidgetAddable", () => {
     expect(
       isWidgetAddable(privacy, {
         [privacy.systemEnabledPref]: false,
+        region: "US",
         trainhopConfig: { widgetPrivacy: { visible: true } },
       })
     ).toBe(true);
@@ -442,7 +535,7 @@ describe("isWidgetAddable", () => {
     "makes stocks addable via %s despite its preffed-off default",
     (type, payload) => {
       const stocks = WIDGET_REGISTRY.find(w => w.id === "stocks");
-      const prefs = { [stocks.systemEnabledPref]: false };
+      const prefs = { [stocks.systemEnabledPref]: false, region: "US" };
       expect(isWidgetAddable(stocks, prefs)).toBe(false);
       expect(
         isWidgetAddable(stocks, {
@@ -465,7 +558,7 @@ describe("isWidgetAddable", () => {
       );
       const prefs = {
         [recentSearches.systemEnabledPref]: false,
-        supportsWidgetSearchSap: true,
+        region: "US",
       };
       expect(isWidgetAddable(recentSearches, prefs)).toBe(false);
       expect(
@@ -482,6 +575,7 @@ describe("isWidgetAddable", () => {
     expect(
       isWidgetAddable(recentSearches, {
         [recentSearches.systemEnabledPref]: false,
+        region: "US",
         trainhopConfig: { widgetRecentSearches: { visible: true } },
       })
     ).toBe(true);
@@ -492,6 +586,7 @@ describe("isWidgetAddable", () => {
     expect(
       isWidgetAddable(horoscopes, {
         [horoscopes.systemEnabledPref]: false,
+        region: "US",
         trainhopConfig: { widgetHoroscopes: { visible: true } },
       })
     ).toBe(true);
@@ -502,7 +597,19 @@ describe("isWidgetAddable", () => {
     expect(
       isWidgetAddable(travel, {
         [travel.systemEnabledPref]: false,
+        region: "US",
         trainhopConfig: { widgetTravel: { visible: true } },
+      })
+    ).toBe(true);
+  });
+
+  it("is addable when revealed via the dedicated widgetSolitaire namespace", () => {
+    const solitaire = WIDGET_REGISTRY.find(w => w.id === "solitaire");
+    expect(
+      isWidgetAddable(solitaire, {
+        [solitaire.systemEnabledPref]: false,
+        region: "US",
+        trainhopConfig: { widgetSolitaire: { visible: true } },
       })
     ).toBe(true);
   });
@@ -570,6 +677,7 @@ describe("isWidgetEnabled", () => {
         {
           [listsWidget.enabledPref]: true,
           [listsWidget.systemEnabledPref]: false,
+          region: "US",
           trainhopConfig: {
             widgets: { [listsWidget.trainhopEnabledKey]: true },
           },
@@ -720,6 +828,122 @@ describe("resolveWidgetHasSidebar", () => {
   });
 });
 
+describe("resolveSidebarWidget", () => {
+  const weatherWidget = WIDGET_REGISTRY.find(w => w.id === "weather");
+  const privacyWidget = WIDGET_REGISTRY.find(w => w.id === "privacy");
+
+  const weatherSmall = {
+    "widgets.enabled": true,
+    [weatherWidget.enabledPref]: true,
+    [weatherWidget.systemEnabledPref]: true,
+    [weatherWidget.sizePref]: "small",
+  };
+  const privacySmall = {
+    "widgets.enabled": true,
+    [privacyWidget.enabledPref]: true,
+    [privacyWidget.systemEnabledPref]: true,
+    [privacyWidget.sizePref]: "small",
+    trainhopConfig: {
+      widgets: { [privacyWidget.trainhopSidebarKey]: true },
+    },
+  };
+
+  it("returns null when nothing qualifies", () => {
+    expect(resolveSidebarWidget({ "widgets.enabled": true })).toBeNull();
+  });
+
+  it("returns weather when it is enabled and small", () => {
+    expect(resolveSidebarWidget(weatherSmall)).toBe(weatherWidget);
+  });
+
+  it("honors an explicit widgetsEnabled argument over the pref", () => {
+    expect(
+      resolveSidebarWidget({ ...weatherSmall, "widgets.enabled": false }, true)
+    ).toBe(weatherWidget);
+  });
+
+  it("returns null when the widget is not small", () => {
+    expect(
+      resolveSidebarWidget({
+        ...weatherSmall,
+        [weatherWidget.sizePref]: "medium",
+      })
+    ).toBeNull();
+  });
+
+  it("does not place privacy in the sidebar by default", () => {
+    expect(
+      resolveSidebarWidget({ ...privacySmall, trainhopConfig: {} })
+    ).toBeNull();
+  });
+
+  it("returns privacy when trainhop turns its sidebar placement on at small", () => {
+    expect(resolveSidebarWidget(privacySmall)).toBe(privacyWidget);
+  });
+
+  it("returns only the first qualifying widget in registry order", () => {
+    const both = { ...weatherSmall, ...privacySmall };
+    expect(resolveSidebarWidget(both)).toBe(weatherWidget);
+  });
+});
+
+describe("hasContentAreaWidgets", () => {
+  const weatherWidget = WIDGET_REGISTRY.find(w => w.id === "weather");
+  const privacyWidget = WIDGET_REGISTRY.find(w => w.id === "privacy");
+  const listsWidget = WIDGET_REGISTRY.find(w => w.id === "lists");
+
+  const weatherSmall = {
+    "widgets.enabled": true,
+    [weatherWidget.enabledPref]: true,
+    [weatherWidget.systemEnabledPref]: true,
+    [weatherWidget.sizePref]: "small",
+  };
+  const privacyEnabled = {
+    [privacyWidget.enabledPref]: true,
+    [privacyWidget.systemEnabledPref]: true,
+  };
+  const listsEnabled = {
+    [listsWidget.enabledPref]: true,
+    [listsWidget.systemEnabledPref]: true,
+  };
+
+  it("is false when no widget is enabled", () => {
+    expect(hasContentAreaWidgets({ "widgets.enabled": true })).toBe(false);
+  });
+
+  it("is false when the only enabled widget sits in the sidebar", () => {
+    expect(hasContentAreaWidgets(weatherSmall)).toBe(false);
+  });
+
+  it("is true when another widget is enabled beside the sidebar one", () => {
+    expect(hasContentAreaWidgets({ ...weatherSmall, ...listsEnabled })).toBe(
+      true
+    );
+  });
+
+  it("is false when privacy is the only widget and it sits in the sidebar", () => {
+    expect(
+      hasContentAreaWidgets({
+        "widgets.enabled": true,
+        ...privacyEnabled,
+        [privacyWidget.sizePref]: "small",
+        trainhopConfig: {
+          widgets: { [privacyWidget.trainhopSidebarKey]: true },
+        },
+      })
+    ).toBe(false);
+  });
+
+  it("uses the widgetsEnabled argument instead of the pref", () => {
+    expect(
+      hasContentAreaWidgets({ "widgets.enabled": false, ...listsEnabled }, true)
+    ).toBe(true);
+    expect(
+      hasContentAreaWidgets({ "widgets.enabled": true, ...listsEnabled }, false)
+    ).toBe(false);
+  });
+});
+
 describe("resolveCrosswordEndpoint", () => {
   const dedicatedEndpoint = "https://dedicated.example.com/index.html";
   const sharedEndpoint = "https://shared.example.com/index.html";
@@ -793,10 +1017,7 @@ describe("getWidgets", () => {
     const src = "moz-extension://test/w.html";
     expect(
       getWidgets([extensionWidget], {
-        [extensionWidget.extensionID]: {
-          src,
-          customizeL10nId: "extension-label",
-        },
+        [extensionWidget.extensionID]: { src },
       })
     ).toEqual([{ ...extensionWidget, src }]);
   });
@@ -1115,6 +1336,7 @@ describe("WIDGET_REGISTRY customize panel fields", () => {
     recentSearches: "WIDGET_RECENT_SEARCHES",
     horoscopes: "WIDGET_HOROSCOPES",
     travel: "WIDGET_TRAVEL",
+    solitaire: "WIDGET_SOLITAIRE",
   };
 
   it("gives every active entry a customizeL10nId", () => {

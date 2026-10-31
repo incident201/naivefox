@@ -68,8 +68,12 @@ XPCOM_MANIFESTS += [
     "components.conf",
 ]
 
+# MOZ_SRC_FILES doesn't support generated files.
 EXTRA_JS_MODULES += [
     "!SpeechRecognitionModelDisplayInfo.sys.mjs",
+]
+
+MOZ_SRC_FILES += [
     "SpeechRecognitionFeature.sys.mjs",
 ]
 

@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-// eslint-disable-next-line import/no-unresolved
+// eslint-disable-next-line import-x/no-unresolved
 import { html, ifDefined } from "lit.all.mjs";
 import "./moz-widget.mjs";
 
@@ -53,10 +53,9 @@ const headerTemplate = ({
   badge,
   backButton,
   trailingButton,
-  menu,
   menuLabel,
 }) =>
-  headerTitle || badge || backButton || trailingButton || menu
+  headerTitle || badge || backButton || trailingButton
     ? html`<moz-widget-header
         slot="header"
         title=${ifDefined(headerTitle)}
@@ -83,25 +82,37 @@ const headerTemplate = ({
               data-l10n-id="moz-widget-units-button"
             ></moz-button>`
           : ""}
-        ${menu
-          ? html`<panel-list slot="menu" id="moz-widget-menu">
-              <panel-item data-l10n-id="moz-widget-menu-refresh"></panel-item>
-              <hr />
-              <panel-item data-l10n-id="moz-widget-menu-remove"></panel-item>
-            </panel-list>`
-          : ""}
       </moz-widget-header>`
     : "";
 
-const Template = ({ size, widgetId, title, l10nId, padded, ...header }) => html`
+const menuTemplate = menu =>
+  menu
+    ? html`<panel-list slot="menu" id="moz-widget-menu">
+        <panel-item data-l10n-id="moz-widget-menu-refresh"></panel-item>
+        <hr />
+        <panel-item data-l10n-id="moz-widget-menu-remove"></panel-item>
+      </panel-list>`
+    : "";
+
+const Template = ({
+  size,
+  widgetId,
+  title,
+  l10nId,
+  padded,
+  menu,
+  menuLabel,
+  ...header
+}) => html`
   <moz-widget
     size=${size}
     widget-id=${widgetId}
     title=${title}
     data-l10n-id=${ifDefined(l10nId)}
     ?padded=${padded}
+    menu-label=${ifDefined(menuLabel)}
   >
-    ${headerTemplate(header)}
+    ${headerTemplate({ ...header, menuLabel })} ${menuTemplate(menu)}
     <section style="padding: 1rem;">
       <p>Any HTML can go in the default slot.</p>
     </section>
@@ -115,6 +126,8 @@ const FramedTemplate = ({
   l10nId,
   padded,
   src,
+  menu,
+  menuLabel,
   ...header
 }) => html`
   <moz-widget
@@ -123,9 +136,10 @@ const FramedTemplate = ({
     title=${title}
     data-l10n-id=${ifDefined(l10nId)}
     ?padded=${padded}
+    menu-label=${ifDefined(menuLabel)}
     src=${src}
   >
-    ${headerTemplate(header)}
+    ${headerTemplate({ ...header, menuLabel })} ${menuTemplate(menu)}
   </moz-widget>
 `;
 
@@ -163,5 +177,12 @@ HeaderActions.args = {
   badge: "new",
   backButton: true,
   trailingButton: true,
+  menu: true,
+};
+
+export const WithoutHeader = FramedTemplate.bind({});
+WithoutHeader.args = {
+  ...Framed.args,
+  headerTitle: undefined,
   menu: true,
 };

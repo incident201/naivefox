@@ -142,6 +142,8 @@ export const INITIAL_STATE = {
     inferredInterests: {},
     coarseInferredInterests: {},
     coarsePrivateInferredInterests: {},
+    locationPrivateInferredInterests: null,
+    shouldUseLocationVector: false,
     debugFeatures: null,
     inferredTelemetrySettingsOverrides: {},
   },
@@ -217,6 +219,7 @@ export const INITIAL_STATE = {
     author: "",
     licenseLabel: "",
     licenseUrl: "",
+    previous: null,
     error: null,
   },
   ListsWidget: {
@@ -748,6 +751,9 @@ function InferredPersonalization(
         coarseInferredInterests: action.data.coarseInferredInterests,
         coarsePrivateInferredInterests:
           action.data.coarsePrivateInferredInterests,
+        locationPrivateInferredInterests:
+          action.data.locationPrivateInferredInterests ?? null,
+        shouldUseLocationVector: action.data.shouldUseLocationVector ?? false,
         inferredTelemetrySettingsOverrides:
           action.data.inferredTelemetrySettingsOverrides,
         lastUpdated: action.data.lastUpdated,
@@ -1258,6 +1264,7 @@ const PictureOfTheDay = (prevState = INITIAL_STATE.PictureOfTheDay, action) => {
         author: action.data.author ?? "",
         licenseLabel: action.data.licenseLabel ?? "",
         licenseUrl: action.data.licenseUrl ?? "",
+        previous: action.data.previous ?? null,
         lastUpdated: action.data.lastUpdated ?? null,
         error: action.data.error ?? null,
         initialized: true,
