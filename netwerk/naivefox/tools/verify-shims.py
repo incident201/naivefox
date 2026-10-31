@@ -135,26 +135,16 @@ def test_necko_channel_params(topsrcdir):
 
     assert "PreferredAlternativeDataTypeParams" in hdr_text
     assert "ProxyInfoCloneArgs" in hdr_text
-    assert "HttpConnectionInfoCloneArgs" in hdr_text
-    assert "CookieStruct" in hdr_text
-    assert "HttpActivityArgs" in hdr_text
     upstream = (
         Path(topsrcdir) / "netwerk" / "ipc" / "NeckoChannelParams.ipdlh"
     ).read_text(encoding="utf-8")
-    upstream_fields = upstream.split("struct HttpConnectionInfoCloneArgs", 1)[1].split(
-        "};", 1
-    )[0]
-    shim_fields = hdr_text.split("class HttpConnectionInfoCloneArgs", 1)[1].split(
-        "private:", 1
-    )[0]
-    upstream_names = set(
-        re.findall(r"^\s*[\w<>?,\[\] ]+\s+(\w+);", upstream_fields, re.M)
-    )
-    shim_names = set(re.findall(r"^\s*NF_FIELD\([^,]+,\s*(\w+)\)", shim_fields, re.M))
-    assert upstream_names == shim_names, (
-        f"HTTP connection clone schema differs: missing={upstream_names - shim_names}, "
-        f"extra={shim_names - upstream_names}"
-    )
+    for removed in ("HttpConnectionInfoCloneArgs", "TransactionObserverResult"):
+        assert removed not in hdr_text, removed
+        assert f"struct {removed}" not in upstream, removed
+    assert "HttpActivityArgs" not in hdr_text
+    assert (
+        Path(topsrcdir) / "netwerk" / "protocol" / "http" / "HttpActivityArgs.h"
+    ).is_file()
     print("  PASS: In-process Necko parameter records verified.")
     return True
 

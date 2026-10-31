@@ -139,7 +139,7 @@ nsresult CliSignalStop::Start(LocalProxyServerControl* aControl) {
   if (mImpl) {
     return NS_ERROR_ALREADY_INITIALIZED;
   }
-  auto state = MakeUnique<Impl>(aControl);
+  auto state = std::make_unique<Impl>(aControl);
   nsresult rv = state->Start();
   if (NS_FAILED(rv)) {
     return rv;

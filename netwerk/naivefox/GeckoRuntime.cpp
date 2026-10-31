@@ -359,7 +359,7 @@ nsresult GeckoRuntime::InitializeWithLocations(
       new DirectoryProvider(aProfile, mBinDirectory, mExecutable);
   mDirectoryProvider = provider;
 
-  mSQLiteLifetime = MakeUnique<AutoSQLiteLifetime>();
+  mSQLiteLifetime = std::make_unique<AutoSQLiteLifetime>();
   MOZ_TRY(NS_InitXPCOM(nullptr, mBinDirectory, mDirectoryProvider));
   mXPCOMInitialized = true;
 
@@ -399,7 +399,7 @@ nsresult GeckoRuntime::InitializeWithLocations(
   MOZ_TRY(observers->NotifyObservers(nullptr, "profile-do-change", u"startup"));
   net_EnsurePSMInit();
 
-  mTemporaryTrustStore = MakeUnique<TemporaryTrustStore>();
+  mTemporaryTrustStore = std::make_unique<TemporaryTrustStore>();
   nsAutoCString trustError;
   nsresult trustRv = mTemporaryTrustStore->LoadFromEnvironment(trustError);
   if (NS_FAILED(trustRv)) {

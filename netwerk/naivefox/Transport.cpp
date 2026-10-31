@@ -66,7 +66,7 @@ class CarrierRequest final : public nsIStreamListener {
         mDone(std::move(aDone)),
         mBodyKind(aBodyKind) {
     if (aBodyKind == CarrierBody::Document) {
-      mSite = MakeUnique<TransportSite>();
+      mSite = std::make_unique<TransportSite>();
     }
   }
 
@@ -533,7 +533,7 @@ TransportStream::TransportStream(nsIAsyncInputStream* aInput,
                                  std::function<void()>&& aEstablished,
                                  std::function<void(nsresult)>&& aFailed,
                                  std::function<void(nsresult)>&& aClosed)
-    : mImpl(MakeUnique<Impl>(aInput, aOutput, aConfig, aSocketTarget,
+    : mImpl(std::make_unique<Impl>(aInput, aOutput, aConfig, aSocketTarget,
                              std::move(aEstablished), std::move(aFailed),
                              std::move(aClosed))) {}
 
@@ -769,7 +769,7 @@ void TransportCarrier::Attach(TransportStream* aStream) {
   }
   auto& s = *aStream->mImpl;
   s.carrier = this;
-  s.state = MakeUnique<wire::StreamState>(
+  s.state = std::make_unique<wire::StreamState>(
       ++mHighestStream, mConfig.mProtocol == ProxyProtocol::H3,
       !mConfig.mServerPin.IsEmpty());
   mStreams.push_back(aStream);

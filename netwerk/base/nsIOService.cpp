@@ -47,6 +47,7 @@
 #include "netCore.h"
 #include "nsAsyncRedirectVerifyHelper.h"
 #include "nsCRT.h"
+#include "nsCharSeparatedTokenizer.h"
 #include "nsDNSService2.h"
 #include "nsEscape.h"
 #include "nsICancelable.h"

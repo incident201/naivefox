@@ -34,6 +34,10 @@ class StoragePrincipalHelper final {
                                                  OriginAttributes& aAttrs) {
     return Copy(aChannel, aAttrs);
   }
+  static bool GetOriginAttributesForHttpConnection(nsIChannel* aChannel, bool,
+                                                   OriginAttributes& aAttrs) {
+    return Copy(aChannel, aAttrs);
+  }
 
  private:
   static bool Copy(nsIChannel* aChannel, OriginAttributes& aAttrs) {

@@ -595,7 +595,7 @@ TransportPacket::TransportPacket(
     std::function<void()>&& aReady,
     std::function<bool(const Bytes&, bool)>&& aCell,
     std::function<void()>&& aWritable, std::function<void(nsresult)>&& aFailed)
-    : mImpl(MakeUnique<Impl>(this)) {
+    : mImpl(std::make_unique<Impl>(this)) {
   mImpl->ready = std::move(aReady);
   mImpl->cell = std::move(aCell);
   mImpl->writable = std::move(aWritable);

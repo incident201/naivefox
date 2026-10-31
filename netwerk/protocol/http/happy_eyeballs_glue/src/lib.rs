@@ -12,7 +12,10 @@ mod metrics {
     pub(crate) struct Metrics;
 
     impl Metrics {
-        pub(crate) fn new(_alt_svc: &[happy_eyeballs::AltSvc]) -> Self {
+        pub(crate) fn new(
+            _alt_svc: &[happy_eyeballs::AltSvc],
+            _preferred: happy_eyeballs::DnsRecordType,
+        ) -> Self {
             Self
         }
 

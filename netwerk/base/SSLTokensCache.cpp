@@ -1818,7 +1818,6 @@ SSLTokensCache::BlockShutdown(nsIAsyncShutdownClient* /* aClient */) {
           [self](bool) { self->RemoveShutdownBlocker(); },
           [self](nsresult) { self->RemoveShutdownBlocker(); });
   return NS_OK;
-#endif
 }
 
 NS_IMETHODIMP

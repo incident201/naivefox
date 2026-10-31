@@ -52,7 +52,7 @@ nsHtml5TreeBuilder::~nsHtml5TreeBuilder() {
 }
 
 nsIContentHandle* nsHtml5TreeBuilder::AllocateContentHandle() {
-  auto handle = mozilla::MakeUnique<uint8_t>(0);
+  auto handle = std::make_unique<uint8_t>(0);
   nsIContentHandle* opaque = reinterpret_cast<nsIContentHandle*>(handle.get());
   mHandles.AppendElement(std::move(handle));
   return opaque;

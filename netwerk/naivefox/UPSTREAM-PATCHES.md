@@ -419,14 +419,16 @@ actors, browser policy containers, crash reporting, CTAP cable services and
 the profile cookie store. New upstream references to these browser services
 must be excluded only under MOZ_NAIVEFOX. Remote origin process types and the
 DOM certificate Promise fail closed in the lean build. The product's in-process
-HTTP connection record and WebTransport statistics record track the upstream
-IPDL field schemas without compiling their actor protocols. Ordinary Firefox
-builds keep the upstream paths and behavior.
+WebTransport statistics record tracks the upstream IPDL field schema without
+compiling its actor protocol; records Firefox no longer declares in IPDL, such
+as the HTTP connection clone and transaction observer records, must not be
+reintroduced as shims. Ordinary Firefox builds keep the upstream paths and
+behavior.
 The closure rule admits only `dom/ipc/RemoteType.cpp` as a process-kind value
 helper; other DOM IPC implementations remain forbidden.
 
-Review obligations: compare both value records to their IPDL schemas with
-verify-shims.py, run all three product builds and closure checks, verify staged
+Review obligations: compare the retained value records to their IPDL schemas
+with verify-shims.py, run all three product builds and closure checks, verify staged
 startup and strict H2/H3 routing, and test certificate rejection and local
 listener lifecycle. Keep cache encryption fail closed and exclude only the
 unused browser service registrations and cookie write queue.
