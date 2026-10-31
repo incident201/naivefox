@@ -320,7 +320,7 @@
     {
       "manifest_path": "third_party/rust/bindgen/Cargo.toml",
       "name": "bindgen",
-      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "source": null,
       "target_entry_points": [
         "third_party/rust/bindgen/build.rs",
         "third_party/rust/bindgen/lib.rs"
@@ -1009,16 +1009,16 @@
       "target_entry_points": [
         "third_party/rust/glean/src/lib.rs"
       ],
-      "version": "70.2.1"
+      "version": "71.0.0"
     },
     {
       "manifest_path": "third_party/rust/glean-build/Cargo.toml",
       "name": "glean-build",
-      "source": "git+https://github.com/mozilla/glean?tag=v70.2.0#9d987fd33e1dc3f2a89e5f5c4565ae696245f6eb",
+      "source": "git+https://github.com/mozilla/glean?tag=v71.0.0#c7f1204c8945030f1b5c8b524de5753c0e0d7f2c",
       "target_entry_points": [
         "third_party/rust/glean-build/src/lib.rs"
       ],
-      "version": "20.1.0"
+      "version": "22.0.1"
     },
     {
       "manifest_path": "third_party/rust/glean-core/Cargo.toml",
@@ -1028,7 +1028,7 @@
         "third_party/rust/glean-core/build.rs",
         "third_party/rust/glean-core/src/lib.rs"
       ],
-      "version": "70.2.1"
+      "version": "71.0.0"
     },
     {
       "manifest_path": "third_party/rust/glob/Cargo.toml",
@@ -1612,7 +1612,7 @@
     {
       "manifest_path": "third_party/rust/mtu/Cargo.toml",
       "name": "mtu",
-      "source": "git+https://github.com/mozilla/neqo?tag=v0.33.0#1ec4c2a3ccd7ada264112d1b70b070381557d844",
+      "source": "git+https://github.com/mozilla/neqo?tag=v0.34.0#e302b43503f44e09f4257573dd320621516d1560",
       "target_entry_points": [
         "third_party/rust/mtu/build.rs",
         "third_party/rust/mtu/src/bin/mtu-lookup.rs",
@@ -1632,49 +1632,49 @@
     {
       "manifest_path": "third_party/rust/neqo-common/Cargo.toml",
       "name": "neqo-common",
-      "source": "git+https://github.com/mozilla/neqo?tag=v0.33.0#1ec4c2a3ccd7ada264112d1b70b070381557d844",
+      "source": "git+https://github.com/mozilla/neqo?tag=v0.34.0#e302b43503f44e09f4257573dd320621516d1560",
       "target_entry_points": [
         "third_party/rust/neqo-common/build.rs",
         "third_party/rust/neqo-common/src/lib.rs"
       ],
-      "version": "0.33.0"
+      "version": "0.34.0"
     },
     {
       "manifest_path": "third_party/rust/neqo-http3/Cargo.toml",
       "name": "neqo-http3",
-      "source": "git+https://github.com/mozilla/neqo?tag=v0.33.0#1ec4c2a3ccd7ada264112d1b70b070381557d844",
+      "source": "git+https://github.com/mozilla/neqo?tag=v0.34.0#e302b43503f44e09f4257573dd320621516d1560",
       "target_entry_points": [
         "third_party/rust/neqo-http3/src/lib.rs"
       ],
-      "version": "0.33.0"
+      "version": "0.34.0"
     },
     {
       "manifest_path": "third_party/rust/neqo-qpack/Cargo.toml",
       "name": "neqo-qpack",
-      "source": "git+https://github.com/mozilla/neqo?tag=v0.33.0#1ec4c2a3ccd7ada264112d1b70b070381557d844",
+      "source": "git+https://github.com/mozilla/neqo?tag=v0.34.0#e302b43503f44e09f4257573dd320621516d1560",
       "target_entry_points": [
         "third_party/rust/neqo-qpack/src/lib.rs"
       ],
-      "version": "0.33.0"
+      "version": "0.34.0"
     },
     {
       "manifest_path": "third_party/rust/neqo-transport/Cargo.toml",
       "name": "neqo-transport",
-      "source": "git+https://github.com/mozilla/neqo?tag=v0.33.0#1ec4c2a3ccd7ada264112d1b70b070381557d844",
+      "source": "git+https://github.com/mozilla/neqo?tag=v0.34.0#e302b43503f44e09f4257573dd320621516d1560",
       "target_entry_points": [
         "third_party/rust/neqo-transport/src/lib.rs"
       ],
-      "version": "0.33.0"
+      "version": "0.34.0"
     },
     {
       "manifest_path": "third_party/rust/neqo-udp/Cargo.toml",
       "name": "neqo-udp",
-      "source": "git+https://github.com/mozilla/neqo?tag=v0.33.0#1ec4c2a3ccd7ada264112d1b70b070381557d844",
+      "source": "git+https://github.com/mozilla/neqo?tag=v0.34.0#e302b43503f44e09f4257573dd320621516d1560",
       "target_entry_points": [
         "third_party/rust/neqo-udp/build.rs",
         "third_party/rust/neqo-udp/src/lib.rs"
       ],
-      "version": "0.33.0"
+      "version": "0.34.0"
     },
     {
       "manifest_path": "netwerk/socket/neqo_glue/Cargo.toml",
@@ -1724,12 +1724,12 @@
     {
       "manifest_path": "third_party/rust/nss-rs/Cargo.toml",
       "name": "nss-rs",
-      "source": "git+https://github.com/mozilla/nss-rs#ba8a3f6acffc7e25749054969ccbbb3ca615df7f",
+      "source": "git+https://github.com/mozilla/nss-rs#bb8ed19e82679e613a636f530d15ddc823f1b040",
       "target_entry_points": [
         "third_party/rust/nss-rs/build.rs",
         "third_party/rust/nss-rs/src/lib.rs"
       ],
-      "version": "0.16.1"
+      "version": "0.16.2"
     },
     {
       "manifest_path": "xpcom/rust/nsstring/Cargo.toml",
@@ -2993,7 +2993,7 @@
       "target_entry_points": [
         "third_party/rust/xshell-venv/src/lib.rs"
       ],
-      "version": "2.0.0"
+      "version": "2.0.1"
     },
     {
       "manifest_path": "third_party/rust/yoke/Cargo.toml",
@@ -3436,7 +3436,7 @@
       "license_file": null,
       "manifest_path": "third_party/rust/bindgen/Cargo.toml",
       "name": "bindgen",
-      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "source": null,
       "version": "0.73.1"
     },
     {
@@ -4438,8 +4438,8 @@
       "license_file": null,
       "manifest_path": "third_party/rust/glean-build/Cargo.toml",
       "name": "glean-build",
-      "source": "git+https://github.com/mozilla/glean?tag=v70.2.0#9d987fd33e1dc3f2a89e5f5c4565ae696245f6eb",
-      "version": "20.1.0"
+      "source": "git+https://github.com/mozilla/glean?tag=v71.0.0#c7f1204c8945030f1b5c8b524de5753c0e0d7f2c",
+      "version": "22.0.1"
     },
     {
       "license": "MIT OR Apache-2.0",
@@ -5322,7 +5322,7 @@
       "license_file": null,
       "manifest_path": "third_party/rust/mtu/Cargo.toml",
       "name": "mtu",
-      "source": "git+https://github.com/mozilla/neqo?tag=v0.33.0#1ec4c2a3ccd7ada264112d1b70b070381557d844",
+      "source": "git+https://github.com/mozilla/neqo?tag=v0.34.0#e302b43503f44e09f4257573dd320621516d1560",
       "version": "0.4.1"
     },
     {
@@ -5350,8 +5350,8 @@
       "license_file": null,
       "manifest_path": "third_party/rust/neqo-common/Cargo.toml",
       "name": "neqo-common",
-      "source": "git+https://github.com/mozilla/neqo?tag=v0.33.0#1ec4c2a3ccd7ada264112d1b70b070381557d844",
-      "version": "0.33.0"
+      "source": "git+https://github.com/mozilla/neqo?tag=v0.34.0#e302b43503f44e09f4257573dd320621516d1560",
+      "version": "0.34.0"
     },
     {
       "license": "MIT OR Apache-2.0",
@@ -5362,8 +5362,8 @@
       "license_file": null,
       "manifest_path": "third_party/rust/neqo-http3/Cargo.toml",
       "name": "neqo-http3",
-      "source": "git+https://github.com/mozilla/neqo?tag=v0.33.0#1ec4c2a3ccd7ada264112d1b70b070381557d844",
-      "version": "0.33.0"
+      "source": "git+https://github.com/mozilla/neqo?tag=v0.34.0#e302b43503f44e09f4257573dd320621516d1560",
+      "version": "0.34.0"
     },
     {
       "license": "MIT OR Apache-2.0",
@@ -5374,8 +5374,8 @@
       "license_file": null,
       "manifest_path": "third_party/rust/neqo-qpack/Cargo.toml",
       "name": "neqo-qpack",
-      "source": "git+https://github.com/mozilla/neqo?tag=v0.33.0#1ec4c2a3ccd7ada264112d1b70b070381557d844",
-      "version": "0.33.0"
+      "source": "git+https://github.com/mozilla/neqo?tag=v0.34.0#e302b43503f44e09f4257573dd320621516d1560",
+      "version": "0.34.0"
     },
     {
       "license": "MIT OR Apache-2.0",
@@ -5386,8 +5386,8 @@
       "license_file": null,
       "manifest_path": "third_party/rust/neqo-transport/Cargo.toml",
       "name": "neqo-transport",
-      "source": "git+https://github.com/mozilla/neqo?tag=v0.33.0#1ec4c2a3ccd7ada264112d1b70b070381557d844",
-      "version": "0.33.0"
+      "source": "git+https://github.com/mozilla/neqo?tag=v0.34.0#e302b43503f44e09f4257573dd320621516d1560",
+      "version": "0.34.0"
     },
     {
       "license": "MIT OR Apache-2.0",
@@ -5398,8 +5398,8 @@
       "license_file": null,
       "manifest_path": "third_party/rust/neqo-udp/Cargo.toml",
       "name": "neqo-udp",
-      "source": "git+https://github.com/mozilla/neqo?tag=v0.33.0#1ec4c2a3ccd7ada264112d1b70b070381557d844",
-      "version": "0.33.0"
+      "source": "git+https://github.com/mozilla/neqo?tag=v0.34.0#e302b43503f44e09f4257573dd320621516d1560",
+      "version": "0.34.0"
     },
     {
       "license": "MPL-2.0",
@@ -5478,8 +5478,8 @@
       "license_file": null,
       "manifest_path": "third_party/rust/nss-rs/Cargo.toml",
       "name": "nss-rs",
-      "source": "git+https://github.com/mozilla/nss-rs#ba8a3f6acffc7e25749054969ccbbb3ca615df7f",
-      "version": "0.16.1"
+      "source": "git+https://github.com/mozilla/nss-rs#bb8ed19e82679e613a636f530d15ddc823f1b040",
+      "version": "0.16.2"
     },
     {
       "license": "MPL-2.0",
@@ -7425,7 +7425,7 @@
       "manifest_path": "third_party/rust/xshell-venv/Cargo.toml",
       "name": "xshell-venv",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
-      "version": "2.0.0"
+      "version": "2.0.1"
     },
     {
       "license": "Unicode-3.0",
@@ -7593,9 +7593,9 @@
     "cargo:cbindgen-manifest-parse-entry": 423,
     "cargo:git-patch-entry": 27,
     "cargo:git-patch-manifest": 13,
-    "cargo:local-patch-metadata": 86,
-    "cargo:local-patch-target-entry": 126,
-    "cargo:target-build-closure": 9773,
+    "cargo:local-patch-metadata": 87,
+    "cargo:local-patch-target-entry": 128,
+    "cargo:target-build-closure": 9782,
     "cargo:target-manifest-parse-closure": 330,
     "cargo:target-manifest-parse-entry": 383,
     "cargo:vendor-checksum-index": 635,
@@ -7607,15 +7607,15 @@
     "make:active-source-fragment-input": 31,
     "make:core-build-infrastructure": 15,
     "mozbuild:active-gyp-entry": 1,
-    "objdir:backend.RecursiveMakeBackend.in": 434,
+    "objdir:backend.RecursiveMakeBackend.in": 545,
     "objdir:component-manifest": 16,
     "objdir:config_status_deps.in": 246,
-    "objdir:generated-action-depfile": 5719,
-    "objdir:generated-action-relative-depfile": 1431,
-    "objdir:generated-make-fragment-source": 870,
-    "objdir:generated-make-prerequisite": 858,
-    "objdir:install-manifest-pattern": 516,
-    "objdir:install-manifest-source": 1764,
+    "objdir:generated-action-depfile": 5737,
+    "objdir:generated-action-relative-depfile": 1433,
+    "objdir:generated-make-fragment-source": 871,
+    "objdir:generated-make-prerequisite": 859,
+    "objdir:install-manifest-pattern": 517,
+    "objdir:install-manifest-source": 1732,
     "python:build-site-manifest": 1,
     "python:build-site-package": 1393
   },
@@ -7869,7 +7869,7 @@
     {
       "manifest_path": "third_party/rust/bindgen/Cargo.toml",
       "name": "bindgen",
-      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "source": null,
       "target_entry_points": [
         "third_party/rust/bindgen/build.rs",
         "third_party/rust/bindgen/lib.rs"
@@ -8576,16 +8576,16 @@
       "target_entry_points": [
         "third_party/rust/glean/src/lib.rs"
       ],
-      "version": "70.2.1"
+      "version": "71.0.0"
     },
     {
       "manifest_path": "third_party/rust/glean-build/Cargo.toml",
       "name": "glean-build",
-      "source": "git+https://github.com/mozilla/glean?tag=v70.2.0#9d987fd33e1dc3f2a89e5f5c4565ae696245f6eb",
+      "source": "git+https://github.com/mozilla/glean?tag=v71.0.0#c7f1204c8945030f1b5c8b524de5753c0e0d7f2c",
       "target_entry_points": [
         "third_party/rust/glean-build/src/lib.rs"
       ],
-      "version": "20.1.0"
+      "version": "22.0.1"
     },
     {
       "manifest_path": "third_party/rust/glean-core/Cargo.toml",
@@ -8595,7 +8595,7 @@
         "third_party/rust/glean-core/build.rs",
         "third_party/rust/glean-core/src/lib.rs"
       ],
-      "version": "70.2.1"
+      "version": "71.0.0"
     },
     {
       "manifest_path": "third_party/rust/glob/Cargo.toml",
@@ -9216,7 +9216,7 @@
     {
       "manifest_path": "third_party/rust/mtu/Cargo.toml",
       "name": "mtu",
-      "source": "git+https://github.com/mozilla/neqo?tag=v0.33.0#1ec4c2a3ccd7ada264112d1b70b070381557d844",
+      "source": "git+https://github.com/mozilla/neqo?tag=v0.34.0#e302b43503f44e09f4257573dd320621516d1560",
       "target_entry_points": [
         "third_party/rust/mtu/build.rs",
         "third_party/rust/mtu/src/bin/mtu-lookup.rs",
@@ -9254,49 +9254,49 @@
     {
       "manifest_path": "third_party/rust/neqo-common/Cargo.toml",
       "name": "neqo-common",
-      "source": "git+https://github.com/mozilla/neqo?tag=v0.33.0#1ec4c2a3ccd7ada264112d1b70b070381557d844",
+      "source": "git+https://github.com/mozilla/neqo?tag=v0.34.0#e302b43503f44e09f4257573dd320621516d1560",
       "target_entry_points": [
         "third_party/rust/neqo-common/build.rs",
         "third_party/rust/neqo-common/src/lib.rs"
       ],
-      "version": "0.33.0"
+      "version": "0.34.0"
     },
     {
       "manifest_path": "third_party/rust/neqo-http3/Cargo.toml",
       "name": "neqo-http3",
-      "source": "git+https://github.com/mozilla/neqo?tag=v0.33.0#1ec4c2a3ccd7ada264112d1b70b070381557d844",
+      "source": "git+https://github.com/mozilla/neqo?tag=v0.34.0#e302b43503f44e09f4257573dd320621516d1560",
       "target_entry_points": [
         "third_party/rust/neqo-http3/src/lib.rs"
       ],
-      "version": "0.33.0"
+      "version": "0.34.0"
     },
     {
       "manifest_path": "third_party/rust/neqo-qpack/Cargo.toml",
       "name": "neqo-qpack",
-      "source": "git+https://github.com/mozilla/neqo?tag=v0.33.0#1ec4c2a3ccd7ada264112d1b70b070381557d844",
+      "source": "git+https://github.com/mozilla/neqo?tag=v0.34.0#e302b43503f44e09f4257573dd320621516d1560",
       "target_entry_points": [
         "third_party/rust/neqo-qpack/src/lib.rs"
       ],
-      "version": "0.33.0"
+      "version": "0.34.0"
     },
     {
       "manifest_path": "third_party/rust/neqo-transport/Cargo.toml",
       "name": "neqo-transport",
-      "source": "git+https://github.com/mozilla/neqo?tag=v0.33.0#1ec4c2a3ccd7ada264112d1b70b070381557d844",
+      "source": "git+https://github.com/mozilla/neqo?tag=v0.34.0#e302b43503f44e09f4257573dd320621516d1560",
       "target_entry_points": [
         "third_party/rust/neqo-transport/src/lib.rs"
       ],
-      "version": "0.33.0"
+      "version": "0.34.0"
     },
     {
       "manifest_path": "third_party/rust/neqo-udp/Cargo.toml",
       "name": "neqo-udp",
-      "source": "git+https://github.com/mozilla/neqo?tag=v0.33.0#1ec4c2a3ccd7ada264112d1b70b070381557d844",
+      "source": "git+https://github.com/mozilla/neqo?tag=v0.34.0#e302b43503f44e09f4257573dd320621516d1560",
       "target_entry_points": [
         "third_party/rust/neqo-udp/build.rs",
         "third_party/rust/neqo-udp/src/lib.rs"
       ],
-      "version": "0.33.0"
+      "version": "0.34.0"
     },
     {
       "manifest_path": "netwerk/socket/neqo_glue/Cargo.toml",
@@ -9346,12 +9346,12 @@
     {
       "manifest_path": "third_party/rust/nss-rs/Cargo.toml",
       "name": "nss-rs",
-      "source": "git+https://github.com/mozilla/nss-rs#ba8a3f6acffc7e25749054969ccbbb3ca615df7f",
+      "source": "git+https://github.com/mozilla/nss-rs#bb8ed19e82679e613a636f530d15ddc823f1b040",
       "target_entry_points": [
         "third_party/rust/nss-rs/build.rs",
         "third_party/rust/nss-rs/src/lib.rs"
       ],
-      "version": "0.16.1"
+      "version": "0.16.2"
     },
     {
       "manifest_path": "xpcom/rust/nsstring/Cargo.toml",
@@ -10836,7 +10836,7 @@
       "target_entry_points": [
         "third_party/rust/xshell-venv/src/lib.rs"
       ],
-      "version": "2.0.0"
+      "version": "2.0.1"
     },
     {
       "manifest_path": "third_party/rust/yoke/Cargo.toml",
@@ -10951,9 +10951,9 @@
   "collector_sha256": "31bf245320f62a88ea4b42d1aadde6d050e0c14948ae6ba6d0f10799b68c61d1",
   "counts": {
     "directory_contracts": 37,
-    "files": 17315
+    "files": 17296
   },
-  "depfile_count": 1467,
+  "depfile_count": 1495,
   "directory_contracts": [
     "config/tests/ref-simple",
     "config/tests/src-simple/l10n",
@@ -11302,6 +11302,9 @@
     "dom/bindings/DOMJSClass.h",
     "dom/bindings/DOMJSProxyHandler.h",
     "dom/bindings/DOMString.h",
+    "dom/bindings/ECMACollectionIterator.h",
+    "dom/bindings/ECMACollectionMixin.h",
+    "dom/bindings/ECMACollections.h",
     "dom/bindings/ErrorIPCUtils.h",
     "dom/bindings/ErrorResult.h",
     "dom/bindings/Errors.msg",
@@ -12541,6 +12544,7 @@
     "intl/locale/tests/unit/test_bug22310.js",
     "intl/locale/tests/unit/test_intl_on_workers.js",
     "intl/locale/tests/unit/test_langPackMatcher.js",
+    "intl/locale/tests/unit/test_langPackMatcher_install.js",
     "intl/locale/tests/unit/test_localeService.js",
     "intl/locale/tests/unit/test_localeService_coverage.js",
     "intl/locale/tests/unit/test_localeService_negotiateLanguages.js",
@@ -13421,6 +13425,7 @@
     "modules/brotli/enc/backward_references_hq.c",
     "modules/brotli/enc/backward_references_hq.h",
     "modules/brotli/enc/backward_references_inc.h",
+    "modules/brotli/enc/backward_references_opt_inc.h",
     "modules/brotli/enc/bit_cost.c",
     "modules/brotli/enc/bit_cost.h",
     "modules/brotli/enc/bit_cost_inc.h",
@@ -13462,6 +13467,7 @@
     "modules/brotli/enc/hash_longest_match_inc.h",
     "modules/brotli/enc/hash_longest_match_quickly_inc.h",
     "modules/brotli/enc/hash_longest_match_simd_inc.h",
+    "modules/brotli/enc/hash_longest_match_simd_opt_inc.h",
     "modules/brotli/enc/hash_rolling_inc.h",
     "modules/brotli/enc/hash_to_binary_tree_inc.h",
     "modules/brotli/enc/histogram.c",
@@ -14346,8 +14352,6 @@
     "netwerk/dns/IDNBlocklistUtils.h",
     "netwerk/dns/IDNCharacterBlocklist.inc",
     "netwerk/dns/LICENSE-NOTICE.txt",
-    "netwerk/dns/NativeDNSResolverOverrideChild.h",
-    "netwerk/dns/NativeDNSResolverOverrideParent.h",
     "netwerk/dns/PlatformDNSAndroid.cpp",
     "netwerk/dns/TRR.cpp",
     "netwerk/dns/TRR.h",
@@ -14357,8 +14361,6 @@
     "netwerk/dns/TRRService.h",
     "netwerk/dns/TRRServiceBase.cpp",
     "netwerk/dns/TRRServiceBase.h",
-    "netwerk/dns/TRRServiceChild.h",
-    "netwerk/dns/TRRServiceParent.h",
     "netwerk/dns/effective_tld_names.dat",
     "netwerk/dns/metrics.yaml",
     "netwerk/dns/moz.build",
@@ -14393,8 +14395,6 @@
     "netwerk/ipc/DocumentChannelChild.h",
     "netwerk/ipc/DocumentChannelParent.h",
     "netwerk/ipc/DocumentLoadListener.h",
-    "netwerk/ipc/InputChannelThrottleQueueChild.h",
-    "netwerk/ipc/InputChannelThrottleQueueParent.h",
     "netwerk/ipc/NeckoChild.h",
     "netwerk/ipc/NeckoCommon.cpp",
     "netwerk/ipc/NeckoCommon.h",
@@ -14404,20 +14404,8 @@
     "netwerk/ipc/NeckoTargetHolder.h",
     "netwerk/ipc/ParentChannelWrapper.h",
     "netwerk/ipc/ParentProcessDocumentChannel.h",
-    "netwerk/ipc/ProxyAutoConfigChild.h",
-    "netwerk/ipc/ProxyAutoConfigParent.h",
     "netwerk/ipc/ProxyConfigLookup.cpp",
     "netwerk/ipc/ProxyConfigLookup.h",
-    "netwerk/ipc/ProxyConfigLookupChild.h",
-    "netwerk/ipc/ProxyConfigLookupParent.h",
-    "netwerk/ipc/SocketProcessBackgroundChild.h",
-    "netwerk/ipc/SocketProcessBackgroundParent.h",
-    "netwerk/ipc/SocketProcessBridgeChild.h",
-    "netwerk/ipc/SocketProcessBridgeParent.h",
-    "netwerk/ipc/SocketProcessChild.h",
-    "netwerk/ipc/SocketProcessHost.h",
-    "netwerk/ipc/SocketProcessImpl.h",
-    "netwerk/ipc/SocketProcessParent.h",
     "netwerk/ipc/moz.build",
     "netwerk/locales/en-US/necko.properties",
     "netwerk/locales/en-US/netwerk/necko.ftl",
@@ -14455,6 +14443,7 @@
     "netwerk/naivefox/OriginChannel.h",
     "netwerk/naivefox/PWebTransport.h",
     "netwerk/naivefox/Promise.h",
+    "netwerk/naivefox/ProxyAutoConfigNaiveFox.cpp",
     "netwerk/naivefox/ProxyProtocol.h",
     "netwerk/naivefox/ReferrerPolicyBinding.h",
     "netwerk/naivefox/RequestBinding.h",
@@ -14511,15 +14500,9 @@
     "netwerk/protocol/http/ASpdySession.h",
     "netwerk/protocol/http/AltDataOutputStreamChild.h",
     "netwerk/protocol/http/AltDataOutputStreamParent.h",
-    "netwerk/protocol/http/AltServiceChild.h",
-    "netwerk/protocol/http/AltServiceParent.h",
-    "netwerk/protocol/http/AltSvcTransactionChild.h",
-    "netwerk/protocol/http/AltSvcTransactionParent.h",
     "netwerk/protocol/http/AlternateServices.cpp",
     "netwerk/protocol/http/AlternateServices.h",
     "netwerk/protocol/http/BackgroundChannelRegistrar.h",
-    "netwerk/protocol/http/BackgroundDataBridgeChild.h",
-    "netwerk/protocol/http/BackgroundDataBridgeParent.h",
     "netwerk/protocol/http/BinaryHttpRequest.cpp",
     "netwerk/protocol/http/BinaryHttpRequest.h",
     "netwerk/protocol/http/CacheControlParser.cpp",
@@ -14588,6 +14571,7 @@
     "netwerk/protocol/http/Http3WebTransportSession.h",
     "netwerk/protocol/http/Http3WebTransportStream.cpp",
     "netwerk/protocol/http/Http3WebTransportStream.h",
+    "netwerk/protocol/http/HttpActivityArgs.h",
     "netwerk/protocol/http/HttpAuthUtils.cpp",
     "netwerk/protocol/http/HttpAuthUtils.h",
     "netwerk/protocol/http/HttpBackgroundChannelChild.h",
@@ -14598,8 +14582,6 @@
     "netwerk/protocol/http/HttpChannelParent.h",
     "netwerk/protocol/http/HttpConnectionBase.cpp",
     "netwerk/protocol/http/HttpConnectionBase.h",
-    "netwerk/protocol/http/HttpConnectionMgrChild.h",
-    "netwerk/protocol/http/HttpConnectionMgrParent.h",
     "netwerk/protocol/http/HttpConnectionMgrShell.h",
     "netwerk/protocol/http/HttpConnectionUDP.cpp",
     "netwerk/protocol/http/HttpConnectionUDP.h",
@@ -14608,8 +14590,6 @@
     "netwerk/protocol/http/HttpLog.h",
     "netwerk/protocol/http/HttpTrafficAnalyzer.cpp",
     "netwerk/protocol/http/HttpTrafficAnalyzer.h",
-    "netwerk/protocol/http/HttpTransactionChild.h",
-    "netwerk/protocol/http/HttpTransactionParent.h",
     "netwerk/protocol/http/HttpTransactionShell.h",
     "netwerk/protocol/http/MockHttpAuth.cpp",
     "netwerk/protocol/http/MockHttpAuth.h",
@@ -14760,10 +14740,6 @@
     "netwerk/protocol/websocket/WebSocketChannel.h",
     "netwerk/protocol/websocket/WebSocketChannelChild.h",
     "netwerk/protocol/websocket/WebSocketChannelParent.h",
-    "netwerk/protocol/websocket/WebSocketConnectionBase.h",
-    "netwerk/protocol/websocket/WebSocketConnectionChild.h",
-    "netwerk/protocol/websocket/WebSocketConnectionListener.h",
-    "netwerk/protocol/websocket/WebSocketConnectionParent.h",
     "netwerk/protocol/websocket/WebSocketEventListenerChild.h",
     "netwerk/protocol/websocket/WebSocketEventListenerParent.h",
     "netwerk/protocol/websocket/WebSocketEventService.h",
@@ -15246,8 +15222,6 @@
     "security/manager/ssl/EnterpriseRoots.h",
     "security/manager/ssl/FIPSUtils.cpp",
     "security/manager/ssl/FIPSUtils.h",
-    "security/manager/ssl/IPCClientCertsChild.h",
-    "security/manager/ssl/IPCClientCertsParent.h",
     "security/manager/ssl/NSSErrorsService.cpp",
     "security/manager/ssl/NSSErrorsService.h",
     "security/manager/ssl/NSSSocketControl.cpp",
@@ -15277,8 +15251,6 @@
     "security/manager/ssl/SSLServerCertVerification.cpp",
     "security/manager/ssl/SSLServerCertVerification.h",
     "security/manager/ssl/ScopedNSSTypes.h",
-    "security/manager/ssl/SelectTLSClientAuthCertChild.h",
-    "security/manager/ssl/SelectTLSClientAuthCertParent.h",
     "security/manager/ssl/SharedCertVerifier.h",
     "security/manager/ssl/SiteIntegrityService.cpp",
     "security/manager/ssl/SiteIntegrityService.h",
@@ -15287,8 +15259,6 @@
     "security/manager/ssl/TLSClientAuthCertSelection.h",
     "security/manager/ssl/TransportSecurityInfo.cpp",
     "security/manager/ssl/TransportSecurityInfo.h",
-    "security/manager/ssl/VerifySSLServerCertChild.h",
-    "security/manager/ssl/VerifySSLServerCertParent.h",
     "security/manager/ssl/X509.sys.mjs",
     "security/manager/ssl/X509CertValidity.cpp",
     "security/manager/ssl/X509CertValidity.h",
@@ -16412,6 +16382,7 @@
     "testing/mozbase/mozgeckoprofiler/mozgeckoprofiler/viewgeckoprofile.py",
     "testing/mozbase/mozgeckoprofiler/setup.py",
     "testing/mozbase/mozgeckoprofiler/tests/manifest.toml",
+    "testing/mozbase/mozgeckoprofiler/tests/test_symbolication.py",
     "testing/mozbase/mozgeckoprofiler/tests/test_view_gecko_profiler.py",
     "testing/mozbase/mozhttpd/mozhttpd/__init__.py",
     "testing/mozbase/mozhttpd/mozhttpd/handlers.py",
@@ -23251,6 +23222,7 @@
     "third_party/rust/neqo-http3/src/features/extended_connect/session.rs",
     "third_party/rust/neqo-http3/src/features/extended_connect/stats.rs",
     "third_party/rust/neqo-http3/src/features/extended_connect/tests/mod.rs",
+    "third_party/rust/neqo-http3/src/features/extended_connect/tests/webtransport/anticipated_streams.rs",
     "third_party/rust/neqo-http3/src/features/extended_connect/tests/webtransport/datagrams.rs",
     "third_party/rust/neqo-http3/src/features/extended_connect/tests/webtransport/mod.rs",
     "third_party/rust/neqo-http3/src/features/extended_connect/tests/webtransport/negotiation.rs",
@@ -23480,6 +23452,10 @@
     "third_party/rust/nss-rs/LICENSE-MIT",
     "third_party/rust/nss-rs/README.md",
     "third_party/rust/nss-rs/SECURITY.md",
+    "third_party/rust/nss-rs/benches/common/mod.rs",
+    "third_party/rust/nss-rs/benches/crypto.rs",
+    "third_party/rust/nss-rs/benches/handshake.rs",
+    "third_party/rust/nss-rs/benches/record_protection.rs",
     "third_party/rust/nss-rs/bindings/bindings.toml",
     "third_party/rust/nss-rs/bindings/nspr_err.h",
     "third_party/rust/nss-rs/bindings/nspr_error.h",
@@ -23542,6 +23518,7 @@
     "third_party/rust/nss-rs/tests/ext.rs",
     "third_party/rust/nss-rs/tests/handshake.rs",
     "third_party/rust/nss-rs/tests/hkdf.rs",
+    "third_party/rust/nss-rs/tests/hmac.rs",
     "third_party/rust/nss-rs/tests/hp.rs",
     "third_party/rust/nss-rs/tests/init.rs",
     "third_party/rust/nss-rs/tests/selfencrypt.rs",
@@ -27736,6 +27713,7 @@
     "xpcom/base/nsDumpUtils.cpp",
     "xpcom/base/nsDumpUtils.h",
     "xpcom/base/nsError.h",
+    "xpcom/base/nsFunctionInterfaceUtils.h",
     "xpcom/base/nsGZFileWriter.cpp",
     "xpcom/base/nsGZFileWriter.h",
     "xpcom/base/nsIAvailableMemoryWatcherBase.idl",
@@ -28114,7 +28092,10 @@
     "xpcom/rust/gecko_logger/Cargo.toml",
     "xpcom/rust/gecko_logger/src/lib.rs",
     "xpcom/rust/gecko_tracing/Cargo.toml",
+    "xpcom/rust/gecko_tracing/src/fields.rs",
     "xpcom/rust/gecko_tracing/src/lib.rs",
+    "xpcom/rust/gecko_tracing/src/moz_log.rs",
+    "xpcom/rust/gecko_tracing/src/span_marker.rs",
     "xpcom/rust/gkrust_utils/Cargo.toml",
     "xpcom/rust/gkrust_utils/cbindgen.toml",
     "xpcom/rust/gkrust_utils/src/lib.rs",
@@ -28311,9 +28292,9 @@
     "xpcom/threads/nsTimerImpl.cpp",
     "xpcom/threads/nsTimerImpl.h"
   ],
-  "firefox_base_commit": "8014960797439064c025f6bbc6a236558bd4f35f",
+  "firefox_base_commit": "9fcf3a1690ecec7078bc93cd2048d6447247f582",
   "generated_makefile_count": 372,
-  "generated_makefiles_sha256": "e9ae8219602bff2669d439a8a4774b8c8f309780cd2e6ed663e03cf881fa6495",
+  "generated_makefiles_sha256": "f0e35e4d97bd3841b8341e2a3fb8c6a37263a8bf0ee06357314d008b4d8ac7fa",
   "install_manifest_count": 7,
   "install_manifest_names": [
     "_test_files",
@@ -28324,19 +28305,19 @@
     "dist_public",
     "xpidl"
   ],
-  "install_manifest_record_count": 2482,
-  "install_manifests_sha256": "c99efb7619270d4fa151d95e9c2ab265bf18b9624880ad2cf4f63651d76400a4",
+  "install_manifest_record_count": 2450,
+  "install_manifests_sha256": "a8b2d79ac9863d1bffa51a2e8d92d30e394075e3ade82045633e80c16727ba32",
   "mozconfig": "netwerk/naivefox/mozconfig-android-aarch64",
   "mozconfig_sha256": "69d4665c2b95be12ac6ba7e976069ff72d28e984a4ede2df50a4729a18052c31",
-  "naivefox_reference_commit": "df78a0e3edf4d173a12e90f00285675bf7bc49c5",
+  "naivefox_reference_commit": "c89046bc3cf7235f8591294490b52250de3625d4",
   "objdir_evidence_sha256": {
-    "backend.RecursiveMakeBackend.in": "75ac54022b3f6399e3787feeea08c3a61a572c9929ddd353ba4e14eaecaa2c05",
+    "backend.RecursiveMakeBackend.in": "5c494f13b0ee0d426fb962e4c93c6d386d48766fea333d266d42c3158a2b8536",
     "config_status_deps.in": "0e26609e2c2a3b170db6ed497cb933521e373cd7ed6c550438edb605e2221a5a"
   },
   "provenance_sha256": "642a32e90aaf870224f1831b2e932e08fb3153ed75765607f2112852f668e3fb",
   "provenance_version": 2,
   "report_version": 1,
-  "source_commit": "df78a0e3edf4d173a12e90f00285675bf7bc49c5",
+  "source_commit": "c89046bc3cf7235f8591294490b52250de3625d4",
   "source_tree_kind": "repository",
   "source_worktree_clean": true,
   "source_worktree_status": [],
