@@ -31,6 +31,7 @@ from mach.requirements import (
     MachEnvRequirements,
     UnexpectedFlexibleRequirementException,
 )
+from mach.util import resource_marker
 
 
 class SiteLockTimeout(Exception):
@@ -685,13 +686,14 @@ class CommandSiteManager:
                     self._log(
                         f"Creating the '{self._site_name}' site at {self.virtualenv_root}"
                     )
-                    _create_venv_with_pthfile(
-                        self._virtualenv,
-                        self._pthfile_lines(),
-                        self._populate_virtualenv,
-                        self._requirements,
-                        self._metadata,
-                    )
+                    with resource_marker("Mach", f"create {self._site_name} site"):
+                        _create_venv_with_pthfile(
+                            self._virtualenv,
+                            self._pthfile_lines(),
+                            self._populate_virtualenv,
+                            self._requirements,
+                            self._metadata,
+                        )
         except Timeout:
             raise SiteLockTimeout(lock_file, self._site_name, timeout)
 
@@ -1093,15 +1095,19 @@ class PythonVirtualenv:
         # self.python_path. However, this seems more risk than it's worth.
 
         try:
-            install_result = subprocess.run(  # noqa PLW1510
-                pip_command(
-                    python_executable=self.python_path,
-                    subcommand="install",
-                    args=pip_install_args,
-                ),
-                check=kwargs.pop("check", True),
-                **kwargs,
-            )
+            with resource_marker(
+                "uv pip install" if use_uv() else "pip install",
+                " ".join(pip_install_args),
+            ):
+                install_result = subprocess.run(  # noqa PLW1510
+                    pip_command(
+                        python_executable=self.python_path,
+                        subcommand="install",
+                        args=pip_install_args,
+                    ),
+                    check=kwargs.pop("check", True),
+                    **kwargs,
+                )
         except subprocess.CalledProcessError as cpe:
             if not self._quiet:
                 # We print the stdout/stderr on a failed install here so that we don't

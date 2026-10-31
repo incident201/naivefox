@@ -239,7 +239,7 @@ bool LimitFileToLessThanSize(const char* aFilename, uint32_t aSize,
 
     // `fgets` always null terminates.  If the line is too long, it won't
     // include a trailing '\n' but will be null-terminated.
-    UniquePtr<char[]> line = MakeUnique<char[]>(aLongLineSize + 1);
+    auto line = std::make_unique<char[]>(aLongLineSize + 1);
     while (fgets(line.get(), aLongLineSize + 1, file.get())) {
       if (numBytesDropped >= minBytesToDrop) {
         if (fputs(line.get(), temp.get()) < 0) {
@@ -662,7 +662,7 @@ class LogModuleManager {
 
     // We may have maxed out, allocate a buffer and re-format
     if (charsWritten >= kBuffSize) {
-      allocatedBuff = MakeUnique<char[]>(charsWritten + 1);  // + final \0
+      allocatedBuff = std::make_unique<char[]>(charsWritten + 1);  // + final \0
       auto [out, size] =
           fmt::vformat_to_n(allocatedBuff.get(), charsWritten, aFmt, aArgs);
       MOZ_ASSERT(size == charsWritten);
@@ -876,13 +876,6 @@ class LogModuleManager {
       // only once on one thread.
       detail::LogFile* release = mToReleaseFile.exchange(nullptr);
       delete release;
-    }
-  }
-
-  void DisableModules() {
-    OffTheBooksMutexAutoLock guard(mModulesLock);
-    for (auto& m : mModules) {
-      (*(m.GetModifiableData()))->SetLevel(LogLevel::Disabled);
     }
   }
 

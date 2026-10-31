@@ -590,26 +590,11 @@ NS_NewChannelWithTriggeringPrincipal(
   NS_ASSERTION(aTriggeringPrincipal,
                "Can not create channel without a triggering Principal!");
 
-  nsCOMPtr<nsICookieJarSettings> cookieJarSettings;
-
-  // Special treatment for resources injected by add-ons if not document,
-  // iframe, workers.
-  if (!nsContentUtils::IsNonSubresourceInternalPolicyType(aContentPolicyType) &&
-      aTriggeringPrincipal &&
-      StaticPrefs::privacy_antitracking_isolateContentScriptResources() &&
-      nsContentUtils::IsExpandedPrincipal(aTriggeringPrincipal)) {
-    bool shouldResistFingerprinting =
-        nsContentUtils::ShouldResistFingerprinting_dangerous(
-            aLoadingNode->NodePrincipal(),
-            "CookieJarSettings can't exist yet, we're creating it",
-            RFPTarget::IsAlwaysEnabledForPrecompute);
-    cookieJarSettings = CookieJarSettings::Create(
-        nsICookieService::BEHAVIOR_REJECT,
-        StoragePrincipalHelper::PartitionKeyForExpandedPrincipal(
-            aTriggeringPrincipal),
-        OriginAttributes::IsFirstPartyEnabled(), false,
-        shouldResistFingerprinting);
-  } else {
+  nsCOMPtr<nsICookieJarSettings> cookieJarSettings =
+      StoragePrincipalHelper::MaybeCreateCookieJarSettingsForContentScript(
+          aTriggeringPrincipal, aLoadingNode->NodePrincipal(),
+          aContentPolicyType);
+  if (!cookieJarSettings) {
     // Let's inherit the cookie behavior and permission from the parent
     // document.
     cookieJarSettings = aLoadingNode->OwnerDoc()->CookieJarSettings();
@@ -1924,10 +1909,9 @@ class TlsAutoIncrement {
 nsresult NS_NewURI(nsIURI** aURI, const nsACString& aSpec,
                    const char* aCharset /* = nullptr */,
                    nsIURI* aBaseURI /* = nullptr */) {
-  // we don't expect any other processes than: socket, content or parent
+  // we don't expect any other processes than: content or parent
   // to be able to create a URL
-  MOZ_ASSERT(XRE_IsSocketProcess() || XRE_IsContentProcess() ||
-             XRE_IsParentProcess());
+  MOZ_ASSERT(XRE_IsContentProcess() || XRE_IsParentProcess());
   TlsAutoIncrement<decltype(gTlsURLRecursionCount)> inc(gTlsURLRecursionCount);
   if (inc.value() >= MAX_RECURSION_COUNT) {
     return NS_ERROR_MALFORMED_URI;
@@ -2858,11 +2842,6 @@ nsresult NS_GetFilenameFromDisposition(nsAString& aFilename,
 }
 
 void net_EnsurePSMInit() {
-  if (XRE_IsSocketProcess()) {
-    EnsureNSSInitializedChromeOrContent();
-    return;
-  }
-
   MOZ_ASSERT(XRE_IsParentProcess());
   MOZ_ASSERT(NS_IsMainThread());
 
@@ -3236,10 +3215,8 @@ nsresult NS_ShouldSecureUpgrade(
   // data (it is read-only).
   // if the connection is not using SSL and either the exact host matches or
   // a superdomain wants to force HTTPS, do it.
-  bool isHttps = aURI->SchemeIs("https");
-
-  // If request is https, then there is nothing to do here.
-  if (isHttps) {
+  if (aURI->SchemeIs("https")) {
+    // If request is https, then there is nothing to do here.
     aLoadInfo->SetHttpsUpgradeTelemetry(nsILoadInfo::ALREADY_HTTPS);
     aShouldUpgrade = false;
     return NS_OK;
@@ -3609,6 +3586,11 @@ bool ChannelIsPost(nsIChannel* aChannel) {
 bool SchemeIsHttpOrHttps(nsIURI* aURI) {
   MOZ_ASSERT(aURI);
   return aURI->SchemeIs("http") || aURI->SchemeIs("https");
+}
+
+bool SchemeIsHttpOrHttps(nsIPrincipal* aPrincipal) {
+  MOZ_ASSERT(aPrincipal);
+  return aPrincipal->SchemeIs("http") || aPrincipal->SchemeIs("https");
 }
 
 bool SchemeIsSpecial(const nsACString& aScheme) {

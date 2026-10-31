@@ -12,7 +12,10 @@ mod metrics {
     pub(crate) struct Metrics;
 
     impl Metrics {
-        pub(crate) fn new(_alt_svc: &[happy_eyeballs::AltSvc]) -> Self {
+        pub(crate) fn new(
+            _alt_svc: &[happy_eyeballs::AltSvc],
+            _preferred: happy_eyeballs::DnsRecordType,
+        ) -> Self {
             Self
         }
 
@@ -139,7 +142,15 @@ pub unsafe extern "C" fn happy_eyeballs_create(
         })
         .collect();
 
-    let metrics = metrics::Metrics::new(&alt_svc_vec);
+    let preferred = match ip_preference {
+        IpPreference::DualStackPreferV6 | IpPreference::Ipv6Only => {
+            happy_eyeballs::DnsRecordType::Aaaa
+        }
+        IpPreference::DualStackPreferV4 | IpPreference::Ipv4Only => {
+            happy_eyeballs::DnsRecordType::A
+        }
+    };
+    let metrics = metrics::Metrics::new(&alt_svc_vec, preferred);
 
     // Clamp the delays to at least 10ms to avoid excessive connection attempts,
     // and the multiplier to at least 1 (it is a non-zero factor).

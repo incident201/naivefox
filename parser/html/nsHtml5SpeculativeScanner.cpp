@@ -47,9 +47,9 @@ nsHtml5SpeculativeScanner::nsHtml5SpeculativeScanner(
 #else
   (void)aParserEventTarget;
 #endif
-  mTreeBuilder = mozilla::MakeUnique<nsHtml5TreeBuilder>(&mStage);
+  mTreeBuilder = std::make_unique<nsHtml5TreeBuilder>(&mStage);
   mTreeBuilder->SetElementObserver(aObserver);
-  mTokenizer = mozilla::MakeUnique<nsHtml5Tokenizer>(mTreeBuilder.get(), false);
+  mTokenizer = std::make_unique<nsHtml5Tokenizer>(mTreeBuilder.get(), false);
   mTokenizer->setInterner(&mAtomTable);
   mTreeBuilder->setScriptingEnabled(true);
   mTokenizer->start();

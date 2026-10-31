@@ -245,8 +245,6 @@ dependencies = [
 [[package]]
 name = "bindgen"
 version = "0.73.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "54be9a169b85a1bef39252af30bb6246a31b23c7e0f6a162520dd869f8dad33c"
 dependencies = [
  "bitflags",
  "cexpr",
@@ -950,6 +948,7 @@ dependencies = [
  "env_logger",
  "lazy_static",
  "log",
+ "tracing",
 ]
 
 [[package]]
@@ -957,6 +956,10 @@ name = "gecko_tracing"
 version = "0.1.0"
 dependencies = [
  "error-support",
+ "gecko-profiler",
+ "gecko_logger",
+ "log",
+ "serde",
  "tracing",
  "tracing-subscriber",
  "tracing-support",
@@ -1055,9 +1058,9 @@ dependencies = [
 
 [[package]]
 name = "glean"
-version = "70.2.1"
+version = "71.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1a75a8cfc27ecee273cf19b4aaf8b50e916b137f6a3d2b4f1c13c59eae0e21ee"
+checksum = "e2b6420e497e5cf99b9cfeb2c0018cdfc7960398a476092e7bf440fbf6bde4cd"
 dependencies = [
  "crossbeam-channel",
  "glean-core",
@@ -1070,17 +1073,17 @@ dependencies = [
 
 [[package]]
 name = "glean-build"
-version = "20.1.0"
-source = "git+https://github.com/mozilla/glean?tag=v70.2.0#9d987fd33e1dc3f2a89e5f5c4565ae696245f6eb"
+version = "22.0.1"
+source = "git+https://github.com/mozilla/glean?tag=v71.0.0#c7f1204c8945030f1b5c8b524de5753c0e0d7f2c"
 dependencies = [
  "xshell-venv",
 ]
 
 [[package]]
 name = "glean-core"
-version = "70.2.1"
+version = "71.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a9fb076df739ce5d2eff3a2cc723cc23e1f90d9d9f07dc46365962745cb3c286"
+checksum = "6e1896d62a48b2d1a2c4146e5bf12f3b85f5b4a7fb99ce6aba84f52770d1b68e"
 dependencies = [
  "android_logger",
  "bincode",
@@ -1735,7 +1738,7 @@ dependencies = [
 [[package]]
 name = "mtu"
 version = "0.4.1"
-source = "git+https://github.com/mozilla/neqo?tag=v0.33.0#1ec4c2a3ccd7ada264112d1b70b070381557d844"
+source = "git+https://github.com/mozilla/neqo?tag=v0.34.0#e302b43503f44e09f4257573dd320621516d1560"
 dependencies = [
  "cfg_aliases",
  "libc",
@@ -1773,8 +1776,8 @@ checksum = "743fb55ba31b18fb1ecef6bdc9aa2743314978ac084044301a7eee33fb99a20d"
 
 [[package]]
 name = "neqo-common"
-version = "0.33.0"
-source = "git+https://github.com/mozilla/neqo?tag=v0.33.0#1ec4c2a3ccd7ada264112d1b70b070381557d844"
+version = "0.34.0"
+source = "git+https://github.com/mozilla/neqo?tag=v0.34.0#e302b43503f44e09f4257573dd320621516d1560"
 dependencies = [
  "enum-map",
  "env_logger",
@@ -1791,8 +1794,8 @@ dependencies = [
 
 [[package]]
 name = "neqo-http3"
-version = "0.33.0"
-source = "git+https://github.com/mozilla/neqo?tag=v0.33.0#1ec4c2a3ccd7ada264112d1b70b070381557d844"
+version = "0.34.0"
+source = "git+https://github.com/mozilla/neqo?tag=v0.34.0#e302b43503f44e09f4257573dd320621516d1560"
 dependencies = [
  "enumset",
  "http",
@@ -1811,8 +1814,8 @@ dependencies = [
 
 [[package]]
 name = "neqo-qpack"
-version = "0.33.0"
-source = "git+https://github.com/mozilla/neqo?tag=v0.33.0#1ec4c2a3ccd7ada264112d1b70b070381557d844"
+version = "0.34.0"
+source = "git+https://github.com/mozilla/neqo?tag=v0.34.0#e302b43503f44e09f4257573dd320621516d1560"
 dependencies = [
  "log",
  "neqo-common",
@@ -1824,8 +1827,8 @@ dependencies = [
 
 [[package]]
 name = "neqo-transport"
-version = "0.33.0"
-source = "git+https://github.com/mozilla/neqo?tag=v0.33.0#1ec4c2a3ccd7ada264112d1b70b070381557d844"
+version = "0.34.0"
+source = "git+https://github.com/mozilla/neqo?tag=v0.34.0#e302b43503f44e09f4257573dd320621516d1560"
 dependencies = [
  "enum-map",
  "enumset",
@@ -1846,8 +1849,8 @@ dependencies = [
 
 [[package]]
 name = "neqo-udp"
-version = "0.33.0"
-source = "git+https://github.com/mozilla/neqo?tag=v0.33.0#1ec4c2a3ccd7ada264112d1b70b070381557d844"
+version = "0.34.0"
+source = "git+https://github.com/mozilla/neqo?tag=v0.34.0#e302b43503f44e09f4257573dd320621516d1560"
 dependencies = [
  "cfg_aliases",
  "libc",
@@ -1863,7 +1866,6 @@ version = "0.1.0"
 dependencies = [
  "firefox-on-glean",
  "libc",
- "log",
  "neqo-common",
  "neqo-http3",
  "neqo-qpack",
@@ -1877,6 +1879,7 @@ dependencies = [
  "static_assertions",
  "static_prefs",
  "thin-vec",
+ "tracing",
  "uuid",
  "winapi",
  "xpcom",
@@ -1919,8 +1922,8 @@ dependencies = [
 
 [[package]]
 name = "nss-rs"
-version = "0.16.1"
-source = "git+https://github.com/mozilla/nss-rs#ba8a3f6acffc7e25749054969ccbbb3ca615df7f"
+version = "0.16.2"
+source = "git+https://github.com/mozilla/nss-rs#bb8ed19e82679e613a636f530d15ddc823f1b040"
 dependencies = [
  "bindgen 0.72.999",
  "derive_more",
@@ -3420,9 +3423,9 @@ checksum = "32ac00cd3f8ec9c1d33fb3e7958a82df6989c42d747bd326c822b1d625283547"
 
 [[package]]
 name = "xshell-venv"
-version = "2.0.0"
+version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b02ebe4a3558b86c64aeab700c924b08613020fca9c94d5f2cd412691b6c00bd"
+checksum = "1cae3b35db7e0236556d24524b840464227105347c4ac2696f15b138ee2698e5"
 dependencies = [
  "xshell",
 ]
@@ -3662,7 +3665,7 @@ version = "0.14.999"
 
 [[patch.unused]]
 name = "jxl_simd"
-version = "0.7.4"
+version = "0.8.0"
 
 [[patch.unused]]
 name = "libcrux-traits"

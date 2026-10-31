@@ -1111,9 +1111,10 @@ nsresult GetParameterHTTP(const nsACString& aHeaderVal, const char* aParamName,
 bool ChannelIsPost(nsIChannel* aChannel);
 
 /**
- * Convenience function for verifying nsIURI scheme is either HTTP or HTTPS.
+ * Convenience functions for checking whether the scheme is HTTP or HTTPS.
  */
 bool SchemeIsHttpOrHttps(nsIURI* aURI);
+bool SchemeIsHttpOrHttps(nsIPrincipal* aPrincipal);
 
 // Helper functions for SetProtocol methods to follow
 // step 2.1 in https://url.spec.whatwg.org/#scheme-state

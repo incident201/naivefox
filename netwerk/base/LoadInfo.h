@@ -203,6 +203,9 @@ nsresult LoadInfoArgsToLoadInfo(const mozilla::net::LoadInfoArgs& aLoadInfoArgs,
          activatedFromNavigationalPrefetch, false)                             \
   SETTER(bool, ActivatedFromNavigationalPrefetch)                              \
                                                                                \
+  GETTER(bool, PrefetchCandidateMatched, prefetchCandidateMatched, false)      \
+  SETTER(bool, PrefetchCandidateMatched)                                       \
+                                                                               \
   GETTER(bool, IsFromProcessingFrameAttributes,                                \
          isFromProcessingFrameAttributes, false)                               \
                                                                                \

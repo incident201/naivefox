@@ -224,6 +224,33 @@ class TestEmitterBasic(unittest.TestCase):
         self.assertEqual(flags.flags["MOZBUILD_CFLAGS"], ["-Os", "-funroll-loops"])
         self.assertEqual(flags.flags["MOZBUILD_CXXFLAGS"], ["-funroll-loops", "-Os"])
 
+    def test_win32_exe_default_ldflags(self):
+        reader = self.reader(
+            "host-compile-flags",
+            extra_substs={"WIN32_EXE_DEFAULT_LDFLAGS": ["-STACK:8388608"]},
+        )
+        sources, ldflags, host_flags, host_ldflags, lib, target_flags = (
+            self.read_topsrcdir(reader)
+        )
+        link_flags = dict(ldflags.get_flags())
+        self.assertEqual(link_flags["PROGRAM_LDFLAGS"], ["-STACK:8388608"])
+        self.assertNotIn("-STACK:8388608", link_flags.get("LDFLAGS", []))
+        for _, flags in host_ldflags.get_flags():
+            self.assertNotIn("-STACK:8388608", flags)
+
+    def test_macos_program_rpath(self):
+        reader = self.reader(
+            "compile-flags",
+            extra_substs={"OS_ARCH": "Darwin"},
+        )
+        sources, ldflags, lib, flags = self.read_topsrcdir(reader)
+        self.assertEqual(ldflags.flags["MACOS_RPATH"], ["-Wl,-rpath,@executable_path"])
+
+    def test_macos_program_rpath_other_os(self):
+        reader = self.reader("compile-flags")
+        sources, ldflags, lib, flags = self.read_topsrcdir(reader)
+        self.assertEqual(ldflags.flags["MACOS_RPATH"], [])
+
     def test_per_source_object_deps(self):
         reader = self.reader("per-source-object-deps")
         objs = self.read_topsrcdir(reader)

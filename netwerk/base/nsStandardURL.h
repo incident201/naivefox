@@ -228,10 +228,10 @@ class nsStandardURL : public nsIFileURL,
                        const nsACString& newRef, bool copyCached = false);
 
   // Helper for subclass implementation of GetFile().  Subclasses that map
-  // URIs to files in a special way should implement this method.  It should
-  // ensure that our mFile is initialized, if it's possible.
-  // returns NS_ERROR_NO_INTERFACE if the url does not map to a file
-  virtual nsresult EnsureFile();
+  // URIs to files in a special way should implement this method.  Returns a
+  // file the caller owns, or NS_ERROR_NO_INTERFACE if the url does not map to
+  // a file.  Must not write mFile: the URL may be in use on other threads.
+  virtual nsresult ResolveFile(nsIFile** aResult);
 
   virtual nsresult Clone(nsIURI** aURI);
   virtual nsresult SetSpecInternal(const nsACString& input);
@@ -265,7 +265,7 @@ class nsStandardURL : public nsIFileURL,
 
   int32_t Port() { return mPort == -1 ? mDefaultPort : mPort; }
 
-  void ReplacePortInSpec(int32_t aNewPort);
+  bool ReplacePortInSpec(int32_t aNewPort);
   void Clear();
   void InvalidateCache(bool invalidateCachedFile = true);
 
@@ -323,6 +323,9 @@ class nsStandardURL : public nsIFileURL,
   int32_t ReplaceSegment(uint32_t pos, uint32_t len, const char* val,
                          uint32_t valLen);
   int32_t ReplaceSegment(uint32_t pos, uint32_t len, const nsACString& val);
+  // Whether replacing aOldLen bytes of mSpec with aNewLen bytes would exceed
+  // network.standard-url.max-length.
+  bool ExceedsMaxLength(uint32_t aOldLen, uint32_t aNewLen) const;
 
   nsresult ParseURL(const char* spec, int32_t specLen);
 
@@ -404,11 +407,9 @@ class nsStandardURL : public nsIFileURL,
   // Concretely typed so ParseAll() is reachable without a downcast.
   RefPtr<nsBaseURLParser> mParser;
 
-  // mFile is protected so subclasses can access it directly
- protected:
-  nsCOMPtr<nsIFile> mFile;  // cached result for nsIFileURL::GetFile
+  // Only set via SetFile() or cloning, never lazily.
+  nsCOMPtr<nsIFile> mFile;
 
- private:
   // cached result for nsIURI::GetDisplayHost
   nsCString mDisplayHost;
 

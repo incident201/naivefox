@@ -4,9 +4,6 @@
 
 #include "TRRServiceChannel.h"
 
-#ifndef MOZ_NAIVEFOX
-#  include "AltServiceChild.h"
-#endif
 #include "HttpLog.h"
 #include "ProxyConfigLookup.h"
 #include "TRR.h"
@@ -273,7 +270,6 @@ nsresult TRRServiceChannel::ResolveProxy() {
 
   MOZ_ASSERT(NS_IsMainThread());
 
-  // TODO: bug 1625171. Consider moving proxy resolution to socket process.
   RefPtr<TRRServiceChannel> self = this;
   nsCOMPtr<nsICancelable> proxyRequest;
   nsresult rv = ProxyConfigLookup::Create(
@@ -408,8 +404,6 @@ nsresult TRRServiceChannel::BeginConnect() {
 
   RefPtr<nsHttpConnectionInfo> connInfo = new nsHttpConnectionInfo(
       host, port, ""_ns, mUsername, proxyInfo, OriginAttributes(), isHttps);
-  // TODO: Bug 1622778 for using AltService in socket process.
-  StoreAllowAltSvc(XRE_IsParentProcess() && LoadAllowAltSvc());
   bool http2Allowed = !gHttpHandler->IsHttp2Excluded(connInfo);
   bool http3Allowed = Http3Allowed();
   if (!http3Allowed) {
@@ -708,7 +702,7 @@ nsresult TRRServiceChannel::SetupTransaction() {
                           mReqContentLength, mCurrentEventTarget, callbacks,
                           this, mBrowserId, HttpTrafficCategory::eInvalid,
                           mRequestContext, mClassOfService, mInitialRwin,
-                          LoadResponseTimeoutEnabled(), mChannelId, nullptr,
+                          LoadResponseTimeoutEnabled(), mChannelId,
                           nsILoadInfo::IPAddressSpace::Unknown, perms);
 
   if (NS_FAILED(rv)) {
@@ -945,16 +939,6 @@ void TRRServiceChannel::ProcessAltService(
        privateBrowsing(mPrivateBrowsing), callbacks = std::move(callbacks),
        proxyInfo = std::move(proxyInfo), caps(mCaps),
        connectionInfo = std::move(connectionInfo)]() {
-#ifndef MOZ_NAIVEFOX
-        if (XRE_IsSocketProcess()) {
-          AltServiceChild::ProcessHeader(
-              altSvc, scheme, originHost, originPort, userName, privateBrowsing,
-              callbacks, proxyInfo, caps & NS_HTTP_DISALLOW_SPDY,
-              OriginAttributes(), connectionInfo);
-          return;
-        }
-#endif
-
         AltSvcMapping::ProcessHeader(altSvc, scheme, originHost, originPort,
                                      userName, privateBrowsing, callbacks,
                                      proxyInfo, caps & NS_HTTP_DISALLOW_SPDY,

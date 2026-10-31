@@ -33,7 +33,6 @@ void DnsMetadata::Fill(nsIDNSAddrRecord* aRecord) {
     return;
   }
   aRecord->IsTRR(&mIsTRR);
-  aRecord->ResolvedInSocketProcess(&mResolvedInSocketProcess);
   aRecord->GetTrrFetchDuration(&mTrrFetchDuration);
   aRecord->GetTrrFetchDurationNetworkOnly(&mTrrFetchDurationNetworkOnly);
   aRecord->GetEffectiveTRRMode(&mEffectiveTRRMode);
@@ -49,7 +48,6 @@ class SingleDNSAddrRecord final : public nsIDNSAddrRecord {
   SingleDNSAddrRecord(NetAddr aAddr, const DnsMetadata& aMetadata)
       : mAddress(aAddr),
         mIsTRR(aMetadata.mIsTRR),
-        mResolvedInSocketProcess(aMetadata.mResolvedInSocketProcess),
         mTrrFetchDuration(aMetadata.mTrrFetchDuration),
         mTrrFetchDurationNetworkOnly(aMetadata.mTrrFetchDurationNetworkOnly),
         mEffectiveTRRMode(aMetadata.mEffectiveTRRMode),
@@ -65,7 +63,6 @@ class SingleDNSAddrRecord final : public nsIDNSAddrRecord {
   NetAddr mAddress;
 
   bool mIsTRR = false;
-  bool mResolvedInSocketProcess = false;
   double mTrrFetchDuration = 0.0;
   double mTrrFetchDurationNetworkOnly = 0.0;
   nsIRequest::TRRMode mEffectiveTRRMode = nsIRequest::TRR_DEFAULT_MODE;
@@ -86,12 +83,6 @@ SingleDNSAddrRecord::GetCanonicalName(nsACString& aResult) {
 NS_IMETHODIMP
 SingleDNSAddrRecord::IsTRR(bool* aRetval) {
   *aRetval = mIsTRR;
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-SingleDNSAddrRecord::ResolvedInSocketProcess(bool* aRetval) {
-  *aRetval = mResolvedInSocketProcess;
   return NS_OK;
 }
 

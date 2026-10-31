@@ -17,7 +17,7 @@
 namespace mozilla::naivefox {
 TransportSite::TransportSite()
     : mDecoder(UTF_8_ENCODING->NewDecoderWithoutBOMHandling()),
-      mScanner(MakeUnique<nsHtml5SpeculativeScanner>(nullptr, this)) {
+      mScanner(std::make_unique<nsHtml5SpeculativeScanner>(nullptr, this)) {
   mStatus = NS_NewURI(getter_AddRefs(mBase), "https://naivefox.invalid/"_ns);
 }
 TransportSite::~TransportSite() = default;

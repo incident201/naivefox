@@ -28,12 +28,22 @@ from mozboot.bootstrap import APPLICATIONS
     help="Only execute actions that leave the system configuration alone.",
 )
 @CommandArgument(
+    "--no-agentic-tools",
+    dest="no_agentic_tools",
+    action="store_true",
+    help="Do not install tools for agentic coding.",
+)
+@CommandArgument(
     "--exclude",
     nargs="+",
     help="A list of bootstrappable elements not to bootstrap.",
 )
 def bootstrap(
-    command_context, application_choice=None, no_system_changes=False, exclude=[]
+    command_context,
+    application_choice=None,
+    no_system_changes=False,
+    no_agentic_tools=False,
+    exclude=[],
 ):
     """Bootstrap system and mach for optimal development experience."""
     from mozboot.bootstrap import Bootstrapper
@@ -42,6 +52,7 @@ def bootstrap(
         choice=application_choice,
         no_interactive=not command_context._mach_context.is_interactive,
         no_system_changes=no_system_changes,
+        no_agentic_tools=no_agentic_tools,
         exclude=exclude,
         mach_context=command_context._mach_context,
     )

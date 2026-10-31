@@ -72,6 +72,10 @@ class GitRepository(Repository):
     def head_rev(self):
         return self._run("rev-parse", "HEAD").strip()
 
+    @property
+    def is_shallow(self):
+        return self._run("rev-parse", "--is-shallow-repository").strip() == "true"
+
     def is_cinnabar_repo(self) -> bool:
         """Return `True` if the repo is a git-cinnabar clone."""
 
@@ -278,6 +282,12 @@ class GitRepository(Repository):
     def get_tracked_files_finder(self, path=None):
         files = [p for p in self._run("ls-files", "-z").split("\0") if p]
         return FileListFinder(files)
+
+    def _get_tracked_files(self, patterns):
+        pathspecs = [f":(glob){pattern}" for pattern in patterns]
+        files = self._run("ls-files", "-z", "--", *pathspecs).split("\0")
+        deleted = self._run("ls-files", "-z", "--deleted", "--", *pathspecs)
+        return sorted(set(files) - set(deleted.split("\0")) - {""})
 
     def get_ignored_files_finder(self):
         files = [

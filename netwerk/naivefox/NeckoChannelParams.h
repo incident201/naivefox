@@ -38,21 +38,6 @@ class PreferredAlternativeDataTypeParams final {
 
 class EarlyHintConnectArgs final {};
 
-class TransactionObserverResult final {
- public:
-  bool& versionOk() { return mVersionOk; }
-  bool& authOk() { return mAuthOk; }
-  nsresult& closeReason() { return mCloseReason; }
-  const bool& versionOk() const { return mVersionOk; }
-  const bool& authOk() const { return mAuthOk; }
-  const nsresult& closeReason() const { return mCloseReason; }
-
- private:
-  bool mVersionOk = false;
-  bool mAuthOk = false;
-  nsresult mCloseReason = NS_OK;
-};
-
 // Parent-only equivalents of the small data records used by common Necko
 // code.  Full Firefox generates these records from NeckoChannelParams.ipdlh;
 // NaiveFox has no Necko child/socket process and therefore needs neither IPC
@@ -90,78 +75,6 @@ class ProxyInfoCloneArgs final {
   uint32_t m_resolveFlags = 0;
   nsCString m_proxyAuthorizationHeader;
   nsCString m_connectionIsolationKey;
-};
-
-class HttpConnectionInfoCloneArgs final {
- public:
-#define NF_FIELD(type, name)                 \
-  type& name() { return m_##name; }          \
-  const type& name() const { return m_##name; }
-  NF_FIELD(nsCString, host)
-  NF_FIELD(int32_t, port)
-  NF_FIELD(nsCString, npnToken)
-  NF_FIELD(nsCString, username)
-  NF_FIELD(OriginAttributes, originAttributes)
-  NF_FIELD(bool, endToEndSSL)
-  NF_FIELD(nsCString, routedHost)
-  NF_FIELD(int32_t, routedPort)
-  NF_FIELD(bool, anonymous)
-  NF_FIELD(bool, aPrivate)
-  NF_FIELD(bool, insecureScheme)
-  NF_FIELD(bool, noSpdy)
-  NF_FIELD(bool, beConservative)
-  NF_FIELD(bool, bypassProxy)
-  NF_FIELD(bool, anonymousAllowClientCert)
-  NF_FIELD(bool, fallbackConnection)
-  NF_FIELD(uint32_t, tlsFlags)
-  NF_FIELD(bool, isolated)
-  NF_FIELD(bool, isTrrServiceChannel)
-  NF_FIELD(uint8_t, trrMode)
-  NF_FIELD(bool, isIPv4Disabled)
-  NF_FIELD(bool, isIPv6Disabled)
-  NF_FIELD(uint8_t, http3Policy)
-  NF_FIELD(nsCString, topWindowOrigin)
-  NF_FIELD(bool, isHttp3)
-  NF_FIELD(bool, webTransport)
-  NF_FIELD(uint64_t, webTransportId)
-  NF_FIELD(bool, hasIPHintAddress)
-  NF_FIELD(nsCString, echConfig)
-  NF_FIELD(bool, happyEyeballsEnabled)
-  NF_FIELD(nsTArray<ProxyInfoCloneArgs>, proxyInfo)
-#undef NF_FIELD
-
- private:
-  nsCString m_host;
-  int32_t m_port = -1;
-  nsCString m_npnToken;
-  nsCString m_username;
-  OriginAttributes m_originAttributes;
-  bool m_endToEndSSL = false;
-  nsCString m_routedHost;
-  int32_t m_routedPort = -1;
-  bool m_anonymous = false;
-  bool m_aPrivate = false;
-  bool m_insecureScheme = false;
-  bool m_noSpdy = false;
-  bool m_beConservative = false;
-  bool m_bypassProxy = false;
-  bool m_anonymousAllowClientCert = false;
-  bool m_fallbackConnection = false;
-  uint32_t m_tlsFlags = 0;
-  bool m_isolated = false;
-  bool m_isTrrServiceChannel = false;
-  uint8_t m_trrMode = 0;
-  bool m_isIPv4Disabled = false;
-  bool m_isIPv6Disabled = false;
-  uint8_t m_http3Policy = 0;
-  nsCString m_topWindowOrigin;
-  bool m_isHttp3 = false;
-  bool m_webTransport = false;
-  uint64_t m_webTransportId = 0;
-  bool m_hasIPHintAddress = false;
-  nsCString m_echConfig;
-  bool m_happyEyeballsEnabled = false;
-  nsTArray<ProxyInfoCloneArgs> m_proxyInfo;
 };
 
 class CookieStruct final {
@@ -234,73 +147,6 @@ class CookieStructTable final {
  private:
   OriginAttributes mAttrs;
   nsTArray<CookieStruct> mCookies;
-};
-
-class HttpActivity final {
- public:
-  HttpActivity() = default;
-  HttpActivity(nsCString aHost, int32_t aPort, bool aEndToEndSSL)
-      : mHost(std::move(aHost)),
-        mPort(aPort),
-        mEndToEndSSL(aEndToEndSSL) {}
-  const nsCString& host() const { return mHost; }
-  int32_t port() const { return mPort; }
-  bool endToEndSSL() const { return mEndToEndSSL; }
-
- private:
-  nsCString mHost;
-  int32_t mPort = -1;
-  bool mEndToEndSSL = false;
-};
-
-class HttpConnectionActivity final {
- public:
-  HttpConnectionActivity() = default;
-  HttpConnectionActivity(nsCString aKey, nsCString aHost, int32_t aPort,
-                         bool aSSL, bool aHasECH, bool aIsHttp3)
-      : mKey(std::move(aKey)),
-        mHost(std::move(aHost)),
-        mPort(aPort),
-        mSSL(aSSL),
-        mHasECH(aHasECH),
-        mIsHttp3(aIsHttp3) {}
-  const nsCString& connInfoKey() const { return mKey; }
-  const nsCString& host() const { return mHost; }
-  int32_t port() const { return mPort; }
-  bool ssl() const { return mSSL; }
-  bool hasECH() const { return mHasECH; }
-  bool isHttp3() const { return mIsHttp3; }
-
- private:
-  nsCString mKey;
-  nsCString mHost;
-  int32_t mPort = -1;
-  bool mSSL = false;
-  bool mHasECH = false;
-  bool mIsHttp3 = false;
-};
-
-class HttpActivityArgs final {
- public:
-  enum Type { Tuint64_t, THttpActivity, THttpConnectionActivity };
-  explicit HttpActivityArgs(uint64_t aId) : mType(Tuint64_t), mId(aId) {}
-  HttpActivityArgs(HttpActivity aActivity)
-      : mType(THttpActivity), mActivity(std::move(aActivity)) {}
-  HttpActivityArgs(HttpConnectionActivity aActivity)
-      : mType(THttpConnectionActivity),
-        mConnectionActivity(std::move(aActivity)) {}
-  Type type() const { return mType; }
-  uint64_t get_uint64_t() const { return mId; }
-  const HttpActivity& get_HttpActivity() const { return mActivity; }
-  const HttpConnectionActivity& get_HttpConnectionActivity() const {
-    return mConnectionActivity;
-  }
-
- private:
-  Type mType;
-  uint64_t mId = 0;
-  HttpActivity mActivity;
-  HttpConnectionActivity mConnectionActivity;
 };
 
 }  // namespace mozilla::net

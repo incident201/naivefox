@@ -1013,7 +1013,7 @@ void nsHttpConnectionMgr::UpdateCoalescingForNewConn(
             coalescingKey.mHash,
             [] {
               LOG(("UpdateCoalescingForNewConn() need new list element\n"));
-              return MakeUnique<nsTArray<CoalescedConnection>>(1);
+              return std::make_unique<nsTArray<CoalescedConnection>>(1);
             })
         ->AppendElement(CoalescedConnection{
             do_GetWeakReference(
@@ -2830,13 +2830,30 @@ void nsHttpConnectionMgr::OnMsgDoShiftReloadConnectionCleanup(int32_t,
   LOG(("nsHttpConnectionMgr::OnMsgDoShiftReloadConnectionCleanup\n"));
   MOZ_ASSERT(OnSocketThread(), "not on socket thread");
 
-  mCoalescingHash.Clear();
-
   nsHttpConnectionInfo* ci = static_cast<nsHttpConnectionInfo*>(param);
+
+  if (ci) {
+    const OriginAttributes& oa = ci->GetOriginAttributes();
+    for (auto iter = mCoalescingHash.Iter(); !iter.Done(); iter.Next()) {
+      iter.Data()->RemoveElementsBy([&oa](const CoalescedConnection& aEntry) {
+        RefPtr<HttpConnectionBase> conn = do_QueryReferent(aEntry.mConn);
+        return !conn || conn->ConnectionInfo()->GetOriginAttributes() == oa;
+      });
+      if (iter.Data()->IsEmpty()) {
+        iter.Remove();
+      }
+    }
+  } else {
+    mCoalescingHash.Clear();
+  }
 
   bool preserveTRR = StaticPrefs::network_trr_preserve_on_background();
   for (const auto& entry : mCT.Values()) {
     if (preserveTRR && entry->mConnInfo->GetIsTrrServiceChannel()) {
+      continue;
+    }
+    if (ci &&
+        entry->mConnInfo->GetOriginAttributes() != ci->GetOriginAttributes()) {
       continue;
     }
     entry->ClosePersistentConnections();
@@ -4344,10 +4361,6 @@ already_AddRefed<ConnectionEntry> nsHttpConnectionMgr::FindConnectionEntry(
 }
 
 nsHttpConnectionMgr* nsHttpConnectionMgr::AsHttpConnectionMgr() { return this; }
-
-HttpConnectionMgrParent* nsHttpConnectionMgr::AsHttpConnectionMgrParent() {
-  return nullptr;
-}
 
 void nsHttpConnectionMgr::NewIdleConnectionAdded(uint32_t timeToLive) {
   mNumIdleConns++;

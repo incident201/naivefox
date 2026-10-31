@@ -171,8 +171,8 @@ LDFLAGS		= $(MOZ_LTO_LDFLAGS) $(COMPUTED_LDFLAGS) $(PGO_LDFLAGS)
 
 COMPILE_CFLAGS	= $(MOZ_LTO_CFLAGS) $(COMPUTED_CFLAGS) $(PGO_CFLAGS) $(_DEPEND_CFLAGS)
 COMPILE_CXXFLAGS = $(MOZ_LTO_CFLAGS) $(COMPUTED_CXXFLAGS) $(PGO_CFLAGS) $(_DEPEND_CFLAGS)
-COMPILE_CMFLAGS = $(MOZ_LTO_CFLAGS) $(OS_COMPILE_CMFLAGS) $(MOZBUILD_CMFLAGS)
-COMPILE_CMMFLAGS = $(MOZ_LTO_CFLAGS) $(OS_COMPILE_CMMFLAGS) $(MOZBUILD_CMMFLAGS)
+COMPILE_CMFLAGS = $(MOZ_LTO_CFLAGS) $(COMPUTED_CMFLAGS)
+COMPILE_CMMFLAGS = $(MOZ_LTO_CFLAGS) $(COMPUTED_CMMFLAGS)
 ASFLAGS = $(COMPUTED_ASFLAGS)
 SFLAGS = $(COMPUTED_SFLAGS)
 
@@ -238,12 +238,6 @@ endif
 
 DEPENDENCIES	= .md
 
-# Export to propagate to cl and submake for third-party code.
-# Eventually, we'll want to just use -I.
-ifdef INCLUDE
-export INCLUDE
-endif
-
 # Export to propagate to link.exe and submake for third-party code.
 # Eventually, we'll want to just use -LIBPATH.
 ifdef LIB
@@ -262,14 +256,6 @@ endif
 
 ifdef SCCACHE_CLIENT_SIDE
 export SCCACHE_CLIENT_SIDE
-endif
-
-ifeq ($(OS_ARCH),WINNT)
-ifneq (,$(filter msvc clang-cl,$(CC_TYPE)))
-WIN32_EXE_LDFLAGS += $(WIN32_EXE_DEFAULT_LDFLAGS)
-else
-MOZ_PROGRAM_LDFLAGS += $(WIN32_EXE_DEFAULT_LDFLAGS)
-endif
 endif
 
 -include $(topsrcdir)/$(MOZ_BUILD_APP)/app-config.mk

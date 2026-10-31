@@ -368,6 +368,18 @@ class DocumentLoadListener : public nsIInterfaceRequestor,
   MOZ_CAN_RUN_SCRIPT
   bool MaybeTriggerProcessSwitch(bool* aWillSwitchToRemote);
 
+  // The commit part of DoOnStartRequest. MaybeBeginOutboundViewTransition can
+  // delay it.
+  MOZ_CAN_RUN_SCRIPT_BOUNDARY
+  nsresult ContinueDoOnStartRequestCommit(bool aSilentErrorLoad);
+
+  // Lets the old document fire pageswap before the commit. If the navigation
+  // can have a view transition, the old document also captures its state. This
+  // then returns true and commits after the capture. Otherwise it returns
+  // false, and the caller commits right away.
+  MOZ_CAN_RUN_SCRIPT_BOUNDARY
+  bool MaybeBeginOutboundViewTransition();
+
   // Called when the process switch is going to happen, potentially
   // asynchronously, from `MaybeTriggerProcessSwitch`.
   //
@@ -571,6 +583,9 @@ class DocumentLoadListener : public nsIInterfaceRequestor,
   uint32_t mLoadStateExternalLoadFlags = 0;
   uint32_t mLoadStateInternalLoadFlags = 0;
   uint32_t mLoadStateLoadType = 0;
+
+  // See nsDocShellLoadState::PageSwapFired.
+  bool mLoadStatePageSwapFired = false;
 
   // Indicates if this load is a download.
   bool mIsDownload = false;

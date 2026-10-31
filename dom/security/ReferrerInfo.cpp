@@ -1320,26 +1320,6 @@ ReferrerInfo::InitWithDocument(const Document* aDocument) {
 #endif
 }
 
-/**
- * Check whether the given node has referrerpolicy attribute and parse
- * referrer policy from the attribute.
- * Currently, referrerpolicy attribute is supported in a, area, img, iframe,
- * script, or link element.
- */
-#ifndef MOZ_NAIVEFOX
-static ReferrerPolicy ReferrerPolicyFromAttribute(const Element& aElement) {
-  if (!aElement.IsAnyOfHTMLElements(nsGkAtoms::a, nsGkAtoms::area,
-                                    nsGkAtoms::script, nsGkAtoms::iframe,
-                                    nsGkAtoms::link, nsGkAtoms::img) &&
-      !aElement.IsSVGElement(nsGkAtoms::a) &&
-      !(aElement.IsMathMLElement(nsGkAtoms::a) &&
-        StaticPrefs::mathml_a_element_enabled())) {
-    return ReferrerPolicy::_empty;
-  }
-  return aElement.GetReferrerPolicyAsEnum();
-}
-#endif
-
 NS_IMETHODIMP
 ReferrerInfo::InitWithElement(const Element* aElement) {
 #ifdef MOZ_NAIVEFOX
@@ -1352,7 +1332,7 @@ ReferrerInfo::InitWithElement(const Element* aElement) {
 
   // Referrer policy from referrerpolicy attribute will have a higher priority
   // than referrer policy from <meta> tag and Referrer-Policy header.
-  mPolicy = ReferrerPolicyFromAttribute(*aElement);
+  mPolicy = aElement->GetReferrerPolicyAsEnum();
   if (mPolicy == ReferrerPolicy::_empty) {
     // Fallback to use document's referrer poicy if we don't have referrer
     // policy from attribute.

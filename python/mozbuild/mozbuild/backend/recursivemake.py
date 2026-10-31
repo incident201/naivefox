@@ -1578,7 +1578,7 @@ class RecursiveMakeBackend(MakeBackend):
             self._process_non_default_target(libdef, shared_lib, backend_file)
         if self.environment.substs.get("OS_ARCH") == "WINNT" and libdef.installed:
             backend_file.write("IMPORT_LIB_FILES := $(IMPORT_LIBRARY)\n")
-            backend_file.write("IMPORT_LIB_DEST := $(DIST)/lib\n")
+            backend_file.write("IMPORT_LIB_DEST = $(DIST)/lib$(DIST_SUBDIR:%=/%)\n")
             backend_file.write("IMPORT_LIB_TARGET := target\n")
             backend_file.write("INSTALL_TARGETS += IMPORT_LIB\n")
 

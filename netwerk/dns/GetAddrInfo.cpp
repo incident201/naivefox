@@ -17,9 +17,6 @@
 
 #include <algorithm>
 
-#ifndef MOZ_NAIVEFOX
-#  include "NativeDNSResolverOverrideParent.h"
-#endif
 #include "mozilla/ClearOnShutdown.h"
 #include "mozilla/Logging.h"
 #include "mozilla/StaticMutex.h"
@@ -30,7 +27,6 @@
 #include "nsHostResolver.h"
 #include "nsIDNSService.h"
 #include "nsINetworkLinkService.h"
-#include "nsIOService.h"
 #include "prerror.h"
 #include "prnetdb.h"
 
@@ -691,11 +687,6 @@ nsresult CreateAndResolveMockHTTPSRecord(const nsACString& aHost,
 // static
 already_AddRefed<nsINativeDNSResolverOverride>
 NativeDNSResolverOverride::GetSingleton() {
-#ifndef MOZ_NAIVEFOX
-  if (nsIOService::UseSocketProcess() && XRE_IsParentProcess()) {
-    return NativeDNSResolverOverrideParent::GetSingleton();
-  }
-#endif
   return GetOverrideSingleton();
 }
 

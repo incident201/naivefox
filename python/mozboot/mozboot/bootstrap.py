@@ -4,8 +4,6 @@
 
 import os
 import platform
-import re
-import shutil
 import subprocess
 import sys
 import time
@@ -23,7 +21,6 @@ from mach.util import (
 from mozbuild.base import MozbuildObject
 from mozfile import which
 from mozversioncontrol import get_repository_object
-from packaging.version import Version
 
 from mozboot.aerynos import AerynOsBootstrapper
 from mozboot.archlinux import ArchlinuxBootstrapper
@@ -139,8 +136,8 @@ Proceed at your own peril.
 """
 
 
-# Dev Drives were added in 22621.2338 and should be available in all subsequent versions
-DEV_DRIVE_MINIMUM_VERSION = Version("10.0.22621.2338")
+# Dev Drives are available from build 22631 (Windows 11 23H2) onward
+DEV_DRIVE_MINIMUM_BUILD = 22631
 DEV_DRIVE_SUGGESTION = """
 Mach has detected that the Firefox source repository ({}) is located on an {} drive.
 Your current version of Windows ({}) supports ReFS drives (Dev Drive).
@@ -169,6 +166,7 @@ class Bootstrapper:
         git_configure=False,
         sccache_configure=False,
         no_system_changes=False,
+        no_agentic_tools=False,
         exclude=[],
         mach_context=None,
     ):
@@ -177,6 +175,7 @@ class Bootstrapper:
         self.git_configure = git_configure
         self.sccache_configure = sccache_configure
         self.no_system_changes = no_system_changes
+        self.no_agentic_tools = no_agentic_tools
         self.exclude = exclude
         self.mach_context = mach_context
         cls = None
@@ -287,16 +286,21 @@ class Bootstrapper:
             mozconfig_builder.append("ac_add_options --with-ccache=sccache")
 
     def check_agentic_tools(self):
-        if self.instance.no_interactive:
+        if self.no_agentic_tools:
             return
 
-        if not self.instance.cargo_tools_installed():
+        if not self.instance.no_interactive and not (
+            self.instance.cargo_tools_installed()
+            and self.instance.npm_tools_installed()
+        ):
             if not self.instance.prompt_yesno(
                 "Will you be using agentic coding tools to work on Firefox?"
             ):
                 return
 
         self.instance.ensure_cargo_tools()
+        self.instance.ensure_npm_tools()
+        self.instance.ensure_mozbuild_bin_in_path()
 
     def check_code_submission(self, checkout_root: Path):
         if self.instance.no_interactive or which("moz-phab"):
@@ -429,69 +433,57 @@ class Bootstrapper:
             )
 
     def _check_for_dev_drive(self, topsrcdir):
-        def extract_windows_version_number(raw_ver_output):
-            pattern = re.compile(r"\bVersion (\d+(\.\d+)*)\b")
-            match = pattern.search(raw_ver_output)
-
-            if match:
-                windows_version_number = match.group(1)
-                return Version(windows_version_number)
-
-            return Version("0")
-
         if os.environ.get("MACH_HIDE_DEV_DRIVE_SUGGESTION"):
             return
 
         print("Checking for Dev Drive...")
 
-        if not shutil.which("powershell"):
+        import ctypes
+        from ctypes import wintypes
+
+        windows_version = sys.getwindowsversion()
+
+        if windows_version.build < DEV_DRIVE_MINIMUM_BUILD:
+            return
+
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        volume_root = ctypes.create_unicode_buffer(wintypes.MAX_PATH)
+        file_system_name = ctypes.create_unicode_buffer(wintypes.MAX_PATH)
+        if not kernel32.GetVolumePathNameW(
+            os.path.realpath(topsrcdir), volume_root, len(volume_root)
+        ) or not kernel32.GetVolumeInformationW(
+            volume_root,
+            None,
+            0,
+            None,
+            None,
+            None,
+            file_system_name,
+            len(file_system_name),
+        ):
             print(
-                "PowerShell is not available on the system path. Unable to check for Dev Drive."
+                DEV_DRIVE_DETECTION_ERROR.format(
+                    ctypes.FormatError(ctypes.get_last_error())
+                )
             )
             return
 
-        try:
-            ver_output = subprocess.check_output(["cmd.exe", "/c", "ver"], text=True)
-            current_windows_version = extract_windows_version_number(ver_output)
+        file_system_type = file_system_name.value
 
-            if current_windows_version < DEV_DRIVE_MINIMUM_VERSION:
-                return
-
-            file_system_info = subprocess.check_output(
-                [
-                    "powershell",
-                    "Get-Item",
-                    "-Path",
-                    topsrcdir,
-                    "|",
-                    "Get-Volume",
-                    "|",
-                    "Select-Object",
-                    "FileSystem",
-                ],
-                text=True,
-            )
-
-            file_system_type = file_system_info.strip().split("\n")[2]
-
-            if file_system_type == "ReFS":
-                print(" The Firefox source repository is on a Dev Drive.")
-            else:
-                print(
-                    DEV_DRIVE_SUGGESTION.format(
-                        topsrcdir, file_system_type, current_windows_version
-                    )
-                )
-                if self.instance.no_interactive:
-                    pass
-                else:
-                    input("\nPress enter to continue.")
-
-        except subprocess.CalledProcessError as error:
+        if file_system_type == "ReFS":
+            print(" The Firefox source repository is on a Dev Drive.")
+        else:
             print(
-                DEV_DRIVE_DETECTION_ERROR.format(f"CalledProcessError: {error.stderr}")
+                DEV_DRIVE_SUGGESTION.format(
+                    topsrcdir,
+                    file_system_type,
+                    f"{windows_version.major}.{windows_version.minor}.{windows_version.build}",
+                )
             )
-            pass
+            if self.instance.no_interactive:
+                pass
+            else:
+                input("\nPress enter to continue.")
 
     def _add_microsoft_defender_antivirus_exclusions(
         self, topsrcdir: Path, state_dir: Path

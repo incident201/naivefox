@@ -11,6 +11,7 @@ SOURCES += [
     "../MemMapSnapshot.cpp",
     "../NaiveFoxRunner.cpp",
     "../OriginChannel.cpp",
+    "../ProxyAutoConfigNaiveFox.cpp",
     "../RuntimeLogging.cpp",
     "../Socks5Parser.cpp",
     "../SocksServer.cpp",

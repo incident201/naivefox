@@ -253,7 +253,7 @@ nsresult nsINIParser::SetString(const char* aSection, const char* aKey,
 
   mSections.WithEntryHandle(aSection, [&](auto&& entry) {
     if (!entry) {
-      entry.Insert(MakeUnique<INIValue>(aKey, aValue));
+      entry.Insert(std::make_unique<INIValue>(aKey, aValue));
       return;
     }
 
@@ -267,7 +267,7 @@ nsresult nsINIParser::SetString(const char* aSection, const char* aKey,
         break;
       }
       if (!v->next) {
-        v->next = MakeUnique<INIValue>(aKey, aValue);
+        v->next = std::make_unique<INIValue>(aKey, aValue);
         break;
       }
       v = v->next.get();

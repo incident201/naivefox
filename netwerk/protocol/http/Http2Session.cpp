@@ -15,9 +15,6 @@
 
 #include <algorithm>
 
-#ifndef MOZ_NAIVEFOX
-#  include "AltServiceChild.h"
-#endif
 #include "CacheControlParser.h"
 #include "Http2Session.h"
 #include "Http2Stream.h"
@@ -229,8 +226,8 @@ Http2Session::Http2Session(nsISocketTransport* aSocketTransport,
 
   LOG3(("Http2Session::Http2Session %p serial=0x%" PRIX64 "\n", this, mSerial));
 
-  mInputFrameBuffer = MakeUnique<char[]>(mInputFrameBufferSize);
-  mOutputQueueBuffer = MakeUnique<char[]>(mOutputQueueSize);
+  mInputFrameBuffer = std::make_unique<char[]>(mInputFrameBufferSize);
+  mOutputQueueBuffer = std::make_unique<char[]>(mOutputQueueSize);
   mDecompressBuffer.SetCapacity(kDefaultBufferSize);
 
   mPushAllowance = gHttpHandler->SpdyPushAllowance();
@@ -2274,16 +2271,6 @@ class UpdateAltSvcEvent : public Runnable {
     uri->GetScheme(originScheme);
     uri->GetHost(originHost);
     uri->GetPort(&originPort);
-
-#ifndef MOZ_NAIVEFOX
-    if (XRE_IsSocketProcess()) {
-      AltServiceChild::ProcessHeader(
-          mHeader, originScheme, originHost, originPort, mCI->GetUsername(),
-          mCI->GetPrivate(), nullptr, mCI->ProxyInfo(), 0,
-          mCI->GetOriginAttributes(), mCI);
-      return NS_OK;
-    }
-#endif
 
     AltSvcMapping::ProcessHeader(mHeader, originScheme, originHost, originPort,
                                  mCI->GetUsername(), mCI->GetPrivate(), nullptr,

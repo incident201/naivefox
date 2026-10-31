@@ -77,7 +77,7 @@ struct HostObjectURIParams
 {
   SimpleURIParams simpleParams;
   bool revoked;
-  nullable nsIPrincipal nullPrincipal;
+  nullable nsIPrincipal nullOriginPrincipal;
 };
 #endif
 

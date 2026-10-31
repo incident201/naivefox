@@ -16,7 +16,7 @@ encoding_c = "0.9.5"
 encoding_c_mem = "0.2.4"
 encoding_glue = { path = "../../../../intl/encoding_glue" }
 gecko_logger = { path = "../../../../xpcom/rust/gecko_logger" }
-gecko_tracing = { path = "../../../../xpcom/rust/gecko_tracing" }
+gecko_tracing = { path = "../../../../xpcom/rust/gecko_tracing", default-features = false }
 gkrust_utils = { path = "../../../../xpcom/rust/gkrust_utils" }
 happy_eyeballs_glue = { path = "../../../../netwerk/protocol/http/happy_eyeballs_glue", default-features = false, features = ["naivefox"] }
 http_sfv = { path = "../../../../netwerk/base/http-sfv" }

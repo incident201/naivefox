@@ -38,12 +38,8 @@ EXPORTS.mozilla.net += [
     "DNSServiceBase.h",
     "HTTPSSVC.h",
     "IDNBlocklistUtils.h",
-    "NativeDNSResolverOverrideChild.h",
-    "NativeDNSResolverOverrideParent.h",
     "TRRService.h",
     "TRRServiceBase.h",
-    "TRRServiceChild.h",
-    "TRRServiceParent.h",
 ]
 
 SOURCES += [
@@ -78,8 +74,6 @@ UNIFIED_SOURCES += [
     "HostRecordQueue.cpp",
     "HTTPSSVC.cpp",
     "IDNBlocklistUtils.cpp",
-    "NativeDNSResolverOverrideChild.cpp",
-    "NativeDNSResolverOverrideParent.cpp",
     "nsDNSService2.cpp",
     "nsHostRecord.cpp",
     "nsHostResolver.cpp",
@@ -88,8 +82,6 @@ UNIFIED_SOURCES += [
     "TRRQuery.cpp",
     "TRRService.cpp",
     "TRRServiceBase.cpp",
-    "TRRServiceChild.cpp",
-    "TRRServiceParent.cpp",
 ]
 
 if CONFIG["MOZ_NAIVEFOX"]:
@@ -107,18 +99,12 @@ if CONFIG["MOZ_NAIVEFOX"]:
         "ChildDNSService.cpp",
         "DNSRequestChild.cpp",
         "DNSRequestParent.cpp",
-        "NativeDNSResolverOverrideChild.cpp",
-        "NativeDNSResolverOverrideParent.cpp",
-        "TRRServiceChild.cpp",
-        "TRRServiceParent.cpp",
     ]:
         UNIFIED_SOURCES.remove(source)
 else:
     IPDL_SOURCES = [
         "PDNSRequest.ipdl",
         "PDNSRequestParams.ipdlh",
-        "PNativeDNSResolverOverride.ipdl",
-        "PTRRService.ipdl",
     ]
 
 include("/ipc/chromium/chromium-config.mozbuild")

@@ -19,7 +19,6 @@ class HttpTransactionShell;
 class nsHttpConnectionInfo;
 class HttpConnectionBase;
 class nsHttpConnectionMgr;
-class HttpConnectionMgrParent;
 class SpeculativeTransaction;
 class ClassOfService;
 
@@ -70,8 +69,9 @@ class HttpConnectionMgrShell : public nsISupports {
   // from being reused.
   [[nodiscard]] virtual nsresult DoShiftReloadConnectionCleanup() = 0;
 
-  // Like DoShiftReloadConnectionCleanup() above, but also resets CI specific
-  // information such as Happy Eyeballs history.
+  // Like DoShiftReloadConnectionCleanup() above, but only for connections
+  // whose origin attributes match the CI. Also resets CI specific information
+  // such as Happy Eyeballs history.
   [[nodiscard]] virtual nsresult DoShiftReloadConnectionCleanupWithConnInfo(
       nsHttpConnectionInfo*) = 0;
 
@@ -163,7 +163,6 @@ class HttpConnectionMgrShell : public nsISupports {
       nsIHttpUpgradeListener* aUpgradeListener) = 0;
 
   virtual nsHttpConnectionMgr* AsHttpConnectionMgr() = 0;
-  virtual HttpConnectionMgrParent* AsHttpConnectionMgrParent() = 0;
 };
 
 #define NS_DECL_HTTPCONNECTIONMGRSHELL                                         \
@@ -210,8 +209,7 @@ class HttpConnectionMgrShell : public nsISupports {
   virtual nsresult CompleteUpgrade(HttpTransactionShell* aTrans,               \
                                    nsIHttpUpgradeListener* aUpgradeListener)   \
       override;                                                                \
-  nsHttpConnectionMgr* AsHttpConnectionMgr() override;                         \
-  HttpConnectionMgrParent* AsHttpConnectionMgrParent() override;
+  nsHttpConnectionMgr* AsHttpConnectionMgr() override;
 
 }  // namespace mozilla::net
 

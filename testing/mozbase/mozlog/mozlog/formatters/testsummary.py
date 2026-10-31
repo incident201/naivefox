@@ -26,10 +26,9 @@ class TestSummaryFormatter(BaseFormatter):
 
     All other actions are dropped.
 
-    In addition, the fields `thread`, `pid`, `source`, `extra`, `tests`, `js_source`, `minidump_path`, `crashing_thread_stack`, `stack` and any
-    field whose name starts with `stackwalk_` are stripped from every
-    emitted record, except that `stack` is preserved for `crash` and
-    `ubsan_error` actions
+    In addition, the fields `thread`, `pid`, `source`, `extra`, `tests`,
+    `js_source`, `crashing_thread_stack` and any field whose name starts with
+    `stackwalk_` are stripped from every emitted record
     """
 
     _ALLOWED_ACTIONS = frozenset({
@@ -51,15 +50,11 @@ class TestSummaryFormatter(BaseFormatter):
         "crashing_thread_stack",
         "extra",
         "js_source",
-        "minidump_path",
         "pid",
         "source",
-        "stack",
         "tests",
         "thread",
     })
-    _KEEP_STACK_ACTIONS = frozenset({"crash", "ubsan_error"})
-    _ALWAYS_STRIP_KEEP_STACK = _ALWAYS_STRIP - {"stack"}
 
     def __call__(self, data):
         action = data.get("action")
@@ -78,15 +73,10 @@ class TestSummaryFormatter(BaseFormatter):
         if action == "lsan_leak" and data.get("allowed_match"):
             return
 
-        if action in self._KEEP_STACK_ACTIONS:
-            strip = self._ALWAYS_STRIP_KEEP_STACK
-        else:
-            strip = self._ALWAYS_STRIP
-
         data = {
             k: v
             for k, v in data.items()
-            if k not in strip and not k.startswith("stackwalk_")
+            if k not in self._ALWAYS_STRIP and not k.startswith("stackwalk_")
         }
 
         return json.dumps(data) + "\n"

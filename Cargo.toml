@@ -86,7 +86,7 @@ exclude = [
 resolver = "2"
 
 [workspace.package]
-rust-version = "1.90.0"
+rust-version = "1.95.0"
 
 [workspace.dependencies]
 # Shared across multiple UniFFI consumers.
@@ -96,7 +96,7 @@ uniffi_pipeline = "0.32"
 # Shared across multiple application-services consumers.
 rusqlite = "0.37"
 # Shared across multiple glean consumers.
-glean = "=70.2.1"
+glean = "=71.0.0"
 
 # Explicitly specify what our profiles use.  The opt-level setting here is
 # a total fiction; see the setup of MOZ_RUST_DEFAULT_FLAGS for what the
@@ -207,6 +207,7 @@ backtrace = { path = "build/rust/backtrace" }
 
 # Patch bindgen 0.72 to 0.73
 bindgen = { package = "bindgen", path = "build/rust/bindgen" }
+bindgen_0_73 = { package = "bindgen", path = "third_party/rust/bindgen" }
 
 # Locally patch icu_normalizer to take fixes from the 2.3 track
 icu_collator = { path = "third_party/rust/icu_collator" }

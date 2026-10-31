@@ -99,15 +99,6 @@ inline bool IsNeckoChild() {
 #endif
 }
 
-inline bool IsSocketProcessChild() {
-#ifdef MOZ_NAIVEFOX
-  return false;
-#else
-  static bool amChild = (XRE_GetProcessType() == GeckoProcessType_Socket);
-  return amChild;
-#endif
-}
-
 class HttpChannelSecurityWarningReporter : public nsISupports {
  public:
   [[nodiscard]] virtual nsresult ReportSecurityMessage(

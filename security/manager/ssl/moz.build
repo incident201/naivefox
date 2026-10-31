@@ -82,14 +82,8 @@ EXPORTS.mozilla += [
 
 EXPORTS.mozilla.psm += [
     "EnabledSignatureSchemes.h",
-    "IPCClientCertsChild.h",
-    "IPCClientCertsParent.h",
     "PSMIPCUtils.h",
-    "SelectTLSClientAuthCertChild.h",
-    "SelectTLSClientAuthCertParent.h",
     "TransportSecurityInfo.h",
-    "VerifySSLServerCertChild.h",
-    "VerifySSLServerCertParent.h",
 ]
 
 UNIFIED_SOURCES += [
@@ -102,7 +96,6 @@ UNIFIED_SOURCES += [
     "DataStorageManager.cpp",
     "EnterpriseRoots.cpp",
     "FIPSUtils.cpp",
-    "IPCClientCertsParent.cpp",
     "md4.c",
     "nsCertTree.cpp",
     "nsNSSCallbacks.cpp",
@@ -140,8 +133,6 @@ UNIFIED_SOURCES += [
     "SSLServerCertVerification.cpp",
     "TLSClientAuthCertSelection.cpp",
     "TransportSecurityInfo.cpp",
-    "VerifySSLServerCertChild.cpp",
-    "VerifySSLServerCertParent.cpp",
     "X509CertValidity.cpp",
 ]
 
@@ -190,11 +181,8 @@ if CONFIG["MOZ_NAIVEFOX"]:
     UNIFIED_SOURCES.remove("PDFSignatureVerification.cpp")
     UNIFIED_SOURCES.remove("nsCertTree.cpp")
     UNIFIED_SOURCES.remove("SecretDecoderRing.cpp")
-    UNIFIED_SOURCES.remove("VerifySSLServerCertChild.cpp")
-    UNIFIED_SOURCES.remove("VerifySSLServerCertParent.cpp")
     UNIFIED_SOURCES.remove("AppSignatureVerification.cpp")
     UNIFIED_SOURCES.remove("NSSKeyStore.cpp")
-    UNIFIED_SOURCES.remove("IPCClientCertsParent.cpp")
 
 if CONFIG["OS_ARCH"] == "Darwin":
     # On macOS this file includes CoreFoundation.h, which contains definitions
@@ -222,7 +210,6 @@ elif not CONFIG["MOZ_NAIVEFOX"]:
 
 if not CONFIG["MOZ_NAIVEFOX"]:
     UNIFIED_SOURCES += [
-        "IPCClientCertsChild.cpp",
         "nsCertOverrideService.cpp",
         "nsSecureBrowserUI.cpp",
     ]
@@ -253,16 +240,11 @@ if CONFIG["TARGET_KERNEL"] == "Darwin":
         "-framework Security",
     ]
 
-IPDL_SOURCES += ["PSMIPCTypes.ipdlh"]
+IPDL_SOURCES += [
+    "PSMIPCTypes.ipdlh",
+]
 
-if not CONFIG["MOZ_NAIVEFOX"]:
-    IPDL_SOURCES += [
-        "PIPCClientCerts.ipdl",
-        "PSelectTLSClientAuthCert.ipdl",
-        "PVerifySSLServerCert.ipdl",
-    ]
-
-# Required by OSClientCerts, IPCClientCerts and CredentialManagerSecret.
+# Required by OSClientCerts and CredentialManagerSecret.
 if CONFIG["OS_ARCH"] == "WINNT":
     OS_LIBS += [
         "advapi32",

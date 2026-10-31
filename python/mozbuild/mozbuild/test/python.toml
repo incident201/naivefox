@@ -23,6 +23,8 @@ subsuite = "mozbuild"
 
 ["action/test_node.py"]
 
+["action/test_package.py"]
+
 ["action/test_process_install_manifest.py"]
 
 ["action/test_run_cargo.py"]
@@ -91,6 +93,8 @@ subsuite = "mozbuild"
 
 ["frontend/test_file_info_reviewers.py"]
 
+["frontend/test_gyp_reader.py"]
+
 ["frontend/test_l10n_manifest.py"]
 
 ["frontend/test_namespaces.py"]
@@ -134,6 +138,8 @@ subsuite = "mozbuild"
 ["test_line_endings.py"]
 
 ["test_mach_cargo.py"]
+
+["test_mach_source_package.py"]
 
 ["test_makeutil.py"]
 
