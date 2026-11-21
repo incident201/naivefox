@@ -244,12 +244,12 @@ jobs:
             'winappsdk-x86_64-pc-windows-msvc.tar.zst'
           $appSdkParent = Join-Path $env:RUNNER_TEMP 'windows-app-sdk'
           curl.exe --fail --location `
-            'https://firefox-ci-tc.services.mozilla.com/api/queue/v1/task/WB_mKg31SO2GAGiahx2A8w/artifacts/public/build/winappsdk-x86_64-pc-windows-msvc.tar.zst' `
+            'https://firefox-ci-tc.services.mozilla.com/api/queue/v1/task/dVwMvf9SRxKCUe6tsAAzvw/artifacts/public/build/winappsdk-x86_64-pc-windows-msvc.tar.zst' `
             --output $appSdkArchive
           $appSdkSha256 = (
             Get-FileHash -Algorithm SHA256 -LiteralPath $appSdkArchive
           ).Hash
-          if ($appSdkSha256 -ne 'BEFC65BD587A7268C30E3EE45AFC787C6E2F138767E039F7B71E34B83C7A696A') {
+          if ($appSdkSha256 -ne '9D13F0A960649A9F1FBE344A40EBF29F4C3488582CE208AF118FC97BF32CE89C') {
             throw "unexpected Windows App SDK archive SHA-256: $appSdkSha256"
           }
           New-Item -ItemType Directory -Force -Path $appSdkParent | Out-Null
