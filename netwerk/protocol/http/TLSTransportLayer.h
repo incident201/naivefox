@@ -5,6 +5,7 @@
 #ifndef TLSTransportLayer_h_
 #define TLSTransportLayer_h_
 
+#include "mozilla/Mutex.h"
 #include "nsIAsyncInputStream.h"
 #include "nsIAsyncOutputStream.h"
 #include "nsIInterfaceRequestor.h"
@@ -55,7 +56,9 @@ class TLSTransportLayer final : public nsISocketTransport,
                              nsIAsyncInputStream* aInputStream,
                              nsIAsyncOutputStream* aOutputStream,
                              nsIInputStreamCallback* aOwner);
-  bool Init(const char* aTLSHost, int32_t aTLSPort);
+  bool Init(const char* aTLSHost, int32_t aTLSPort,
+            const OriginAttributes& aOriginAttributes, uint32_t aFlags,
+            uint32_t aTlsFlags);
   already_AddRefed<nsIAsyncInputStream> GetInputStreamWrapper() {
     nsCOMPtr<nsIAsyncInputStream> stream = &mSocketInWrapper;
     return stream.forget();
@@ -127,7 +130,20 @@ class TLSTransportLayer final : public nsISocketTransport,
   virtual ~TLSTransportLayer();
   bool DispatchRelease();
 
-  nsISocketTransport* Transport() { return mSocketTransport; }
+  // A strong reference to mSocketTransport, taken under mLock so it can be
+  // used on any thread. It is released on the socket thread.
+  class MOZ_STACK_CLASS AutoSocketTransport {
+   public:
+    explicit AutoSocketTransport(TLSTransportLayer* aLayer);
+    ~AutoSocketTransport();
+    explicit operator bool() const { return !!mTransport; }
+    nsISocketTransport* operator->() const MOZ_NO_ADDREF_RELEASE_ON_RETURN {
+      return mTransport;
+    }
+
+   private:
+    nsCOMPtr<nsISocketTransport> mTransport;
+  };
 
   void MaybeWakeWaiter(int32_t aPollResult, int16_t aOutFlags, bool aInput);
 
@@ -147,7 +163,9 @@ class TLSTransportLayer final : public nsISocketTransport,
   static PRStatus Close(PRFileDesc* fd);
   static int16_t Poll(PRFileDesc* fd, int16_t in_flags, int16_t* out_flags);
 
-  nsCOMPtr<nsISocketTransport> mSocketTransport;
+  // Only changed on the socket thread. Use AutoSocketTransport to access it.
+  Mutex mLock{"TLSTransportLayer::mLock"};
+  nsCOMPtr<nsISocketTransport> mSocketTransport MOZ_GUARDED_BY(mLock);
   InputStreamWrapper mSocketInWrapper;
   OutputStreamWrapper mSocketOutWrapper;
   nsCOMPtr<nsITLSSocketControl> mTLSSocketControl;

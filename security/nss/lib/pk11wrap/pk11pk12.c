@@ -976,6 +976,11 @@ PK11_ImportPrivateKeyInfoAndReturnKey(PK11SlotInfo *slot,
             lpk->keyType = kyberKey;
             lpk->u.mlkem.params = algTag;
         handlePQKey:
+            /* RFC 9881 and RFC 9935: the parameters MUST be absent. */
+            if (pki->algorithm.parameters.len != 0) {
+                PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+                goto loser;
+            }
             if (pki->privateKey.data == NULL || pki->privateKey.len == 0) {
                 PORT_SetError(SEC_ERROR_BAD_KEY);
                 goto loser;
@@ -1034,6 +1039,12 @@ PK11_ImportPrivateKeyInfoAndReturnKey(PK11SlotInfo *slot,
         if (pki->algorithm.parameters.len != 0) {
             /* Currently supporting only (Pure)Ed25519/X25519 .*/
             PORT_SetError(SEC_ERROR_UNSUPPORTED_KEYALG);
+            goto loser;
+        }
+        unsigned int expectedLen = (lpk->keyType == edKey) ? ED25519_PRIVATE_KEY_BYTES
+                                                           : X25519_PUBLIC_KEY_BYTES;
+        if (lpk->u.ec.privateValue.len != expectedLen) {
+            PORT_SetError(SEC_ERROR_BAD_KEY);
             goto loser;
         }
 

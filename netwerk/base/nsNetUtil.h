@@ -951,6 +951,12 @@ bool NS_IsAboutBlankAllowQueryAndFragment(nsIURI* uri);
 bool NS_IsAboutSrcdoc(nsIURI* uri);
 
 /**
+ * Test whether a URI is "about:blank" or "about:srcdoc", possibly with fragment
+ * or query.  |uri| must not be null
+ */
+bool NS_IsAboutBlankOrSrcdoc(nsIURI* uri);
+
+/**
  * Test whether a URI has an "about", "blob", "data", "file", or an HTTP(S)
  * scheme.
  */
@@ -1036,6 +1042,13 @@ nsresult NS_ShouldSecureUpgrade(
     nsIPrincipal* aChannelResultPrincipal, bool aAllowSTS,
     const mozilla::OriginAttributes& aOriginAttributes, bool& aShouldUpgrade,
     std::function<void(bool, nsresult)>&& aResultCallback, bool& aWillCallback);
+
+/**
+ * Return true if NS_ShouldSecureUpgrade will upgrade |aURI| to https because
+ * of upgrade-insecure-requests or the mixed content auto-upgrade. Unlike
+ * NS_ShouldSecureUpgrade, this has no side effects and works in any process.
+ */
+bool NS_WillUpgradeInsecureRequest(nsIURI* aURI, nsILoadInfo* aLoadInfo);
 
 /**
  * Returns an https URI for channels that need to go through secure upgrades.

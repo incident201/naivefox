@@ -59,6 +59,10 @@ class NaiveFoxWebSocketTestPeer final {
     MutexAutoLock lock(aChannel->mCompressorMutex);
     return aChannel->mDataStarted || !!aChannel->mPMCECompressor;
   }
+  static nsresult FeedInput(WebSocketChannel* aChannel, uint8_t* aData,
+                            uint32_t aLength) {
+    return aChannel->ProcessInput(aData, aLength);
+  }
 };
 
 namespace {
@@ -185,7 +189,9 @@ std::shared_ptr<FeedState> FeedWhileConsumerBlocked(WebSocketChannel* aChannel,
         uint32_t accepted = 0;
         nsresult status = NS_OK;
         for (; accepted < aCount; ++accepted) {
-          status = channel->OnDataReceived(frame.data(), frame.size());
+          std::vector<uint8_t> chunk(frame);
+          status = NaiveFoxWebSocketTestPeer::FeedInput(
+              channel, chunk.data(), static_cast<uint32_t>(chunk.size()));
           if (NS_FAILED(status)) {
             break;
           }

@@ -4,7 +4,7 @@
 
 import { RemoteSettings } from "resource://services-settings/remote-settings.sys.mjs";
 
-import { X509 } from "resource://gre/modules/psm/X509.sys.mjs";
+import { X509 } from "moz-src:///security/manager/ssl/X509.sys.mjs";
 
 const SECURITY_STATE_BUCKET = "security-state";
 const SECURITY_STATE_SIGNER = "onecrl.content-signature.mozilla.org";
@@ -445,8 +445,15 @@ class IntermediatePreloads {
       return;
     }
 
-    // attachment cache is no longer needed
-    await this.client.attachments.deleteAll();
+    // Keep the cached attachments of the records still waiting, so that later
+    // runs can import them from the cached bundle.
+    if (toDownload.length == waiting.length) {
+      await this.client.attachments.deleteAll();
+    } else {
+      await this.client.attachments.cacheImpl.deleteMultiple(
+        toDownload.map(r => r.id)
+      );
+    }
 
     Services.obs.notifyObservers(
       null,

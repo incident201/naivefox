@@ -72,12 +72,10 @@ def build_dict(config, env=os.environ):
     d["mingw"] = substs.get("CC_TYPE") == "clang" and d["os"] == "win"
     d["debug"] = substs.get("MOZ_DEBUG") == "1"
     d["nightly_build"] = substs.get("NIGHTLY_BUILD") == "1"
-    d["early_beta_or_earlier"] = substs.get("EARLY_BETA_OR_EARLIER") == "1"
     d["release_or_beta"] = substs.get("RELEASE_OR_BETA") == "1"
     d["devedition"] = substs.get("MOZ_DEV_EDITION") == "1"
     d["pgo"] = substs.get("MOZ_PGO") == "1"
     d["crashreporter"] = bool(substs.get("MOZ_CRASHREPORTER"))
-    d["normandy"] = substs.get("MOZ_NORMANDY") == "1"
     d["datareporting"] = bool(substs.get("MOZ_DATA_REPORTING"))
     d["healthreport"] = substs.get("MOZ_SERVICES_HEALTHREPORT") == "1"
     d["sync"] = substs.get("MOZ_SERVICES_SYNC") == "1"

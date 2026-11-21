@@ -78,6 +78,9 @@ class HttpConnectionUDP final : public HttpConnectionBase,
 
   void OnQuicTimeoutExpired();
 
+  // Returns the seconds until the next tick is needed.
+  uint32_t ReadTimeoutTick();
+
   int64_t BytesWritten() override;
 
   nsresult GetSelfAddr(NetAddr* addr) override;
@@ -89,6 +92,10 @@ class HttpConnectionUDP final : public HttpConnectionBase,
 
   void NotifyDataRead();
   void NotifyDataWrite();
+
+  // ForceSend() without its kForceDelay backup timer, for data that should
+  // go out on the next event loop turn, e.g. datagrams.
+  [[nodiscard]] nsresult ForceSendNow();
 
   Http3Stats GetStats();
 

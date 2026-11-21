@@ -65,10 +65,9 @@
 #  include "mozilla/dom/NavigatorLogin.h"
 #  include "mozilla/dom/PerformanceStorage.h"
 #  include "mozilla/dom/PolicyContainer.h"
-#endif
-#ifndef MOZ_NAIVEFOX
 #  include "mozilla/dom/ReferrerInfo.h"
 #endif
+#include "mozilla/dom/RemoteType.h"
 #ifdef MOZ_NAIVEFOX
 #  include "SecFetch.h"
 #else
@@ -695,8 +694,9 @@ nsresult nsHttpChannel::PrepareToConnect() {
   // off the async operation that can result in calling the lambda (which
   // will Resume), to avoid a race condition.
   nsresult rv = gHttpHandler->AddAcceptAndDictionaryHeaders(
-      mURI, mLoadInfo->GetExternalContentPolicyType(), &mRequestHead, IsHTTPS(),
-      this, nsHttpChannel::StaticSuspend,
+      mURI, mLoadInfo->GetExternalContentPolicyType(), &mRequestHead,
+      IsHTTPS() && IsReadableForDictionaries(false), this,
+      nsHttpChannel::StaticSuspend,
       [self = RefPtr(this)](bool aNeedsResume, DictionaryCacheEntry* aDict) {
         if (aNeedsResume) {
           LOG_DICTIONARIES(("Resuming after getting Dictionary headers"));
@@ -814,6 +814,19 @@ nsresult nsHttpChannel::PrepareToConnect() {
     return enabled;
   };
 
+  auto deviceOnlyForCurrentContainer = [&]() {
+    uint32_t containerId = mLoadInfo->GetOriginAttributes().mUserContextId;
+    bool deviceOnly = Preferences::GetBool(
+        nsPrintfCString("network.http.microsoft-entra-sso.device-only.%u",
+                        containerId)
+            .get(),
+        StaticPrefs::network_http_microsoft_entra_sso_device_only());
+
+    LOG(("Device-only for container %u is %d\n", containerId, deviceOnly));
+
+    return deviceOnly;
+  };
+
 #endif  // defined(XP_WIN) || defined(XP_MACOSX)
 
 #ifdef XP_WIN
@@ -827,7 +840,7 @@ nsresult nsHttpChannel::PrepareToConnect() {
     if ((type == ExtContentPolicy::TYPE_DOCUMENT ||
          type == ExtContentPolicy::TYPE_SUBDOCUMENT) &&
         prefEnabledForCurrentContainer()) {
-      AddWindowsSSO(this);
+      AddWindowsSSO(this, deviceOnlyForCurrentContainer());
     }
   }
 #endif
@@ -866,7 +879,8 @@ nsresult nsHttpChannel::PrepareToConnect() {
         }
       };
 
-      nsresult rv = AddMicrosoftEntraSSO(this, std::move(resultCallback));
+      nsresult rv = AddMicrosoftEntraSSO(this, deviceOnlyForCurrentContainer(),
+                                         std::move(resultCallback));
 
       // Returns NS_OK if performRequests is called in MicrosoftEntraSSOUtils
       // This temporarily stops the channel setup for the delegate.
@@ -1276,17 +1290,29 @@ nsresult nsHttpChannel::ContinueOnBeforeConnect(bool aShouldUpgrade,
     } else {
       mCaps |= NS_HTTP_DISALLOW_SPDY;
     }
-    // Upgrades cannot use HTTP/3.
-    // TODO: When mUpgradeProtocolCallback is not null, we should allow HTTP/3
-    // for connect-udp.
-    mCaps |= NS_HTTP_DISALLOW_HTTP3;
+    // Upgrades cannot use HTTP/3 -- extended CONNECT can't be issued before the
+    // peer's SETTINGS are known. A MASQUE proxy is the exception: its outer hop
+    // *is* HTTP/3 (CONNECT-UDP) and the upgrade rides the inner tunnel, so
+    // disallowing h3 leaves only a TCP attempt against a QUIC-only port, which
+    // can never connect. Only Happy Eyeballs dispatches the upgrade onto that
+    // tunnel, so the exception is tied to the same pref. Keep Http3Allowed() in
+    // sync.
+    bool masqueProxy =
+        mProxyInfo &&
+        static_cast<nsProxyInfo*>(mProxyInfo.get())->IsHttp3Proxy() &&
+        StaticPrefs::network_http_happy_eyeballs_proxy_enabled();
+    if (!masqueProxy) {
+      mCaps |= NS_HTTP_DISALLOW_HTTP3;
+    }
     // NS_HTTP_STICKY_CONNECTION breaks the (non-Happy-Eyeballs) HTTPS RR
     // fallback mechanism, which restarts the transaction to fall back. Happy
     // Eyeballs instead races endpoints (honoring the HTTPS RR port, hints and
     // ALPN) and dispatches the sticky upgrade onto the winner with no restart,
-    // so it can safely use HTTPS RR. Only disallow HTTPS RR for upgrades that
-    // are not handled by Happy Eyeballs.
-    if (!(mCaps & NS_HTTP_USE_HAPPY_EYEBALLS)) {
+    // so it can safely use HTTPS RR. Without Happy Eyeballs, upgrades can only
+    // use HTTPS RR when nsHttpTransaction is allowed to restart them for the
+    // HTTPS RR fallback.
+    if (!(mCaps & NS_HTTP_USE_HAPPY_EYEBALLS) &&
+        !StaticPrefs::network_http_upgrade_use_https_rr()) {
       DisallowHTTPSRR(mCaps);
     }
   }
@@ -1320,9 +1346,10 @@ nsresult nsHttpChannel::ContinueOnBeforeConnect(bool aShouldUpgrade,
           .SetTRRMode(nsIRequest::GetTRRMode())
           .SetIPv4Disabled(mCaps & NS_HTTP_DISABLE_IPV4)
           .SetIPv6Disabled(mCaps & NS_HTTP_DISABLE_IPV6)
-          .SetHttp3Policy((mCaps & NS_HTTP_DISALLOW_HTTP3)
-                              ? Http3Policy::Disabled
-                              : Http3Policy::Allowed)
+          .SetHttp3Policy(
+              (mCaps & NS_HTTP_DISALLOW_HTTP3)  ? Http3Policy::Disabled
+              : mConnectionInfo->GetHttp3Only() ? Http3Policy::Only
+                                                : Http3Policy::Allowed)
           .SetAnonymousAllowClientCert(
               (mLoadFlags & LOAD_ANONYMOUS_ALLOW_CLIENT_CERT) != 0)
           .Finalize();
@@ -1687,6 +1714,9 @@ nsresult nsHttpChannel::ContinueConnect() {
     return NS_ERROR_OFFLINE;
   }
 
+  // Not served from cache, so drop any caller-set cacheReadStart.
+  mCacheReadStart = TimeStamp();
+
   // hit the net...
   nsresult rv = DoConnect(mTransactionSticky);
   mTransactionSticky = nullptr;
@@ -1694,45 +1724,8 @@ nsresult nsHttpChannel::ContinueConnect() {
 }
 
 nsresult nsHttpChannel::DoConnect(HttpTransactionShell* aTransWithStickyConn) {
-  LOG(("nsHttpChannel::DoConnect [this=%p]\n", this));
-
-  if (!mDNSBlockingPromise.IsEmpty()) {
-    LOG(("  waiting for DNS prefetch"));
-
-    // Transaction is passed only from auth retry for which we will definitely
-    // not block on DNS to alter the origin server name for IP; it has already
-    // been done.
-    MOZ_ASSERT(!aTransWithStickyConn);
-    MOZ_ASSERT(mDNSBlockingThenable);
-
-    nsCOMPtr<nsISerialEventTarget> target(do_GetMainThread());
-    RefPtr<nsHttpChannel> self(this);
-    mDNSBlockingThenable->Then(
-        target, __func__,
-        [self](const nsCOMPtr<nsIDNSRecord>& aRec) {
-          nsresult rv = self->DoConnectActual(nullptr);
-          if (NS_FAILED(rv)) {
-            self->CloseCacheEntry(false);
-            (void)self->AsyncAbort(rv);
-          }
-        },
-        [self](nsresult err) {
-          self->CloseCacheEntry(false);
-          (void)self->AsyncAbort(err);
-        });
-
-    // The connection will continue when the promise is resolved in
-    // OnLookupComplete.
-    return NS_OK;
-  }
-
-  return DoConnectActual(aTransWithStickyConn);
-}
-
-nsresult nsHttpChannel::DoConnectActual(
-    HttpTransactionShell* aTransWithStickyConn) {
-  LOG(("nsHttpChannel::DoConnectActual [this=%p, aTransWithStickyConn=%p]\n",
-       this, aTransWithStickyConn));
+  LOG(("nsHttpChannel::DoConnect [this=%p, aTransWithStickyConn=%p]\n", this,
+       aTransWithStickyConn));
 
   nsresult rv = SetupChannelForTransaction();
   if (NS_FAILED(rv)) {
@@ -2502,6 +2495,15 @@ nsresult nsHttpChannel::CallOnStartRequest() {
     MOZ_ASSERT(LoadConcurrentCacheAccess());
     LOG(("CallOnStartRequest already invoked before"));
     return mStatus;
+  }
+
+  // Alt-data describes the cached body, so it doesn't apply to a body coming
+  // from the network.  ContinueProcessNormal() has already dropped it, but
+  // other paths (e.g. OnAuthCancelled()) deliver a network body without it.
+  if (!mCachePump) {
+    mAvailableCachedAltDataType.Truncate();
+    StoreDeliveringAltData(false);
+    mAltDataLength = -1;
   }
 
   // Ensure mListener->OnStartRequest will be invoked before exiting
@@ -3908,7 +3910,8 @@ nsresult nsHttpChannel::ContinueProcessNormal(nsresult rv) {
     // and improve hitrate.  Downside is CPU use, complexity and perhaps delay,
     // maybe.
     nsAutoCString dictionary;
-    if (StaticPrefs::network_http_dictionaries_enable() && IsHTTPS()) {
+    if (StaticPrefs::network_http_dictionaries_enable() && IsHTTPS() &&
+        IsReadableForDictionaries(true)) {
       (void)mResponseHead->GetHeader(nsHttp::Use_As_Dictionary, dictionary);
       if (!dictionary.IsEmpty()) {
         if (!ParseDictionary(mCacheEntry, mResponseHead.get(), true)) {
@@ -5166,6 +5169,15 @@ nsresult nsHttpChannel::OpenCacheEntryInternal(bool isHttps) {
   nsCOMPtr<nsICacheStorage> cacheStorage;
   mCacheEntryURI = mURI;
 
+  // A navigation activated from a prefetch record reads the record's own
+  // entry. A cache-bypassing reload would truncate it, so it doesn't qualify.
+  bool readPrefetchEntry =
+      mNavigationalPrefetchCacheURI &&
+      !BYPASS_LOCAL_CACHE(mLoadFlags, LoadPreferCacheLoadOverBypass());
+  if (readPrefetchEntry) {
+    mCacheEntryURI = mNavigationalPrefetchCacheURI;
+  }
+
   uint32_t cacheEntryOpenFlags;
   bool offline = gIOService->IsOffline();
 
@@ -5187,6 +5199,10 @@ nsresult nsHttpChannel::OpenCacheEntryInternal(bool isHttps) {
     StoreCacheEntryIsReadOnly(true);
   } else if (BYPASS_LOCAL_CACHE(mLoadFlags, LoadPreferCacheLoadOverBypass())) {
     cacheEntryOpenFlags = nsICacheStorage::OPEN_TRUNCATE;
+  } else if (readPrefetchEntry) {
+    // Never write to (or replace) the entry the prefetch record holds.
+    cacheEntryOpenFlags = nsICacheStorage::OPEN_READONLY;
+    StoreCacheEntryIsReadOnly(true);
   } else {
     cacheEntryOpenFlags =
         nsICacheStorage::OPEN_NORMALLY | nsICacheStorage::CHECK_MULTITHREADED;
@@ -5402,12 +5418,18 @@ nsHttpChannel::OnCacheEntryCheck(nsICacheEntry* entry, uint32_t* aResult) {
        entry));
 
   // Held for the whole check: this may run on the cache I/O thread while the
-  // backstop timeout runs on the main thread, and the timeout must not slip in
-  // between the test below and the state we arm from here on.
+  // backstop timeout or a cancel runs on the main thread, and neither may slip
+  // in between the tests below and the state we arm from here on.
   MutexAutoLock lock(mCacheWaitLock);
 
   if (mCacheWaitTimedOut) {
     LOG(("  cache entry check arrived after backstop timeout, declining"));
+    *aResult = ENTRY_NOT_WANTED;
+    return NS_OK;
+  }
+
+  if (mCanceled) {
+    LOG(("  cache entry check arrived after cancel, declining"));
     *aResult = ENTRY_NOT_WANTED;
     return NS_OK;
   }
@@ -6071,15 +6093,13 @@ nsresult nsHttpChannel::OpenCacheInputStream(nsICacheEntry* cacheEntry,
 
   // If an alternate representation was requested, try to open the alt
   // input stream.
-  // If the entry has a "is-from-child" metadata, then only open the altdata
-  // stream if the consumer is also from child.
-  bool altDataFromChild = false;
-  {
-    nsCString value;
-    rv = cacheEntry->GetMetaDataElement("alt-data-from-child",
-                                        getter_Copies(value));
-    altDataFromChild = !value.IsEmpty();
-  }
+  // If the entry has "alt-data-from-child" metadata (the remote type of the
+  // content process that wrote it), then only open the altdata stream if the
+  // consumer is also from child.
+  nsCString altDataRemoteType;
+  rv = cacheEntry->GetMetaDataElement("alt-data-from-child",
+                                      getter_Copies(altDataRemoteType));
+  bool altDataFromChild = !altDataRemoteType.IsEmpty();
 
   nsAutoCString altDataType;
   (void)cacheEntry->GetAltDataType(altDataType);
@@ -6088,19 +6108,27 @@ nsresult nsHttpChannel::OpenCacheInputStream(nsICacheEntry* cacheEntry,
   mCachedResponseHead->ContentType(contentType);
 
   // Alt-data written by a content process (bytecode cache) may only be
-  // consumed by a load whose principal matches the one that produced it.
+  // consumed by a load from the same remote type, with a principal matching
+  // the one that produced it.  The triggering remote type of a load from a
+  // content process is that of the process which sent it.
   if (altDataFromChild && !altDataType.IsEmpty()) {
     nsAutoCString storedOrigin;
     cacheEntry->GetMetaDataElement("alt-data-principal",
                                    getter_Copies(storedOrigin));
     nsAutoCString currentOrigin;
     GetAltDataBindingOrigin(currentOrigin);
+    dom::RemoteType currentRemoteType;
+    MOZ_ALWAYS_SUCCEEDS(mLoadInfo->GetTriggeringRemoteType(currentRemoteType));
+    nsCString currentRemoteTypeString = currentRemoteType.Stringify();
     if (storedOrigin.IsEmpty() || currentOrigin.IsEmpty() ||
-        !storedOrigin.Equals(currentOrigin)) {
+        !storedOrigin.Equals(currentOrigin) ||
+        !altDataRemoteType.Equals(currentRemoteTypeString)) {
       LOG(
-          ("Rejecting child-written alt-data due to principal mismatch "
-           "[channel=%p, stored='%s', current='%s']",
-           this, storedOrigin.get(), currentOrigin.get()));
+          ("Rejecting child-written alt-data due to principal or remote type "
+           "mismatch [channel=%p, stored='%s' from '%s', current='%s' from "
+           "'%s']",
+           this, storedOrigin.get(), altDataRemoteType.get(),
+           currentOrigin.get(), currentRemoteTypeString.get()));
       altDataType.Truncate();
     }
   }
@@ -6282,6 +6310,12 @@ nsresult nsHttpChannel::ReadFromCache(void) {
 
   rv = mCachePump->AsyncRead(this);
   if (NS_FAILED(rv)) return rv;
+
+  // Performance timing uses this as responseStart for every cache hit; keep
+  // an earlier value set by the caller, e.g. when a prefetch completed.
+  if (mCacheReadStart.IsNull()) {
+    mCacheReadStart = TimeStamp::Now();
+  }
 
   uint32_t suspendCount = mSuspendCount;
   if (LoadAsyncResumePending()) {
@@ -6640,6 +6674,24 @@ nsresult nsHttpChannel::UpdateCacheEntryHeaders(nsICacheEntry* entry,
   // Indicate we have successfully finished setting metadata on the cache
   // entry.
   return entry->MetaDataReady();
+}
+
+bool nsHttpChannel::IsReadableForDictionaries(bool aCheckResponse) {
+  ExtContentPolicyType type = mLoadInfo->GetExternalContentPolicyType();
+  // Navigations are never opaque, even though cross-origin subdocument loads
+  // get opaque tainting in Gecko.
+  if (type == ExtContentPolicy::TYPE_DOCUMENT ||
+      type == ExtContentPolicy::TYPE_SUBDOCUMENT) {
+    return true;
+  }
+  LoadTainting tainting = mLoadInfo->GetTainting();
+  if (tainting == LoadTainting::Opaque) {
+    return false;
+  }
+  if (aCheckResponse && tainting == LoadTainting::CORS) {
+    return PerformCORSCheck();
+  }
+  return true;
 }
 
 bool nsHttpChannel::ParseDictionary(nsICacheEntry* aEntry,
@@ -7654,7 +7706,12 @@ nsresult nsHttpChannel::CancelInternal(nsresult status) {
 
   mEarlyHintObserver = nullptr;
   mWebTransportSessionEventListener = nullptr;
-  mCanceled = true;
+  {
+    // Waits for an OnCacheEntryCheck in flight on the cache I/O thread; once
+    // we're canceled, the abort path reads the state it would write.
+    MutexAutoLock lock(mCacheWaitLock);
+    mCanceled = true;
+  }
   mStatus = NS_FAILED(status) ? status : NS_ERROR_ABORT;
 
   // If ORB blocked this response, doom the entry that was committed to the
@@ -8162,6 +8219,12 @@ void nsHttpChannel::AsyncOpenFinal(TimeStamp aTimeStamp) {
     mAsyncOpenTime = aTimeStamp;
   }
 
+  // A completed prefetch's response was there before the navigation started.
+  if (mLoadInfo->GetActivatedFromNavigationalPrefetch() &&
+      mCacheReadStart.IsNull()) {
+    mCacheReadStart = mAsyncOpenTime;
+  }
+
   // Remember we have Authorization header set here.  We need to check on it
   // just once and early, AsyncOpen is the best place.
   StoreCustomAuthHeader(mRequestHead.HasHeader(nsHttp::Authorization));
@@ -8382,6 +8445,12 @@ nsresult nsHttpChannel::BeginConnect() {
         connInfo =
             new nsHttpConnectionInfo(host, port, "h3"_ns, mUsername, proxyInfo,
                                      originAttributes, isHttps, true, true);
+        // WebTransport over HTTP/2 is not fully implemented, so don't let the
+        // session fall back to a TCP connection.
+        if (!StaticPrefs::network_webtransport_http2_enabled()) {
+          connInfo =
+              connInfo->Mutate().SetHttp3Policy(Http3Policy::Only).Finalize();
+        }
       }
       wtconSettings->GetDedicated(&dedicated);
       if (dedicated) {
@@ -8513,7 +8582,8 @@ nsresult nsHttpChannel::BeginConnect() {
       return false;
     }
 
-    if (mProxyInfo) {
+    if (mProxyInfo &&
+        !StaticPrefs::network_http_happy_eyeballs_proxy_enabled()) {
       return false;
     }
 
@@ -8524,6 +8594,11 @@ nsresult nsHttpChannel::BeginConnect() {
         mLoadInfo->TriggeringPrincipal()->IsSystemPrincipal()) {
       return false;
     }
+    // An explicit NaiveFox physical host mapping routes the outer proxy socket
+    // through DnsAndConnectSocket without resolving the logical proxy host.
+    if (proxyInfo && !proxyInfo->NaiveFoxPhysicalHost().IsEmpty()) {
+      return false;
+    }
 #endif
 
     // WebSocket and WebTransport upgrades share the same rollout pref.
@@ -8532,10 +8607,8 @@ nsresult nsHttpChannel::BeginConnect() {
       return false;
     }
 
-    // Connect-only requests need the extended-CONNECT tunnel path, which is
-    // untested with Happy Eyeballs. These only reach us via a proxy today
-    // (already excluded above), but guard explicitly against a future
-    // non-proxied consumer.
+    // Connect-only needs the extended-CONNECT tunnel path, which Happy
+    // Eyeballs does not establish yet.
     if (mCaps & NS_HTTP_CONNECT_ONLY) {
       return false;
     }
@@ -9040,48 +9113,34 @@ nsHttpChannel::OnProxyAvailable(nsICancelable* request, nsIChannel* channel,
     mProxyInfo = pi;
 
     if (mProxyInfo) {
-      nsAutoCStringN<8> type;
-      mProxyInfo->GetType(type);
-      uint32_t flags = 0;
-      mProxyInfo->GetFlags(&flags);
-
-      if (type.EqualsLiteral("socks")) {
-        if (flags & nsIProxyInfo::TRANSPARENT_PROXY_RESOLVES_HOST) {
-          glean::networking::proxy_info_type
-              .EnumGet(glean::networking::ProxyInfoTypeLabel::eSocks5h)
-              .Add(1);
-        } else {
-          glean::networking::proxy_info_type
-              .EnumGet(glean::networking::ProxyInfoTypeLabel::eSocks5)
-              .Add(1);
-        }
-      } else if (type.EqualsLiteral("socks4")) {
-        if (flags & nsIProxyInfo::TRANSPARENT_PROXY_RESOLVES_HOST) {
-          glean::networking::proxy_info_type
-              .EnumGet(glean::networking::ProxyInfoTypeLabel::eSocks4a)
-              .Add(1);
-        } else {
-          glean::networking::proxy_info_type
-              .EnumGet(glean::networking::ProxyInfoTypeLabel::eSocks4)
-              .Add(1);
-        }
-      } else if (type.EqualsLiteral("http")) {
-        glean::networking::proxy_info_type
-            .EnumGet(glean::networking::ProxyInfoTypeLabel::eHttp)
-            .Add(1);
-      } else if (type.EqualsLiteral("https")) {
-        glean::networking::proxy_info_type
-            .EnumGet(glean::networking::ProxyInfoTypeLabel::eHttps)
-            .Add(1);
-      } else if (type.EqualsLiteral("direct")) {
-        glean::networking::proxy_info_type
-            .EnumGet(glean::networking::ProxyInfoTypeLabel::eDirect)
-            .Add(1);
-      } else {
-        glean::networking::proxy_info_type
-            .EnumGet(glean::networking::ProxyInfoTypeLabel::eUnknown)
-            .Add(1);
+      glean::networking::ProxyInfoTypeLabel label;
+      switch (GetProxyTypeHelper(mProxyInfo)) {
+        case nsIHttpChannelInternal::PROXY_TYPE_DIRECT:
+          label = glean::networking::ProxyInfoTypeLabel::eDirect;
+          break;
+        case nsIHttpChannelInternal::PROXY_TYPE_HTTP:
+          label = glean::networking::ProxyInfoTypeLabel::eHttp;
+          break;
+        case nsIHttpChannelInternal::PROXY_TYPE_HTTPS:
+          label = glean::networking::ProxyInfoTypeLabel::eHttps;
+          break;
+        case nsIHttpChannelInternal::PROXY_TYPE_SOCKS4:
+          label = glean::networking::ProxyInfoTypeLabel::eSocks4;
+          break;
+        case nsIHttpChannelInternal::PROXY_TYPE_SOCKS4A:
+          label = glean::networking::ProxyInfoTypeLabel::eSocks4a;
+          break;
+        case nsIHttpChannelInternal::PROXY_TYPE_SOCKS5:
+          label = glean::networking::ProxyInfoTypeLabel::eSocks5;
+          break;
+        case nsIHttpChannelInternal::PROXY_TYPE_SOCKS5H:
+          label = glean::networking::ProxyInfoTypeLabel::eSocks5h;
+          break;
+        default:
+          label = glean::networking::ProxyInfoTypeLabel::eUnknown;
+          break;
       }
+      glean::networking::proxy_info_type.EnumGet(label).Add(1);
     }
   }
 
@@ -9714,6 +9773,17 @@ nsHttpChannel::OnStartRequest(nsIRequest* request) {
     mResponseHead =
         mTransaction->TakeResponseHeadAndConnInfo(getter_AddRefs(connInfo));
     mSupportsHTTP3 = mTransaction->GetSupportsHTTP3();
+    if (connInfo) {
+      nsIHttpChannelInternal::ProxyType proxyType =
+          GetProxyTypeHelper(connInfo->ProxyInfo());
+      // A MASQUE proxy can also be reached over TCP, when the HTTP/3
+      // connection to it fails or loses the Happy Eyeballs race.
+      if (proxyType == nsIHttpChannelInternal::PROXY_TYPE_MASQUE &&
+          !mTransaction->IsTunnelOverHttp3()) {
+        proxyType = nsIHttpChannelInternal::PROXY_TYPE_HTTPS;
+      }
+      mProxyType = Some(proxyType);
+    }
     // the response head may be null if the transaction was cancelled.  in
     // which case we just need to call OnStartRequest/OnStopRequest.
     if (mResponseHead) {
@@ -9757,10 +9827,12 @@ nsHttpChannel::OnStartRequest(nsIRequest* request) {
     if (NS_SUCCEEDED(rv)) return NS_OK;
   }
 
-  // If this is a system principal request to an essential domain and we
-  // currently have connectivity, then check if there's a fallback domain we
-  // can use to retry. If so we redirect to the fallback domain.
-  if (NS_FAILED(mStatus) && !mCanceled && IsInternalSystemLoad(mLoadInfo)) {
+  // If this is a system principal request to an essential domain, we are not
+  // shutting down and we currently have connectivity, then check if there's a
+  // fallback domain we can use to retry. If so we redirect to the fallback
+  // domain.
+  if (NS_FAILED(mStatus) && !mCanceled && IsInternalSystemLoad(mLoadInfo) &&
+      gHttpHandler->Active()) {
     if (StaticPrefs::network_essential_domains_fallback() &&
         hasConnectivity()) {
       auto passDomainCategory = [&](nsIChannel* aRedirectedChannel) {
@@ -9774,6 +9846,8 @@ nsHttpChannel::OnStartRequest(nsIRequest* request) {
       };
 
       if (nsCOMPtr<nsIURI> fallbackURI = GetFallbackURI(mURI)) {
+        PushRedirectAsyncFunc(
+            &nsHttpChannel::ContinueOnStartRequestAfterFallback);
         rv = StartRedirectChannelToURI(fallbackURI,
                                        nsIChannelEventSink::REDIRECT_INTERNAL,
                                        passDomainCategory);
@@ -9785,9 +9859,29 @@ nsHttpChannel::OnStartRequest(nsIRequest* request) {
                                         "httpchannel-fallback", nullptr);
           return NS_OK;
         }
+        PopRedirectAsyncFunc(
+            &nsHttpChannel::ContinueOnStartRequestAfterFallback);
       }
     }
   }
+
+  return ContinueOnStartRequestWithoutFallback();
+}
+
+nsresult nsHttpChannel::ContinueOnStartRequestAfterFallback(nsresult aResult) {
+  if (NS_SUCCEEDED(aResult)) {
+    // The fallback channel took over; this one is canceled by the redirect
+    // handling code.
+    return NS_OK;
+  }
+
+  // The redirect to the fallback domain failed, so report this channel's own
+  // result to the listener.
+  return ContinueOnStartRequestWithoutFallback();
+}
+
+nsresult nsHttpChannel::ContinueOnStartRequestWithoutFallback() {
+  nsresult rv = NS_OK;
 
   // avoid crashing if mListener happens to be null...
   if (!mListener) {
@@ -11433,6 +11527,12 @@ nsHttpChannel::GetPreferCacheLoadOverBypass(bool* aPreferCacheLoadOverBypass) {
   return NS_OK;
 }
 
+nsresult nsHttpChannel::SetNavigationalPrefetchCacheURI(nsIURI* aURI) {
+  ENSURE_CALLED_BEFORE_ASYNC_OPEN();
+  mNavigationalPrefetchCacheURI = aURI;
+  return NS_OK;
+}
+
 NS_IMETHODIMP
 nsHttpChannel::PreferAlternativeDataType(
     const nsACString& aType, const nsACString& aContentType,
@@ -11873,15 +11973,6 @@ nsHttpChannel::OnLookupComplete(nsICancelable* request, nsIDNSRecord* rec,
     mCaps &= ~NS_HTTP_REFRESH_DNS;
     if (mTransaction) {
       mTransaction->SetDNSWasRefreshed();
-    }
-  }
-
-  if (!mDNSBlockingPromise.IsEmpty()) {
-    if (NS_SUCCEEDED(status)) {
-      nsCOMPtr<nsIDNSRecord> record(rec);
-      mDNSBlockingPromise.Resolve(record, __func__);
-    } else {
-      mDNSBlockingPromise.Reject(status, __func__);
     }
   }
 
@@ -13041,13 +13132,15 @@ nsHttpChannel::SetEarlyHintObserver(nsIEarlyHintObserver* aObserver) {
 NS_IMETHODIMP
 nsHttpChannel::EarlyHint(const nsACString& aLinkHeader,
                          const nsACString& aReferrerPolicy,
-                         const nsACString& aCspHeader) {
+                         const nsACString& aCspHeader,
+                         const nsACString& aConnectionAllowlistHeader) {
   LOG(("nsHttpChannel::EarlyHint.\n"));
 
   if (nsCOMPtr<nsIEarlyHintObserver> obs = mEarlyHintObserver) {
     if (nsContentUtils::ComputeIsSecureContext(this)) {
       LOG(("nsHttpChannel::EarlyHint propagated.\n"));
-      obs->EarlyHint(aLinkHeader, aReferrerPolicy, aCspHeader);
+      obs->EarlyHint(aLinkHeader, aReferrerPolicy, aCspHeader,
+                     aConnectionAllowlistHeader);
     }
   }
   return NS_OK;

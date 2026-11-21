@@ -70,8 +70,10 @@ class nsHttpConnectionMgr final : public HttpConnectionMgrShell,
   //-------------------------------------------------------------------------
 
   // called to change the connection entry associated with conn from specific
-  // into a wildcard (i.e. http2 proxy friendy) mapping
-  void MoveToWildCardConnEntry(nsHttpConnectionInfo* specificCI,
+  // into a wildcard (i.e. http2 proxy friendy) mapping. Returns false if the
+  // move did not happen, in which case conn still belongs to the specific
+  // entry and must keep its specific conn info.
+  bool MoveToWildCardConnEntry(nsHttpConnectionInfo* specificCI,
                                nsHttpConnectionInfo* wildcardCI,
                                HttpConnectionBase* conn);
 
@@ -97,8 +99,13 @@ class nsHttpConnectionMgr final : public HttpConnectionMgrShell,
   // The connection manager needs to know when a normal HTTP connection has been
   // upgraded to SPDY because the dispatch and idle semantics are a little
   // bit different.
+  // |entry| defaults to the one keyed by the connection's conn info. Happy
+  // Eyeballs must pass the entry that actually holds the connection: its
+  // per-attempt conn info adopts the proxy port, so it hashes to a different
+  // entry (see CloneAndAdoptPortAndAlpn).
   void ReportSpdyConnection(nsHttpConnection*, bool usingSpdy,
-                            bool disallowHttp3);
+                            bool disallowHttp3,
+                            ConnectionEntry* entry = nullptr);
 
   // Move an established h3 connection out of an Http3Policy::Only entry (eager
   // Alt-Svc h3 validation) and into the origin's entry, re-keying it onto an
@@ -191,9 +198,6 @@ class nsHttpConnectionMgr final : public HttpConnectionMgrShell,
   [[nodiscard]] bool ProcessPendingQForEntry(nsHttpConnectionInfo*);
   void ProcessPendingQForEntry(ConnectionEntry*);
 
-  // public, so that the SPDY/http2 seesions can activate
-  void ActivateTimeoutTick();
-
   already_AddRefed<PendingTransactionInfo> FindTransactionHelper(
       bool removeWhenFound, ConnectionEntry* aEnt, nsAHttpTransaction* aTrans);
 
@@ -207,6 +211,9 @@ class nsHttpConnectionMgr final : public HttpConnectionMgrShell,
   void MaybeRemoveEntryFromPendingSet(ConnectionEntry* ent);
 
  public:
+  // Public so that sessions can request a tick when they start needing one.
+  void ActivateTimeoutTick();
+
   void RegisterOriginCoalescingKey(HttpConnectionBase*, const nsACString& host,
                                    int32_t port);
   // A test if be-conservative should be used when proxy is setup for the

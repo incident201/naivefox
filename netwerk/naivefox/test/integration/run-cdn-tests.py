@@ -64,6 +64,10 @@ def run_case(args, protocol, mode):
             f.concurrent_open_streams(ports, target.server_address[1])
             f.cancel_stream(ports, target.server_address[1])
             f.download(ports, "http", target.server_address[1], 65536)
+            f.wait_until(
+                lambda: client.log_path.read_text(errors="replace").count(
+                    "NaiveFox websocket ready startup=20") >= 2,
+                "second carrier did not complete startup", client, timeout=30)
             if mode == "normal" and protocol == "h2":
                 f.echo_wake(ports, "socks", target.server_address[1], idle_seconds=30)
                 tunnel = f.open_tunnel(ports, "http", target.server_address[1])

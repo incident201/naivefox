@@ -14,14 +14,21 @@ import mozinfo
 import mozpack.path as mozpath
 import toml
 from mach.mixin.logging import LoggingMixin
-from mozpack.chrome.manifest import Manifest
+from mozpack.chrome.manifest import Manifest, parse_manifest_line
 from mozshellutil import quote
 
 from mozbuild.base import ExecutionSummary
 from mozbuild.util import HierarchicalStringList
 
 from ..testing import REFTEST_FLAVORS, TEST_MANIFESTS, SupportFilesConverter
-from .context import Context, ObjDirPath, Path, SourcePath, SubContext
+from .context import (
+    VARIABLES,
+    Context,
+    ObjDirPath,
+    Path,
+    SourcePath,
+    SubContext,
+)
 from .data import (
     BaseRustLibrary,
     BaseRustProgram,
@@ -47,7 +54,6 @@ from .data import (
     HostSources,
     InstallationTarget,
     IPDLCollection,
-    JARManifest,
     JsShellArchive,
     LegacyRunTests,
     Library,
@@ -78,8 +84,10 @@ from .data import (
     WasmSources,
     WebIDLCollection,
     XPCOMComponentManifests,
+    XPIArchive,
     XPIDLModule,
 )
+from .jar_manifest import jar_manifest_defines, parse_jar_manifest
 from .l10n_manifest import emit_l10n_manifest_contexts
 from .reader import SandboxValidationError
 
@@ -991,6 +999,10 @@ class TreeMetadataEmitter(LoggingMixin):
                 linkables.append(lib)
                 if not lib.installed:
                     generated_files.add(lib.lib_name)
+                if lib.symbols_file:
+                    lib.extra_link_deps.append(
+                        ObjDirPath(context, "!" + lib.symbols_file)
+                    )
                 if symbols_file and isinstance(symbols_file, SourcePath):
                     script = mozpath.join(
                         mozpath.dirname(mozpath.dirname(__file__)),
@@ -1085,6 +1097,15 @@ class TreeMetadataEmitter(LoggingMixin):
                     )
                 seen[basename] = (src, symbol)
 
+        if context.get("IS_COMPILER_PLUGIN") and not any(
+            isinstance(l, HostSharedLibrary) for l in host_linkables
+        ):
+            raise SandboxValidationError(
+                "IS_COMPILER_PLUGIN is set but no host shared library is defined "
+                "in this directory.",
+                context,
+            )
+
         extra_link_deps = context.get("EXTRA_LINK_DEPS")
         if extra_link_deps:
             link_targets = [
@@ -1105,9 +1126,8 @@ class TreeMetadataEmitter(LoggingMixin):
                         f"(resolved to {dep.full_path})",
                         context,
                     )
-            deps = list(extra_link_deps)
             for linkable in link_targets:
-                linkable.extra_link_deps = deps
+                linkable.extra_link_deps += extra_link_deps
         # Only emit sources if we have linkables defined in the same context.
         # Note the linkables are not emitted in this function, but much later,
         # after aggregation (because of e.g. USE_LIBS processing).
@@ -1186,15 +1206,11 @@ class TreeMetadataEmitter(LoggingMixin):
 
         no_pgo = context.get("NO_PGO")
         no_pgo_sources = [f for f, (_, flags) in all_flags.items() if flags.no_pgo]
-        if no_pgo:
-            if no_pgo_sources:
-                raise SandboxValidationError(
-                    "NO_PGO and SOURCES[...].no_pgo cannot be set at the same time",
-                    context,
-                )
-            passthru.variables["NO_PROFILE_GUIDED_OPTIMIZE"] = no_pgo
-        if no_pgo_sources:
-            passthru.variables["NO_PROFILE_GUIDED_OPTIMIZE"] = no_pgo_sources
+        if no_pgo and no_pgo_sources:
+            raise SandboxValidationError(
+                "NO_PGO and SOURCES[...].no_pgo cannot be set at the same time",
+                context,
+            )
 
         # A map from "canonical suffixes" for a particular source file
         # language to the range of suffixes associated with that language.
@@ -1293,7 +1309,7 @@ class TreeMetadataEmitter(LoggingMixin):
                     wasm_linkable.sources[suffix] += srcs
 
         for f, (path, flags) in sorted(all_flags.items()):
-            if flags.flags or flags.object_deps:
+            if flags.flags or flags.no_pgo or flags.object_deps:
                 ext = mozpath.splitext(f)[1]
                 deps = []
                 for d in flags.object_deps:
@@ -1305,7 +1321,7 @@ class TreeMetadataEmitter(LoggingMixin):
                             context,
                         )
                     deps.append(p)
-                yield PerSourceFlag(context, path, flags.flags, deps)
+                yield PerSourceFlag(context, path, flags.flags, flags.no_pgo, deps)
 
         # If there are any C++ sources, set all the linkables defined here
         # to require the C++ linker.
@@ -1332,6 +1348,12 @@ class TreeMetadataEmitter(LoggingMixin):
         if any(k in context for k in ("FINAL_TARGET", "XPI_NAME", "DIST_SUBDIR")):
             yield InstallationTarget(context)
 
+        # A jar manifest is read outside the sandbox, so it is read before the
+        # directory traversal object snapshots the paths this context was built
+        # from. The backends union the paths of every object, so the
+        # InstallationTarget above missing them does not matter.
+        jar_manifest_objects = list(self._process_jar_manifests(context))
+
         # We always emit a directory traversal descriptor. This is needed by
         # the recursive make backend.
         yield from self._emit_directory_traversal_from_context(context)
@@ -1346,6 +1368,23 @@ class TreeMetadataEmitter(LoggingMixin):
         computed_as_flags = ComputedFlags(context, context["ASM_FLAGS"])
         computed_wasm_flags = ComputedFlags(context, context["WASM_FLAGS"])
 
+        # Set compiler and link flags according to whether we want a console.
+        if context.config.substs.get("TARGET_OS") == "WINNT":
+            if context.get("WINCONSOLE", True):
+                extra_win32_exe_ldflags = context.config.substs.get(
+                    "WIN32_CONSOLE_EXE_LDFLAGS", []
+                )
+                # TODO: Bug 2069767 - Keep MOZ_WINCONSOLE undefined by default:
+                # Output() in nsAppRunner.cpp only shows startup errors in a
+                # message box when it is undefined.
+                if "WINCONSOLE" in context:
+                    context["DEFINES"]["MOZ_WINCONSOLE"] = True
+            else:
+                extra_win32_exe_ldflags = context.config.substs.get(
+                    "WIN32_GUI_EXE_LDFLAGS", []
+                )
+            context["WIN32_EXE_LDFLAGS"] += extra_win32_exe_ldflags
+
         # Proxy some variables as-is until we have richer classes to represent
         # them. We should aim to keep this set small because it violates the
         # desired abstraction of the build definition away from makefiles.
@@ -1356,10 +1395,7 @@ class TreeMetadataEmitter(LoggingMixin):
             "RCFILE",
             "RCINCLUDE",
             "WIN32_EXE_LDFLAGS",
-            "USE_EXTENSION_MANIFEST",
             "WASM_LIBS",
-            "XPI_PKGNAME",
-            "XPI_TESTDIR",
         ]
         for v in varlist:
             if v in context and context[v]:
@@ -1387,6 +1423,17 @@ class TreeMetadataEmitter(LoggingMixin):
             if v in context and context[v]:
                 computed_flags.resolve_flags("MOZBUILD_%s" % v, context[v])
 
+        # A directory can opt out with `NO_PGO`. Simple programs don't need a
+        # profile and there is no logic to re-link them in the second pass,
+        # and there is no sense in profiling unit tests.
+        if (
+            context.get("NO_PGO")
+            or context.get("SIMPLE_PROGRAMS")
+            or context.get("CPP_UNIT_TESTS")
+        ):
+            computed_flags.resolve_flags("PGO", [])
+            computed_flags.resolve_flags("PGO_DEFINES", [])
+
         for v in ["WASM_CFLAGS", "WASM_CXXFLAGS"]:
             if v in context and context[v]:
                 computed_wasm_flags.resolve_flags("MOZBUILD_%s" % v, context[v])
@@ -1400,19 +1447,6 @@ class TreeMetadataEmitter(LoggingMixin):
 
         if "HOST_LDFLAGS" in context and context["HOST_LDFLAGS"]:
             computed_host_link_flags.resolve_flags("MOZBUILD", context["HOST_LDFLAGS"])
-
-        # Set compiler and link flags according to whether we want a console.
-        if context.config.substs.get("TARGET_OS") == "WINNT":
-            if context.get("WINCONSOLE", True):
-                context["WIN32_EXE_LDFLAGS"] += context.config.substs.get(
-                    "WIN32_CONSOLE_EXE_LDFLAGS", []
-                )
-                if "WINCONSOLE" in context:
-                    context["DEFINES"]["MOZ_WINCONSOLE"] = True
-            else:
-                context["WIN32_EXE_LDFLAGS"] += context.config.substs.get(
-                    "WIN32_GUI_EXE_LDFLAGS", []
-                )
 
         deffile = context.get("DEFFILE")
         if deffile and context.config.substs.get("OS_TARGET") == "WINNT":
@@ -1581,12 +1615,14 @@ class TreeMetadataEmitter(LoggingMixin):
                 "FINAL_TARGET_PP_FILES",
                 "OBJDIR_PP_FILES",
                 "LOCALIZED_PP_FILES",
+                "JAR_MANIFESTS",
             )
         ):
             raise SandboxValidationError(
                 "PP_FILES_EXTRA_DEPS is set but no preprocessed files "
                 "(FINAL_TARGET_PP_FILES, OBJDIR_PP_FILES, LOCALIZED_PP_FILES, "
-                "or an EXTRA_PP_* variant) are defined in this directory.",
+                "an EXTRA_PP_* variant, or JAR_MANIFESTS) are defined in this "
+                "directory.",
                 context,
             )
 
@@ -1767,8 +1803,9 @@ class TreeMetadataEmitter(LoggingMixin):
         for obj in self._process_test_manifests(context):
             yield obj
 
-        for obj in self._process_jar_manifests(context):
-            yield obj
+        yield from jar_manifest_objects
+
+        yield from self._process_xpi_archive(context)
 
         computed_as_flags.resolve_flags("MOZBUILD", context.get("ASFLAGS"))
 
@@ -1865,12 +1902,15 @@ class TreeMetadataEmitter(LoggingMixin):
             raise SandboxValidationError(str(error), context)
 
     def _process_generated_files(self, context):
-        # The link reads whatever EXTRA_LINK_DEPS names, so a generated file
-        # among them has to be written before the link rather than alongside
-        # the other generated files.
+        # The link reads whatever EXTRA_LINK_DEPS and SYMBOLS_FILE name, so a
+        # generated file among them has to be written before the link rather
+        # than alongside the other generated files.
         link_deps = {
             mozpath.normpath(dep.full_path)
-            for dep in context.get("EXTRA_LINK_DEPS") or ()
+            for dep in [
+                *context.get("EXTRA_LINK_DEPS", []),
+                context.get("SYMBOLS_FILE"),
+            ]
             if isinstance(dep, ObjDirPath)
         }
 
@@ -2120,6 +2160,21 @@ class TreeMetadataEmitter(LoggingMixin):
 
         yield obj
 
+    def _process_xpi_archive(self, context):
+        name = context.get("XPI_PKGNAME")
+        if not name:
+            return
+        if not context.get("XPI_NAME"):
+            raise SandboxValidationError(
+                "XPI_PKGNAME set but XPI_NAME not set. An archive packages what "
+                "was staged for it, and only XPI_NAME stages anything.",
+                context,
+            )
+        destdir = None
+        if testdir := context.get("XPI_TESTDIR"):
+            destdir = mozpath.relpath(testdir.full_path, context.config.topobjdir)
+        yield XPIArchive(context, name, destdir)
+
     def _process_jar_manifests(self, context):
         jar_manifests = context.get("JAR_MANIFESTS", [])
         if len(jar_manifests) > 1:
@@ -2129,7 +2184,7 @@ class TreeMetadataEmitter(LoggingMixin):
             )
 
         for path in jar_manifests:
-            yield JARManifest(context, path)
+            yield from self._expand_jar_manifest(context, path)
 
         # Temporary test to look for jar.mn files that creep in without using
         # the new declaration. Before, we didn't require jar.mn files to
@@ -2143,6 +2198,118 @@ class TreeMetadataEmitter(LoggingMixin):
                     "Please define JAR_MANIFESTS.",
                     context,
                 )
+
+    def _expand_jar_manifest(self, context, path):
+        """The installs a jar manifest declares, as ordinary objects.
+
+        A jar manifest names the same installs `moz.build` already expresses, so
+        no backend needs to know that one was involved.
+        """
+        ab_cd = context.config.substs.get("MOZ_UI_LOCALE", "en-US")
+
+        sections, inputs = parse_jar_manifest(
+            path.full_path, jar_manifest_defines(context)
+        )
+        # A manifest with no section yields nothing that would record it, so
+        # the paths it read are recorded on the context itself.
+        for read in inputs:
+            context.add_source(mozpath.normsep(read))
+
+        for jarinfo in sections:
+            yield from self._expand_jar_section(context, path, jarinfo, ab_cd)
+
+    def _expand_jar_section(self, context, path, jarinfo, ab_cd):
+        section_name = jarinfo.name.resolve(ab_cd)
+        jar_context = Context(allowed_variables=VARIABLES, config=context.config)
+        jar_context.push_source(context.main_path)
+        jar_context.push_source(path.full_path)
+
+        install_target = context["FINAL_TARGET"]
+        if jarinfo.base:
+            install_target = mozpath.normpath(
+                mozpath.join(install_target, jarinfo.base)
+            )
+        jar_context["FINAL_TARGET"] = install_target
+        if context.get("DEFINES"):
+            jar_context["DEFINES"] = context["DEFINES"]
+        files = jar_context["FINAL_TARGET_FILES"]
+        files_pp = jar_context["FINAL_TARGET_PP_FILES"]
+        localized_files = jar_context["LOCALIZED_FILES"]
+        localized_files_pp = jar_context["LOCALIZED_PP_FILES"]
+
+        for e in jarinfo.entries:
+            entry_source = e.source.resolve(ab_cd)
+            entry_output = e.output.resolve(ab_cd)
+            if e.is_locale:
+                if jarinfo.relativesrcdir:
+                    src = f"/{jarinfo.relativesrcdir}"
+                else:
+                    src = ""
+                src = mozpath.join(src, "en-US", entry_source)
+            elif "*" in entry_source and not entry_source.startswith("/"):
+                # A pattern is rooted at the directory holding the manifest, so
+                # what it matches is the path below the destination for every
+                # backend.
+                src = mozpath.join("/", jar_context.relsrcdir, entry_source)
+            else:
+                src = entry_source
+
+            src = Path(jar_context, src)
+
+            if "*" not in entry_source and not os.path.exists(src.full_path):
+                if e.is_locale:
+                    raise SandboxValidationError(
+                        f"{path}: Cannot find {entry_source} (tried {src.full_path})",
+                        context,
+                    )
+                if entry_source.startswith("/"):
+                    src = Path(jar_context, "!" + entry_source)
+                else:
+                    # This actually gets awkward if the jar.mn is not
+                    # in the same directory as the moz.build declaring
+                    # it, but it's simpler.
+                    src = Path(context, "!" + entry_source)
+
+            output_basename = mozpath.basename(entry_output)
+            if output_basename != src.target_basename:
+                src = Path(src.context, (src, output_basename))
+            dest = mozpath.dirname(mozpath.join(section_name, entry_output))
+
+            if e.preprocess:
+                if "*" in entry_source:
+                    raise SandboxValidationError(
+                        f"{path}: Wildcards are not supported with preprocessing",
+                        context,
+                    )
+                if e.is_locale:
+                    localized_files_pp[dest] += [src]
+                else:
+                    files_pp[dest] += [src]
+            elif e.is_locale:
+                localized_files[dest] += [src]
+            else:
+                files[dest] += [src]
+
+        extra_deps = list(context.get("PP_FILES_EXTRA_DEPS") or [])
+        if any(files.walk()):
+            yield FinalTargetFiles(jar_context, files)
+        if any(files_pp.walk()):
+            yield FinalTargetPreprocessedFiles(
+                jar_context, files_pp, extra_deps=extra_deps
+            )
+        if any(localized_files.walk()):
+            yield LocalizedFiles(jar_context, localized_files)
+        if any(localized_files_pp.walk()):
+            yield LocalizedPreprocessedFiles(
+                jar_context, localized_files_pp, extra_deps=extra_deps
+            )
+
+        for m in jarinfo.chrome_manifests:
+            entry = parse_manifest_line(
+                mozpath.dirname(section_name),
+                m.resolve(ab_cd).replace("%", mozpath.basename(section_name) + "/"),
+            )
+            yield ChromeManifestEntry(jar_context, f"{section_name}.manifest", entry)
 
     def _emit_directory_traversal_from_context(self, context):
         o = DirectoryTraversal(context)

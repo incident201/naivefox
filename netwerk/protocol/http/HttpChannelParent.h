@@ -195,7 +195,7 @@ class HttpChannelParent final : public nsIInterfaceRequestor,
   virtual mozilla::ipc::IPCResult RecvDocumentChannelCleanup(
       const bool& clearCacheEntry) override;
   virtual mozilla::ipc::IPCResult RecvRemoveCorsPreflightCacheEntry(
-      nsIURI* uri, const mozilla::ipc::PrincipalInfo& requestingPrincipal,
+      nsIURI* uri, NotNull<nsIPrincipal*> requestingPrincipal,
       const OriginAttributes& originAttributes) override;
   virtual mozilla::ipc::IPCResult RecvBytesRead(const int32_t& aCount) override;
   virtual mozilla::ipc::IPCResult RecvOpenOriginalCacheInputStream() override;
@@ -256,7 +256,7 @@ class HttpChannelParent final : public nsIInterfaceRequestor,
   bool IsRedirectDueToAuthRetry(uint32_t redirectFlags);
 
   // Sets mAltDataBindingOrigin from aChannel's principal, or clears it if the
-  // principal is not one the content process could have loaded.
+  // content process has not loaded that principal's origin.
   void UpdateAltDataBindingOrigin(HttpBaseChannel* aChannel);
 
   int32_t mSendWindowSize;

@@ -22,10 +22,12 @@
 #include "mozilla/BaseProfiler.h"
 #include "mozilla/Logging.h"
 #include "mozilla/Preferences.h"
+#include "mozilla/ProfilerThreadSleep.h"
 #include "mozilla/RandomNum.h"
 #include "mozilla/ScopeExit.h"
 #include "mozilla/Services.h"
 #include "mozilla/StaticPrefs_security.h"
+#include "mozilla/TimeStamp.h"
 #include "mozilla/glean/SecurityManagerSslMetrics.h"
 #include "mozilla/net/SSLTokensCache.h"
 #include "mozilla/psm/EnabledSignatureSchemes.h"
@@ -1896,16 +1898,98 @@ nsresult nsSSLIOLayerAddToSocket(int32_t family, const char* host, int32_t port,
   return NS_OK;
 }
 
+#if !defined(MOZ_NO_SMART_CARDS)
+struct RemoteCryptokiState {
+  TimeStamp mLastUpdate;
+  nsTArray<CryptokiObject> mCryptokiObjects;
+};
+
+constinit static StaticDataMutex<Maybe<RemoteCryptokiState>>
+    sRemoteClientCertificatesState("sRemoteClientCertificatesState");
+
+constinit static StaticDataMutex<Maybe<RemoteCryptokiState>>
+    sRemoteCACertificatesState("sRemoteCACertificatesState");
+
+auto LockRemoteCryptokiState(SearchingFor searchingFor) {
+  switch (searchingFor) {
+    case SearchingFor::ClientCertificates:
+      return sRemoteClientCertificatesState.Lock();
+    case SearchingFor::CACertificates:
+      return sRemoteCACertificatesState.Lock();
+  }
+  MOZ_RELEASE_ASSERT(false);
+}
+
+void CacheRemoteCryptokiObjects(SearchingFor searchingFor) {
+  if (!PKCS11ModuleDB::UtilityProcessEnabled()) {
+    return;
+  }
+
+  MOZ_ASSERT(!NS_IsMainThread());
+  if (NS_IsMainThread()) {
+    return;
+  }
+
+  // If a search of the desired type has been performed within the last scan
+  // delay, use the cached results.
+  auto remoteCryptokiState(LockRemoteCryptokiState(searchingFor));
+  if (remoteCryptokiState->isSome() &&
+      TimeStamp::Now() - (*remoteCryptokiState)->mLastUpdate <
+          TimeDuration::FromMilliseconds(
+              StaticPrefs::
+                  security_utility_pkcs11_module_process_scan_delay_ms())) {
+    return;
+  }
+
+  Monitor monitor{__func__};
+  bool done = false;
+  nsTArray<CryptokiObject> objects;
+  nsresult rv = NS_DispatchToMainThread(NS_NewRunnableFunction(
+      __func__, [searchingFor, &monitor, &done, &objects] {
+        RefPtr<PKCS11ModuleDB> pkcs11ModuleDB(PKCS11ModuleDB::GetSingleton());
+        if (!pkcs11ModuleDB) {
+          MonitorAutoLock lock(monitor);
+          done = true;
+          lock.Notify();
+          return;
+        }
+        pkcs11ModuleDB->FindObjects(searchingFor)
+            ->Then(GetCurrentSerialEventTarget(), __func__,
+                   [&monitor, &done,
+                    &objects](const PKCS11ModuleDB::FindObjectsPromise::
+                                  ResolveOrRejectValue& value) {
+                     MonitorAutoLock lock(monitor);
+                     if (value.IsResolve()) {
+                       objects.Assign(value.ResolveValue());
+                     }
+                     done = true;
+                     lock.Notify();
+                   });
+      }));
+  if (NS_FAILED(rv)) {
+    return;
+  }
+
+  {
+    MonitorAutoLock lock(monitor);
+    while (!done) {
+      lock.Wait();
+    }
+  }
+
+  remoteCryptokiState->reset();
+  remoteCryptokiState->emplace(
+      RemoteCryptokiState{TimeStamp::Now(), std::move(objects)});
+}
+#endif  // !MOZ_NO_SMART_CARDS
+
 extern "C" {
 
-#if defined(MOZ_WIDGET_ANDROID) || \
-    (defined(NIGHTLY_BUILD) && !defined(MOZ_NO_SMART_CARDS))
 const uint8_t kCryptokiObjectTypeCert = 1;
-#endif
-#if defined(NIGHTLY_BUILD) && !defined(MOZ_NO_SMART_CARDS)
+#if !defined(MOZ_NO_SMART_CARDS)
 const uint8_t kCryptokiObjectTypeRSAKey = 2;
 const uint8_t kCryptokiObjectTypeECKey = 3;
-#endif  // NIGHTLY_BUILD && !MOZ_NO_SMART_CARDS
+#endif  // !MOZ_NO_SMART_CARDS
 
 using FindObjectsCallback = void (*)(uint8_t type, size_t id_len,
                                      const uint8_t* id, size_t data_len,
@@ -1995,44 +2079,15 @@ void AndroidDoSign(size_t certLen, const uint8_t* cert, size_t dataLen,
 // tokens.
 void RemoteCertsDoFindObjects(SearchingFor searchingFor, FindObjectsCallback cb,
                               void* ctx) {
-#if defined(NIGHTLY_BUILD) && !defined(MOZ_NO_SMART_CARDS)
-  MOZ_ASSERT(!NS_IsMainThread());
-  if (NS_IsMainThread()) {
-    return;
-  }
-
-  Monitor monitor{__func__};
-  bool done = false;
+#if !defined(MOZ_NO_SMART_CARDS)
   nsTArray<CryptokiObject> objects;
-  nsresult rv = NS_DispatchToMainThread(NS_NewRunnableFunction(
-      __func__, [searchingFor, &monitor, &done, &objects] {
-        RefPtr<PKCS11ModuleDB> pkcs11ModuleDB(PKCS11ModuleDB::GetSingleton());
-        if (!pkcs11ModuleDB) {
-          MonitorAutoLock lock(monitor);
-          done = true;
-          lock.Notify();
-          return;
-        }
-        pkcs11ModuleDB->FindObjects(searchingFor)
-            ->Then(GetCurrentSerialEventTarget(), __func__,
-                   [&monitor, &done,
-                    &objects](const PKCS11ModuleDB::FindObjectsPromise::
-                                  ResolveOrRejectValue& value) {
-                     MonitorAutoLock lock(monitor);
-                     if (value.IsResolve()) {
-                       objects.Assign(value.ResolveValue());
-                     }
-                     done = true;
-                     lock.Notify();
-                   });
-      }));
-  if (NS_FAILED(rv)) {
-    return;
-  }
-
-  MonitorAutoLock lock(monitor);
-  while (!done) {
-    lock.Wait();
+  {
+    auto remoteCryptokiState(LockRemoteCryptokiState(searchingFor));
+    // CacheRemoteCryptokiObjects should have run at least once at this point.
+    MOZ_ASSERT(remoteCryptokiState->isSome());
+    if (remoteCryptokiState->isSome()) {
+      objects.Assign((*remoteCryptokiState)->mCryptokiObjects.Clone());
+    }
   }
   for (const auto& object : objects) {
     switch (object.type()) {
@@ -2061,7 +2116,7 @@ void RemoteCertsDoFindObjects(SearchingFor searchingFor, FindObjectsCallback cb,
         break;
     }
   }
-#endif  // NIGHTLY_BUILD && !MOZ_NO_SMART_CARDS
+#endif  // !MOZ_NO_SMART_CARDS
 }
 
 // This function implements signing using private keys stored on remote PKCS#11
@@ -2069,7 +2124,7 @@ void RemoteCertsDoFindObjects(SearchingFor searchingFor, FindObjectsCallback cb,
 void RemoteCertsDoSign(size_t certLen, const uint8_t* cert, size_t dataLen,
                        const uint8_t* data, size_t paramsLen,
                        const uint8_t* params, SignCallback cb, void* ctx) {
-#if defined(NIGHTLY_BUILD) && !defined(MOZ_NO_SMART_CARDS)
+#if !defined(MOZ_NO_SMART_CARDS)
   MOZ_ASSERT(!NS_IsMainThread());
   if (NS_IsMainThread()) {
     return;
@@ -2116,7 +2171,7 @@ void RemoteCertsDoSign(size_t certLen, const uint8_t* cert, size_t dataLen,
     lock.Wait();
   }
   cb(signature.Length(), signature.Elements(), ctx);
-#endif  // NIGHTLY_BUILD && !MOZ_NO_SMART_CARDS
+#endif  // !MOZ_NO_SMART_CARDS
 }
 #endif  // !MOZ_NAIVEFOX
 }  // extern "C"

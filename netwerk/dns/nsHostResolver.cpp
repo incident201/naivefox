@@ -233,6 +233,8 @@ void nsHostResolver::ClearPendingQueue(
 // right now, so we need to mark them to get re-resolved on completion!
 
 void nsHostResolver::FlushCache(bool aTrrToo, bool aFlushEvictionQueue) {
+  DNSNetworkChanged();
+
   MutexAutoLock dbLock(mDBLock);
   MutexAutoLock queueLock(mQueue.mLock);
 
@@ -1891,7 +1893,13 @@ void nsHostResolver::ResolveHostTask() {
       LOG(("byType on DNS thread"));
       TypeRecordResultType result = AsVariant(mozilla::Nothing());
       uint32_t ttl = UINT32_MAX;
-      nsresult status = ResolveHTTPSRecord(rec->host, rec->flags, result, ttl);
+      Maybe<nsCString> originHost;
+      if (RefPtr<TypeHostRecord> typeRec = do_QueryObject(rec)) {
+        MutexAutoLock lock(typeRec->mResultsLock);
+        originHost = typeRec->mOriginHost;
+      }
+      nsresult status =
+          ResolveHTTPSRecord(rec->host, rec->flags, result, ttl, originHost);
       mozilla::glean::networking::dns_native_count
           .EnumGet(rec->pb
                        ? glean::networking::DnsNativeCountLabel::eHttpsPrivate
@@ -1968,7 +1976,7 @@ void nsHostResolver::GetDNSCacheEntries(nsTArray<DNSCacheEntries>* args) {
   for (const auto& recordEntry : mRecordDB) {
     // We don't pay attention to address literals, only resolved domains.
     // Also require a host.
-    nsHostRecord* rec = recordEntry.GetWeak();
+    nsHostRecord* rec = recordEntry.GetRawPtr();
     MOZ_ASSERT(rec, "rec should never be null here!");
 
     if (!rec) {

@@ -14,9 +14,9 @@
 #include "nsIPKCS11ModuleDB.h"
 #include "nsTLiteralString.h"
 
-#if defined(NIGHTLY_BUILD) && !defined(MOZ_NO_SMART_CARDS)
+#if !defined(MOZ_NO_SMART_CARDS)
 #  include "mozilla/ipc/UtilityProcessManager.h"
-#endif  // NIGHTLY_BUILD && !MOZ_NO_SMART_CARDS
+#endif  // !MOZ_NO_SMART_CARDS
 
 namespace mozilla {
 namespace psm {
@@ -47,9 +47,9 @@ class PKCS11ModuleDB : public nsIPKCS11ModuleDB {
                               const nsCString& libraryPath,
                               uint32_t mechanismFlags, uint32_t cipherFlags);
 
-#if defined(NIGHTLY_BUILD) && !defined(MOZ_NO_SMART_CARDS)
+#if !defined(MOZ_NO_SMART_CARDS)
   static nsresult DoListModules(nsTArray<mozilla::psm::ModuleInfo>& modules);
-#endif  // NIGHTLY_BUILD && !MOZ_NO_SMART_CARDS
+#endif  // !MOZ_NO_SMART_CARDS
 
  protected:
   virtual ~PKCS11ModuleDB() = default;
@@ -59,7 +59,7 @@ class PKCS11ModuleDB : public nsIPKCS11ModuleDB {
       MozPromise<nsTArray<RefPtr<nsIPKCS11Module>>, nsresult, true>;
   RefPtr<ListModulesPromise> ListMainProcessModules();
 
-#if defined(NIGHTLY_BUILD) && !defined(MOZ_NO_SMART_CARDS)
+#if !defined(MOZ_NO_SMART_CARDS)
   using PKCS11ModuleProcessPromise =
       MozPromise<RefPtr<PKCS11ModuleParent>, nsresult, false>;
   RefPtr<PKCS11ModuleProcessPromise> mPKCS11ModuleProcessPromise;
@@ -111,7 +111,7 @@ class PKCS11ModuleDB : public nsIPKCS11ModuleDB {
   static RefPtr<SignPromise> SignGivenParent(
       Span<uint8_t> certificate, Span<uint8_t> data, Span<uint8_t> params,
       const RefPtr<PKCS11ModuleParent>& parent);
-#endif  // NIGHTLY_BUILD && !MOZ_NO_SMART_CARDS
+#endif  // !MOZ_NO_SMART_CARDS
 };
 
 const nsLiteralCString kNSSInternalModuleName("NSS Internal PKCS #11 Module");

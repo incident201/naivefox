@@ -26,6 +26,7 @@
 #include "nsINetworkLinkService.h"
 #include "nsIOService.h"
 #include "nsIObserverService.h"
+#include "nsISpeculativeConnect.h"
 #include "nsNetUtil.h"
 #include "nsSocketTransportService2.h"
 #include "nsStandardURL.h"
@@ -145,6 +146,8 @@ void TRRService::AddObserver(nsIObserver* aObserver,
                                  true);
     observerService->AddObserver(aObserver, "xpcom-shutdown-threads", true);
     observerService->AddObserver(aObserver, "application-foreground", true);
+    observerService->AddObserver(aObserver, "geckoview-initial-foreground",
+                                 true);
   }
 }
 
@@ -469,11 +472,16 @@ void TRRService::AddEtcHosts(const nsTArray<nsCString>& aArray) {
 void TRRService::ReadEtcHostsFile() {
   DNSServiceBase::DoReadEtcHostsFile(
       [](const nsTArray<nsCString>* aArray) -> bool {
-        RefPtr<TRRService> service(sTRRServicePtr);
-        if (service && aArray) {
-          service->AddEtcHosts(*aArray);
+        if (!sTRRServicePtr) {
+          return false;
         }
-        return !!service;
+        return NS_SUCCEEDED(NS_DispatchToMainThread(NS_NewRunnableFunction(
+            "TRRService::ReadEtcHostsFile", [hosts = aArray->Clone()] {
+              RefPtr<TRRService> service(sTRRServicePtr);
+              if (service) {
+                service->AddEtcHosts(hosts);
+              }
+            })));
       });
 }
 
@@ -520,6 +528,7 @@ nsresult TRRService::Start() {
 
 TRRService::~TRRService() {
   MOZ_ASSERT(NS_IsMainThread(), "wrong thread");
+  sTRRServicePtr.compareExchange(this, nullptr);
   LOG(("Exiting TRRService\n"));
 }
 
@@ -668,7 +677,8 @@ TRRService::Observe(nsISupports* aSubject, const char* aTopic,
         mConfirmation.HandleEvent(ConfirmationEvent::NetworkUp);
       }
     }
-  } else if (!strcmp(aTopic, "application-foreground")) {
+  } else if (!strcmp(aTopic, "application-foreground") ||
+             !strcmp(aTopic, "geckoview-initial-foreground")) {
     MaybeSpeculativeConnectToTRR();
   } else if (!strcmp(aTopic, "xpcom-shutdown-threads")) {
     mShutdown = true;
@@ -704,17 +714,70 @@ void TRRService::RebuildSuffixList(nsTArray<nsCString>&& aSuffixList) {
   }
 }
 
+namespace {
+class TRRPreconnectAllow1918 final : public nsIInterfaceRequestor,
+                                     public nsISpeculativeConnectionOverrider {
+ public:
+  NS_DECL_THREADSAFE_ISUPPORTS
+  NS_DECL_NSIINTERFACEREQUESTOR
+  NS_DECL_NSISPECULATIVECONNECTIONOVERRIDER
+
+ private:
+  ~TRRPreconnectAllow1918() = default;
+};
+
+NS_IMPL_ISUPPORTS(TRRPreconnectAllow1918, nsIInterfaceRequestor,
+                  nsISpeculativeConnectionOverrider)
+
+NS_IMETHODIMP
+TRRPreconnectAllow1918::GetInterface(const nsIID& aIID, void** aResult) {
+  return QueryInterface(aIID, aResult);
+}
+
+NS_IMETHODIMP
+TRRPreconnectAllow1918::GetParallelSpeculativeConnectLimit(uint32_t* aLimit) {
+  *aLimit = gHttpHandler->ParallelSpeculativeConnectLimit();
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+TRRPreconnectAllow1918::GetIgnoreIdle(bool* aIgnoreIdle) {
+  *aIgnoreIdle = false;
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+TRRPreconnectAllow1918::GetAllow1918(bool* aAllow) {
+  *aAllow = true;
+  return NS_OK;
+}
+}  // namespace
+
 void TRRService::MaybeSpeculativeConnectToTRR() {
-  if (!StaticPrefs::network_trr_preconnect_on_foreground() || !Enabled()) {
+  if (!StaticPrefs::network_trr_preconnect_on_foreground() || !Enabled() ||
+      StaticPrefs::network_trr_use_ohttp()) {
     return;
   }
 
   RefPtr<nsHttpConnectionInfo> ci = TRRConnectionInfo();
   if (!ci) {
+    mPreconnectPending = true;
+    InitTRRConnectionInfo();
     return;
   }
 
-  (void)gHttpHandler->SpeculativeConnect(ci, nullptr, 0, nullptr);
+  nsCOMPtr<nsIInterfaceRequestor> callbacks;
+  if (StaticPrefs::network_trr_preconnect_allow_rfc1918()) {
+    callbacks = new TRRPreconnectAllow1918();
+  }
+  (void)gHttpHandler->SpeculativeConnect(ci, callbacks, 0, nullptr);
+}
+
+void TRRService::SetDefaultTRRConnectionInfo(nsHttpConnectionInfo* aConnInfo) {
+  TRRServiceBase::SetDefaultTRRConnectionInfo(aConnInfo);
+  if (aConnInfo && mPreconnectPending.exchange(false)) {
+    MaybeSpeculativeConnectToTRR();
+  }
 }
 
 void TRRService::ConfirmationContext::SetState(

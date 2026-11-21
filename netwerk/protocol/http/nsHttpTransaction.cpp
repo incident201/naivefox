@@ -57,6 +57,7 @@
 #include "nsITLSSocketControl.h"
 #include "nsIThrottledInputChannel.h"
 #include "nsITransport.h"
+#include "nsIWeakReferenceUtils.h"
 #include "nsMultiplexInputStream.h"
 #include "nsNetCID.h"
 #include "nsNetUtil.h"
@@ -161,16 +162,11 @@ void nsHttpTransaction::SetClassOfService(ClassOfService cos) {
 nsHttpTransaction::~nsHttpTransaction() {
   LOG(("Destroying nsHttpTransaction @%p\n", this));
 
-  if (mTokenBucketCancel) {
-    if (OnSocketThread()) {
-      mTokenBucketCancel->Cancel(NS_ERROR_ABORT);
-    } else {
-      MOZ_DIAGNOSTIC_ASSERT(false,
-                            "Token bucket not canceled before off-thread "
-                            "destruction");
-    }
-    mTokenBucketCancel = nullptr;
-  }
+  // A queued token bucket event keeps a strong reference to this transaction
+  // (TokenBucketCancelable::mEvent), so the transaction cannot be destroyed
+  // while still queued. By the time we get here the event has been admitted or
+  // canceled on the socket thread, which cleared mTokenBucketCancel.
+  MOZ_DIAGNOSTIC_ASSERT(!mTokenBucketCancel);
 
   // Force the callbacks and connection to be released right now
   {
@@ -321,10 +317,29 @@ nsresult nsHttpTransaction::Init(
   // read from a private clone and leave the channel's stream untouched by the
   // socket thread. Parent-process upload streams are normalized to be cloneable
   // (see HttpBaseChannel's NormalizeUploadStream).
+  //
+  // A streaming body is usually an async pipe; cloning it adds a second reader
+  // that nobody reads, so the pipe would hold on to every segment written to it
+  // and buffer the whole upload in memory.  HttpBaseChannel::CloneUploadStream
+  // refuses to tee such a stream for the same reason.  A pipe can't be rewound,
+  // so the channel never touches it.  A seekable streaming body (a Blob's
+  // stream) can be, so it is cloned like any other.
+  nsCOMPtr<nsISeekableStream> seekable = do_QueryInterface(requestBody);
   nsCOMPtr<nsIInputStream> requestBodyClone;
-  if (mHasRequestBody && NS_SUCCEEDED(NS_CloneInputStream(
-                             requestBody, getter_AddRefs(requestBodyClone)))) {
-    requestBody = requestBodyClone;
+  if (mHasRequestBody && (!mRequestBodyIsStreaming || seekable)) {
+    rv = NS_CloneInputStream(requestBody, getter_AddRefs(requestBodyClone));
+    if (NS_SUCCEEDED(rv)) {
+      requestBody = requestBodyClone;
+    } else if (XRE_IsParentProcess() && seekable) {
+      // The channel can rewind this stream on the main thread, so reading it
+      // here would mean two threads sharing it.  InternalSetUploadStream
+      // refuses a stream that can't be cloned, so this shouldn't happen.
+      // The socket process gets its own deserialized copy, which may not be
+      // cloneable (e.g. a file stream sent as a descriptor), and nothing
+      // else touches it there, so sharing is fine.
+      MOZ_DIAGNOSTIC_ASSERT(false, "Upload stream should be cloneable");
+      return rv;
+    }
   }
 
   // Bug 2059211: cap the body stream at the declared Content-Length.  A body
@@ -585,6 +600,8 @@ void nsHttpTransaction::SetConnection(nsAHttpConnection* conn) {
     mConnection = conn;
     if (mConnection) {
       mIsHttp3Used = mConnection->Version() == HttpVersion::v3_0;
+      RefPtr<HttpConnectionBase> conn = mConnection->HttpConnection();
+      mIsTunnelOverHttp3 = conn && conn->TunnelOverHttp3();
       if (mActivated) {
         mConnection->GetSelfAddr(&mSelfAddr);
         mConnection->GetPeerAddr(&mPeerAddr);
@@ -1147,6 +1164,8 @@ int64_t nsHttpTransaction::GetRequestSize() { return mRequestSize; }
 
 bool nsHttpTransaction::IsHttp3Used() { return mIsHttp3Used; }
 
+bool nsHttpTransaction::IsTunnelOverHttp3() { return mIsTunnelOverHttp3; }
+
 bool nsHttpTransaction::Http2Disabled() const {
   return mCaps & NS_HTTP_DISALLOW_SPDY;
 }
@@ -1513,10 +1532,11 @@ void nsHttpTransaction::Close(nsresult reason) {
 
   MOZ_ASSERT(OnSocketThread(), "not on socket thread");
 
-  if (mTokenBucketCancel) {
-    mTokenBucketCancel->Cancel(reason);
-    mTokenBucketCancel = nullptr;
+  if (nsCOMPtr<nsICancelable> tokenBucketCancel =
+          do_QueryReferent(mTokenBucketCancel)) {
+    tokenBucketCancel->Cancel(reason);
   }
+  mTokenBucketCancel = nullptr;
 
   if (reason == NS_BINDING_RETARGETED) {
     LOG(("  close %p skipped due to ERETARGETED\n", this));
@@ -1589,6 +1609,15 @@ void nsHttpTransaction::Close(nsresult reason) {
     mDontRetryWithDirectRoute = true;
   }
 
+  // A sticky transaction must not leave a connection that carries
+  // connection-based auth state. The HTTPS RR fallback errors only happen on a
+  // fresh connection, so restarting a sticky upgrade for them is safe. Happy
+  // Eyeballs handles HTTPS RR fallback itself without restarting.
+  const bool restartStickyForHTTPSRR =
+      shouldRestartTransactionForHTTPSRR && !connReused &&
+      !(mCaps & NS_HTTP_USE_HAPPY_EYEBALLS) &&
+      StaticPrefs::network_http_upgrade_use_https_rr();
+
   const bool restartForHttp3ProtocolError =
       reason == NS_ERROR_NET_HTTP3_PROTOCOL_ERROR && !mReceivedData &&
       !mConnInfo->IsHttp3ProxyConnection() &&
@@ -1631,7 +1660,7 @@ void nsHttpTransaction::Close(nsresult reason) {
        shouldRestartTransactionForHTTPSRR || restartForHttp3ProtocolError) &&
       (!(mCaps & NS_HTTP_STICKY_CONNECTION) ||
        (mCaps & NS_HTTP_CONNECTION_RESTARTABLE) ||
-       (mEarlyDataDisposition == EARLY_425))) {
+       (mEarlyDataDisposition == EARLY_425) || restartStickyForHTTPSRR)) {
     if (mForceRestart) {
       SetRestartReason(TRANSACTION_RESTART_FORCED);
       if (NS_SUCCEEDED(Restart())) {
@@ -2385,6 +2414,10 @@ nsresult nsHttpTransaction::ParseLineSegment(char* segment, uint32_t len) {
         (void)mResponseHead->GetHeader(nsHttp::Content_Security_Policy,
                                        cspHeader);
 
+        nsCString connectionAllowlistHeader;
+        (void)mResponseHead->GetHeader(nsHttp::Connection_Allowlist,
+                                       connectionAllowlistHeader);
+
         nsCOMPtr<nsIEarlyHintObserver> earlyHint;
         {
           MutexAutoLock lock(mLock);
@@ -2396,8 +2429,11 @@ nsresult nsHttpTransaction::ParseLineSegment(char* segment, uint32_t len) {
                   "nsIEarlyHintObserver->EarlyHint",
                   [obs{std::move(earlyHint)}, header{std::move(linkHeader)},
                    referrerPolicy{std::move(referrerPolicy)},
-                   cspHeader{std::move(cspHeader)}]() {
-                    obs->EarlyHint(header, referrerPolicy, cspHeader);
+                   cspHeader{std::move(cspHeader)},
+                   connectionAllowlistHeader{
+                       std::move(connectionAllowlistHeader)}]() {
+                    obs->EarlyHint(header, referrerPolicy, cspHeader,
+                                   connectionAllowlistHeader);
                   }),
               NS_DISPATCH_NORMAL);
           MOZ_ASSERT(NS_SUCCEEDED(rv));
@@ -2548,6 +2584,11 @@ bool nsHttpTransaction::HandleWebTransportResponse(uint16_t aStatus) {
   if (!wtSession) {
     return false;
   }
+  if (!wtSession->GetHttp3WebTransportSession() &&
+      !StaticPrefs::network_webtransport_http2_enabled()) {
+    LOG(("HandleWebTransportResponse: WebTransport over HTTP/2 is disabled"));
+    return false;
+  }
 
   nsCOMPtr<WebTransportSessionEventListener> webTransportListener;
   {
@@ -2633,10 +2674,14 @@ nsresult nsHttpTransaction::HandleContentStart() {
     if (mIsForWebTransport) {
       responseChecked = HandleWebTransportResponse(mResponseHead->Status());
       LOG(("HandleWebTransportResponse res=%d", responseChecked));
-      if (responseChecked) {
-        mNoContent = true;
-        mPreserveStream = true;
+      if (!responseChecked) {
+        // There is no WebTransport session to hand the response to, e.g. the
+        // request was sent over HTTP/1.1. Fail it rather than delivering the
+        // response body.
+        return NS_ERROR_FAILURE;
       }
+      mNoContent = true;
+      mPreserveStream = true;
     }
 
     if (!responseChecked) {
@@ -2938,10 +2983,17 @@ nsresult nsHttpTransaction::ProcessData(char* buf, uint32_t count,
     }
 
     if (!mContentDecodingCheck) {
-      // The main thread may take mResponseHead once the data is in the pipe.
-      MutexAutoLock lock(mLock);
-      if (mResponseHead) {
-        mContentDecoding = mResponseHead->HasHeader(nsHttp::Content_Encoding);
+      Maybe<bool> contentDecoding;
+      {
+        // The main thread may take mResponseHead once the data is in the pipe.
+        MutexAutoLock lock(mLock);
+        if (mResponseHead) {
+          contentDecoding =
+              Some(mResponseHead->HasHeader(nsHttp::Content_Encoding));
+        }
+      }
+      if (contentDecoding) {
+        mContentDecoding = *contentDecoding;
         mContentDecodingCheck = true;
       }
     }
@@ -3418,8 +3470,16 @@ bool nsHttpTransaction::TryToRunPacedRequest() {
 
   mSubmittedRatePacing = true;
   mSynchronousRatePaceRequest = true;
-  (void)gHttpHandler->SubmitPacedRequest(this,
-                                         getter_AddRefs(mTokenBucketCancel));
+  nsCOMPtr<nsICancelable> cancelable;
+  (void)gHttpHandler->SubmitPacedRequest(this, getter_AddRefs(cancelable));
+  // If the event was dispatched synchronously, OnTokenBucketAdmitted already
+  // ran and cleared mTokenBucketCancel; there is nothing left to cancel. Only
+  // when the event is queued do we keep a weak reference so we can cancel it
+  // later. It is weak because the token bucket keeps the cancelable (and,
+  // through it, this transaction) alive while the event is queued.
+  if (!mPassedRatePacing) {
+    mTokenBucketCancel = do_GetWeakReference(cancelable);
+  }
   mSynchronousRatePaceRequest = false;
   return mPassedRatePacing;
 }
@@ -3439,10 +3499,11 @@ void nsHttpTransaction::OnTokenBucketAdmitted() {
 }
 
 void nsHttpTransaction::CancelPacing(nsresult reason) {
-  if (mTokenBucketCancel) {
-    mTokenBucketCancel->Cancel(reason);
-    mTokenBucketCancel = nullptr;
+  if (nsCOMPtr<nsICancelable> tokenBucketCancel =
+          do_QueryReferent(mTokenBucketCancel)) {
+    tokenBucketCancel->Cancel(reason);
   }
+  mTokenBucketCancel = nullptr;
 }
 
 //-----------------------------------------------------------------------------
