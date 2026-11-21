@@ -8594,6 +8594,11 @@ nsresult nsHttpChannel::BeginConnect() {
         mLoadInfo->TriggeringPrincipal()->IsSystemPrincipal()) {
       return false;
     }
+    // An explicit NaiveFox physical host mapping routes the outer proxy socket
+    // through DnsAndConnectSocket without resolving the logical proxy host.
+    if (proxyInfo && !proxyInfo->NaiveFoxPhysicalHost().IsEmpty()) {
+      return false;
+    }
 #endif
 
     // WebSocket and WebTransport upgrades share the same rollout pref.

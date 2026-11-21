@@ -217,6 +217,7 @@ NS_IMPL_ADDREF(AsyncStatement)
 NS_IMPL_RELEASE_WITH_DESTROY(AsyncStatement, Destroy())
 
 void AsyncStatement::Destroy() {
+#ifndef MOZ_NAIVEFOX
   // The JS params helper keeps a raw pointer to us that is cleared when the
   // params holder is released on the main thread. Delete there, so that
   // happens as part of our destruction rather than after it.
@@ -225,6 +226,7 @@ void AsyncStatement::Destroy() {
     NS_PROXY_DELETE_TO_MAIN_THREAD(AsyncStatement);
     return;
   }
+#endif
   delete this;
 }
 

@@ -6,7 +6,9 @@
 
 #include "MainThreadUtils.h"
 #include "mozilla/AppShutdown.h"
-#include "mozilla/CycleCollectedJSRuntime.h"
+#ifndef MOZ_NAIVEFOX
+#  include "mozilla/CycleCollectedJSRuntime.h"
+#endif
 #include "mozilla/Logging.h"
 #include "mozilla/ProfilerLabels.h"
 #include "mozilla/ProfilerMarkers.h"
@@ -15,7 +17,9 @@
 #include "mozilla/net/NeckoCommon.h"
 #include "nsComponentManagerUtils.h"
 #include "nsContentUtils.h"
-#include "nsCycleCollector.h"
+#ifndef MOZ_NAIVEFOX
+#  include "nsCycleCollector.h"
+#endif
 #include "nsEnumeratorUtils.h"
 #include "nsIConsoleService.h"
 #include "nsIObserver.h"
@@ -279,7 +283,7 @@ NS_IMETHODIMP nsObserverService::NotifyObservers(nsISupports* aSubject,
 
   MOZ_ASSERT(AppShutdown::IsNoOrLegalShutdownTopic(aTopic));
 
-#ifdef DEBUG
+#if defined(DEBUG) && !defined(MOZ_NAIVEFOX)
   // Use NotifyWhenScriptSafe for anything that can run during the GC callback.
   CycleCollectedJSRuntime* ccRuntime = CycleCollectedJSRuntime::Get();
   MOZ_ASSERT_IF(ccRuntime, !ccRuntime->IsInGCCallback());

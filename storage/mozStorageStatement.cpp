@@ -244,9 +244,11 @@ void Statement::MaybeRecordQueryStatus(int srv, bool isResetting) {
 
 Statement::~Statement() {
   MOZ_DIAGNOSTIC_ASSERT(mRefCnt == 1, "Unexpected refcount at destruction");
+#ifndef MOZ_NAIVEFOX
   MOZ_ASSERT(NS_IsMainThread() || (mStatementParamsHolder == nullptr &&
                                    mStatementRowHolder == nullptr),
              "Must be destroyed on the main thread if JS helpers exist");
+#endif
   internalFinalize(/* aDestructing */ true);
 }
 
@@ -257,6 +259,7 @@ NS_IMPL_ADDREF(Statement)
 NS_IMPL_RELEASE_WITH_DESTROY(Statement, Destroy())
 
 void Statement::Destroy() {
+#ifndef MOZ_NAIVEFOX
   // The JS helpers keep raw pointers to us that are cleared when their holders
   // are released on the main thread. Delete there, so that happens as part of
   // our destruction rather than after it.
@@ -268,6 +271,7 @@ void Statement::Destroy() {
     NS_PROXY_DELETE_TO_MAIN_THREAD(Statement);
     return;
   }
+#endif
   delete this;
 }
 

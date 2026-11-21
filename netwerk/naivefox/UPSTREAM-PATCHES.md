@@ -406,13 +406,16 @@ Files:
 
 - caps/BasePrincipal.cpp
 - dom/ipc/RemoteType.cpp
+- ipc/glue/NodeChannel.cpp
 - netwerk/base/TRRLoadInfo.cpp
 - netwerk/base/nsNetUtil.cpp
 - netwerk/cache2/CacheFile.cpp
 - netwerk/cookie/CookieCommons.h and moz.build
 - security/manager/ssl/components.conf and nsNSSCertificateDB.cpp
+- storage/mozStorageAsyncStatement.cpp and mozStorageStatement.cpp
+- xpcom/ds/nsObserverService.cpp
 - xpcom/threads/nsThread.h
-- netwerk/naivefox/PWebTransport.h, NeckoChannelParams.h and tools/verify-shims.py
+- netwerk/naivefox/PWebTransport.h and tools/verify-shims.py
 
 The single-process product retains native H2/H3 and NSS while omitting DOM
 actors, browser policy containers, crash reporting, CTAP cable services and

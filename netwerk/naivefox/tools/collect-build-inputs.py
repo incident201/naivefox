@@ -24,6 +24,7 @@ MAKE_SOURCE_PATH = re.compile(
 )
 GYP_SOURCE_PATH = re.compile(r"[\"']([^\"']+\.gypi?)[\"']")
 PY_ACTION = re.compile(r"call\s+py_action,\s*([A-Za-z0-9_+-]+)")
+PY_ACTION_MODULE = re.compile(r"-m\s+mozbuild\.action\.([A-Za-z0-9_+-]+)")
 JAR_MANIFEST = re.compile(r"^JAR_MANIFEST\s*:?=\s*(.+)$", re.MULTILINE)
 JAR_SOURCE = re.compile(r"\((%?[^)]+)\)")
 ASSEMBLY_SOURCE = re.compile(r"^SSRCS\s*\+=\s*(.+)$", re.MULTILINE)
@@ -348,7 +349,7 @@ def main() -> int:
                 for match in glob.glob(str(Path(base) / pattern), recursive=True):
                     add_path(Path(match), "objdir:install-manifest-pattern")
             elif record_type == "7":
-                if len(fields) != 8:
+                if len(fields) not in {7, 8}:
                     raise SystemExit(f"malformed install preprocess record: {manifest}")
                 add_path(Path(fields[2]), "objdir:install-manifest-source")
                 add_path(Path(fields[3]), "objdir:install-manifest-dependency")
@@ -475,7 +476,7 @@ def main() -> int:
     )
     for fragment in python_action_fragments:
         text = fragment.read_text(encoding="utf-8", errors="replace")
-        for action in PY_ACTION.findall(text):
+        for action in (*PY_ACTION.findall(text), *PY_ACTION_MODULE.findall(text)):
             path = source_tree / "python" / "mozbuild" / "mozbuild" / "action"
             path /= f"{action}.py"
             if path.is_file():
