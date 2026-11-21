@@ -746,15 +746,16 @@ export var PlacesUIUtils = {
   },
 
   /**
-   * Opens the sidebar for a query in a browser window, opening a new window
+   * Opens the sidebar for a Places node in a browser window, opening a new window
    * if none is available.
    *
    * @param {nsINavHistoryResultNode} node
-   *   The query node.
+   *   The folder or query node.
    */
-  async showSidebarForQuery(node) {
+  async showSidebarForNode(node) {
     let { query, queryOptions } = lazy.PlacesUtils.asQuery(node);
     let sidebarId =
+      lazy.PlacesUtils.nodeIsFolderOrShortcut(node) ||
       queryOptions.queryType ==
         Ci.nsINavHistoryQueryOptions.QUERY_TYPE_BOOKMARKS ||
       queryOptions.resultType ==
@@ -892,6 +893,32 @@ export var PlacesUIUtils = {
   },
 
   /**
+   * Returns where a bookmark or history URL should be opened for the given
+   * event, taking browser.tabs.loadUILinkInTab into account.
+   *
+   * @param {string} url
+   *   The URL to open.
+   * @param {Event} event
+   *   The DOM mouse/key event with modifier keys set.
+   * @param {Window} browserWindow
+   *   The browser window the link will be opened in.
+   * @returns {string}
+   *   Where to open the URL, see BrowserUtils.whereToOpenLink.
+   */
+  whereToOpenUILink(url, event, browserWindow) {
+    let where = lazy.BrowserUtils.whereToOpenLink(event, false, true);
+    if (this.loadUILinkInTab) {
+      if (where == "current" && !url.startsWith("javascript:")) {
+        where = "tab";
+      }
+      if (where == "tab" && browserWindow?.gBrowser.selectedTab.isEmpty) {
+        where = "current";
+      }
+    }
+    return where;
+  },
+
+  /**
    * Loads the node's URL in the appropriate tab or window given the
    * user's preference specified by modifier keys tracked by a
    * DOM mouse/key event.
@@ -904,18 +931,11 @@ export var PlacesUIUtils = {
    */
   openNodeWithEvent: function PUIU_openNodeWithEvent(aNode, aEvent) {
     let window = aEvent.target.documentGlobal;
-
-    let where = lazy.BrowserUtils.whereToOpenLink(aEvent, false, true);
-    if (this.loadBookmarksInTabs && lazy.PlacesUtils.nodeIsBookmark(aNode)) {
-      if (where == "current" && !aNode.uri.startsWith("javascript:")) {
-        where = "tab";
-      }
-      let browserWindow = getBrowserWindow(window);
-      if (where == "tab" && browserWindow?.gBrowser.selectedTab.isEmpty) {
-        where = "current";
-      }
-    }
-
+    let where = this.whereToOpenUILink(
+      aNode.uri,
+      aEvent,
+      getBrowserWindow(window)
+    );
     this._openNodeIn(aNode, where, window);
   },
 
@@ -980,7 +1000,7 @@ export var PlacesUIUtils = {
       }
       aWindow.openTrustedLinkIn(aNode.uri, aWhere, {
         allowPopups: isJavaScriptURL,
-        inBackground: this.loadBookmarksInBackground,
+        inBackground: this.loadUILinkInBackground,
         allowInheritPrincipal: isJavaScriptURL,
         private: aPrivate,
         userContextId,
@@ -1471,7 +1491,7 @@ export var PlacesUIUtils = {
 
     PlacesUIUtils.lastContextMenuTriggerNode = menupopup.triggerNode;
 
-    if (Services.prefs.getBoolPref("browser.tabs.loadBookmarksInTabs", false)) {
+    if (PlacesUIUtils.loadUILinkInTab) {
       menupopup.ownerDocument
         .getElementById("placesContext_open")
         .removeAttribute("default");
@@ -1901,14 +1921,14 @@ XPCOMUtils.defineLazyPreferenceGetter(
 );
 XPCOMUtils.defineLazyPreferenceGetter(
   PlacesUIUtils,
-  "loadBookmarksInBackground",
-  "browser.tabs.loadBookmarksInBackground",
+  "loadUILinkInBackground",
+  "browser.tabs.loadUILinkInBackground",
   false
 );
 XPCOMUtils.defineLazyPreferenceGetter(
   PlacesUIUtils,
-  "loadBookmarksInTabs",
-  "browser.tabs.loadBookmarksInTabs",
+  "loadUILinkInTab",
+  "browser.tabs.loadUILinkInTab",
   false
 );
 XPCOMUtils.defineLazyPreferenceGetter(

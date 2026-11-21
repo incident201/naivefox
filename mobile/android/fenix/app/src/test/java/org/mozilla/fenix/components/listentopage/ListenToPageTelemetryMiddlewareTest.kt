@@ -11,13 +11,17 @@ import mozilla.components.feature.listentopage.ChunkState
 import mozilla.components.feature.listentopage.ListenAction
 import mozilla.components.feature.listentopage.ListenState
 import mozilla.components.feature.listentopage.ListenStore
-import mozilla.components.feature.listentopage.PlaybackPhase
-import mozilla.components.feature.listentopage.PlaybackSpeed
 import mozilla.components.feature.listentopage.PlaybackState
-import mozilla.components.feature.listentopage.Voice
 import mozilla.components.feature.listentopage.VoiceState
 import mozilla.components.feature.listentopage.content.LanguageSource
+import mozilla.components.feature.listentopage.facts.ListenToPageFacts
 import mozilla.components.feature.listentopage.listenReducer
+import mozilla.components.feature.listentopage.playback.PlaybackPhase
+import mozilla.components.feature.listentopage.playback.PlaybackSpeed
+import mozilla.components.feature.listentopage.voices.Voice
+import mozilla.components.support.base.Component
+import mozilla.components.support.base.facts.Action
+import mozilla.components.support.base.facts.Fact
 import mozilla.components.support.test.robolectric.testContext
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -38,10 +42,11 @@ class ListenToPageTelemetryMiddlewareTest {
         val store = createStore(phase = PlaybackPhase.Paused)
         assertNull(ListenToPage.playPressed.testGetValue())
 
-        store.dispatch(ListenAction.Controls.PlayPauseClicked)
+        store.dispatch(ListenAction.User.Controls.PlayPauseClicked)
 
         assertNotNull(ListenToPage.playPressed.testGetValue())
         assertNull(ListenToPage.pausePressed.testGetValue())
+        assertEquals("in_app", ListenToPage.playPressed.testGetValue()!!.single().extra?.get("source"))
     }
 
     @Test
@@ -49,45 +54,49 @@ class ListenToPageTelemetryMiddlewareTest {
         val store = createStore(phase = PlaybackPhase.Playing)
         assertNull(ListenToPage.pausePressed.testGetValue())
 
-        store.dispatch(ListenAction.Controls.PlayPauseClicked)
+        store.dispatch(ListenAction.User.Controls.PlayPauseClicked)
 
         assertNotNull(ListenToPage.pausePressed.testGetValue())
         assertNull(ListenToPage.playPressed.testGetValue())
+        assertEquals("in_app", ListenToPage.pausePressed.testGetValue()!!.single().extra?.get("source"))
     }
 
     @Test
     fun `WHEN the play button is pressed while buffering THEN record pause_pressed`() {
         val store = createStore(phase = PlaybackPhase.Buffering)
 
-        store.dispatch(ListenAction.Controls.PlayPauseClicked)
+        store.dispatch(ListenAction.User.Controls.PlayPauseClicked)
 
         assertNotNull(ListenToPage.pausePressed.testGetValue())
         assertNull(ListenToPage.playPressed.testGetValue())
+        assertEquals("in_app", ListenToPage.pausePressed.testGetValue()!!.single().extra?.get("source"))
     }
 
     @Test
     fun `WHEN skip back is pressed THEN record skip_back_pressed`() {
         val store = createStore(phase = PlaybackPhase.Playing)
 
-        store.dispatch(ListenAction.Controls.RewindClicked)
+        store.dispatch(ListenAction.User.Controls.RewindClicked)
 
         assertNotNull(ListenToPage.skipBackPressed.testGetValue())
+        assertEquals("in_app", ListenToPage.skipBackPressed.testGetValue()!!.single().extra?.get("source"))
     }
 
     @Test
     fun `WHEN skip forward is pressed THEN record skip_forward_pressed`() {
         val store = createStore(phase = PlaybackPhase.Playing)
 
-        store.dispatch(ListenAction.Controls.ForwardClicked)
+        store.dispatch(ListenAction.User.Controls.ForwardClicked)
 
         assertNotNull(ListenToPage.skipForwardPressed.testGetValue())
+        assertEquals("in_app", ListenToPage.skipForwardPressed.testGetValue()!!.single().extra?.get("source"))
     }
 
     @Test
     fun `WHEN the progress bar is seeked ahead of the current position THEN record seek_performed forward`() {
         val store = createStore(phase = PlaybackPhase.Playing, positionMs = 5_000L, durationMs = 20_000L)
 
-        store.dispatch(ListenAction.Playback.SeekRequested(fraction = 0.75f))
+        store.dispatch(ListenAction.User.Controls.SeekRequested(fraction = 0.75f))
 
         assertEquals("forward", ListenToPage.seekPerformed.testGetValue()!!.single().extra?.get("direction"))
     }
@@ -96,7 +105,7 @@ class ListenToPageTelemetryMiddlewareTest {
     fun `WHEN the progress bar is seeked behind the current position THEN record seek_performed backward`() {
         val store = createStore(phase = PlaybackPhase.Playing, positionMs = 15_000L, durationMs = 20_000L)
 
-        store.dispatch(ListenAction.Playback.SeekRequested(fraction = 0.25f))
+        store.dispatch(ListenAction.User.Controls.SeekRequested(fraction = 0.25f))
 
         assertEquals("backward", ListenToPage.seekPerformed.testGetValue()!!.single().extra?.get("direction"))
     }
@@ -105,7 +114,7 @@ class ListenToPageTelemetryMiddlewareTest {
     fun `WHEN the voice list is opened THEN record voice_list_opened`() {
         val store = createStore(phase = PlaybackPhase.Paused)
 
-        store.dispatch(ListenAction.Controls.VoicesClicked)
+        store.dispatch(ListenAction.User.Voices.VoicesClicked)
 
         assertNotNull(ListenToPage.voiceListOpened.testGetValue())
     }
@@ -114,7 +123,7 @@ class ListenToPageTelemetryMiddlewareTest {
     fun `WHEN the voice list is dismissed THEN record voice_list_dismissed`() {
         val store = createStore(phase = PlaybackPhase.Paused)
 
-        store.dispatch(ListenAction.Controls.VoicesDismissed)
+        store.dispatch(ListenAction.User.Voices.VoicesDismissed)
 
         assertNotNull(ListenToPage.voiceListDismissed.testGetValue())
     }
@@ -125,7 +134,7 @@ class ListenToPageTelemetryMiddlewareTest {
         val store =
             createStore(phase = PlaybackPhase.Paused, availableVoices = listOf(default, Voice("en-gb", Locale.UK)))
 
-        store.dispatch(ListenAction.Voices.VoiceSelected(default))
+        store.dispatch(ListenAction.User.Voices.VoiceSelected(default))
 
         assertEquals("true", ListenToPage.voiceSelected.testGetValue()!!.single().extra?.get("is_default"))
     }
@@ -136,7 +145,7 @@ class ListenToPageTelemetryMiddlewareTest {
         val other = Voice(id = "en-gb", locale = Locale.UK)
         val store = createStore(phase = PlaybackPhase.Paused, availableVoices = listOf(default, other))
 
-        store.dispatch(ListenAction.Voices.VoiceSelected(other))
+        store.dispatch(ListenAction.User.Voices.VoiceSelected(other))
 
         assertEquals("false", ListenToPage.voiceSelected.testGetValue()!!.single().extra?.get("is_default"))
     }
@@ -145,7 +154,7 @@ class ListenToPageTelemetryMiddlewareTest {
     fun `WHEN the speed list is opened THEN record speed_list_opened`() {
         val store = createStore(phase = PlaybackPhase.Paused)
 
-        store.dispatch(ListenAction.Controls.PlaybackSpeedClicked)
+        store.dispatch(ListenAction.User.Controls.PlaybackSpeedClicked)
 
         assertNotNull(ListenToPage.speedListOpened.testGetValue())
     }
@@ -154,7 +163,7 @@ class ListenToPageTelemetryMiddlewareTest {
     fun `WHEN the speed list is dismissed THEN record speed_list_dismissed`() {
         val store = createStore(phase = PlaybackPhase.Paused)
 
-        store.dispatch(ListenAction.Controls.PlaybackSpeedDismissed)
+        store.dispatch(ListenAction.User.Controls.PlaybackSpeedDismissed)
 
         assertNotNull(ListenToPage.speedListDismissed.testGetValue())
     }
@@ -163,9 +172,10 @@ class ListenToPageTelemetryMiddlewareTest {
     fun `WHEN a speed is selected THEN record speed_selected with the multiplier`() {
         val store = createStore(phase = PlaybackPhase.Paused)
 
-        store.dispatch(ListenAction.Controls.PlaybackSpeedSelected(PlaybackSpeed.X1_5))
+        store.dispatch(ListenAction.User.Controls.PlaybackSpeedSelected(PlaybackSpeed.X1_5))
 
         assertEquals("1.5", ListenToPage.speedSelected.testGetValue()!!.single().extra?.get("speed"))
+        assertEquals("in_app", ListenToPage.speedSelected.testGetValue()!!.single().extra?.get("source"))
     }
 
     @Test
@@ -173,7 +183,7 @@ class ListenToPageTelemetryMiddlewareTest {
         val voice = Voice(id = "en-us", locale = Locale.US)
         val store = createStore(phase = PlaybackPhase.Paused, availableVoices = listOf(voice))
 
-        store.dispatch(ListenAction.Voices.VoiceSelected(voice, ListenAction.Voices.VoiceSource.UserSelected))
+        store.dispatch(ListenAction.User.Voices.VoiceSelected(voice, ListenAction.User.Voices.VoiceSource.UserSelected))
 
         assertEquals("user_selected", ListenToPage.voiceSelected.testGetValue()!!.single().extra?.get("source"))
     }
@@ -183,7 +193,7 @@ class ListenToPageTelemetryMiddlewareTest {
         val voice = Voice(id = "en-us", locale = Locale.US)
         val store = createStore(phase = PlaybackPhase.Paused, availableVoices = listOf(voice))
 
-        store.dispatch(ListenAction.Voices.VoiceSelected(voice, ListenAction.Voices.VoiceSource.Fallback))
+        store.dispatch(ListenAction.User.Voices.VoiceSelected(voice, ListenAction.User.Voices.VoiceSource.Fallback))
 
         assertEquals("fallback", ListenToPage.voiceSelected.testGetValue()!!.single().extra?.get("source"))
     }
@@ -192,7 +202,7 @@ class ListenToPageTelemetryMiddlewareTest {
     fun `WHEN listening is requested THEN record requested`() {
         val store = createStore(phase = PlaybackPhase.Idle)
 
-        store.dispatch(ListenAction.Session.ListenRequested(tabId = "tab-1", url = "https://example.org"))
+        store.dispatch(ListenAction.User.Session.ListenRequested(tabId = "tab-1", url = "https://example.org"))
 
         assertNotNull(ListenToPage.requested.testGetValue())
     }
@@ -201,7 +211,7 @@ class ListenToPageTelemetryMiddlewareTest {
     fun `WHEN content is ready THEN record content_ready with its language`() {
         val store = createStore(phase = PlaybackPhase.Idle)
 
-        store.dispatch(ListenAction.Content.ContentReady(languageTag = "en-US"))
+        store.dispatch(ListenAction.System.Content.ContentReady(languageTag = "en-US"))
 
         assertEquals("en-US", ListenToPage.contentReady.testGetValue()!!.single().extra?.get("language"))
     }
@@ -210,7 +220,9 @@ class ListenToPageTelemetryMiddlewareTest {
     fun `WHEN content is ready in the language the page declares THEN record content_ready with the page source`() {
         val store = createStore(phase = PlaybackPhase.Idle)
 
-        store.dispatch(ListenAction.Content.ContentReady(languageTag = "de", languageSource = LanguageSource.Page))
+        store.dispatch(
+            ListenAction.System.Content.ContentReady(languageTag = "de", languageSource = LanguageSource.Page)
+        )
 
         val extra = ListenToPage.contentReady.testGetValue()!!.single().extra
         assertEquals("de", extra?.get("language"))
@@ -222,7 +234,7 @@ class ListenToPageTelemetryMiddlewareTest {
         val store = createStore(phase = PlaybackPhase.Idle)
 
         store.dispatch(
-            ListenAction.Content.ContentReady(languageTag = "en-US", languageSource = LanguageSource.Fallback)
+            ListenAction.System.Content.ContentReady(languageTag = "en-US", languageSource = LanguageSource.Fallback)
         )
 
         val extra = ListenToPage.contentReady.testGetValue()!!.single().extra
@@ -234,8 +246,8 @@ class ListenToPageTelemetryMiddlewareTest {
     fun `WHEN playback starts across chunks THEN record playback_started once per session`() {
         val store = createStore(phase = PlaybackPhase.Buffering)
 
-        store.dispatch(ListenAction.Playback.PlaybackStarted(chunk = ChunkState(index = 0), positionMs = 0L))
-        store.dispatch(ListenAction.Playback.PlaybackStarted(chunk = ChunkState(index = 1), positionMs = 0L))
+        store.dispatch(ListenAction.System.Playback.PlaybackStarted(chunk = ChunkState(index = 0), positionMs = 0L))
+        store.dispatch(ListenAction.System.Playback.PlaybackStarted(chunk = ChunkState(index = 1), positionMs = 0L))
 
         assertEquals(1, ListenToPage.playbackStarted.testGetValue()!!.size)
     }
@@ -244,9 +256,9 @@ class ListenToPageTelemetryMiddlewareTest {
     fun `WHEN a new session starts THEN playback_started can record again`() {
         val store = createStore(phase = PlaybackPhase.Buffering)
 
-        store.dispatch(ListenAction.Playback.PlaybackStarted(chunk = ChunkState(index = 0), positionMs = 0L))
-        store.dispatch(ListenAction.Session.ListenRequested(tabId = "tab-1", url = "https://example.org"))
-        store.dispatch(ListenAction.Playback.PlaybackStarted(chunk = ChunkState(index = 0), positionMs = 0L))
+        store.dispatch(ListenAction.System.Playback.PlaybackStarted(chunk = ChunkState(index = 0), positionMs = 0L))
+        store.dispatch(ListenAction.User.Session.ListenRequested(tabId = "tab-1", url = "https://example.org"))
+        store.dispatch(ListenAction.System.Playback.PlaybackStarted(chunk = ChunkState(index = 0), positionMs = 0L))
 
         assertEquals(2, ListenToPage.playbackStarted.testGetValue()!!.size)
     }
@@ -255,7 +267,7 @@ class ListenToPageTelemetryMiddlewareTest {
     fun `WHEN playback ends THEN record playback_ended`() {
         val store = createStore(phase = PlaybackPhase.Playing)
 
-        store.dispatch(ListenAction.Playback.PlaybackEnded)
+        store.dispatch(ListenAction.System.Playback.PlaybackEnded)
 
         assertNotNull(ListenToPage.playbackEnded.testGetValue())
     }
@@ -264,8 +276,8 @@ class ListenToPageTelemetryMiddlewareTest {
     fun `WHEN playback ends more than once THEN record playback_ended once per session`() {
         val store = createStore(phase = PlaybackPhase.Playing)
 
-        store.dispatch(ListenAction.Playback.PlaybackEnded)
-        store.dispatch(ListenAction.Playback.PlaybackEnded)
+        store.dispatch(ListenAction.System.Playback.PlaybackEnded)
+        store.dispatch(ListenAction.System.Playback.PlaybackEnded)
 
         assertEquals(1, ListenToPage.playbackEnded.testGetValue()!!.size)
     }
@@ -274,9 +286,9 @@ class ListenToPageTelemetryMiddlewareTest {
     fun `WHEN a new session starts THEN playback_ended can record again`() {
         val store = createStore(phase = PlaybackPhase.Playing)
 
-        store.dispatch(ListenAction.Playback.PlaybackEnded)
-        store.dispatch(ListenAction.Session.ListenRequested(tabId = "tab-1", url = "https://example.org"))
-        store.dispatch(ListenAction.Playback.PlaybackEnded)
+        store.dispatch(ListenAction.System.Playback.PlaybackEnded)
+        store.dispatch(ListenAction.User.Session.ListenRequested(tabId = "tab-1", url = "https://example.org"))
+        store.dispatch(ListenAction.System.Playback.PlaybackEnded)
 
         assertEquals(2, ListenToPage.playbackEnded.testGetValue()!!.size)
     }
@@ -285,7 +297,7 @@ class ListenToPageTelemetryMiddlewareTest {
     fun `WHEN the session is stopped from the close button THEN record stopped with close_button`() {
         val store = createStore(phase = PlaybackPhase.Playing)
 
-        store.dispatch(ListenAction.Session.StopRequested(ListenAction.Session.StopSource.CloseButton))
+        store.dispatch(ListenAction.User.Session.StopRequested(ListenAction.User.Session.StopSource.CloseButton))
 
         assertEquals("close_button", ListenToPage.stopped.testGetValue()!!.single().extra?.get("source"))
     }
@@ -294,7 +306,7 @@ class ListenToPageTelemetryMiddlewareTest {
     fun `WHEN the session is stopped by the tab closing THEN record stopped with tab_closed`() {
         val store = createStore(phase = PlaybackPhase.Playing)
 
-        store.dispatch(ListenAction.Session.StopRequested(ListenAction.Session.StopSource.TabClosed))
+        store.dispatch(ListenAction.User.Session.StopRequested(ListenAction.User.Session.StopSource.TabClosed))
 
         assertEquals("tab_closed", ListenToPage.stopped.testGetValue()!!.single().extra?.get("source"))
     }
@@ -303,16 +315,27 @@ class ListenToPageTelemetryMiddlewareTest {
     fun `WHEN the session is stopped by closing reader mode THEN record stopped with reader_mode_closed`() {
         val store = createStore(phase = PlaybackPhase.Playing)
 
-        store.dispatch(ListenAction.Session.StopRequested(ListenAction.Session.StopSource.ReaderModeClosed))
+        store.dispatch(ListenAction.User.Session.StopRequested(ListenAction.User.Session.StopSource.ReaderModeClosed))
 
         assertEquals("reader_mode_closed", ListenToPage.stopped.testGetValue()!!.single().extra?.get("source"))
+    }
+
+    @Test
+    fun `WHEN the session is stopped by turning the feature off THEN record stopped with feature_disabled`() {
+        val store = createStore(phase = PlaybackPhase.Paused)
+
+        store.dispatch(ListenAction.User.Session.StopRequested(ListenAction.User.Session.StopSource.FeatureDisabled))
+
+        assertEquals("feature_disabled", ListenToPage.stopped.testGetValue()!!.single().extra?.get("source"))
     }
 
     @Test
     fun `WHEN the media session ended outside the app THEN record stopped with media_session_ended_outside_app`() {
         val store = createStore(phase = PlaybackPhase.Paused)
 
-        store.dispatch(ListenAction.Session.StopRequested(ListenAction.Session.StopSource.MediaSessionEndedOutsideApp))
+        store.dispatch(
+            ListenAction.User.Session.StopRequested(ListenAction.User.Session.StopSource.MediaSessionEndedOutsideApp)
+        )
 
         assertEquals(
             "media_session_ended_outside_app",
@@ -324,7 +347,7 @@ class ListenToPageTelemetryMiddlewareTest {
     fun `WHEN no offline voice is available THEN record no_offline_voice with the language`() {
         val store = createStore(phase = PlaybackPhase.Idle, languageTag = "en-US")
 
-        store.dispatch(ListenAction.Voices.NoOfflineVoicesAvailable)
+        store.dispatch(ListenAction.System.Voices.NoOfflineVoicesAvailable)
 
         assertEquals("en-US", ListenToPage.noOfflineVoice.testGetValue()!!.single().extra?.get("language"))
     }
@@ -333,7 +356,7 @@ class ListenToPageTelemetryMiddlewareTest {
     fun `WHEN content is unavailable THEN record content_unavailable`() {
         val store = createStore(phase = PlaybackPhase.Idle)
 
-        store.dispatch(ListenAction.Content.ContentUnavailable)
+        store.dispatch(ListenAction.System.Content.ContentUnavailable)
 
         assertNotNull(ListenToPage.contentUnavailable.testGetValue())
     }
@@ -342,7 +365,7 @@ class ListenToPageTelemetryMiddlewareTest {
     fun `WHEN synthesis fails THEN record synthesis_failed`() {
         val store = createStore(phase = PlaybackPhase.Buffering)
 
-        store.dispatch(ListenAction.Synthesis.SynthesisFailed)
+        store.dispatch(ListenAction.System.Synthesis.SynthesisFailed)
 
         assertNotNull(ListenToPage.synthesisFailed.testGetValue())
     }
@@ -351,7 +374,7 @@ class ListenToPageTelemetryMiddlewareTest {
     fun `WHEN playback fails THEN record playback_failed`() {
         val store = createStore(phase = PlaybackPhase.Playing)
 
-        store.dispatch(ListenAction.Playback.PlaybackFailed)
+        store.dispatch(ListenAction.System.Playback.PlaybackFailed)
 
         assertNotNull(ListenToPage.playbackFailed.testGetValue())
     }
@@ -360,11 +383,51 @@ class ListenToPageTelemetryMiddlewareTest {
     fun `WHEN an untracked control is pressed THEN record nothing`() {
         val store = createStore(phase = PlaybackPhase.Playing)
 
-        store.dispatch(ListenAction.Controls.PlaybackSpeedClicked)
+        store.dispatch(ListenAction.User.Controls.PlaybackSpeedClicked)
 
         assertNull(ListenToPage.playPressed.testGetValue())
         assertNull(ListenToPage.voiceListOpened.testGetValue())
     }
+
+    @Test
+    fun `WHEN play is pressed in the media controls THEN record play_pressed from media_controls`() {
+        ListenToPageTelemetryMiddleware().process(mediaControlFact(ListenToPageFacts.Items.PLAY_PRESSED))
+
+        assertEquals("media_controls", ListenToPage.playPressed.testGetValue()!!.single().extra?.get("source"))
+    }
+
+    @Test
+    fun `WHEN pause is pressed in the media controls THEN record pause_pressed from media_controls`() {
+        ListenToPageTelemetryMiddleware().process(mediaControlFact(ListenToPageFacts.Items.PAUSE_PRESSED))
+
+        assertEquals("media_controls", ListenToPage.pausePressed.testGetValue()!!.single().extra?.get("source"))
+    }
+
+    @Test
+    fun `WHEN skip back is pressed in the media controls THEN record skip_back_pressed from media_controls`() {
+        ListenToPageTelemetryMiddleware().process(mediaControlFact(ListenToPageFacts.Items.SKIP_BACK_PRESSED))
+
+        assertEquals("media_controls", ListenToPage.skipBackPressed.testGetValue()!!.single().extra?.get("source"))
+    }
+
+    @Test
+    fun `WHEN skip forward is pressed in the media controls THEN record skip_forward_pressed from media_controls`() {
+        ListenToPageTelemetryMiddleware().process(mediaControlFact(ListenToPageFacts.Items.SKIP_FORWARD_PRESSED))
+
+        assertEquals("media_controls", ListenToPage.skipForwardPressed.testGetValue()!!.single().extra?.get("source"))
+    }
+
+    @Test
+    fun `WHEN the speed is changed in the media controls THEN record speed_selected with the speed from media_controls`() {
+        ListenToPageTelemetryMiddleware().process(mediaControlFact(ListenToPageFacts.Items.SPEED_SELECTED, "1.5"))
+
+        val extra = ListenToPage.speedSelected.testGetValue()!!.single().extra
+        assertEquals("1.5", extra?.get("speed"))
+        assertEquals("media_controls", extra?.get("source"))
+    }
+
+    private fun mediaControlFact(item: String, value: String? = null) =
+        Fact(component = Component.FEATURE_LISTENTOPAGE, action = Action.CLICK, item = item, value = value)
 
     private fun createStore(
         phase: PlaybackPhase,

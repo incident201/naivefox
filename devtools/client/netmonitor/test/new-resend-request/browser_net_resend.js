@@ -131,9 +131,8 @@ async function testResendRequest() {
 
 async function resendRequestAndWaitForNewRequest(monitor, originalRequestItem) {
   const { document, store, windowRequire, connector } = monitor.panelWin;
-  const { getSelectedRequest, getDisplayedRequests } = windowRequire(
-    "devtools/client/netmonitor/src/selectors/index"
-  );
+  const { getSelectedRequest, getDisplayedRequests, getRequestById } =
+    windowRequire("devtools/client/netmonitor/src/selectors/index");
 
   info("Select the request to resend");
   const expectedNoOfRequestsAfterResend =
@@ -156,10 +155,10 @@ async function resendRequestAndWaitForNewRequest(monitor, originalRequestItem) {
 
   info("Open the context menu and select the resend for the request");
   EventUtils.sendMouseEvent({ type: "contextmenu" }, originalRequestItem);
-  const wait = waitForNetworkEvents(monitor, 1);
+  const onNetworkEvents = waitForNetworkEvents(monitor, 1);
   await selectContextMenuItem(monitor, "request-list-context-resend-only");
   await waitForNewRequest;
-  await wait;
+  await onNetworkEvents;
 
   const newResourceId = getSelectedRequest(store.getState()).id;
 
@@ -203,7 +202,7 @@ async function testOldEditAndResendPanel() {
 
   store.dispatch(Actions.selectRequest(origItemId));
   await waitForRequestData(
-    store,
+    monitor,
     ["requestHeaders", "requestPostData"],
     origItemId
   );
@@ -226,9 +225,9 @@ async function testOldEditAndResendPanel() {
   testCustomItemChanged(customItem, origItem);
 
   // send the new request
-  const wait = waitForNetworkEvents(monitor, 1);
+  const onNetworkEvents = waitForNetworkEvents(monitor, 1);
   store.dispatch(Actions.sendCustomRequest());
-  await wait;
+  await onNetworkEvents;
 
   let sentItem;
   // Testing sent request will require updated requestHeaders and requestPostData,

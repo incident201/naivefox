@@ -249,6 +249,10 @@ enum class NodeSelectorFlags : uint32_t {
   RelativeSelectorSearchDirectionAncestorSibling =
       RelativeSelectorSearchDirectionSibling |
       RelativeSelectorSearchDirectionAncestor,
+
+  // This node was evaluated as a container for a container query with attr()
+  // functions whose attribute names can't be known at parse time.
+  ContainerQueryWithUnparsedAttr = 1 << 11,
 };
 
 MOZ_MAKE_ENUM_CLASS_BITWISE_OPERATORS(NodeSelectorFlags);
@@ -1815,6 +1819,8 @@ class nsINode : public mozilla::dom::EventTarget {
     virtual void Traverse(nsCycleCollectionTraversalCallback&);
     virtual void Unlink(nsINode&);
 
+    void ClearWeakReference();
+
     /**
      * A list of mutation observers
      */
@@ -1837,7 +1843,8 @@ class nsINode : public mozilla::dom::EventTarget {
 
     /**
      * Weak reference to this node.  This is cleared by the destructor of
-     * nsNodeWeakReference.
+     * nsNodeWeakReference, and by ClearWeakReference when the node is
+     * unlinked or destroyed.
      */
     nsNodeWeakReference* MOZ_NON_OWNING_REF mWeakReference;
 
@@ -2638,9 +2645,9 @@ class nsINode : public mozilla::dom::EventTarget {
     ElementMayHaveAnonymousChildren,
     // Set if element has CustomElementData.
     ElementHasCustomElementData,
-    // Set if the element was created from prototype cache and
-    // its l10n attributes haven't been changed.
-    ElementCreatedFromPrototypeAndHasUnmodifiedL10n,
+    // Set if the element was created already-translated from prototype cache
+    // and its l10n attributes haven't been changed.
+    ElementTranslatedFromPrototype,
     // Guard value
     BooleanFlagCount
   };
@@ -2797,14 +2804,14 @@ class nsINode : public mozilla::dom::EventTarget {
   // scoped (non-global) registry.
   inline bool HasScopedRegistry() const;
 
-  void SetElementCreatedFromPrototypeAndHasUnmodifiedL10n() {
-    SetBoolFlag(ElementCreatedFromPrototypeAndHasUnmodifiedL10n);
+  void SetElementTranslatedFromPrototype() {
+    SetBoolFlag(ElementTranslatedFromPrototype);
   }
-  bool HasElementCreatedFromPrototypeAndHasUnmodifiedL10n() {
-    return GetBoolFlag(ElementCreatedFromPrototypeAndHasUnmodifiedL10n);
+  bool IsElementTranslatedFromPrototype() {
+    return GetBoolFlag(ElementTranslatedFromPrototype);
   }
-  void ClearElementCreatedFromPrototypeAndHasUnmodifiedL10n() {
-    ClearBoolFlag(ElementCreatedFromPrototypeAndHasUnmodifiedL10n);
+  void ClearElementTranslatedFromPrototype() {
+    ClearBoolFlag(ElementTranslatedFromPrototype);
   }
 
   [[nodiscard]] inline mozilla::dom::ShadowRoot* GetShadowRoot() const;

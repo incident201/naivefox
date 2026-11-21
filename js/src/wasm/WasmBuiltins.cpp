@@ -769,20 +769,6 @@ static void WasmHandleRequestTierUp(Instance* instance) {
   }
 }
 
-#ifdef JS_HW_SHADOW_STACK
-// Advance the tracked shadow stack pointer by exactly one entry with the
-// provided return address.
-static void UnwindShadowStackEntry(ResumeFromException* rfe,
-                                   uintptr_t returnAddress) {
-  if (!rfe->shadowStackPointer) {
-    return;
-  }
-
-  MOZ_RELEASE_ASSERT(*rfe->shadowStackPointer == returnAddress);
-  rfe->shadowStackPointer++;
-}
-#endif
-
 // Unwind the activation in response to a thrown exception. This function is
 // responsible for notifying the debugger of each unwound frame.
 //
@@ -823,21 +809,6 @@ void wasm::HandleExceptionWasm(JSContext* cx, JitFrameIter& iter,
   // re-added to the map of live frames, right as it becomes trash).
   iter.asWasm().setIsLeavingFrames();
 
-#ifdef JS_HW_SHADOW_STACK
-  if (activation->isWasmTrapping()) {
-    const TrapData& trapData = activation->wasmTrapData();
-    if (trapData.unwoundFrame) {
-      // wasm::StartUnwinding() unwound the frame where the trap occurred.
-      UnwindShadowStackEntry(rfe,
-                             reinterpret_cast<uintptr_t>(trapData.unwoundPC));
-    }
-  } else {
-    // Non-trapping iteration starts after the Wasm exit frame.
-    UnwindShadowStackEntry(rfe, reinterpret_cast<uintptr_t>(
-                                    iter.asWasm().resumePCinCurrentFrame()));
-  }
-#endif
-
   // Get (or wrap) the exception that we'll search for catch handlers for.
   Rooted<WasmExceptionObject*> wasmExn(cx,
                                        GetOrWrapWasmException(activation, cx));
@@ -850,24 +821,29 @@ void wasm::HandleExceptionWasm(JSContext* cx, JitFrameIter& iter,
   // in a continuation's entry function): it has no iterated frame, so it must
   // be freed when we cross the first stack switch.
   wasm::ContStack* wasmPreviousStack = iter.asWasm().unwoundContStack();
-#endif
 
-  auto advanceFrame = [&] {
-#ifdef JS_HW_SHADOW_STACK
-    auto returnAddress =
-        reinterpret_cast<uintptr_t>(iter.asWasm().frame()->returnAddress());
-#endif
-    ++iter;
-#ifdef JS_HW_SHADOW_STACK
-    // We don't want to unwind past the shadow stack entry of the frame
-    // we will resume in.
-    if (!iter.done()) {
-      UnwindShadowStackEntry(rfe, returnAddress);
+  // When we iterate out of a continuation stack, we need to defer freeing it
+  // for one iteration. This is because the activation's exit FP keeps pointing
+  // into it until we advance past the first frame of the new stack.
+  wasm::ContStack* wasmStackToFree = nullptr;
+  auto freeUnwoundStack = [&]() {
+    if (!wasmStackToFree) {
+      return;
     }
-#endif
+    MOZ_RELEASE_ASSERT(
+        !activation->hasWasmExitFP() ||
+        !wasmStackToFree->hasStackAddress(uintptr_t(activation->wasmExitFP())));
+    ContStack::unwind(wasmStackToFree->handlers());
+    wasmStackToFree = nullptr;
   };
+#else
+  auto freeUnwoundStack = [&]() {};
+#endif
+  // Ensure any early returns also free an unwound stack.
+  auto ensureFreeUnwoundStack =
+      mozilla::MakeScopeExit([&]() { freeUnwoundStack(); });
 
-  for (; !iter.done() && iter.isWasm(); advanceFrame()) {
+  for (; !iter.done() && iter.isWasm(); ++iter, freeUnwoundStack()) {
     // Wasm code can enter same-compartment realms, so reset cx->realm to
     // this frame's realm.
     WasmFrameIter& wasmFrame = iter.asWasm();
@@ -877,9 +853,8 @@ void wasm::HandleExceptionWasm(JSContext* cx, JitFrameIter& iter,
 #ifdef ENABLE_WASM_JSPI
     wasm::ContStack* wasmStack = wasmFrame.contStack();
     if (wasmFrame.currentFrameStackSwitched()) {
-      if (wasmPreviousStack) {
-        ContStack::unwind(wasmPreviousStack->handlers());
-      }
+      MOZ_RELEASE_ASSERT(!wasmStackToFree);
+      wasmStackToFree = wasmPreviousStack;
       wasmPreviousStack = wasmStack;
     } else {
       MOZ_RELEASE_ASSERT(wasmStack == wasmPreviousStack);
@@ -928,6 +903,9 @@ void wasm::HandleExceptionWasm(JSContext* cx, JitFrameIter& iter,
           rfe->stackTarget = &cx->wasm().mainStackTarget();
           rfe->baseHandlers = nullptr;
         }
+#  ifdef JS_HW_SHADOW_STACK
+        rfe->shadowStackSwitchPointer = wasmFrame.shadowStackSwitchPointer();
+#  endif
 #endif  // ENABLE_WASM_JSPI
 
         // Maintain the invariant that trapping and exit frame state is always

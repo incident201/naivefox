@@ -16,6 +16,7 @@
 #include "nsICacheInfoChannel.h"
 #include "nsIDNSService.h"
 #include "nsIHttpChannel.h"
+#include "nsIHttpChannelInternal.h"
 #include "nsITRRSkipReason.h"
 #include "nsPrintfCString.h"
 #include "nsString.h"
@@ -151,6 +152,13 @@ struct ParamTraits<nsICacheInfoChannel::CacheDisposition>
           nsICacheInfoChannel::CacheDisposition,
           nsICacheInfoChannel::kCacheUnresolved,
           nsICacheInfoChannel::kCacheDispositionEnd> {};
+
+template <>
+struct ParamTraits<nsIHttpChannelInternal::ProxyType>
+    : public ContiguousEnumSerializerInclusive<
+          nsIHttpChannelInternal::ProxyType,
+          nsIHttpChannelInternal::PROXY_TYPE_DIRECT,
+          nsIHttpChannelInternal::PROXY_TYPE_UNKNOWN> {};
 
 }  // namespace IPC
 

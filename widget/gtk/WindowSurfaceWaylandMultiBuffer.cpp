@@ -243,8 +243,7 @@ void WindowSurfaceWaylandMB::HandlePartialUpdate(
             mFrontBuffer->GetSize().ToUnknownSize(),
             mFrontBuffer->GetSurfaceFormat(),
             (const uint8_t*)mFrontBuffer->GetImageData(),
-            mFrontBuffer->GetSize().width *
-                BytesPerPixel(mFrontBuffer->GetSurfaceFormat()));
+            mFrontBuffer->GetStride());
     RefPtr<DrawTarget> dt = mInProgressBuffer->Lock();
 
     for (auto iter = copyRegion.RectIter(); !iter.Done(); iter.Next()) {
@@ -278,7 +277,7 @@ void WindowSurfaceWaylandMB::Commit(
     return;
   }
 
-  auto waylandSurface = aWaylandSurfaceLock.GetWaylandSurface();
+  auto waylandSurface = aWaylandSurfaceLock.GetSurface();
   waylandSurface->InvalidateRegionLocked(aWaylandSurfaceLock,
                                          aInvalidRegion.ToUnknownRegion());
   waylandSurface->AttachLocked(aWaylandSurfaceLock, mInProgressBuffer);

@@ -34,6 +34,7 @@
 #include "mozilla/dom/BlobBinding.h"
 #include "mozilla/dom/ContentList.h"
 #include "mozilla/dom/DOMCollectedFramesBinding.h"
+#include "mozilla/dom/DOMMozPromiseRequestHolder.h"
 #include "mozilla/dom/DOMRect.h"
 #include "mozilla/dom/DirectionalityUtils.h"
 #include "mozilla/dom/DocumentInlines.h"
@@ -47,6 +48,7 @@
 #include "mozilla/dom/UserActivation.h"
 #include "mozilla/layers/APZCCallbackHelper.h"
 #include "mozilla/layers/CompositorBridgeChild.h"
+#include "mozilla/layers/ImageBridgeChild.h"
 #include "mozilla/layers/PCompositorBridgeTypes.h"
 #include "mozilla/layers/TouchActionHelper.h"
 #include "mozilla/media/MediaUtils.h"
@@ -61,6 +63,7 @@
 #include "nsFrameManager.h"
 #include "nsGlobalWindowInner.h"
 #include "nsGlobalWindowOuter.h"
+#include "nsHtml5FragmentFastPath.h"
 #include "nsIDocShell.h"
 #include "nsIFrame.h"
 #include "nsIObjectLoadingContent.h"
@@ -424,6 +427,13 @@ nsDOMWindowUtils::GetDocumentMetadata(const nsAString& aName,
 NS_IMETHODIMP
 nsDOMWindowUtils::UpdateLayerTree() {
   FlushLayoutWithoutThrottledAnimations();
+  // Some frames, e.g. those of an OffscreenCanvas or a video, are sent over
+  // ImageBridge rather than in the layer transaction. Make sure they have been
+  // sent before the transaction below, which the compositor waits on.
+  if (RefPtr<layers::ImageBridgeChild> imageBridge =
+          layers::ImageBridgeChild::GetSingleton()) {
+    imageBridge->WaitFlushTasks();
+  }
   if (RefPtr<PresShell> ps = GetPresShell()) {
     nsAutoScriptBlocker scriptBlocker;
     RefPtr renderer = ps->GetWindowRenderer();
@@ -1166,6 +1176,12 @@ nsDOMWindowUtils::GetParsedStyleSheets(uint32_t* aSheets) {
 }
 
 NS_IMETHODIMP
+nsDOMWindowUtils::GetInnerHTMLFastPathCount(uint32_t* aCount) {
+  *aCount = nsHtml5FragmentFastPath::SuccessCount();
+  return NS_OK;
+}
+
+NS_IMETHODIMP
 nsDOMWindowUtils::ActivateNativeMenuItemAt(const nsAString& indexString) {
   // get the widget to send the event to
   nsCOMPtr<nsIWidget> widget = GetWidget();
@@ -1190,6 +1206,17 @@ nsDOMWindowUtils::GetNativeMenuItemKeyEquivalent(const nsAString& aElementId,
   if (!widget) return NS_ERROR_FAILURE;
 
   return widget->GetNativeMenuItemKeyEquivalent(aElementId, aResult);
+}
+
+NS_IMETHODIMP
+nsDOMWindowUtils::GetNativeMenuItemTitle(const nsAString& aElementId,
+                                         nsAString& aResult) {
+  nsCOMPtr<nsIWidget> widget = GetWidget();
+  if (!widget) {
+    return NS_ERROR_FAILURE;
+  }
+
+  return widget->GetNativeMenuItemTitle(aElementId, aResult);
 }
 
 NS_IMETHODIMP
@@ -2432,26 +2459,8 @@ nsDOMWindowUtils::SendContentCommandEvent(const nsAString& aType,
     return NS_ERROR_FAILURE;
   }
 
-  EventMessage msg;
-  if (aType.EqualsLiteral("cut")) {
-    msg = eContentCommandCut;
-  } else if (aType.EqualsLiteral("copy")) {
-    msg = eContentCommandCopy;
-  } else if (aType.EqualsLiteral("paste")) {
-    msg = eContentCommandPaste;
-  } else if (aType.EqualsLiteral("delete")) {
-    msg = eContentCommandDelete;
-  } else if (aType.EqualsLiteral("undo")) {
-    msg = eContentCommandUndo;
-  } else if (aType.EqualsLiteral("redo")) {
-    msg = eContentCommandRedo;
-  } else if (aType.EqualsLiteral("insertText")) {
-    msg = eContentCommandInsertText;
-  } else if (aType.EqualsLiteral("replaceText")) {
-    msg = eContentCommandReplaceText;
-  } else if (aType.EqualsLiteral("pasteTransferable")) {
-    msg = eContentCommandPasteTransferable;
-  } else {
+  EventMessage msg = nsContentUtils::ContentCommandFromString(aType);
+  if (NS_WARN_IF(!msg)) {
     return NS_ERROR_FAILURE;
   }
 
@@ -2638,29 +2647,34 @@ nsDOMWindowUtils::DefaultDevicesRoundTripLatency(Promise** aOutPromise) {
     return err.StealNSResult();
   }
 
-  NS_ADDREF(promise.get());
-  void* p = reinterpret_cast<void*>(promise.get());
-  NS_DispatchBackgroundTask(
-      NS_NewRunnableFunction("DefaultDevicesRoundTripLatency", [p]() {
-        double mean, stddev;
-        bool success =
-            CubebUtils::EstimatedLatencyDefaultDevices(&mean, &stddev);
+  using LatencyPromise = MozPromise<nsTArray<double>, nsresult, true>;
+  auto holder =
+      MakeRefPtr<DOMMozPromiseRequestHolder<LatencyPromise>>(inner->AsGlobal());
+  nsCOMPtr<nsISerialEventTarget> taskQueue;
+  nsresult rv = NS_CreateBackgroundTaskQueue("DefaultDevicesRoundTripLatency",
+                                             getter_AddRefs(taskQueue));
+  NS_ENSURE_SUCCESS(rv, rv);
 
-        NS_DispatchToMainThread(NS_NewRunnableFunction(
-            "DefaultDevicesRoundTripLatency", [p, success, mean, stddev]() {
-              Promise* promise = reinterpret_cast<Promise*>(p);
-              if (!success) {
-                promise->MaybeReject(NS_ERROR_FAILURE);
-                NS_RELEASE(promise);
-                return;
-              }
-              nsTArray<double> a;
-              a.AppendElement(mean);
-              a.AppendElement(stddev);
-              promise->MaybeResolve(a);
-              NS_RELEASE(promise);
-            }));
-      }));
+  InvokeAsync(
+      taskQueue, __func__,
+      []() {
+        double mean, stddev;
+        if (!CubebUtils::EstimatedLatencyDefaultDevices(&mean, &stddev)) {
+          return LatencyPromise::CreateAndReject(NS_ERROR_FAILURE, __func__);
+        }
+        return LatencyPromise::CreateAndResolve(nsTArray<double>{mean, stddev},
+                                                __func__);
+      })
+      ->Then(GetMainThreadSerialEventTarget(), __func__,
+             [holder, promise](LatencyPromise::ResolveOrRejectValue&& aValue) {
+               holder->Complete();
+               if (aValue.IsResolve()) {
+                 promise->MaybeResolve(aValue.ResolveValue());
+               } else {
+                 promise->MaybeReject(aValue.RejectValue());
+               }
+             })
+      ->Track(*holder);
 
   promise.forget(aOutPromise);
   return NS_OK;
@@ -4190,7 +4204,10 @@ nsDOMWindowUtils::GetRefreshDriverHasPendingTick(bool* aResult) {
 }
 
 NS_IMETHODIMP
-nsDOMWindowUtils::EnterChaosMode() {
+nsDOMWindowUtils::EnterChaosMode(uint32_t aFeatures) {
+  if (aFeatures) {
+    ChaosMode::SetChaosFeature(static_cast<ChaosFeature>(aFeatures));
+  }
   ChaosMode::enterChaosMode();
   return NS_OK;
 }

@@ -214,7 +214,7 @@ MOZ_RUNINIT HTMLEditor::AttributeFilter
               (&aAttrName == nsGkAtoms::id || &aAttrName == nsGkAtoms::dir));
         };
 
-HTMLEditor::HTMLEditor(const Document& aDocument)
+HTMLEditor::HTMLEditor(const Document& /*aDocument*/)
     : EditorBase(EditorBase::EditorType::HTML),
       mCRInParagraphCreatesParagraph(false),
       mIsObjectResizingEnabled(
@@ -1815,12 +1815,22 @@ Result<EditActionResult, nsresult> HTMLEditor::HandleTabKeyPressInTable(
     return Err(NS_ERROR_FAILURE);
   }
   // ...so that we can ask for first cell in that row...
-  cell = GetTableCellElementAt(*tblElement, row, 0);
+  const RefPtr<Element> firstEditableRow = [&]() -> Element* {
+    uint32_t colIndex = 0;
+    while (Element* cellInTheRow = GetMaybeGeneratedTableCellElementAt(
+               *tblElement, row, colIndex++)) {
+      if (HTMLEditUtils::IsSimplyEditableNode(*cellInTheRow)) {
+        MOZ_ASSERT(!cellInTheRow->IsInNativeAnonymousSubtree());
+        return cellInTheRow;
+      }
+    }
+    return nullptr;
+  }();
   // ...and then set selection there.  (Note that normally you should use
   // CollapseSelectionToDeepestNonTableFirstChild(), but we know cell is an
   // empty new cell, so this works fine)
-  if (cell) {
-    nsresult rv = CollapseSelectionToStartOf(*cell);
+  if (firstEditableRow) {
+    nsresult rv = CollapseSelectionToStartOf(*firstEditableRow);
     if (NS_FAILED(rv)) {
       NS_WARNING("EditorBase::CollapseSelectionToStartOf() failed");
       return Err(NS_ERROR_EDITOR_DESTROYED);
@@ -4478,7 +4488,12 @@ nsresult HTMLEditor::EnsureNoFollowingUnnecessaryLineBreak(
                          "to delete unnecessary <br>");
     return rv;
   }
-  MOZ_ASSERT(isNewLinePreformatted);
+
+  // FYI: unnecessaryLineBreak is a preformatted linefeed, but
+  // isNewLinePreformatted may be false because aNextOrAfterModifiedPoint may be
+  // before the container element of the text which specifies `white-space` to
+  // `pre-*`.
+
   if (aPreservePreformattedLineBreak == PreservePreformattedLineBreak::Yes) {
     // Do not preserve preformatted linefeed if it's a padding for empty block
     // even if the caller wants to preserve unnecessary preformatted linefeed

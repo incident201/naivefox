@@ -6,12 +6,7 @@
 /**
  * The current SQLite database schema version
  */
-export const CURRENT_SCHEMA_VERSION = 12;
-
-/**
- * The directory that the SQLite database lives in
- */
-export const DB_FOLDER_PATH = PathUtils?.profileDir ?? "./";
+export const CURRENT_SCHEMA_VERSION = 13;
 
 /**
  * The name of the SQLite database file

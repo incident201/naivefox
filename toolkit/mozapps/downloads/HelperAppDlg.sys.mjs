@@ -44,9 +44,15 @@ Integration.downloads.defineESModuleGetter(
  * @return true if we can use the directory, false otherwise.
  */
 function isUsableDirectory(aDirectory) {
-  return (
-    aDirectory.exists() && aDirectory.isDirectory() && aDirectory.isWritable()
-  );
+  try {
+    return (
+      aDirectory.exists() && aDirectory.isDirectory() && aDirectory.isWritable()
+    );
+  } catch (ex) {
+    // These checks can throw instead of returning false, e.g. if the volume
+    // is read-only or disappears in the meantime.
+    return false;
+  }
 }
 
 let gDownloadSavePickerQueues = new WeakMap();
@@ -220,15 +226,19 @@ export class nsUnknownContentTypeDialog {
         null
       );
       /*
-       * There were some concerns that this load might be triggered by an
-       * inital about:blank in the window. This seems unlikely because:
+       * There were some concerns that this event might be triggered by an
+       * initial about:blank in the window. This seems unlikely because:
        * 1. Loading about:blank takes a tick and would therefore be canceled by
        *    a consecutive chrome URI load.
-       * 2. With recent about:blank changes, the load event is fired when we
+       * 2. With recent about:blank changes, the load events are fired when we
        *    determine about:blank to be the navigation target, which isn't the
        *    case here.
        */
-      this.mDialog.addEventListener("load", () => this.initDialog());
+      this.mDialog.addEventListener(
+        "DOMContentLoaded",
+        () => this.initDialog(),
+        { once: true }
+      );
     } catch (ex) {
       // The containing window may have gone away.  Break reference
       // cycles and stop doing the download.
@@ -251,7 +261,7 @@ export class nsUnknownContentTypeDialog {
     if (!this.#log) {
       this.#log = console.createInstance({
         maxLogLevelPref: "toolkit.download.loglevel",
-        prefix: "HelperAppService",
+        logModule: "HelperAppService",
       });
       let info = this.mLauncher.MIMEInfo;
       // primaryExtension can throw if there are no extensions on this mimetype.
@@ -412,7 +422,7 @@ export class nsUnknownContentTypeDialog {
         }
 
         let file = picker.file;
-        if (file) {
+        if (file && isUsableDirectory(file.parent)) {
           // Do not store the last save directory as a pref inside the private browsing mode
           gDownloadLastDir.setFile(aLauncher.source, file.parent);
         }
@@ -457,7 +467,13 @@ export class nsUnknownContentTypeDialog {
       }
       // Don't pop up the downloads panel redundantly.
       aLauncher.saveDestinationAvailable(result, !!result);
-    })().catch(console.error);
+    })().catch(ex => {
+      console.error(ex);
+      // A null destination cancels the download. Without a call to
+      // saveDestinationAvailable() the transfer would keep running in the
+      // background, with no target file and no entry in the downloads panel.
+      aLauncher.saveDestinationAvailable(null);
+    });
   }
 
   getFinalLeafName(aLeafName, aFileExt, aAfterFilePicker) {
@@ -624,16 +640,14 @@ export class nsUnknownContentTypeDialog {
       this.dialogElement("normalBox").collapsed = true;
       // show basic choice
       this.dialogElement("basicBox").collapsed = false;
-      // change button labels and icons; use "save" icon for the accept
-      // button since it's the only action possible
+      // change the accept button label and icon, since saving is the only
+      // action possible
       let acceptButton = dialog.getButton("accept");
-      acceptButton.label = this.dialogElement("strings").getString(
-        "unknownAccept.label"
+      this.mDialog.document.l10n.setAttributes(
+        acceptButton,
+        "unknowncontenttype-accept-save-file"
       );
       acceptButton.setAttribute("icon", "save");
-      dialog.getButton("cancel").label = this.dialogElement(
-        "strings"
-      ).getString("unknownCancel.label");
       // hide other handler
       this.dialogElement("openHandler").collapsed = true;
       // set save as the selected option

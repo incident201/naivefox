@@ -166,6 +166,15 @@ class CorruptedDataError extends InvalidSignatureError {
   }
 }
 
+class CertFetchError extends Error {
+  constructor(cid, x5u, reason) {
+    super(`Cannot fetch certificate chain (${cid}) from '${x5u}': ${reason}`, {
+      cause: reason,
+    });
+    this.name = "CertFetchError";
+  }
+}
+
 class UnknownCollectionError extends Error {
   constructor(cid) {
     super(`Unknown Collection "${cid}"`);
@@ -194,9 +203,7 @@ class AttachmentDownloader extends Downloader {
         return this._client.db.saveAttachment(attachmentId, null);
       },
       deleteMultiple: async attachmentIds => {
-        return this._client.db.saveAttachments(
-          attachmentIds.map(id => [id, null])
-        );
+        return this._client.db.deleteAttachments(attachmentIds);
       },
       prune: async excludeIds => {
         return this._client.db.pruneAttachments(excludeIds);
@@ -284,6 +291,11 @@ export class RemoteSettingsClient extends EventEmitter {
   static get InvalidSignatureError() {
     return InvalidSignatureError;
   }
+
+  static get CertFetchError() {
+    return CertFetchError;
+  }
+
   static get MissingSignatureError() {
     return MissingSignatureError;
   }
@@ -576,10 +588,16 @@ export class RemoteSettingsClient extends EventEmitter {
       }
       if (
         e instanceof RemoteSettingsClient.EmptyDatabaseError &&
-        emptyListFallback
+        (emptyListFallback || lazy.Utils.shouldSkipRemoteActivity)
       ) {
-        // If consumer requested an empty list fallback, no need to raise attention if no data in DB.
+        // If consumer requested an empty list fallback, or if remote activity is
+        // disabled (eg. in tests), no need to raise attention if no data in DB.
         lazy.console.debug(e);
+      } else if (Services.startup.shuttingDown) {
+        lazy.console.debug(
+          `${this.identifier} read interrupted by shutdown`,
+          e
+        );
       } else {
         // Report error, and continue with trying to load the binary dump.
         lazy.console.error(e);
@@ -728,6 +746,7 @@ export class RemoteSettingsClient extends EventEmitter {
     const startedAt = new Date();
     let reportStatus = null;
     let thrownError = null;
+    let ageSeconds;
     try {
       // If network is offline, we can't synchronize.
       if (lazy.Utils.isOffline) {
@@ -777,10 +796,11 @@ export class RemoteSettingsClient extends EventEmitter {
           // we fetch them and validate the signature immediately.
           if (this.verifySignature && lazy.ObjectUtils.isEmpty(localMetadata)) {
             lazy.console.debug(`${this.identifier} pull collection metadata`);
-            const { metadata } = await this._fetchChangeset(
+            let metadata;
+            ({ metadata, ageSeconds } = await this._fetchChangeset(
               expectedTimestamp,
               expectedTimestamp
-            );
+            ));
             await this.db.importChanges(metadata);
             // We don't bother validating the signature if the dump was just loaded. We do
             // if the dump was loaded at some other point (eg. from .get()).
@@ -811,12 +831,12 @@ export class RemoteSettingsClient extends EventEmitter {
           // Local data is either outdated or tampered.
           // In both cases we will fetch changes from server,
           // and make sure we overwrite local data.
-          syncResult = await this._importChanges(
+          ({ syncResult, ageSeconds } = await this._importChanges(
             localRecords,
             collectionLastModified,
             localMetadata,
             expectedTimestamp
-          );
+          ));
           if (sendEvents && this.hasListeners("sync")) {
             // If we have listeners for the "sync" event, then compute the lists of changes.
             // The records imported from the dump should be considered as "created" for the
@@ -867,17 +887,22 @@ export class RemoteSettingsClient extends EventEmitter {
             lazy.console.warn(
               `${this.identifier} Signature verified failed. Retry from scratch`
             );
-            syncResult = await this._importChanges(
+            ({ syncResult, ageSeconds } = await this._importChanges(
               localRecords,
               collectionLastModified,
               localMetadata,
               expectedTimestamp,
               { retry: true }
-            );
+            ));
           } catch (ex) {
-            // If the signature fails again, or if an error occured during wiping out the
-            // local data, then we report it as a *signature retry* error.
-            reportStatus = lazy.UptakeTelemetry.STATUS.SIGNATURE_RETRY_ERROR;
+            // If the certificate chain could not be fetched, we report it as a
+            // *cert fetch* error. If the signature fails again, or if an error
+            // occurred while wiping out the local data, then we report it as a
+            // *signature retry* error.
+            reportStatus =
+              ex instanceof CertFetchError
+                ? lazy.UptakeTelemetry.STATUS.CERTIFICATE_ERROR
+                : lazy.UptakeTelemetry.STATUS.SIGNATURE_RETRY_ERROR;
             throw ex;
           }
         } else {
@@ -947,6 +972,9 @@ export class RemoteSettingsClient extends EventEmitter {
         trigger,
         duration: durationMilliseconds,
       };
+      if (ageSeconds !== undefined) {
+        reportArgs.age = ageSeconds;
+      }
       // In Bug 1617133, we will try to break down specific errors into
       // more precise statuses by reporting the JavaScript error name
       // ("TypeError", etc.) to Telemetry.
@@ -979,6 +1007,10 @@ export class RemoteSettingsClient extends EventEmitter {
    * @returns {Error}
    */
   _adjustedError(e) {
+    if (e instanceof CertFetchError) {
+      // CertFetchError could accidentally match case below.
+      return e;
+    }
     if (/unparseable/.test(e.message)) {
       return new RemoteSettingsClient.ServerContentParseError(e);
     }
@@ -1012,7 +1044,9 @@ export class RemoteSettingsClient extends EventEmitter {
   _telemetryFromError(e, options = { default: null }) {
     let reportStatus = options.default;
 
-    if (e instanceof RemoteSettingsClient.NetworkOfflineError) {
+    if (e instanceof CertFetchError) {
+      reportStatus = lazy.UptakeTelemetry.STATUS.CERTIFICATE_ERROR;
+    } else if (e instanceof RemoteSettingsClient.NetworkOfflineError) {
       reportStatus = lazy.UptakeTelemetry.STATUS.NETWORK_OFFLINE_ERROR;
     } else if (e instanceof lazy.IDBHelpers.ShutdownError) {
       reportStatus = lazy.UptakeTelemetry.STATUS.SHUTDOWN_ERROR;
@@ -1096,7 +1130,7 @@ export class RemoteSettingsClient extends EventEmitter {
         );
         continue;
       }
-      const certChain = await (await lazy.Utils.fetch(x5u)).text();
+      const certChain = await this._fetchCertChain(x5u);
       lazy.console.debug(`${this.identifier} verify signature using ${x5u}`);
 
       if (
@@ -1122,6 +1156,31 @@ export class RemoteSettingsClient extends EventEmitter {
     throw thrownErrors[0] ?? new MissingSignatureError(this.identifier);
   }
 
+  async _fetchCertChain(x5u) {
+    let response;
+    try {
+      response = await lazy.Utils.fetch(x5u);
+    } catch (e) {
+      throw new CertFetchError(this.identifier, x5u, e);
+    }
+    if (!response.ok) {
+      throw new CertFetchError(this.identifier, x5u, `HTTP ${response.status}`);
+    }
+    const contentType = response.headers.get("Content-Type") ?? "";
+    if (!contentType.includes("text/plain")) {
+      throw new CertFetchError(
+        this.identifier,
+        x5u,
+        `Unexpected content-type '${contentType}'`
+      );
+    }
+    try {
+      return await response.text();
+    } catch (e) {
+      throw new CertFetchError(this.identifier, x5u, e);
+    }
+  }
+
   /**
    * This method is in charge of fetching data from server, applying the diff-based
    * changes to the local DB, validating the signature, and computing a synchronization
@@ -1138,6 +1197,8 @@ export class RemoteSettingsClient extends EventEmitter {
    * @param {object} [options]
    * @param {boolean} [options.retry]
    *   Whether this method is called in the retry situation.
+   * @returns {Promise<{syncResult: object, ageSeconds: number}>}
+   *   the synchronization result and the age of the pulled data in seconds.
    */
   async _importChanges(
     localRecords,
@@ -1181,7 +1242,7 @@ export class RemoteSettingsClient extends EventEmitter {
     lazy.console.debug(
       `${this.identifier} Fetch changes from server (expected=${expectedTimestamp}, since=${since})`
     );
-    const { metadata, remoteTimestamp, remoteRecords } =
+    const { metadata, remoteTimestamp, remoteRecords, ageSeconds } =
       await this._fetchChangeset(expectedTimestamp, since);
 
     lazy.console.debug(
@@ -1203,10 +1264,13 @@ export class RemoteSettingsClient extends EventEmitter {
       if (localTrustworthy) {
         lazy.console.info(`${this.identifier} CDN served staled data, ignore.`);
         return {
-          current: localRecords,
-          created: [],
-          updated: [],
-          deleted: [],
+          syncResult: {
+            current: localRecords,
+            created: [],
+            updated: [],
+            deleted: [],
+          },
+          ageSeconds,
         };
       }
       // Otherwise, continue with importing, since we prefer stale data over corrupt/tempered.
@@ -1323,7 +1387,7 @@ export class RemoteSettingsClient extends EventEmitter {
       );
     }
 
-    return syncResult;
+    return { syncResult, ageSeconds };
   }
 
   /**
@@ -1335,9 +1399,8 @@ export class RemoteSettingsClient extends EventEmitter {
   async _fetchChangeset(expectedTimestamp, since) {
     const client = this.httpClient();
     const {
-      metadata,
-      timestamp: remoteTimestamp,
-      changes: remoteRecords,
+      headers,
+      json: { metadata, timestamp: remoteTimestamp, changes: remoteRecords },
     } = await client.execute(
       {
         path: `/buckets/${this.bucketName}/collections/${this.collectionName}/changeset`,
@@ -1347,12 +1410,18 @@ export class RemoteSettingsClient extends EventEmitter {
           _expected: expectedTimestamp,
           _since: since,
         },
+        raw: true,
       }
     );
+    const ageSeconds =
+      (lazy.Utils.serverTimeMillis(headers) - remoteTimestamp) / 1000;
     return {
       remoteTimestamp,
       metadata,
-      remoteRecords,
+      remoteRecords: this.localFields.length
+        ? remoteRecords.map(r => this._cleanLocalFields(r))
+        : remoteRecords,
+      ageSeconds,
     };
   }
 

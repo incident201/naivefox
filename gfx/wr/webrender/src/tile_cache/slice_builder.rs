@@ -553,6 +553,8 @@ fn create_tile_cache(
     //         (b) Box-shadow or image-mask clips
     //         (c) More than one rounded-rect clip (unless they can be intersected
     //             into a single rounded-rect clip).
+    //         (d) Clips in a preserve-3d context, which apply in the plane of
+    //             their element rather than when compositing.
     let mut shared_clip_node_id = shared_clip_node_id.unwrap_or(ClipNodeId::NONE);
     let mut current_node_id = shared_clip_node_id;
     let mut rounded_rect_count = 0;
@@ -573,13 +575,16 @@ fn create_tile_cache(
         let node = clip_tree_builder.get_node(current_node_id);
         let clip_node_data = &clips[node.handle];
 
-        // Check if this clip is in the root coord system (i.e. is axis-aligned with tile-cache)
-        let is_rcs = spatial_tree.is_root_coord_system(node.spatial_node_index);
+        // Check if this clip is in the root coord system (i.e. is axis-aligned with tile-cache),
+        // outside any preserve-3d context
+        let is_rcs = spatial_tree.is_root_coord_system(node.spatial_node_index) &&
+            !spatial_tree.is_in_preserve_3d_context(node.spatial_node_index);
 
         let node_valid = if is_rcs {
-            match clip_node_data.key.kind {
+            match clip_node_data.kind {
                 ClipItemKeyKind::ImageMask(..) |
                 ClipItemKeyKind::Path(..) |
+                ClipItemKeyKind::Border(_) |
                 ClipItemKeyKind::Rectangle(ClipMode::ClipOut) |
                 ClipItemKeyKind::RoundedRectangle(_, _, ClipMode::ClipOut) => {
                     // Has an image-mask or clip-out clip, we can't handle this as a shared clip
@@ -610,7 +615,8 @@ fn create_tile_cache(
                 }
             }
         } else {
-            // Has a complex transform, we can't handle this as a shared clip
+            // Has a complex transform or is in a preserve-3d context, we can't
+            // handle this as a shared clip
             false
         };
 
@@ -622,7 +628,7 @@ fn create_tile_cache(
                 // correct spatial transforms is performed in pre_update; here we just
                 // verify the clips are geometrically compatible in their local spaces
                 // to decide whether to keep both in the shared clip chain.
-                let can_combine = match (accumulated_rounded_rect, clip_node_data.key.kind) {
+                let can_combine = match (accumulated_rounded_rect, clip_node_data.kind) {
                     (
                         Some((acc_rect, acc_radius)),
                         ClipItemKeyKind::RoundedRectangle(radius, _, ClipMode::Clip),
@@ -647,7 +653,7 @@ fn create_tile_cache(
                     // Can't combine, drop children and keep only this clip.
                     shared_clip_node_id = current_node_id;
                     rounded_rect_count = 1;
-                    if let ClipItemKeyKind::RoundedRectangle(radius, _, ClipMode::Clip) = clip_node_data.key.kind {
+                    if let ClipItemKeyKind::RoundedRectangle(radius, _, ClipMode::Clip) = clip_node_data.kind {
                         let radius = clamped_radius(&BorderRadius::from(radius), node.unsnapped_clip_rect.size());
                         accumulated_rounded_rect = Some((node.unsnapped_clip_rect, radius));
                     }

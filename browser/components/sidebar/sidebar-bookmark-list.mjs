@@ -42,6 +42,8 @@ let activeDropList = null;
  * @property {boolean} [isPlaceContainer]
  * @property {boolean} [isTagContainer]
  * @property {boolean} [isTagsRoot]
+ * @property {string} [targetFolderGuid]
+ *   For a folder shortcut, the guid of the folder it points to.
  */
 
 export class SidebarBookmarkList extends SidebarTabList {
@@ -237,6 +239,8 @@ export class SidebarBookmarkList extends SidebarTabList {
           @auxclick=${e => this.#onFolderAuxClick(e, tabItem.guid)}
           @mouseenter=${e => this.#updateFolderTooltip(e, title)}
           .guid=${tabItem.guid}
+          .targetFolderGuid=${tabItem.targetFolderGuid}
+          .uri=${tabItem.uri}
         >
           <span
             class="bookmark-folder-title text-truncated-ellipsis"
@@ -252,6 +256,8 @@ export class SidebarBookmarkList extends SidebarTabList {
           @toggle=${e => this.#onFolderToggle(e, tabItem.guid)}
           data-folder-kind=${ifDefined(folderKind)}
           .guid=${tabItem.guid}
+          .targetFolderGuid=${tabItem.targetFolderGuid}
+          .uri=${tabItem.uri}
         >
           <summary
             draggable="true"
@@ -279,7 +285,8 @@ export class SidebarBookmarkList extends SidebarTabList {
               secondaryActionClass="delete-button"
               .tabItems=${tabItem.children}
               .expandedFolderGuids=${this.expandedFolderGuids}
-              .readOnly=${this.readOnly || !!tabItem.isPlaceContainer}
+              .readOnly=${this.readOnly ||
+              (tabItem.isPlaceContainer && !tabItem.targetFolderGuid)}
               @fxview-tab-list-primary-action=${this.onPrimaryAction}
               @fxview-tab-list-secondary-action=${this.onSecondaryAction}
             >
@@ -301,8 +308,6 @@ export class SidebarBookmarkList extends SidebarTabList {
         .guid=${ifDefined(tabItem.guid)}
         .hasPopup=${this.hasPopup}
         .indicators=${tabItem.indicators}
-        .primaryL10nArgs=${ifDefined(tabItem.primaryL10nArgs)}
-        .primaryL10nId=${tabItem.primaryL10nId}
         role="treeitem"
         aria-level=${this.level}
         aria-posinset=${i + 1}
@@ -464,6 +469,7 @@ export class SidebarBookmarkList extends SidebarTabList {
           return {
             element: details,
             guid: details.guid,
+            targetFolderGuid: details.targetFolderGuid,
             orientation,
             isFolder: true,
           };
@@ -480,7 +486,13 @@ export class SidebarBookmarkList extends SidebarTabList {
         } else {
           orientation = DROP_ON;
         }
-        return { element: el, guid: el.guid, orientation, isFolder: true };
+        return {
+          element: el,
+          guid: el.guid,
+          targetFolderGuid: el.targetFolderGuid,
+          orientation,
+          isFolder: true,
+        };
       }
       if (el.classList?.contains("bookmark-separator") && el.guid) {
         const rect = el.getBoundingClientRect();
@@ -659,6 +671,8 @@ export class SidebarBookmarkList extends SidebarTabList {
     if (
       !target ||
       target.guid === this.#draggedGuid ||
+      (target.targetFolderGuid &&
+        target.targetFolderGuid === this.#draggedGuid) ||
       this.#isFixedSortFolderTarget(target)
     ) {
       this.#cleanupIndicator();
@@ -689,6 +703,7 @@ export class SidebarBookmarkList extends SidebarTabList {
       return {
         element: parentDetails,
         guid: parentDetails.guid,
+        targetFolderGuid: parentDetails.targetFolderGuid,
         orientation: DROP_ON,
         isFolder: true,
       };
@@ -698,10 +713,12 @@ export class SidebarBookmarkList extends SidebarTabList {
 
   // A query folder (Recently Bookmarked, Recent Tags, or a tag container) has
   // a forced sort order, so we can't drop into it. Such folders are the only
-  // ones tagged with `data-folder-kind`.
+  // ones tagged with `data-folder-kind`, apart from folder shortcuts, which
+  // accept drops on behalf of the folder they point to.
   #isFixedSortFolderTarget(target) {
     return (
       target.isFolder &&
+      !target.targetFolderGuid &&
       target.orientation === DROP_ON &&
       !!target.element?.dataset?.folderKind
     );
@@ -805,7 +822,7 @@ export class SidebarBookmarkList extends SidebarTabList {
     let insertionPoint;
     if (target.orientation === DROP_ON) {
       insertionPoint = {
-        guid: target.guid,
+        guid: target.targetFolderGuid ?? target.guid,
         isTag: false,
         getIndex: async () => lazy.PlacesUtils.bookmarks.DEFAULT_INDEX,
       };
@@ -846,9 +863,5 @@ export class SidebarBookmarkList extends SidebarTabList {
 }
 customElements.define("sidebar-bookmark-list", SidebarBookmarkList);
 
-export class SidebarBookmarkRow extends SidebarTabRow {
-  get tooltipText() {
-    return this.url ? `${this.title}\n${this.url}` : null;
-  }
-}
+export class SidebarBookmarkRow extends SidebarTabRow {}
 customElements.define("sidebar-bookmark-row", SidebarBookmarkRow);

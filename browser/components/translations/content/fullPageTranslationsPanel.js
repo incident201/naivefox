@@ -225,7 +225,7 @@ var FullPageTranslationsPanel = new (class {
       try {
         this.#console = console.createInstance({
           maxLogLevelPref: "browser.translations.logLevel",
-          prefix: "Translations",
+          logModule: "Translations",
         });
       } catch {
         // The console may not be initialized yet.
@@ -1482,7 +1482,11 @@ var FullPageTranslationsPanel = new (class {
       return;
     }
 
-    if (TranslationsParent.isFullPageTranslationsRestrictedForPage(gBrowser)) {
+    if (
+      TranslationsParent.isFullPageTranslationsRestrictedForPage(
+        gBrowser.selectedBrowser
+      )
+    ) {
       this.buttonElements.button.hidden = true;
     } else if (!TranslationsFeature.isEnabled) {
       // When the Translations feature is disabled, no actor instance is created, therefore no
@@ -1543,19 +1547,6 @@ var FullPageTranslationsPanel = new (class {
           case "full-page-translations-panel-to-menupopup":
             this.onChangeToLanguage(event);
             break;
-          case "full-page-translations-panel-restore-button":
-            this.onRestore(event);
-            break;
-          case "full-page-translations-panel-cancel":
-          case "full-page-translations-panel-dismiss-error":
-            this.onCancel(event);
-            break;
-          case "full-page-translations-panel-translate":
-            this.onTranslate(event);
-            break;
-          case "full-page-translations-panel-change-source-language":
-            this.onChangeSourceLanguage(event);
-            break;
         }
         break;
       }
@@ -1564,6 +1555,23 @@ var FullPageTranslationsPanel = new (class {
           case "full-page-translations-panel-intro-learn-more-link":
           case "full-page-translations-panel-unsupported-learn-more-link":
             this.onLearnMoreLink();
+            break;
+          case "full-page-translations-panel-restore-button":
+            this.handlePanelButtonEvent(event);
+            this.onRestore(event);
+            break;
+          case "full-page-translations-panel-cancel":
+          case "full-page-translations-panel-dismiss-error":
+            this.handlePanelButtonEvent(event);
+            this.onCancel(event);
+            break;
+          case "full-page-translations-panel-translate":
+            this.handlePanelButtonEvent(event);
+            this.onTranslate(event);
+            break;
+          case "full-page-translations-panel-change-source-language":
+            this.handlePanelButtonEvent(event);
+            this.onChangeSourceLanguage(event);
             break;
           default:
             this.handlePanelButtonEvent(event);
@@ -1640,6 +1648,10 @@ var FullPageTranslationsPanel = new (class {
         if (
           // Only show the button if the Translations feature is enabled.
           TranslationsFeature.isEnabled &&
+          // Full-Page Translations is allowed for this page.
+          !TranslationsParent.isFullPageTranslationsRestrictedForPage(
+            gBrowser.selectedBrowser
+          ) &&
           // We've already requested to translate this page, so always show the icon.
           (requestedLanguagePair ||
             // There was an error translating, so always show the icon. This can happen

@@ -48,10 +48,12 @@ header_skiplist:
   - memory/build/malloc_decls.h
   - memory/mozalloc/cxxalloc.h
   - memory/mozalloc/mozalloc.h
+  - mfbt/zmij/zmij.h
   - modules/libpref/init/StaticPrefListBegin.h
   - modules/libpref/init/StaticPrefListEnd.h
   - mozglue/baseprofiler/public/BaseProfilerMarkersDetail.h
   - netwerk/socket/neqo_glue/NeqoHttp3Conn.h
+  - parser/html/nsHtml5PortabilityHSupplement.h
   - parser/html/nsHtml5TokenizerCppSupplement.h
   - parser/html/nsHtml5TokenizerHSupplement.h
   - parser/html/nsHtml5TreeBuilderCppSupplement.h

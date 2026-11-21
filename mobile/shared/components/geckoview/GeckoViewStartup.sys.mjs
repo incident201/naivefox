@@ -12,7 +12,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
   DoHController: "moz-src:///toolkit/components/doh/DoHController.sys.mjs",
   EventDispatcher: "resource://gre/modules/Messaging.sys.mjs",
   PdfJs: "resource://pdf.js/PdfJs.sys.mjs",
-  GeckoViewPreferences: "resource://gre/modules/GeckoViewPreferences.sys.mjs",
+  GeckoViewPreferences:
+    "moz-src:///mobile/shared/components/geckoview/GeckoViewPreferences.sys.mjs",
 });
 
 const { debug, warn } = GeckoViewUtils.initLogging("Startup");
@@ -259,6 +260,7 @@ export class GeckoViewStartup {
             ged: [
               "GeckoView:IPProtection:Init",
               "GeckoView:IPProtection:Uninit",
+              "GeckoView:IPProtection:AuthStateChanged",
               "GeckoView:IPProtection:IPProtectionService:GetState",
               "GeckoView:IPProtection:IPPProxyManager:GetState",
               "GeckoView:IPProtection:Activate",
@@ -273,6 +275,7 @@ export class GeckoViewStartup {
             module: "resource://gre/modules/ChildCrashHandler.sys.mjs",
             observers: [
               "compositor:process-aborted",
+              "gmp-plugin-crash",
               "ipc:content-created",
               "ipc:content-shutdown",
               "process-type-set",

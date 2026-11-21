@@ -15,7 +15,6 @@ import kotlinx.coroutines.test.runTest
 import mozilla.appservices.fxaclient.DeviceCapability as RustDeviceCapability
 import mozilla.appservices.fxaclient.FxaConfig
 import mozilla.appservices.fxaclient.FxaEvent
-import mozilla.appservices.fxaclient.FxaRustAuthState
 import mozilla.appservices.fxaclient.FxaServer
 import mozilla.appservices.fxaclient.FxaState
 import mozilla.components.concept.base.crash.CrashReporting
@@ -298,7 +297,7 @@ class FxaAccountManagerTest {
         fxaManager.start()
 
         whenever(account.processEvent(any()))
-            .thenReturn(FxaState.Authenticating("https://test-oauth.example.com/", FxaRustAuthState.CONNECTED))
+            .thenReturn(FxaState.Authenticating("https://test-oauth.example.com/", FxaState.Connected))
         fxaManager.beginAuthentication(service = FxaService.Sync.identifier, entrypoint = entryPoint)
 
         whenever(account.processEvent(any())).thenReturn(FxaState.Connected)
@@ -315,9 +314,9 @@ class FxaAccountManagerTest {
 
         fxaManager.finishEmailAuthentication(AuthType.Signin)
 
-        val deviceConfig = argumentCaptor<DeviceConfig>()
-        verify(fxaManager.testableStorageWrapper.deviceConstellation).finalizeDevice(deviceConfig.capture())
-        assertEquals(emptySet(), deviceConfig.value.capabilities)
+        val capabilitiesCaptor = argumentCaptor<Set<DeviceCapability>>()
+        verify(fxaManager.testableStorageWrapper.deviceConstellation).ensureCapabilities(capabilitiesCaptor.capture())
+        assertEquals(emptySet(), capabilitiesCaptor.value)
     }
 
     @Test
@@ -328,9 +327,9 @@ class FxaAccountManagerTest {
 
         fxaManager.finishEmailAuthentication(AuthType.Signin)
 
-        val configCaptor = argumentCaptor<DeviceConfig>()
-        verify(fxaManager.testableStorageWrapper.deviceConstellation).finalizeDevice(configCaptor.capture())
-        assertEquals(testDeviceCapabilities, configCaptor.value.capabilities)
+        val capabilitiesCaptor = argumentCaptor<Set<DeviceCapability>>()
+        verify(fxaManager.testableStorageWrapper.deviceConstellation).ensureCapabilities(capabilitiesCaptor.capture())
+        assertEquals(testDeviceCapabilities, capabilitiesCaptor.value)
     }
 
     @Test
@@ -359,7 +358,7 @@ class FxaAccountManagerTest {
 
             val eventCaptor = argumentCaptor<FxaEvent>()
             whenever(account.processEvent(eventCaptor.capture()))
-                .thenReturn(FxaState.Authenticating("https://test-oauth.example.com/", FxaRustAuthState.CONNECTED))
+                .thenReturn(FxaState.Authenticating("https://test-oauth.example.com/", FxaState.Connected))
 
             // when we call begin auth with scopes and service defined
             fxaManager.beginAuthentication(
@@ -399,7 +398,7 @@ class FxaAccountManagerTest {
 
             val eventCaptor = argumentCaptor<FxaEvent>()
             whenever(account.processEvent(eventCaptor.capture()))
-                .thenReturn(FxaState.Authenticating("https://test-oauth.example.com/", FxaRustAuthState.CONNECTED))
+                .thenReturn(FxaState.Authenticating("https://test-oauth.example.com/", FxaState.Connected))
 
             // when we call begin auth with scopes and service defined
             val syncScopes = FxaService.Sync.requiredScopes.map { it.value }
@@ -433,7 +432,7 @@ class FxaAccountManagerTest {
         fxaManager.start()
 
         whenever(account.processEvent(any()))
-            .thenReturn(FxaState.Authenticating("https://test-oauth.example.com/", FxaRustAuthState.CONNECTED))
+            .thenReturn(FxaState.Authenticating("https://test-oauth.example.com/", FxaState.Connected))
         fxaManager.beginAuthentication(
             pairingUrl = "http://test-oauth/example.com/pairing",
             entrypoint = entryPoint,
@@ -454,10 +453,10 @@ class FxaAccountManagerTest {
 
         fxaManager.finishPairingAuthentication(AuthType.Pairing)
 
-        val configCaptor = argumentCaptor<DeviceConfig>()
-        verify(fxaManager.testableStorageWrapper.deviceConstellation).finalizeDevice(configCaptor.capture())
+        val capabilitiesCaptor = argumentCaptor<Set<DeviceCapability>>()
+        verify(fxaManager.testableStorageWrapper.deviceConstellation).ensureCapabilities(capabilitiesCaptor.capture())
 
-        assertEquals(emptySet(), configCaptor.value.capabilities)
+        assertEquals(emptySet(), capabilitiesCaptor.value)
     }
 
     @Test
@@ -468,9 +467,9 @@ class FxaAccountManagerTest {
 
         fxaManager.finishPairingAuthentication(AuthType.Pairing)
 
-        val configCaptor = argumentCaptor<DeviceConfig>()
-        verify(fxaManager.testableStorageWrapper.deviceConstellation).finalizeDevice(configCaptor.capture())
-        assertEquals(testDeviceCapabilities, configCaptor.value.capabilities)
+        val capabilitiesCaptor = argumentCaptor<Set<DeviceCapability>>()
+        verify(fxaManager.testableStorageWrapper.deviceConstellation).ensureCapabilities(capabilitiesCaptor.capture())
+        assertEquals(testDeviceCapabilities, capabilitiesCaptor.value)
     }
 
     @Test
@@ -518,7 +517,7 @@ class FxaAccountManagerTest {
         fxaManager.start()
 
         whenever(account.processEvent(any()))
-            .thenReturn(FxaState.Authenticating("https://test-oauth.example.com/", FxaRustAuthState.CONNECTED))
+            .thenReturn(FxaState.Authenticating("https://test-oauth.example.com/", FxaState.Connected))
         fxaManager.beginAuthentication(service = FxaService.Sync.identifier, entrypoint = entryPoint)
 
         // Simulate the fxa client moving to the `Disconnected` state after `finishAuthentication()` is called.
@@ -562,7 +561,7 @@ class FxaAccountManagerTest {
 
         fxaManager.start()
 
-        verify(fxaManager.testableStorageWrapper.deviceConstellation, never()).finalizeDevice(any())
+        verify(fxaManager.testableStorageWrapper.deviceConstellation, never()).ensureCapabilities(any())
     }
 
     @Test
@@ -607,7 +606,7 @@ class FxaAccountManagerTest {
         fxaManager.start()
 
         whenever(account.processEvent(any()))
-            .thenReturn(FxaState.Authenticating("https://test-oauth.example.com/", FxaRustAuthState.CONNECTED))
+            .thenReturn(FxaState.Authenticating("https://test-oauth.example.com/", FxaState.Connected))
         fxaManager.beginAuthentication(service = FxaService.Sync.identifier, entrypoint = entryPoint)
 
         whenever(account.processEvent(any())).thenReturn(FxaState.Connected)
@@ -637,7 +636,7 @@ class FxaAccountManagerTest {
         fxaManager.start()
 
         whenever(account.processEvent(any()))
-            .thenReturn(FxaState.Authenticating("https://test-oauth.example.com/", FxaRustAuthState.CONNECTED))
+            .thenReturn(FxaState.Authenticating("https://test-oauth.example.com/", FxaState.Connected))
         fxaManager.beginAuthentication(service = FxaService.Sync.identifier, entrypoint = entryPoint)
 
         whenever(account.processEvent(any())).thenReturn(FxaState.Connected)
@@ -667,7 +666,7 @@ class FxaAccountManagerTest {
         whenever(account.processEvent(any())).thenReturn(FxaState.Disconnected)
         fxaManager.start()
         whenever(account.processEvent(any()))
-            .thenReturn(FxaState.Authenticating("https://test-oauth.example.com/", FxaRustAuthState.CONNECTED))
+            .thenReturn(FxaState.Authenticating("https://test-oauth.example.com/", FxaState.Connected))
         fxaManager.beginAuthentication(service = FxaService.Sync.identifier, entrypoint = entryPoint)
         whenever(account.processEvent(any())).thenReturn(FxaState.Connected)
         fxaManager.finishAuthentication(FxaAuthData(AuthType.Signin, "test-code", "test-auth-state"))
@@ -702,7 +701,7 @@ class FxaAccountManagerTest {
         whenever(account.processEvent(any())).thenReturn(FxaState.Disconnected)
         fxaManager.start()
         whenever(account.processEvent(any()))
-            .thenReturn(FxaState.Authenticating("https://test-oauth.example.com/", FxaRustAuthState.CONNECTED))
+            .thenReturn(FxaState.Authenticating("https://test-oauth.example.com/", FxaState.Connected))
         fxaManager.beginAuthentication(service = FxaService.Sync.identifier, entrypoint = entryPoint)
         whenever(account.processEvent(any())).thenReturn(FxaState.Connected)
         fxaManager.finishAuthentication(FxaAuthData(AuthType.Signin, "test-code", "test-auth-state"))
@@ -737,7 +736,7 @@ class FxaAccountManagerTest {
         whenever(account.processEvent(any())).thenReturn(FxaState.Disconnected)
         fxaManager.start()
         whenever(account.processEvent(any()))
-            .thenReturn(FxaState.Authenticating("https://test-oauth.example.com/", FxaRustAuthState.CONNECTED))
+            .thenReturn(FxaState.Authenticating("https://test-oauth.example.com/", FxaState.Connected))
         fxaManager.beginAuthentication(service = FxaService.Sync.identifier, entrypoint = entryPoint)
         whenever(account.processEvent(any())).thenReturn(FxaState.Connected)
         fxaManager.finishAuthentication(FxaAuthData(AuthType.Signin, "test-code", "test-auth-state"))
@@ -768,7 +767,7 @@ class FxaAccountManagerTest {
         fxaManager.start()
 
         whenever(account.processEvent(any()))
-            .thenReturn(FxaState.Authenticating("https://test-oauth.example.com/", FxaRustAuthState.CONNECTED))
+            .thenReturn(FxaState.Authenticating("https://test-oauth.example.com/", FxaState.Connected))
         fxaManager.beginAuthentication(service = FxaService.Sync.identifier, entrypoint = entryPoint)
 
         whenever(account.processEvent(any())).thenReturn(FxaState.Connected)
@@ -792,9 +791,9 @@ class FxaAccountManagerTest {
 
         fxaManager.encounteredAuthError("fake operation", 1)
 
-        val configCaptor = argumentCaptor<DeviceConfig>()
-        verify(fxaManager.testableStorageWrapper.deviceConstellation).finalizeDevice(configCaptor.capture())
-        assertEquals(testDeviceCapabilities, configCaptor.value.capabilities)
+        val capabilitiesCaptor = argumentCaptor<Set<DeviceCapability>>()
+        verify(fxaManager.testableStorageWrapper.deviceConstellation).ensureCapabilities(capabilitiesCaptor.capture())
+        assertEquals(testDeviceCapabilities, capabilitiesCaptor.value)
     }
 
     @Test
@@ -816,7 +815,7 @@ class FxaAccountManagerTest {
         fxaManager.start()
 
         whenever(account.processEvent(any()))
-            .thenReturn(FxaState.Authenticating("https://test-oauth.example.com/", FxaRustAuthState.CONNECTED))
+            .thenReturn(FxaState.Authenticating("https://test-oauth.example.com/", FxaState.Connected))
         fxaManager.beginAuthentication(service = FxaService.Sync.identifier, entrypoint = entryPoint)
 
         whenever(account.processEvent(any())).thenReturn(FxaState.Connected)
@@ -960,7 +959,7 @@ class FxaAccountManagerTest {
         whenever(account.processEvent(any())).thenReturn(FxaState.Disconnected)
         start()
         whenever(account.processEvent(any()))
-            .thenReturn(FxaState.Authenticating("https://test-oauth.example.com/", FxaRustAuthState.CONNECTED))
+            .thenReturn(FxaState.Authenticating("https://test-oauth.example.com/", FxaState.Connected))
         beginAuthentication(
             service = FxaService.Sync.identifier,
             entrypoint = entryPoint,
@@ -974,7 +973,7 @@ class FxaAccountManagerTest {
         whenever(account.processEvent(any())).thenReturn(FxaState.Disconnected)
         start()
         whenever(account.processEvent(any()))
-            .thenReturn(FxaState.Authenticating("https://test-oauth.example.com/", FxaRustAuthState.CONNECTED))
+            .thenReturn(FxaState.Authenticating("https://test-oauth.example.com/", FxaState.Connected))
         beginAuthentication(
             service = FxaService.Sync.identifier,
             pairingUrl = "http://test-oauth/example.com/pairing",

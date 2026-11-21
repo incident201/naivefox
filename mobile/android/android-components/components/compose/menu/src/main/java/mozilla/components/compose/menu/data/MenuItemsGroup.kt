@@ -4,13 +4,14 @@
 
 package mozilla.components.compose.menu.data
 
-/** Group of menu items to be shown in a [Menu]. */
+import mozilla.components.compose.base.text.Text
+
+/** Group of menu items to be shown in a `Menu`. */
 sealed class MenuItemsGroup {
     abstract val id: String
     abstract val items: List<MenuItem>
     abstract val isSticky: Boolean
-    abstract val isDisabled: Boolean
-    abstract val isHidden: Boolean
+    abstract val name: Text?
 
     /**
      * A group of menu items shown as a vertical list.
@@ -18,13 +19,13 @@ sealed class MenuItemsGroup {
      * @property id A unique identifier for this group.
      * @property items The items to show in this group.
      * @property isSticky Whether this group should be sticky at the top or bottom of the menu.
+     * @property name Name of this group, read by accessibility services before the names of its items.
      */
     data class Row(
         override val id: String,
         override val items: List<MenuItem>,
         override val isSticky: Boolean = false,
-        override val isDisabled: Boolean = false,
-        override val isHidden: Boolean = false,
+        override val name: Text? = null,
     ) : MenuItemsGroup()
 
     /**
@@ -33,12 +34,14 @@ sealed class MenuItemsGroup {
      * @property id A unique identifier for this group.
      * @property items The items to show in this group.
      * @property isSticky Whether this group should be sticky at the top or bottom of the menu.
+     * @property name Name of this group, read by accessibility services before the names of its items.
+     * @property showTitles Whether the titles of the items are shown below their icons. Sticky groups never show them.
      */
     data class Grid(
         override val id: String,
         override val items: List<MenuItem>,
         override val isSticky: Boolean = false,
-        override val isDisabled: Boolean = false,
-        override val isHidden: Boolean = false,
+        override val name: Text? = null,
+        val showTitles: Boolean = true,
     ) : MenuItemsGroup()
 }

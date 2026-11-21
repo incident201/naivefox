@@ -9,6 +9,7 @@ import android.content.Intent
 import android.speech.RecognizerIntent
 import androidx.annotation.VisibleForTesting
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -17,9 +18,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -93,8 +94,6 @@ internal class HomeToolbarComposable(
     private val searchSuggestionsContent: @Composable (Modifier) -> Unit,
     private val navigationBarContent: (@Composable () -> Unit)?,
 ) : FenixHomeToolbar {
-    private val addressBarVisibility = mutableStateOf(true)
-
     init {
         // Reset the toolbar visibility & position whenever coming back to the home screen
         // like after changing the toolbar position in settings.
@@ -104,21 +103,12 @@ internal class HomeToolbarComposable(
     @Composable
     private fun DefaultToolbar() {
         val isSearching = toolbarStore.observeAsComposableState { it.isEditMode() }.value
-        val queryWasPrefilled =
-            toolbarStore
-                .observeAsComposableState {
-                    it.editState.queryWasPrefilled
-                }
-                .value
-        val currentQuery = toolbarStore.observeAsComposableState { it.editState.query.current }.value
+        val isSearchActive = appStore.observeAsComposableState { it.searchState.isSearchActive }.value
         val isPrivateMode = browsingModeManager.mode.isPrivate
-        val isUniversalEdgeToEdge = settings.enableUniversalEdgeToEdgeWallpapers
-        val hasWallpaperBackground =
-            hasWallpaperBackground(appStore = appStore, settings = settings, isPrivateMode = isPrivateMode)
         // Tint the browser action icons outside the address bar (tab counter, menu) with the
         // wallpaper's text color. The page actions inside the address bar (e.g. voice search) keep
-        // the default color so they stay legible on the address bar background. Universal only.
-        val wallpaperTextColor = WallpaperTheme.onWallpaper.takeIf { isUniversalEdgeToEdge && hasWallpaperBackground }
+        // the default color so they stay legible on the address bar background.
+        val wallpaperTextColor = WallpaperTheme.onWallpaper.takeIf { !isPrivateMode }
 
         BackInvokedHandler(isSearching) {
             val sourceTabId = appStore.state.searchState.sourceTabId
@@ -130,22 +120,31 @@ internal class HomeToolbarComposable(
         }
 
         FirefoxTheme {
-            MaterialTheme(
-                colorScheme =
-                    homepageToolbarColors(
-                        isPrivateMode = isPrivateMode,
-                        shouldUseEdgeToEdgeColors =
-                            hasWallpaperBackground &&
-                                if (settings.enableHomepageTrendingRecentSearch) {
-                                    !isSearching
-                                } else {
-                                    !isSearching || (currentQuery.isEmpty() && !queryWasPrefilled)
-                                },
-                    )
-            ) {
+            MaterialTheme(colorScheme = toolbarColors(isSearching = isSearchActive)) {
                 ToolbarContent(wallpaperTextColor = wallpaperTextColor)
             }
         }
+    }
+
+    /** Colors of the toolbar and of the search screen shown together with it. */
+    @Composable
+    private fun toolbarColors(isSearching: Boolean): ColorScheme {
+        val queryWasPrefilled =
+            toolbarStore
+                .observeAsComposableState {
+                    it.editState.queryWasPrefilled
+                }
+                .value
+        val currentQuery = toolbarStore.observeAsComposableState { it.editState.query.current }.value
+        return homepageToolbarColors(
+            isPrivateMode = browsingModeManager.mode.isPrivate,
+            shouldUseEdgeToEdgeColors =
+                if (settings.enableHomepageTrendingRecentSearch) {
+                    !isSearching
+                } else {
+                    !isSearching || (currentQuery.isEmpty() && !queryWasPrefilled)
+                },
+        )
     }
 
     @Composable
@@ -158,7 +157,9 @@ internal class HomeToolbarComposable(
                 settings.shouldShowTabStripAtTop
             }
         }
-        val isTabStripAtBottom = remember { shouldUseBottomToolbar && settings.shouldShowTabStripAtBottom }
+        val isSearchActive = appStore.observeAsComposableState { it.searchState.isSearchActive }.value
+        val isTabStripAtBottom =
+            remember { shouldUseBottomToolbar && settings.shouldShowTabStripAtBottom } && !isSearchActive
 
         Column(
             modifier =
@@ -191,19 +192,18 @@ internal class HomeToolbarComposable(
 
     @Composable
     private fun ColumnScope.AddressBar(wallpaperTextColor: Color?) {
-        val isAddressBarVisible = remember { addressBarVisibility }
-        val hasBottomStrip = remember {
-            settings.shouldUseBottomToolbar &&
-                (settings.shouldShowTabStripAtBottom || settings.shouldShowTabGroupsStrip)
-        }
+        val isSearchActive = appStore.observeAsComposableState { it.searchState.isSearchActive }.value
+        val isMiddleSearchEnabled = settings.isHomepageMiddleSearchEnabled
+        val isEditMode = toolbarStore.observeAsComposableState { it.isEditMode() }.value
+        val isAddressBarShown = !isMiddleSearchEnabled || (isSearchActive && isEditMode)
 
         Box {
-            if (settings.isHomepageMiddleSearchEnabled) {
+            if (isMiddleSearchEnabled) {
                 BrowserSimpleToolbar(toolbarStore, appStore)
             }
 
             this@AddressBar.AnimatedVisibility(
-                visible = isAddressBarVisible.value || appStore.state.searchState.isSearchActive,
+                visible = isAddressBarShown,
                 enter =
                     fadeIn(
                         animationSpec =
@@ -212,36 +212,50 @@ internal class HomeToolbarComposable(
                                 easing = Easing { fraction -> fraction * fraction },
                             )
                     ),
-                exit =
-                    fadeOut(
-                        animationSpec =
-                            tween(
-                                durationMillis = 250,
-                                easing = Easing { fraction -> 1f - (1f - fraction) * (1f - fraction) },
-                            )
-                    ),
+                exit = addressBarExitTransition(isMiddleSearchEnabled),
             ) {
-                BrowserToolbar(
-                    store = toolbarStore,
-                    browserActionsColor = wallpaperTextColor,
-                    showDivider = !hasBottomStrip,
-                )
+                // AnimatedVisibility keeps its content for a frame or more after being hidden, even without an exit
+                // transition, during which the address bar would show over the homepage in its display mode. With the
+                // middle search bar, it is therefore removed right away instead.
+                if (isAddressBarShown) {
+                    BrowserToolbar(
+                        store = toolbarStore,
+                        browserActionsColor = wallpaperTextColor,
+                        showDivider = false,
+                    )
+                }
             }
         }
     }
+
+    // With the middle search bar, the address bar is hidden right away when the search ends, rather than fading out
+    // over the homepage.
+    private fun addressBarExitTransition(isMiddleSearchEnabled: Boolean): ExitTransition =
+        if (isMiddleSearchEnabled) {
+            ExitTransition.None
+        } else {
+            fadeOut(
+                animationSpec =
+                    tween(
+                        durationMillis = 250,
+                        easing = Easing { fraction -> 1f - (1f - fraction) * (1f - fraction) },
+                    )
+            )
+        }
 
     @Composable
     override fun Content() {
         DefaultToolbar()
     }
 
-    override fun build(middleSearchEnabled: Boolean) {
-        configureStartingInSearchMode()
-        updateAddressBarVisibility(!middleSearchEnabled)
+    @Composable
+    override fun searchBackgroundColor(): Color? {
+        val isSearchActive = appStore.observeAsComposableState { it.searchState.isSearchActive }.value
+        return if (isSearchActive) toolbarColors(isSearching = true).surface else null
     }
 
-    override fun updateAddressBarVisibility(isVisible: Boolean) {
-        addressBarVisibility.value = isVisible
+    override fun build() {
+        configureStartingInSearchMode()
     }
 
     private fun buildToolbarGravityConfig(): ToolbarGravity =

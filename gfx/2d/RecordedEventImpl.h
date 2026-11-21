@@ -2007,6 +2007,8 @@ void RecordedEvent::ReadPatternData(S& aStream,
 
 inline void RecordedEvent::StorePattern(PatternStorage& aDestination,
                                         const Pattern& aSource) const {
+  // Zero the storage so that its padding is written as zeroes.
+  memset(&aDestination, 0, sizeof(aDestination));
   aDestination.mType = aSource.GetType();
 
   switch (aSource.GetType()) {
@@ -3716,10 +3718,11 @@ void RecordedSourceSurfaceCreation::Record(S& aStream) const {
     gfxWarning()
         << "RecordedSourceSurfaceCreation::Record failed to map surface";
     WriteElement(aStream, IntSize(1, 1));
-    int bpp = BytesPerPixel(format);
-    WriteElement(aStream, bpp <= 4 ? format : SurfaceFormat::B8G8R8A8);
+    SurfaceFormat fallbackFormat =
+        BytesPerPixel(format) <= 4 ? format : SurfaceFormat::B8G8R8A8;
+    WriteElement(aStream, fallbackFormat);
     static const char zeroData[4] = {0, 0, 0, 0};
-    aStream.write(zeroData, BytesPerPixel(format));
+    aStream.write(zeroData, BytesPerPixel(fallbackFormat));
   }
 }
 

@@ -2174,8 +2174,13 @@ void MacroAssembler::branchTestStringImpl(Condition cond, const T& t,
 void MacroAssembler::branchTestStringTruthy(bool truthy,
                                             const ValueOperand& value,
                                             Label* label) {
-  Condition c = testStringTruthy(truthy, value);
-  B(label, c);
+  vixl::UseScratchRegisterScope temps(this);
+  const Register scratch = temps.AcquireX().asUnsized();
+  MOZ_ASSERT(value.valueReg() != scratch);
+
+  unboxString(value, scratch);
+  load32(Address(scratch, JSString::offsetOfLength()), scratch);
+  branchTest32(truthy ? NonZero : Zero, scratch, scratch, label);
 }
 
 void MacroAssembler::branchTestSymbol(Condition cond, Register tag,
@@ -2235,8 +2240,13 @@ void MacroAssembler::branchTestBigIntImpl(Condition cond, const T& t,
 void MacroAssembler::branchTestBigIntTruthy(bool truthy,
                                             const ValueOperand& value,
                                             Label* label) {
-  Condition c = testBigIntTruthy(truthy, value);
-  B(label, c);
+  vixl::UseScratchRegisterScope temps(this);
+  const Register scratch = temps.AcquireX().asUnsized();
+  MOZ_ASSERT(value.valueReg() != scratch);
+
+  unboxBigInt(value, scratch);
+  load32(Address(scratch, BigInt::offsetOfDigitLength()), scratch);
+  branchTest32(truthy ? NonZero : Zero, scratch, scratch, label);
 }
 
 void MacroAssembler::branchTestNull(Condition cond, Register tag,
@@ -2304,6 +2314,11 @@ void MacroAssembler::branchTestObjectImpl(Condition cond, const T& t,
                                           Label* label) {
   Condition c = testObject(cond, t);
   B(label, c);
+}
+
+void MacroAssembler::branchTestGCThing(Condition cond, Register tag,
+                                       Label* label) {
+  branchTestGCThingImpl(cond, tag, label);
 }
 
 void MacroAssembler::branchTestGCThing(Condition cond, const Address& address,
@@ -3126,6 +3141,42 @@ void MacroAssembler::permuteInt16x8(const uint16_t lanes[8], FloatRegister src,
 
 void MacroAssembler::permuteInt32x4(const uint32_t lanes[4], FloatRegister src,
                                     FloatRegister dest) {
+  auto is = [&](uint32_t a, uint32_t b, uint32_t c, uint32_t d) {
+    return lanes[0] == a && lanes[1] == b && lanes[2] == c && lanes[3] == d;
+  };
+  if (is(0, 2, 0, 2)) {
+    Uzp1(Simd4S(dest), Simd4S(src), Simd4S(src));
+    return;
+  }
+  if (is(1, 3, 1, 3)) {
+    Uzp2(Simd4S(dest), Simd4S(src), Simd4S(src));
+    return;
+  }
+  if (is(0, 0, 2, 2)) {
+    Trn1(Simd4S(dest), Simd4S(src), Simd4S(src));
+    return;
+  }
+  if (is(1, 1, 3, 3)) {
+    Trn2(Simd4S(dest), Simd4S(src), Simd4S(src));
+    return;
+  }
+  if (is(0, 0, 1, 1)) {
+    Zip1(Simd4S(dest), Simd4S(src), Simd4S(src));
+    return;
+  }
+  if (is(2, 2, 3, 3)) {
+    Zip2(Simd4S(dest), Simd4S(src), Simd4S(src));
+    return;
+  }
+  if (is(1, 0, 3, 2)) {
+    Rev64(Simd4S(dest), Simd4S(src));
+    return;
+  }
+  if (is(0, 1, 0, 1) || is(2, 3, 2, 3)) {
+    Dup(Simd2D(dest), Simd2D(src), lanes[0] / 2);
+    return;
+  }
+
   ScratchSimd128Scope scratch(*this);
   const int8_t lanes_[16] = {
       (int8_t)(lanes[0] << 2),       (int8_t)((lanes[0] << 2) + 1),

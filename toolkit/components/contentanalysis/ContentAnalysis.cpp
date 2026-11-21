@@ -124,11 +124,9 @@ bool SourceIsSameTab(nsIContentAnalysisRequest* aRequest) {
   RefPtr<mozilla::dom::WindowGlobalParent> windowGlobal;
   MOZ_ALWAYS_SUCCEEDS(
       aRequest->GetWindowGlobalParent(getter_AddRefs(windowGlobal)));
-  return windowGlobal->GetBrowsingContext()->Top() ==
-             sourceWindowGlobal->GetBrowsingContext()->Top() &&
-         windowGlobal->DocumentPrincipal() &&
-         windowGlobal->DocumentPrincipal()->Subsumes(
-             sourceWindowGlobal->DocumentPrincipal());
+  return mozilla::contentanalysis::ContentAnalysis::IsSamePageAndSite(
+      windowGlobal, sourceWindowGlobal->TopWindowContext()->InnerWindowId(),
+      sourceWindowGlobal->DocumentPrincipal());
 }
 
 // Only used to pick the wording of the dialogs, so that a blocked copy says
@@ -443,9 +441,6 @@ nsresult ContentAnalysisRequest::GetFileDigest(const nsAString& aFilePath,
   auto closeFile = MakeScopeExit([fd]() { PR_Close(fd); });
   constexpr uint32_t kBufferSize = 1024 * 1024;
   auto buffer = std::make_unique<uint8_t[]>(kBufferSize);
-  if (!buffer) {
-    return NS_ERROR_OUT_OF_MEMORY;
-  }
   PRInt32 bytesRead = PR_Read(fd, buffer.get(), kBufferSize);
   while (bytesRead != 0) {
     if (bytesRead == -1) {
@@ -937,6 +932,26 @@ void ContentAnalysis::CachedClipboardResponse::SetCachedResponse(
   }
 
   mData.AppendElement(std::make_pair(aURI, aAction));
+}
+
+/* static */
+bool ContentAnalysis::IsSamePageAndSite(dom::WindowGlobalParent* aRequesting,
+                                        uint64_t aSourceTopInnerWindowId,
+                                        nsIPrincipal* aSourcePrincipal) {
+  if (!aRequesting || !aSourcePrincipal || !aSourceTopInnerWindowId) {
+    return false;
+  }
+  nsIPrincipal* principal = aRequesting->DocumentPrincipal();
+  dom::BrowsingContext* browsingContext = aRequesting->GetBrowsingContext();
+  // The system principal subsumes everything, so a parent-process or chrome
+  // window has to be ruled out explicitly rather than through Subsumes().
+  if (!principal || principal->IsSystemPrincipal() || !browsingContext ||
+      !browsingContext->IsContent()) {
+    return false;
+  }
+  dom::WindowContext* top = aRequesting->TopWindowContext();
+  return top && top->InnerWindowId() == aSourceTopInnerWindowId &&
+         principal->Subsumes(aSourcePrincipal);
 }
 
 NS_IMETHODIMP ContentAnalysis::SetCachedResponse(
@@ -2875,7 +2890,7 @@ void ContentAnalysis::CheckClipboardContentAnalysis(
   }
 
   mozilla::Maybe<uint64_t> cacheInnerWindowId =
-      aClipboard->GetClipboardCacheInnerWindowId(aClipboardType);
+      aClipboard->GetClipboardCacheInnerWindowId(aClipboardType, aWindow);
   RefPtr<mozilla::dom::WindowGlobalParent> sourceWindowGlobal;
   if (cacheInnerWindowId.isSome()) {
     sourceWindowGlobal = mozilla::dom::WindowGlobalParent::GetByInnerWindowId(
@@ -2957,15 +2972,15 @@ ContentAnalysis::CheckUploadsInBatchMode(
     nsCOMArray<nsIFile>&& aFiles, bool aAutoAcknowledge,
     mozilla::dom::WindowGlobalParent* aWindow,
     nsIContentAnalysisRequest::Reason aReason, nsIURI* aURI /* = nullptr */) {
-  nsresult rv;
   auto contentAnalysis = GetContentAnalysisFromService();
   // Ideally the caller would check all of this before going through the work
   // of building up aFiles, but we'll double-check here.
   if (NS_WARN_IF(!contentAnalysis)) {
-    return FilesAllowedPromise::CreateAndReject(rv, __func__);
+    return FilesAllowedPromise::CreateAndReject(NS_ERROR_NOT_AVAILABLE,
+                                                __func__);
   }
   bool contentAnalysisIsActive = false;
-  rv = contentAnalysis->GetIsActive(&contentAnalysisIsActive);
+  nsresult rv = contentAnalysis->GetIsActive(&contentAnalysisIsActive);
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return FilesAllowedPromise::CreateAndReject(rv, __func__);
   }

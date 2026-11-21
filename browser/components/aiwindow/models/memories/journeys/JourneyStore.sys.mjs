@@ -10,8 +10,8 @@ const JOURNEY_STORE_VERSION = 1;
 const lazy = {};
 ChromeUtils.defineLazyGetter(lazy, "console", () =>
   console.createInstance({
-    prefix: "JourneyStore",
-    maxLogLevelPref: "browser.smartwindow.memoriesLogLevel",
+    logModule: "JourneyStore",
+    maxLogLevelPref: "browser.smartwindow.memories.logLevel",
   })
 );
 
@@ -100,8 +100,8 @@ function ensureInitialized() {
 
 /**
  * Stores journey metadata independently of memories. Suppressing a journey does
- * not delete its related memory. MemoriesManager is responsible for removing
- * journey metadata when the related memory is deleted. The store returns
+ * not delete its related memory. JourneyManager is responsible for removing
+ * journey metadata when the related memory is no longer present. The store returns
  * suppressed records; callers are responsible for filtering them.
  *
  * Data loads on first use. Mutations schedule a save and return without awaiting

@@ -23,7 +23,6 @@ import kotlinx.coroutines.withContext
 import mozilla.appservices.fxaclient.DeviceConfig as ASDeviceConfig
 import mozilla.appservices.fxaclient.FxaEvent
 import mozilla.appservices.fxaclient.FxaException
-import mozilla.appservices.fxaclient.FxaRustAuthState
 import mozilla.appservices.fxaclient.FxaState
 import mozilla.appservices.syncmanager.DeviceSettings
 import mozilla.components.concept.base.crash.Breadcrumb
@@ -295,7 +294,7 @@ open class FxaAccountManager(
             FxaState.Connected,
             FxaState.AuthIssues -> account
             // Bug 2030890 - we may not leave the `FxaState.Authenticating` state.
-            is FxaState.Authenticating if it.initialState == FxaRustAuthState.CONNECTED -> account
+            is FxaState.Authenticating if it.initialState is FxaState.Connected -> account
             else -> null
         }
     }
@@ -305,7 +304,7 @@ open class FxaAccountManager(
         when (it) {
             FxaState.Connected -> account
             // While authenticating from a connected state we should return the account.
-            is FxaState.Authenticating if it.initialState == FxaRustAuthState.CONNECTED -> account
+            is FxaState.Authenticating if it.initialState is FxaState.Connected -> account
             else -> null
         }
     }
@@ -507,7 +506,10 @@ open class FxaAccountManager(
                     ASDeviceConfig(
                         name = deviceConfig.name,
                         deviceType = deviceConfig.type.into(),
-                        capabilities = deviceConfig.withSupportedCapabilities().capabilities.map { it.into() },
+                        capabilities =
+                            deviceConfig.getCapabilities(hasSyncScope = account.hasScope(SCOPE_SYNC)).map {
+                                it.into()
+                            },
                     )
                 )
             is Event.Account.BeginEmailFlow ->
@@ -575,7 +577,6 @@ open class FxaAccountManager(
                     is Event.Account.Start -> {
                         if (authenticationSideEffects()) {
                             notifyObservers { onAuthenticated(account, AuthType.Existing) }
-                            initializeDevice()
                             refreshProfile(ignoreCache = false)
                         } else {
                             throw AccountManagerException.AuthenticationSideEffectsFailed()
@@ -584,7 +585,7 @@ open class FxaAccountManager(
                     is Event.Progress.AuthData -> {
                         if (authenticationSideEffects()) {
                             notifyObservers { onAuthenticated(account, via.authData.authType) }
-                            finalizeDevice()
+                            ensureCapabilities()
                             refreshProfile(ignoreCache = false)
                         } else {
                             throw AccountManagerException.AuthenticationSideEffectsFailed()
@@ -595,7 +596,7 @@ open class FxaAccountManager(
                         // Should we also call authenticationSideEffects here?
                         // (https://bugzilla.mozilla.org/show_bug.cgi?id=1865086)
                         notifyObservers { onAuthenticated(account, AuthType.Recovered) }
-                        finalizeDevice()
+                        ensureCapabilities()
                         refreshProfile(ignoreCache = true)
                     }
                     else -> Unit
@@ -641,23 +642,10 @@ open class FxaAccountManager(
         }
     }
 
-    private suspend fun initializeDevice(): ServiceResult {
-        return account.deviceConstellation().initializeDevice(deviceConfig.withSupportedCapabilities())
-    }
-
-    private suspend fun finalizeDevice(): ServiceResult {
-        return account.deviceConstellation().finalizeDevice(deviceConfig.withSupportedCapabilities())
-    }
-
-    /**
-     * @return a [DeviceConfig] with the [DeviceConfig.capabilities] when the account has the sync scope. When the sync
-     *   scope is not present on the account, then the capabilities are empty.
-     *
-     * This is because the capabilities defined in [mozilla.appservices.fxaclient.DeviceCapability] require the sync
-     * scope to function.
-     */
-    private fun DeviceConfig.withSupportedCapabilities(): DeviceConfig {
-        return copy(capabilities = capabilities.takeIf { account.hasScope(SCOPE_SYNC) }.orEmpty())
+    private suspend fun ensureCapabilities(): ServiceResult {
+        return account
+            .deviceConstellation()
+            .ensureCapabilities(deviceConfig.getCapabilities(hasSyncScope = account.hasScope(SCOPE_SYNC)))
     }
 
     /**

@@ -29,7 +29,11 @@ subsuite = "taskgraph"
 
 ["test_transforms_build_schedules.py"]
 
+["test_transforms_copy_cached_dep.py"]
+
 ["test_transforms_duplicate.py"]
+
+["test_transforms_fetch.py"]
 
 ["test_transforms_job.py"]
 
@@ -38,6 +42,10 @@ subsuite = "taskgraph"
 ["test_transforms_mozconfig.py"]
 
 ["test_transforms_perftest.py"]
+
+["test_transforms_raptor_ab.py"]
+
+["test_transforms_repackage_partner.py"]
 
 ["test_transforms_source_test.py"]
 

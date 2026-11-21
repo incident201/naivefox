@@ -14,6 +14,7 @@
 #include "mozilla/ipc/UtilityProcessSandboxing.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/RemoteMediaManagerParent.h"
+#include "mozilla/StaticPrefs_dom.h"
 
 #if defined(XP_LINUX) && defined(MOZ_SANDBOX)
 #  include "mozilla/Sandbox.h"
@@ -137,11 +138,13 @@ bool UtilityProcessChild::Init(mozilla::ipc::UntypedEndpoint&& aEndpoint,
 
   // Notify the parent process that we have finished our init and that it can
   // now resolve the pending promise of process startup
-  SendInitCompleted();
+  if (!StaticPrefs::dom_ipc_utilityProcess_testing_skipInitCompleted()) {
+    SendInitCompleted();
 
-  PROFILER_MARKER_UNTYPED(
-      "UtilityProcessChild::SendInitCompleted", IPC,
-      MarkerOptions(MarkerTiming::IntervalUntilNowFrom(mChildStartTime)));
+    PROFILER_MARKER_UNTYPED(
+        "UtilityProcessChild::SendInitCompleted", IPC,
+        MarkerOptions(MarkerTiming::IntervalUntilNowFrom(mChildStartTime)));
+  }
 
   RunOnShutdown(
       [sandboxKind = mSandbox] {
@@ -231,7 +234,7 @@ mozilla::ipc::IPCResult UtilityProcessChild::RecvRequestMemoryReport(
   return IPC_OK();
 }
 
-#if defined(NIGHTLY_BUILD) && !defined(MOZ_NO_SMART_CARDS)
+#if !defined(MOZ_NO_SMART_CARDS)
 IPCResult UtilityProcessChild::RecvStartPKCS11ModuleService(
     Endpoint<PPKCS11ModuleChild>&& aEndpoint, nsCString&& aProfilePath) {
   auto child = MakeRefPtr<psm::PKCS11ModuleChild>();
@@ -243,7 +246,7 @@ IPCResult UtilityProcessChild::RecvStartPKCS11ModuleService(
   mPKCS11ModuleInstance = std::move(child);
   return IPC_OK();
 }
-#endif  // NIGHTLY_BUILD && !MOZ_NO_SMART_CARDS
+#endif  // !MOZ_NO_SMART_CARDS
 
 #if defined(MOZ_SANDBOX) && defined(MOZ_DEBUG) && defined(ENABLE_TESTS)
 mozilla::ipc::IPCResult UtilityProcessChild::RecvInitSandboxTesting(
@@ -387,7 +390,8 @@ mozilla::ipc::IPCResult UtilityProcessChild::RecvShutdown() {
         mProfilerController->GrabShutdownProfileAndShutdown();
     mProfilerController = nullptr;
 
-    if (const size_t len = shutdownProfileAndAdditionalInformation.SizeOf();
+    if (const size_t len =
+            shutdownProfileAndAdditionalInformation.InlineIPCSize();
         len >= size_t(IPC::Channel::kMaximumMessageSize)) {
       shutdownProfileAndAdditionalInformation.mProfile = nsPrintfCString(
           "*Profile from pid %u bigger (%zu) than IPC max (%zu)",
@@ -452,9 +456,9 @@ void UtilityProcessChild::ActorDestroy(ActorDestroyReason aWhy) {
   mWindowsUtilsInstance = nullptr;
 #  endif
 
-#  if defined(NIGHTLY_BUILD) && !defined(MOZ_NO_SMART_CARDS)
+#  if !defined(MOZ_NO_SMART_CARDS)
   mPKCS11ModuleInstance = nullptr;
-#  endif  // NIGHTLY_BUILD && !MOZ_NO_SMART_CARDS
+#  endif  // !MOZ_NO_SMART_CARDS
 
   // Wait until all RemoteMediaManagerParent have closed.
   // It is still possible some may not have clean up yet, and we might hit

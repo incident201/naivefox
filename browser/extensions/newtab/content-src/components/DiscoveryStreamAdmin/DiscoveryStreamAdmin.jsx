@@ -40,9 +40,6 @@ const PREF_CONTEXTUAL_BANNER_COUNTS =
   "discoverystream.placements.contextualBanners.counts";
 const PREF_UNIFIED_ADS_ENABLED = "unifiedAds.spocs.enabled";
 const PREF_UNIFIED_ADS_ENDPOINT = "unifiedAds.endpoint";
-const PREF_ALLOWED_ENDPOINTS = "discoverystream.endpoints";
-const PREF_OHTTP_CONFIG = "discoverystream.ohttp.configURL";
-const PREF_OHTTP_RELAY = "discoverystream.ohttp.relayURL";
 const PREF_WIDGETS_SYSTEM_ENABLED = "widgets.system.enabled";
 
 // Internal, pref-gated widget features that default off but we want to test in
@@ -50,12 +47,6 @@ const PREF_WIDGETS_SYSTEM_ENABLED = "widgets.system.enabled";
 // Each `pref` is the full activity-stream-relative pref; toggles reuse
 // handleWidgetToggle, which sets the pref named by the toggle's id.
 const WIDGET_EXTRA_FEATURES = {
-  pictureOfTheDay: [
-    {
-      pref: "widgets.pictureOfTheDay.setAsWallpaper.enabled",
-      label: "Set as wallpaper",
-    },
-  ],
   privacy: [{ pref: "widgets.privacy.showVpnMessages", label: "VPN messages" }],
 };
 
@@ -1185,47 +1176,15 @@ export class DiscoveryStreamAdminUI extends React.PureComponent {
   }
 
   handleAllizomToggle(e) {
-    const prefs = this.props.otherPrefs;
-    const unifiedAdsSpocsEnabled = prefs[PREF_UNIFIED_ADS_ENABLED];
-    if (!unifiedAdsSpocsEnabled) {
+    if (!this.props.otherPrefs[PREF_UNIFIED_ADS_ENABLED]) {
       return;
     }
-    const { pressed } = e.target;
-    const { dispatch } = this.props;
-    const allowedEndpoints = prefs[PREF_ALLOWED_ENDPOINTS];
-    const setPref = (pref = "", value = "") => {
-      dispatch(ac.SetPref(pref, value));
-    };
-    const clearPref = (pref = "") => {
-      dispatch(
-        ac.OnlyToMain({
-          type: at.CLEAR_PREF,
-          data: {
-            name: pref,
-          },
-        })
-      );
-    };
-    if (pressed) {
-      setPref(PREF_UNIFIED_ADS_ENDPOINT, "https://ads.allizom.org/");
-      setPref(
-        PREF_ALLOWED_ENDPOINTS,
-        `${allowedEndpoints},https://ads.allizom.org/`
-      );
-      setPref(
-        PREF_OHTTP_CONFIG,
-        "https://stage.ohttp-gateway.nonprod.webservices.mozgcp.net/ohttp-configs"
-      );
-      setPref(
-        PREF_OHTTP_RELAY,
-        "https://mozilla-ohttp-relay-test.edgecompute.app/"
-      );
-    } else {
-      clearPref(PREF_UNIFIED_ADS_ENDPOINT);
-      clearPref(PREF_ALLOWED_ENDPOINTS);
-      clearPref(PREF_OHTTP_CONFIG);
-      clearPref(PREF_OHTTP_RELAY);
-    }
+    this.props.dispatch(
+      ac.OnlyToMain({
+        type: at.DISCOVERY_STREAM_DEV_STAGING_ADS,
+        data: { enabled: e.target.pressed },
+      })
+    );
   }
 
   renderSpocs() {

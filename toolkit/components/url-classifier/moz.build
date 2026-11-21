@@ -13,6 +13,7 @@ XPIDL_SOURCES += [
     "nsIUrlClassifierHashCompleter.idl",
     "nsIUrlClassifierInfo.idl",
     "nsIUrlClassifierPrefixSet.idl",
+    "nsIUrlClassifierRealTimeKeyService.idl",
     "nsIUrlClassifierRemoteSettingsService.idl",
     "nsIUrlClassifierStreamUpdater.idl",
     "nsIUrlClassifierTestUtils.idl",
@@ -64,7 +65,13 @@ EXTRA_JS_MODULES += [
     "UrlClassifierRemoteSettingsService.sys.mjs",
 ]
 
-XPCOM_MANIFESTS += ["components.conf"]
+MOZ_SRC_FILES += [
+    "UrlClassifierRealTimeKeyService.sys.mjs",
+]
+
+XPCOM_MANIFESTS += [
+    "components.conf",
+]
 
 EXPORTS += [
     "chromium/safebrowsing.pb.h",

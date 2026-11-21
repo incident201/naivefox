@@ -18,10 +18,10 @@ browser-main-private-window-title = { PLATFORM() ->
 browser-main-private-suffix-for-content = Private Browsing
 
 # The non-variable portion of this MUST match the translation of
-# "PRIVATE_BROWSING_SHORTCUT_TITLE" in custom.properties
+# "private-browsing-shortcut-title" in installer/custom.ftl
 private-browsing-shortcut-text-2 = { -brand-shortcut-name } Private Browsing
 
-# This MUST match the translation of "BRIEF_APP_DESC" in custom.properties
+# This MUST match the translation of "brief-app-desc" in installer/custom.ftl
 browser-shortcut-description = Fast and private web browsing
 
 ##
@@ -108,9 +108,12 @@ urlbar-result-menu-manage-firefox-suggest2 = Manage { -firefox-suggest-brand-nam
 # user tell Firefox that the location is not accurate. Typically the location
 # will be a city name, or a city name combined with the name of its parent
 # administrative division (e.g., a province, prefecture, or state).
-urlbar-result-menu-report-inaccurate-location2 = Report inaccurate location
-urlbar-result-menu-show-less-frequently2 = Show less frequently
-urlbar-result-menu-dont-show-weather-suggestions2 = Don’t show weather suggestions
+urlbar-result-menu-report-inaccurate-location3 = Report inaccurate location
+    .accesskey = R
+urlbar-result-menu-show-less-frequently3 = Show less frequently
+    .accesskey = f
+urlbar-result-menu-dont-show-weather-suggestions3 = Don’t show weather suggestions
+    .accesskey = n
 
 # Shown in the urlbar input field context menu to dismiss an adaptive autofill
 # suggestion.
@@ -270,8 +273,9 @@ search-one-offs-add-engine =
     .aria-label = Add search engine “{ $engineName }”
 # When more than 5 engines are offered by a web page, they are grouped in a
 # submenu using this as its label.
-search-one-offs-add-engine-menu =
+search-one-offs-add-engine-menu2 =
     .label = Add search engine
+    .accesskey = h
 
 ## Local search mode one-off buttons
 ## Variables:
@@ -809,7 +813,8 @@ urlbar-result-realtime-opt-in-dismiss = Dismiss
 urlbar-result-realtime-opt-in-dismiss-all2 = Don’t show these suggestions
 
 # This string is shown in the result menu.
-urlbar-result-menu-dont-show-market2 = Don’t show market suggestions
+urlbar-result-menu-dont-show-market3 = Don’t show market suggestions
+    .accesskey = n
 
 # A message that replaces a result when the user dismisses Market suggestions.
 urlbar-result-dismissal-acknowledgment-market = Thanks for your feedback. You won’t see market suggestions anymore.
@@ -950,6 +955,14 @@ urlbar-view-context-menu-open-in-window2 = Open in New Window
     .accesskey = N
 urlbar-view-context-menu-open-in-private-window2 = Open in New Private Window
     .accesskey = P
+urlbar-view-context-menu-search-in-tab = Search in New Tab
+    .accesskey = w
+urlbar-view-context-menu-search-in-container-tab = Search in New Container Tab
+    .accesskey = i
+urlbar-view-context-menu-search-in-window = Search in New Window
+    .accesskey = N
+urlbar-view-context-menu-search-in-private-window = Search in New Private Window
+    .accesskey = P
 
 # A checkable menu item that controls whether pressing the Tab key while
 # navigating the address bar results stops on each result's menu button. When
@@ -989,8 +1002,8 @@ urlbar-group-trending =
   .label = Trending on { $engine }
 
 # The result menu labels shown next to trending results.
-urlbar-result-menu-trending-dont-show2 = Don’t show trending searches
-  .accesskey = D
+urlbar-result-menu-trending-dont-show3 = Don’t show trending searches
+    .accesskey = n
 
 # A message that replaces a result when the user dismisses all suggestions of a
 # particular type.
@@ -1166,6 +1179,7 @@ qrcode-save-filename-with-domain-base = qrcode-{ $domain }
 
 qrcode-window-title = QR Code
 qrcode-dialog-title = QR Code
+qrcode-dialog-title-download-mobile = Download { -brand-product-name } for mobile
 qrcode-image =
     .aria-label = QR code
 qrcode-close-button =
@@ -1284,6 +1298,42 @@ plugin-crashed-notification-reload-button =
 plugin-crashed-notification-submit-button =
     .label = Submit a crash report
     .accesskey = S
+
+## Notification bar shown after the user chooses to visit a site flagged by Safe Browsing
+
+safebrowsing-deceptive-site-message = Deceptive Site!
+safebrowsing-reported-attack-site-message = Reported Attack Site!
+safebrowsing-reported-unwanted-site-message = Reported Unwanted Software Site!
+safebrowsing-reported-harmful-site-message = Reported Harmful Site!
+safebrowsing-get-me-out-of-here-button =
+    .label = Get me out of here!
+    .accesskey = G
+safebrowsing-not-a-deceptive-site-button =
+    .label = This isn’t a deceptive site…
+    .accesskey = D
+safebrowsing-not-an-attack-site-button =
+    .label = This isn’t an attack site…
+    .accesskey = A
+
+## Notification bar shown when a captive portal is blocking network access
+## and requires the user to log in before browsing.
+
+captive-portal-info-message = You must log in to this network before you can access the Internet.
+# Shown in all tabs except the login page tab. Clicking it shows the portal
+# login page tab.
+captive-portal-show-login-page-button =
+    .label = Open network login page
+
+## Notification bar shown when the user tries to visit a local host, but a
+## search page was already loaded for the given word by the time the DNS
+## request recognized it.
+## Variables:
+##   $hostName (String) - The recognized host (for example, “http://example/”).
+
+keyword-uri-fixup-message = Did you mean to go to { $hostName }?
+keyword-uri-fixup-go-to-button =
+    .label = Yes, take me to { $hostName }
+    .accesskey = Y
 
 ## Password save/update panel
 
@@ -1705,6 +1755,8 @@ urlbar-trust-icon-trackers-blocked-longform-label = { $count ->
 trustpanel-etp-label-enabled = Enhanced Tracking Protection is on
 trustpanel-etp-label-disabled = Enhanced Tracking Protection is off
 
+trustpanel-etp-label-redesign = Enhanced Tracking Protection
+
 # Variables
 #  $host (String): the hostname of the site that is being displayed.
 trustpanel-etp-toggle-on =
@@ -1716,6 +1768,10 @@ trustpanel-etp-toggle-off =
 
 trustpanel-etp-description-enabled = If something looks broken on this site, try turning off protections.
 trustpanel-etp-description-disabled = { -brand-product-name } thinks companies should follow you less. We block as many trackers as we can when you turn on protections.
+
+trustpanel-trackercount-label = Show trackers blocked in address bar
+trustpanel-trackercount-toggle =
+    .aria-label = Show trackers blocked in address bar
 
 trustpanel-connection-label-secure = Connection secure
 trustpanel-connection-label-insecure = Connection not secure
@@ -1729,7 +1785,10 @@ trustpanel-header-disabled = You turned off protections
 trustpanel-description-disabled = { -brand-product-name } is off-duty. We suggest turning protections back on.
 
 trustpanel-clear-cookies-button = Clear cookies and site data
+trustpanel-delete-site-data-button = Delete site data
+trustpanel-fix-site-issue-button = Fix site issue
 trustpanel-privacy-link = Privacy Settings
+trustpanel-manage-settings-button = Manage settings
 
 # Variables
 #  $host (String): the hostname of the site that is being displayed.
@@ -1749,6 +1808,7 @@ trustpanel-site-information-header =
 trustpanel-siteinformation-morelink = More site information
 
 trustpanel-blocker-see-all = See All
+trustpanel-blocker-see-trackers-button = See trackers
 
 # Variables
 #  $host (String): the hostname of the site that is being displayed.
@@ -1763,6 +1823,20 @@ trustpanel-blocker-section-header2 = { $count ->
   *[other] <span data-l10n-name="count">{ $count }</span> Trackers blocked on this site
 }
 trustpanel-blocker-description = { -brand-product-name } thinks companies should follow you less. So we block as many as we can.
+
+##  $count (String): the number of trackers blocked.
+
+trustpanel-blocker-section-header2-redesign = { $count ->
+  [one] { -brand-short-name } blocked <span data-l10n-name="count">{ $count }</span> tracker on this site
+  *[other] { -brand-short-name } blocked <span data-l10n-name="count">{ $count }</span> trackers on this site
+}
+trustpanel-blocker-description-redesign = These trackers were blocked from collecting info about your browsing.
+
+trustpanel-no-trackers-header-redesign = No trackers found on this site
+trustpanel-no-trackers-description-redesign = { -brand-short-name } checked for known trackers and didn’t find any.
+
+trustpanel-etp-off-description-redesign = Turn on protections and { -brand-short-name } will block known trackers from collecting info about your browsing.
+
 trustpanel-blocked-header = { -brand-product-name } blocked these things for you:
 trustpanel-tracking-header = { -brand-product-name } allowed these things so sites don’t break:
 trustpanel-tracking-description = Without trackers, some buttons, forms, and login fields might not work.

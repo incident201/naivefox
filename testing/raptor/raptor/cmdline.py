@@ -118,6 +118,17 @@ def default_desktop_binary(app):
     return None
 
 
+def absolute_binary_argv(argv, binary):
+    """Append `--binary <binary>` to argv when `binary` is an absolute path.
+
+    argparse keeps the last value, so this overrides any earlier spelling
+    of the option (--binary, --bin, -b<path>, ...).
+    """
+    if not binary or not os.path.isabs(binary):
+        return argv
+    return argv + ["--binary", binary]
+
+
 def print_all_activities():
     all_activities = []
     for next_app in APPS:
@@ -352,7 +363,10 @@ def create_parser(mach_interface=False):
         help="Parameters to add to the test_url query string",
     )
     add_arg(
-        "--print-tests", action=_PrintTests, help="Print all available Raptor tests"
+        "--print-tests",
+        "--list-tests",
+        action=_PrintTests,
+        help="Print all available Raptor tests",
     )
     add_arg(
         "--debug-mode",
@@ -584,6 +598,15 @@ def create_parser(mach_interface=False):
         metavar="OPTION",
         help="Alternative methods for summarizing technical and visual pageload metrics. "
         "Options: median.",
+    )
+    add_arg(
+        "--perfherder-extra-option",
+        dest="perfherder_extra_options",
+        action="append",
+        default=[],
+        metavar="OPTION",
+        help="Add an extra option to the Perfherder data, which puts the results "
+        "in a separate series. Can be given more than once.",
     )
     add_arg(
         "--benchmark-repository",

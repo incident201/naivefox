@@ -35,6 +35,10 @@ static constexpr ARMRegister ScratchReg64 = {ScratchReg, 64};
 static constexpr Register ScratchReg2{Registers::ip1};
 static constexpr ARMRegister ScratchReg2_64 = {ScratchReg2, 64};
 
+// Holds the snapshot offset of an Ion bailout between
+// CodeGeneratorShared::emitBailoutOOL and deoptLabel_, where it is pushed.
+static constexpr Register BailoutSnapshotOffsetReg = ScratchReg2;
+
 static constexpr FloatRegister ReturnDoubleReg = {FloatRegisters::d0,
                                                   FloatRegisters::Double};
 static constexpr FloatRegister ScratchDoubleReg_ = {FloatRegisters::d31,
@@ -460,8 +464,8 @@ class Assembler : public vixl::Assembler {
   void executableCopy(uint8_t* buffer);
 
   BufferOffset immPool(ARMRegister dest, uint8_t* value, vixl::LoadLiteralOp op,
-                       const LiteralDoc& doc);
-  BufferOffset immPool64(ARMRegister dest, uint64_t value);
+                       PoolEntryKind kind, const LiteralDoc& doc);
+  BufferOffset immPool64(ARMRegister dest, uint64_t value, PoolEntryKind kind);
   BufferOffset fImmPool(ARMFPRegister dest, uint8_t* value,
                         vixl::LoadLiteralOp op, const LiteralDoc& doc);
   BufferOffset fImmPool64(ARMFPRegister dest, double value);

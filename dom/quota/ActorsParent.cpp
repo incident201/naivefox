@@ -2818,7 +2818,9 @@ void QuotaManager::InitQuotaForOrigin(
   // state. Enqueuing here ensures the corrected metadata is flushed back.
   //
   // We set mMetadataDirty directly because the OriginInfo is not yet
-  // registered in GroupInfo, so DirtyTrackingAutoLock cannot look it up.
+  // registered in GroupInfo, so DirtyTrackingAutoLock cannot look it up. Set
+  // mLastModifiedTime here as well to match OriginInfo::MakeDirty; otherwise,
+  // FlushDirtyOriginInfos subtracts a null TimeStamp from now.
   //
   // Enqueue for storage-database flush when the existing row is stale or
   // missing.
@@ -2834,6 +2836,7 @@ void QuotaManager::InitQuotaForOrigin(
   if (!aFullOriginMetadata.mIsPrivate && !cacheRowMatches &&
       (fullOriginMetadata.mDirty || !aCacheMap.IsActive()) &&
       aDirectoryExists && !mUsageModificationDisabled.load()) {
+    originInfo->mLastModifiedTime = TimeStamp::Now();
     originInfo->mMetadataDirty = true;
     auto* message = new UnboundedMPSCQueue<RefPtr<OriginInfo>>::Message();
     message->data = originInfo;
@@ -3150,13 +3153,8 @@ nsresult QuotaManager::LoadQuota() {
           // doing that. We just need to use correct group and last access
           // time before initializing quota for the given origin.
 
-          const bool needsRescan =
-#if defined(NIGHTLY_BUILD) || defined(DEBUG)
-              !fullOriginMetadata.CheckIfUsageIsConsistent(
-                  "LoadQuotaFromCache"_ns);
-#else
-              false;
-#endif
+          const bool needsRescan = !fullOriginMetadata.CheckIfUsageIsConsistent(
+              "LoadQuotaFromCache"_ns);
           if (fullOriginMetadata.mDirty || needsRescan) {
             aDirtyOrigins.AppendElement(std::move(fullOriginMetadata));
           } else if (IsBestEffortPersistenceType(
@@ -4431,11 +4429,8 @@ Result<Ok, nsresult> QuotaManager::InitializeOriginDirectory(
 
     if (StaticPrefs::dom_quotaManager_loadQuotaFromSecondaryCache() &&
         IsInitializableQuotaVersion(metadata.mQuotaVersion) &&
-        !metadata.mAccessed
-#if defined(NIGHTLY_BUILD) || defined(DEBUG)
-        && metadata.CheckIfUsageIsConsistent("InitializeOriginDirectory"_ns)
-#endif
-    ) {
+        !metadata.mAccessed &&
+        metadata.CheckIfUsageIsConsistent("InitializeOriginDirectory"_ns)) {
       QM_LOG(("Initializing quota for: %s", metadata.mOrigin.get()));
       InitQuotaForOrigin(metadata, /* aDirectoryExists */ true, aCacheMap);
 
@@ -6229,14 +6224,15 @@ void QuotaManager::FlushDirtyOriginInfos() {
       continue;
     }
 
-    if (!IsOriginInitialized(groupInfo->GetPersistenceType(), info->Origin())) {
-      continue;
-    }
-
     // The OriginInfo may have been cleaned by a direct CreateDirectoryMetadata2
     // call (e.g. via InitializeOrigin) since it was queued. Skip the redundant
     // write in that case.
     if (!info->LockedDirty()) {
+      continue;
+    }
+
+    if (!IsOriginInitialized(groupInfo->GetPersistenceType(), info->Origin())) {
+      itemsToRequeue.AppendElement(std::move(info));
       continue;
     }
 
@@ -7265,7 +7261,7 @@ QuotaManager::EnsureTemporaryOriginIsInitializedInternal(
     originMetadataWithEncryption.mIsEncrypted = mStorageEncryptionEnabled;
 
     FullOriginMetadata fullOriginMetadata{
-        originMetadataWithEncryption,
+        std::move(originMetadataWithEncryption),
         OriginStateMetadata{
             /* aLastAccessTime */ timestamp,
             /* aLastMaintenanceDate */ Date::FromTimestamp(timestamp).ToDays(),

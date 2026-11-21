@@ -1,5 +1,4 @@
 [
-  "app.normandy.first_run",
   "app.normandy.user_id",
   "app.update.background.rolledout",
   "app.update.interval",
@@ -43,7 +42,6 @@
   "extensions.ui.mlmodel.hidden",
   "extensions.ui.sitepermission.hidden",
   "extensions.webextensions.ExtensionStorageIDB.migrated.*",
-  "mail.*",
   "media.gmp-manager.buildID",
   "media.gmp-manager.lastCheck",
   "media.gmp-manager.lastEmptyCheck",

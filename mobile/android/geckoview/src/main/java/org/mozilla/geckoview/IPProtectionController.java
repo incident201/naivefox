@@ -9,6 +9,7 @@ import androidx.annotation.AnyThread;
 import androidx.annotation.IntDef;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.StringDef;
 import androidx.annotation.UiThread;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -51,6 +52,17 @@ public class IPProtectionController {
 
   /** The service is ready to be activated. */
   public static final int SERVICE_STATE_READY = 4;
+
+  /** The auth providers the IP protection service can use. */
+  @Retention(RetentionPolicy.SOURCE)
+  @StringDef(value = {CURRENT_AUTH_PROVIDER_FXA, CURRENT_AUTH_PROVIDER_GPI})
+  public @interface CurrentAuthProvider {}
+
+  /** The service uses FxA. */
+  public static final String CURRENT_AUTH_PROVIDER_FXA = "fxa";
+
+  /** The service uses Google Play Integrity. */
+  public static final String CURRENT_AUTH_PROVIDER_GPI = "gpi";
 
   private static @ServiceState int parseServiceState(final @Nullable String state) {
     switch (state) {
@@ -252,6 +264,22 @@ public class IPProtectionController {
     default @NonNull GeckoResult<String> onTokenRequest() {
       return GeckoResult.fromException(new RuntimeException(ERROR_LOGIN_NEEDED));
     }
+
+    /**
+     * Invoked when a token previously returned by {@link #onTokenRequest} was rejected and must not
+     * be used again. The embedder should drop it, so that the next {@link #onTokenRequest} returns
+     * a fresh one.
+     *
+     * <p>The request that hit the rejection stays pending until the returned {@link GeckoResult}
+     * completes, so complete it on every path. The default implementation is a no-op.
+     *
+     * @param token The rejected token.
+     * @return A {@link GeckoResult} that completes once the token has been dropped.
+     */
+    @UiThread
+    default @NonNull GeckoResult<Void> onTokenRejected(final @NonNull String token) {
+      return GeckoResult.fromValue(null);
+    }
   }
 
   /** Delegate for receiving IP protection state notifications. */
@@ -288,6 +316,22 @@ public class IPProtectionController {
      */
     @UiThread
     default void onCountryListChanged(final @NonNull List<Country> countries) {}
+
+    /**
+     * Called when the auth provider the IP protection service uses changes.
+     *
+     * <p>With {@link #SIGNED_OUT_AUTH_GPI}, nothing is reported until a sign-in state has been
+     * received.
+     *
+     * <p>Each value is reported once, when it changes; a change reported while no delegate is set
+     * is not sent again.
+     *
+     * @param authProvider The current auth provider. One of the {@link CurrentAuthProvider}
+     *     constants, or {@code null} after the service is uninitialized.
+     */
+    @UiThread
+    default void onCurrentAuthProviderChanged(
+        final @Nullable @CurrentAuthProvider String authProvider) {}
   }
 
   /* package */ IPProtectionController() {
@@ -299,20 +343,51 @@ public class IPProtectionController {
             "GeckoView:IPProtection:IPPProxyManager:StateChanged",
             "GeckoView:IPProtection:IPPProxyManager:UsageChanged",
             "GeckoView:IPProtection:ServerList:ListChanged",
+            "GeckoView:IPProtection:CurrentAuthProviderChanged",
             "GeckoView:IPProtection:GetToken",
+            "GeckoView:IPProtection:TokenRejected",
             "GeckoView:IPProtection:GPI:WarmUp",
             "GeckoView:IPProtection:GPI:RequestToken");
   }
 
+  /** The auth providers IP Protection uses while no account is signed in. */
+  @Retention(RetentionPolicy.SOURCE)
+  @StringDef(value = {SIGNED_OUT_AUTH_NONE, SIGNED_OUT_AUTH_GPI})
+  public @interface SignedOutAuth {}
+
+  /** IP Protection authenticates only with the signed-in account. */
+  public static final String SIGNED_OUT_AUTH_NONE = "none";
+
   /**
-   * Initializes the IP protection service.
+   * IP Protection may authenticate with Google Play Integrity.
+   *
+   * <p>Without a {@link GpiProvider}, the service uses the signed-in account until the app
+   * restarts.
+   */
+  public static final String SIGNED_OUT_AUTH_GPI = "gpi";
+
+  /**
+   * Initializes the IP protection service with {@link #SIGNED_OUT_AUTH_NONE}.
    *
    * @return A {@link GeckoResult} that resolves when initialization completes.
    */
   @HandlerThread
   public @NonNull GeckoResult<Void> init() {
+    return init(SIGNED_OUT_AUTH_NONE);
+  }
+
+  /**
+   * Initializes the IP protection service.
+   *
+   * @param signedOutAuth The {@link SignedOutAuth} to use.
+   * @return A {@link GeckoResult} that resolves when initialization completes.
+   */
+  @HandlerThread
+  public @NonNull GeckoResult<Void> init(final @NonNull @SignedOutAuth String signedOutAuth) {
     ThreadUtils.assertOnHandlerThread();
-    return EventDispatcher.getInstance().queryVoid("GeckoView:IPProtection:Init");
+    final GeckoBundle bundle = new GeckoBundle(1);
+    bundle.putString("signedOutAuth", signedOutAuth);
+    return EventDispatcher.getInstance().queryVoid("GeckoView:IPProtection:Init", bundle);
   }
 
   /**
@@ -402,8 +477,7 @@ public class IPProtectionController {
    * precondition is violated, the returned {@link GeckoResult} is rejected with {@link
    * IllegalStateException}.
    *
-   * <p>Requires {@link #init()} to have been called; otherwise the JS-side listeners that consume
-   * the event have not yet been registered.
+   * <p>Requires {@link #init(String)} to have been called; a state reported earlier is ignored.
    *
    * @param signedIn Whether the embedding app currently has a signed-in user.
    * @return A {@link GeckoResult} that resolves once the JS side has acknowledged the event, or
@@ -580,6 +654,7 @@ public class IPProtectionController {
 
   /** Exception type for IP proxy errors. */
   public static class IPProxyException extends RuntimeException {
+    private static final long serialVersionUID = 1L;
 
     /** An unexpected error occurred. */
     public static final int ERROR_UNKNOWN = -1;
@@ -767,6 +842,10 @@ public class IPProtectionController {
         case "GeckoView:IPProtection:ServerList:ListChanged":
           withDelegate(event, d -> d.onCountryListChanged(countriesFromBundle(message)));
           break;
+        case "GeckoView:IPProtection:CurrentAuthProviderChanged":
+          withDelegate(
+              event, d -> d.onCurrentAuthProviderChanged(message.getString("authProvider")));
+          break;
         case "GeckoView:IPProtection:GetToken":
           {
             final AuthProvider provider = tryAuthProvider(event, callback);
@@ -785,11 +864,25 @@ public class IPProtectionController {
                         }));
             break;
           }
+        case "GeckoView:IPProtection:TokenRejected":
+          {
+            final AuthProvider provider = tryAuthProvider(event, callback);
+            if (provider == null) return;
+            final String token = message.getString("token", "");
+            if (token.isEmpty()) {
+              callback.sendError(ERROR_LOGIN_NEEDED);
+              break;
+            }
+            callback.resolveTo(provider.onTokenRejected(token));
+            break;
+          }
         case "GeckoView:IPProtection:GPI:WarmUp":
           {
             final GpiProvider gpiProvider = mGpiProvider;
             if (gpiProvider == null) {
               Log.w(LOGTAG, "Received " + event + " but no GPI provider is set");
+              EventDispatcher.getInstance()
+                  .dispatch("GeckoView:IPProtection:GPI:WarmUpFailed", null);
               break;
             }
             gpiProvider

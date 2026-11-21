@@ -34,7 +34,7 @@ use crate::picture::{get_relative_scale_offset, PictureInstance};
 use crate::picture::MAX_COMPOSITOR_SURFACES_SIZE;
 use crate::prim_store::{ClipSnap, PrimitiveInstance, PrimitiveKind, PrimitiveScratchBuffer, PictureIndex};
 use crate::print_tree::{PrintTreePrinter, PrintTree};
-use crate::{profiler, render_backend::{DataStores, DlStores}};
+use crate::{profiler, render_backend::DlStores};
 use crate::profiler::TransactionProfile;
 use crate::renderer::GpuBufferBuilderF;
 use crate::resource_cache::{ResourceCache, ImageRequest};
@@ -70,9 +70,9 @@ pub const MAX_COMPOSITOR_SURFACES: usize = 4;
 /// This is an arbitrary number that should be enough for most cases.
 pub const MAX_COMPOSITOR_UNDERLAY_SURFACES: usize = 5;
 
-/// Number of consecutive frames that a YUV primitive must remain at the same
-/// picture-space coverage rect before it may be promoted to an OS compositor
-/// overlay or underlay.
+/// Number of consecutive frames that a non-DRM 8-bit YUV primitive must remain
+/// at the same picture-space coverage rect when the stability delay is enabled.
+/// HDR and DRM video bypass this delay.
 const YUV_SURFACE_STABLE_FRAMES: u32 = 15;
 
 /// The size in device pixels of a normal cached tile.
@@ -601,7 +601,7 @@ impl Tile {
             &state.composite_state.compositor_kind,
             frame_context.config.gpu_supports_render_target_partial_update,
         );
-        let supports_simple_prims = !matches!(state.composite_state.compositor_kind, CompositorKind::Native { .. });
+        let supports_simple_prims = !state.composite_state.compositor_kind.uses_native_tiles();
 
         // TODO(gw): Consider using smaller tiles and/or tile splits for
         //           native compositors that don't support dirty rects.
@@ -670,21 +670,18 @@ impl Tile {
                     // involves drawing to a texture. Create the correct surface
                     // descriptor depending on the compositing mode that will read
                     // the output.
-                    let descriptor = match state.composite_state.compositor_kind {
-                        CompositorKind::Draw { .. } | CompositorKind::Layer { .. } => {
-                            // For a texture cache entry, create an invalid handle that
-                            // will be allocated when update_picture_cache is called.
-                            SurfaceTextureDescriptor::TextureCache {
-                                handle: None,
-                            }
+                    let descriptor = if state.composite_state.compositor_kind.uses_native_tiles() {
+                        // Create a native surface surface descriptor, but don't allocate
+                        // a surface yet. The surface is allocated *after* occlusion
+                        // culling occurs, so that only visible tiles allocate GPU memory.
+                        SurfaceTextureDescriptor::Native {
+                            id: None,
                         }
-                        CompositorKind::Native { .. } => {
-                            // Create a native surface surface descriptor, but don't allocate
-                            // a surface yet. The surface is allocated *after* occlusion
-                            // culling occurs, so that only visible tiles allocate GPU memory.
-                            SurfaceTextureDescriptor::Native {
-                                id: None,
-                            }
+                    } else {
+                        // For a texture cache entry, create an invalid handle that
+                        // will be allocated when update_picture_cache is called.
+                        SurfaceTextureDescriptor::TextureCache {
+                            handle: None,
                         }
                     };
 
@@ -922,8 +919,8 @@ pub struct TileCacheInstance {
     pub overlay_region: PictureRect,
     /// The number YuvImage prims in this cache, provided in our TileCacheParams.
     pub yuv_images_count: usize,
-    /// The remaining number of YuvImage prims we will see this frame. We prioritize
-    /// promoting these before promoting any Image prims.
+    /// The remaining number of YuvImage prims we will see this frame. Ordinary
+    /// Image prims wait for these to be considered; DRM Image prims do not.
     pub yuv_images_remaining: usize,
     /// Per-YUV-primitive stability state retained across frames.
     yuv_surface_stability: FastHashMap<crate::intern::ItemUid, YuvSurfaceStability>,
@@ -1164,13 +1161,9 @@ impl TileCacheInstance {
         compositor_kind: &CompositorKind,
         root_spatial_node_index: SpatialNodeIndex,
     ) -> bool {
-        match compositor_kind {
-            CompositorKind::Layer { .. } => true,
-            CompositorKind::Native { .. } | CompositorKind::Draw { .. } => {
-                // Only check for occlusion on visible tiles that are fixed position.
-                self.spatial_node_index == root_spatial_node_index
-            }
-        }
+        compositor_kind.culls_all_tiles() ||
+            // Only check for occlusion on visible tiles that are fixed position.
+            self.spatial_node_index == root_spatial_node_index
     }
 
     /// Whether a backdrop-filter in this slice or a slice above may sample `rect`.
@@ -1430,7 +1423,7 @@ impl TileCacheInstance {
                 // A tile cache has no local clip rect of its own.
                 LayoutRect::max_rect(),
                 frame_context.spatial_tree,
-                &frame_state.data_stores.clip,
+                &frame_state.dl_stores.clips,
                 &frame_state.clip_tree,
             );
 
@@ -1441,7 +1434,7 @@ impl TileCacheInstance {
                 &mut frame_state.frame_gpu_data.f32,
                 frame_state.resource_cache,
                 &surface.culling_rect,
-                &frame_state.data_stores.clip,
+                &frame_state.dl_stores.clips,
                 frame_state.rg_builder,
                 true,
             );
@@ -1464,7 +1457,7 @@ impl TileCacheInstance {
                         let clip_instance = frame_state
                             .clip_store
                             .get_instance_from_range(&clip_chain.clips_range, i);
-                        let clip_node = &frame_state.data_stores.clip[clip_instance.handle];
+                        let clip_node = &frame_state.dl_stores.clips[clip_instance.handle];
 
                         if let ClipItemKind::RoundedRectangle { radius, inset: _, mode } = clip_node.item.kind {
                             assert_eq!(mode, ClipMode::Clip);
@@ -1518,7 +1511,7 @@ impl TileCacheInstance {
                                     rect: clip_instance.clip_rect,
                                     radius,
                                     spatial_node_index: clip_instance.spatial_node_index,
-                                    uid: clip_instance.handle.uid().get_uid(),
+                                    uid: frame_state.dl_stores.clips.uid(clip_instance.handle).get_uid(),
                                 });
                             }
                         }
@@ -1714,7 +1707,7 @@ impl TileCacheInstance {
                 // simple composite mode, the texture cache handle will expire and be collected
                 // by the texture cache. For native compositor mode, we need to explicitly
                 // invoke a callback to the client to destroy that surface.
-                if let CompositorKind::Native { .. } = frame_state.composite_state.compositor_kind {
+                if frame_state.composite_state.compositor_kind.uses_native_tiles() {
                     for tile in old_tiles.values_mut() {
                         // Only destroy native surfaces that have been allocated. It's
                         // possible for display port tiles to be created that never
@@ -1766,10 +1759,10 @@ impl TileCacheInstance {
         surface_kind: CompositorSurfaceKind,
         pic_coverage_rect: PictureRect,
         frame_context: &FrameVisibilityContext,
-        data_stores: &DataStores,
+        dl_stores: &DlStores,
         clip_store: &ClipStore,
         composite_state: &CompositeState,
-        color_depth: Option<ColorDepth>,
+        force_external_composition: bool,
     ) -> Result<CompositorSurfaceKind, SurfacePromotionFailure> {
         use SurfacePromotionFailure::*;
 
@@ -1787,10 +1780,10 @@ impl TileCacheInstance {
                 // promoted directly to a compositor surface.
                 if prim_clip_chain.needs_mask {
                     let mut is_supported_rounded_rect = false;
-                    if let CompositorKind::Layer { .. } = composite_state.compositor_kind {
+                    if composite_state.compositor_kind.supports_rounded_clip_promotion() {
                         if prim_clip_chain.clips_range.count == 1 && self.compositor_clip.is_none() {
                             let clip_instance = clip_store.get_instance_from_range(&prim_clip_chain.clips_range, 0);
-                            let clip_node = &data_stores.clip[clip_instance.handle];
+                            let clip_node = &dl_stores.clips[clip_instance.handle];
 
                             if let ClipItemKind::RoundedRectangle { ref radius, mode: ClipMode::Clip, .. } = clip_node.item.kind {
                                 // Compositor rounded clips only support the default round
@@ -1837,11 +1830,8 @@ impl TileCacheInstance {
                 }
             }
             CompositorSurfaceKind::Underlay => {
-                // Should we force the promotion of this surface? We'll force it if promotion
-                // is necessary for correct color display of HDR.
-                let force_for_hdr = matches!(color_depth, Some(color_depth) if color_depth.bit_depth() > 8);
-
-                if !force_for_hdr && self.is_sampled_by_backdrop(&pic_coverage_rect) {
+                // HDR and DRM video bypass this backdrop-filter restriction.
+                if !force_external_composition && self.is_sampled_by_backdrop(&pic_coverage_rect) {
                     return Err(UnderBackdropFilter);
                 }
 
@@ -1853,7 +1843,7 @@ impl TileCacheInstance {
                     if !self.backdrop.opaque_rect.contains_box(&pic_coverage_rect) {
                         let result = Err(UnderlayAlphaBackdrop);
                         // If we aren't forcing, give up and return Err.
-                        if !force_for_hdr {
+                        if !force_external_composition {
                             return result;
                         }
 
@@ -1862,11 +1852,9 @@ impl TileCacheInstance {
                     }
 
                     if !self.underlays.is_empty() {
-                        // If we aren't forcing, we limit the number of masked underlays
-                        // Permit more underlays when forced.
-                        // XXX WebRender does not support full HDR yet.
-                        // HDR requires external composite to show correct colors.
-                        if !force_for_hdr || self.underlays.len() > MAX_COMPOSITOR_UNDERLAY_SURFACES {
+                        // Normally allow only one masked underlay. HDR and DRM video
+                        // may use additional masked underlays up to the limit below.
+                        if !force_external_composition || self.underlays.len() > MAX_COMPOSITOR_UNDERLAY_SURFACES {
                             return Err(UnderlaySurfaceLimit);
                         }
                     }
@@ -1877,7 +1865,7 @@ impl TileCacheInstance {
                 if self.overlay_region.intersects(&pic_coverage_rect) {
                     let result = Err(UnderlayIntersectsOverlay);
                     // If we aren't forcing, give up and return Err.
-                    if !force_for_hdr {
+                    if !force_external_composition {
                         return result;
                     }
 
@@ -1940,7 +1928,7 @@ impl TileCacheInstance {
         prim_spatial_node_index: SpatialNodeIndex,
         pic_coverage_rect: PictureRect,
         frame_context: &FrameVisibilityContext,
-        data_stores: &DataStores,
+        dl_stores: &DlStores,
         clip_store: &ClipStore,
         image_dependencies: &[ImageDependency;3],
         api_keys: &[ImageKey; 3],
@@ -1976,7 +1964,7 @@ impl TileCacheInstance {
             prim_spatial_node_index,
             pic_coverage_rect,
             frame_context,
-            data_stores,
+            dl_stores,
             clip_store,
             ExternalSurfaceDependency::Yuv {
                 image_dependencies: *image_dependencies,
@@ -2004,7 +1992,7 @@ impl TileCacheInstance {
         prim_spatial_node_index: SpatialNodeIndex,
         pic_coverage_rect: PictureRect,
         frame_context: &FrameVisibilityContext,
-        data_stores: &DataStores,
+        dl_stores: &DlStores,
         clip_store: &ClipStore,
         image_dependency: ImageDependency,
         api_key: ImageKey,
@@ -2042,7 +2030,7 @@ impl TileCacheInstance {
             prim_spatial_node_index,
             pic_coverage_rect,
             frame_context,
-            data_stores,
+            dl_stores,
             clip_store,
             ExternalSurfaceDependency::Rgb {
                 image_dependency,
@@ -2069,7 +2057,7 @@ impl TileCacheInstance {
         prim_spatial_node_index: SpatialNodeIndex,
         pic_coverage_rect: PictureRect,
         frame_context: &FrameVisibilityContext,
-        data_stores: &DataStores,
+        dl_stores: &DlStores,
         clip_store: &ClipStore,
         dependency: ExternalSurfaceDependency,
         api_keys: &[ImageKey; 3],
@@ -2161,7 +2149,7 @@ impl TileCacheInstance {
             assert!(self.compositor_clip.is_none());
 
             let clip_instance = clip_store.get_instance_from_range(&prim_clip_chain.clips_range, 0);
-            let clip_node = &data_stores.clip[clip_instance.handle];
+            let clip_node = &dl_stores.clips[clip_instance.handle];
             if let ClipItemKind::RoundedRectangle { radius, mode: ClipMode::Clip, .. } = clip_node.item.kind {
                 let radius = clamped_radius(&radius, clip_instance.clip_rect.size());
 
@@ -2219,12 +2207,8 @@ impl TileCacheInstance {
         // handle to use, or allocate a new one. For existing native surfaces, we can
         // also determine whether this needs to be updated, depending on whether the
         // image generation(s) of the planes have changed since last composite.
-        let (native_surface_id, update_params) = match composite_state.compositor_kind {
-            CompositorKind::Draw { .. } | CompositorKind::Layer { .. } => {
-                (None, None)
-            }
-            CompositorKind::Native { .. } => {
-                let native_surface_size = surface_size.to_i32();
+        let (native_surface_id, update_params) = if composite_state.compositor_kind.uses_native_tiles() {
+            let native_surface_size = surface_size.to_i32();
 
                 let key = ExternalNativeSurfaceKey {
                     image_keys: *api_keys,
@@ -2306,7 +2290,8 @@ impl TileCacheInstance {
                 };
 
                 (Some(native_surface.native_surface_id), update_params)
-            }
+        } else {
+            (None, None)
         };
 
         let descriptor = ExternalSurfaceDescriptor {
@@ -2426,7 +2411,6 @@ impl TileCacheInstance {
         prim_spatial_node_index: SpatialNodeIndex,
         local_prim_rect: LayoutRect,
         frame_context: &FrameVisibilityContext,
-        data_stores: &DataStores,
         dl_stores: &DlStores,
         clip_store: &ClipStore,
         pictures: &[PictureInstance],
@@ -2593,15 +2577,13 @@ impl TileCacheInstance {
                     prim_info.color_binding = Some(color_u.into());
                 }
             }
-            PrimitiveKind::Image { data_handle, .. } => {
-                let image_key = &data_stores.image[data_handle];
+            PrimitiveKind::Image { handle } => {
+                let image_key = &dl_stores.images[handle];
                 let image_data = &image_key.kind;
 
-                // For now, assume that for compositor surface purposes, any RGBA image may be
-                // translucent. See the comment in `add_prim` in this source file for more
-                // details. We'll leave the `is_opaque` code branches here, but disabled, as
-                // in future we will want to support this case correctly.
+                // Image primitives, including DRM images, only use overlays.
                 let mut is_opaque = false;
+                let mut is_drm_source = false;
 
                 if let Some(image_properties) = resource_cache.get_image_properties(image_data.key) {
                     // For an image to be a possible opaque backdrop, it must:
@@ -2622,26 +2604,31 @@ impl TileCacheInstance {
                     }
 
                     is_opaque = image_properties.descriptor.is_opaque();
+                    is_drm_source = image_properties.descriptor.is_drm_source();
                 }
 
                 let mut promotion_result: Result<CompositorSurfaceKind, SurfacePromotionFailure> = Ok(CompositorSurfaceKind::Blit);
                 if image_key.common.flags.contains(PrimitiveFlags::PREFER_COMPOSITOR_SURFACE) {
-                    // Only consider promoting Images if all of our YuvImages have been
-                    // processed (whether they were promoted or not).
-                    if self.yuv_images_remaining > 0 {
+                    // DRM images should not wait for unrelated YUV images.
+                    if self.yuv_images_remaining > 0 && !is_drm_source {
                         promotion_result = Err(ImageWaitingOnYuvImage);
                     } else {
-                        promotion_result = self.can_promote_to_surface(prim_clip_chain,
-                                                          prim_spatial_node_index,
-                                                          is_root_tile_cache,
-                                                          sub_slice_index,
-                                                          CompositorSurfaceKind::Overlay,
-                                                          pic_coverage_rect,
-                                                          frame_context,
-                                                          data_stores,
-                                                          clip_store,
-                                                          composite_state,
-                                                          None);
+                        promotion_result = self.can_promote_to_surface(
+                            prim_clip_chain,
+                            prim_spatial_node_index,
+                            is_root_tile_cache,
+                            sub_slice_index,
+                            CompositorSurfaceKind::Overlay,
+                            pic_coverage_rect,
+                            frame_context,
+                            dl_stores,
+                            clip_store,
+                            composite_state,
+                            is_drm_source,
+                        );
+                        if is_drm_source && matches!(promotion_result, Err(SliceAtomic)) {
+                            promotion_result = Ok(CompositorSurfaceKind::Overlay);
+                        }
                     }
 
                     // Native OS compositors (DC and CA, at least) support premultiplied alpha
@@ -2661,7 +2648,7 @@ impl TileCacheInstance {
                             prim_spatial_node_index,
                             pic_coverage_rect,
                             frame_context,
-                            data_stores,
+                            dl_stores,
                             clip_store,
                             ImageDependency {
                                 key: image_data.key,
@@ -2702,9 +2689,9 @@ impl TileCacheInstance {
                     generation: resource_cache.get_image_generation(image_data.key),
                 });
             }
-            PrimitiveKind::YuvImage { data_handle, .. } => {
+            PrimitiveKind::YuvImage { handle } => {
                 let prim_uid = prim_instance.uid(dl_stores);
-                let prim_data = &data_stores.yuv_image[data_handle];
+                let prim_data = &dl_stores.yuv_images[handle];
 
                 let mut promotion_result: Result<CompositorSurfaceKind, SurfacePromotionFailure> = Ok(CompositorSurfaceKind::Blit);
                 if prim_data.common.flags.contains(PrimitiveFlags::PREFER_COMPOSITOR_SURFACE) {
@@ -2717,12 +2704,18 @@ impl TileCacheInstance {
                         self.yuv_images_remaining -= 1;
                     }
 
-                    // Wide-color / HDR YUV images must keep the existing immediate
-                    // promotion behavior. WebRender cannot faithfully flatten these
-                    // into 8-bit content, so only apply the stability delay to Color8.
+                    let is_drm_source = prim_data.kind.yuv_key.iter().any(|&key| {
+                        key != ImageKey::DUMMY && resource_cache.get_image_properties(key)
+                            .map_or(false, |properties| properties.descriptor.is_drm_source())
+                    });
+                    let force_external_composition =
+                        prim_data.kind.color_depth != ColorDepth::Color8 || is_drm_source;
+
+                    // HDR and DRM video should be promoted immediately rather than
+                    // spending the stability delay composited into content tiles.
                     let apply_stability_delay =
                         frame_context.config.enable_yuv_overlay_stability &&
-                        prim_data.kind.color_depth == ColorDepth::Color8;
+                        !force_external_composition;
                     let allow_promotion = !apply_stability_delay || {
                         let stability = self.yuv_surface_stability
                             .entry(prim_uid)
@@ -2746,11 +2739,18 @@ impl TileCacheInstance {
                     if !allow_promotion {
                         promotion_result = Err(YuvImageNotStable);
                     } else {
+                        // Prefer an overlay when its clipping, transform, and stacking
+                        // requirements are met. Otherwise try an underlay, which can use
+                        // a cutout in the content tiles to support masked video.
+                        // HDR and DRM video bypass selected promotion restrictions to
+                        // preserve external composition: HDR needs it for correct colors,
+                        // and DRM video should avoid being drawn into content tiles.
+                        // If neither attempt succeeds, draw the video with a blit into
+                        // content tiles, which may lose HDR color fidelity.
                         let promotion_attempts =
                             [CompositorSurfaceKind::Overlay, CompositorSurfaceKind::Underlay];
                         for kind in promotion_attempts {
-                            // Since this might be an attempt after an earlier error, clear the flag
-                            // so that we are allowed to report another error.
+                            // Try an overlay first, then an underlay if promotion fails.
                             promotion_result = self.can_promote_to_surface(
                                                         prim_clip_chain,
                                                         prim_spatial_node_index,
@@ -2759,19 +2759,17 @@ impl TileCacheInstance {
                                                         kind,
                                                         pic_coverage_rect,
                                                         frame_context,
-                                                        data_stores,
+                                                        dl_stores,
                                                         clip_store,
                                                         composite_state,
-                                                        Some(prim_data.kind.color_depth));
+                                                        force_external_composition);
                             if promotion_result.is_ok() {
                                 break;
                             }
-                            // We couldn't promote, but did we give up because the slice is marked
-                            // atomic? If that was the reason, and the YuvImage is wide color,
-                            // failing to promote will flatten the colors and look terrible. Let's
-                            // ignore the atomic slice restriction in such a case.
+                            // Allow HDR and DRM video to use an overlay even when
+                            // the slice is atomic.
                             if let Err(SliceAtomic) = promotion_result {
-                                if prim_data.kind. color_depth != ColorDepth::Color8 {
+                                if force_external_composition {
                                     // Let's promote with the attempted kind.
                                     promotion_result = Ok(kind);
                                     break;
@@ -2780,8 +2778,7 @@ impl TileCacheInstance {
                         }
                     }
 
-                    // TODO(gw): When we support RGBA images for external surfaces, we also
-                    //           need to check if opaque (YUV images are implicitly opaque).
+                    // YUV images are implicitly opaque and can use underlays.
 
                     // If this primitive is being promoted to a surface, construct an external
                     // surface descriptor for use later during batching and compositing. We only
@@ -2809,7 +2806,7 @@ impl TileCacheInstance {
                             prim_spatial_node_index,
                             pic_coverage_rect,
                             frame_context,
-                            data_stores,
+                            dl_stores,
                             clip_store,
                             &image_dependencies,
                             &prim_data.kind.yuv_key,
@@ -2861,15 +2858,15 @@ impl TileCacheInstance {
                     );
                 }
             }
-            PrimitiveKind::ImageBorder { data_handle, .. } => {
-                let border_data = &data_stores.image_border[data_handle].kind;
+            PrimitiveKind::ImageBorder { handle } => {
+                let border_data = &dl_stores.image_borders[handle].kind;
                 prim_info.images.push(ImageDependency {
                     key: border_data.request.key,
                     generation: resource_cache.get_image_generation(border_data.request.key),
                 });
             }
-            PrimitiveKind::LinearGradient { data_handle, .. } => {
-                let gradient_data = &data_stores.linear_grad[data_handle];
+            PrimitiveKind::LinearGradient { handle } => {
+                let gradient_data = &dl_stores.linear_gradients[handle];
                 if gradient_data.stops_opacity.is_opaque
                     && gradient_data.tile_spacing == LayoutSize::zero()
                 {
@@ -2881,8 +2878,8 @@ impl TileCacheInstance {
                     });
                 }
             }
-            PrimitiveKind::ConicGradient { data_handle, .. } => {
-                let gradient_data = &data_stores.conic_grad[data_handle];
+            PrimitiveKind::ConicGradient { handle } => {
+                let gradient_data = &dl_stores.conic_gradients[handle];
                 if gradient_data.stops_opacity.is_opaque
                     && gradient_data.tile_spacing == LayoutSize::zero()
                 {
@@ -2894,8 +2891,8 @@ impl TileCacheInstance {
                     });
                 }
             }
-            PrimitiveKind::RadialGradient { data_handle, .. } => {
-                let gradient_data = &data_stores.radial_grad[data_handle];
+            PrimitiveKind::RadialGradient { handle } => {
+                let gradient_data = &dl_stores.radial_gradients[handle];
                 if gradient_data.stops_opacity.is_opaque
                     && gradient_data.tile_spacing == LayoutSize::zero()
                 {
@@ -3036,7 +3033,7 @@ impl TileCacheInstance {
                     backdrop_candidate.opaque_rect = clip_store
                         .get_inner_rect_for_clip_chain(
                             prim_clip_chain,
-                            &data_stores.clip,
+                            &dl_stores.clips,
                             frame_context.spatial_tree,
                         )
                         .unwrap_or(PictureRect::zero());
@@ -3099,10 +3096,11 @@ impl TileCacheInstance {
         // Compute scratch ranges for clips once, outside the tile loop.
         // Actual quantization into per-tile vert_data happens inside add_prim_dependency.
         for clip_instance in clip_instances {
-            let clip = &data_stores.clip[clip_instance.handle];
+            let clip = &dl_stores.clips[clip_instance.handle];
             let clip_local_rect = match clip.item.kind {
                 ClipItemKind::Rectangle { .. }
                 | ClipItemKind::RoundedRectangle { .. }
+                | ClipItemKind::Border { .. }
                 | ClipItemKind::Image { .. }
                 | ClipItemKind::Path { .. } => Some(clip_instance.clip_rect),
             };
@@ -3116,7 +3114,7 @@ impl TileCacheInstance {
                 ),
                 None => VertRange::INVALID,
             };
-            prim_info.clips.push((clip_instance.handle.uid(), clip_scratch));
+            prim_info.clips.push((dl_stores.clips.uid(clip_instance.handle), clip_scratch));
         }
 
         // For unclamped primitives, push prim + coverage into curr_verts once.
@@ -3299,14 +3297,22 @@ impl TileCacheInstance {
         });
 
         if !self.underlays.is_empty() && (!self.deferred_dirty_tests.is_empty() || !self.mix_blend_pic_rects.is_empty()) {
-            let is_yuv_8bit = |desc: &ExternalSurfaceDescriptor| {
-                matches!(
-                    desc.dependency,
+            // True only for YUV surfaces with 8-bit channels and no DRM source
+            // flag on any valid plane. "non" applies only to DRM: RGB surfaces,
+            // higher-bit-depth YUV surfaces, and DRM YUV surfaces return false.
+            let is_non_drm_yuv_8bit = |desc: &ExternalSurfaceDescriptor| {
+                match desc.dependency {
                     ExternalSurfaceDependency::Yuv {
                         channel_bit_depth: 8,
+                        image_dependencies,
                         ..
-                    }
-                )
+                    } => !image_dependencies.iter().any(|dep| {
+                        dep.key != ImageKey::DUMMY && resource_cache
+                            .get_image_properties(dep.key)
+                            .map_or(false, |properties| properties.descriptor.is_drm_source())
+                    }),
+                    _ => false,
+                }
             };
 
             let intersects_with_dirty_tests = |desc: &ExternalSurfaceDescriptor| {
@@ -3321,13 +3327,19 @@ impl TileCacheInstance {
                     .any(|rect| rect.intersects(&desc.local_rect))
             };
 
-            // Cancel underlay if underlay intersects with backdrop filter or mix-blend-mode and bit depth is 8 bits
-            // XXX WebRender does not support full HDR yet. HDR requires external composite to show correct colors.
+            // An underlay has already been chosen because overlay promotion failed.
+            // Draw non-DRM 8-bit YUV video into content tiles with a blit when it
+            // intersects a backdrop filter or mix-blend-mode, so those effects can
+            // sample the video. Otherwise keep the underlay.
+            // Keep DRM and higher-bit-depth YUV video as underlays even when they
+            // intersect these effects: DRM video should remain externally composited,
+            // and blitting HDR video into 8-bit content tiles can produce incorrect
+            // colors. RGB surfaces are not changed by this YUV-specific check.
             let (underlays, cancel_underlays): (Vec<_>, Vec<_>) =
                 self.underlays
                     .iter()
                     .partition(|desc| {
-                        !is_yuv_8bit(desc) ||
+                        !is_non_drm_yuv_8bit(desc) ||
                         (!intersects_with_dirty_tests(desc) && !intersects_with_mix_blend(desc))
                     });
 

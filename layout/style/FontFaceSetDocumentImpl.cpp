@@ -633,9 +633,10 @@ StyleLockedFontFaceRule* FontFaceSetDocumentImpl::FindRuleForEntry(
   NS_ASSERTION(!aFontEntry->mIsUserFontContainer, "only platform font entries");
   for (uint32_t i = 0; i < mRuleFaces.Length(); ++i) {
     FontFaceImpl* f = mRuleFaces[i].mFontFace;
-    gfxUserFontEntry* entry = f->GetUserFontEntry();
-    if (entry && entry->GetPlatformFontEntry() == aFontEntry) {
-      return f->GetRule();
+    if (gfxUserFontEntry* entry = f->GetUserFontEntry()) {
+      if (entry->PlatformFontEntryEquals(aFontEntry)) {
+        return f->GetRule();
+      }
     }
   }
   return nullptr;
@@ -719,10 +720,9 @@ bool FontFaceSetDocumentImpl::MightHavePendingFontLoads() {
 
   // And we also wait for any CSS style sheets to finish loading, as their
   // styles might cause new fonts to load.
-  if (css::Loader* loader = mDocument->GetExistingCSSLoader()) {
-    if (loader->HasPendingLoads()) {
-      return true;
-    }
+  if (css::Loader* loader = mDocument->GetExistingCSSLoader();
+      loader && loader->HasPendingNonDeferredLoads()) {
+    return true;
   }
 
   return false;

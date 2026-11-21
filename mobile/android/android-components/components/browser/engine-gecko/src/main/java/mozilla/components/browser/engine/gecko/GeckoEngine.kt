@@ -1147,7 +1147,6 @@ class GeckoEngine(
     }
 
     /** See [BrowserPreferencesRuntime.registerPrefForObservation]. */
-    @OptIn(ExperimentalGeckoViewApi::class)
     override fun registerPrefForObservation(
         pref: String,
         onSuccess: () -> Unit,
@@ -1168,7 +1167,6 @@ class GeckoEngine(
     }
 
     /** See [BrowserPreferencesRuntime.registerPrefsForObservation]. */
-    @OptIn(ExperimentalGeckoViewApi::class)
     override fun registerPrefsForObservation(
         prefs: List<String>,
         onSuccess: () -> Unit,
@@ -1189,7 +1187,6 @@ class GeckoEngine(
     }
 
     /** See [BrowserPreferencesRuntime.unregisterPrefForObservation]. */
-    @OptIn(ExperimentalGeckoViewApi::class)
     override fun unregisterPrefForObservation(
         pref: String,
         onSuccess: () -> Unit,
@@ -1210,7 +1207,6 @@ class GeckoEngine(
     }
 
     /** See [BrowserPreferencesRuntime.unregisterPrefsForObservation]. */
-    @OptIn(ExperimentalGeckoViewApi::class)
     override fun unregisterPrefsForObservation(
         prefs: List<String>,
         onSuccess: () -> Unit,
@@ -1353,7 +1349,6 @@ class GeckoEngine(
 
     /** See [Engine.setBrowserPref]. */
     @ExperimentalAndroidComponentsApi
-    @OptIn(ExperimentalGeckoViewApi::class)
     @Suppress("TooGenericExceptionCaught")
     override fun setBrowserPrefs(
         prefs: List<SetBrowserPreference<*>>,
@@ -1658,6 +1653,13 @@ class GeckoEngine(
                         runtime.settings.loginAutofillEnabled = value
                     }
 
+                override var creditCardSecurityCodeEnabled: Boolean
+                    @OptIn(ExperimentalGeckoViewApi::class) get() = runtime.settings.creditCardSecurityCodeEnabled
+                    @OptIn(ExperimentalGeckoViewApi::class)
+                    set(value) {
+                        runtime.settings.creditCardSecurityCodeEnabled = value
+                    }
+
                 @ExperimentalAndroidComponentsApi
                 override var firefoxRelay: Engine.FirefoxRelayMode?
                     @OptIn(ExperimentalGeckoViewApi::class)
@@ -1681,14 +1683,6 @@ class GeckoEngine(
                                 }
                             runtime.settings.setFirefoxRelay(mode)
                         }
-                    }
-
-                @ExperimentalAndroidComponentsApi
-                override var ipProtectionAuthProvider: String?
-                    @OptIn(ExperimentalGeckoViewApi::class) get() = runtime.settings.ipProtectionAuthProvider
-                    @OptIn(ExperimentalGeckoViewApi::class)
-                    set(value) {
-                        value?.let { runtime.settings.setIpProtectionAuthProvider(it) }
                     }
 
                 override var forceUserScalableContent: Boolean
@@ -2014,8 +2008,8 @@ class GeckoEngine(
                     this.forceUserScalableContent = it.forceUserScalableContent
                     this.clearColor = it.clearColor
                     this.loginAutofillEnabled = it.loginAutofillEnabled
+                    this.creditCardSecurityCodeEnabled = it.creditCardSecurityCodeEnabled
                     this.firefoxRelay = it.firefoxRelay
-                    this.ipProtectionAuthProvider = it.ipProtectionAuthProvider
                     this.enterpriseRootsEnabled = it.enterpriseRootsEnabled
                     this.httpsOnlyMode = it.httpsOnlyMode
                     this.dohSettingsMode = it.dohSettingsMode

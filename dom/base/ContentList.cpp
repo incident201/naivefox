@@ -352,13 +352,12 @@ uint32_t ContentList::Length() {
 
 Element* ContentList::Item(uint32_t aIndex) {
   uint32_t count = mElements.Length();
+  MOZ_ASSERT_IF(mState == State::Dirty, !count);
   if (aIndex >= count && mState != State::UpToDate) {
     // Prefetch progressively more elements if access is sequential
     uint32_t prefetch = aIndex == count ? std::min(count, 64u) : 0;
     PopulateSelf(std::min(aIndex, UINT32_MAX - 1 - prefetch) + prefetch + 1);
   }
-  MOZ_ASSERT(mState != State::Dirty,
-             "mElements should've been cleared if dirty");
 
   ASSERT_IN_SYNC;
   NS_ASSERTION(!mRootNode || mState != State::Dirty,
@@ -693,7 +692,8 @@ void ContentList::ContentInserted(nsIContent* aChild,
 
 void ContentList::ContentWillBeRemoved(nsIContent* aChild,
                                        const ContentRemoveInfo&) {
-  if (mState != State::Dirty &&
+  MOZ_ASSERT_IF(mState == State::Dirty, mElements.IsEmpty());
+  if (!mElements.IsEmpty() &&
       MayContainRelevantNodes(aChild->GetParentNode()) &&
       nsContentUtils::IsInSameAnonymousTree(mRootNode, aChild) &&
       MatchSelf<MatchSelfMode::Removal>(aChild)) {
@@ -776,8 +776,7 @@ nsINode* ContentList::GetNextNode(nsINode* aCurrent) {
   return aCurrent->GetNextNode(mRootNode);
 }
 
-void ContentList::PopulateSelf(uint32_t aNeededLength,
-                               uint32_t aExpectedElementsIfDirty) {
+void ContentList::PopulateSelf(uint32_t aNeededLength) {
   if (!mRootNode) {
     return;
   }
@@ -785,11 +784,13 @@ void ContentList::PopulateSelf(uint32_t aNeededLength,
   ASSERT_IN_SYNC;
 
   uint32_t count = mElements.Length();
-  NS_ASSERTION(mState != State::Dirty || count == aExpectedElementsIfDirty,
+  NS_ASSERTION(mState != State::Dirty || count == 0,
                "Reset() not called when setting state to State::Dirty?");
 
-  if (count >= aNeededLength)  // We're all set
+  if (count >= aNeededLength) {
+    // An override may already have appended elements.
     return;
+  }
 
   uint32_t elementsToAppend = aNeededLength - count;
 #ifdef DEBUG
@@ -1117,8 +1118,8 @@ void LabelsNodeList::ResetRoots() {
   // If the outermost labeled element or host is in a shadow tree, its
   // containing shadow root is already in newRoots.
   if (!labeledElementOrHostIsInShadowTree) {
-    // `labeledHost` is either `labeledElement`, or the shadow host which has
-    // `labeledElement` as its resolved reference target.
+    // `labeledElementOrHost` is either `labeledElement`, or the shadow host
+    // which has `labeledElement` as its resolved reference target.
     if (Document* doc = labeledElementOrHost->GetUncomposedDoc()) {
       newRoots.AppendElement(doc);
     } else if (newRoots.IsEmpty()) {
@@ -1165,7 +1166,7 @@ void LabelsNodeList::ResetRoots() {
 }
 
 nsINode* LabelsNodeList::GetNextNode(nsINode* aCurrent) {
-  auto* labeledElement = (nsGenericHTMLElement*)mData;
+  auto* labeledElement = static_cast<nsGenericHTMLElement*>(mData);
   MOZ_ASSERT(labeledElement, "Must have labeled element");
   MOZ_ASSERT(mRootNode, "Must have root node");
 
@@ -1192,22 +1193,23 @@ nsINode* LabelsNodeList::GetNextNode(nsINode* aCurrent) {
   }
 
   // If we descended into a shadow tree, back out of it until we find an
-  // adjacent node, or hit a shadow root which doesn't have the current element
-  // as its reference target.
-  nsINode* cur = aCurrent;
-  while (!next) {
-    ShadowRoot* shadow = cur->GetContainingShadow();
-    if (!shadow || shadow->GetReferenceTargetElement() == cur) {
+  // adjacent node, or hit a shadow root which doesn't have labeledElement as
+  // its resolved reference target.
+  for (ShadowRoot* shadow = aCurrent->GetContainingShadow(); shadow;
+       shadow = shadow->Host()->GetContainingShadow()) {
+    Element* curElement = shadow->Host();
+    if (curElement->ResolveReferenceTarget() != labeledElement) {
       break;
     }
-    cur = shadow->Host();
-    next = cur->GetNextNode();
+    next = curElement->GetNextNode();
+    if (next) {
+      return next;
+    }
   }
-  return next;
+  return nullptr;
 }
 
-void LabelsNodeList::PopulateSelf(uint32_t aNeededLength,
-                                  uint32_t aExpectedElementsIfDirty) {
+void LabelsNodeList::PopulateSelf(uint32_t aNeededLength) {
   if (!mRootNode) {
     return;
   }
@@ -1216,10 +1218,11 @@ void LabelsNodeList::PopulateSelf(uint32_t aNeededLength,
   nsINode* cur = mRootNode;
   if (mElements.IsEmpty() && cur->IsElement() && Match(cur->AsElement())) {
     mElements.AppendElement(cur->AsElement());
-    ++aExpectedElementsIfDirty;
+    mState = State::Lazy;
+    SetEnabledCallbacks(nsIMutationObserver::kAll);
   }
 
-  ContentList::PopulateSelf(aNeededLength, aExpectedElementsIfDirty);
+  ContentList::PopulateSelf(aNeededLength);
 }
 
 void LabelsNodeList::DisconnectFromRoot() {

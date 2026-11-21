@@ -21,6 +21,8 @@ import mozfile
 import mozinfo
 import six
 from mozlog import structured
+from mozlog.formatters import JSONFormatter
+from mozlog.handlers import StreamHandler
 from runxpcshelltests import XPCShellTests
 
 TEST_PASS_STRING = "TEST-PASS"
@@ -342,6 +344,19 @@ function run_test () {
 }
 """
 
+TEST_FAILING_ONCE = """
+function run_test () {
+  // See TEST_CRASHING_ONCE about writing to the cwd.
+  let marker = do_get_cwd();
+  marker.append("failed_once");
+  let failed = marker.exists();
+  if (!failed) {
+    marker.create(Ci.nsIFile.NORMAL_FILE_TYPE, 0o644);
+  }
+  Assert.ok(failed);
+}
+"""
+
 # A test for asynchronous cleanup functions
 ASYNC_CLEANUP = """
 function run_test() {
@@ -576,7 +591,13 @@ prefs = [
         self.manifest = self.writeFile("xpcshell.toml", val)
 
     def assertTestResult(
-        self, expected, shuffle=False, verbose=False, headless=False, retry=None
+        self,
+        expected,
+        shuffle=False,
+        verbose=False,
+        headless=False,
+        retry=None,
+        verify=False,
     ):
         """
         Assert that self.x.runTests with manifest=self.manifest
@@ -595,6 +616,9 @@ prefs = [
         kwargs["testingModulesDir"] = self.testing_modules
         kwargs["utility_path"] = self.utility_path
         kwargs["repeat"] = 0
+        if verify:
+            kwargs["verify"] = True
+            kwargs["verifyMaxTime"] = 3600
         # Don't retry tests that are expected to fail
         if retry is not None:
             kwargs["retry"] = retry
@@ -842,6 +866,62 @@ prefs = [
         )
         self.assertEqual(error["stack"][1]["line"], 100)
         self.assertNotIn("column", error["stack"][1])
+
+    def testASanErrorAction(self):
+        """
+        An AddressSanitizer report printed by the test process is reported
+        as a single asan_error structured log action, and as a crash of the
+        test in the error summary, which fails the group.
+
+        The report lines are synthetic, so this runs on every build type.
+        """
+        records = []
+        self.x.log.add_handler(records.append)
+        self.writeFile(
+            "test_asan.js",
+            """
+          function run_test() {
+            dump("==1234==ERROR: AddressSanitizer: SEGV on unknown address 0x00000000030b (pc 0x7b03e9dd40af bp 0x7fff627fb7f0 sp 0x7fff627fb7e0 T0)\\n");
+            dump("==1234==The signal is caused by a READ memory access.\\n");
+            dump("==1234==Hint: address points to the zero page.\\n");
+            dump("    #0 0x7b03e9dd40af in GetInnerWindow /src/Document.h:1942:12\\n");
+            dump("    #1 0x7f42401b0a33 in clone misc/../sysdeps/unix/sysv/linux/x86_64/clone.S:100\\n");
+            dump("SUMMARY: AddressSanitizer: SEGV /src/Document.h:1942:12 in GetInnerWindow\\n");
+            dump("==1234==ABORTING\\n");
+            Assert.ok(true);
+          }
+        """,
+        )
+
+        self.writeManifest(["test_asan.js"])
+        # Not retried, so the report is not logged quietly.
+        self.assertTestResult(True, verbose=True, retry=False)
+
+        errors = [r for r in records if r["action"] == "asan_error"]
+        self.assertEqual(len(errors), 1, pprint.pformat(records))
+        error = errors[0]
+        self.assertEqual(error["kind"], "SEGV")
+        self.assertTrue(
+            error["message"].startswith("SEGV on unknown address 0x00000000030b")
+        )
+        self.assertEqual(error["pid"], 1234)
+        self.assertEqual(error["file"], "/src/Document.h")
+        self.assertEqual(error["lineno"], 1942)
+        self.assertEqual(error["column"], 12)
+        self.assertEqual(error["function"], "GetInnerWindow")
+        self.assertTrue(error["test"].endswith("test_asan.js"))
+        self.assertNotIn("quiet", error)
+        self.assertEqual(
+            [f["function"] for f in error["stack"]], ["GetInnerWindow", "clone"]
+        )
+
+        crashes = self.errorSummaryLines("crash")
+        self.assertEqual(len(crashes), 1, self.errorsummary.getvalue())
+        self.assertEqual(
+            crashes[0]["signature"], "AddressSanitizer: SEGV [@ GetInnerWindow]"
+        )
+        self.assertTrue(crashes[0]["test"].endswith("test_asan.js"))
+        self.assertGroupStatus("ERROR")
 
     def testChildPass(self):
         """
@@ -1201,6 +1281,57 @@ add_test({
             self.assertEqual(1, len(self.errorSummaryLines("crash")))
             self.assertInLog("INFO crashed process")
             self.assertNotInLog("\nPROCESS-CRASH")
+
+    def testVerifyDoesNotRetry(self):
+        """
+        Test that verification reports a failure that a retry would hide.
+        """
+        self.writeFile("test_fails_once.js", TEST_FAILING_ONCE)
+        self.writeManifest(["test_fails_once.js"])
+
+        self.assertTestResult(False, retry=True, verify=True)
+        self.assertEqual(1, self.x.failCount)
+        self.assertNotInLog("will retry")
+
+    def testVerify(self):
+        """
+        Check that --verify logs a group for each test, with its chaos mode steps
+        in a group of their own.
+        """
+        self.writeFile("test_basic.js", SIMPLE_PASSING_TEST)
+        self.writeFile("test_add_test_simple.js", ADD_TEST_SIMPLE)
+        self.writeManifest(["test_basic.js", "test_add_test_simple.js"])
+        raw = six.StringIO()
+        self.x.log.add_handler(StreamHandler(raw, JSONFormatter()))
+
+        self.assertTestResult(True, verify=True)
+        records = [json.loads(l) for l in raw.getvalue().splitlines()]
+        groups = [
+            (r["action"], os.path.basename(r["name"]))
+            for r in records
+            if r["action"] in ("group_start", "group_end")
+        ]
+        self.assertEqual(
+            [
+                marker
+                for test in ("test_basic.js", "test_add_test_simple.js")
+                for marker in (
+                    ("group_start", f"{test} --verify"),
+                    ("group_start", "sequential"),
+                    ("group_end", "sequential"),
+                    ("group_start", "parallel"),
+                    ("group_end", "parallel"),
+                    ("group_start", "chaos"),
+                    ("group_start", "sequential"),
+                    ("group_end", "sequential"),
+                    ("group_start", "parallel"),
+                    ("group_end", "parallel"),
+                    ("group_end", "chaos"),
+                    ("group_end", f"{test} --verify"),
+                )
+            ],
+            groups,
+        )
 
     def testCrashWithRetry(self):
         """

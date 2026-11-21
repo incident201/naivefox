@@ -448,6 +448,10 @@ toolbar[inactive="true"] .urlbar,
 }
 
 .urlbar-input {
+  /* global-shared.css sets this in chrome documents, but not in the page that
+     hosts an in-page bar. */
+  min-width: 0;
+
   /* Make the editable line box span the field's full inner height so clicking
      anywhere in the field places the caret. The value equals the input's
      available height so it fills the field without growing it. */
@@ -666,7 +670,7 @@ toolbar[inactive="true"] .urlbar,
   flex: 1;
   min-width: 0;
   height: 100%;
-  margin-inline-start: var(--urlbar-input-gap);
+  margin-inline: var(--urlbar-input-gap);
   cursor: text;
 
   /* With the search engine button on its own row, a plain glass marks the
@@ -976,6 +980,14 @@ toolbar[inactive="true"] .urlbar,
     color: var(--urlbar-box-text-color-active);
     outline-color: var(--toolbarbutton-outline-color-active);
   }
+
+  /* Icons with an attention fill (e.g. a starred bookmark) must follow the
+     hover text color to stay legible against the hover background. */
+  @media (forced-colors) {
+    &:not([disabled]):is(:hover, [open]) > .urlbar-icon {
+      fill: currentColor;
+    }
+  }
 }
 
 .searchbar-textbox:placeholder-shown::-moz-search-clear-button,
@@ -1100,7 +1112,7 @@ toolbar[inactive="true"] .urlbar,
 
 /* Picture-in-Picture icon */
 #picture-in-picture-button > .urlbar-icon {
-  list-style-image: url("chrome://global/skin/media/picture-in-picture-open.svg");
+  list-style-image: url("resource://content-accessible/media/picture-in-picture-open.svg");
 }
 
 #picture-in-picture-button[pipactive] > .urlbar-icon {
@@ -1128,7 +1140,7 @@ toolbar[inactive="true"] .urlbar,
      Don't use margin-inline-end as this is adjusting the art of the icon. */
   margin-right: -1px;
 
-  #translations-button[translationsactive] > & {
+  [translationsactive] > & {
     fill: var(--toolbarbutton-icon-fill-attention);
     fill-opacity: 1;
     margin-inline: var(--space-small);
@@ -1168,17 +1180,9 @@ toolbar[inactive="true"] .urlbar,
     font-weight: var(--font-weight-bold);
   }
 
-  #translations-button[translationsactive]:is(:hover, [open]) > #translations-button-icon {
-    fill: currentColor;
-  }
-
   #translations-button:is(:hover, [open]) > #translations-button-locale {
     background-color: var(--toolbar-field-background-color);
     color: var(--toolbarbutton-icon-fill-attention);
-  }
-
-  #translations-button:is(:hover, [open]) > #translations-button-circle-arrows {
-    fill: currentColor;
   }
 }
 

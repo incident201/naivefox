@@ -23,6 +23,8 @@ support-files = ["topstories.json"]
 
 ["test_ExternalComponentsFeed.js"]
 
+["test_FramedWidgetsFeed.js"]
+
 ["test_HighlightsFeed.js"]
 
 ["test_InferredFeatureModel.js"]
@@ -72,7 +74,17 @@ tags = "remote-settings"
 ["test_Store.js"]
 
 ["test_TelemetryFeed.js"]
+head = "head.js head_TelemetryFeed.js"
 support-files = ["../schemas/*.schema.json"]
+
+["test_TelemetryFeed_contentDwell.js"]
+head = "head.js head_TelemetryFeed.js"
+
+["test_TelemetryFeed_dwellTime.js"]
+head = "head.js head_TelemetryFeed.js"
+
+["test_TelemetryFeed_userEvents.js"]
+head = "head.js head_TelemetryFeed.js"
 
 ["test_ThompsonSample.js"]
 

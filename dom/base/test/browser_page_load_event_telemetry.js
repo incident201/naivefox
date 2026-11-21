@@ -17,6 +17,9 @@ const SLOW_DOCUMENT_URL = PAGELOAD_BASE + "file_slow_document.sjs";
 // earlier would carry the security info from that earlier handshake.
 const DOMAIN_EVENT_URL = "https://example.org/browser/dom/base/test/empty.html";
 
+// Unique per run, so tasks that check network-only timings never get a cache hit.
+const UNCACHED_QUERY = `?${Date.now()}`;
+
 // Which of page_load and page_load_domain a load produces is a random sample,
 // and they carry different extra keys, so force the former for the whole file.
 add_setup(async function () {
@@ -360,7 +363,7 @@ add_task(async function test_repeated_page_hides_report_once() {
 });
 
 const REDIRECT_BEFORE_LOAD_URL =
-  PAGELOAD_BASE + "file_redirect_before_load.html";
+  PAGELOAD_BASE + "file_redirect_before_load.html" + UNCACHED_QUERY;
 
 // The flag describes the load, so foregrounding a tab after a background load
 // has completed must not turn it into a foreground load.
@@ -476,10 +479,6 @@ add_task(async function () {
         Assert.equal(entry.name, "page_load");
         Assert.greater(parseInt(entry.extra.load_time), 0);
         Assert.ok(
-          entry.extra.using_webdriver,
-          "Webdriver field should be set to true."
-        );
-        Assert.ok(
           "is_active_client" in entry.extra,
           "Active client field should be recorded."
         );
@@ -497,4 +496,31 @@ add_task(async function () {
     // timeout.
     1000
   );
+});
+
+// Mochitest reaches its test hosts through an HTTP proxy. A response from the
+// cache doesn't use a connection, so load a URL that isn't in the cache.
+add_task(async function test_proxy_type() {
+  if (Services.prefs.getBoolPref("telemetry.fog.artifact_build", false)) {
+    Assert.ok(true, "Test skipped in artifact builds. See bug 1836686.");
+    return;
+  }
+
+  let first = PAGELOAD_BASE + "empty.html" + UNCACHED_QUERY;
+  let second = PAGELOAD_BASE + "dummy.html";
+  let tab = await BrowserTestUtils.openNewForegroundTab(gBrowser, first);
+  let browser = tab.linkedBrowser;
+
+  await resetPageloadTelemetry();
+  BrowserTestUtils.startLoadingURIString(browser, second);
+  await BrowserTestUtils.browserLoaded(browser, false, second);
+
+  let events = await waitForPageloadEvents(1);
+  Assert.equal(
+    events[0].extra.proxy_type,
+    String(Ci.nsIHttpChannelInternal.PROXY_TYPE_HTTP),
+    "The proxy the document was loaded through is reported."
+  );
+
+  BrowserTestUtils.removeTab(tab);
 });

@@ -499,17 +499,11 @@ ModuleEnvironmentObject* ModuleEnvironmentObject::createSynthetic(
 
 /* static */
 ModuleEnvironmentObject* ModuleEnvironmentObject::createForWasmModule(
-    JSContext* cx, Handle<ModuleObject*> module) {
-  // Wasm source-phase modules have no JavaScript bindings, so the environment
-  // has no property slots.
-  Rooted<SharedPropMap*> map(cx);
-  uint32_t mapLength = 0;
-  uint32_t numSlots = JSSLOT_FREE(&class_);
-  uint32_t numFixed = gc::GetGCKindSlots(gc::GetGCObjectKind(numSlots));
+    JSContext* cx, Handle<ModuleObject*> module,
+    Handle<ExportNameVector> exportNames) {
   Rooted<SharedShape*> shape(
-      cx, SharedShape::getInitialOrPropMapShape(cx, &class_, cx->realm(),
-                                                TaggedProto(nullptr), numFixed,
-                                                map, mapLength, OBJECT_FLAGS));
+      cx, CreateEnvironmentShapeForWasmModule(cx, &class_, JSSLOT_FREE(&class_),
+                                              exportNames));
   if (!shape) {
     return nullptr;
   }
@@ -538,14 +532,30 @@ IndirectBindingMap& ModuleEnvironmentObject::importBindings() const {
   return module().importBindings();
 }
 
-bool ModuleEnvironmentObject::createImportBinding(JSContext* cx,
-                                                  Handle<JSAtom*> importName,
-                                                  Handle<ModuleObject*> module,
-                                                  Handle<JSAtom*> localName) {
+bool ModuleEnvironmentObject::createImportBinding(
+    JSContext* cx, Handle<JSAtom*> importName,
+    Handle<ResolvedBindingObject*> binding) {
   RootedId importNameId(cx, AtomToId(importName));
-  RootedId localNameId(cx, AtomToId(localName));
-  Rooted<ModuleEnvironmentObject*> env(cx, &module->initialEnvironment());
-  return importBindings().put(cx, importNameId, env, localNameId);
+  return importBindings().put(cx, importNameId, binding);
+}
+
+/* static */
+uint32_t ModuleEnvironmentObject::namespaceSlotIndex(ImportPhase phase) {
+  MOZ_ASSERT(phase == ImportPhase::Evaluation ||
+             phase == ImportPhase::Deferred);
+  return phase == ImportPhase::Deferred ? DEFERRED_NAMESPACE_SLOT.index()
+                                        : NAMESPACE_SLOT.index();
+}
+
+void ModuleEnvironmentObject::initNamespaceSlot(ImportPhase phase,
+                                                ModuleNamespaceObject* ns) {
+  MOZ_ASSERT(phase == ImportPhase::Evaluation ||
+             phase == ImportPhase::Deferred);
+  auto slot =
+      phase == ImportPhase::Deferred ? DEFERRED_NAMESPACE_SLOT : NAMESPACE_SLOT;
+  MOZ_ASSERT(getReservedSlotTyped(slot).isUndefined() ||
+             &getReservedSlotTyped(slot).toObject() == ns);
+  setReservedSlotTyped(slot, ObjectValue(*ns));
 }
 
 bool ModuleEnvironmentObject::hasImportBinding(Handle<PropertyName*> name) {
@@ -800,8 +810,7 @@ static bool IsInternalDotName(JSContext* cx, HandleId id) {
          id.isAtom(cx->names().dot_staticInitializers_) ||
          id.isAtom(cx->names().dot_staticFieldKeys_) ||
          id.isAtom(cx->names().dot_args_) ||
-         id.isAtom(cx->names().dot_newTarget_) ||
-         id.isAtom(cx->names().star_namespace_star_);
+         id.isAtom(cx->names().dot_newTarget_);
 }
 #endif
 
@@ -1244,6 +1253,16 @@ ClassBodyLexicalEnvironmentObject* ClassBodyLexicalEnvironmentObject::create(
       LexicalEnvironmentObject::create(cx, shape, enclosing, heap));
   if (!env) {
     return nullptr;
+  }
+
+  // Initialize all bindings as uninitialized. Private methods are initialized
+  // while defining the class, after code can capture this environment object.
+  // The private brand check prevents JS code from reading these slots before
+  // they're initialized, but the magic value ensures Warp doesn't bake in the
+  // initial value.
+  uint32_t lastSlot = env->getLastProperty().slot();
+  for (uint32_t slot = JSSLOT_FREE(&class_); slot <= lastSlot; slot++) {
+    env->initSlot(slot, MagicValue(JS_UNINITIALIZED_LEXICAL));
   }
 
   env->initScope(scope);

@@ -56,13 +56,18 @@ import {
 import { Resource } from "resource://services-sync/resource.sys.mjs";
 import { EngineSynchronizer } from "resource://services-sync/stages/enginesync.sys.mjs";
 import { DeclinedEngines } from "resource://services-sync/stages/declined.sys.mjs";
+import { EngineSyncIDs } from "moz-src:///services/sync/modules/stages/syncids.sys.mjs";
 import { Status } from "resource://services-sync/status.sys.mjs";
 
 ChromeUtils.importESModule("resource://services-sync/telemetry.sys.mjs");
 import { Svc, Utils } from "resource://services-sync/util.sys.mjs";
 
 import { getFxAccountsSingleton } from "resource://gre/modules/FxAccounts.sys.mjs";
-import { SCOPE_APP_SYNC } from "resource://gre/modules/FxAccountsCommon.sys.mjs";
+import {
+  PREF_LAST_FXA_USER_UID,
+  SCOPE_APP_SYNC,
+} from "resource://gre/modules/FxAccountsCommon.sys.mjs";
+import { WeaveService } from "moz-src:///services/sync/Weave.sys.mjs";
 
 const fxAccounts = getFxAccountsSingleton();
 
@@ -114,6 +119,11 @@ function getEngineModules() {
 
 const lazy = {};
 
+const ACCOUNT_CHOICES_PREF = "perDeviceEngineChoices.accountChoices";
+// Engine choices are per device, so we save them for the last
+// signed in user upon signing out
+const SAVED_CHOICES_PREF = "perDeviceEngineChoices.saved";
+
 // A unique identifier for this browser session. Used for logging so
 // we can easily see whether 2 logs are in the same browser session or
 // after the browser restarted.
@@ -134,6 +144,7 @@ Sync11Service.prototype = {
   infoURL: null,
   storageURL: null,
   metaURL: null,
+  syncIDsURL: null,
   cryptoKeyURL: null,
   // The cluster URL comes via the identity object, which in the FxA
   // world is ebbedded in the token returned from the token server.
@@ -196,6 +207,7 @@ Sync11Service.prototype = {
       this.infoURL = undefined;
       this.storageURL = undefined;
       this.metaURL = undefined;
+      this.syncIDsURL = undefined;
       this.cryptoKeysURL = undefined;
       return;
     }
@@ -208,6 +220,7 @@ Sync11Service.prototype = {
     this.infoURL = this.userBaseURL + "info/collections";
     this.storageURL = this.userBaseURL + "storage/";
     this.metaURL = this.storageURL + "meta/global";
+    this.syncIDsURL = this.storageURL + "meta/syncids";
     this.cryptoKeysURL = this.storageURL + CRYPTO_COLLECTION + "/" + KEYS_WBO;
   },
 
@@ -370,6 +383,7 @@ Sync11Service.prototype = {
     this._log.info("Loading Weave " + WEAVE_VERSION);
 
     this.recordManager = new RecordManager(this);
+    this.engineSyncIDs = new EngineSyncIDs(this);
 
     this.enabled = true;
 
@@ -411,12 +425,9 @@ Sync11Service.prototype = {
     CommonUtils.nextTick(() => {
       this.status.ready = true;
 
-      // UI code uses the flag on the XPCOM service so it doesn't have
+      // UI code uses the flag on the service so it doesn't have
       // to load a bunch of modules.
-      let xps = Cc["@mozilla.org/weave/service;1"].getService(
-        Ci.nsISupports
-      ).wrappedJSObject;
-      xps.ready = true;
+      WeaveService.ready = true;
 
       Svc.Obs.notify("weave:service:ready");
     });
@@ -537,6 +548,11 @@ Sync11Service.prototype = {
       this._log.info("Meta record is null, aborting engine state update.");
       return;
     }
+    if (Weave.perDeviceEngineChoices) {
+      // Show the choices the first sync will apply.
+      this.maybeUpdateEngineState(meta);
+      return;
+    }
     const declinedEngines = meta.payload.declined;
     const allEngines = this.engineManager.getAll().map(e => e.name);
     // We don't want our observer of the enabled prefs to treat the change as
@@ -551,6 +567,134 @@ Sync11Service.prototype = {
       }
     } finally {
       this._ignorePrefObserver = false;
+    }
+  },
+
+  /**
+   * Inherit the account's choices on the first sync after sign-in, as a
+   * legacy client would.
+   *
+   * @param {WBORecord} meta the already-fetched meta/global.
+   */
+  maybeUpdateEngineState(meta) {
+    // Set once a sync completes, and cleared on disconnect.
+    if (Svc.PrefBranch.getStringPref("lastSync", "")) {
+      Svc.PrefBranch.clearUserPref(SAVED_CHOICES_PREF);
+      return;
+    }
+
+    const { engines, declined } = meta.isNew ? {} : meta.payload;
+    const saved = this._savedEngineChoices();
+    if (!saved) {
+      // Another account's, or unusable.
+      Svc.PrefBranch.clearUserPref(SAVED_CHOICES_PREF);
+    }
+    const { enabled, disabled } = saved ?? {
+      enabled: engines ? Object.keys(engines) : [],
+      disabled: Array.isArray(declined) ? declined : [],
+    };
+
+    this._log.info("Applying initial account choices", { enabled, disabled });
+    // Account choices aren't local user changes.
+    this._ignorePrefObserver = true;
+    try {
+      // Local changes made since sign-in win, as they do for legacy clients.
+      const all = this.engineManager
+        .getAll()
+        .filter(
+          e =>
+            !Svc.PrefBranch.getBoolPref(
+              "engineStatusChanged." + e.prefName,
+              false
+            )
+        );
+      for (const engine of all) {
+        if (enabled.includes(engine.name)) {
+          engine.enabled = true;
+        }
+      }
+      // Declines win, including over engines that share a pref.
+      for (const engine of all) {
+        if (disabled.includes(engine.name)) {
+          engine.enabled = false;
+        }
+      }
+    } finally {
+      this._ignorePrefObserver = false;
+    }
+  },
+
+  /**
+   * @returns {?{enabled: string[], disabled: string[]}} the engines this
+   *   device had enabled and disabled when it signed out, if the same account
+   *   has signed back in.
+   */
+  _savedEngineChoices() {
+    let saved;
+    try {
+      saved = JSON.parse(Svc.PrefBranch.getStringPref(SAVED_CHOICES_PREF, ""));
+    } catch {}
+    // FxA sets this to the new account's hash on sign-in, before Sync starts.
+    if (
+      saved?.uid !== Services.prefs.getStringPref(PREF_LAST_FXA_USER_UID, "") ||
+      !Array.isArray(saved.enabled) ||
+      !Array.isArray(saved.disabled)
+    ) {
+      return null;
+    }
+    this._log.info("Restoring this device's choices from before sign-out");
+    return saved;
+  },
+
+  _engineChoicesToSave() {
+    const uid = Services.prefs.getStringPref(PREF_LAST_FXA_USER_UID, "");
+    if (!Weave.perDeviceEngineChoices || !uid) {
+      return null;
+    }
+    const all = this.engineManager.getAll();
+    return JSON.stringify({
+      uid,
+      enabled: all.filter(e => e.enabled).map(e => e.name),
+      disabled: all.filter(e => !e.enabled).map(e => e.name),
+    });
+  },
+
+  /**
+   * Remember the account's choices, which only legacy clients maintain, so a
+   * meta/global we recreate after a server wipe doesn't change theirs.
+   *
+   * @param {WBORecord} meta the already-fetched meta/global.
+   */
+  rememberAccountChoices(meta) {
+    let { engines, declined } = meta.payload;
+    if (meta.isNew || !engines || typeof engines != "object") {
+      return;
+    }
+    let versions = {};
+    for (let name of Object.keys(engines)) {
+      let version = engines[name]?.version;
+      if (Number.isInteger(version)) {
+        versions[name] = version;
+      }
+    }
+    Svc.PrefBranch.setStringPref(
+      ACCOUNT_CHOICES_PREF,
+      JSON.stringify({
+        engines: versions,
+        declined: Array.isArray(declined) ? declined : [],
+      })
+    );
+  },
+
+  /**
+   * @returns {?{engines: {[name: string]: number}, declined: string[]}} the
+   *   choices saved by `rememberAccountChoices`, if any.
+   */
+  lastAccountChoices() {
+    try {
+      return JSON.parse(Svc.PrefBranch.getStringPref(ACCOUNT_CHOICES_PREF, ""));
+    } catch {
+      return null;
     }
   },
 
@@ -1002,6 +1146,9 @@ Sync11Service.prototype = {
   // resets/turns-off sync.
   async startOver() {
     this._log.trace("Invoking Service.startOver.");
+    // Without a completed sync, keep any choices saved by an earlier sign-out.
+    const hasSynced = !!Svc.PrefBranch.getStringPref("lastSync", "");
+    const choicesToSave = hasSynced && this._engineChoicesToSave();
     await this._stopTracking();
     this.status.resetSync();
 
@@ -1034,7 +1181,12 @@ Sync11Service.prototype = {
     // Reset Weave prefs.
     this._ignorePrefObserver = true;
     for (const pref of Svc.PrefBranch.getChildList("")) {
-      Svc.PrefBranch.clearUserPref(pref);
+      if (pref != SAVED_CHOICES_PREF || hasSynced) {
+        Svc.PrefBranch.clearUserPref(pref);
+      }
+    }
+    if (choicesToSave) {
+      Svc.PrefBranch.setStringPref(SAVED_CHOICES_PREF, choicesToSave);
     }
     this._ignorePrefObserver = false;
     this.clusterURL = null;
@@ -1156,6 +1308,8 @@ Sync11Service.prototype = {
       );
 
       this.recordManager.del(this.metaURL);
+      // meta/syncids is in the same collection.
+      this.engineSyncIDs.clearCache();
 
       // ... fetch the current record from the server, and COPY THE FLAGS.
       let newMeta = await this.recordManager.get(this.metaURL);
@@ -1453,7 +1607,25 @@ Sync11Service.prototype = {
     let meta = new WBORecord("meta", "global");
     meta.payload.syncID = this.syncID;
     meta.payload.storageVersion = STORAGE_VERSION;
-    meta.payload.declined = this.engineManager.getDeclined();
+    let choices = Weave.perDeviceEngineChoices && this.lastAccountChoices();
+    if (choices) {
+      meta.payload.engines = Object.fromEntries(
+        Object.entries(choices.engines).map(([name, version]) => [
+          name,
+          { version, syncID: Utils.makeGUID() },
+        ])
+      );
+      meta.payload.declined = choices.declined;
+    } else if (Weave.perDeviceEngineChoices) {
+      // A record without one makes Application Services clients enable
+      // everything.
+      meta.payload.declined = this.engineManager
+        .getAll()
+        .filter(e => !e.enabled)
+        .map(e => e.name);
+    } else {
+      meta.payload.declined = this.engineManager.getDeclined();
+    }
     meta.modified = 0;
     meta.isNew = true;
 
@@ -1642,6 +1814,7 @@ Sync11Service.prototype = {
       // Pretend we've never synced to the server and drop cached data
       this.syncID = "";
       this.recordManager.clearCache();
+      this.engineSyncIDs.clearCache();
     })();
   },
 

@@ -155,6 +155,13 @@ void MergeCharactersInTextRun(gfxTextRun* aDest, gfxTextRun* aSrc,
   for (gfxTextRun::GlyphRunIterator iter(aSrc, gfxTextRun::Range(aSrc));
        !iter.AtEnd(); iter.NextRun()) {
     const gfxTextRun::GlyphRun* run = iter.GlyphRun();
+    if (offset >= aDest->GetLength()) {
+      // Running out of destination is expected if a font change split a merge
+      // group, leaving only discarded continuation characters in this run.
+      MOZ_ASSERT(aCharsToMerge[iter.StringStart()],
+                 "bad offset in transformed textrun");
+      break;
+    }
     aDest->AddGlyphRun(run->mFont, run->mMatchType, offset, false,
                        run->mOrientation, run->mIsCJK);
 
@@ -164,6 +171,10 @@ void MergeCharactersInTextRun(gfxTextRun* aDest, gfxTextRun* aSrc,
     gfxTextRun::CompressedGlyph mergedGlyph = srcGlyphs[mergeRunStart];
     uint32_t stringEnd = iter.StringEnd();
     for (uint32_t k = iter.StringStart(); k < stringEnd; ++k) {
+      if (offset >= aDest->GetLength()) {
+        MOZ_ASSERT_UNREACHABLE("bad offset in transformed textrun");
+        break;
+      }
       const gfxTextRun::CompressedGlyph g = srcGlyphs[k];
       if (g.IsSimpleGlyph()) {
         if (!anyMissing) {
@@ -244,7 +255,8 @@ void MergeCharactersInTextRun(gfxTextRun* aDest, gfxTextRun* aSrc,
                  "Leftover glyphs, don't request merging of the last character "
                  "with its next!");
   }
-  NS_ASSERTION(offset == aDest->GetLength(), "Bad offset calculations");
+  MOZ_DIAGNOSTIC_ASSERT(offset == aDest->GetLength(),
+                        "Bad offset calculation in MergeCharactersInTextRun");
 }
 
 gfxTextRunFactory::Parameters GetParametersForInner(
@@ -329,6 +341,19 @@ bool nsCaseTransformTextRunFactory::TransformString(
   StyleTextTransform style = aGlobalTransform.valueOr(StyleTextTransform::NONE);
   bool forceNonFullWidth = false;
   const nsAtom* lang = aLanguage;
+
+  // Characters appended to the converted string for a multi-character case
+  // mapping (e.g. ß -> SS) don't pass through the width conversion below.
+  auto appendWithWidthTransform = [&](char16_t aCh) {
+    uint32_t c = aCh;
+    if (!aCaseTransformsOnly && !forceNonFullWidth &&
+        (style & StyleTextTransform::FULL_WIDTH)) {
+      c = unicode::GetFullWidth(c);
+    } else if (forceNonFullWidth) {
+      c = unicode::GetFullWidthInverse(c);
+    }
+    aConvertedString.Append(char16_t(c));
+  };
 
   LanguageSpecificCasingBehavior languageSpecificCasing = GetCasingFor(lang);
   mozilla::GreekCasing::State greekState;
@@ -428,7 +453,7 @@ bool nsCaseTransformTextRunFactory::TransformString(
               break;
             }
             if (ch == 0x00CC) {
-              aConvertedString.Append('i');
+              appendWithWidthTransform('i');
               aConvertedString.Append(0x0307);
               extraChars += 2;
               ch = 0x0300;
@@ -438,7 +463,7 @@ bool nsCaseTransformTextRunFactory::TransformString(
               break;
             }
             if (ch == 0x00CD) {
-              aConvertedString.Append('i');
+              appendWithWidthTransform('i');
               aConvertedString.Append(0x0307);
               extraChars += 2;
               ch = 0x0301;
@@ -448,7 +473,7 @@ bool nsCaseTransformTextRunFactory::TransformString(
               break;
             }
             if (ch == 0x0128) {
-              aConvertedString.Append('i');
+              appendWithWidthTransform('i');
               aConvertedString.Append(0x0307);
               extraChars += 2;
               ch = 0x0303;
@@ -468,7 +493,7 @@ bool nsCaseTransformTextRunFactory::TransformString(
               ntPrefix = true;
             } else {
               if (ntPrefix && mozilla::IrishCasing::IsUpperVowel(ch)) {
-                aConvertedString.Append('-');
+                appendWithWidthTransform('-');
                 ++extraChars;
               }
               ntPrefix = false;
@@ -543,7 +568,7 @@ bool nsCaseTransformTextRunFactory::TransformString(
           if (mcm) {
             int j = 0;
             while (j < 2 && mcm->mMappedChars[j + 1]) {
-              aConvertedString.Append(mcm->mMappedChars[j]);
+              appendWithWidthTransform(mcm->mMappedChars[j]);
               ++extraChars;
               ++j;
             }
@@ -677,7 +702,7 @@ bool nsCaseTransformTextRunFactory::TransformString(
           if (mcm) {
             int j = 0;
             while (j < 2 && mcm->mMappedChars[j + 1]) {
-              aConvertedString.Append(mcm->mMappedChars[j]);
+              appendWithWidthTransform(mcm->mMappedChars[j]);
               ++extraChars;
               ++j;
             }
@@ -740,7 +765,7 @@ bool nsCaseTransformTextRunFactory::TransformString(
             if (mcm) {
               int j = 0;
               while (j < 2 && mcm->mMappedChars[j + 1]) {
-                aConvertedString.Append(mcm->mMappedChars[j]);
+                appendWithWidthTransform(mcm->mMappedChars[j]);
                 ++extraChars;
                 ++j;
               }

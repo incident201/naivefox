@@ -14,9 +14,9 @@ support-files = [
 prefs = [
   "browser.newtabpage.resource-mapping.log=true",
   "browser.newtabpage.activity-stream.debug=false",
-  "browser.newtabpage.activity-stream.discoverystream.enabled=true",
   "browser.newtabpage.activity-stream.discoverystream.endpoints=data:",
   "browser.newtabpage.activity-stream.feeds.system.topstories=true",
+  "browser.newtabpage.activity-stream.feeds.discoverystreamfeed=true",
   "browser.newtabpage.activity-stream.feeds.section.topstories=true",
   "browser.newtabpage.activity-stream.discoverystream.sections.region-content-config=",
   "messaging-system.log=all",
@@ -53,6 +53,8 @@ https_first_disabled = true
 
 ["browser_enabled_newtabpage.js"]
 
+["browser_framed_widgets.js"]
+
 ["browser_getScreenshots.js"]
 
 ["browser_highlights_section.js"]
@@ -87,3 +89,5 @@ https_first_disabled = true
 tags = "urlbar"
 
 ["browser_topsites_sponsored.js"]
+
+["browser_wrexhamafc_widget.js"]

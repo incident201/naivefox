@@ -77,6 +77,41 @@ void nsContainerFrame::SetInitialChildList(ChildListID aListID,
   }
 }
 
+static bool IsNonFloatPlaceholder(const nsIFrame* aFrame) {
+  return aFrame->IsPlaceholderFrame() &&
+         !aFrame->HasAnyStateBits(PLACEHOLDER_FOR_FLOAT);
+}
+
+/**
+ * Returns true if adding or removing a child of aParent can't affect the
+ * intrinsic sizes of aParent or its ancestors.
+ *
+ * That's the case for placeholders of absolutely/fixed positioned and top
+ * layer frames (but not floats), unless aParent is inline-level: a placeholder
+ * has no intrinsic size itself (see nsPlaceholderFrame::AddInlineMinISize),
+ * but an abspos placeholder in inline content introduces a line-break
+ * opportunity (see bug 1418472 in nsTextFrame.cpp), which can change the
+ * min-content size of the enclosing block.
+ */
+static bool ChildChangeKeepsIntrinsicSizes(const nsContainerFrame* aParent,
+                                           bool aIsNonFloatPlaceholder) {
+  return aIsNonFloatPlaceholder && !aParent->IsLineParticipant();
+}
+
+/**
+ * Returns the IntrinsicDirty value to use when aFrameList is added to
+ * aParent's principal child list.
+ */
+static IntrinsicDirty IntrinsicDirtyForChildListChange(
+    const nsContainerFrame* aParent, const nsFrameList& aFrameList) {
+  for (nsIFrame* f : aFrameList) {
+    if (!ChildChangeKeepsIntrinsicSizes(aParent, IsNonFloatPlaceholder(f))) {
+      return IntrinsicDirty::FrameAndAncestors;
+    }
+  }
+  return IntrinsicDirty::None;
+}
+
 void nsContainerFrame::AppendFrames(ChildListID aListID,
                                     nsFrameList&& aFrameList) {
   MOZ_ASSERT(aListID == FrameChildListID::Principal ||
@@ -87,11 +122,13 @@ void nsContainerFrame::AppendFrames(ChildListID aListID,
     return;
   }
 
+  const IntrinsicDirty intrinsicDirty =
+      IntrinsicDirtyForChildListChange(this, aFrameList);
   DrainSelfOverflowList();  // ensure the last frame is in mFrames
   mFrames.AppendFrames(this, std::move(aFrameList));
 
   if (aListID != FrameChildListID::NoReflowPrincipal) {
-    PresShell()->FrameNeedsReflow(this, IntrinsicDirty::FrameAndAncestors,
+    PresShell()->FrameNeedsReflow(this, intrinsicDirty,
                                   NS_FRAME_HAS_DIRTY_CHILDREN);
   }
 }
@@ -109,11 +146,13 @@ void nsContainerFrame::InsertFrames(ChildListID aListID, nsIFrame* aPrevFrame,
     return;
   }
 
+  const IntrinsicDirty intrinsicDirty =
+      IntrinsicDirtyForChildListChange(this, aFrameList);
   DrainSelfOverflowList();  // ensure aPrevFrame is in mFrames
   mFrames.InsertFrames(this, aPrevFrame, std::move(aFrameList));
 
   if (aListID != FrameChildListID::NoReflowPrincipal) {
-    PresShell()->FrameNeedsReflow(this, IntrinsicDirty::FrameAndAncestors,
+    PresShell()->FrameNeedsReflow(this, intrinsicDirty,
                                   NS_FRAME_HAS_DIRTY_CHILDREN);
   }
 }
@@ -142,6 +181,7 @@ void nsContainerFrame::RemoveFrame(DestroyContext& aContext,
   // told not to (FrameChildListID::NoReflowPrincipal).
   const bool generateReflowCommand =
       aListID != FrameChildListID::NoReflowPrincipal;
+  const bool isNonFloatPlaceholder = IsNonFloatPlaceholder(aOldFrame);
   for (nsIFrame* continuation : Reversed(continuations)) {
     nsContainerFrame* parent = continuation->GetParent();
 
@@ -151,8 +191,12 @@ void nsContainerFrame::RemoveFrame(DestroyContext& aContext,
     parent->StealFrame(continuation);
     continuation->Destroy(aContext);
     if (generateReflowCommand && parent != lastParent) {
-      presShell->FrameNeedsReflow(parent, IntrinsicDirty::FrameAndAncestors,
-                                  NS_FRAME_HAS_DIRTY_CHILDREN);
+      presShell->FrameNeedsReflow(
+          parent,
+          ChildChangeKeepsIntrinsicSizes(parent, isNonFloatPlaceholder)
+              ? IntrinsicDirty::None
+              : IntrinsicDirty::FrameAndAncestors,
+          NS_FRAME_HAS_DIRTY_CHILDREN);
       lastParent = parent;
     }
   }
@@ -2649,22 +2693,44 @@ nsresult nsOverflowContinuationTracker::Insert(nsIFrame* aOverflowCont,
       reparented = true;
     }
 
-    // If aOverflowCont has a prev/next-in-flow that might be in
+    // If any other continuation of aOverflowCont's frame is already in
     // mOverflowContList we need to find it and insert after/before it to
-    // maintain the order amongst next-in-flows in this list.
-    nsIFrame* pif = aOverflowCont->GetPrevInFlow();
-    nsIFrame* nif = aOverflowCont->GetNextInFlow();
-    if ((pif && pif->GetParent() == mParent && pif != mPrevOverflowCont) ||
-        (nif && nif->GetParent() == mParent && mPrevOverflowCont)) {
-      for (nsIFrame* f : *mOverflowContList) {
-        if (f == pif) {
-          mPrevOverflowCont = pif;
-          break;
+    // maintain the order amongst the continuations in this list.
+
+    // Return whether aFrame is found in aOverflowCont's prev-in-flow chain.
+    auto IsEarlierContinuation = [aOverflowCont](nsIFrame* aFrame) {
+      for (nsIFrame* f = aOverflowCont->GetPrevInFlow(); f;
+           f = f->GetPrevInFlow()) {
+        if (f == aFrame) {
+          return true;
         }
-        if (f == nif) {
-          mPrevOverflowCont = f->GetPrevSibling();
-          break;
+      }
+      return false;
+    };
+
+    // Return true if aFrame is found in aOverflowCont's next-in-flow chain.
+    auto IsLaterContinuation = [aOverflowCont](nsIFrame* aFrame) {
+      for (nsIFrame* f = aOverflowCont->GetNextInFlow(); f;
+           f = f->GetNextInFlow()) {
+        if (f == aFrame) {
+          return true;
         }
+      }
+      return false;
+    };
+
+    // Scan mOverflowContList, setting mPrevOverflowCont to the /last/ earlier
+    // continuation of aOverflowCont, or to the prev-sibling of the /first/
+    // later continuation.
+    for (nsIFrame* f : *mOverflowContList) {
+      if (IsEarlierContinuation(f)) {
+        mPrevOverflowCont = f;
+        // No `break`: keep looking for another continuation that is still in
+        // the prev-in-flow chain.
+      } else if (IsLaterContinuation(f)) {
+        mPrevOverflowCont = f->GetPrevSibling();
+        // Stop as soon as we find a later continuation.
+        break;
       }
     }
 

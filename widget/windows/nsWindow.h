@@ -302,7 +302,8 @@ class nsWindow final : public nsIWidget {
       bool aIsContextMenuKey, int16_t aButton, uint16_t aInputSource,
       WinPointerInfo* aPointerInfo = nullptr,
       IsNonclient aIgnoreAPZ = IsNonclient::No,
-      mozilla::Maybe<LayoutDeviceIntPoint> aMovement = mozilla::Nothing());
+      mozilla::Maybe<LayoutDeviceIntPoint> aMovement = mozilla::Nothing(),
+      const mozilla::WidgetMouseEventCommand& aCommand = {});
   void DispatchPendingEvents();
   MOZ_CAN_RUN_SCRIPT void DispatchCustomEvent(const nsString& eventName);
 
@@ -446,6 +447,12 @@ class nsWindow final : public nsIWidget {
     return sIsUsingRawInputForMouseMove;
   }
 
+  // Dispatch the pending X1/X2 mouse button press, now that we know
+  // what its default action should be.
+  // Returns false if there is no pending X1/X2 button press.
+  bool DispatchPendingMouseUpEvent(
+      const mozilla::WidgetMouseEventCommand& aCommand);
+
  private:
   using TimeStamp = mozilla::TimeStamp;
   using TimeDuration = mozilla::TimeDuration;
@@ -520,6 +527,15 @@ class nsWindow final : public nsIWidget {
 
   void WindowUsesOMTC() override;
   void RegisterTouchWindow() override;
+
+  // Stores X1/X2 mouse up events while we figure out the default action.
+  struct PendingMouseUpEventData {
+    int16_t mButton;
+    uint16_t mInputSource;
+    WPARAM mWParam;
+    LPARAM mLParam;
+  };
+  mozilla::Maybe<PendingMouseUpEventData> mPendingMouseUpEvent;
 
   /**
    * Callbacks
@@ -673,7 +689,6 @@ class nsWindow final : public nsIWidget {
 
   void CreateCompositor() override;
   void DestroyCompositor() override;
-  void RequestFxrOutput() override;
 
   void RecreateDirectManipulationIfNeeded();
   void ResizeDirectManipulationViewport();
@@ -923,10 +938,6 @@ class nsWindow final : public nsIWidget {
   WinPointerEvents mPointerEvents;
 
   ScreenPoint mLastPanGestureFocus;
-
-  // When true, used to indicate an async call to RequestFxrOutput to the GPU
-  // process after the Compositor is created
-  bool mRequestFxrOutputPending = false;
 
   // A stack based class used in DispatchMouseEvent() to tell whether we should
   // NOT open context menu when we receives WM_CONTEXTMENU after the

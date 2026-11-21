@@ -228,15 +228,6 @@ class RaptorRunner(MozbuildObject):
                         "Run `./mach browsertime --setup --clobber` to set it up."
                     )
 
-                # Bug 1766112 - For the time being, we need to trigger a
-                # clean build to upgrade browsertime. This should be disabled
-                # after some time.
-                print(
-                    "Setting --clean to True to rebuild Python "
-                    "environment for Browsertime upgrade..."
-                )
-                self.config["clean"] = True
-
             version, src = _get_browsertime_version()
             print(f"Using browsertime version {version} from {src}")
 
@@ -378,9 +369,16 @@ def run_raptor(command_context, **kwargs):
 
     is_android = Conditions.is_android(build_obj) or kwargs["app"] in ANDROID_BROWSERS
 
+    # mozharness changes the working directory, so resolve a relative
+    # desktop binary path now.
+    binary = kwargs.get("binary")
+    if not is_android and binary and os.path.exists(binary):
+        kwargs["binary"] = os.path.abspath(binary)
+
     if is_android:
         from mozrunner.devices.android_device import (
             InstallIntent,
+            prepend_adb_dir_to_path,
             verify_android_device,
         )
 
@@ -413,6 +411,8 @@ def run_raptor(command_context, **kwargs):
             )
             return 1
 
+        prepend_adb_dir_to_path(build_obj)
+
     # Remove mach global arguments from sys.argv to prevent them
     # from being consumed by raptor. Treat any item in sys.argv
     # occuring before "raptor" as a mach global argument.
@@ -423,6 +423,9 @@ def run_raptor(command_context, **kwargs):
             argv.append(arg)
         if arg.startswith("raptor"):
             in_mach = False
+    from raptor.cmdline import absolute_binary_argv
+
+    argv = absolute_binary_argv(argv, kwargs.get("binary"))
 
     raptor = command_context._spawn(RaptorRunner)
 

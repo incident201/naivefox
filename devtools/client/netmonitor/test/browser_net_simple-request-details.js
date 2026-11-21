@@ -26,9 +26,9 @@ add_task(async function () {
 
   store.dispatch(Actions.batchEnable(false));
 
-  const wait = waitForNetworkEvents(monitor, 1);
+  const onNetworkEvents = waitForNetworkEvents(monitor, 1);
   await reloadSelectedTab();
-  await wait;
+  await onNetworkEvents;
 
   is(
     getSelectedRequest(store.getState()),
@@ -127,7 +127,7 @@ add_task(async function () {
       "The HTTP version is incorrect."
     );
 
-    await waitForRequestData(store, ["requestHeaders", "responseHeaders"]);
+    await waitForRequestData(monitor, ["requestHeaders", "responseHeaders"]);
 
     is(
       tabpanel.querySelectorAll(".accordion-item").length,

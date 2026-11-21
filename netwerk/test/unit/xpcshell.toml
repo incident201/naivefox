@@ -26,6 +26,7 @@ support-files = [
   "trr_common.js",
   "test_http3_prio_helpers.js",
   "http2_test_common.js",
+  "http2_test_server.js",
   "http3_proxy_common.js",
   "http3_common.js",
 ]
@@ -97,12 +98,16 @@ skip-if = [
 ["test_altsvc.js"]
 run-sequentially = ["true"] # node server exceptions dont replay well
 
+["test_altsvc_cache_last-pb-context-exited.js"]
+
 ["test_altsvc_lna.js"]
 
 ["test_altsvc_pref.js"]
 skip-if = [
   "os == 'win' && os_version == '11.26200' && arch == 'x86_64' && msix",
 ]
+
+["test_altsvc_proxy_cert_origin.js"]
 
 ["test_altsvc_proxy_dns_leak.js"]
 
@@ -122,6 +127,8 @@ run-if = [
 ["test_authentication.js"]
 
 ["test_authpromptwrapper.js"]
+
+["test_background_connection_cleanup.js"]
 
 ["test_backgroundfilesaver.js"]
 requesttimeoutfactor = 2  # Slow on macOS debug and Android debug
@@ -515,6 +522,8 @@ prefs = ["browser.cache.disk.encryption.enabled=true"]
 
 ["test_cache2-45-clear-base-domain-context-evictor.js"]
 
+["test_cache2-46-output-stream-outlives-entry.js"]
+
 ["test_cache2_clear_with_principal.js"]
 
 ["test_cache2_clear_with_usercontext_oa.js"]
@@ -531,7 +540,9 @@ prefs = ["browser.cache.disk.encryption.enabled=true"]
 
 ["test_captive_portal_service.js"]
 run-sequentially = ["true"] # node server exceptions dont replay well
-skip-if = ["os == 'android'"] # The captive detector is not built on Android
+skip-if = [
+  "os == 'android'", # The captive detector is not built on Android
+]
 
 ["test_cert_info.js"]
 
@@ -613,9 +624,6 @@ run-sequentially = [
 ["test_cookies_privatebrowsing.js"]
 
 ["test_cookies_profile_close.js"]
-skip-if = [
-  "os == 'android' && os_version == '14' && arch == 'x86_64' && !fission", # Bug 1700483
-]
 
 ["test_cookies_purge_counting.js"]
 
@@ -738,6 +746,8 @@ prefs = [
 
 ["test_essential_domain_fallback.js"]
 
+["test_essential_domain_fallback_redirect_fail.js"]
+
 ["test_event_sink.js"]
 
 ["test_eviction.js"]
@@ -768,6 +778,14 @@ skip-if = [
 ["test_getHost.js"]
 
 ["test_gre_resources.js"]
+
+["test_h2_0rtt_early_data_limit.js"]
+run-sequentially = ["true"] # TlsServer listens to the same port
+skip-if = [
+  "os == 'win' && msix", # Bug 1808049
+]
+
+["test_h2_continuation_end_stream.js"]
 
 ["test_h2_unclean_shutdown_retry.js"]
 prefs = ["network.http.speculative-parallel-limit=0"]
@@ -870,6 +888,11 @@ skip-if = [
 
 ["test_happy_eyeballs_ip_preference.js"]
 
+["test_happy_eyeballs_ipv6_link_local.js"]
+run-if = [
+  "os == 'mac'", # needs a link-local address on the loopback interface
+]
+
 ["test_happy_eyeballs_local_addr_retry.js"]
 skip-if = [
   "os == 'android'",
@@ -955,7 +978,14 @@ skip-if = [
 
 ["test_http2.js"]
 run-sequentially = ["true"] # node server exceptions dont replay well
-head = "head_channels.js head_cache.js head_cookies.js head_trr.js head_http3.js http2_test_common.js"
+head = "head_channels.js head_cache.js head_cookies.js head_trr.js head_http3.js http2_test_server.js http2_test_common.js"
+
+["test_http2_fin_buffered.js"]
+requesttimeoutfactor = 2  # Slow on Android
+
+["test_http2_max_header_list_size.js"]
+
+["test_http2_output_queue_limit.js"]
 
 ["test_http2_proxy_concurrent_stream.js"]
 requesttimeoutfactor = 4  # Slow on Linux and Windows
@@ -964,7 +994,7 @@ skip-if = [
 ]
 
 ["test_http2_with_http3_proxy.js"]
-head = "head_channels.js head_cache.js head_cookies.js head_trr.js head_http3.js http2_test_common.js"
+head = "head_channels.js head_cache.js head_cookies.js head_trr.js head_http3.js http2_test_server.js http2_test_common.js"
 run-sequentially = ["true"] # node server exceptions dont replay well
 requesttimeoutfactor = 2
 skip-if = [
@@ -977,7 +1007,7 @@ skip-if = [
 
 ["test_http2_with_proxy.js"]
 run-sequentially = ["true"] # node server exceptions dont replay well
-head = "head_channels.js head_cache.js head_cookies.js head_trr.js head_http3.js http2_test_common.js"
+head = "head_channels.js head_cache.js head_cookies.js head_trr.js head_http3.js http2_test_server.js http2_test_common.js"
 
 ["test_http3.js"]
 head = "head_cookies.js head_channels.js head_cache.js head_http3.js http3_common.js"
@@ -1170,7 +1200,7 @@ skip-if = [
 ["test_http3_prio_enabled.js"]
 run-sequentially = ["true"] # http3server
 skip-if = [
-  "true", # Will be reenabled in bug 1865394
+  "os == 'win' && msix", # Bug 1807931
 ]
 
 ["test_http3_protocol_error_fallback.js"]
@@ -1226,6 +1256,15 @@ run-sequentially = ["true"]
 requesttimeoutfactor = 2
 skip-if = [
   "os == 'android'",
+]
+
+["test_http3_proxy_reset_keeps_alt_svc.js"]
+head = "head_cookies.js head_channels.js head_cache.js head_http3.js http3_common.js"
+run-sequentially = ["true"] # http3server
+skip-if = [
+  "os == 'android'", # The MASQUE proxy runs on the host machine
+  "os == 'mac' && os_version == '10.15' && arch == 'x86_64'", # dontfragment, see test_http3_with_proxy.js
+  "os == 'win' && msix", # Bug 1807931
 ]
 
 ["test_http3_quic_token_partition.js"]
@@ -1312,6 +1351,21 @@ skip-if = [
 
 ["test_httpcancel.js"]
 
+["test_https_proxy_h3_outer_via_https_rr.js"]
+run-sequentially = ["true"] # node server exceptions dont replay well
+requesttimeoutfactor = 2
+skip-if = [
+  "os == 'android'", # H3 proxy server doesn't work there, Bug 1982955
+  "os == 'win' && msix",
+]
+
+["test_https_proxy_with_https_rr.js"]
+run-sequentially = ["true"] # node server exceptions dont replay well
+requesttimeoutfactor = 2
+skip-if = [
+  "os == 'win' && msix",
+]
+
 ["test_https_rr_ech_prefs.js"]
 
 ["test_https_rr_sorted_alpn.js"]
@@ -1371,7 +1425,9 @@ run-sequentially = ["true"] # node server exceptions dont replay well
 ["test_large_port.js"]
 
 ["test_lna_captive_portal.js"]
-skip-if = ["os == 'android'"] # The captive detector is not built on Android
+skip-if = [
+  "os == 'android'", # The captive detector is not built on Android
+]
 
 ["test_loadgroup_cancel.js"]
 
@@ -1435,6 +1491,13 @@ run-if = [
 
 ["test_network_connectivity_service_idle_startup.js"]
 
+["test_network_id_match.js"]
+
+["test_network_interfaces.js"]
+run-if = [
+  "enterprise",
+]
+
 ["test_no_cookies_after_last_pb_exit.js"]
 
 ["test_no_vary_search_memory_only.js"]
@@ -1475,9 +1538,9 @@ run-if = [
 ["test_ntlm_native_server_validation.js"]
 # Needs "sys-ntlm" to resolve to a real native module, which is nsAuthSSPI on
 # Windows; elsewhere nsHttpNTLMAuth silently falls back to the internal one.
-run-if = [
-  "os == 'win'",
-]
+# run-if = [
+#   "os == 'win'",
+# ]
 
 ["test_ntlm_proxy_and_web_auth.js"]
 # Without this the Windows SSPI module handles the proxy challenge using the
@@ -1516,9 +1579,6 @@ prefs = ["network.auth.force-generic-ntlm=true"]
 ["test_ping_aboutnetworking.js"]
 
 ["test_plaintext_sniff.js"]
-skip-if = [
-  "true", # Causes sporatic oranges
-]
 
 ["test_port_remapping.js"]
 
@@ -1565,6 +1625,9 @@ skip-if = [
 ["test_proxy_cancel.js"]
 
 ["test_proxy_fast_path.js"]
+
+["test_proxy_forwarding_peer_port.js"]
+run-sequentially = ["true"] # node server exceptions dont replay well
 
 ["test_proxy_pac.js"]
 
@@ -1721,6 +1784,9 @@ skip-if = [
   "os == 'win' && os_version == '11.26200' && arch == 'x86_64' && msix", # Bug 1808048
 ]
 
+["test_socks_proxy_fetch.js"]
+run-sequentially = ["true"] # node server exceptions dont replay well
+
 ["test_speculative_connect.js"]
 
 ["test_ssl_token_cache_persist.js"]
@@ -1794,7 +1860,6 @@ skip-if = [
 ["test_tldservice_nextsubdomain.js"]
 
 ["test_tls13_disabled.js"]
-run-sequentially = ["true"] # node server exceptions dont replay well
 skip-if = [
   "os == 'android' && os_version == '14' && arch == 'x86_64'", # Bug 1982955
   "os == 'win' && os_version == '11.26200' && arch == 'x86_64' && msix", # Bug 1808048
@@ -1944,6 +2009,8 @@ skip-if = [
 
 ["test_unix_domain.js"]
 
+["test_upload_stream_normalization.js"]
+
 ["test_uri_mutator.js"]
 
 ["test_use_httpssvc.js"]
@@ -1955,6 +2022,12 @@ skip-if = [
 ["test_websocket_500k.js"]
 skip-if = [
   "verify",
+]
+
+["test_websocket_ech.js"]
+run-sequentially = ["true"] # uses common port for ECH server
+skip-if = [
+  "os == 'win' && msix", # Bug 1808049
 ]
 
 ["test_websocket_fails.js"]
@@ -1979,7 +2052,14 @@ skip-if = [
   "os == 'win' && os_version == '11.26200' && arch == 'x86_64' && msix", # Bug 1808049
 ]
 
+["test_webtransport_https_rr_no_h3.js"]
+skip-if = [
+  "os == 'android'", # The node servers run on the host machine
+  "os == 'win' && msix", # Bug 1808049
+]
+
 ["test_webtransport_simple.js"]
+run-sequentially = ["true"] # http3server
 skip-if = [
   "os == 'android' && os_version == '14' && arch == 'x86_64'",
   "os == 'win' && os_version == '10.2009' && arch == 'x86_64'", # Bug 1807931
@@ -1994,7 +2074,9 @@ skip-if = [
 ]
 
 ["test_windows_sso.js"]
-run-if = ["os == 'win'"]
+run-if = [
+  "os == 'win'",
+]
 
 ["test_xmlhttprequest.js"]
 prefs = ["network.xhr.block_sync_system_requests=false"] # Bug 721336

@@ -1,5 +1,5 @@
 const { A2UI } = ChromeUtils.importESModule(
-  "moz-src:///browser/components/aiwindow/ui/modules/A2UI.mjs"
+  "moz-src:///browser/components/aiwindow/ui/modules/A2UI.sys.mjs"
 );
 
 describe("A2UI", () => {
@@ -13,6 +13,128 @@ describe("A2UI", () => {
 
     it("returns an empty page definition", () => {
       Assert.deepEqual(a2ui.toUI(), { component: "Page", children: [] });
+    });
+  });
+
+  describe("when reporting conversions", () => {
+    const surface = (...blocks) => ({
+      components: [
+        {
+          id: "root",
+          component: "Page",
+          header: "hdr",
+          children: blocks.map(block => block.id),
+        },
+        { id: "hdr", component: "Header", title: "Page Title" },
+        ...blocks,
+      ],
+      dataModel: {},
+    });
+    const statement = { title: "A statement", body: "Its body." };
+    const group = { items: [{ text: "An item" }] };
+
+    it("reports nothing for a surface without a root", () => {
+      Assert.deepEqual(new A2UI({ components: [] }).conversions(), []);
+    });
+
+    it("reports nothing for blocks that render as sent", () => {
+      const conversions = new A2UI(
+        surface(
+          { id: "text", component: "TextBlock", lead: "A lead" },
+          {
+            id: "highlights",
+            component: "Highlights",
+            title: "Highlights Title",
+            items: [statement, statement],
+          },
+          {
+            id: "column",
+            component: "List",
+            layout: "column",
+            groups: [group, group],
+          },
+          { id: "row", component: "List", layout: "row", groups: [group] }
+        )
+      ).conversions();
+
+      Assert.deepEqual(conversions, []);
+    });
+
+    it("reports each converted block in render order", () => {
+      const conversions = new A2UI(
+        surface(
+          {
+            id: "single",
+            component: "Highlights",
+            title: "Highlights Title",
+            items: [statement],
+          },
+          { id: "text", component: "TextBlock", lead: "A lead" },
+          {
+            id: "no-bodies",
+            component: "Highlights",
+            title: "Highlights Title",
+            items: [{ title: "One" }, { title: "Two" }],
+          },
+          { id: "empty", component: "Highlights", items: [] },
+          {
+            id: "column",
+            component: "List",
+            layout: "column",
+            groups: [group],
+          },
+          { id: "no-layout", component: "List", groups: [group] }
+        )
+      ).conversions();
+
+      Assert.deepEqual(conversions, [
+        "Highlights>TextBlock",
+        "Highlights>List_row",
+        "Highlights>none",
+        "List_column>List_row",
+        "List>List_row",
+      ]);
+    });
+
+    it("reports each converted instance of a template", () => {
+      const a2uiSurface = surface();
+      a2uiSurface.components[0].children = {
+        componentId: "template",
+        path: "/sections",
+      };
+      a2uiSurface.components.push({
+        id: "template",
+        component: "Highlights",
+        title: "Highlights Title",
+        items: { path: "items" },
+      });
+      a2uiSurface.dataModel = {
+        sections: [
+          { items: [statement] },
+          { items: [statement, statement] },
+          { items: [] },
+        ],
+      };
+
+      Assert.deepEqual(new A2UI(a2uiSurface).conversions(), [
+        "Highlights>TextBlock",
+        "Highlights>none",
+      ]);
+    });
+
+    it("reports the same conversions on each call", () => {
+      const instance = new A2UI(
+        surface({
+          id: "single",
+          component: "Highlights",
+          title: "Highlights Title",
+          items: [statement],
+        })
+      );
+
+      instance.toUI();
+      Assert.deepEqual(instance.conversions(), ["Highlights>TextBlock"]);
+      Assert.deepEqual(instance.conversions(), ["Highlights>TextBlock"]);
     });
   });
 
@@ -338,6 +460,226 @@ describe("A2UI", () => {
           highlightItems[0].sources.items,
           a2uiData.dataModel.sources
         );
+      });
+
+      it("drops a highlights block with no statements", () => {
+        a2uiData.dataModel.highlightItems = [null];
+        a2uiData.components[2].items = { path: "/highlightItems" };
+        a2ui = new A2UI(a2uiData);
+
+        Assert.deepEqual(
+          a2ui.toUI().children.map(child => child.id),
+          ["hdr"]
+        );
+      });
+
+      it("turns a single statement into a text block", () => {
+        a2uiData.dataModel.sources.push({ title: "route", href: "route-id" });
+        a2uiData.components[2].items = [
+          null,
+          {
+            eyebrow: "Verdict",
+            title: "Dual-fuel is the safe pick.",
+            body: "Eight of nine sources back dual-fuel.",
+            sources: { items: { path: "/sources" } },
+          },
+        ];
+        a2ui = new A2UI(a2uiData);
+
+        Assert.deepEqual(a2ui.toUI().children[1], {
+          id: "ans",
+          component: "TextBlock",
+          lead: "Dual-fuel is the safe pick.",
+          paragraphs: ["Eight of nine sources back dual-fuel."],
+          references: [
+            { title: "site1 name", href: "https://www.site1.com" },
+            { title: "site2 name", href: "https://www.site2.com" },
+            { title: "site3 name", href: "https://www.site3.com" },
+          ],
+        });
+      });
+
+      it("turns untitled statements into one text block", () => {
+        delete a2uiData.components[2].title;
+        a2uiData.components[2].items[1].sources = {
+          items: [
+            { title: "site1 again", href: "https://www.site1.com" },
+            { title: "site4 name", href: "https://www.site4.com" },
+          ],
+        };
+        a2ui = new A2UI(a2uiData);
+
+        Assert.deepEqual(a2ui.toUI().children[1], {
+          id: "ans",
+          component: "TextBlock",
+          lead: "",
+          paragraphs: [
+            "A cold-climate heat pump works here — paired with the furnace for the coldest nights.",
+            "Eight of nine sources back dual-fuel for 1940s retrofits.",
+            "Air sealing matters more than which model you pick.",
+            "Envelope work moves the payback further than the equipment on the invoice.",
+          ],
+          references: [
+            ...a2uiData.dataModel.sources,
+            { title: "site4 name", href: "https://www.site4.com" },
+          ],
+        });
+      });
+
+      it("turns statements without bodies into a list", () => {
+        for (const item of a2uiData.components[2].items) {
+          delete item.body;
+        }
+        a2ui = new A2UI(a2uiData);
+
+        Assert.deepEqual(a2ui.toUI().children[1], {
+          id: "ans",
+          component: "List",
+          title: "Highlights Title",
+          groups: [
+            {
+              items: [
+                {
+                  text: "A cold-climate heat pump works here — paired with the furnace for the coldest nights.",
+                },
+                { text: "Air sealing matters more than which model you pick." },
+              ],
+            },
+          ],
+          layout: "row",
+        });
+      });
+
+      it("turns untitled statements without bodies into one text block", () => {
+        delete a2uiData.components[2].title;
+        for (const item of a2uiData.components[2].items) {
+          delete item.body;
+        }
+        a2ui = new A2UI(a2uiData);
+
+        const block = a2ui.toUI().children[1];
+        Assert.equal(block.component, "TextBlock");
+        Assert.deepEqual(block.paragraphs, [
+          "A cold-climate heat pump works here — paired with the furnace for the coldest nights.",
+          "Air sealing matters more than which model you pick.",
+        ]);
+      });
+
+      it("turns statements without titles into a list", () => {
+        for (const item of a2uiData.components[2].items) {
+          delete item.title;
+        }
+        a2ui = new A2UI(a2uiData);
+
+        Assert.deepEqual(a2ui.toUI().children[1], {
+          id: "ans",
+          component: "List",
+          title: "Highlights Title",
+          groups: [
+            {
+              items: a2uiData.components[2].items.map(item => ({
+                text: item.body,
+              })),
+            },
+          ],
+          layout: "row",
+        });
+      });
+
+      it("lists statements missing a title or a body after the others", () => {
+        const { items } = a2uiData.components[2];
+        delete items[0].body;
+        items.push(
+          { eyebrow: "Rebates", body: "Federal and utility rebates stack." },
+          { eyebrow: "Sources only" }
+        );
+        a2ui = new A2UI(a2uiData);
+
+        Assert.deepEqual(a2ui.toUI().children[1], {
+          id: "ans",
+          component: "List",
+          title: "Highlights Title",
+          groups: [
+            {
+              heading: "Air sealing matters more than which model you pick.",
+              items: [
+                {
+                  text: "Envelope work moves the payback further than the equipment on the invoice.",
+                },
+              ],
+            },
+            {
+              items: [
+                {
+                  text: "A cold-climate heat pump works here — paired with the furnace for the coldest nights.",
+                },
+                { text: "Federal and utility rebates stack." },
+              ],
+            },
+          ],
+          layout: "row",
+        });
+      });
+
+      it("turns a single statement without a title into a list", () => {
+        a2uiData.components[2].items = [
+          {
+            eyebrow: "Verdict",
+            body: "Eight of nine sources back dual-fuel.",
+            sources: { items: { path: "/sources" } },
+          },
+        ];
+        a2ui = new A2UI(a2uiData);
+
+        Assert.deepEqual(a2ui.toUI().children[1], {
+          id: "ans",
+          component: "List",
+          title: "Highlights Title",
+          groups: [
+            { items: [{ text: "Eight of nine sources back dual-fuel." }] },
+          ],
+          layout: "row",
+        });
+      });
+
+      it("drops a highlights block whose statements have no text", () => {
+        a2uiData.components[2].items = [
+          { eyebrow: "Verdict" },
+          { sources: { items: { path: "/sources" } } },
+        ];
+        a2ui = new A2UI(a2uiData);
+
+        Assert.deepEqual(
+          a2ui.toUI().children.map(child => child.id),
+          ["hdr"]
+        );
+      });
+
+      it("takes the text block lead from the first title it finds", () => {
+        const leadOf = (highlights, item) => {
+          a2uiData.components[2] = {
+            id: "ans",
+            component: "Highlights",
+            ...highlights,
+            items: [item],
+          };
+          return new A2UI(a2uiData).toUI().children[1].lead;
+        };
+
+        Assert.equal(
+          leadOf(
+            { title: "Group" },
+            { eyebrow: "Monday", title: "Showers", body: "Rain." }
+          ),
+          "Showers",
+          "The statement title comes first"
+        );
+        Assert.equal(
+          leadOf({}, { eyebrow: "Monday", body: "Rain." }),
+          "Monday",
+          "Then the eyebrow"
+        );
+        Assert.equal(leadOf({}, { body: "Rain." }), "", "Else no lead");
       });
     });
 
@@ -988,6 +1330,47 @@ describe("A2UI", () => {
         });
 
         a2ui = new A2UI(a2uiData);
+      });
+
+      it("lays out a single group without a description as a row", () => {
+        const layoutOf = list => {
+          a2uiData.components[2] = {
+            ...a2uiData.components[2],
+            ...list,
+          };
+          return new A2UI(a2uiData).toUI().children[1].layout;
+        };
+        const { groups } = a2uiData.components[2];
+        const [group] = groups;
+
+        Assert.equal(
+          layoutOf({ description: undefined, groups: [group] }),
+          "row",
+          "A single group without a description is laid out as a row"
+        );
+        Assert.equal(
+          layoutOf({
+            description: undefined,
+            groups: [group, { heading: "Empty", items: [] }],
+            layout: "column",
+          }),
+          "row",
+          "Empty groups are not counted"
+        );
+        Assert.equal(
+          layoutOf({ description: "A description", layout: "column" }),
+          "column",
+          "A description keeps the model's layout"
+        );
+        Assert.equal(
+          layoutOf({
+            description: undefined,
+            groups,
+            layout: "column",
+          }),
+          "column",
+          "Several groups keep the model's layout"
+        );
       });
 
       it("resolves the List title, description and groups as is", () => {

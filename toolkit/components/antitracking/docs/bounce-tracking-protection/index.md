@@ -83,6 +83,36 @@ committed yet, since that would name the initiating tab again; such a navigation
 adds no candidate. A frame initiated top level navigation is therefore credited
 to the page hosting the frame, which is the site actually being left.
 
+#### Extended navigations across containers
+
+The spec keeps one bounce tracking record per top level traversable, and state is
+keyed by the traversable's storage partition. With per-site container association
+(`privacy.containers.switchDuringNavigation.enabled`), a top level navigation, or
+one of its redirects, to a site bound to a container switches the load into that
+container and retargets it into a new tab. Later hops which are bound to nothing
+stay in that container. A single extended navigation can therefore run in two
+tabs and two containers, which the spec has no notion of.
+
+Gecko handles this as follows:
+
+- The record follows the load. When the retargeted load is about to commit in
+  the new tab, `BounceTrackingState::OnLoadRetargeted` moves the record from
+  the tab the load started in to the new tab, and restarts its pending client
+  bounce timer there. The destination becomes the final host as usual. The tab
+  left behind holds no record, so closing it, as happens for a blank tab which
+  only existed for the load, classifies nothing. The move is skipped if that tab
+  has started another navigation meanwhile.
+- Every site of the record is a `BounceTrackingSite`: the site together with
+  the `OriginAttributes` it ran in. For a server side hop those are the ones of
+  its redirect, for a client side hop the ones of the tab being left. A bounce
+  is classified, exempted by user activation and purged in that container only.
+- The initial and final host are exempt only in the container their document
+  ran in. Having been on a site in one container does not exempt that site's
+  bounces in another, which would otherwise let a tracker collect state in a
+  container the user never visited it in.
+- User activation recorded during the navigation does not move with the record,
+  so it cannot feed the storage access heuristic of another container.
+
 #### Comparison with Chromium
 
 Chromium's implementation starts a redirect chain the same way. In
@@ -100,6 +130,60 @@ Gecko is stricter in one case. Chromium's fallback is the initiator's origin as-
 so for a context opened by a cross-site frame it resolves to the frame's own site and
 the frame can still name itself. Gecko resolves the opener to its top level document
 instead.
+
+## Purge exceptions
+
+A classified bounce tracker is not purged if its site has one of the following
+exceptions:
+
+- A `trackingprotection` permission, or `trackingprotection-pb` in private
+  browsing. These are set when the user turns off Enhanced Tracking Protection
+  for the site with the toggle in the trust panel.
+- A `cookie` permission with `ALLOW_ACTION`, which is set when the user always
+  allows cookies for the site, for example via the cookie exceptions in
+  preferences. Other `cookie` values, such as blocking or allowing for the
+  session only, are not exceptions. `cookie` permissions are stored without
+  private browsing isolation, so they currently only exempt sites in normal
+  browsing.
+- A `bounce-tracking-protection-exception` permission, which is set by remote
+  interventions, see below.
+
+Exceptions apply to the entire site (eTLD+1): a permission set for
+`https://www.example.com` also exempts `example.com` and all of its subdomains.
+Normal and private browsing are checked separately, using the permissions of the
+respective context. A site which is skipped because of an exception is removed
+from the bounce tracker candidates. If it bounces again after the exception has
+been removed it can be classified and purged again.
+
+### Remote interventions
+
+If BTP breaks a website, the site can be exempted from purging remotely,
+without shipping a new Firefox release, by setting a
+`bounce-tracking-protection-exception` permission via
+[remote permissions](/permissions/remote.md). Records go into the
+`remote-permissions` Remote Settings collection:
+
+```json
+{
+  "origin": "https://example.com",
+  "type": "bounce-tracking-protection-exception",
+  "capability": 1
+}
+```
+
+Only `ALLOW_ACTION` (`1`) may be set. `RemotePermissionService` rejects any
+other value except `UNKNOWN_ACTION` (`0`), which removes the permission, and
+BTP only considers `ALLOW_ACTION` to be an exception. New entries are requested through the
+[remote permissions process](/permissions/remote.md).
+
+Remote permissions are imported as default permissions. They are not written to
+the permission database, are mirrored to private browsing, and are not shown in
+the permission UI. Firefox does not ship a dump of the `remote-permissions`
+collection, so a new profile only gets the exceptions after its first Remote
+Settings sync. The import runs asynchronously during startup and BTP does not
+wait for it before purging, so a purge which runs before the import has
+finished does not see these exceptions. Changes synced from Remote Settings apply from the next purge
+onwards.
 
 ## Gecko Implementation
 
@@ -125,14 +209,10 @@ classDiagram
         <!-- [...] -->
     }
 
-    class nsIBTPExceptionList {
-        <!-- Bug 1930704: Empty classes lead to build errors. Adding a comment inside the class fixes the issue -->
-        <!-- [...] -->
-    }
-
     class BounceTrackingStateGlobal {
         - mUserActivation: nsTHashMap&lt;nsCStringHashKey, PRTime&gt;
-        - mBounceTrackers: nsTHashMap&lt;nsCStringHashKey, PRTime&gt;
+        - mBounceTrackers: nsTHashMap&lt;nsCStringHashKey, BounceTrackerCandidate&gt;
+        - mRecentPurges: nsTHashMap&lt;nsCStringHashKey, nsTArray&lt;RefPtr&lt;BounceTrackingPurgeEntry&gt;&gt;&gt;
         - mOriginAttributes: OriginAttributes
     }
 
@@ -145,14 +225,30 @@ classDiagram
     }
 
 
+    class BounceTrackingPurgeEntry {
+        - mSite: BounceTrackingSite
+        - mChainRecord: BounceTrackingRecord
+    }
+
+    note for BounceTrackingPurgeEntry "Purge log entry, keeps the bounce chain
+                                       which got the site classified."
+
     class BounceTrackingRecord {
-        - mInitialHost: nsAutoCString
-        - mBounceHosts: nsTHashSet&lt;nsCStringHashKey&gt;
-        - mFinalHost: nsAutoCString
+        - mInitialSite: BounceTrackingSite
+        - mBounceSites: nsTHashSet&lt;BounceTrackingSiteHashKey&gt;
+        - mFinalSite: BounceTrackingSite
     }
 
     note for BounceTrackingRecord "Encapsulates the per-tab navigation state
                                    during an extended navigation."
+
+    class BounceTrackingSite {
+        - mSiteHost: nsCString
+        - mOriginAttributes: OriginAttributes
+    }
+
+    note for BounceTrackingSite "A site together with the storage partition it
+                                 ran in, or the null site for untracked documents."
 
     class BounceTrackingState {
         - mBounceTrackingProtection: BounceTrackingProtection
@@ -178,16 +274,17 @@ classDiagram
     BounceTrackingState --o BounceTrackingProtection
     BounceTrackingState --> BounceTrackingProtection : RecordStatefulBounces() on extended nav end
     BounceTrackingState *-- BounceTrackingRecord
+    BounceTrackingRecord *-- BounceTrackingSite
+    BounceTrackingPurgeEntry *-- BounceTrackingSite
+    BounceTrackingStateGlobal *-- BounceTrackingPurgeEntry
     BrowsingContextWebProgress *-- BounceTrackingState
     BounceTrackingStateGlobal --* BounceTrackingProtectionStorage
     BounceTrackingStateGlobal --> BounceTrackingProtectionStorage : Persists state changes in storage.
     BounceTrackingProtection --> BounceTrackingStateGlobal : Manages global state
-    nsIBTPExceptionList --* BounceTrackingProtection
-    nsIBTPExceptionList --> BounceTrackingProtection : Site host purge exceptions from RemoteSettings.
     BounceTrackingAllowList --* BounceTrackingProtection
-    BounceTrackingAllowList --> BounceTrackingProtection :  Site host purge exceptions from PermissionManager.
+    BounceTrackingAllowList --> BounceTrackingProtection :  Site purge exceptions from PermissionManager, incl. remote permissions.
     BrowsingContextWebProgress --> BounceTrackingState : Navigation signals
-    DocumentLoadListener --> BounceTrackingState : Navigation signals
+    DocumentLoadListener --> BounceTrackingState : Navigation signals, OnLoadRetargeted()
 ```
 
 ## Preferences

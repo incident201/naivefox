@@ -44,13 +44,35 @@ ls -l /builds/worker/artifacts/nexus-logs/
 # GeckoView is built by this task and published to a local Maven repository, so
 # the passes rooted at the standalone Gradle builds resolve it from there. It is
 # not a cached dependency and is deliberately not packaged.
+#
+# The Nimbus Gradle plugin resolves nimbus-fml from ivy repositories, which
+# Nexus doesn't proxy; it is packaged from the Gradle cache below instead.
 python3 "$VERIFY_DEPENDENCIES" --inventories "$DEPENDENCY_INVENTORIES" \
     --unproxied org/mozilla/geckoview \
+    --unproxied org/mozilla/appservices/tools/nimbus-fml \
     android-gradle-dependencies/mozilla \
     android-gradle-dependencies/central \
     android-gradle-dependencies/google \
     android-gradle-dependencies/gradle-plugins
 
-tar cavf /builds/worker/artifacts/android-gradle-dependencies.tar.zst android-gradle-dependencies
+# Laid out like archive.mozilla.org, which NIMBUS_FML_REPOSITORY expects.
+if [ -z "$MOZ_APPSERVICES_IN_TREE" ]; then
+    for zip in ${GRADLE_USER_HOME}/caches/modules-2/files-2.1/org.mozilla.appservices.tools/nimbus-fml/*/*/*.zip; do
+        version=$(basename "$(dirname "$(dirname "$zip")")")
+        mkdir -p "android-gradle-dependencies/nimbus-fml/$version"
+        cp "$zip" "android-gradle-dependencies/nimbus-fml/$version/nimbus-fml.zip"
+    done
+fi
+
+SEED_CACHES=$WORKSPACE/gradle-user-home-seed/caches
+mkdir -p $SEED_CACHES
+pushd ${GRADLE_USER_HOME}/caches
+cp -R --parents [0-9]*/generated-gradle-jars [0-9]*/groovy-dsl [0-9]*/kotlin-dsl [0-9]*/dependencies-accessors [0-9]*/transforms jars-* $SEED_CACHES
+popd
+find $SEED_CACHES \( -name '*.lock' -o -name gc.properties \) -delete
+
+tar cavf /builds/worker/artifacts/android-gradle-dependencies-nexus-attributes.tar.zst android-gradle-dependencies/*/.nexus
+tar cavf /builds/worker/artifacts/android-gradle-dependencies.tar.zst --exclude=.nexus --exclude=.meta android-gradle-dependencies
+tar cavf /builds/worker/artifacts/gradle-user-home-seed.tar.zst gradle-user-home-seed
 
 popd

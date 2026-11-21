@@ -26,7 +26,7 @@ import mozilla.components.browser.state.selector.findTab
 import mozilla.components.browser.state.state.TabSessionState
 import mozilla.components.browser.state.store.BrowserStore
 import mozilla.components.feature.listentopage.content.Content
-import mozilla.components.feature.listentopage.content.ContentProvider
+import mozilla.components.feature.listentopage.content.ContentExtractor
 import mozilla.components.feature.listentopage.content.TextChunker
 import mozilla.components.feature.listentopage.facts.emitEngineBoundFact
 import mozilla.components.feature.listentopage.playback.ArticleDisplayData
@@ -36,6 +36,7 @@ import mozilla.components.feature.listentopage.playback.ChunkFile
 import mozilla.components.feature.listentopage.playback.ChunkPosition
 import mozilla.components.feature.listentopage.playback.PlaybackController
 import mozilla.components.feature.listentopage.playback.PlaybackIntent
+import mozilla.components.feature.listentopage.playback.PlaybackPhase
 import mozilla.components.feature.listentopage.playback.SEEK_BACK_INCREMENT_MS
 import mozilla.components.feature.listentopage.playback.SEEK_FORWARD_INCREMENT_MS
 import mozilla.components.feature.listentopage.playback.SynthesisJobPriorityLock
@@ -43,11 +44,13 @@ import mozilla.components.feature.listentopage.playback.articlePositionOf
 import mozilla.components.feature.listentopage.playback.chunkPositionAt
 import mozilla.components.feature.listentopage.playback.offsetInMeasuredChunk
 import mozilla.components.feature.listentopage.playback.shownDurationMs
+import mozilla.components.feature.listentopage.settings.ListenEnabledState
 import mozilla.components.feature.listentopage.settings.ListenSettings
 import mozilla.components.feature.listentopage.synthesis.NoOfflineVoiceAvailableException
 import mozilla.components.feature.listentopage.synthesis.NothingToReadException
 import mozilla.components.feature.listentopage.synthesis.SpeechSynthesizer
 import mozilla.components.feature.listentopage.synthesis.SynthesisQueue
+import mozilla.components.feature.listentopage.voices.Voice
 import mozilla.components.lib.state.Middleware
 import mozilla.components.lib.state.Store
 import mozilla.components.support.base.log.logger.Logger
@@ -56,14 +59,15 @@ import mozilla.components.support.ktx.kotlin.stripCommonSubdomains
 /**
  * [Middleware] that extracts the article a listening session reads out, synthesizes it and plays it.
  *
- * @property contentProvider Provides the article text and language for a tab.
+ * @property contentExtractor Provides the article text and language for a tab.
  * @property synthesizerProvider Builds the speech engine. A provider rather than an instance for two reasons: building
  *   one binds the platform engine over IPC, which must not happen on the caller's thread, and [SpeechSynthesizer.close]
  *   is terminal, so a session that closes its engine needs a way to get another one.
  * @property audioCache Holds the audio files. It is emptied when the session stops.
  * @property playbackController Plays the audio file. It is used instead of the player directly, because only playback
  *   commanded through the media session keeps the audio alive in the background and shows the notification.
- * @property settings The module's own preferences, holding the voice the user picked for each article language.
+ * @property settings The module's own preferences, holding the voice the user picked for each article language and
+ *   whether the feature is turned on. The session stops when the feature is turned off.
  * @property scope The [CoroutineScope] the extraction, the synthesis and the playback commands run in. It has to
  *   dispatch on one thread: the session fields below are read from `invoke`, which the store runs on whichever thread
  *   dispatched, and written from this scope.
@@ -73,7 +77,7 @@ import mozilla.components.support.ktx.kotlin.stripCommonSubdomains
 @Suppress("TooManyFunctions")
 class ListenMiddleware(
     private val browserStore: BrowserStore,
-    private val contentProvider: ContentProvider,
+    private val contentExtractor: ContentExtractor,
     private val synthesizerProvider: () -> SpeechSynthesizer,
     private val audioCache: AudioFileCache,
     private val playbackController: PlaybackController,
@@ -144,18 +148,18 @@ class ListenMiddleware(
         next(action)
 
         when (action) {
-            is ListenAction.Session.ListenRequested -> {
-                store.endSession(releasePlayback = false)
+            is ListenAction.User.Session.ListenRequested -> {
+                store.endSession()
                 observePlayback(store)
                 requestContent(store, action.tabId)
                 trackTabClosure(store, action.tabId)
             }
 
-            is ListenAction.Session.StopRequested -> store.endSession(releasePlayback = true)
+            is ListenAction.User.Session.StopRequested -> store.endSession()
 
-            is ListenAction.Content.ContentReady -> store.loadVoicesAndPlay(action.languageTag)
+            is ListenAction.System.Content.ContentReady -> store.loadVoicesAndPlay(action.languageTag)
 
-            is ListenAction.Voices.VoiceSelected -> {
+            is ListenAction.User.Voices.VoiceSelected -> {
                 // Saved even when the voice is the one already reading, because the voice a load picks for itself is
                 // put in the store without being saved: the first tap on it is what makes the choice the user's own.
                 store.state.languageTag?.let { action.voice.persistChoiceFor(it) }
@@ -167,27 +171,28 @@ class ListenMiddleware(
                 }
             }
 
-            is ListenAction.Playback.SeekRequested -> {
+            is ListenAction.User.Controls.SeekRequested -> {
                 store.seekToArticlePosition(
                     positionMs = store.state.articleProgress.positionMs,
                     progressBeforeSeek = previousProgress,
                 )
             }
-            ListenAction.Controls.PlayPauseClicked -> store.togglePlayback()
-            ListenAction.Controls.RewindClicked -> store.skipBy(-SEEK_BACK_INCREMENT_MS)
-            ListenAction.Controls.ForwardClicked -> store.skipBy(SEEK_FORWARD_INCREMENT_MS)
-            ListenAction.Controls.VoicesClicked -> store.refreshVoices()
-            is ListenAction.Controls.PlaybackSpeedSelected ->
+            ListenAction.User.Controls.PlayPauseClicked -> store.togglePlayback()
+            ListenAction.User.Controls.RewindClicked -> store.skipBy(-SEEK_BACK_INCREMENT_MS)
+            ListenAction.User.Controls.ForwardClicked -> store.skipBy(SEEK_FORWARD_INCREMENT_MS)
+            ListenAction.User.Voices.VoicesClicked -> store.refreshVoices()
+            is ListenAction.User.Controls.PlaybackSpeedSelected ->
                 scope.launch { playbackController.setSpeed(action.playbackSpeed) }
-            is ListenAction.Playback,
-            is ListenAction.Controls,
-            ListenAction.Content.ContentUnavailable,
-            is ListenAction.Voices.AvailableVoicesLoaded,
-            ListenAction.Voices.NoOfflineVoicesAvailable,
-            is ListenAction.Synthesis,
+            is ListenAction.System.Playback,
+            is ListenAction.User.Controls,
+            ListenAction.User.Voices.VoicesDismissed,
+            ListenAction.System.Content.ContentUnavailable,
+            is ListenAction.System.Voices.AvailableVoicesLoaded,
+            ListenAction.System.Voices.NoOfflineVoicesAvailable,
+            is ListenAction.System.Synthesis,
             is PlaylistAction,
-            is ListenAction.ModeChanged,
-            ListenAction.ErrorDismissed -> Unit
+            is ListenAction.User.ModeChanged,
+            ListenAction.User.ErrorDismissed -> Unit
         }
     }
 
@@ -204,7 +209,15 @@ class ListenMiddleware(
             launch {
                 playbackController.sessionEnded.first()
                 store.dispatch(
-                    ListenAction.Session.StopRequested(ListenAction.Session.StopSource.MediaSessionEndedOutsideApp)
+                    ListenAction.User.Session.StopRequested(
+                        ListenAction.User.Session.StopSource.MediaSessionEndedOutsideApp
+                    )
+                )
+            }
+            launch {
+                settings.enabled.first { it == ListenEnabledState.Disabled }
+                store.dispatch(
+                    ListenAction.User.Session.StopRequested(ListenAction.User.Session.StopSource.FeatureDisabled)
                 )
             }
             playbackController.status.collect { store.reportPlayback(it) }
@@ -235,13 +248,13 @@ class ListenMiddleware(
 
             // If the player reaches a chunk that is not playing yet, it indicates the chunk is still loading
             PlaybackPhase.Playing if playback.chunk.index != playlist.playingChunkIndex -> {
-                dispatch(ListenAction.Playback.PlaybackStarted(playback.chunk, playback.positionMs))
+                dispatch(ListenAction.System.Playback.PlaybackStarted(playback.chunk, playback.positionMs))
                 synthesizing(this::dispatch) {
                     synthesisQueue?.let { workAheadOf(it, playlist.playingChunkIndex) }
                 }
             }
 
-            else -> dispatch(ListenAction.Playback.StateChangeObserved(playback))
+            else -> dispatch(ListenAction.System.Playback.StateChangeObserved(playback))
         }
     }
 
@@ -259,24 +272,24 @@ class ListenMiddleware(
                     .mapNotNull { state ->
                         val tab = state.findTab(tabId)
                         when {
-                            tab == null -> ListenAction.Session.StopSource.TabClosed
+                            tab == null -> ListenAction.User.Session.StopSource.TabClosed
                             // checks if the tab's url has been updated while listening to the tab
                             tab.content.url != startingTabUrl && tab.pageUrl != startingTabPageUrl ->
-                                ListenAction.Session.StopSource.TabClosed
+                                ListenAction.User.Session.StopSource.TabClosed
                             startedInReaderMode && !tab.readerState.active ->
-                                ListenAction.Session.StopSource.ReaderModeClosed
+                                ListenAction.User.Session.StopSource.ReaderModeClosed
                             else -> null
                         }
                     }
                     .first()
-            store.dispatch(ListenAction.Session.StopRequested(source))
+            store.dispatch(ListenAction.User.Session.StopRequested(source))
         }
     }
 
     private fun requestContent(store: Store<ListenState, ListenAction>, tabId: String) {
         contentJob?.cancel()
         contentJob = scope.launch {
-            val content = contentProvider.getContent(tabId)
+            val content = contentExtractor.getContent(tabId)
 
             // A session for another tab was started, or the session was stopped, while the article was extracted.
             if (store.state.tabId != tabId) {
@@ -285,7 +298,7 @@ class ListenMiddleware(
 
             content
                 .onSuccess { store.readArticle(tabId, it) }
-                .onFailure { store.dispatch(ListenAction.Content.ContentUnavailable) }
+                .onFailure { store.dispatch(ListenAction.System.Content.ContentUnavailable) }
         }
     }
 
@@ -298,7 +311,7 @@ class ListenMiddleware(
      */
     private fun ListenStore.readArticle(tabId: String, content: Content) {
         if (content.text.isBlank()) {
-            dispatch(ListenAction.Content.ContentUnavailable)
+            dispatch(ListenAction.System.Content.ContentUnavailable)
             return
         }
 
@@ -312,7 +325,7 @@ class ListenMiddleware(
                 displayData = displayData,
             )
         dispatch(
-            ListenAction.Content.ContentReady(
+            ListenAction.System.Content.ContentReady(
                 languageTag = language,
                 languageSource = content.languageSource,
                 title = displayData.title,
@@ -331,7 +344,7 @@ class ListenMiddleware(
      */
     private fun ListenStore.loadVoicesAndPlay(langTag: String) {
         // Shown as buffering from here until the opening plays
-        dispatch(ListenAction.Playback.PlaybackWaiting)
+        dispatch(ListenAction.System.Playback.PlaybackWaiting)
         voicesJob?.cancel()
         voicesJob = scope.launch {
             if (state.voiceState.loadState != VoiceLoadState.Loaded && !loadVoices(langTag)) {
@@ -352,7 +365,7 @@ class ListenMiddleware(
             PlaybackPhase.Failed -> scope.launch { playbackController.resume() }
 
             PlaybackPhase.Ended -> {
-                dispatch(ListenAction.Playback.PlaybackWaiting)
+                dispatch(ListenAction.System.Playback.PlaybackWaiting)
                 seekToArticlePosition(0)
                 scope.launch { playbackController.resume() }
             }
@@ -374,12 +387,12 @@ class ListenMiddleware(
             val voices = engine.loadAvailableVoices(langTag)
 
             if (voices.isEmpty()) {
-                dispatch(ListenAction.Voices.NoOfflineVoicesAvailable)
+                dispatch(ListenAction.System.Voices.NoOfflineVoicesAvailable)
                 false
             } else {
                 val selected = voices.loadSavedVoiceFor(langTag)
                 engine.setVoice(selected)
-                dispatch(ListenAction.Voices.AvailableVoicesLoaded(voices, selected))
+                dispatch(ListenAction.System.Voices.AvailableVoicesLoaded(voices, selected))
                 true
             }
         }
@@ -406,11 +419,11 @@ class ListenMiddleware(
                     ) {
                         playbackController.pause()
                     }
-                    dispatch(ListenAction.Voices.NoOfflineVoicesAvailable)
+                    dispatch(ListenAction.System.Voices.NoOfflineVoicesAvailable)
                 }
                 selected != null && selected in voices ->
                     dispatch(
-                        ListenAction.Voices.AvailableVoicesLoaded(
+                        ListenAction.System.Voices.AvailableVoicesLoaded(
                             voices = voices,
                             selectedVoice = selected,
                         )
@@ -418,9 +431,14 @@ class ListenMiddleware(
                 else -> {
                     val fallback = voices.loadSavedVoiceFor(languageTag)
                     dispatch(
-                        ListenAction.Voices.AvailableVoicesLoaded(voices = voices, selectedVoice = selected ?: fallback)
+                        ListenAction.System.Voices.AvailableVoicesLoaded(
+                            voices = voices,
+                            selectedVoice = selected ?: fallback,
+                        )
                     )
-                    dispatch(ListenAction.Voices.VoiceSelected(fallback, ListenAction.Voices.VoiceSource.Fallback))
+                    dispatch(
+                        ListenAction.User.Voices.VoiceSelected(fallback, ListenAction.User.Voices.VoiceSource.Fallback)
+                    )
                 }
             }
         }
@@ -464,7 +482,7 @@ class ListenMiddleware(
             // The voice before stops at once, rather than reading on until the new one is ready.
             if (textPositionAfterVoiceChanged != null) {
                 playbackController.stopAndBufferAt(progress.positionMs)
-                dispatch(ListenAction.Playback.PlaybackWaiting)
+                dispatch(ListenAction.System.Playback.PlaybackWaiting)
             }
 
             // Only this article's audio goes: the playback and the engine are kept, because the new voice reads over
@@ -573,11 +591,11 @@ class ListenMiddleware(
         // Exit early if there are no additional chunks to synthesize
         val missing = playlist.nextToQueue
         if (missing >= chunkCount) {
-            dispatch(ListenAction.Playback.PlaybackEnded)
+            dispatch(ListenAction.System.Playback.PlaybackEnded)
             return
         }
 
-        dispatch(ListenAction.Playback.PlaybackWaiting)
+        dispatch(ListenAction.System.Playback.PlaybackWaiting)
 
         synthesizing(this::dispatch) {
             // In case we receive a repeated report of playback ending we check to see if the next chunk has already
@@ -602,7 +620,7 @@ class ListenMiddleware(
         val target = progress.chunkDurationsMs.chunkPositionAt(progress.positionMs)
         if (queue == null || target == null) {
             // No way to remake a chunk that we can't find
-            dispatch(ListenAction.Playback.PlaybackFailed)
+            dispatch(ListenAction.System.Playback.PlaybackFailed)
             return
         }
 
@@ -615,7 +633,7 @@ class ListenMiddleware(
 
         if (recoveryAttempts >= MAX_RECOVERY_ATTEMPTS) {
             lock.release()
-            dispatch(ListenAction.Playback.PlaybackFailed)
+            dispatch(ListenAction.System.Playback.PlaybackFailed)
             return
         }
         recoveryAttempts += 1
@@ -688,12 +706,12 @@ class ListenMiddleware(
         val articleEndMs = state.articleProgress.durationMs
         dispatch(PlaylistAction.Finished)
         scope.launch { playbackController.finishAt(articleEndMs) }
-        dispatch(ListenAction.Playback.PlaybackEnded)
+        dispatch(ListenAction.System.Playback.PlaybackEnded)
     }
 
     private fun ListenStore.revertArticleProgress(progress: ArticleProgress) {
         dispatch(
-            ListenAction.Playback.ArticleProgressReverted(
+            ListenAction.System.Playback.ArticleProgressReverted(
                 positionMs = progress.positionMs,
                 durationMs = progress.durationMs,
                 chunkDurationsMs = progress.chunkDurationsMs,
@@ -709,7 +727,7 @@ class ListenMiddleware(
     private fun ListenStore.seekFromNotification(positionMs: Long) {
         val shownDurationMs = state.articleProgress.shownDurationMs()
         if (shownDurationMs > 0) {
-            dispatch(ListenAction.Playback.SeekRequested(positionMs.toFloat() / shownDurationMs))
+            dispatch(ListenAction.User.Controls.SeekRequested(positionMs.toFloat() / shownDurationMs))
         }
     }
 
@@ -730,7 +748,7 @@ class ListenMiddleware(
         val targetChunkStartMs = chunkDurationsBeforeTargetChunk.sum()
         scope.launch { playbackController.stopAndBufferAt(targetChunkStartMs + targetPosition.offsetMs) }
 
-        dispatch(ListenAction.Playback.PlaybackWaiting)
+        dispatch(ListenAction.System.Playback.PlaybackWaiting)
 
         stopSynthesizing {}
 
@@ -867,14 +885,14 @@ class ListenMiddleware(
             } catch (e: CancellationException) {
                 throw e
             } catch (_: NothingToReadException) {
-                dispatch(ListenAction.Content.ContentUnavailable)
+                dispatch(ListenAction.System.Content.ContentUnavailable)
             } catch (_: NoOfflineVoiceAvailableException) {
                 // The engine only reaches for the network when it has no offline voice for the language, so a network
                 // failure during synthesis means the same thing to the user as an empty voice list.
-                dispatch(ListenAction.Voices.NoOfflineVoicesAvailable)
+                dispatch(ListenAction.System.Voices.NoOfflineVoicesAvailable)
             } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
                 logger.error("Could not read the article out loud", e)
-                dispatch(ListenAction.Synthesis.SynthesisFailed)
+                dispatch(ListenAction.System.Synthesis.SynthesisFailed)
             }
         }
     }
@@ -895,44 +913,33 @@ class ListenMiddleware(
     }
 
     /**
-     * Stops everything the session has in flight and throws away the audio it made.
-     *
-     * @param releasePlayback Whether to give up the playback and close the engine, which takes the notification away
-     *   with the service. A session starting in place of this one keeps both: it replaces what is playing, and it reads
-     *   with the same engine rather than paying to bind another.
+     * Stops everything the session has in flight, gives up the playback, closes the synthesis engine, and clears the
+     * audio cache for the session. This will also cause the notification to disappear.
      */
-    private fun ListenStore.endSession(releasePlayback: Boolean) {
+    private fun ListenStore.endSession() {
         contentJob?.cancel()
         voicesJob?.cancel()
         refreshVoicesJob?.cancel()
         tabClosureJob?.cancel()
+        playbackStatusJob?.cancel()
         article = null
 
-        val emptying = synthesisQueue
         synthesisQueue = null
         dispatch(MeasurementAction.Cleared)
 
-        val closing = synthesizer.takeIf { releasePlayback }
-        if (releasePlayback) {
-            playbackStatusJob?.cancel()
-            synthesizer = null
-        }
+        val closing = synthesizer
+        synthesizer = null
 
         stopSynthesizing {
-            if (releasePlayback) {
-                playbackController.release()
+            playbackController.release()
 
-                // The engine is an IPC binding into the text to speech app, which stays alive for the rest of this
-                // app's life unless it is shut down. Closing is terminal, which is why the next session builds its own.
-                withContext(ioDispatcher) { closing?.close() }
+            // The engine is an IPC binding into the text to speech app, which stays alive for the rest of this
+            // app's life unless it is shut down. Closing is terminal, which is why the next session builds its own.
+            withContext(ioDispatcher) { closing?.close() }
 
-                // Nothing else deletes the audio, so without this a session leaves its files behind for as long as the
-                // system keeps the cache directory. Only safe once the playback above has given up the files.
-                audioCache.clear()
-            } else {
-                // The playback carries on into the session replacing this one, so only this article's own audio goes.
-                emptying?.clear()
-            }
+            // Nothing else deletes the audio, so without this a session leaves its files behind for as long as the
+            // system keeps the cache directory. Only safe once the playback above has given up the files.
+            audioCache.clear()
         }
     }
 

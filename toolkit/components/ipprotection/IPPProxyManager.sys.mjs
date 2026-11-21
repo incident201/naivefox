@@ -67,6 +67,25 @@ XPCOMUtils.defineLazyPreferenceGetter(
   500
 );
 
+// Ceiling for the exponential rotation backoff, so wake recovery keeps probing
+// often enough to catch connectivity returning.
+XPCOMUtils.defineLazyPreferenceGetter(
+  lazy,
+  "maxRetryAfter",
+  "browser.ipProtection.guardian.maxRetryAfter",
+  Temporal.Duration.from({ seconds: 30 }).total("milliseconds")
+);
+
+// Overall budget for a wake-recovery rotation: longer than the in-session
+// `timeout` since the network is often absent for a while after wake, but bounded
+// so we surface a recoverable error instead of hanging forever.
+XPCOMUtils.defineLazyPreferenceGetter(
+  lazy,
+  "wakeTimeout",
+  "browser.ipProtection.guardian.wakeTimeout",
+  Temporal.Duration.from({ minutes: 2 }).total("milliseconds")
+);
+
 XPCOMUtils.defineLazyPreferenceGetter(
   lazy,
   "attemptTimeout",
@@ -148,7 +167,7 @@ const LOG_PREF = "browser.ipProtection.log";
 
 ChromeUtils.defineLazyGetter(lazy, "logConsole", function () {
   return console.createInstance({
-    prefix: "IPP_ProxyManager",
+    logModule: "IPP_ProxyManager",
     maxLogLevel: Services.prefs.getBoolPref(LOG_PREF, false) ? "Debug" : "Warn",
   });
 });
@@ -241,6 +260,8 @@ class IPPProxyManagerSingleton extends EventTarget {
   #usage = null;
   /**@type {import("./IPPChannelFilter.sys.mjs").IPPChannelFilter | null} */
   #connection = null;
+  /** @type {{country: object, city: object} | null} */
+  #location = null;
   #networkErrorObserver = null;
   // If this is set, we're awaiting a proxy pass rotation.
   /** @type {{ promise: Promise<void>, controller: AbortController } | null} */
@@ -319,6 +340,13 @@ class IPPProxyManagerSingleton extends EventTarget {
     this.#pass = null;
     this.#usage = null;
     this.#cancelChannelFilter();
+  }
+
+  /**
+   * The location the active connection routes through, or null.
+   */
+  get location() {
+    return this.#location;
   }
 
   /**
@@ -493,9 +521,9 @@ class IPPProxyManagerSingleton extends EventTarget {
    * True if started by user action, false if system action
    * @param {boolean} inPrivateBrowsing
    * True if started from a private browsing window
-   * @param {string} [country]
-   * Optional ISO 3166-1 alpha-2 country code to route through. When
-   * omitted, the recommended (anycast) location is used.
+   * @param {string|Promise<string|undefined>} [country]
+   * Optional ISO 3166-1 alpha-2 country code to route through, or a promise
+   * for one. When omitted, the recommended (anycast) location is used.
    * @param {import("./IPPChannelFilter.sys.mjs").IPPProxyMode} [mode]
    * Mode for this connection. When omitted, browser.ipProtection.mode decides.
    * @returns {Promise<{started: boolean, error?: string}>}
@@ -510,7 +538,8 @@ class IPPProxyManagerSingleton extends EventTarget {
       return { started: false, error: ERRORS.QUOTA_EXHAUSTED };
     }
 
-    if (this.#state === IPPProxyStates.ERROR) {
+    const retrying = this.#state === IPPProxyStates.ERROR;
+    if (retrying) {
       if (!userAction) {
         return { started: false, error: this.#errorType ?? ERRORS.GENERIC };
       }
@@ -592,13 +621,14 @@ class IPPProxyManagerSingleton extends EventTarget {
           } else if (error === ERRORS.CANCELED) {
             this.#cancelChannelFilter();
             this.#setErrorState(error);
-          } else if (userAction) {
+          } else if (userAction && !retrying) {
             this.#connection?.fail();
             this.#cancelChannelFilter();
             this.#setErrorState(error);
           } else {
-            // Nobody checks a system activation's result, so keep holding
-            // traffic in ERROR until stop() rather than retrying from READY.
+            // Nobody checks a system activation's result, and a failed retry
+            // must not release the traffic ERROR held, so keep holding it in
+            // ERROR until stop() rather than retrying from READY.
             this.#setErrorState(error);
           }
           return { started: false, error };
@@ -658,6 +688,7 @@ class IPPProxyManagerSingleton extends EventTarget {
     }
     this.#schedulePassRotation(this.#pass);
 
+    country = await country;
     const location = country
       ? lazy.IPProtectionServerlist.getLocation(country)
       : lazy.IPProtectionServerlist.getRecommendedLocation();
@@ -669,6 +700,7 @@ class IPPProxyManagerSingleton extends EventTarget {
     lazy.logConsole.debug("Server:", server?.hostname);
 
     this.#connection.initialize(this.#pass, server);
+    this.#location = location;
 
     this.networkErrorObserver.start();
     this.networkErrorObserver.addIsolationKey(this.#connection.isolationKey);
@@ -746,6 +778,7 @@ class IPPProxyManagerSingleton extends EventTarget {
 
       this.networkErrorObserver.stop();
     }
+    this.#location = null;
     this.#errorType = null;
   }
 
@@ -802,6 +835,7 @@ class IPPProxyManagerSingleton extends EventTarget {
 
     this.#connection.suspend();
     this.#connection.initialize(this.#pass, server);
+    this.#location = location;
 
     this.networkErrorObserver.addIsolationKey(this.#connection.isolationKey);
 
@@ -907,9 +941,12 @@ class IPPProxyManagerSingleton extends EventTarget {
    * until the abort signal is triggered.
    *
    * @param {AbortSignal} abortSignal
+   * @param {boolean} abortOnNetworkError
+   *   When true a NETWORK_ERROR result is returned; when false (wake recovery)
+   *   it is retried within the overall budget.
    * @returns {Promise<object|null>}
    */
-  async #attemptPassRotation(abortSignal) {
+  async #attemptPassRotation(abortSignal, abortOnNetworkError) {
     let delay = lazy.retryAfter;
     while (!abortSignal.aborted) {
       let result;
@@ -928,21 +965,23 @@ class IPPProxyManagerSingleton extends EventTarget {
         if (abortSignal.aborted) {
           return null;
         }
-        // A per-attempt timeout (attemptSignal aborted) or an offline error is
-        // transient: back off and retry within the overall budget instead of
-        // failing the whole rotation.
-        if (!attemptSignal.aborted && !lazy.IPPNetworkUtils.isOffline) {
+        // Providers report transport failures as a NETWORK_ERROR result, so a
+        // thrown error is an auth failure. Only a per-attempt timeout is retried.
+        if (!attemptSignal.aborted) {
           throw e;
         }
       } finally {
         lazy.clearTimeout(attemptTimer);
       }
-      if (result && !(result.status >= 500 && result.status <= 599)) {
+      const retryable =
+        (result?.status >= 500 && result?.status <= 599) ||
+        (result?.error === AUTH_ERRORS.NETWORK_ERROR && !abortOnNetworkError);
+      if (result && !retryable) {
         return result;
       }
       await scheduleCallback(
         () => {
-          delay *= 2;
+          delay = Math.min(delay * 2, lazy.maxRetryAfter);
         },
         Temporal.Now.instant().add({ milliseconds: delay }),
         abortSignal
@@ -991,17 +1030,25 @@ class IPPProxyManagerSingleton extends EventTarget {
   /**
    * Starts a flow to get a new ProxyPass and replace the current one.
    *
+   * @param {object} [options]
+   * @param {boolean} [options.abortOnNetworkError=true]
+   *   In-session (true): bounded by the short `timeout`, a network error is a
+   *   failure. Wake recovery (false): uses the longer `wakeTimeout` and retries
+   *   through network errors, only failing on a Guardian error or the budget.
    * @returns {Promise<void|ProxyPass>} - Returns a promise that resolves when the rotation is complete or failed.
    * When it's called again while a rotation is in progress, it will return the existing promise.
    */
-  async rotateProxyPass() {
+  async rotateProxyPass({ abortOnNetworkError = true } = {}) {
     if (this.#rotation) {
       return this.#rotation.promise;
     }
     const controller = new AbortController();
-    const timeoutId = lazy.setTimeout(() => {
-      controller.abort(ERRORS.TIMEOUT);
-    }, lazy.timeout);
+    const timeoutId = lazy.setTimeout(
+      () => {
+        controller.abort(ERRORS.TIMEOUT);
+      },
+      abortOnNetworkError ? lazy.timeout : lazy.wakeTimeout
+    );
     let { promise, resolve } = Promise.withResolvers();
     this.#rotation = { promise, controller };
     let resumed = false;
@@ -1019,10 +1066,23 @@ class IPPProxyManagerSingleton extends EventTarget {
       this.#connection.suspend();
     }
 
-    let result = await this.#attemptPassRotation(controller.signal);
+    let result;
+    try {
+      result = await this.#attemptPassRotation(
+        controller.signal,
+        abortOnNetworkError
+      );
+    } catch (e) {
+      this.#setErrorState(e);
+      return null;
+    }
     if (controller.signal.aborted || !result) {
       if (controller.signal.reason === ERRORS.TIMEOUT) {
-        this.#setErrorState(ERRORS.TIMEOUT);
+        // Wake recovery that never reconnected surfaces a recoverable network
+        // error rather than a generic timeout.
+        this.#setErrorState(
+          abortOnNetworkError ? ERRORS.TIMEOUT : ERRORS.NETWORK
+        );
       }
       return null;
     }

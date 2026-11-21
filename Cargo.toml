@@ -96,7 +96,7 @@ uniffi_pipeline = "0.32"
 # Shared across multiple application-services consumers.
 rusqlite = "0.37"
 # Shared across multiple glean consumers.
-glean = "=71.0.0"
+glean = "=71.1.0"
 
 # Explicitly specify what our profiles use.  The opt-level setting here is
 # a total fiction; see the setup of MOZ_RUST_DEFAULT_FLAGS for what the
@@ -215,8 +215,6 @@ icu_collator_data = { path = "third_party/rust/icu_collator_data" }
 icu_normalizer = { path = "third_party/rust/icu_normalizer" }
 icu_normalizer_data = { path = "third_party/rust/icu_normalizer_data" }
 icu_collections = { path = "third_party/rust/icu_collections" }
-utf8_iter = { path = "third_party/rust/utf8_iter" }
-utf16_iter = { path = "third_party/rust/utf16_iter" }
 icu_properties = { path = "third_party/rust/icu_properties" }
 icu_properties_data = { path = "third_party/rust/icu_properties_data" }
 
@@ -353,7 +351,7 @@ ohttp = { git = "https://github.com/martinthomson/ohttp", rev = "600931b5a1e9477
 zip = { path = "third_party/rust/zip" }
 
 # Unpublished changes
-cssparser = { git = "https://github.com/servo/rust-cssparser", rev = "9f3ceddf398f5ce4ab76fdad1b42ccb6c578a926" }
+cssparser = { git = "https://github.com/servo/rust-cssparser", rev = "2436e4330d8fa0c5208c12c6d2306f5e2a43c71f" }
 
 # Patch libcrux-traits to avoid unnecessary unused dependencies and conflicts.
 libcrux-traits = { path = "build/rust/libcrux-traits" }

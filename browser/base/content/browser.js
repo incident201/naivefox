@@ -129,6 +129,19 @@ ChromeUtils.defineESModuleGetters(this, {
   ZoomUI: "resource:///modules/ZoomUI.sys.mjs",
 });
 
+ChromeUtils.defineESModuleGetters(
+  this,
+  {
+    ctrlTab: "chrome://browser/content/tabbrowser/browser-ctrlTab.mjs",
+    gTabsPanel: "chrome://browser/content/tabbrowser/all-tabs-menu.mjs",
+    StatusPanel: "chrome://browser/content/tabbrowser/status-panel.mjs",
+    TabBarVisibility:
+      "chrome://browser/content/tabbrowser/tab-bar-visibility.mjs",
+    TabContextMenu: "chrome://browser/content/tabbrowser/tab-context-menu.mjs",
+  },
+  { global: "current" }
+);
+
 ChromeUtils.defineLazyGetter(this, "fxAccounts", () => {
   return ChromeUtils.importESModule(
     "resource://gre/modules/FxAccounts.sys.mjs"
@@ -178,11 +191,6 @@ XPCOMUtils.defineLazyScriptGetter(
 );
 XPCOMUtils.defineLazyScriptGetter(
   this,
-  "gTabsPanel",
-  "chrome://browser/content/tabbrowser/browser-allTabsMenu.js"
-);
-XPCOMUtils.defineLazyScriptGetter(
-  this,
   [
     "BrowserAddonUI",
     "gExtensionsNotifications",
@@ -190,11 +198,6 @@ XPCOMUtils.defineLazyScriptGetter(
     "gXPInstallObserver",
   ],
   "chrome://browser/content/browser-addons.js"
-);
-XPCOMUtils.defineLazyScriptGetter(
-  this,
-  "ctrlTab",
-  "chrome://browser/content/tabbrowser/browser-ctrlTab.js"
 );
 XPCOMUtils.defineLazyScriptGetter(
   this,
@@ -751,6 +754,9 @@ Object.defineProperty(this, "gFindBarPromise", {
 });
 
 function shouldSuppressPopupNotifications() {
+  const { WindowLock } = ChromeUtils.importESModule(
+    "moz-src:///browser/modules/WindowLock.sys.mjs"
+  );
   // We have to hide notifications explicitly when the window is
   // minimized because of the effects of the "noautohide" attribute on Linux.
   // This can be removed once bug 545265 and bug 1320361 are fixed.
@@ -759,7 +765,8 @@ function shouldSuppressPopupNotifications() {
   return (
     window.windowState == window.STATE_MINIMIZED ||
     gBrowser?.selectedBrowser.hasAttribute("tabDialogShowing") ||
-    gDialogBox?.isOpen
+    gDialogBox?.isOpen ||
+    WindowLock.isWindowLocked(window)
   );
 }
 
@@ -1241,21 +1248,12 @@ var gKeywordURIFixup = {
         }
 
         let displayHostName = "http://" + hostName + "/";
-        let message = gNavigatorBundle.getFormattedString(
-          "keywordURIFixup.message",
-          [displayHostName]
-        );
-        let yesMessage = gNavigatorBundle.getFormattedString(
-          "keywordURIFixup.goTo",
-          [displayHostName]
-        );
+        let l10nArgs = { hostName: displayHostName };
 
         let buttons = [
           {
-            label: yesMessage,
-            accessKey: gNavigatorBundle.getString(
-              "keywordURIFixup.goTo.accesskey"
-            ),
+            "l10n-id": "keyword-uri-fixup-go-to-button",
+            "l10n-args": l10nArgs,
             callback() {
               // Do not set this preference while in private browsing.
               if (!PrivateBrowsingUtils.isWindowPrivate(window)) {
@@ -1277,7 +1275,10 @@ var gKeywordURIFixup = {
         let notification = await notificationBox.appendNotification(
           "keyword-uri-fixup",
           {
-            label: message,
+            label: {
+              "l10n-id": "keyword-uri-fixup-message",
+              "l10n-args": l10nArgs,
+            },
             priority: notificationBox.PRIORITY_INFO_HIGH,
           },
           buttons
@@ -2465,7 +2466,11 @@ var XULBrowserWindow = {
       }
     }
 
-    if (TranslationsParent.isFullPageTranslationsRestrictedForPage(gBrowser)) {
+    if (
+      TranslationsParent.isFullPageTranslationsRestrictedForPage(
+        gBrowser.selectedBrowser
+      )
+    ) {
       this._menuItemForTranslations.setAttribute("disabled", "true");
     } else {
       this._menuItemForTranslations.removeAttribute("disabled");
@@ -3884,6 +3889,14 @@ function CanCloseWindow() {
     return true;
   }
 
+  // Don't show beforeunload prompts while the window is locked.
+  const { WindowLock } = ChromeUtils.importESModule(
+    "moz-src:///browser/modules/WindowLock.sys.mjs"
+  );
+  if (WindowLock.isWindowLocked(window)) {
+    return true;
+  }
+
   for (let browser of gBrowser.browsers) {
     // Don't instantiate lazy browsers.
     if (!browser.isConnected) {
@@ -4109,7 +4122,7 @@ function warnAboutClosingWindow() {
 var MailIntegration = {
   sendLinkForBrowser(aBrowser) {
     this.sendMessage(
-      gURLBar.makeURIReadable(aBrowser.currentURI).displaySpec,
+      BrowserUtils.getExposableURI(aBrowser.currentURI).displaySpec,
       aBrowser.contentTitle
     );
   },
@@ -4834,8 +4847,9 @@ var gDialogBox = {
       urlbar.view?.close();
     }
 
+    using disposables = new DisposableStack();
     try {
-      await this._open(uri, args, triggeringEvent);
+      await this._open(uri, args, triggeringEvent, disposables);
     } catch (ex) {
       console.error(ex);
     } finally {
@@ -4854,7 +4868,6 @@ var gDialogBox = {
       document.documentElement.removeAttribute("window-modal-open");
       dialog.removeEventListener("dialogopen", this);
       dialog.removeEventListener("close", this);
-      this._updateMenuAndCommandState(true /* to enable */);
       this._dialog = null;
       UpdatePopupNotificationsVisibility();
     }
@@ -4884,7 +4897,15 @@ var gDialogBox = {
     }
   },
 
-  _open(uri, args, triggeringEvent) {
+  /**
+   * @param {string} uri - URI of the dialog document.
+   * @param {object} args - Arguments for the dialog.
+   * @param {Event} [triggeringEvent] - The event that made the user open the
+   * dialog, see SubDialog.open().
+   * @param {DisposableStack} disposables - Receives what needs to be undone
+   * once the dialog is closed.
+   */
+  _open(uri, args, triggeringEvent, disposables) {
     // Get this offset before we touch style below, as touching style seems
     // to reset the cached layout bounds.
     let offset = window.windowUtils.getBoundsWithoutFlushing(
@@ -4902,7 +4923,7 @@ var gDialogBox = {
     this._didOpenHTMLDialog = true;
 
     // Disable menus and shortcuts.
-    this._updateMenuAndCommandState(false /* to disable */);
+    this.disableMenusAndCommands(disposables);
 
     // Now actually set up the dialog contents:
     let template = document.getElementById("window-modal-dialog-template")
@@ -4944,6 +4965,9 @@ var gDialogBox = {
     "key_browserConsole",
     "key_browserToolbox",
 
+    // Locking windows must stay possible while a dialog is open.
+    "cmd_lockWindows",
+
     // Don't touch the editing keys/commands which we might want inside the dialog.
     "key_undo",
     "key_redo",
@@ -4954,6 +4978,26 @@ var gDialogBox = {
     "key_delete",
     "key_selectAll",
   ]),
+
+  // Number of callers currently requiring menus and commands to be disabled.
+  _menuAndCommandDisablers: 0,
+
+  /**
+   * Disables menus and commands until the given stack is disposed. They only
+   * get enabled again once every stack passed here has been disposed.
+   *
+   * @param {DisposableStack} disposables
+   */
+  disableMenusAndCommands(disposables) {
+    disposables.defer(() => {
+      if (--this._menuAndCommandDisablers == 0) {
+        this._updateMenuAndCommandState(true /* to enable */);
+      }
+    });
+    if (this._menuAndCommandDisablers++ == 0) {
+      this._updateMenuAndCommandState(false /* to disable */);
+    }
+  },
 
   _updateMenuAndCommandState(shouldBeEnabled) {
     let editorCommands = document.getElementById("editMenuCommands");
@@ -4996,6 +5040,8 @@ if (window.location.href != AppConstants.BROWSER_CHROME_URL) {
 
 var ConfirmationHint = {
   _timerID: null,
+  _duration: 0,
+  _pendingShow: null,
 
   /**
    * Shows a transient, non-interactive confirmation hint anchored to an
@@ -5018,7 +5064,19 @@ var ConfirmationHint = {
    *         - l10nArgs (object): l10n arguments for the messageId.
    *         - hideCheckmark: Whether to hide the animated checkmark
    */
-  show(
+  show(anchor, messageId, options = {}) {
+    if (this._panel.state == "hiding") {
+      // openPopup does nothing while the panel is hiding.
+      this._pendingShow = [anchor, messageId, options];
+      return;
+    }
+    this._show(anchor, messageId, options);
+  },
+
+  /**
+   * Does the work of show(). Called internally to handle queued hints not counting twice.
+   */
+  _show(
     anchor,
     messageId,
     {
@@ -5064,38 +5122,48 @@ var ConfirmationHint = {
     // The timeout value used here allows the panel to stay open for
     // 3s after the text transition (duration=120ms) has finished.
     // If there is a description, we show for 6s after the text transition.
-    const DURATION = showDescription ? 6000 : 3000;
-    let startAutoHideTimer = () => {
-      this._animationBox.setAttribute("animate", "true");
-      this._timerID = setTimeout(() => {
-        this._panel.hidePopup(true);
-      }, DURATION + 120);
-    };
+    this._duration = showDescription ? 6000 : 3000;
 
     if (this._panel.state == "open") {
       // A hint is already showing: openPopup below would be a no-op and no
       // popupshown event would fire to restart the timer _reset just cleared.
-      startAutoHideTimer();
+      this._startAutoHideTimer();
       return;
     }
-
-    this._panel.addEventListener("popupshown", startAutoHideTimer, {
-      once: true,
-    });
-
-    this._panel.addEventListener(
-      "popuphidden",
-      () => {
-        // reset the timerId in case our timeout wasn't the cause of the popup being hidden
-        this._reset();
-      },
-      { once: true }
-    );
 
     this._panel.openPopup(anchor, {
       position: position ?? "bottomleft topleft",
       triggerEvent: event,
     });
+  },
+
+  handleEvent(event) {
+    switch (event.type) {
+      case "popupshown":
+        this._startAutoHideTimer();
+        break;
+      case "popuphidden": {
+        // reset the timerId in case our timeout wasn't the cause of the popup being hidden
+        this._reset();
+        let pending = this._pendingShow;
+        this._pendingShow = null;
+        if (pending) {
+          this._show(...pending);
+        }
+        break;
+      }
+    }
+  },
+
+  /**
+   * Shows the hint's message and hides the hint after `_duration` ms, plus
+   * the length of the message's text transition.
+   */
+  _startAutoHideTimer() {
+    this._animationBox.setAttribute("animate", "true");
+    this._timerID = setTimeout(() => {
+      this._panel.hidePopup(true);
+    }, this._duration + 120);
   },
 
   _reset() {
@@ -5144,6 +5212,8 @@ var ConfirmationHint = {
       let wrapper = document.getElementById("confirmation-hint-wrapper");
       wrapper.replaceWith(wrapper.content);
       this.__panel = document.getElementById("confirmation-hint");
+      this.__panel.addEventListener("popupshown", this);
+      this.__panel.addEventListener("popuphidden", this);
     }
   },
 };

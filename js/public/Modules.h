@@ -15,6 +15,7 @@
 #include "js/ColumnNumber.h"    // JS::ColumnNumberOneOrigin
 #include "js/CompileOptions.h"  // JS::ReadOnlyCompileOptions
 #include "js/RootingAPI.h"      // JS::{Mutable,}Handle
+#include "js/TypeDecls.h"       // JS::MutableHandleObjectVector
 #include "js/Value.h"           // JS::Value
 #include "js/Vector.h"          // js::Vector
 
@@ -225,24 +226,17 @@ extern JS_PUBLIC_API JSObject* CreateDefaultExportSyntheticModule(
     JSContext* cx, Handle<Value> defaultExport);
 
 /**
- * Compile the given wasm source buffer as an evaluation phase module record.
+ * Compile the given wasm source buffer as a module record.
  */
 extern JS_PUBLIC_API JSObject* CompileWasmModule(
     JSContext* cx, const ReadOnlyCompileOptions& options,
     js::Vector<uint8_t, 0, js::MallocAllocPolicy>& srcBuf);
 
 /**
- * Compile the given wasm source buffer as a source phase module record.
+ * Create a module record for a WebAssembly.Module object produced by
+ * JS::FinishCompileForESM.
  */
-extern JS_PUBLIC_API JSObject* CompileWasmModuleAsSource(
-    JSContext* cx, const ReadOnlyCompileOptions& options,
-    js::Vector<uint8_t, 0, js::MallocAllocPolicy>& srcBuf);
-
-/**
- * Create a source phase module record for a WebAssembly.Module object
- * produced by JS::FinishCompileForESM.
- */
-extern JS_PUBLIC_API JSObject* CreateWasmSourcePhaseModule(
+extern JS_PUBLIC_API JSObject* CreateWasmModule(
     JSContext* cx, Handle<JSObject*> wasmModuleObject);
 
 /**
@@ -283,6 +277,14 @@ extern JS_PUBLIC_API void SetModulePreload(JSObject* module, bool isPreload);
  * their specifiers may have changed.
  */
 extern JS_PUBLIC_API void ResetPreloadedModule(JSObject* module);
+
+/**
+ * Set |result| to every module record in |moduleRecord|'s [[LoadedModules]]
+ * list, discarding its previous contents. Returns false on OOM.
+ */
+extern JS_PUBLIC_API bool GetLoadedModules(JSContext* cx,
+                                           Handle<JSObject*> moduleRecord,
+                                           MutableHandleObjectVector result);
 
 /*
  * Perform the ModuleLink operation on the given source text module record.
@@ -357,7 +359,7 @@ GetModuleRequestType(JSContext* cx, Handle<JSObject*> moduleRequestArg);
  * Return true if the specified module request is a source phase import.
  */
 extern JS_PUBLIC_API bool ModuleRequestIsSourcePhase(
-    JSContext* cx, Handle<JSObject*> moduleRequestArg);
+    JSObject* moduleRequestArg);
 
 /*
  * Get the module record for a module script.

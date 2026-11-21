@@ -100,11 +100,6 @@ class MockGfxInfo final : public nsIGfxInfo {
     return NS_ERROR_NOT_IMPLEMENTED;
   }
 
-  NS_IMETHODIMP GetEmbeddedInFirefoxReality(
-      bool* aEmbeddedInFirefoxReality) override {
-    return NS_ERROR_NOT_IMPLEMENTED;
-  }
-
   NS_IMETHOD GetAzureCanvasBackend(nsAString& aBackend) override {
     return NS_ERROR_NOT_IMPLEMENTED;
   }
@@ -318,7 +313,6 @@ class GfxConfigManager : public ::testing::Test, public gfxConfigManager {
     mWrScissoredCacheClearsEnabled = true;
     ++mHwStretchingSupport.mBoth;
     mIsNightly = true;
-    mIsEarlyBetaOrEarlier = true;
   }
 
   void TearDown() override {
@@ -381,7 +375,7 @@ TEST_F(GfxConfigManager, WebRenderDefault) {
 }
 
 TEST_F(GfxConfigManager, WebRenderDefaultRelease) {
-  mIsNightly = mIsEarlyBetaOrEarlier = false;
+  mIsNightly = false;
   ConfigureWebRender();
 
   EXPECT_TRUE(mFeatures.mWr.IsEnabled());
@@ -745,7 +739,7 @@ TEST_F(GfxConfigManager, WebRenderGPUProcessDisabled) {
 }
 
 TEST_F(GfxConfigManager, WebRenderIntelBatteryNoHwStretchingNotNightly) {
-  mIsNightly = mIsEarlyBetaOrEarlier = false;
+  mIsNightly = false;
   ++mHwStretchingSupport.mNone;
   mScaledResolution = true;
   mMockGfxInfo->mHasBattery.ref() = true;
@@ -843,7 +837,7 @@ TEST_F(GfxConfigManager, WebRenderForceSoftwareForceEnabledEnvvar) {
 }
 
 TEST_F(GfxConfigManager, WebRenderSoftwareReleaseWindowsGPUProcessDisabled) {
-  mIsNightly = mIsEarlyBetaOrEarlier = false;
+  mIsNightly = false;
   mMockGfxInfo->mStatusWr = nsIGfxInfo::FEATURE_BLOCKED_DEVICE;
   mFeatures.mGPUProcess.UserDisable("", ""_ns);
   ConfigureWebRender();

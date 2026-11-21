@@ -529,11 +529,14 @@ newtab:
     type: event
     description: >
       Recorded when the customize panel becomes visible, whichever control
-      or message opened it.
+      or message opened it. The extras record the source of the open and
+      the subpanel showing at that moment.
     bugs:
       - https://bugzilla.mozilla.org/show_bug.cgi?id=2066344
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2066847
     data_reviews:
       - https://bugzilla.mozilla.org/show_bug.cgi?id=2066344
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2066847
     data_sensitivity:
       - interaction
     notification_emails:
@@ -541,6 +544,46 @@ newtab:
     expires: never
     extra_keys:
       newtab_visit_id: *newtab_visit_id
+      source:
+        description: >
+          What opened the panel. The following values are tested against
+          CUSTOMIZE_PANEL_SOURCES in
+          browser/extensions/newtab/content-src/lib/constants.mjs by
+          customize-panel-telemetry.test.js, which reads this list:
+            - customize_button
+            - manage_widgets
+            - wallpaper_feature_highlight
+            - promo_card
+            - personalized_card
+            - activation_window_message
+            - top_sites_web_notifications
+            - settings
+            - external_link
+
+          The value is also the telemetry name of each widget with a "Manage
+          wallpaper" menu item.
+          settings is an open from the "Choose a wallpaper", "Manage widgets"
+          or "Manage topics" links in the Home section of Settings.
+          external_link is any other link to the panel, such as the
+          "Customize" button on the What's New Page.
+        type: string
+      subpanel:
+        description: >
+          The subpanel showing when the panel opened. The following values
+          are tested against CUSTOMIZE_SUBPANELS in
+          browser/extensions/newtab/content-src/lib/constants.mjs by
+          customize-panel-telemetry.test.js, which reads this list:
+            - sections_management
+            - widgets_management
+            - themes_management
+            - wallpaper_categories
+
+          Left out when the panel opened on its main
+          view. When source is wallpaper_feature_highlight and the highlight
+          links to a wallpaper category, this is wallpaper_categories, even
+          if that category isn't available and the panel opened on its main
+          view.
+        type: string
     send_in_pings:
       - newtab
 
@@ -563,10 +606,14 @@ newtab:
       newtab_visit_id: *newtab_visit_id
       panel:
         description: >
-          Which subpanel opened. One of themes_management,
-          wallpaper_categories, sections_management, widgets_management,
-          the ids of CUSTOMIZE_SUBPANELS in
-          browser/extensions/newtab/content-src/lib/constants.mjs.
+          Which subpanel opened. The following values are tested against
+          CUSTOMIZE_SUBPANELS in
+          browser/extensions/newtab/content-src/lib/constants.mjs by
+          customize-panel-telemetry.test.js, which reads this list:
+            - themes_management
+            - wallpaper_categories
+            - sections_management
+            - widgets_management
         type: string
     send_in_pings:
       - newtab
@@ -1443,8 +1490,14 @@ newtab:
       and weather_impression.
     bugs:
       - https://bugzilla.mozilla.org/show_bug.cgi?id=2010597
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2085959
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2079330
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2083870
     data_reviews:
       - https://bugzilla.mozilla.org/show_bug.cgi?id=2010597
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2085959
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2079330
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2083870
     data_sensitivity:
       - interaction
     notification_emails:
@@ -1460,6 +1513,22 @@ newtab:
         description: >
           Size of widget (e.g., small, medium, large).
         type: string
+      widget_location: &widget_location
+        description: >
+          Where on the page the widget renders. One of home_space (pinned to
+          the Home space), widget_space (the Widgets space, where users pin
+          widgets to Home), widget_container (the widgets section in any other
+          layout), sidebar (the page's inline-end sidebar, e.g. small Weather)
+          or story_card (the first card of a story section).
+        type: string
+      widget_variant: &widget_variant
+        description: >
+          Optional, widget-defined state the widget was showing. Privacy sends
+          etp_off, no_trackers_blocked, count_only for the small card,
+          newtab-privacy-blank for the state with no message, or the ID of the
+          message shown.
+          Travel sends the background image shown.
+        type: string
     send_in_pings:
       - newtab
 
@@ -1472,8 +1541,14 @@ newtab:
       weather_open_provider_url and weather_change_display.
     bugs:
       - https://bugzilla.mozilla.org/show_bug.cgi?id=2010597
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2085959
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2079330
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2083870
     data_reviews:
       - https://bugzilla.mozilla.org/show_bug.cgi?id=2010597
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2085959
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2079330
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2083870
     data_sensitivity:
       - interaction
     notification_emails:
@@ -1485,17 +1560,22 @@ newtab:
       widget_source: &widget_source
         description: >
           Where the event originated (e.g., widget, context_menu, customize_panel).
+          iframe means a framed widget's own document reported the event.
         type: string
       widget_size: *widget_size
       user_action:
         description: >
           Specific action taken by different widgets (e.g., list_copy, list_create,
           timer_set, timer_play, timer_pause, change_location, detect_location).
+          add_to_home and remove_from_home pin a widget to the Home space or
+          move it back to the Widgets space, without turning it on or off.
         type: string
       action_value:
         description: >
           Optional value associated with action (string representation).
         type: string
+      widget_location: *widget_location
+      widget_variant: *widget_variant
     send_in_pings:
       - newtab
 
@@ -1507,10 +1587,13 @@ newtab:
       and weather_enabled.
     bugs:
       - https://bugzilla.mozilla.org/show_bug.cgi?id=2010597
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2079330
     data_reviews:
       - https://bugzilla.mozilla.org/show_bug.cgi?id=2010597
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2079330
     data_sensitivity:
       - technical
+      - interaction
     notification_emails:
       - mcrawford@mozilla.com
     expires: never
@@ -1523,6 +1606,7 @@ newtab:
         description: >
           Whether widget is now enabled (true) or disabled (false).
         type: boolean
+      widget_variant: *widget_variant
     send_in_pings:
       - newtab
 
@@ -1533,10 +1617,13 @@ newtab:
       This metric replaces weather_load_error.
     bugs:
       - https://bugzilla.mozilla.org/show_bug.cgi?id=2010597
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2079330
     data_reviews:
       - https://bugzilla.mozilla.org/show_bug.cgi?id=2010597
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2079330
     data_sensitivity:
       - technical
+      - interaction
     notification_emails:
       - mcrawford@mozilla.com
     expires: never
@@ -1548,6 +1635,31 @@ newtab:
         description: >
           Type of error encountered (e.g., load_error, network_error, timeout).
         type: string
+      widget_variant: *widget_variant
+    send_in_pings:
+      - newtab
+
+  widgets_ready:
+    type: event
+    description: >
+      Recorded once per widget card, when the widget is ready and the user has
+      seen the card.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2070700
+    data_reviews:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2070700
+    data_sensitivity:
+      - technical
+      - interaction
+    notification_emails:
+      - mcrawford@mozilla.com
+    expires: never
+    extra_keys:
+      newtab_visit_id: *newtab_visit_id
+      widget_name: *widget_name
+      widget_size: *widget_size
+      widget_location: *widget_location
+      widget_variant: *widget_variant
     send_in_pings:
       - newtab
 
@@ -1557,8 +1669,10 @@ newtab:
       Recorded when user interacts with widget container controls.
     bugs:
       - https://bugzilla.mozilla.org/show_bug.cgi?id=2012821
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2085959
     data_reviews:
       - https://bugzilla.mozilla.org/show_bug.cgi?id=2012821
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2085959
     data_sensitivity:
       - interaction
     notification_emails:
@@ -1570,7 +1684,9 @@ newtab:
       action_type:
         description: >
           Type of container action. (hide_all, change_size_all,
-          change_row_visibility, feedback)
+          change_row_visibility, feedback, remove_all_from_home).
+          remove_all_from_home moves every widget on the Home space back to the
+          Widgets space without turning any off.
         type: string
       action_value:
         description: >
@@ -1592,6 +1708,28 @@ newtab:
       - interaction
     notification_emails:
       - mcrawford@mozilla.com
+    expires: never
+    lifetime: application
+    send_in_pings:
+      - newtab
+
+  widgets_home_list:
+    type: string_list
+    description: >
+      The list of widget telemetry names pinned to the Home space that it
+      currently shows. Recorded at startup and whenever the user pins or
+      unpins a widget or a widget is enabled or disabled. Only set in layouts
+      where users pin widgets to Home, so an empty list means nothing is
+      pinned there.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2085959
+    data_reviews:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2085959
+    data_sensitivity:
+      - interaction
+    notification_emails:
+      - mcrawford@mozilla.com
+      - jbrown@mozilla.com
     expires: never
     lifetime: application
     send_in_pings:
@@ -2867,6 +3005,61 @@ newtab_content:
     expires: never
     send_in_pings:
       - newtab
+
+  stories_feed_result:
+    type: labeled_counter
+    description: >
+      Merino stories feed requests, by result. Requests skipped because the
+      cached feed is still fresh are not counted. Labels are `success` or
+      the error type. `network` covers any failure without an error status,
+      and over OHTTP, `http_4xx` and `http_5xx` include errors from the
+      relay. For what New Tab showed instead, see `stories_feed_state`.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2010048
+    data_reviews:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2010048
+    data_sensitivity:
+      - technical
+    notification_emails:
+      - jbrown@mozilla.com
+    expires: never
+    labels:
+      - success
+      - timeout
+      - http_4xx
+      - http_5xx
+      - network
+      - ohttp_config
+      - endpoint_disallowed
+      - bad_response
+    send_in_pings:
+      - newtab-content
+
+  stories_feed_state:
+    type: string
+    lifetime: application
+    description: >
+      What the New Tab stories section shows, as of the latest stories feed
+      load: `stories` (a fresh feed), `cache` (an expired cached feed,
+      because the latest Merino request failed), `placeholder`
+      (placeholders or the empty state, because there was no usable feed),
+      or `off` (stories are turned off). Sent with every newtab-content
+      ping, so the share of pings with `placeholder` estimates the share of
+      New Tab sessions that showed no stories. Unlike
+      `stories_feed_result`, retries do not inflate it. Missing from pings
+      sent before the first feed load in a session. Only recorded when the
+      private ping is enabled.
+    bugs:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2010048
+    data_reviews:
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2010048
+    data_sensitivity:
+      - technical
+    notification_emails:
+      - jbrown@mozilla.com
+    expires: never
+    send_in_pings:
+      - newtab-content
 
   followed_sections:
     type: string_list

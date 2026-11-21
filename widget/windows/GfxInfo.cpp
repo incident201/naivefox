@@ -64,12 +64,6 @@ GfxInfo::GetHasBattery(bool* aHasBattery) {
   return NS_OK;
 }
 
-NS_IMETHODIMP
-GfxInfo::GetEmbeddedInFirefoxReality(bool* aEmbeddedInFirefoxReality) {
-  *aEmbeddedInFirefoxReality = gfxVars::FxREmbedded();
-  return NS_OK;
-}
-
 #define PIXEL_STRUCT_RGB 1
 #define PIXEL_STRUCT_BGR 2
 
@@ -1738,6 +1732,12 @@ const nsTArray<RefPtr<GfxDriverInfo>>& GfxInfo::GetGfxDriverInfo() {
         nsIGfxInfo::FEATURE_BLOCKED_DRIVER_VERSION, DRIVER_GREATER_THAN,
         V(32, 0, 101, 5972), "FEATURE_FAILURE_BUG_1933755");
 
+    APPEND_TO_DRIVER_BLOCKLIST2(
+        OperatingSystem::Windows, DeviceFamily::IntelAlchemist,
+        nsIGfxInfo::FEATURE_REUSE_DECODER_DEVICE,
+        nsIGfxInfo::FEATURE_BLOCKED_DRIVER_VERSION, DRIVER_GREATER_THAN,
+        V(32, 0, 101, 5972), "FEATURE_FAILURE_BUG_2086938");
+
     ////////////////////////////////////
     // FEATURE_OVERLAY_VP_AUTO_HDR
 
@@ -1797,21 +1797,6 @@ const nsTArray<RefPtr<GfxDriverInfo>>& GfxInfo::GetGfxDriverInfo() {
 
     ////////////////////////////////////
     // FEATURE_WEBRENDER_COMPOSITOR
-
-#ifndef EARLY_BETA_OR_EARLIER
-    // See also bug 1616874
-    APPEND_TO_DRIVER_BLOCKLIST2(
-        OperatingSystem::Windows, DeviceFamily::IntelAll,
-        nsIGfxInfo::FEATURE_WEBRENDER_COMPOSITOR,
-        nsIGfxInfo::FEATURE_BLOCKED_DEVICE, DRIVER_EQUAL, V(24, 20, 100, 6293),
-        "FEATURE_FAILURE_BUG_1602511");
-
-    APPEND_TO_DRIVER_BLOCKLIST2(OperatingSystem::Windows, DeviceFamily::AtiAll,
-                                nsIGfxInfo::FEATURE_WEBRENDER_COMPOSITOR,
-                                nsIGfxInfo::FEATURE_BLOCKED_DEVICE,
-                                DRIVER_LESS_THAN_OR_EQUAL, V(8, 17, 10, 1129),
-                                "FEATURE_FAILURE_CHROME_BUG_800950");
-#endif
 
     APPEND_TO_DRIVER_BLOCKLIST2(
         OperatingSystem::Windows10or11, DeviceFamily::NvidiaPascal,

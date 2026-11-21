@@ -4,7 +4,6 @@
 
 package org.mozilla.fenix.home.toolbar
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -37,7 +36,6 @@ import mozilla.components.compose.browser.toolbar.store.DisplayState
 import mozilla.components.lib.state.ext.observeAsComposableState
 import mozilla.components.ui.icons.R as iconsR
 import org.mozilla.fenix.components.AppStore
-import org.mozilla.fenix.components.components
 import org.mozilla.fenix.theme.FirefoxTheme
 import org.mozilla.fenix.wallpapers.WallpaperTheme
 
@@ -54,17 +52,16 @@ fun BrowserSimpleToolbar(
 ) {
     val uiState by store.observeAsComposableState { it }
 
-    val pageOrigin = uiState.displayState.pageOrigin
     val browserActionsStart = uiState.displayState.browserActionsStart
     val browserActionsEnd = uiState.displayState.browserActionsEnd
     val onInteraction: (BrowserToolbarEvent) -> Unit = { store.dispatch(it) }
 
     val isPrivateMode = appStore.observeAsComposableState { it.mode.isPrivate }.value
-    // Tint the browser action icons with the wallpaper text color only under the universal
-    // treatment. WallpaperTheme.onWallpaper falls back to onSurface for the default wallpaper, in
-    // previews, and anywhere LocalWallpaperState is not provided (e.g. tab previews).
+    // Tint the browser action icons with the wallpaper text color. WallpaperTheme.onWallpaper falls
+    // back to onSurface for the default wallpaper, in previews, and anywhere LocalWallpaperState is
+    // not provided (e.g. tab previews).
     val browserActionsColor =
-        if (!inComposePreview && components.settings.enableUniversalEdgeToEdgeWallpapers && !isPrivateMode) {
+        if (!inComposePreview && !isPrivateMode) {
             WallpaperTheme.onWallpaper
         } else {
             MaterialTheme.colorScheme.onSurface
@@ -82,10 +79,7 @@ fun BrowserSimpleToolbar(
                 )
             }
 
-            Spacer(
-                modifier =
-                    Modifier.clickable { onInteraction(requireNotNull(pageOrigin.onClick)) }.height(64.dp).weight(1f)
-            )
+            Spacer(modifier = Modifier.height(64.dp).weight(1f))
 
             if (browserActionsEnd.isNotEmpty()) {
                 ActionContainer(

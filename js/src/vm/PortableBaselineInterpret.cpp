@@ -41,6 +41,7 @@
 #include "proxy/DeadObjectProxy.h"
 #include "proxy/DOMProxy.h"
 #include "util/Unicode.h"
+#include "vm/ArgumentsObject.h"
 #include "vm/AsyncFunction.h"
 #include "vm/AsyncIteration.h"
 #include "vm/DateObject.h"
@@ -635,7 +636,7 @@ uint64_t ICInterpretOps(uint64_t arg0, uint64_t arg1, ICStub* stub,
     DECLARE_CACHEOP_CASE(LoadFixedSlot);
     DECLARE_CACHEOP_CASE(LoadDynamicSlot);
     DECLARE_CACHEOP_CASE(AssertNoAllocationMetadataBuilder);
-    DECLARE_CACHEOP_CASE(GuardFunctionHasJitEntry);
+    DECLARE_CACHEOP_CASE(GuardFunctionHasValidJitEntry);
     DECLARE_CACHEOP_CASE(GuardFunctionHasNoJitEntry);
     DECLARE_CACHEOP_CASE(GuardFunctionIsNonBuiltinCtor);
     DECLARE_CACHEOP_CASE(GuardFunctionIsConstructor);
@@ -710,7 +711,8 @@ uint64_t ICInterpretOps(uint64_t arg0, uint64_t arg1, ICStub* stub,
     DECLARE_CACHEOP_CASE(AssertPropertyLookup);
     DECLARE_CACHEOP_CASE(GuardIsNonResizableTypedArray);
     DECLARE_CACHEOP_CASE(GuardIndexIsNotDenseElement);
-    DECLARE_CACHEOP_CASE(LoadFixedSlotTypedResult);
+    DECLARE_CACHEOP_CASE(LoadReservedFixedSlotResult);
+    DECLARE_CACHEOP_CASE(LoadReservedFixedSlotTypedResult);
     DECLARE_CACHEOP_CASE(LoadDenseElementHoleResult);
     DECLARE_CACHEOP_CASE(LoadDenseElementExistsResult);
     DECLARE_CACHEOP_CASE(LoadTypedArrayElementExistsResult);
@@ -1691,11 +1693,14 @@ uint64_t ICInterpretOps(uint64_t arg0, uint64_t arg1, ICStub* stub,
         DISPATCH_CACHEOP();
       }
 
-      CACHEOP_CASE(GuardFunctionHasJitEntry) {
+      CACHEOP_CASE(GuardFunctionHasValidJitEntry) {
         ObjOperandId funId = cacheIRReader.objOperandId();
         JSObject* fun = reinterpret_cast<JSObject*>(READ_REG(funId.id()));
         uint16_t flags = FunctionFlags::HasJitEntryFlags();
         if (!fun->as<JSFunction>().flags().hasFlags(flags)) {
+          FAIL_IC();
+        }
+        if (fun->as<JSFunction>().nargs() > JIT_ARGS_LENGTH_MAX) {
           FAIL_IC();
         }
         DISPATCH_CACHEOP();
@@ -2625,10 +2630,11 @@ uint64_t ICInterpretOps(uint64_t arg0, uint64_t arg1, ICStub* stub,
       }
 
       CACHEOP_CASE(LoadFixedSlotResult)
-      CACHEOP_CASE_FALLTHROUGH(LoadFixedSlotTypedResult) {
+      CACHEOP_CASE_FALLTHROUGH(LoadReservedFixedSlotResult)
+      CACHEOP_CASE_FALLTHROUGH(LoadReservedFixedSlotTypedResult) {
         ObjOperandId objId = cacheIRReader.objOperandId();
         uint32_t offsetOffset = cacheIRReader.stubOffset();
-        if (cacheop == CacheOp::LoadFixedSlotTypedResult) {
+        if (cacheop == CacheOp::LoadReservedFixedSlotTypedResult) {
           // Type is unused here.
           (void)cacheIRReader.valueType();
         }
@@ -2814,8 +2820,9 @@ uint64_t ICInterpretOps(uint64_t arg0, uint64_t arg1, ICStub* stub,
         ObjOperandId objId = cacheIRReader.objOperandId();
         ArrayBufferViewObject* abvo =
             reinterpret_cast<ArrayBufferViewObject*>(READ_REG(objId.id()));
-        size_t len = size_t(
-            abvo->getFixedSlot(ArrayBufferViewObject::LENGTH_SLOT).toPrivate());
+        size_t len =
+            size_t(abvo->getFixedSlotTyped(ArrayBufferViewObject::LENGTH_SLOT)
+                       .toPrivate());
         if (len > size_t(INT32_MAX)) {
           FAIL_IC();
         }
@@ -2828,8 +2835,9 @@ uint64_t ICInterpretOps(uint64_t arg0, uint64_t arg1, ICStub* stub,
         ObjOperandId objId = cacheIRReader.objOperandId();
         ArrayBufferViewObject* abvo =
             reinterpret_cast<ArrayBufferViewObject*>(READ_REG(objId.id()));
-        size_t len = size_t(
-            abvo->getFixedSlot(ArrayBufferViewObject::LENGTH_SLOT).toPrivate());
+        size_t len =
+            size_t(abvo->getFixedSlotTyped(ArrayBufferViewObject::LENGTH_SLOT)
+                       .toPrivate());
         retValue = DoubleValue(double(len)).asRawBits();
         PREDICT_RETURN();
         DISPATCH_CACHEOP();
@@ -4904,9 +4912,9 @@ uint64_t ICInterpretOps(uint64_t arg0, uint64_t arg1, ICStub* stub,
         ObjOperandId objId = cacheIRReader.objOperandId();
         ArrayBufferViewObject* abvo =
             reinterpret_cast<ArrayBufferViewObject*>(READ_REG(objId.id()));
-        size_t byteOffset =
-            size_t(abvo->getFixedSlot(ArrayBufferViewObject::BYTEOFFSET_SLOT)
-                       .toPrivate());
+        size_t byteOffset = size_t(
+            abvo->getFixedSlotTyped(ArrayBufferViewObject::BYTEOFFSET_SLOT)
+                .toPrivate());
         if (byteOffset > size_t(INT32_MAX)) {
           FAIL_IC();
         }
@@ -4919,9 +4927,9 @@ uint64_t ICInterpretOps(uint64_t arg0, uint64_t arg1, ICStub* stub,
         ObjOperandId objId = cacheIRReader.objOperandId();
         ArrayBufferViewObject* abvo =
             reinterpret_cast<ArrayBufferViewObject*>(READ_REG(objId.id()));
-        size_t byteOffset =
-            size_t(abvo->getFixedSlot(ArrayBufferViewObject::BYTEOFFSET_SLOT)
-                       .toPrivate());
+        size_t byteOffset = size_t(
+            abvo->getFixedSlotTyped(ArrayBufferViewObject::BYTEOFFSET_SLOT)
+                .toPrivate());
         retValue = DoubleValue(double(byteOffset)).asRawBits();
         PREDICT_RETURN();
         DISPATCH_CACHEOP();

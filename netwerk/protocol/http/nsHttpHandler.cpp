@@ -358,7 +358,6 @@ static const char* gCallbackPrefs[] = {
     DOM_SECURITY_PREFIX,
     "image.http.accept",
     "image.jxl.enabled",
-    nullptr,
 };
 
 nsresult nsHttpHandler::Init() {
@@ -704,14 +703,15 @@ nsresult nsHttpHandler::InitConnectionMgr() {
 // dictionary load.
 nsresult nsHttpHandler::AddAcceptAndDictionaryHeaders(
     nsIURI* aURI, ExtContentPolicyType aType, nsHttpRequestHead* aRequest,
-    bool aSecure, nsHttpChannel* aChan, void (*aSuspend)(nsHttpChannel*),
+    bool aAllowDictionaries, nsHttpChannel* aChan,
+    void (*aSuspend)(nsHttpChannel*),
     const std::function<bool(bool, DictionaryCacheEntry*)>& aCallback) {
   LOG(("Adding Dictionary headers"));
   auto guard = MakeScopeExit([&]() { (aCallback)(false, nullptr); });
 
   nsresult rv = NS_OK;
   // Add the "Accept-Encoding" header and possibly Dictionary headers
-  if (aSecure) {
+  if (aAllowDictionaries) {
     // The dictionary info may require us to check the cache.
     if (StaticPrefs::network_http_dictionaries_enable() && mDictionaryCache) {
       // Note: this is async; the lambda can happen later
@@ -2410,9 +2410,6 @@ nsHttpHandler::Observe(nsISupports* subject, const char* topic,
 #endif
   } else if (!strcmp(topic, "last-pb-context-exited")) {
     mPrivateAuthCache->ClearAll();
-    if (mAltSvcCache) {
-      mAltSvcCache->ClearAltServiceMappings();
-    }
 #ifndef MOZ_NAIVEFOX
     nsCORSListenerProxy::ClearPrivateBrowsingCache();
 #endif
@@ -2446,9 +2443,11 @@ nsHttpHandler::Observe(nsISupports* subject, const char* topic,
     // going to the background on android means we should close
     // down idle connections for power conservation
     if (mConnMgr) {
-      rv = mConnMgr->DoShiftReloadConnectionCleanup();
+      rv = StaticPrefs::network_http_close_connections_on_background()
+               ? mConnMgr->DoShiftReloadConnectionCleanup()
+               : mConnMgr->CloseAllIdleConnections();
       if (NS_FAILED(rv)) {
-        LOG(("    DoShiftReloadConnectionCleanup failed (%08x)\n",
+        LOG(("    background connection cleanup failed (%08x)\n",
              static_cast<uint32_t>(rv)));
       }
     }

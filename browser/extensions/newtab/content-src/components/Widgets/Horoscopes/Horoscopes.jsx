@@ -6,16 +6,23 @@
 import React, { useCallback } from "react";
 import { useSelector } from "react-redux";
 import { actionCreators as ac, actionTypes as at } from "common/Actions.mjs";
-import { WIDGET_REGISTRY, resolveWidgetSize } from "common/WidgetsRegistry.mjs";
+import {
+  FRAMED_WIDGET_SANDBOX,
+  WIDGET_REGISTRY,
+  resolveWidgetFrame,
+  resolveWidgetSize,
+  WIDGET_USER_ACTIONS,
+  WIDGET_SOURCES,
+} from "common/WidgetsRegistry.mjs";
 import { WidgetMenuButton } from "../WidgetMenuButton";
 import { WidgetMenuFooter } from "../WidgetMenuFooter";
 import { WidgetMenuPoweredBy } from "../WidgetMenuPoweredBy";
 import { SizeSubmenu } from "../SizeSubmenu";
 import { useWidgetTelemetry } from "../useWidgetTelemetry";
+import { useSrcAfterPageShown } from "../usePageVisible";
 
 const USER_ACTION_TYPES = {
-  CHANGE_SIZE: "change_size",
-  LEARN_MORE: "learn_more",
+  ...WIDGET_USER_ACTIONS,
   POWERED_BY_YAHOO: "powered_by_yahoo",
 };
 
@@ -42,6 +49,13 @@ const Horoscopes = ({
   widgetEnabledMap,
 }) => {
   const prefs = useSelector(state => state.Prefs.values);
+  const framedWidgets = useSelector(state => state.FramedWidgets);
+  const { src: frameSrc, state: frameState } = resolveWidgetFrame(
+    HOROSCOPES_ENTRY,
+    prefs,
+    framedWidgets
+  );
+  const src = useSrcAfterPageShown(frameSrc);
 
   const widgetSize = resolveWidgetSize(HOROSCOPES_ENTRY, prefs);
 
@@ -70,7 +84,7 @@ const Horoscopes = ({
       // `value` is action_value; `size` overrides the reported widget_size,
       // which would otherwise still be the pre-change size.
       recordUserAction(USER_ACTION_TYPES.CHANGE_SIZE, {
-        source: "context_menu",
+        source: WIDGET_SOURCES.CONTEXT_MENU,
         value: size,
         size,
       });
@@ -81,9 +95,15 @@ const Horoscopes = ({
 
   // The shared footer opens the support link; here we only record the click.
   const handleLearnMore = () => {
-    recordUserAction(USER_ACTION_TYPES.LEARN_MORE, { source: "context_menu" });
+    recordUserAction(USER_ACTION_TYPES.LEARN_MORE, {
+      source: WIDGET_SOURCES.CONTEXT_MENU,
+    });
     handleInteraction();
   };
+
+  if (frameState === "hidden") {
+    return null;
+  }
 
   return (
     <article
@@ -147,8 +167,14 @@ const Horoscopes = ({
         </div>
       </div>
 
-      {/* The widget iframe goes here. */}
-      <div className="horoscopes-body" />
+      <div className="horoscopes-body">
+        <iframe
+          className="horoscopes-frame"
+          aria-labelledby="horoscopes-widget-label"
+          src={src}
+          sandbox={FRAMED_WIDGET_SANDBOX}
+        />
+      </div>
     </article>
   );
 };

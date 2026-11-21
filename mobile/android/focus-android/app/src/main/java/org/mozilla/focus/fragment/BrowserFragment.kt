@@ -28,8 +28,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.snackbar.Snackbar
 import java.net.URLEncoder
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import mozilla.components.browser.state.selector.findTabOrCustomTab
 import mozilla.components.browser.state.selector.privateTabs
 import mozilla.components.browser.state.state.CustomTabConfig
@@ -99,10 +97,13 @@ import org.mozilla.focus.menu.BrowserMenuCallbacks
 import org.mozilla.focus.open.OpenWithFragment
 import org.mozilla.focus.session.ui.TabsPopup
 import org.mozilla.focus.settings.permissions.permissionoptions.SitePermissionOptionsStorage
+import org.mozilla.focus.settings.privacy.CertificateDetailsPanel
 import org.mozilla.focus.settings.privacy.ConnectionDetailsPanel
+import org.mozilla.focus.settings.privacy.QwacStatusRequest
 import org.mozilla.focus.settings.privacy.SiteSecurityInfo
 import org.mozilla.focus.settings.privacy.TrackingProtectionPanel
 import org.mozilla.focus.settings.privacy.TrackingProtectionPanelInteractor
+import org.mozilla.focus.settings.privacy.canOpenCertificateDetails
 import org.mozilla.focus.shortcut.HomeScreen
 import org.mozilla.focus.state.AppAction
 import org.mozilla.focus.topsites.DefaultTopSitesStorage.Companion.TOP_SITES_MAX_LIMIT
@@ -137,6 +138,7 @@ class BrowserFragment : BaseFragment(), UserInteractionHandler, AccessibilityMan
     private val toolbarIntegration = ViewBoundFeatureWrapper<BrowserToolbarIntegration>()
 
     private var trackingProtectionPanel: TrackingProtectionPanel? = null
+    private var qwacStatusRequest: QwacStatusRequest? = null
     private lateinit var requestPermissionLauncher: ActivityResultLauncher<Array<String>>
     private lateinit var downloadFileUtils: DownloadFileUtils
     private var tabsPopup: TabsPopup? = null
@@ -449,7 +451,7 @@ class BrowserFragment : BaseFragment(), UserInteractionHandler, AccessibilityMan
                     storage = components.topSitesStorage,
                     config = {
                         TopSitesConfig(
-                            totalSites = TOP_SITES_MAX_LIMIT,
+                            targetSitesCount = TOP_SITES_MAX_LIMIT,
                             frecencyConfig = null,
                             providerConfig = null,
                         )
@@ -695,9 +697,7 @@ class BrowserFragment : BaseFragment(), UserInteractionHandler, AccessibilityMan
 
         crashReporterFragment.onCloseTabPressed = { sendCrashReport ->
             if (sendCrashReport) {
-                val crashReporter = requireComponents.crashReporter
-
-                requireComponents.applicationScope.launch(Dispatchers.IO) { crashReporter.submitReport(crash) }
+                requireComponents.crashReporter.submitReport(crash)
             }
 
             requireComponents.sessionUseCases.crashRecovery.invoke()
@@ -1036,6 +1036,7 @@ class BrowserFragment : BaseFragment(), UserInteractionHandler, AccessibilityMan
                             isTrackingProtectionOn = tab.trackingProtection.ignoredOnTrackingProtection.not(),
                             isConnectionSecure = tab.content.securityInfo.isSecure,
                             blockedTrackersCount = requireContext().settings.getTotalBlockedTrackersCount(),
+                            showCertificateDetailsLink = showCertificateDetailsLink(),
                         ),
                     interactor =
                         object : TrackingProtectionPanelInteractor {
@@ -1056,22 +1057,45 @@ class BrowserFragment : BaseFragment(), UserInteractionHandler, AccessibilityMan
                         },
                 )
                 .also { currentEtp -> context?.let { currentEtp.show() } }
+
+        // Only secure pages with a certificate can present a QWAC.
+        val panel = trackingProtectionPanel
+        qwacStatusRequest =
+            if (showCertificateDetailsLink()) {
+                QwacStatusRequest(tab.engineState.engineSession).also { request ->
+                    request.observe { qwac -> panel?.updateQwacStatus(isQwac = qwac != null) }
+                }
+            } else {
+                null
+            }
     }
 
     private fun reloadCurrentTab() {
         requireComponents.sessionUseCases.reload(tab.id)
     }
 
+    /** Whether the certificate details are opened from a "Secure connection" link in the tracking protection panel. */
+    private fun showCertificateDetailsLink(): Boolean = tab.content.securityInfo.canOpenCertificateDetails()
+
     private fun showConnectionInfo() {
         val connectionInfoPanel =
-            ConnectionDetailsPanel(
-                context = requireContext(),
-                engineSession = tab.engineState.engineSession,
-                tabTitle = tab.content.title,
-                tabUrl = tab.content.url,
-                isConnectionSecure = tab.content.securityInfo.isSecure,
-                goBack = { trackingProtectionPanel?.show() },
-            )
+            if (showCertificateDetailsLink()) {
+                CertificateDetailsPanel(
+                    context = requireContext(),
+                    qwacStatusRequest = qwacStatusRequest ?: QwacStatusRequest(tab.engineState.engineSession),
+                    tabUrl = tab.content.url,
+                    certificate = tab.content.securityInfo.certificate,
+                    goBack = { trackingProtectionPanel?.show() },
+                )
+            } else {
+                ConnectionDetailsPanel(
+                    context = requireContext(),
+                    tabTitle = tab.content.title,
+                    tabUrl = tab.content.url,
+                    isConnectionSecure = tab.content.securityInfo.isSecure,
+                    goBack = { trackingProtectionPanel?.show() },
+                )
+            }
         trackingProtectionPanel?.hide()
         connectionInfoPanel.show()
     }

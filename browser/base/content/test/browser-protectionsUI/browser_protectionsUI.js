@@ -11,7 +11,7 @@ const TRACKING_PAGE =
 
 ChromeUtils.defineESModuleGetters(this, {
   ContentBlockingAllowList:
-    "resource://gre/modules/ContentBlockingAllowList.sys.mjs",
+    "moz-src:///toolkit/components/antitracking/ContentBlockingAllowList.sys.mjs",
 });
 
 const { CustomizableUITestUtils } = ChromeUtils.importESModule(
@@ -33,12 +33,14 @@ add_setup(async function () {
       ["browser.urlbar.scotchBonnet.enableOverride", true],
     ],
   });
+  await UrlClassifierTestUtils.addBuiltInTestTrackers();
 
   let oldCanRecord = Services.telemetry.canRecordExtended;
   Services.telemetry.canRecordExtended = true;
   Services.telemetry.clearEvents();
 
-  registerCleanupFunction(() => {
+  registerCleanupFunction(async () => {
+    await UrlClassifierTestUtils.cleanupTestTrackers();
     Services.telemetry.canRecordExtended = oldCanRecord;
     Services.telemetry.clearEvents();
   });

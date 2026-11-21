@@ -5,12 +5,11 @@
 package org.mozilla.fenix.home.store
 
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalWindowInfo
 import org.mozilla.fenix.browser.browsingmode.BrowsingMode
 import org.mozilla.fenix.browser.browsingmode.BrowsingModeManager
 import org.mozilla.fenix.components.appstate.AppState
 import org.mozilla.fenix.components.appstate.setup.checklist.SetupChecklistState
-import org.mozilla.fenix.components.components
+import org.mozilla.fenix.components.appstate.sports.SportsWidgetState
 import org.mozilla.fenix.components.toolbar.ToolbarPosition
 import org.mozilla.fenix.ext.shouldShowRecentSyncedTabs
 import org.mozilla.fenix.ext.shouldShowRecentTabs
@@ -22,9 +21,6 @@ import org.mozilla.fenix.home.recentsyncedtabs.RecentSyncedTabState
 import org.mozilla.fenix.home.recenttabs.RecentTab
 import org.mozilla.fenix.home.recentvisits.RecentlyVisitedItem
 import org.mozilla.fenix.home.topsites.TopSiteState
-import org.mozilla.fenix.home.topsites.calculateTopSitesRowLayout
-import org.mozilla.fenix.home.topsites.collapsedTopSitesCount
-import org.mozilla.fenix.home.ui.horizontalMargin
 import org.mozilla.fenix.termsofuse.store.PrivacyNoticeBannerState
 import org.mozilla.fenix.utils.Settings
 
@@ -72,8 +68,6 @@ internal sealed class HomepageState {
      * @property collectionsState State of the collections section to display.
      * @property showTopSitesHeader Whether to show the shortcuts section header and "show all" button.
      * @property showPrivacyReport Whether to show the privacy report section.
-     * @property longfoxEnabled Whether the longfox game is enabled.
-     * @property showLongfoxAnimation Whether to play the fox peek animation on the privacy report card.
      * @property trackersBlockedCount The number of trackers blocked for the privacy report.
      * @property headerState State related to the header of the homepage.
      * @property middleSearchState State of the middle search bar on the homepage.
@@ -81,6 +75,7 @@ internal sealed class HomepageState {
      * @property setupChecklistState Optional state of the setup checklist feature.
      * @property isSearchInProgress Whether search is currently active on the homepage.
      * @property bottomPadding Amount of padding to display at the bottom of the homepage.
+     * @property sportsWidgetState State of the sports widget on the homepage.
      */
     internal data class Normal(
         val shouldShowPrivacyNoticeBanner: Boolean,
@@ -93,8 +88,6 @@ internal sealed class HomepageState {
         val collectionsState: CollectionsState,
         val showTopSitesHeader: Boolean,
         val showPrivacyReport: Boolean,
-        val longfoxEnabled: Boolean,
-        val showLongfoxAnimation: Boolean,
         val trackersBlockedCount: Int,
         override val headerState: HeaderState,
         override val middleSearchState: MiddleSearchState = MiddleSearchState(),
@@ -102,6 +95,7 @@ internal sealed class HomepageState {
         val setupChecklistState: SetupChecklistState?,
         override val isSearchInProgress: Boolean,
         val bottomPadding: Int,
+        val sportsWidgetState: SportsWidgetState = SportsWidgetState(),
     ) : HomepageState()
 
     val browsingMode: BrowsingMode
@@ -197,16 +191,11 @@ internal sealed class HomepageState {
                     collectionsState =
                         CollectionsState.build(
                             appState = appState,
-                            browserState = components.core.store.state,
                             showCollections = settings.collections,
                             shouldShowCollectionsMigrationCard = collectionsMigrationCardState.visible,
                         ),
-                    showTopSitesHeader =
-                        !(settings.privateModeAndStoriesEntryPointEnabled &&
-                            topSites.size < collapsedTopSitesCount(topSitesColumns())) && !settings.showMoreShortcuts,
+                    showTopSitesHeader = !settings.showMoreShortcuts,
                     showPrivacyReport = settings.showPrivacyReportFeature,
-                    longfoxEnabled = settings.longfoxEnabled,
-                    showLongfoxAnimation = settings.longfoxEnabled && longfoxEntryPointReady,
                     trackersBlockedCount = blockedTrackersState.trackersBlockedCount,
                     headerState = buildHeaderState(settings = settings),
                     middleSearchState = buildMiddleSearchState(appState = appState, settings = settings),
@@ -219,31 +208,17 @@ internal sealed class HomepageState {
                         } else {
                             BOTTOM_PADDING_BOTTOM_TOOLBAR
                         },
+                    sportsWidgetState = sportsWidgetState,
                 )
             }
     }
 }
 
-/** Returns the number of shortcut columns the homepage lays out for the current screen width. */
-@Composable
-private fun topSitesColumns(): Int {
-    val availableWidth = LocalWindowInfo.current.containerDpSize.width - horizontalMargin * 2
-    return calculateTopSitesRowLayout(availableWidth).columns
-}
-
-private fun buildHeaderState(settings: Settings): HeaderState {
-    return if (settings.privateModeAndStoriesEntryPointEnabled) {
-        HeaderState.Experimental.Normal(
-            showButtonAnimation = settings.shouldShowNewsButtonAnimation(),
-            showStoriesButton = settings.showPocketRecommendationsFeature,
-        )
-    } else {
-        HeaderState.Normal(
-            showStoriesButton = settings.showPocketRecommendationsFeature,
-            showButtons = !settings.isHomepageMiddleSearchEnabled,
-        )
-    }
-}
+private fun buildHeaderState(settings: Settings) =
+    HeaderState(
+        showStoriesButton = settings.showPocketRecommendationsFeature,
+        showButtons = !settings.isHomepageMiddleSearchEnabled,
+    )
 
 @Composable
 private fun buildMiddleSearchState(appState: AppState, settings: Settings) =
@@ -252,50 +227,23 @@ private fun buildMiddleSearchState(appState: AppState, settings: Settings) =
         searchBarEnabled = settings.isHomepageMiddleSearchEnabled,
     )
 
-private fun buildPrivateHeaderState(settings: Settings): HeaderState {
-    return if (settings.privateModeAndStoriesEntryPointEnabled) {
-        HeaderState.Experimental.Private
-    } else {
-        HeaderState.Normal(
-            showStoriesButton = false,
-            showButtons = !settings.isHomepageMiddleSearchEnabled,
-        )
-    }
-}
+private fun buildPrivateHeaderState(settings: Settings) =
+    HeaderState(
+        showStoriesButton = false,
+        showButtons = !settings.isHomepageMiddleSearchEnabled,
+    )
 
-/** A simple wrapper around state required for the homepage header. */
-internal sealed class HeaderState {
-
-    /**
-     * Represents the non-experimental header state for both normal and private mode. The header's colors are derived
-     * from the wallpaper at render time (see `HomepageHeader`), so no colors are held here.
-     *
-     * @property showStoriesButton Whether to show the stories button.
-     * @property showButtons Whether to show the stories and private browsing buttons.
-     */
-    data class Normal(
-        val showStoriesButton: Boolean,
-        val showButtons: Boolean = true,
-    ) : HeaderState()
-
-    /** Represents the experimental states for the entry points experiment. */
-    sealed class Experimental : HeaderState() {
-
-        /**
-         * Represents the header in normal mode for the entry points experiment.
-         *
-         * @property showStoriesButton Whether to show the stories button.
-         * @property showButtonAnimation Whether to animate the news button label.
-         */
-        data class Normal(
-            val showStoriesButton: Boolean,
-            val showButtonAnimation: Boolean,
-        ) : Experimental()
-
-        /** Represents the header in private mode for the entry points experiment. */
-        data object Private : Experimental()
-    }
-}
+/**
+ * State required for the homepage header in both normal and private mode. The header's colors are derived from the
+ * wallpaper at render time (see `HomepageHeader`), so no colors are held here.
+ *
+ * @property showStoriesButton Whether to show the stories button.
+ * @property showButtons Whether to show the stories and private browsing buttons.
+ */
+internal data class HeaderState(
+    val showStoriesButton: Boolean,
+    val showButtons: Boolean = true,
+)
 
 /**
  * State of the middle search bar on the homepage.

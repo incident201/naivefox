@@ -88,6 +88,10 @@ class nsCSSFrameConstructor final : public nsFrameManager {
     Async,
   };
 
+  // Whether the caller of ContentRangeInserted knows that all the children in
+  // the range share the same insertion point.
+  enum class SameInsertionPoint : bool { No, Yes };
+
   mozilla::RestyleManager* RestyleManager() const;
 
   mozilla::ViewportFrame* ConstructRootFrame();
@@ -104,34 +108,38 @@ class nsCSSFrameConstructor final : public nsFrameManager {
   void CheckBitsForLazyFrameConstruction(nsIContent*) {}
 #endif
 
-  // Issues a single ContentInserted for each child in the range
-  // [aStartChild, aEndChild).
-  void IssueSingleInsertNofications(nsIContent* aStartChild,
-                                    nsIContent* aEndChild, InsertionKind);
+  // Issues ContentRangeInserted calls for the children of a shadow host in the
+  // range [aStartChild, aEndChild), batching runs of consecutive siblings that
+  // share the same insertion point.
+  void IssueShadowHostChildrenInsertNotifications(
+      const mozilla::dom::ShadowRoot&, nsIContent* aStartChild,
+      nsIContent* aEndChild, InsertionKind);
 
   /**
    * Data that represents an insertion point for some child content.
    */
   struct InsertionPoint {
-    InsertionPoint() : mParentFrame(nullptr), mContainer(nullptr) {}
+    InsertionPoint() = default;
 
     InsertionPoint(nsContainerFrame* aParentFrame, nsIContent* aContainer)
         : mParentFrame(aParentFrame), mContainer(aContainer) {}
+
+    bool operator==(const InsertionPoint&) const = default;
 
     /**
      * The parent frame to use if the inserted children needs to create
      * frame(s).  May be null, which signals that  we shouldn't try to
      * create frames for the inserted children; either because there are
      * no parent frame or because there are multiple insertion points and
-     * we will call IssueSingleInsertNofications for each child instead.
+     * we will call ContentRangeInserted for each subrange instead.
      * mContainer should not be used when mParentFrame is null.
      */
-    nsContainerFrame* mParentFrame;
+    nsContainerFrame* mParentFrame = nullptr;
     /**
      * The flattened tree parent for the inserted children.
      * It's undefined if mParentFrame is null.
      */
-    nsIContent* mContainer;
+    nsIContent* mContainer = nullptr;
   };
 
   /**
@@ -139,8 +147,8 @@ class nsCSSFrameConstructor final : public nsFrameManager {
    * inserted/appended to one insertion point together.
    *
    * If so, returns that insertion point. If not, returns with
-   * InsertionPoint.mFrame == nullptr and issues single ContentInserted calls
-   * for each child.
+   * InsertionPoint.mFrame == nullptr and issues ContentRangeInserted calls
+   * for each subrange that shares an insertion point.
    *
    * aEndChild = nullptr indicates that we are dealing with an append.
    */
@@ -211,11 +219,11 @@ class nsCSSFrameConstructor final : public nsFrameManager {
   // [aStartChild, aEndChild).  aStartChild must be non-null.  aEndChild may be
   // null to indicate the range includes all kids after aStartChild.
   //
-  // If aInsertionKind is Async then frame construction of the new children can
-  // be done lazily. It is only allowed to be Async when inserting a single
-  // node.
+  // For InsertionKind::Async, frame construction of the new children can
+  // be done lazily.
   void ContentRangeInserted(nsIContent* aStartChild, nsIContent* aEndChild,
-                            InsertionKind aInsertionKind);
+                            InsertionKind,
+                            SameInsertionPoint = SameInsertionPoint::No);
 
   // The kind of removal we're dealing with.
   enum class RemovalKind : uint8_t {
@@ -419,27 +427,6 @@ class nsCSSFrameConstructor final : public nsFrameManager {
   // Set up our mDocElementContainingBlock correctly for the given root
   // content.
   void SetUpDocElementContainingBlock(nsIContent* aDocElement);
-
-  /**
-   * CreateAttributeContent creates a single content/frame combination for an
-   * |attr(foo)| generated content.
-   *
-   * @param aParentContent the parent content for the generated content (that
-   * is, the originating element).
-   * @param aParentFrame the parent frame for the generated frame
-   * @param aAttrNamespace the namespace of the attribute in question
-   * @param aAttrName the localname of the attribute
-   * @param aComputedStyle the style to use
-   * @param aGeneratedContent the array of generated content to append the
-   *                          created content to.
-   * @param [out] aNewContent the content node we create
-   * @param [out] aNewFrame the new frame we create
-   */
-  void CreateAttributeContent(const Element& aParentContent,
-                              nsIFrame* aParentFrame, int32_t aAttrNamespace,
-                              nsAtom* aAttrName, ComputedStyle* aComputedStyle,
-                              nsCOMArray<nsIContent>& aGeneratedContent,
-                              nsIContent** aNewContent, nsIFrame** aNewFrame);
 
   /**
    * Create a text node containing the given string. If aText is non-null
@@ -1431,8 +1418,6 @@ class nsCSSFrameConstructor final : public nsFrameManager {
                                                              ComputedStyle&);
   static const FrameConstructionData* FindImgControlData(const Element&,
                                                          ComputedStyle&);
-  static const FrameConstructionData* FindSearchControlData(const Element&,
-                                                            ComputedStyle&);
   static const FrameConstructionData* FindInputData(const Element&,
                                                     ComputedStyle&);
   static const FrameConstructionData* FindObjectData(const Element&,
@@ -1693,14 +1678,6 @@ class nsCSSFrameConstructor final : public nsFrameManager {
   void FinishBuildingScrollContainerFrame(
       nsContainerFrame* aScrollContainerFrame, nsIFrame* aScrolledFrame);
 
-  void InitializeListboxSelect(nsFrameConstructorState& aState,
-                               nsContainerFrame* aScrollFrame,
-                               nsContainerFrame* aScrolledFrame,
-                               nsIContent* aContent,
-                               nsContainerFrame* aParentFrame,
-                               ComputedStyle* aComputedStyle,
-                               nsFrameList& aFrameList);
-
   /**
    * Recreate frames for aContent.
    */
@@ -1718,6 +1695,7 @@ class nsCSSFrameConstructor final : public nsFrameManager {
   // GetPrimaryFrame() call on a content node (which means its parent is also
   // not null).
   bool MaybeRecreateContainerForFrameRemoval(nsIFrame* aFrame);
+  bool ShouldRebuildFrameTreeForReplicatedFrames(nsIFrame*);
 
   nsIFrame* CreateContinuingOuterTableFrame(nsIFrame* aFrame,
                                             nsContainerFrame* aParentFrame,
@@ -1900,30 +1878,47 @@ class nsCSSFrameConstructor final : public nsFrameManager {
                              bool aItemIsWithinSVGText,
                              bool aItemAllowsTextPathChild);
 
-  // Determine whether we need to wipe out aFrame (the insertion parent) and
-  // rebuild the entire subtree when we insert or append new content under
-  // aFrame.
-  //
-  // This is similar to WipeContainingBlock(), but is called
-  // before constructing any frame construction items. Any container frames
-  // which need reframing regardless of the content inserted or appended can add
-  // a check in this method.
-  //
-  // @return true if we reconstructed the insertion parent frame; false
-  // otherwise
-  bool WipeInsertionParent(nsContainerFrame* aFrame);
+  /**
+   * Reframes if content can't be inserted or appended under aInsertionParent
+   * incrementally, regardless of what that content is. Checks that depend on
+   * the new content belong in MaybeRecreateForInsertedChildren().
+   *
+   * @param aInsertionParent the frame that the frames for the new content
+   *     would be inserted or appended under.
+   * @return true if frames (of aInsertionParent or an ancestor) were destroyed
+   *     and their reconstruction scheduled, in which case the caller must not
+   *     construct frames for the new content.
+   */
+  bool MaybeRecreateForInsertionParent(nsContainerFrame* aInsertionParent);
 
-  // Determine whether we need to wipe out what we just did and start over
-  // because we're doing something like adding block kids to an inline frame
-  // (and therefore need an {ib} split).  aPrevSibling must be correct, even in
-  // aIsAppend cases.  Passing aIsAppend false even when an append is happening
-  // is ok in terms of correctness, but can lead to unnecessary reframing.
-  //
-  // @return true if we reconstructed the containing block, false otherwise.
-  bool WipeContainingBlock(nsFrameConstructorState& aState,
-                           nsIFrame* aContainingBlock, nsIFrame* aFrame,
-                           FrameConstructionItemList& aItems, bool aIsAppend,
-                           nsIFrame* aPrevSibling);
+  /**
+   * Reframes if the frames for aItems can't be inserted or appended under
+   * aInsertionParent incrementally.
+   *
+   * @param aState the frame constructor state.
+   * @param aContainingBlock if non-null, the frame at which the search for the
+   *     block to reframe starts when an {ib} split is involved. If null, the
+   *     search starts at aInsertionParent.
+   * @param aInsertionParent the frame that the frames for aItems would be
+   *     inserted or appended under.
+   * @param aItems the frame construction items for the new content. Whitespace
+   *     items that can be dropped may be removed from it.
+   * @param aIsAppend true if the frames would be appended at the very end of
+   *     aInsertionParent (no next sibling and no next continuation). Passing
+   *     false when an append is happening is ok in terms of correctness, but
+   *     can lead to unnecessary reframing.
+   * @param aPrevSibling the frame that the new frames would be inserted after,
+   *     or null if they would be aInsertionParent's first children. Must be
+   *     correct even if aIsAppend is true.
+   * @return true if frames (of aInsertionParent or an ancestor) were destroyed
+   *     and their reconstruction scheduled, in which case the caller must not
+   *     construct frames for the new content.
+   */
+  bool MaybeRecreateForInsertedChildren(nsFrameConstructorState& aState,
+                                        nsIFrame* aContainingBlock,
+                                        nsIFrame* aInsertionParent,
+                                        FrameConstructionItemList& aItems,
+                                        bool aIsAppend, nsIFrame* aPrevSibling);
 
   void ReframeContainingBlock(nsIFrame* aFrame);
 

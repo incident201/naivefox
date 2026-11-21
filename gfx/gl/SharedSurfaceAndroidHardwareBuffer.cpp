@@ -24,9 +24,18 @@ SharedSurface_AndroidHardwareBuffer::Create(const SharedSurfaceDesc& desc) {
   const auto& gle = GLContextEGL::Cast(desc.gl);
   const auto& egl = gle->mEgl;
 
+  // WebGL surfaces are accessed through GL, including readback, so they do not
+  // need CPU access usage flags.
+  uint64_t usage = AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE |
+                   AHARDWAREBUFFER_USAGE_GPU_COLOR_OUTPUT;
+  // Keep the previous allocation flags on Android emulators for compatibility
+  // with their EGLImage texture binding path. See bug 2093103.
+  if (gle->Renderer() == GLRenderer::AndroidEmulator) {
+    usage = layers::AndroidHardwareBuffer::kDefaultUsage;
+  }
   RefPtr<layers::AndroidHardwareBuffer> buffer =
-      layers::AndroidHardwareBuffer::Create(desc.size,
-                                            gfx::SurfaceFormat::R8G8B8A8);
+      layers::AndroidHardwareBuffer::Create(
+          desc.size, gfx::SurfaceFormat::R8G8B8A8, usage);
   if (!buffer) {
     return nullptr;
   }
@@ -145,12 +154,17 @@ void SharedSurface_AndroidHardwareBuffer::WaitForBufferOwnership() {
     return;
   }
 
+  bool success;
   if (egl->IsExtensionSupported(gl::EGLExtension::KHR_wait_sync)) {
-    egl->fWaitSync(sync, 0);
+    success = egl->fWaitSync(sync, 0) == LOCAL_EGL_TRUE;
   } else {
-    egl->fClientWaitSync(sync, 0, LOCAL_EGL_FOREVER);
+    success = egl->fClientWaitSync(sync, 0, LOCAL_EGL_FOREVER) ==
+              LOCAL_EGL_CONDITION_SATISFIED;
   }
   egl->fDestroySync(sync);
+  if (!success) {
+    gfxCriticalNote << "Failed to wait for AHB ownership fence";
+  }
 }
 
 /*static*/

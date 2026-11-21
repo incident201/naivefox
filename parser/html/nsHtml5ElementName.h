@@ -239,7 +239,7 @@ class nsHtml5ElementName {
     this->htmlCreator = nullptr;
 #else
     if (custom) {
-      this->htmlCreator = NS_NewCustomElement;
+      this->htmlCreator = nullptr;
     } else {
       this->htmlCreator = NS_NewHTMLUnknownElement;
     }
@@ -251,7 +251,7 @@ class nsHtml5ElementName {
 #ifdef MOZ_NAIVEFOX
     return this->mCustom;
 #else
-    return this->htmlCreator == NS_NewCustomElement;
+    return !this->htmlCreator;
 #endif
   }
 

@@ -6,16 +6,15 @@ use euclid::vec2;
 use api::{BorderSide, BorderStyle, ColorF};
 use api::{NormalBorder as ApiNormalBorder, RepeatMode};
 use api::units::*;
-use crate::clip::ClipNodeId;
 use crate::ellipse::Ellipse;
+use crate::frame_builder::FrameBuildingState;
 use crate::renderer::GpuBufferBuilderF;
-use crate::scene_building::SceneBuilder;
-use crate::spatial_tree::SpatialNodeIndex;
+use crate::render_task::{RenderTask, RenderTaskKind};
+use crate::render_task_cache::{RenderTaskCacheKey, RenderTaskCacheKeyKind, RenderTaskParent, to_cache_size};
+use crate::render_task_graph::RenderTaskId;
 use crate::gpu_types::{BorderInstance, BorderInstanceGpuData, BorderSegment};
 use crate::prim_store::NinePatchDescriptor;
-use crate::prim_store::borders::NormalBorderPrim;
 use crate::util::{lerp, RectHelpers};
-use crate::internal_types::LayoutPrimitiveInfo;
 use crate::segment::EdgeMask;
 
 // Using 2048 as the maximum radius in device space before which we
@@ -39,10 +38,6 @@ const MAX_SQUARE_DOT_WIDTH: f32 = 2.0;
 //           the border cache key than duplicating
 //           all the border structs with hashable
 //           variants...
-
-// `BorderRadiusAu` now lives in `webrender_api` so builder-side interning keys
-// can reference it. Re-exported here to keep existing references working.
-pub use api::key_types::BorderRadiusAu;
 
 // `BorderSideAu` (with its `From` conversions to/from the api border types) now
 // lives in `webrender_api::key_types` so builder-side interning keys can
@@ -75,27 +70,6 @@ pub struct BorderSegmentCacheKey {
 // builder-side interning can build a stable normal-border key. Re-exported to
 // keep existing references working.
 pub use api::key_types::ensure_no_corner_overlap;
-
-impl<'a> SceneBuilder<'a> {
-    pub fn add_normal_border(
-        &mut self,
-        info: &LayoutPrimitiveInfo,
-        border: &ApiNormalBorder,
-        widths: LayoutSideOffsets,
-        spatial_node_index: SpatialNodeIndex,
-        clip_node_id: ClipNodeId,
-    ) {
-        self.add_primitive(
-            spatial_node_index,
-            clip_node_id,
-            info,
-            NormalBorderPrim {
-                border: (*border).into(),
-                widths: widths.to_au(),
-            },
-        );
-    }
-}
 
 pub trait BorderSideHelpers {
     fn border_color(&self, is_inner_border: bool) -> ColorF;
@@ -543,6 +517,81 @@ pub struct NormalBorderSegment {
     pub task_size: LayoutSize,
     pub cache_key: BorderSegmentCacheKey,
     pub is_solid: Option<ColorF>,
+}
+
+impl NormalBorderSegment {
+    pub fn bounds(&self, clip_rect: &LayoutRect) -> LayoutRect {
+        let mut bounds = self.pattern_rect.intersection_unchecked(clip_rect);
+        if let Some(clip_rect) = self.clip_rect {
+            bounds = bounds.intersection_unchecked(&clip_rect);
+        }
+        bounds
+    }
+
+    pub fn request_render_task(
+        &self,
+        border: &ApiNormalBorder,
+        scale: &mut LayoutToDeviceScale,
+        parent: RenderTaskParent,
+        frame_state: &mut FrameBuildingState,
+    ) -> (RenderTaskId, DeviceIntSize) {
+        let cache_size = to_cache_size(self.task_size, scale);
+        let cache_key = RenderTaskCacheKey {
+            kind: RenderTaskCacheKeyKind::BorderSegment(self.cache_key.clone()),
+            origin: DeviceIntPoint::zero(),
+            size: cache_size,
+        };
+        let task_id = frame_state.resource_cache.request_render_task(
+            Some(cache_key),
+            false,
+            parent,
+            &mut frame_state.frame_gpu_data.f32,
+            frame_state.rg_builder,
+            &mut frame_state.surface_builder,
+            &mut |rg_builder, gpu_buffer| {
+                rg_builder.add().init(RenderTask::new_dynamic(
+                    cache_size,
+                    RenderTaskKind::new_border_segment(build_border_instances(
+                        &self.cache_key, self.task_size, cache_size, border, *scale, gpu_buffer,
+                    )),
+                ))
+            },
+        );
+        (task_id, cache_size)
+    }
+
+    pub fn repetition(&self, cache_size: DeviceIntSize) -> (LayoutSize, LayoutSize) {
+        let mut stretch_size = self.pattern_rect.size();
+        let mut spacing = LayoutSize::zero();
+        let mut _repeat_offset = LayoutVector2D::zero();
+        crate::border::compute_border_repetition(
+            self.pattern_rect.size(),
+            cache_size.to_f32(),
+            self.repeat_x,
+            self.repeat_y,
+            &mut stretch_size,
+            &mut spacing,
+            &mut _repeat_offset,
+        );
+
+        if self.repeat_x == RepeatMode::Repeat {
+            let w = self.pattern_rect.width();
+            let sw = stretch_size.width;
+            let scale = w / ((w / sw).round() * sw);
+
+            stretch_size.width *= scale;
+        }
+
+        if self.repeat_y == RepeatMode::Repeat {
+            let h = self.pattern_rect.height();
+            let sh = stretch_size.height;
+            let scale = h / ((h / sh).round() * sh);
+
+            stretch_size.height *= scale;
+        }
+
+        (stretch_size, spacing)
+    }
 }
 
 /// Create the set of border segments and render task
@@ -1232,6 +1281,7 @@ fn add_edge_segment(
 /// segment into the render task cache.
 pub fn build_border_instances(
     cache_key: &BorderSegmentCacheKey,
+    task_size: LayoutSize,
     cache_size: DeviceIntSize,
     border: &ApiNormalBorder,
     scale: LayoutToDeviceScale,
@@ -1270,18 +1320,34 @@ pub fn build_border_instances(
     // thickness of up to a whole pixel more than was asked for. A hairline side
     // still gets a texel of its own so it can't drop out of the cached arc
     // entirely, but a side with no width keeps none.
-    let side_texels = |v: f32| if v > 0.0 { (v * scale.0).max(1.0) } else { 0.0 };
-    let size = LayoutSize::from_au(cache_key.size);
-    let widths = DeviceSize::new(side_texels(size.width), side_texels(size.height));
-    let radius = LayoutSize::from_au(cache_key.radius) * scale;
-    let shape = f32::from_bits(cache_key.shape);
-    let shape_offset = LayoutSize::from_au(cache_key.shape_offset) * scale;
-    let inset = LayoutSize::from_au(cache_key.inset) * scale;
+    //
+    // The task is stretched onto `task_size` when composited, so the geometry is
+    // mapped into it with the scale of that stretch on each axis rather than the
+    // nominal `scale`. The two only differ when the box isn't a whole number of
+    // texels at `scale` (e.g. a power-of-2 raster scale under an animated
+    // transform), and then the rounded task size would otherwise leave a strip
+    // past the corner's clip centre, which the shader fills solid (bug 2090433).
+    let axis_scale = |cache: i32, local: f32| {
+        if local > 0.0 { cache as f32 / local } else { scale.0 }
+    };
+    let sx = axis_scale(cache_size.width, task_size.width);
+    let sy = axis_scale(cache_size.height, task_size.height);
+    let to_device = |s: LayoutSize| DeviceSize::new(s.width * sx, s.height * sy);
 
-    let h_corner_outer = (LayoutPoint::from_au(cache_key.h_adjacent_corner_outer) * scale).round();
-    let h_corner_radius = (LayoutSize::from_au(cache_key.h_adjacent_corner_radius) * scale).ceil();
-    let v_corner_outer = (LayoutPoint::from_au(cache_key.v_adjacent_corner_outer) * scale).round();
-    let v_corner_radius = (LayoutSize::from_au(cache_key.v_adjacent_corner_radius) * scale).ceil();
+    let side_texels = |v: f32, s: f32| if v > 0.0 { (v * s).max(1.0) } else { 0.0 };
+    let size = LayoutSize::from_au(cache_key.size);
+    let widths = DeviceSize::new(side_texels(size.width, sx), side_texels(size.height, sy));
+    let radius = to_device(LayoutSize::from_au(cache_key.radius));
+    let shape = f32::from_bits(cache_key.shape);
+    let shape_offset = to_device(LayoutSize::from_au(cache_key.shape_offset));
+    let inset = to_device(LayoutSize::from_au(cache_key.inset));
+
+    let h_corner_outer = LayoutPoint::from_au(cache_key.h_adjacent_corner_outer);
+    let h_corner_outer = DevicePoint::new(h_corner_outer.x * sx, h_corner_outer.y * sy).round();
+    let h_corner_radius = to_device(LayoutSize::from_au(cache_key.h_adjacent_corner_radius)).ceil();
+    let v_corner_outer = LayoutPoint::from_au(cache_key.v_adjacent_corner_outer);
+    let v_corner_outer = DevicePoint::new(v_corner_outer.x * sx, v_corner_outer.y * sy).round();
+    let v_corner_radius = to_device(LayoutSize::from_au(cache_key.v_adjacent_corner_radius)).ceil();
 
     let shape_offset = if shape < 1.0 {
         radius.max(widths) + shape_offset

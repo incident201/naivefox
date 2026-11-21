@@ -10,10 +10,13 @@ const PREF_IS_DEFAULT_WINDOW = "browser.smartwindow.isDefaultWindow";
 const PREF_RESUME_ACTIVITY_ENABLED =
   "browser.smartwindow.resumeActivity.enabled";
 const PREF_SMARTWINDOW_ENABLED = "browser.smartwindow.enabled";
+const PREF_AUTH_IMPL = "browser.smartwindow.auth.impl";
 const PREF_AGENT_ENABLED = "browser.smartwindow.agent.enabled";
-const PREF_AGENT_SUPPORTED_REGIONS =
-  "browser.smartwindow.agent.supportedRegions";
 const PREF_AITAB_MENUS = "browser.smartwindow.aitab.menus";
+
+const { MonitorUIUtils } = ChromeUtils.importESModule(
+  "moz-src:///browser/components/aiwindow/ui/modules/MonitorUIUtils.sys.mjs"
+);
 
 add_task(async function test_nimbus_enables_aitab_menus() {
   await SpecialPowers.pushPrefEnv({
@@ -199,26 +202,16 @@ add_task(async function test_nimbus_agent_watch_sets_and_restores_prefs() {
     true,
     "agent.enabled defaults to true before enrollment"
   );
-  is(
-    Services.prefs.getCharPref(PREF_AGENT_SUPPORTED_REGIONS),
-    "US,CA",
-    "agent.supportedRegions defaults to US,CA before enrollment"
-  );
 
   const cleanup = await NimbusTestUtils.enrollWithFeatureConfig({
     featureId: "smartWindowAgentWatch",
-    value: { enabled: false, supportedRegions: "GB" },
+    value: { enabled: false },
   });
 
   is(
     Services.prefs.getBoolPref(PREF_AGENT_ENABLED),
     false,
     "agent.enabled reflects the enrolled value"
-  );
-  is(
-    Services.prefs.getCharPref(PREF_AGENT_SUPPORTED_REGIONS),
-    "GB",
-    "agent.supportedRegions reflects the enrolled value"
   );
 
   await cleanup();
@@ -227,11 +220,6 @@ add_task(async function test_nimbus_agent_watch_sets_and_restores_prefs() {
     Services.prefs.getBoolPref(PREF_AGENT_ENABLED),
     true,
     "agent.enabled is restored to its default after unenrollment"
-  );
-  is(
-    Services.prefs.getCharPref(PREF_AGENT_SUPPORTED_REGIONS),
-    "US,CA",
-    "agent.supportedRegions is restored to its default after unenrollment"
   );
 });
 
@@ -272,4 +260,46 @@ add_task(async function test_nimbus_resume_activity_overrides_fallback_pref() {
     true,
     "resumeActivity falls back to the pref again after unenrollment"
   );
+});
+
+/**
+ * Enrolling in the smartWindow feature with authImpl writes it to the auth
+ * impl pref via AIWindow.onNimbusUpdate, and unenrolling leaves the pref.
+ */
+add_task(async function test_nimbus_authImpl_sets_pref() {
+  ok(
+    !Services.prefs.prefHasUserValue(PREF_AUTH_IMPL),
+    "No user value for the auth impl before enrollment"
+  );
+  is(
+    await AuthProvider.getProviderName(),
+    "fxa",
+    "FxA is used before enrollment"
+  );
+  Services.fog.testResetFOG();
+
+  const cleanup = await NimbusTestUtils.enrollWithFeatureConfig({
+    featureId: "smartWindow",
+    value: { authImpl: "" },
+  });
+  is(
+    Services.prefs.getStringPref(PREF_AUTH_IMPL),
+    "",
+    "The auth impl pref is set from the enrollment"
+  );
+  const events = Glean.smartWindow.authImplSwitched.testGetValue();
+  is(events?.length, 1, "One auth_impl_switched was recorded");
+  Assert.deepEqual(
+    events[0].extra,
+    { from: "fxa", to: "guest", reason: "nimbus" },
+    "The enrollment switch is attributed to Nimbus"
+  );
+
+  await cleanup();
+  is(
+    Services.prefs.getStringPref(PREF_AUTH_IMPL),
+    "",
+    "Unenrolling leaves the auth impl pref"
+  );
+  Services.prefs.clearUserPref(PREF_AUTH_IMPL);
 });

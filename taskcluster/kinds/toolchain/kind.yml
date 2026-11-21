@@ -22,7 +22,6 @@ task-defaults:
         tier: 1
     run-on-projects: []
     run:
-        clone-with: hg
         using: toolchain-script
 
 tasks-from:
@@ -54,6 +53,7 @@ tasks-from:
     - mingw.yml
     - minidump-stackwalk.yml
     - misc.yml
+    - mold.yml
     - mozcheck.yml
     - nasm.yml
     - nimbus-fml.yml

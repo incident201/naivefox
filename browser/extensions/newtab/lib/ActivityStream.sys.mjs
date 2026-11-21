@@ -57,6 +57,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "resource://newtab/lib/Widgets/RecentSearchesFeed.sys.mjs",
   PictureOfTheDayFeed:
     "resource://newtab/lib/Widgets/PictureOfTheDayFeed.sys.mjs",
+  FramedWidgetsFeed: "resource://newtab/lib/Widgets/FramedWidgetsFeed.sys.mjs",
   StartupCacheInit: "resource://newtab/lib/StartupCacheInit.sys.mjs",
   Store: "resource://newtab/lib/Store.sys.mjs",
   SystemTickFeed: "resource://newtab/lib/SystemTickFeed.sys.mjs",
@@ -64,7 +65,6 @@ ChromeUtils.defineESModuleGetters(lazy, {
   TimerFeed: "resource://newtab/lib/Widgets/TimerFeed.sys.mjs",
   TravelFeed: "resource://newtab/lib/Widgets/TravelFeed.sys.mjs",
   TopSitesFeed: "resource://newtab/lib/TopSitesFeed.sys.mjs",
-  TopStoriesFeed: "resource://newtab/lib/TopStoriesFeed.sys.mjs",
   WallpaperFeed: "resource://newtab/lib/Wallpapers/WallpaperFeed.sys.mjs",
   WeatherFeed: "resource://newtab/lib/WeatherFeed.sys.mjs",
   WebNotificationsFeed: "resource://newtab/lib/WebNotificationsFeed.sys.mjs",
@@ -97,8 +97,6 @@ const LOCALE_SOV_CONFIG =
 
 const REGION_WEATHER_CONFIG =
   "browser.newtabpage.activity-stream.discoverystream.region-weather-config";
-const LOCALE_WEATHER_CONFIG =
-  "browser.newtabpage.activity-stream.discoverystream.locale-weather-config";
 
 const REGION_TOPICS_CONFIG =
   "browser.newtabpage.activity-stream.discoverystream.topicSelection.region-topics-config";
@@ -367,11 +365,8 @@ function showSpocs({ geo }) {
   return spocsGeo.includes(geo);
 }
 
-function showWeather({ geo, locale }) {
-  return (
-    csvPrefHasValue(REGION_WEATHER_CONFIG, geo) &&
-    csvPrefHasValue(LOCALE_WEATHER_CONFIG, locale)
-  );
+function showWeather({ geo }) {
+  return csvPrefHasValue(REGION_WEATHER_CONFIG, geo);
 }
 
 /**
@@ -685,6 +680,7 @@ export const PREFS_CONFIG = new Map([
     {
       title: "Displays Top Sites on the New Tab Page",
       value: PREF_DEFAULT_VALUE_TOPSITES_ENABLED,
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -730,6 +726,35 @@ export const PREFS_CONFIG = new Map([
       title:
         "User pref for showing web notifications on newtab. Only consulted when system.showWebNotifications is set",
       value: true,
+      allowSetFromContent: { type: "boolean" },
+    },
+  ],
+  [
+    "feeds.system.topstories",
+    {
+      title:
+        "System pref that fetches content recommendations from a configurable content provider",
+      // Dynamically determine if stories should be shown for a geo / locale
+      getValue: ({ geo, locale }) => {
+        // If we don't have geo, we don't want to flash the screen with stories while geo loads.
+        // Best to display nothing until geo is ready.
+        if (!geo) {
+          return false;
+        }
+        const blockedRegions =
+          lazy.NimbusFeatures.pocketNewtab.getVariable("regionStoriesBlock") ||
+          "";
+        if (csvHasValue(blockedRegions, geo)) {
+          return false;
+        }
+        if (!locale) {
+          return false;
+        }
+        return (
+          storiesRegionLocaleMatches(geo, locale) ||
+          matchesLegacyRegionStoriesConfig(geo, locale)
+        );
+      },
     },
   ],
   [
@@ -844,6 +869,7 @@ export const PREFS_CONFIG = new Map([
     {
       title: "showWeather",
       value: true,
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -860,6 +886,7 @@ export const PREFS_CONFIG = new Map([
       title:
         "Enable opt-in dialog to display for weather widget in GDPR regions.",
       value: true,
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -868,6 +895,7 @@ export const PREFS_CONFIG = new Map([
       title:
         "User choice made when prompted with the opt-in dialog for weather.",
       value: false,
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -883,6 +911,7 @@ export const PREFS_CONFIG = new Map([
     {
       title: "weather.query",
       value: "",
+      allowSetFromContent: { type: "string" },
     },
   ],
   [
@@ -897,6 +926,7 @@ export const PREFS_CONFIG = new Map([
     {
       title: "Switch the temperature between Celsius and Fahrenheit",
       getValue: ({ geo }) => (geo === "US" ? "f" : "c"),
+      allowSetFromContent: { oneOf: ["c", "f"] },
     },
   ],
   [
@@ -905,6 +935,7 @@ export const PREFS_CONFIG = new Map([
       title:
         "Toggle the weather widget to include a text summary of the current conditions",
       value: "detailed",
+      allowSetFromContent: { oneOf: ["simple", "detailed"] },
     },
   ],
   [
@@ -924,18 +955,11 @@ export const PREFS_CONFIG = new Map([
     },
   ],
   [
-    "widgets.pictureOfTheDay.setAsWallpaper.enabled",
-    {
-      title:
-        "Whether the Picture of the day 'Set as wallpaper' feature/CTA is enabled",
-      value: true,
-    },
-  ],
-  [
     "widgets.pictureOfTheDay.dismissedDate",
     {
       title: "Published date of the Picture of the day the user dismissed",
       value: "",
+      allowSetFromContent: { type: "string" },
     },
   ],
   [
@@ -944,6 +968,7 @@ export const PREFS_CONFIG = new Map([
       title:
         "Boolean flag for determining if a user has interacted with the Picture of the day widget",
       value: false,
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -984,6 +1009,7 @@ export const PREFS_CONFIG = new Map([
     {
       title: "Number of rows of Top Sites to display",
       value: 1,
+      allowSetFromContent: { type: "number" },
     },
   ],
   [
@@ -998,12 +1024,7 @@ export const PREFS_CONFIG = new Map([
     {
       title:
         "Group pinned Top Sites into a contiguous block with restricted drag-and-drop reordering",
-      // Channel-derived (resolves on the host), so it's on in Nightly and Beta
-      // but stays dark after the XPI train-hops to Release. A literal true would
-      // ride inside the XPI and wrongly activate.
-      value:
-        AppConstants.NIGHTLY_BUILD ||
-        AppConstants.MOZ_UPDATE_CHANNEL === "beta",
+      value: true,
     },
   ],
   [
@@ -1063,7 +1084,7 @@ export const PREFS_CONFIG = new Map([
     "section.highlights.rows",
     {
       title: "Number of rows of Highlights to display",
-      value: 1,
+      value: 2,
     },
   ],
   [
@@ -1071,6 +1092,7 @@ export const PREFS_CONFIG = new Map([
     {
       title: "Whether top stories are enabled by default.",
       value: PREF_DEFAULT_VALUE_TOPSTORIES_ENABLED,
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -1100,6 +1122,7 @@ export const PREFS_CONFIG = new Map([
       title:
         "Boolean flag controlling wallpaper visibility -- if true the user's selected wallpaper is shown, if false it is hidden",
       value: false,
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -1140,6 +1163,7 @@ export const PREFS_CONFIG = new Map([
       title:
         "Boolean flag used for telemetry to track if a user has previously uploaded a custom wallpaper",
       value: false,
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -1186,6 +1210,22 @@ export const PREFS_CONFIG = new Map([
     },
   ],
   [
+    "newtabWallpapers.categoryOrder",
+    {
+      title:
+        "Comma-separated wallpaper category order. Unlisted categories follow the listed ones. Overridden by trainhopConfig.wallpapers.categoryOrder",
+      value: "",
+    },
+  ],
+  [
+    "newtabWallpapers.maxCategories",
+    {
+      title:
+        "Maximum number of wallpaper category tiles in the Nova layout, including Your images. Overridden by trainhopConfig.wallpapers.maxCategories",
+      value: 6,
+    },
+  ],
+  [
     "newtabAdSize.leaderboard",
     {
       title: "Boolean flag to turn the leaderboard ad size on and off",
@@ -1204,7 +1244,8 @@ export const PREFS_CONFIG = new Map([
     "newtabAdSize.billboard",
     {
       title: "Boolean flag to turn the billboard ad size on and off",
-      value: false,
+      value: true,
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -1212,7 +1253,7 @@ export const PREFS_CONFIG = new Map([
     {
       title:
         "position for billboard spoc - should correlate to a row in DS grid",
-      value: "3",
+      value: "1",
     },
   ],
   [
@@ -1220,13 +1261,14 @@ export const PREFS_CONFIG = new Map([
     {
       title: "Boolean flag to turn the medium (MREC) ad size on and off",
       value: false,
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
     "discoverystream.promoCard.enabled",
     {
       title: "Boolean flag to turn the promo card on and off",
-      value: false,
+      value: true,
     },
   ],
   [
@@ -1234,6 +1276,7 @@ export const PREFS_CONFIG = new Map([
     {
       title: "Boolean flag whether the promo card is visible or not",
       value: false,
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -1241,6 +1284,7 @@ export const PREFS_CONFIG = new Map([
     {
       title: "Boolean flag to enable section layout UI in recommended stories",
       getValue: showSectionLayout,
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -1265,6 +1309,7 @@ export const PREFS_CONFIG = new Map([
       title:
         "Boolean flag to enable revised pocket story card UI in recommended stories",
       value: false,
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -1309,6 +1354,7 @@ export const PREFS_CONFIG = new Map([
       title:
         "Whether the user stopped the story carousel from rotating on its own",
       value: false,
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -1359,6 +1405,7 @@ export const PREFS_CONFIG = new Map([
     {
       title: "User pref to toggle inferred personalizaton",
       value: false,
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -1372,6 +1419,13 @@ export const PREFS_CONFIG = new Map([
     "discoverystream.reportAds.enabled",
     {
       title: "Boolean flag to enable reporting ads from the context menu",
+      value: false,
+    },
+  ],
+  [
+    "discoverystream.reportAds.newReasons.enabled",
+    {
+      title: "Boolean flag to enable updated reporting reasons for ads",
       value: false,
     },
   ],
@@ -1401,6 +1455,7 @@ export const PREFS_CONFIG = new Map([
     {
       title: "comma separated string of sections that are visible",
       value: "",
+      allowSetFromContent: { type: "string" },
     },
   ],
   [
@@ -1430,6 +1485,7 @@ export const PREFS_CONFIG = new Map([
       title:
         "CSV string of the banner placement ids on newtab Pocket grid. This placement id tells us which banner is visible when contexual ads are on",
       value: "",
+      allowSetFromContent: { type: "string" },
     },
   ],
   [
@@ -1438,6 +1494,7 @@ export const PREFS_CONFIG = new Map([
       title:
         "CSV string of AdBanner placement counts on newtab Pocket grid. The count tells the ad server how many banners to return for this position and placement.",
       value: "",
+      allowSetFromContent: { type: "string" },
     },
   ],
   [
@@ -1445,6 +1502,7 @@ export const PREFS_CONFIG = new Map([
     {
       title:
         "CSV string of spoc placement ids on newtab Pocket grid. A placement id tells our ad server where the ads are intended to be displayed.",
+      allowSetFromContent: { type: "string" },
     },
   ],
   [
@@ -1452,6 +1510,7 @@ export const PREFS_CONFIG = new Map([
     {
       title:
         "CSV string of spoc placement counts on newtab Pocket grid. The count tells the ad server how many ads to return for this position and placement.",
+      allowSetFromContent: { type: "string" },
     },
   ],
   [
@@ -1523,6 +1582,7 @@ export const PREFS_CONFIG = new Map([
     {
       title: "Currently set wallpaper",
       value: "",
+      allowSetFromContent: { type: "string" },
     },
   ],
   [
@@ -1531,6 +1591,7 @@ export const PREFS_CONFIG = new Map([
       title:
         "Initial wallpaper set by a Nimbus experiment. Persists after experiment ends.",
       value: "",
+      allowSetFromContent: { type: "string" },
     },
   ],
   [
@@ -1592,6 +1653,7 @@ export const PREFS_CONFIG = new Map([
       title: "Makes widgets available: shows the controls that turn them on",
       // pref is dynamic
       getValue: marketGate("widgets.system.enabled"),
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -1600,6 +1662,7 @@ export const PREFS_CONFIG = new Map([
       title: "Allows users to toggle all widgets on and off at once",
       // pref is dynamic
       getValue: marketGate("widgets.enabled"),
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -1607,6 +1670,7 @@ export const PREFS_CONFIG = new Map([
     {
       title: "Enables the to-do lists widget",
       getValue: offByDefault("widgets.lists.enabled"),
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -1630,6 +1694,7 @@ export const PREFS_CONFIG = new Map([
       title: "Makes the to-do lists widget available",
       // pref is dynamic
       getValue: marketGate("widgets.system.lists.enabled"),
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -1638,6 +1703,7 @@ export const PREFS_CONFIG = new Map([
       title:
         "Boolean flag for determining if a user has interacted with the lists widget",
       value: false,
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -1660,6 +1726,7 @@ export const PREFS_CONFIG = new Map([
       title:
         "Toggles maximized state for all widgets in the widgets section. It defaults to false as the default widget size is medium",
       value: false,
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -1675,6 +1742,7 @@ export const PREFS_CONFIG = new Map([
       title:
         "Whether the Nova widgets row is expanded beyond its first visual row. Persists the user's Show more / Show less choice across sessions.",
       value: false,
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   // @experiment(remove) { bug 2066527 }
@@ -1684,6 +1752,7 @@ export const PREFS_CONFIG = new Map([
       title:
         "Set once the user manually expands the auto-minimized widgets section. Suppresses the auto-collapse on every future new tab and returns the section header button to its widget-size toggle behaviour.",
       value: false,
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -1691,6 +1760,7 @@ export const PREFS_CONFIG = new Map([
     {
       title: "Enables the focus timer widget",
       getValue: offByDefault("widgets.focusTimer.enabled"),
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -1699,6 +1769,7 @@ export const PREFS_CONFIG = new Map([
       title: "Makes the focus timer widget available",
       // pref is dynamic
       getValue: marketGate("widgets.system.focusTimer.enabled"),
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -1707,6 +1778,7 @@ export const PREFS_CONFIG = new Map([
       title:
         "Boolean flag for determining if a user has interacted with the timer widget",
       value: false,
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -1714,6 +1786,7 @@ export const PREFS_CONFIG = new Map([
     {
       title: "Enables the focus timer widget to show system notifications",
       value: false,
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -1728,6 +1801,7 @@ export const PREFS_CONFIG = new Map([
     {
       title: "Enables the weather widget",
       value: true,
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -1735,6 +1809,7 @@ export const PREFS_CONFIG = new Map([
     {
       title: "Enables the weather widget experiment in Nimbus",
       getValue: showWeather,
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -1757,6 +1832,7 @@ export const PREFS_CONFIG = new Map([
     {
       title: "Size of the weather forecast widget (small, medium, or large)",
       getValue: getWeatherWidgetSize,
+      allowSetFromContent: { oneOf: ["small", "medium", "large"] },
     },
   ],
   [
@@ -1764,6 +1840,7 @@ export const PREFS_CONFIG = new Map([
     {
       title: "Enables the clock widget",
       getValue: offByDefault("widgets.clocks.enabled"),
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -1772,6 +1849,7 @@ export const PREFS_CONFIG = new Map([
       title: "Makes the clock widget available",
       // pref is dynamic
       getValue: marketGate("widgets.system.clocks.enabled"),
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -1786,6 +1864,7 @@ export const PREFS_CONFIG = new Map([
     {
       title: "Size of the lists widget (medium or large)",
       value: "",
+      allowSetFromContent: { oneOf: ["small", "medium", "large"] },
     },
   ],
   [
@@ -1793,6 +1872,7 @@ export const PREFS_CONFIG = new Map([
     {
       title: "Size of the focus timer widget (medium or large)",
       value: "",
+      allowSetFromContent: { oneOf: ["small", "medium", "large"] },
     },
   ],
   [
@@ -1800,6 +1880,7 @@ export const PREFS_CONFIG = new Map([
     {
       title: "Size of the clock widget (small, medium, or large)",
       value: "",
+      allowSetFromContent: { oneOf: ["small", "medium", "large"] },
     },
   ],
   [
@@ -1808,6 +1889,7 @@ export const PREFS_CONFIG = new Map([
       title:
         "User override for clock widget hour format ('12', '24', or empty string to use locale default)",
       value: "",
+      allowSetFromContent: { type: "string" },
     },
   ],
   [
@@ -1815,6 +1897,7 @@ export const PREFS_CONFIG = new Map([
     {
       title: "Saved clock widget time zones",
       value: "",
+      allowSetFromContent: { type: "string" },
     },
   ],
   [
@@ -1823,6 +1906,7 @@ export const PREFS_CONFIG = new Map([
       title:
         "Boolean flag for determining if a user has interacted with the clock widget",
       value: false,
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -1831,6 +1915,7 @@ export const PREFS_CONFIG = new Map([
       title: "Enables the privacy widget",
       // Off everywhere. To release organically: add locale-config to firefox.js, switch to marketGate.
       getValue: () => !marketGateEnabled(),
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -1838,6 +1923,7 @@ export const PREFS_CONFIG = new Map([
     {
       title: "Enables the crossword widget",
       getValue: offByDefault("widgets.crossword.enabled"),
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -1846,6 +1932,7 @@ export const PREFS_CONFIG = new Map([
       title:
         "Boolean flag for determining if a user has interacted with the crossword widget",
       value: false,
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -1854,6 +1941,7 @@ export const PREFS_CONFIG = new Map([
       title: "Enables the stocks widget",
       // Off everywhere. To release organically: add locale-config to firefox.js, switch to marketGate.
       getValue: () => !marketGateEnabled(),
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -1862,6 +1950,7 @@ export const PREFS_CONFIG = new Map([
       title:
         "Boolean flag for determining if a user has interacted with the stocks widget",
       value: false,
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -1870,6 +1959,7 @@ export const PREFS_CONFIG = new Map([
       title: "Enables the recent searches widget",
       // Off everywhere. To release organically: add locale-config to firefox.js, switch to marketGate.
       getValue: () => !marketGateEnabled(),
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -1878,6 +1968,7 @@ export const PREFS_CONFIG = new Map([
       title:
         "Boolean flag for determining if a user has interacted with the recent searches widget",
       value: false,
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -1886,6 +1977,7 @@ export const PREFS_CONFIG = new Map([
       title: "Enables the horoscopes widget",
       // Off everywhere. To release organically: add locale-config to firefox.js, switch to marketGate.
       getValue: () => !marketGateEnabled(),
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -1894,6 +1986,7 @@ export const PREFS_CONFIG = new Map([
       title:
         "Boolean flag for determining if a user has interacted with the horoscopes widget",
       value: false,
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -1902,6 +1995,7 @@ export const PREFS_CONFIG = new Map([
       title: "Enables the travel widget",
       // Off everywhere. To release organically: add locale-config to firefox.js, switch to marketGate.
       getValue: () => !marketGateEnabled(),
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -1910,6 +2004,7 @@ export const PREFS_CONFIG = new Map([
       title: "Enables the solitaire widget",
       // Off everywhere. To release organically: add locale-config to firefox.js, switch to marketGate.
       getValue: () => !marketGateEnabled(),
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -1918,6 +2013,7 @@ export const PREFS_CONFIG = new Map([
       title:
         "Boolean flag for determining if a user has interacted with the travel widget",
       value: false,
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -1926,6 +2022,16 @@ export const PREFS_CONFIG = new Map([
       title:
         "Boolean flag for determining if a user has interacted with the solitaire widget",
       value: false,
+      allowSetFromContent: { type: "boolean" },
+    },
+  ],
+  [
+    "widgets.wrexhamAFC.enabled",
+    {
+      title: "Enables the Wrexham AFC widget",
+      // Off everywhere. To release organically: add locale-config to firefox.js, switch to marketGate.
+      getValue: () => !marketGateEnabled(),
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -1933,6 +2039,7 @@ export const PREFS_CONFIG = new Map([
     {
       title: "Enables the picture of the day widget",
       getValue: offByDefault("widgets.pictureOfTheDay.enabled"),
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -1941,6 +2048,7 @@ export const PREFS_CONFIG = new Map([
       title: "Enables the privacy widget experiment in Nimbus",
       // Off everywhere. To release organically: add locale-config to firefox.js, switch to marketGate.
       value: false,
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -1949,6 +2057,7 @@ export const PREFS_CONFIG = new Map([
       title: "Makes the crossword widget available",
       // pref is dynamic
       getValue: marketGate("widgets.system.crossword.enabled"),
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -1957,6 +2066,7 @@ export const PREFS_CONFIG = new Map([
       title: "Enables the recent searches widget experiment in Nimbus",
       // Off everywhere. To release organically: add locale-config to firefox.js, switch to marketGate.
       value: false,
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -1965,6 +2075,7 @@ export const PREFS_CONFIG = new Map([
       title: "Enables the horoscopes widget experiment in Nimbus",
       // Off everywhere. To release organically: add locale-config to firefox.js, switch to marketGate.
       value: false,
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -1973,6 +2084,7 @@ export const PREFS_CONFIG = new Map([
       title: "Enables the travel widget experiment in Nimbus",
       // Off everywhere. To release organically: add locale-config to firefox.js, switch to marketGate.
       value: false,
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -1981,6 +2093,16 @@ export const PREFS_CONFIG = new Map([
       title: "Enables the solitaire widget experiment in Nimbus",
       // Off everywhere. To release organically: add locale-config to firefox.js, switch to marketGate.
       value: false,
+      allowSetFromContent: { type: "boolean" },
+    },
+  ],
+  [
+    "widgets.system.wrexhamAFC.enabled",
+    {
+      title: "Enables the Wrexham AFC widget experiment in Nimbus",
+      // Off everywhere. To release organically: add locale-config to firefox.js, switch to marketGate.
+      value: false,
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -1989,6 +2111,7 @@ export const PREFS_CONFIG = new Map([
       title: "Enables the stocks widget experiment in Nimbus",
       // Off everywhere. To release organically: add locale-config to firefox.js, switch to marketGate.
       value: false,
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -1997,6 +2120,7 @@ export const PREFS_CONFIG = new Map([
       title: "Makes the picture of the day widget available",
       // pref is dynamic
       getValue: marketGate("widgets.system.pictureOfTheDay.enabled"),
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -2004,6 +2128,7 @@ export const PREFS_CONFIG = new Map([
     {
       title: "Size of the privacy widget (medium or large)",
       value: "",
+      allowSetFromContent: { oneOf: ["small", "medium", "large"] },
     },
   ],
   [
@@ -2037,6 +2162,7 @@ export const PREFS_CONFIG = new Map([
       title:
         "Allow VPN promotional messages in the Privacy widget (off by default; not all users are VPN-eligible)",
       value: false,
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -2094,6 +2220,7 @@ export const PREFS_CONFIG = new Map([
     {
       title: "Size of the crossword widget (medium or large)",
       value: "",
+      allowSetFromContent: { oneOf: ["small", "medium", "large"] },
     },
   ],
   [
@@ -2101,6 +2228,7 @@ export const PREFS_CONFIG = new Map([
     {
       title: "Size of the stocks widget (small, medium, or large)",
       value: "",
+      allowSetFromContent: { oneOf: ["small", "medium", "large"] },
     },
   ],
   [
@@ -2108,6 +2236,7 @@ export const PREFS_CONFIG = new Map([
     {
       title: "Size of the recent searches widget (medium or large)",
       value: "",
+      allowSetFromContent: { oneOf: ["small", "medium", "large"] },
     },
   ],
   [
@@ -2115,6 +2244,7 @@ export const PREFS_CONFIG = new Map([
     {
       title: "Size of the horoscopes widget (medium or large)",
       value: "",
+      allowSetFromContent: { oneOf: ["small", "medium", "large"] },
     },
   ],
   [
@@ -2122,6 +2252,7 @@ export const PREFS_CONFIG = new Map([
     {
       title: "Size of the travel widget (medium or large)",
       value: "",
+      allowSetFromContent: { oneOf: ["small", "medium", "large"] },
     },
   ],
   [
@@ -2129,6 +2260,24 @@ export const PREFS_CONFIG = new Map([
     {
       title: "Size of the solitaire widget (medium or large)",
       value: "",
+      allowSetFromContent: { oneOf: ["small", "medium", "large"] },
+    },
+  ],
+  [
+    "widgets.wrexhamAFC.size",
+    {
+      title: "Size of the Wrexham AFC widget (medium or large)",
+      value: "",
+      allowSetFromContent: { oneOf: ["small", "medium", "large"] },
+    },
+  ],
+  [
+    "widgets.wrexhamAFC.view",
+    {
+      title:
+        "View shown by the Wrexham AFC widget (matches, table or fixtures)",
+      value: "",
+      allowSetFromContent: { oneOf: ["matches", "table", "fixtures"] },
     },
   ],
   [
@@ -2137,6 +2286,7 @@ export const PREFS_CONFIG = new Map([
       title:
         "Tab the recent searches widget last showed, so a new tab opens the widget on the same tab as the user last selected",
       value: "recent",
+      allowSetFromContent: { oneOf: ["recent", "trending"] },
     },
   ],
   [
@@ -2144,6 +2294,7 @@ export const PREFS_CONFIG = new Map([
     {
       title: "Saved stocks widget watchlist ticker symbols (comma-separated)",
       value: "",
+      allowSetFromContent: { type: "string" },
     },
   ],
   [
@@ -2151,15 +2302,39 @@ export const PREFS_CONFIG = new Map([
     {
       title: "Size of the picture of the day widget (small, medium, or large)",
       value: "",
+      allowSetFromContent: { oneOf: ["small", "medium", "large"] },
     },
   ],
   [
-    "widgets.crossword.endpoint",
+    "widgets.framed.endpoint.prod",
     {
       title:
-        "The Merino endpoint that serves the crossword bundle rendered in the widget iframe",
-      value:
-        "https://prod-games-particle.merino.prod.webservices.mozgcp.net/index.html",
+        "The prod Merino endpoint serving the document URL and enabled state of every framed widget",
+      value: "https://merino.services.mozilla.com/api/v1/widgets/framed",
+    },
+  ],
+  [
+    "widgets.framed.endpoint.stage",
+    {
+      title:
+        "The stage Merino endpoint serving the document URL and enabled state of every framed widget",
+      value: "https://merino.services.allizom.org/api/v1/widgets/framed",
+    },
+  ],
+  [
+    "widgets.framed.allowedHostSuffixes",
+    {
+      title:
+        "Host suffixes (comma-separated) framed widget documents may load from; the frame-src CSP must allow them too",
+      value: ".mozgcp.net,.mozilla.com",
+    },
+  ],
+  [
+    "widgets.framed.environment",
+    {
+      title:
+        "Which framed widgets endpoint framed widgets load from (prod or stage)",
+      value: "prod",
     },
   ],
   [
@@ -2182,6 +2357,16 @@ export const PREFS_CONFIG = new Map([
       title:
         "Widget display order as a comma-separated list of widget IDs. Empty string means use the default registry order.",
       value: "",
+      allowSetFromContent: { type: "string" },
+    },
+  ],
+  [
+    "widgets.home",
+    {
+      title:
+        "JSON array of the widget IDs the user has on the Home space, when the thematic spaces config names a widgetLibrary. Empty string means use the config's widgets for the default space.",
+      value: "",
+      allowSetFromContent: { type: "string" },
     },
   ],
   [
@@ -2311,6 +2496,7 @@ export const PREFS_CONFIG = new Map([
     {
       title: "Selected topics",
       value: "",
+      allowSetFromContent: { type: "string" },
     },
   ],
   [
@@ -2325,6 +2511,7 @@ export const PREFS_CONFIG = new Map([
     {
       title: "Returns true only if the user has previously selected topics",
       value: false,
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -2332,6 +2519,7 @@ export const PREFS_CONFIG = new Map([
     {
       title: "amount of times that topic selection onboarding has been shown",
       value: 0,
+      allowSetFromContent: { type: "number" },
     },
   ],
   [
@@ -2340,6 +2528,7 @@ export const PREFS_CONFIG = new Map([
       title:
         "Whether the onboarding should be shown, based on previous interactions",
       value: true,
+      allowSetFromContent: { type: "boolean" },
     },
   ],
   [
@@ -2355,6 +2544,7 @@ export const PREFS_CONFIG = new Map([
     {
       title: "time in ms that the onboarding show be shown next",
       value: 0,
+      allowSetFromContent: { type: "number" },
     },
   ],
   [
@@ -2522,6 +2712,7 @@ export const PREFS_CONFIG = new Map([
       title:
         "Name of the active newtab page layout variant, for layout experimentation. See PAGE_LAYOUT_VARIANTS in common/PageLayoutVariants.mjs for the valid values. Overridden by trainhopConfig.pageLayouts.variant.",
       value: "nova-full-width",
+      allowSetFromContent: { type: "string" },
     },
   ],
   [
@@ -2530,6 +2721,7 @@ export const PREFS_CONFIG = new Map([
       title:
         "JSON config for the spaces-thematic-v1 layout variant: an `order` array of space ids, a `default` id that the page opens on and that also takes any section or widget no other space claims, a `preview` boolean that turns on the tab preview, and a `spaces` object mapping each id to a `label`, an `icon` chrome:// URL, an optional `previewImage` chrome:// URL that the preview shows instead of the space's first item, and `sections` and `widgets` arrays. Defaults to the config this build ships; clearing the user value returns to it. A config that cannot render turns the layout off rather than partly applying; nothing is merged with the default. Overridden by trainhopConfig.spaces.",
       value: JSON.stringify(DEFAULT_SPACES_CONFIG),
+      allowSetFromContent: { type: "string" },
     },
   ],
   [
@@ -2620,34 +2812,6 @@ const FEEDS_DATA = [
     factory: () => new lazy.HighlightsFeed(),
     title: "Fetches content recommendations from places db",
     value: false,
-  },
-  {
-    name: "system.topstories",
-    factory: () =>
-      new lazy.TopStoriesFeed(PREFS_CONFIG.get("discoverystream.config")),
-    title:
-      "System pref that fetches content recommendations from a configurable content provider",
-    // Dynamically determine if stories should be shown for a geo / locale
-    getValue: ({ geo, locale }) => {
-      // If we don't have geo, we don't want to flash the screen with stories while geo loads.
-      // Best to display nothing until geo is ready.
-      if (!geo) {
-        return false;
-      }
-      const blockedRegions =
-        lazy.NimbusFeatures.pocketNewtab.getVariable("regionStoriesBlock") ||
-        "";
-      if (csvHasValue(blockedRegions, geo)) {
-        return false;
-      }
-      if (!locale) {
-        return false;
-      }
-      return (
-        storiesRegionLocaleMatches(geo, locale) ||
-        matchesLegacyRegionStoriesConfig(geo, locale)
-      );
-    },
   },
   {
     name: "systemtick",
@@ -2768,6 +2932,12 @@ const FEEDS_DATA = [
     value: true,
   },
   {
+    name: "framedwidgetsfeed",
+    factory: () => new lazy.FramedWidgetsFeed(),
+    title: "Handles fetching and caching the Merino framed widgets manifest",
+    value: true,
+  },
+  {
     name: "timerfeed",
     factory: () => new lazy.TimerFeed(),
     title: "Handles the data for the Timer widget",
@@ -2800,6 +2970,13 @@ for (const config of FEEDS_DATA) {
   FEEDS_CONFIG.set(pref, config.factory);
   PREFS_CONFIG.set(pref, config);
 }
+
+// Copied out at load because PREFS_CONFIG entries are replaced at runtime.
+export const CONTENT_PREF_RULES = new Map(
+  [...PREFS_CONFIG]
+    .filter(([, config]) => config.allowSetFromContent)
+    .map(([name, config]) => [name, Object.freeze(config.allowSetFromContent)])
+);
 
 export class ActivityStream {
   #createdInstant = null;

@@ -138,8 +138,6 @@ class Animation : public DOMEventTargetHelper,
   virtual void SetEffect(AnimationEffect* aEffect);
   void SetEffectNoUpdate(AnimationEffect* aEffect);
 
-  void RemovedNamedTimelineReferenceFromJS(const nsAtom* aName);
-
   AnimationTimeline* GetTimelineFromJS() const {
     auto* timeline = GetTimeline();
     if (timeline && timeline->IsUnresolvedTimeline()) {
@@ -376,8 +374,6 @@ class Animation : public DOMEventTargetHelper,
     NonOwningAnimationTarget mTarget;
     uint64_t mIndex;
   };
-  // Note: we provide |aContext|/|aOtherContext| only when it is a cancelled
-  // transition or animation (for overridding the target and animation index).
   int32_t CompareCompositeOrder(const Maybe<EventContext>& aContext,
                                 const Animation& aOther,
                                 const Maybe<EventContext>& aOtherContext,

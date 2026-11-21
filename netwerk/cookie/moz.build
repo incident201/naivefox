@@ -103,7 +103,7 @@ LOCAL_INCLUDES += [
 ]
 
 if not CONFIG["MOZ_NAIVEFOX"]:
-    EXTRA_JS_MODULES += [
+    MOZ_SRC_FILES += [
         "ThirdPartyCookieBlockingExceptionListService.sys.mjs",
     ]
 

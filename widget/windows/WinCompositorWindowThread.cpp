@@ -18,8 +18,9 @@ namespace widget {
 
 static StaticRefPtr<WinCompositorWindowThread> sWinCompositorWindowThread;
 
-static StaticMonitor sShutdownMonitor;
-static bool sShutdownComplete MOZ_GUARDED_BY(sShutdownMonitor) = false;
+StaticMonitor WinCompositorWindowThread::sShutdownMonitor;
+bool WinCompositorWindowThread::sShutdownComplete MOZ_GUARDED_BY(
+    WinCompositorWindowThread::sShutdownMonitor) = false;
 
 // Ensures the flag that forces user32 handle validation calls onto the slow
 // kernel path is cleared for this thread, since it creates, destroys and
@@ -136,7 +137,7 @@ void WinCompositorWindowThread::ShutDown() {
     // Waiting on a monitor that has already been notified.
     StaticMonitorAutoLock lock(sShutdownMonitor);
 
-    static const TimeDuration TIMEOUT = TimeDuration::FromSeconds(2.0);
+    static const TimeDuration TIMEOUT = TimeDuration::FromSeconds(2);
     RefPtr<Runnable> runnable =
         NewRunnableMethod("WinCompositorWindowThread::ShutDownTask",
                           sWinCompositorWindowThread.get(),

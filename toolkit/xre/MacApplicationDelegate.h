@@ -13,8 +13,9 @@
 
 void EnsureUseCocoaDockAPI();
 void SetupMacApplicationDelegate(bool* gRestartedByOS);
+void ActivateMacAppAfterLaunch();
 void InitializeMacApp();
 nsTArray<nsCString> TakeStartupURLs();
-void DisableAppNap();
+void RegisterEarlyUserDefaults();
 
 #endif

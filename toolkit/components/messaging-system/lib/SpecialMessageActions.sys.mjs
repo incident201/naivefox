@@ -36,6 +36,9 @@ ChromeUtils.defineESModuleGetters(lazy, {
   AIWindowUI:
     // eslint-disable-next-line mozilla/no-browser-refs-in-toolkit
     "moz-src:///browser/components/aiwindow/ui/modules/AIWindowUI.sys.mjs",
+  AutoTabGrouping:
+    // eslint-disable-next-line mozilla/no-browser-refs-in-toolkit
+    "moz-src:///browser/components/aiwindow/ui/modules/AutoTabGrouping.sys.mjs",
   CustomIconManager:
     // eslint-disable-next-line mozilla/no-browser-refs-in-toolkit
     "moz-src:///browser/components/shell/CustomIconManager.sys.mjs",
@@ -72,6 +75,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "resource:///modules/profiles/SelectableProfileService.sys.mjs",
   SessionStore:
     "moz-src:///browser/components/sessionstore/SessionStore.sys.mjs",
+  // eslint-disable-next-line mozilla/no-browser-refs-in-toolkit
+  SharingUtils: "moz-src:///browser/components/sharing/SharingUtils.sys.mjs",
   // eslint-disable-next-line mozilla/no-browser-refs-in-toolkit
   Spotlight: "resource:///modules/asrouter/Spotlight.sys.mjs",
   // eslint-disable-next-line mozilla/no-browser-refs-in-toolkit
@@ -155,9 +160,14 @@ export const SpecialMessageActions = {
    *   confirmed the action, so it will hang until the prompt is dismissed. This
    *   parameter makes the API resolve after the prompt is shown, but before the
    *   user has confirmed or rejected the action. Defaults to false.
+   * @param {boolean} options.promptOnly Only pin through the OS prompt that
+   *   asks for the user's consent, never through an API that may pin silently.
+   *   Defaults to false.
    */
-  pinFirefoxToTaskbar(window, { privatePin, fireAndForget } = {}) {
-    return window.getShellService().pinToTaskbar(privatePin, fireAndForget);
+  pinFirefoxToTaskbar(window, { privatePin, fireAndForget, promptOnly } = {}) {
+    return window
+      .getShellService()
+      .pinToTaskbar(privatePin, fireAndForget, promptOnly);
   },
 
   /**
@@ -422,6 +432,7 @@ export const SpecialMessageActions = {
       "browser.migrate.content-modal.about-welcome-behavior",
       "browser.migrate.content-modal.import-all.enabled",
       "browser.migrate.preferences-entrypoint.enabled",
+      "browser.ml.chat.provider",
       "browser.shell.checkDefaultBrowser",
       "browser.shell.setDefaultGuidanceNotifications",
       "browser.startup.homepage",
@@ -460,6 +471,9 @@ export const SpecialMessageActions = {
       "browser.startup.couldRestoreSession.count",
     ];
 
+    // Prefs that keep the first non-default value written to them, rewrites ignored.
+    const writeOncePrefs = ["termsofuse.firstAcceptedDate"];
+
     // allowedPrefs above is the in-tree baseline. It can be extended off-train
     // via Remote Settings, but not for onImpression prefs, which stay
     // deliberately restricted to prefs reviewed in-tree, and not for the prefs
@@ -488,6 +502,12 @@ export const SpecialMessageActions = {
       !pref.name.startsWith("messaging-system-action.")
     ) {
       pref.name = `messaging-system-action.${pref.name}`;
+    }
+    if (
+      writeOncePrefs.includes(pref.name) &&
+      Services.prefs.prefHasUserValue(pref.name)
+    ) {
+      return;
     }
     // If pref has no value, reset it, otherwise set it to desired value
     switch (typeof pref.value) {
@@ -917,6 +937,21 @@ export const SpecialMessageActions = {
           }
         );
         break;
+      case "SHOW_QR_CODE": {
+        const { gBrowser } = window.top;
+        await lazy.SharingUtils.showQRCodePanel(
+          window.top,
+          gBrowser.getTabForBrowser(browser)
+            ? browser
+            : gBrowser.selectedBrowser,
+          Services.urlFormatter.formatURL(action.data.args),
+          {
+            titleL10nId: action.data.title,
+            hideActions: action.data.hideActions,
+          }
+        );
+        break;
+      }
       case "OPEN_ABOUT_PAGE": {
         let aboutPageURL = new URL(`about:${action.data.args}`);
         if (!ALLOWED_ABOUT_PAGES.has(aboutPageURL.pathname)) {
@@ -950,6 +985,27 @@ export const SpecialMessageActions = {
           }
         );
         break;
+      case "OPEN_SUPPORT_PAGE": {
+        let baseURL = new URL(
+          Services.urlFormatter.formatURLPref("app.support.baseURL")
+        );
+        let supportPageURL = new URL(action.data.args, baseURL);
+        // The page must resolve to a URL under the support base URL.
+        if (
+          supportPageURL.origin !== baseURL.origin ||
+          !supportPageURL.pathname.startsWith(baseURL.pathname)
+        ) {
+          throw new Error(
+            `SpecialMessageActions: OPEN_SUPPORT_PAGE disallows ${action.data.args}`
+          );
+        }
+        window.openLinkIn(supportPageURL.href, action.data.where || "current", {
+          private: false,
+          triggeringPrincipal:
+            Services.scriptSecurityManager.createNullPrincipal({}),
+        });
+        break;
+      }
       case "OPEN_APPLICATIONS_MENU":
         lazy.UITour.showMenu(window, action.data.args);
         break;
@@ -1104,6 +1160,14 @@ export const SpecialMessageActions = {
       case "OPEN_SMARTWINDOW_MONITOR_CREATE":
         lazy.AIWindowUI.showMonitorCreateForm(window);
         break;
+      case "SUBMIT_SMARTWINDOW_PROMPT": {
+        const { prompt, source = "fxms" } = action.data;
+        await lazy.AIWindowUI.submitToSidebar(window, prompt, {
+          submitType: source,
+          aitabSource: source,
+        });
+        break;
+      }
       case "OPEN_PROTECTION_PANEL": {
         let { gProtectionsHandler } = window;
         gProtectionsHandler.showProtectionsPopup({});
@@ -1178,6 +1242,9 @@ export const SpecialMessageActions = {
       case "SET_TERMS_OF_USE_INTERACTED":
         Services.obs.notifyObservers(null, "termsofuse:interacted");
         break;
+      case "ACCEPT_SMARTWINDOW_TOU":
+        Services.obs.notifyObservers(null, "smartwindow-tou-accepted");
+        break;
       case "CREATE_NEW_SELECTABLE_PROFILE":
         this.createAndOpenProfile();
         break;
@@ -1194,7 +1261,7 @@ export const SpecialMessageActions = {
         break;
       }
       case "OPEN_ORGANIZE_TABS_PANEL":
-        lazy.AIWindowUI.toggleGroupTabsPanel(window, {
+        lazy.AutoTabGrouping.toggleGroupTabsPanel(window, {
           source: action.data?.source ?? "message",
         });
         break;

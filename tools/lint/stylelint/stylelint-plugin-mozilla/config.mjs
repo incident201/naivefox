@@ -114,7 +114,7 @@ const BackgroundColor = {
     "--fxview-element-background-hover",
     "--fxviewtabrow-element-background-active",
     "--fxviewtabrow-element-background-hover",
-    "--identity-stroke-color",
+    "--identity-color",
     "--identity-tab-color",
     "--lwt-accent-color",
     "--newtab-background-card",
@@ -323,6 +323,7 @@ const BorderStyle = {
     "none",
     "hidden",
   ],
+  allowedTokens: ["--default-focusring"],
 };
 
 /** @type {PropertyTypeConfig} */
@@ -421,6 +422,11 @@ const Size = {
   allowFunctions: ["max"],
   tokenTypes: ["size", "icon-size"],
   allowUnits: true,
+  allowedTokens: [
+    "--downloads-item-height",
+    "--menu-panel-width-wide",
+    "--panel-and-palette-icon-size",
+  ],
   allowedUnits: ["%", "ch", "em", "vh", "vw"],
   customFixes: {
     ...createRawValuesObject(["size", "icon-size"]),
@@ -458,6 +464,36 @@ const Stroke = {
     "outline",
   ],
   customFixes: customColorFixes,
+};
+
+/**
+ * Every property type, keyed by the name the generated docs page uses for it.
+ *
+ * @type {Record<string, PropertyTypeConfig>}
+ */
+export const propertyTypes = {
+  BackgroundColor,
+  BackgroundAttachment,
+  BackgroundImage,
+  BackgroundPosition,
+  BackgroundSize,
+  BackgroundRepeat,
+  BackgroundClip,
+  BoxShadow,
+  Fill,
+  FontSize,
+  FontWeight,
+  BorderColor,
+  BorderStyle,
+  BorderWidth,
+  BorderRadius,
+  FlexBasis,
+  FlexShorthand,
+  Opacity,
+  TextColor,
+  Space,
+  Size,
+  Stroke,
 };
 
 /**

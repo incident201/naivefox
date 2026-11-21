@@ -26,13 +26,35 @@ declare namespace BrowserWindow {
   var RTL_UI: boolean;
 
   function isBlankPageURL(aURL: string): boolean;
+  function isElementVisible(aElement: Element | null): boolean;
   function isInitialPage(url: string | nsIURI): boolean;
   function CreateContainerTabMenu(event: Event): void;
+  function createUserContextMenu(
+    event: Event,
+    options?: {
+      target?: Element | null;
+      isContextMenu?: boolean;
+      isPanelList?: boolean;
+      excludeUserContextId?: number | string | null;
+      showDefaultTab?: boolean;
+      showAddContainer?: boolean;
+      showManageContainers?: boolean;
+      containerSource?: string;
+    }
+  ): void;
+  function showFullScreenViewContextMenuItems(popup: Element): void;
   function UpdatePopupNotificationsVisibility(): void;
   function openPreferences(
     paneID?: string,
     extraArgs?: { urlParams?: Record<string, string> }
   ): Promise<void>;
+  function openTrustedLinkIn(
+    url: string,
+    where: string,
+    params?: Parameters<
+      typeof import("resource:///modules/URILoadingHelper.sys.mjs").URILoadingHelper.openLinkIn
+    >[3]
+  ): void;
 
   // browser-init.js
   var gBrowserInit: {
@@ -49,6 +71,7 @@ declare namespace BrowserWindow {
   // browser-customtitlebar.js
   var CustomTitlebar: {
     readonly enabled: boolean;
+    allowedBy(condition: string, allow: boolean): void;
   };
 
   // browser-sidebar.js
@@ -56,9 +79,18 @@ declare namespace BrowserWindow {
     import("moz-src:///browser/components/sidebar/SidebarState.sys.mjs").SidebarStateProps;
 
   var SidebarController: {
+    readonly _positionStart: boolean;
     getUIState(): SidebarStateProps;
     markSessionRestoreStateReceived(): void;
     updateUIState(state?: SidebarStateProps): Promise<void>;
+  };
+
+  // browser-sync.js
+  var gSync: {
+    updateTabContextMenu(
+      aPopupMenu: XULPopupElement,
+      aTargetTab: MozTabbrowserTab
+    ): void;
   };
 
   // browser-webrtc.js
@@ -67,6 +99,8 @@ declare namespace BrowserWindow {
   };
 
   // browser.js
+  var gNavToolbox: XULElement;
+
   const DynamicShortcutTooltip: {
     nodeToTooltipMap: Record<string, string>;
     cache: Map<string, string>;
@@ -84,5 +118,54 @@ declare namespace BrowserWindow {
 
   var FirefoxViewHandler: {
     tab: MozTabbrowserTab | null;
+    openTab(section?: string): void;
   };
+
+  // customizableui/content/panelUI.js
+  var PanelUI: {
+    showSubView(
+      aViewId: string,
+      aAnchor: Element,
+      aEvent?: Event
+    ): Promise<void>;
+    _ensureShortcutsShown(view?: Element): void;
+  };
+
+  var XULBrowserWindow: {
+    status: string;
+    defaultStatus: string;
+    overLink: string;
+    busyUI: boolean;
+  };
+
+  type MousePosListener = {
+    getMouseTargetRect(): {
+      top: number;
+      bottom: number;
+      left: number;
+      right: number;
+    };
+    onMouseEnter?(): void;
+    onMouseLeave?(): void;
+  };
+
+  var MousePosTracker: {
+    addListener(listener: MousePosListener): void;
+    removeListener(listener: MousePosListener): void;
+  };
+
+  // tabbrowser/content/all-tabs-menu.mjs
+  var gTabsPanel: typeof import("chrome://browser/content/tabbrowser/all-tabs-menu.mjs").gTabsPanel;
+
+  // tabbrowser/content/browser-ctrlTab.mjs
+  var ctrlTab: typeof import("chrome://browser/content/tabbrowser/browser-ctrlTab.mjs").ctrlTab;
+
+  // tabbrowser/content/status-panel.mjs
+  var StatusPanel: typeof import("chrome://browser/content/tabbrowser/status-panel.mjs").StatusPanel;
+
+  // tabbrowser/content/tab-bar-visibility.mjs
+  var TabBarVisibility: typeof import("chrome://browser/content/tabbrowser/tab-bar-visibility.mjs").TabBarVisibility;
+
+  // tabbrowser/content/tab-context-menu.mjs
+  var TabContextMenu: typeof import("chrome://browser/content/tabbrowser/tab-context-menu.mjs").TabContextMenu;
 }

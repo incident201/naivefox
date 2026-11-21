@@ -164,6 +164,41 @@ export class MarionetteCommandsChild extends JSWindowActorChild {
     );
   }
 
+  /**
+   * Wait until this top-level document's current layout has been painted and
+   * composited, so that a compositor readback doesn't capture a stale frame.
+   * Modeled on MarionetteReftestChild's paintComplete.
+   */
+  async #waitForPaintedViewport() {
+    const win = this.contentWindow;
+    const windowUtils = win.windowUtils;
+
+    // Paint the current layout and wait for the compositor to process it.
+    windowUtils.updateLayerTree();
+
+    // Then wait for that paint to be composited.
+    if (windowUtils.isMozAfterPaintPending) {
+      const transactionId = windowUtils.lastTransactionId;
+      await new Promise(resolve => {
+        const listener = event => {
+          if (
+            event.transactionId >= transactionId ||
+            !windowUtils.isMozAfterPaintPending
+          ) {
+            win.windowRoot.removeEventListener("MozAfterPaint", listener);
+            resolve();
+          }
+        };
+        win.windowRoot.addEventListener("MozAfterPaint", listener);
+      });
+    }
+
+    // Resolve at the start of the next frame in case of leftover paints.
+    await new Promise(resolve =>
+      win.requestAnimationFrame(() => win.requestAnimationFrame(resolve))
+    );
+  }
+
   // eslint-disable-next-line complexity
   async receiveMessage(msg) {
     if (!this.contentWindow) {
@@ -196,6 +231,9 @@ export class MarionetteCommandsChild extends JSWindowActorChild {
         case "MarionetteCommandsParent:_getInViewCentrePoint":
           result = this.#getInViewCentrePoint(data);
           break;
+        case "MarionetteCommandsParent:_waitForPaintedViewport":
+          await this.#waitForPaintedViewport();
+          break;
         case "MarionetteCommandsParent:_finalizeAction":
           await this.#finalizeAction();
           break;
@@ -213,9 +251,6 @@ export class MarionetteCommandsChild extends JSWindowActorChild {
         case "MarionetteCommandsParent:executeScript":
           result = await this.executeScript(data);
           waitForNextTick = true;
-          break;
-        case "MarionetteCommandsParent:findElement":
-          result = await this.findElement(data);
           break;
         case "MarionetteCommandsParent:findElements":
           result = await this.findElements(data);
@@ -359,25 +394,6 @@ export class MarionetteCommandsChild extends JSWindowActorChild {
   }
 
   /**
-   * Find an element in the current browsing context's document using the
-   * given search strategy.
-   *
-   * @param {object=} options
-   * @param {string} options.strategy
-   * @param {string} options.selector
-   * @param {object} options.opts
-   * @param {Element} options.opts.startNode
-   */
-  async findElement(options = {}) {
-    const { strategy, selector, opts } = options;
-
-    opts.all = false;
-
-    const container = { frame: this.document.defaultView };
-    return lazy.dom.find(container, strategy, selector, opts);
-  }
-
-  /**
    * Find elements in the current browsing context's document using the
    * given search strategy.
    *
@@ -389,8 +405,6 @@ export class MarionetteCommandsChild extends JSWindowActorChild {
    */
   async findElements(options = {}) {
     const { strategy, selector, opts } = options;
-
-    opts.all = true;
 
     const container = { frame: this.document.defaultView };
     return lazy.dom.find(container, strategy, selector, opts);

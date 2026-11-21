@@ -28,7 +28,10 @@ static mozilla::LazyLogModule sApzInpLog("apz.inputqueue");
 namespace mozilla {
 namespace layers {
 
-InputQueue::InputQueue() = default;
+InputQueue::InputQueue(
+    TouchSwipableDirectionsCallback&& aTouchSwipableDirectionsCallback)
+    : mTouchSwipableDirectionsCallback(
+          std::move(aTouchSwipableDirectionsCallback)) {}
 
 InputQueue::~InputQueue() { mQueuedInputs.Clear(); }
 
@@ -238,6 +241,69 @@ APZEventResult InputQueue::ReceiveTouchInput(
       result.SetStatusForTouchEvent(*block, aFlags, consumableFlags, target);
     }
   }
+
+  if (aEvent.mMayTriggerSwipe) {
+    switch (aEvent.mType) {
+      case MultiTouchInput::MULTITOUCH_START:
+        // Do not wait for a browser gesture response on touchstart. The widget
+        // only records the swipable directions here; it needs a move outside
+        // slop to decide whether to start a swipe and send a response. Moves
+        // within slop are suppressed, and ending or cancelling a touch before
+        // that decision does not send a response either. Waiting on touchstart
+        // would therefore leave a tap or stationary press queued indefinitely.
+        // APZ must also process touchstart to begin tap/long-press recognition.
+
+        // MaybeRequestContentResponse() above has already set the content
+        // response if the target is confirmed, so on touchstart
+        // HasContentResponded() matches IsTargetConfirmed().
+        if (!block->HasTouchSwipeInfo()) {
+          result.mSwipableDirectionsForTouch = Nothing();
+          block->SetTouchSwipableDirectionsCallback(
+              mTouchSwipableDirectionsCallback);
+          break;
+        }
+
+        result.mSwipableDirectionsForTouch =
+            Some(block->GetSwipableDirections(target));
+        break;
+      case MultiTouchInput::MULTITOUCH_MOVE:
+        // Wait for a browser gesture response before ProcessQueue() so that
+        // APZ cannot pan before widget decides if it triggers swipe. Moves
+        // whose status is set as eConsumeNoDefault never reach the widget
+        // and they get no response, so they must not wait. Note that the
+        // widget clears mMayTriggerSwipe after the first swipe decision, so
+        // later moves, which don't set browser gesture response, do not
+        // wait. (This is separate from the widget waiting below.)
+        if (result.GetStatus() != nsEventStatus_eConsumeNoDefault) {
+          // If APZ is waiting for a content response but no notification is
+          // pending for the widget, APZ has started a new wait on this
+          // touchmove (e.g. the first touchmove out of slop with a fast-path
+          // APZ-aware listener). Content may prevent this touchmove, so APZ and
+          // the widget have to wait for that.
+          // If a notification is pending, i.e. an earlier wait such as the one
+          // started on touchstart has not finished, we do not need to start
+          // another wait, because content sends only one response whether it
+          // prevents the touchstart or the first touchmove (it holds its
+          // response until the first touchmove when a touchstart is not
+          // prevented). So starting another wait would make the widget wait
+          // for a second notification that never comes.
+          const bool isAPZWaitingForContentResponse =
+              !block->HasContentResponded() &&
+              !block->IsContentResponseTimerExpired();
+          if (isAPZWaitingForContentResponse &&
+              !block->HasTouchSwipableDirectionsCallback()) {
+            result.mSwipableDirectionsForTouch = Nothing();
+            block->SetTouchSwipableDirectionsCallback(
+                mTouchSwipableDirectionsCallback);
+          }
+          block->SetNeedsToWaitForBrowserGestureResponse(true);
+        }
+        break;
+      default:
+        break;
+    }
+  }
+
   mQueuedInputs.AppendElement(std::make_unique<QueuedInput>(aEvent, *block));
   ProcessQueue();
 
@@ -579,6 +645,10 @@ APZEventResult InputQueue::ReceivePanGestureInput(
     terminator.mLocalPanDisplacement = ParentLayerPoint{};
     mQueuedInputs.AppendElement(
         std::make_unique<QueuedInput>(terminator, *block));
+    // The gesture is over, so momentum events that follow belong to the
+    // interrupted gesture and should be discarded rather than added to this
+    // block.
+    mActivePanGestureBlock = nullptr;
   }
   ProcessQueue();
 
@@ -1046,13 +1116,12 @@ void InputQueue::SetAllowedTouchBehavior(
 
 void InputQueue::SetBrowserGestureResponse(uint64_t aInputBlockId,
                                            BrowserGestureResponse aResponse) {
-  InputBlockState* inputBlock = FindBlockForId(aInputBlockId, nullptr);
-
-  if (inputBlock && inputBlock->AsPanGestureBlock()) {
-    PanGestureBlockState* block = inputBlock->AsPanGestureBlock();
-    block->SetBrowserGestureResponse(aResponse);
-  } else if (inputBlock) {
-    NS_WARNING("input block is not a pan gesture block");
+  if (auto* inputBlock = FindBlockForId(aInputBlockId, nullptr)) {
+    if (auto* block = inputBlock->AsBrowserGesturableBlock()) {
+      block->SetBrowserGestureResponse(aResponse);
+    } else {
+      NS_WARNING("input block should be browser gesturable here");
+    }
   }
   ProcessQueue();
 }
@@ -1100,9 +1169,11 @@ bool InputQueue::ProcessQueue() {
         if (curBlock->AsTouchBlock()) {
           // touch
           additionalLog.AppendPrintf(
-              "waiting-long-tap-result: %d allowed-touch-behaviors: %d",
+              "waiting-long-tap-result: %d allowed-touch-behaviors: %d "
+              "waiting-browser-gesture-response: %d",
               curBlock->AsTouchBlock()->IsWaitingLongTapResult(),
-              curBlock->AsTouchBlock()->HasAllowedTouchBehaviors());
+              curBlock->AsTouchBlock()->HasAllowedTouchBehaviors(),
+              curBlock->AsTouchBlock()->IsWaitingForBrowserGestureResponse());
         } else if (curBlock->AsPanGestureBlock()) {
           // pan gesture
           additionalLog.AppendPrintf(
@@ -1165,6 +1236,10 @@ bool InputQueue::ProcessQueue() {
       if (mLastActiveApzc && mLastActiveApzc != target &&
           mTouchCounter.GetActiveTouchCount() > 0) {
         mLastActiveApzc->ResetTouchInputState();
+      }
+      if (TouchBlockState* touchBlock = curBlock->AsTouchBlock()) {
+        touchBlock->UpdateTouchCounter(
+            mQueuedInputs[0]->Input()->AsMultiTouchInput());
       }
       if (curBlock->ShouldDropEvents()) {
         if (curBlock->AsTouchBlock()) {

@@ -423,7 +423,7 @@ XPCOMUtils.defineLazyServiceGetters(lazy, {
 
 ChromeUtils.defineESModuleGetters(lazy, {
   LanguageDetector:
-    "resource://gre/modules/translations/LanguageDetector.sys.mjs",
+    "moz-src:///toolkit/components/translations/LanguageDetector.sys.mjs",
   RemoteSettings: "resource://services-settings/remote-settings.sys.mjs",
   setTimeout: "resource://gre/modules/Timer.sys.mjs",
   TranslationsFeature:
@@ -438,7 +438,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
 ChromeUtils.defineLazyGetter(lazy, "console", () => {
   return console.createInstance({
     maxLogLevelPref: "browser.translations.logLevel",
-    prefix: "Translations",
+    logModule: "Translations",
   });
 });
 
@@ -1457,6 +1457,14 @@ export class TranslationsParent extends JSWindowActorParent {
   static #translationModelRecords = null;
 
   /**
+   * The records from #translationModelRecords, grouped by their exact source
+   * language tag and then by their exact target language tag.
+   *
+   * @type {WeakMap<Map<string, TranslationModelRecord>, Map<string, Map<string, TranslationModelRecord[]>>>}
+   */
+  static #translationModelRecordsByLanguage = new WeakMap();
+
+  /**
    * The RemoteSettingsClient that downloads the translation models.
    *
    * @type {RemoteSettingsClient | null}
@@ -2231,12 +2239,12 @@ export class TranslationsParent extends JSWindowActorParent {
   /**
    * Restrict full-page translation offers to only top-level pages with supported schemes.
    *
-   * @param {object} gBrowser
+   * @param {MozBrowser} browser
    * @returns {boolean}
    */
-  static isFullPageTranslationsRestrictedForPage(gBrowser) {
-    const contentType = gBrowser.selectedBrowser.documentContentType;
-    const scheme = gBrowser.currentURI.scheme;
+  static isFullPageTranslationsRestrictedForPage(browser) {
+    const contentType = browser.documentContentType;
+    const scheme = browser.currentURI.scheme;
 
     if (contentType === "application/pdf") {
       return true;
@@ -4159,6 +4167,41 @@ export class TranslationsParent extends JSWindowActorParent {
   }
 
   /**
+   * Groups the records by their exact source and target language tags, so that
+   * language matching only needs to run once per distinct tag. The result is
+   * cached for the lifetime of the records map.
+   *
+   * @param {Map<string, TranslationModelRecord>} records
+   * @returns {Map<string, Map<string, TranslationModelRecord[]>>}
+   */
+  static #getTranslationModelRecordsByLanguage(records) {
+    let bySource =
+      TranslationsParent.#translationModelRecordsByLanguage.get(records);
+    if (bySource) {
+      return bySource;
+    }
+    bySource = new Map();
+    for (const record of records.values()) {
+      let byTarget = bySource.get(record.sourceLanguage);
+      if (!byTarget) {
+        byTarget = new Map();
+        bySource.set(record.sourceLanguage, byTarget);
+      }
+      let pairRecords = byTarget.get(record.targetLanguage);
+      if (!pairRecords) {
+        pairRecords = [];
+        byTarget.set(record.targetLanguage, pairRecords);
+      }
+      pairRecords.push(record);
+    }
+    TranslationsParent.#translationModelRecordsByLanguage.set(
+      records,
+      bySource
+    );
+    return bySource;
+  }
+
+  /**
    * Get the necessary files for translating between two given languages.
    * This may require the files for a pivot language translation
    * if there is no language model for a direct translation.
@@ -4179,6 +4222,8 @@ export class TranslationsParent extends JSWindowActorParent {
     includePivotRecords
   ) {
     const records = await TranslationsParent.#getTranslationModelRecords();
+    const recordsByLanguage =
+      TranslationsParent.#getTranslationModelRecordsByLanguage(records);
 
     let matchedRecords = new Set();
 
@@ -4189,19 +4234,27 @@ export class TranslationsParent extends JSWindowActorParent {
 
     const addLanguagePair = (sourceLanguage, targetLanguage) => {
       let matchFound = false;
-      for (const record of records.values()) {
+      for (const [recordSourceLanguage, byTarget] of recordsByLanguage) {
         if (
-          lazy.TranslationsUtils.langTagsMatch(
-            record.sourceLanguage,
+          !lazy.TranslationsUtils.langTagsMatch(
+            recordSourceLanguage,
             sourceLanguage
-          ) &&
-          lazy.TranslationsUtils.langTagsMatch(
-            record.targetLanguage,
-            targetLanguage
           )
         ) {
-          matchedRecords.add(record);
-          matchFound = true;
+          continue;
+        }
+        for (const [recordTargetLanguage, pairRecords] of byTarget) {
+          if (
+            lazy.TranslationsUtils.langTagsMatch(
+              recordTargetLanguage,
+              targetLanguage
+            )
+          ) {
+            for (const record of pairRecords) {
+              matchedRecords.add(record);
+            }
+            matchFound = true;
+          }
         }
       }
       return matchFound;
@@ -4603,7 +4656,10 @@ export class TranslationsParent extends JSWindowActorParent {
     }
 
     const browser = this.#getBrowserFromContext();
-    if (!browser) {
+    if (
+      !browser ||
+      TranslationsParent.isFullPageTranslationsRestrictedForPage(browser)
+    ) {
       return;
     }
 
@@ -5078,10 +5134,18 @@ export class TranslationsParent extends JSWindowActorParent {
   /**
    * Returns the language tags used to decide whether full-page translation should be offered.
    *
-   * @returns {Promise<LangTags | null>} - Returns null if the actor was destroyed before
-   *   the result could be resolved.
+   * @returns {Promise<LangTags | null>} - Returns null for restricted pages or if the
+   *   actor was destroyed before the result could be resolved.
    */
   async getLangTags() {
+    const browser = this.#getBrowserFromContext();
+    if (
+      !browser ||
+      TranslationsParent.isFullPageTranslationsRestrictedForPage(browser)
+    ) {
+      return null;
+    }
+
     if (this.languageState.detectedLanguages) {
       return this.languageState.detectedLanguages;
     }
@@ -5095,7 +5159,11 @@ export class TranslationsParent extends JSWindowActorParent {
 
     try {
       const langTags = await langTagsPromise;
-      if (this.#isDestroyed || !langTags) {
+      if (
+        this.#isDestroyed ||
+        !langTags ||
+        TranslationsParent.isFullPageTranslationsRestrictedForPage(browser)
+      ) {
         return null;
       }
       this.languageState.detectedLanguages = langTags;

@@ -226,6 +226,11 @@ internal class FilePicker(
             (prompt is File) || (prompt is Folder)
         }
 
+    private fun getActiveFilePromptRequest(): File? =
+        store.state.findCustomTabOrSelectedTab(sessionId)?.content?.promptRequests?.lastOrNull { prompt ->
+            prompt is File
+        } as? File
+
     /**
      * Notifies the feature that the permissions request was completed. It will then either process or dismiss the
      * prompt request.
@@ -235,9 +240,19 @@ internal class FilePicker(
      * @see [onNeedToRequestPermissions].
      */
     override fun onPermissionsResult(permissions: Array<String>, grantResults: IntArray) {
+        val request = (currentRequest as? File) ?: getActiveFilePromptRequest()
+
+        if (request == null) {
+            logger.warn("Permission result received without an active file request")
+            dismissRequest()
+            return
+        }
+
+        currentRequest = request
+
         if (grantResults.isNotEmpty() && grantResults.any { it == PERMISSION_GRANTED }) {
             // at least one permission was granted
-            onPermissionsGranted(currentRequest as File)
+            onPermissionsGranted(request)
             currentRequest = null
         } else {
             // all permissions were denied, either when requested or already permanently denied
@@ -321,9 +336,10 @@ internal class FilePicker(
         }
     }
 
-    private fun dismissRequest() {
+    @VisibleForTesting
+    internal fun dismissRequest() {
+        currentRequest = null
         store.consumePromptFrom<File>(sessionId) { request ->
-            currentRequest = null
             request.onDismiss()
         }
     }
@@ -338,9 +354,7 @@ internal class FilePicker(
                 if (sanitizedUris.isEmpty()) {
                     request.onDismiss()
                 } else {
-                    sanitizedUris.map {
-                        enqueueForCleanup(container.context, it)
-                    }
+                    sanitizedUris.forEach(::enqueueForCleanup)
                     request.onMultipleFilesSelected(container.context, sanitizedUris)
                 }
             }
@@ -349,7 +363,7 @@ internal class FilePicker(
             uri?.let {
                 // We want to verify that we are not exposing any private data
                 if (!it.isUnderPrivateAppDirectory(container.context)) {
-                    enqueueForCleanup(container.context, it)
+                    enqueueForCleanup(it)
                     request.onSingleFileSelected(container.context, it)
                 } else {
                     request.onDismiss()
@@ -382,8 +396,8 @@ internal class FilePicker(
         onNeedToRequestPermissions(permissions.toTypedArray())
     }
 
-    private fun enqueueForCleanup(context: Context, uri: Uri) {
-        val contentResolver = context.contentResolver
+    private fun enqueueForCleanup(uri: Uri) {
+        val contentResolver = container.context.contentResolver
         val fileName = uri.getFileName(contentResolver)
         fileUploadsDirCleaner.enqueueForCleanup(fileName)
     }

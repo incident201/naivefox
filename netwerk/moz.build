@@ -25,7 +25,7 @@ if CONFIG["MOZ_NAIVEFOX"]:
     DIRS += ["naivefox"]
 
 if CONFIG["MOZ_SCTP"]:
-    DIRS += ["sctp/src", "sctp/datachannel"]
+    DIRS += ["sctp/datachannel"]
 
 if CONFIG["NECKO_WIFI"]:
     DIRS += ["wifi"]

@@ -9,7 +9,10 @@ package org.mozilla.fenix.ui.robots
 import android.content.Intent
 import android.util.Log
 import androidx.compose.ui.test.junit4.ComposeTestRule
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
 import androidx.core.net.toUri
+import androidx.preference.R as preferenceR
 import androidx.recyclerview.widget.RecyclerView
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.action.ViewActions
@@ -41,6 +44,7 @@ import org.hamcrest.CoreMatchers
 import org.hamcrest.CoreMatchers.endsWith
 import org.hamcrest.Matchers.allOf
 import org.mozilla.fenix.R
+import org.mozilla.fenix.ext.components
 import org.mozilla.fenix.helpers.AppAndSystemHelper.forceCloseApp
 import org.mozilla.fenix.helpers.AppAndSystemHelper.isPackageInstalled
 import org.mozilla.fenix.helpers.Constants.LISTS_MAXSWIPES
@@ -53,6 +57,7 @@ import org.mozilla.fenix.helpers.MatcherHelper.itemContainingText
 import org.mozilla.fenix.helpers.MatcherHelper.itemWithText
 import org.mozilla.fenix.helpers.TestAssetHelper.waitingTime
 import org.mozilla.fenix.helpers.TestAssetHelper.waitingTimeShort
+import org.mozilla.fenix.helpers.TestHelper.appContext
 import org.mozilla.fenix.helpers.TestHelper.appName
 import org.mozilla.fenix.helpers.TestHelper.hasCousin
 import org.mozilla.fenix.helpers.TestHelper.mDevice
@@ -61,6 +66,7 @@ import org.mozilla.fenix.helpers.TestHelper.scrollToElementByText
 import org.mozilla.fenix.helpers.click
 import org.mozilla.fenix.helpers.ext.waitNotNull
 import org.mozilla.fenix.settings.SupportUtils
+import org.mozilla.fenix.settings.account.AccountSettingsTestTag
 
 /** Implementation of Robot Pattern for the settings menu. */
 class SettingsRobot {
@@ -190,7 +196,7 @@ class SettingsRobot {
             TAG,
             "verifyEnhancedTrackingProtectionButton: Trying to verify that the \"Enhanced Tracking Protection\" button is visible",
         )
-        onView(withId(R.id.recycler_view))
+        onView(withId(preferenceR.id.recycler_view))
             .perform(
                 RecyclerViewActions.scrollTo<RecyclerView.ViewHolder>(
                     hasDescendant(withText("Enhanced Tracking Protection"))
@@ -276,7 +282,7 @@ class SettingsRobot {
 
     fun verifyOpenLinksInAppsButton() {
         Log.i(TAG, "verifyOpenLinksInAppsButton: Trying to perform scroll to the \"Open links in apps\" button")
-        onView(withId(R.id.recycler_view))
+        onView(withId(preferenceR.id.recycler_view))
             .perform(
                 RecyclerViewActions.scrollTo<RecyclerView.ViewHolder>(
                     hasDescendant(withText(R.string.preferences_open_links_in_apps))
@@ -300,7 +306,7 @@ class SettingsRobot {
 
         val extensions = getStringResource(R.string.preferences_extensions)
         Log.i(TAG, "verifySettingsView: Trying to perform scroll to the \"$extensions\" button")
-        onView(withId(R.id.recycler_view))
+        onView(withId(preferenceR.id.recycler_view))
             .perform(
                 RecyclerViewActions.scrollTo<RecyclerView.ViewHolder>(
                     hasDescendant(withText(R.string.preferences_extensions))
@@ -347,7 +353,7 @@ class SettingsRobot {
     fun verifyAdvancedHeading() {
         val extensions = getStringResource(R.string.preferences_extensions)
         Log.i(TAG, "verifyAdvancedHeading: Trying to perform scroll to the \"$extensions\" button")
-        onView(withId(R.id.recycler_view))
+        onView(withId(preferenceR.id.recycler_view))
             .perform(
                 RecyclerViewActions.scrollTo<RecyclerView.ViewHolder>(
                     hasDescendant(withText(R.string.preferences_extensions))
@@ -362,7 +368,7 @@ class SettingsRobot {
     fun verifyAddons() {
         val extensions = getStringResource(R.string.preferences_extensions)
         Log.i(TAG, "verifyAddons: Trying to perform scroll to the \"$extensions\" button")
-        onView(withId(R.id.recycler_view))
+        onView(withId(preferenceR.id.recycler_view))
             .perform(
                 RecyclerViewActions.scrollTo<RecyclerView.ViewHolder>(
                     hasDescendant(withText(R.string.preferences_extensions))
@@ -383,7 +389,7 @@ class SettingsRobot {
     }
 
     fun verifyLeakCanaryToggle(enabled: Boolean) {
-        onView(withId(R.id.recycler_view))
+        onView(withId(preferenceR.id.recycler_view))
             .perform(
                 RecyclerViewActions.scrollTo<RecyclerView.ViewHolder>(
                     hasDescendant(withText(R.string.preference_leakcanary))
@@ -409,7 +415,7 @@ class SettingsRobot {
     }
 
     fun verifyRemoteDebuggingToggle(enabled: Boolean) {
-        onView(withId(R.id.recycler_view))
+        onView(withId(preferenceR.id.recycler_view))
             .perform(
                 RecyclerViewActions.scrollTo<RecyclerView.ViewHolder>(
                     hasDescendant(withText(R.string.preferences_remote_debugging))
@@ -677,7 +683,7 @@ class SettingsRobot {
         ): SettingsSubMenuLanguageRobot.Transition {
             Log.i(TAG, "openLanguageSubMenu: Trying to click the $localizedText button")
             mDevice.waitForIdle()
-            onView(withId(R.id.recycler_view))
+            onView(withId(preferenceR.id.recycler_view))
                 .perform(
                     RecyclerViewActions.actionOnItem<RecyclerView.ViewHolder>(
                         hasDescendant(withText(localizedText)),
@@ -733,9 +739,16 @@ class SettingsRobot {
             composeTestRule: ComposeTestRule,
             interact: SettingsSignInToSyncRobot.() -> Unit,
         ): SettingsSignInToSyncRobot.Transition {
-            Log.i(TAG, "openTurnOnSyncMenu: Trying to click the \"Sync and save your data\" button")
-            onView(withText("Sign in")).click()
-            Log.i(TAG, "openTurnOnSyncMenu: Clicked the \"Sync and save your data\" button")
+            // The legacy "Sign in" branch can be removed once accountSettingsNewUi is enabled by default.
+            if (appContext.components.settings.accountSettingsNewUi) {
+                Log.i(TAG, "openTurnOnSyncMenu: Trying to click the \"Sign in\" promo card")
+                composeTestRule.onNodeWithTag(AccountSettingsTestTag.SIGN_IN_PROMO_CARD).performClick()
+                Log.i(TAG, "openTurnOnSyncMenu: Clicked the \"Sign in\" promo card")
+            } else {
+                Log.i(TAG, "openTurnOnSyncMenu: Trying to click the \"Sync and save your data\" button")
+                onView(withText("Sign in")).click()
+                Log.i(TAG, "openTurnOnSyncMenu: Clicked the \"Sync and save your data\" button")
+            }
 
             SettingsSignInToSyncRobot().interact()
             return SettingsSignInToSyncRobot.Transition(composeTestRule)
@@ -870,6 +883,7 @@ class SettingsRobot {
             composeTestRule: ComposeTestRule,
             interact: SettingsSubMenuPageSummariesRobot.() -> Unit,
         ): SettingsSubMenuPageSummariesRobot.Transition {
+            scrollToElementByText(getStringResource(R.string.preferences_page_summaries))
             assertUIObjectExists(itemContainingText(getStringResource(R.string.preferences_page_summaries)))
             Log.i(TAG, "openPageSummariesSubMenu: Trying to click the \"Page summaries\" button")
             itemContainingText(getStringResource(R.string.preferences_page_summaries)).click()
@@ -923,7 +937,7 @@ private fun aboutFirefoxHeading(): UiObject {
     return itemContainingText("About $appName")
 }
 
-fun swipeToBottom() = onView(withId(R.id.recycler_view)).perform(ViewActions.swipeUp())
+fun swipeToBottom() = onView(withId(preferenceR.id.recycler_view)).perform(ViewActions.swipeUp())
 
 fun clickRateButtonGooglePlay() {
     rateOnGooglePlayHeading().click()

@@ -518,15 +518,19 @@ add_task(
 );
 
 /*
- * Tests that the user account is marked as premium when hasUpgraded is true,
- * bandwithUsage is unset, or isDefaultBrowser is true
+ * Tests that the user account is marked as premium when hasUpgraded is true or isDefaultBrowser is true
  */
 add_task(async function test_user_set_to_premium() {
-  let { locationsList } = await openLocationsList({
-    hasUpgraded: true,
-    bandwidthUsage: { used: 100, max: 1000 },
-    isDefaultBrowser: false,
-  });
+  let sandbox = sinon.createSandbox();
+  const { ShellService } = ChromeUtils.importESModule(
+    "moz-src:///browser/components/shell/ShellService.sys.mjs"
+  );
+  let isDefaultBrowserStub = sandbox
+    .stub(ShellService, "isDefaultBrowserAsync")
+    .resolves(false);
+
+  setupService({ isReady: true, hasUpgraded: true });
+  let { locationsList } = await openLocationsList({ hasUpgraded: true });
 
   Assert.ok(
     locationsList.premium,
@@ -536,25 +540,9 @@ add_task(async function test_user_set_to_premium() {
   await closePanel();
   cleanupService();
 
-  ({ locationsList } = await openLocationsList({
-    hasUpgraded: false,
-    bandwidthUsage: null,
-    isDefaultBrowser: false,
-  }));
-
-  Assert.ok(
-    locationsList.premium,
-    "user should be premium when bandwidthUsage is unset"
-  );
-
-  await closePanel();
-  cleanupService();
-
-  ({ locationsList } = await openLocationsList({
-    hasUpgraded: false,
-    bandwidthUsage: { used: 100, max: 1000 },
-    isDefaultBrowser: true,
-  }));
+  isDefaultBrowserStub.resolves(true);
+  setupService({ isReady: true, hasUpgraded: false });
+  ({ locationsList } = await openLocationsList({ hasUpgraded: false }));
 
   Assert.ok(
     locationsList.premium,
@@ -563,13 +551,23 @@ add_task(async function test_user_set_to_premium() {
 
   await closePanel();
   cleanupService();
+  sandbox.restore();
 });
 
 /**
  * Tests that moz-promo is shown when not upgraded
  */
 add_task(async function test_promo_shown_when_not_upgraded() {
+  let sandbox = sinon.createSandbox();
+  sandbox
+    .stub(IPProtection.getPanel(window), "isDefaultBrowser")
+    .resolves(true);
   let { locationsEl } = await openLocationsList({ hasUpgraded: false });
+
+  Assert.ok(
+    !locationsEl.querySelector("#locations-subview-set-default-promo"),
+    "set default promo should not be present when Firefox is the default"
+  );
 
   let promo = locationsEl.querySelector("moz-promo#locations-subview-promo");
   Assert.ok(promo, "moz-promo should be present when user has not upgraded");
@@ -585,12 +583,79 @@ add_task(async function test_promo_shown_when_not_upgraded() {
 
   let button = promo.querySelector("moz-button");
   Assert.ok(button, "promo should have an actions button");
-  let openWebLinkInStub = sinon.stub(window, "openWebLinkIn");
+  let openWebLinkInStub = sandbox.stub(window, "openWebLinkIn");
+  let panelHiddenPromise = waitForPanelEvent(document, "popuphidden");
   button.click();
+  await panelHiddenPromise;
   Assert.ok(
     openWebLinkInStub.calledOnce,
     "openWebLinkIn should be called once"
   );
+  sandbox.restore();
+  cleanupService();
+});
+
+/**
+ * Tests that the set default promo is shown instead of the Mozilla VPN promo
+ * when Firefox is not the default browser, and that its button sets Firefox
+ * as the default browser.
+ */
+add_task(async function test_set_default_promo_shown_when_not_default() {
+  let sandbox = sinon.createSandbox();
+  let panel = IPProtection.getPanel(window);
+  let isDefaultStub = sandbox.stub(panel, "isDefaultBrowser").resolves(false);
+  let setDefaultStub = sandbox
+    .stub(SpecialMessageActions, "setDefaultBrowser")
+    .resolves();
+  let { locationsEl } = await openLocationsList({ hasUpgraded: false });
+
+  Assert.ok(
+    !locationsEl.querySelector("#locations-subview-promo"),
+    "Mozilla VPN promo should not be present when Firefox is not the default"
+  );
+  let promo = locationsEl.querySelector(
+    "moz-promo#locations-subview-set-default-promo"
+  );
+  Assert.ok(promo, "set default promo should be present");
+  Assert.equal(
+    promo.getAttribute("imagesrc"),
+    "chrome://browser/content/ipprotection/assets/location-pin.svg",
+    "set default promo should show the location pin image"
+  );
+
+  isDefaultStub.resolves(true);
+  let button = promo.querySelector("moz-button");
+  let panelHiddenPromise = waitForPanelEvent(document, "popuphidden");
+  button.click();
+  await panelHiddenPromise;
+
+  Assert.ok(
+    setDefaultStub.calledOnceWith(window),
+    "SpecialMessageActions.setDefaultBrowser should be called with the window"
+  );
+  Assert.ok(panel.state.isDefaultBrowser, "isDefaultBrowser should be updated");
+
+  sandbox.restore();
+  cleanupService();
+});
+
+/**
+ * Tests that the set default promo is not shown when the user has upgraded.
+ */
+add_task(async function test_set_default_promo_not_shown_when_upgraded() {
+  let sandbox = sinon.createSandbox();
+  sandbox
+    .stub(IPProtection.getPanel(window), "isDefaultBrowser")
+    .resolves(false);
+  let { locationsEl } = await openLocationsList({ hasUpgraded: true });
+
+  Assert.ok(
+    !locationsEl.querySelector("moz-promo"),
+    "no promo should be present when user has upgraded"
+  );
+
+  sandbox.restore();
+  await closePanel();
   cleanupService();
 });
 

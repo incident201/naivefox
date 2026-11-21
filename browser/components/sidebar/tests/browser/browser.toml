@@ -57,11 +57,15 @@ prefs = [
 
 ["browser_history_sidebar.js"]
 
+["browser_history_sidebar_card_context_menu.js"]
+
 ["browser_history_sidebar_drag_and_drop.js"]
 
 ["browser_history_sidebar_glean.js"]
 
 ["browser_history_sidebar_import_promo.js"]
+
+["browser_history_sidebar_memory_optimizations.js"]
 
 ["browser_launcher_dividers.js"]
 tags = "vertical-tabs"
@@ -82,7 +86,11 @@ tags = "vertical-tabs"
 
 ["browser_opentabs_sidebar.js"]
 
+["browser_places_sidebar.js"]
+
 ["browser_resize_sidebar.js"]
+
+["browser_resource_monitor_telemetry.js"]
 
 ["browser_sidebar_animation.js"]
 

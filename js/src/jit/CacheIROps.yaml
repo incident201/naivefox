@@ -851,7 +851,10 @@
     obj: ObjId
     offset: Int32Id
 
-- name: GuardFunctionHasJitEntry
+# Guards HasJitEntryFlags().
+# In ICs, also guards that nargs <= JIT_ARGS_LENGTH_MAX.
+# When transpiled to MIR, we enforce that elsewhere.
+- name: GuardFunctionHasValidJitEntry
   shared: true
   transpile: true
   cost_estimate: 1
@@ -2297,8 +2300,6 @@
   transpile: true
   cost_estimate: 0
   args:
-    numFixedSlots: UInt32Imm
-    numDynamicSlots: UInt32Imm
     allocKind: AllocKindImm
     thisShape: ShapeField
     site: AllocSiteField
@@ -2329,7 +2330,15 @@
     obj: ObjId
     offset: RawInt32Field
 
-- name: LoadFixedSlotTypedResult
+- name: LoadReservedFixedSlotResult
+  shared: false
+  transpile: true
+  cost_estimate: 1
+  args:
+    obj: ObjId
+    offset: RawInt32Field
+
+- name: LoadReservedFixedSlotTypedResult
   shared: false
   transpile: true
   cost_estimate: 1

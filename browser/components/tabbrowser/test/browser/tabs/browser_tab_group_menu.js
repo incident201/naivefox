@@ -86,6 +86,7 @@ add_task(async function test_tabGroupCreatePanel() {
   };
 
   let group = await openCreatePanel();
+  let swatches = tabgroupPanel.querySelector(".tab-group-editor-swatches");
   Assert.equal(tabgroupPanel.state, "open", "Create panel is visible");
   Assert.ok(tabgroupEditor.createMode, "Group editor is in create mode");
   // Edit panel should be populated with correct group details
@@ -100,7 +101,7 @@ add_task(async function test_tabGroupCreatePanel() {
     "Create panel's input populated with correct name"
   );
   Assert.equal(
-    tabgroupPanel.querySelector("input[name='tab-group-color']:checked").value,
+    swatches.value,
     group.color,
     "Create panel's colorpicker has correct color pre-selected"
   );
@@ -146,16 +147,24 @@ add_task(async function test_tabGroupCreatePanel() {
     "Shopping",
     "Group label changed when input value changed"
   );
+  // moz-visual-picker-item re-dispatches click on its host, which has no
+  // accessible of its own.
+  AccessibilityUtils.setEnv({ mustHaveAccessibleRule: false });
   tabgroupPanel.querySelector("#tab-group-editor-swatch-red").click();
+  AccessibilityUtils.resetEnv();
   Assert.equal(
     group.color,
     "red",
     "Group color changed to red after clicking red swatch"
   );
   Assert.equal(
-    tabgroupPanel.querySelector("input[name='tab-group-color']:checked").value,
+    swatches.value,
     "red",
     "Red swatch radio selected after clicking red swatch"
+  );
+  Assert.ok(
+    tabgroupPanel.querySelector("#tab-group-editor-swatch-red").checked,
+    "Red swatch item is checked after clicking red swatch"
   );
 
   info(
@@ -857,4 +866,33 @@ add_task(async function test_swatchLayout() {
   tabgroupPanel.hidePopup();
   await panelHidden;
   await removeTabGroup(group);
+});
+
+/**
+ * Tests that the color picker is only built once the editor is first opened,
+ * so that opening a window doesn't pay for it.
+ */
+add_task(async function test_swatchesBuiltOnFirstOpen() {
+  let win = await BrowserTestUtils.openNewBrowserWindow();
+  let tabgroupEditor = win.document.getElementById("tab-group-editor");
+  Assert.ok(
+    !tabgroupEditor.querySelector("moz-visual-picker"),
+    "Color picker isn't built when the window opens"
+  );
+
+  let tab = BrowserTestUtils.addTab(win.gBrowser, "about:blank");
+  let panelShown = BrowserTestUtils.waitForPopupEvent(
+    tabgroupEditor.panel,
+    "shown"
+  );
+  win.gBrowser.addTabGroup([tab], {
+    metricsContext: win.gBrowser.TabMetrics.userTriggeredContext(),
+  });
+  await panelShown;
+  Assert.ok(
+    tabgroupEditor.querySelector("moz-visual-picker.tab-group-editor-swatches"),
+    "Color picker is built once the editor opens"
+  );
+
+  await BrowserTestUtils.closeWindow(win);
 });

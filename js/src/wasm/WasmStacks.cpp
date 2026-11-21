@@ -42,6 +42,10 @@
 #include "jit/MacroAssembler-inl.h"
 #include "vm/JSObject-inl.h"
 
+#ifdef JS_HW_SHADOW_STACK
+#  include "util/HardwareShadowStack.h"
+#endif
+
 #ifdef XP_WIN
 // We only need the `windows.h` header, but this file can get unified built
 // with WasmSignalHandlers.cpp, which requires `winternal.h` to be included
@@ -487,6 +491,16 @@ void ContStackSize::compute() {
   headerSize = RoundUp(sizeof(ContStack), pageSize);
   totalSize = topGuardSize + ContStackRedZoneSize + jitStackSize +
               bottomGuardSize + headerSize;
+#  ifdef JS_HW_SHADOW_STACK
+  // Every call pushes a return address onto both stacks, so the hardware shadow
+  // stack never needs to be larger than the native stack.
+  // TODO: We could consider using some smaller fraction of the native stack
+  // size but for now 1:1 is a safe default.
+  // TODO: ContStackAllocator::ensureInitialized should also account for
+  // shadowStackSize when computing how many stacks and arenas fit within
+  // wasm_cont_stack_max_vmem.
+  shadowStackSize = ContStackRedZoneSize + jitStackSize;
+#  endif
 
   // Assert we can't overflow when multiplying our size by capacity. Assume
   // 32-bit integers to be conservative.
@@ -556,6 +570,44 @@ void ContStack::init(ContStackArena* arena, uintptr_t allocationBase,
   // zero initialized and we don't want it all to get committed right away.
 }
 
+bool ContStack::ensureShadowStack() {
+#  ifdef JS_HW_SHADOW_STACK
+  MOZ_ASSERT(isDead());
+  if (!IsShadowStackEnabled()) {
+    return true;
+  }
+  // Unless this stack was last switched away from at its base, its shadow
+  // stack can no longer be switched to at the initial shadow stack pointer. We
+  // simply remap a fresh shadow stack region in that case.
+  // TODO: In the future we could preserve this existing mapping and resuse it
+  // by cleaning up left over entries when we first switch on to it.
+  if (shadowStackAllocationBase_ &&
+      !CanSwitchToShadowStack(initialShadowStackPointer_)) {
+    freeShadowStack();
+  }
+  if (!shadowStackAllocationBase_) {
+    shadowStackAllocationBase_ = reinterpret_cast<uintptr_t>(
+        MapShadowStack(arena_->owner_->stackSize().shadowStackSize,
+                       &initialShadowStackPointer_));
+  }
+  return !!shadowStackAllocationBase_;
+#  else
+  return true;
+#  endif
+}
+
+void ContStack::freeShadowStack() {
+#  ifdef JS_HW_SHADOW_STACK
+  if (!shadowStackAllocationBase_) {
+    return;
+  }
+  UnmapShadowStack(reinterpret_cast<void*>(shadowStackAllocationBase_),
+                   arena_->owner_->stackSize().shadowStackSize);
+  shadowStackAllocationBase_ = 0;
+  initialShadowStackPointer_ = nullptr;
+#  endif
+}
+
 void ContStack::prepare(Handle<ContObject*> continuation,
                         Handle<JSFunction*> target, void* contBaseFrameStub,
                         const Code* creatorCode) {
@@ -565,6 +617,9 @@ void ContStack::prepare(Handle<ContObject*> continuation,
 
   initialResumeTarget_.framePointer = baseFrame();
   initialResumeTarget_.stackPointer = baseFrame();
+#  ifdef JS_HW_SHADOW_STACK
+  initialResumeTarget_.shadowStackPointer = initialShadowStackPointer_;
+#  endif
   initialResumeTarget_.resumePC = contBaseFrameStub;
   initialResumeTarget_.instance = &target->wasmInstance();
   initialResumeTarget_.stack = &target_;
@@ -602,6 +657,10 @@ void ContStack::reset() {
 
   initialResumeTarget_.framePointer = nullptr;
   initialResumeTarget_.stackPointer = nullptr;
+#  ifdef JS_HW_SHADOW_STACK
+  exitShadowStackPointer_ = nullptr;
+  initialResumeTarget_.shadowStackPointer = nullptr;
+#  endif
   initialResumeTarget_.resumePC = nullptr;
   initialResumeTarget_.instance = nullptr;
   initialResumeTarget_.stack = nullptr;
@@ -636,6 +695,9 @@ void ContStack::decommit() {
   void* base = reinterpret_cast<void*>(stackLimitForSystem_);
   size_t length = stackBase_ - stackLimitForSystem_;
   (void)gc::MarkPagesUnusedSoft(base, length);
+  // Eagerly free the shadow stack mapping. When this ContStack is allocated
+  // again, ensureShadowStack will create a fresh mapping.
+  freeShadowStack();
   pageState_ = PageState::Decommitted;
 }
 
@@ -756,6 +818,11 @@ void ContStack::traceSuspended(JSTracer* trc, JSObject* src) {
     }
     ++iter;
   }
+
+  // Keep the initial function's instance alive, as TraceJitFrames does when
+  // crossing the base frame of a running stack.
+  TraceInstanceEdge(trc, baseFrame()->calleeInstance(),
+                    "cont base frame instance");
 }
 
 void ContStack::updateSuspendedForMovingGC(Nursery& nursery) {
@@ -870,6 +937,9 @@ ContStackArena::ContStackArena(ContStackAllocator* owner, void* base)
 ContStackArena::~ContStackArena() {
   MOZ_RELEASE_ASSERT(isEmpty());
   if (base_) {
+    for (uint32_t i = 0; i < capacity(); i++) {
+      stack(i)->freeShadowStack();
+    }
     gc::UnmapPages(base_, owner_->arenaSize());
   }
 }
@@ -909,6 +979,9 @@ UniqueContStack ContStackArena::allocate(Handle<ContObject*> continuation,
     return nullptr;
   }
   uint32_t freeIndex = uint32_t(std::countr_zero(currentFreeMask_));
+  if (!stack(freeIndex)->ensureShadowStack()) {
+    return nullptr;
+  }
   currentFreeMask_ &= ~(uint64_t(1) << freeIndex);
   UniqueContStack result(stack(freeIndex));
   result->prepare(continuation, target, contBaseFrameStub, creatorCode);
@@ -926,6 +999,18 @@ ContStack* ContStackArena::findForAddress(uintptr_t address) const {
   }
   return stack(index);
 }
+
+#  ifdef JS_HW_SHADOW_STACK
+size_t ContStackArena::shadowStackMappedBytes() const {
+  size_t count = 0;
+  for (uint32_t i = 0; i < capacity(); i++) {
+    if (stack(i)->shadowStackAllocationBase_) {
+      count++;
+    }
+  }
+  return count * owner_->stackSize().shadowStackSize;
+}
+#  endif
 
 void ContStackAllocator::ensureInitialized() {
   if (initialized_) {
@@ -1042,9 +1127,12 @@ UniqueContStack ContStackAllocator::allocate(JSContext* cx,
 
   UniqueContStack stack =
       arena->allocate(continuation, target, contBaseFrameStub, creatorCode);
-
-  // This arena should have capacity, so allocation should be infallible.
-  MOZ_ASSERT(stack);
+  // This arena has capacity, but allocation can still fail if we are unable to
+  // map hardware shadow stack memory.
+  if (!stack) {
+    ReportOutOfMemory(cx);
+    return nullptr;
+  }
 
   return stack;
 }
@@ -1089,7 +1177,13 @@ size_t ContStackAllocator::sizeOfNonHeap() const {
   if (!initialized_) {
     return 0;
   }
-  return arenas_.length() * arenaSize();
+  size_t size = arenas_.length() * arenaSize();
+#  ifdef JS_HW_SHADOW_STACK
+  for (const auto& arena : arenas_) {
+    size += arena->shadowStackMappedBytes();
+  }
+#  endif
+  return size;
 }
 
 /* static */
@@ -1284,6 +1378,14 @@ void EmitSwitchStack(MacroAssembler& masm, Register switchTarget,
     masm.Mov(vixl::sp, PseudoStackPointer64);
   }
 #  endif
+
+#  ifdef JS_HW_SHADOW_STACK
+  // Switch SSP to the switch target when shadow stack is enabled.
+  masm.loadPtr(
+      Address(switchTarget, offsetof(wasm::SwitchTarget, shadowStackPointer)),
+      scratch1);
+  masm.switchToShadowStackPtr(scratch1);
+#  endif
   masm.loadPtr(
       Address(switchTarget, offsetof(wasm::SwitchTarget, framePointer)),
       FramePointer);
@@ -1301,6 +1403,11 @@ void EmitClearSwitchTarget(MacroAssembler& masm, Register switchTarget) {
                                                            framePointer)));
   masm.storePtr(ImmWord(0), Address(switchTarget, offsetof(wasm::SwitchTarget,
                                                            stackPointer)));
+#  ifdef JS_HW_SHADOW_STACK
+  masm.storePtr(
+      ImmWord(0),
+      Address(switchTarget, offsetof(wasm::SwitchTarget, shadowStackPointer)));
+#  endif
   masm.storePtr(ImmWord(0),
                 Address(switchTarget, offsetof(wasm::SwitchTarget, resumePC)));
   masm.storePtr(ImmWord(0), Address(switchTarget,
@@ -1438,6 +1545,14 @@ static void EmitBuildSwitchTarget(MacroAssembler& masm,
       Address(FramePointer, -static_cast<int32_t>(switchTargetFramePushed) +
                                 static_cast<int32_t>(offsetof(
                                     wasm::SwitchTarget, stackPointer))));
+#  ifdef JS_HW_SHADOW_STACK
+  masm.moveShadowStackPtrTo(scratch);
+  masm.storePtr(
+      scratch,
+      Address(FramePointer, -static_cast<int32_t>(switchTargetFramePushed) +
+                                static_cast<int32_t>(offsetof(
+                                    wasm::SwitchTarget, shadowStackPointer))));
+#  endif
   masm.storePtr(
       resumePC,
       Address(FramePointer, -static_cast<int32_t>(switchTargetFramePushed) +
@@ -1589,7 +1704,7 @@ void EmitSuspend(jit::MacroAssembler& masm, jit::Register instance,
   MOZ_ASSERT(*suspendFramePushed == masm.framePushed());
 
   masm.wasmTrapInstruction();
-  masm.bind(&resumeLabel);
+  masm.bindIndirectTarget(&resumeLabel, TargetKind::Jump);
   *suspendCodeOffset = *resumeLabel.target();
   masm.addCodeLabel(resumeLabel);
   masm.append(callSiteDesc, *resumeLabel.target());
@@ -2045,7 +2160,7 @@ void EmitResume(MacroAssembler& masm, Register instance, Register cont,
   MOZ_ASSERT(*resumeFramePushed == handlersFramePushed);
 
   for (uint32_t i = 0; i < numHandlers; i++) {
-    masm.bind(&handlerCodeLabels[i]);
+    masm.bindIndirectTarget(&handlerCodeLabels[i], TargetKind::Jump);
     masm.addCodeLabel(handlerCodeLabels[i]);
     // All registers are dead here, except for InstanceReg. Jump to our final
     // handler's label.
@@ -2053,7 +2168,7 @@ void EmitResume(MacroAssembler& masm, Register instance, Register cont,
   }
 
   masm.wasmTrapInstruction();
-  masm.bind(&returnLabel);
+  masm.bindIndirectTarget(&returnLabel, TargetKind::Jump);
   masm.addCodeLabel(returnLabel);
 
   *resumeCodeOffset = *returnLabel.target();

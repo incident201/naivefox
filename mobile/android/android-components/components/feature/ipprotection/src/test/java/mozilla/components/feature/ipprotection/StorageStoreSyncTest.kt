@@ -6,15 +6,15 @@ package mozilla.components.feature.ipprotection
 
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
-import mozilla.components.ExperimentalAndroidComponentsApi
+import mozilla.components.feature.ipprotection.storage.FakeEligibilityStorage
 import mozilla.components.feature.ipprotection.storage.StorageStoreSync
+import mozilla.components.feature.ipprotection.storage.buildStore
 import mozilla.components.feature.ipprotection.store.IPProtectionAction
 import mozilla.components.feature.ipprotection.store.state.EligibilityStatus
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-@OptIn(ExperimentalAndroidComponentsApi::class)
 class StorageStoreSyncTest {
 
     @Test

@@ -45,7 +45,6 @@ codespell:
         - testing/mozbase/docs/
         - testing/raptor/raptor/perfdocs/
         - toolkit/components/extensions/docs/
-        - toolkit/components/normandy/docs/
         - toolkit/components/search/docs/
         - toolkit/components/search/schema/
         - toolkit/components/telemetry/docs/
@@ -92,5 +91,6 @@ codespell:
         - ftl
     support-files:
         - 'tools/lint/spell/**'
+        - 'python/sites/lint.txt'
     type: external
     payload: spell:lint

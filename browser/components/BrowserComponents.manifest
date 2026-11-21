@@ -14,9 +14,7 @@ category first-startup-new-profile resource:///modules/AboutNewTabResourceMappin
 # Browser global components initializing before UI startup
 category browser-before-ui-startup moz-src:///browser/components/sessionstore/SessionStore.sys.mjs SessionStore.init
 category browser-before-ui-startup resource:///modules/BuiltInThemes.sys.mjs BuiltInThemes.maybeInstallActiveBuiltInTheme
-#ifdef MOZ_NORMANDY
-category browser-before-ui-startup resource://normandy/Normandy.sys.mjs Normandy.init
-#endif
+category browser-before-ui-startup resource://nimbus/ExperimentAPI.sys.mjs ExperimentAPI.init
 category browser-before-ui-startup moz-src:///browser/components/privatebrowsing/ResetPBMPanel.sys.mjs ResetPBMPanel.init
 #ifdef NIGHTLY_BUILD
 category browser-before-ui-startup moz-src:///browser/components/remotecontrol/RemoteControlPanel.sys.mjs RemoteControlPanel.init
@@ -24,6 +22,9 @@ category browser-before-ui-startup moz-src:///browser/components/remotecontrol/R
 category browser-before-ui-startup resource:///modules/AboutHomeStartupCache.sys.mjs AboutHomeStartupCache.init
 category browser-before-ui-startup moz-src:///browser/components/AccountsGlue.sys.mjs AccountsGlue.init
 category browser-before-ui-startup moz-src:///browser/modules/ObserverForwarder.sys.mjs ObserverForwarder.init
+#if defined(XP_MACOSX) || defined(XP_WIN)
+category browser-before-ui-startup moz-src:///browser/modules/WindowLock.sys.mjs WindowLock.init
+#endif
 #ifdef XP_WIN
 category browser-before-ui-startup moz-src:///browser/components/shell/StartupOSIntegration.sys.mjs StartupOSIntegration.applyCustomIconOnStartup
 #endif
@@ -63,6 +64,9 @@ category browser-window-load chrome://browser/content/browser.js#gUIDensity gUID
 category browser-window-load chrome://browser/content/browser.js#Win10TabletModeUpdater Win10TabletModeUpdater.init
 category browser-window-load chrome://browser/content/browser.js#CombinedStopReload CombinedStopReload.ensureInitialized
 category browser-window-load moz-src:///browser/modules/PrivateBrowsingUI.sys.mjs PrivateBrowsingUI.init
+#if defined(XP_MACOSX) || defined(XP_WIN)
+category browser-window-load moz-src:///browser/modules/WindowLock.sys.mjs WindowLock.initWindow
+#endif
 category browser-window-load moz-src:///browser/components/taskbartabs/TaskbarTabsChrome.sys.mjs TaskbarTabsChrome.init
 category browser-window-load chrome://browser/content/browser-pageActions.js BrowserPageActions.init
 category browser-window-load chrome://browser/content/browser-toolbarKeyNav.js ToolbarKeyboardNavigator.init
@@ -86,7 +90,7 @@ category browser-window-delayed-startup chrome://browser/content/browser-places.
 category browser-window-delayed-startup chrome://browser/content/browser-siteProtections.js gProtectionsHandler.init
 category browser-window-delayed-startup chrome://browser/content/browser-trustPanel.js gTrustPanelHandler.init
 category browser-window-delayed-startup chrome://browser/content/browser-places.js#PlacesToolbarHelper PlacesToolbarHelper.init
-category browser-window-delayed-startup chrome://browser/content/tabbrowser/browser-ctrlTab.js ctrlTab.observePref
+category browser-window-delayed-startup chrome://browser/content/browser.js#ctrlTab ctrlTab.observePref
 # The object handling the downloads indicator is initialized here in the delayed startup function,
 # but the actual indicator element is not loaded unless there are downloads to be displayed.
 category browser-window-delayed-startup chrome://browser/content/downloads/indicator.js DownloadsButton.initializeIndicator
@@ -157,7 +161,7 @@ category browser-window-unload chrome://browser/content/browser-sync.js gSync.un
 
 # Teardown for `browser-window-delayed-startup` consumers. Fired only when the
 # window's delayed startup actually ran.
-category browser-window-unload-delayed-startup chrome://browser/content/tabbrowser/browser-ctrlTab.js ctrlTab.stopObservingPref
+category browser-window-unload-delayed-startup chrome://browser/content/browser.js#ctrlTab ctrlTab.stopObservingPref
 category browser-window-unload-delayed-startup chrome://browser/content/browser-siteProtections.js gProtectionsHandler.uninit
 category browser-window-unload-delayed-startup chrome://browser/content/browser-trustPanel.js gTrustPanelHandler.uninit
 category browser-window-unload-delayed-startup chrome://browser/content/tabbrowser/browser-fullZoom.js FullZoom.destroy
@@ -200,14 +204,15 @@ category browser-idle-startup moz-src:///browser/components/places/PlacesUIUtils
 category browser-idle-startup resource:///modules/BuiltInThemes.sys.mjs BuiltInThemes.ensureBuiltInThemes
 category browser-idle-startup resource://gre/modules/RFPHelper.sys.mjs RFPHelper.init
 category browser-idle-startup resource://gre/modules/Blocklist.sys.mjs Blocklist.loadBlocklistAsync
-category browser-idle-startup resource://gre/modules/psm/RemoteSecuritySettings.sys.mjs RemoteSecuritySettings.init
+category browser-idle-startup moz-src:///security/manager/ssl/RemoteSecuritySettings.sys.mjs RemoteSecuritySettings.init
 category browser-idle-startup moz-src:///browser/components/tabbrowser/TabUnloader.sys.mjs TabUnloader.init
 category browser-idle-startup moz-src:///browser/components/tabbrowser/TabGroupsToolbarButton.sys.mjs TabGroupsToolbarButton.init
 category browser-idle-startup moz-src:///browser/components/genai/GenAI.sys.mjs GenAI.init
 category browser-idle-startup moz-src:///browser/components/urlbar/QuickSuggest.sys.mjs QuickSuggest.init
+category browser-idle-startup moz-src:///browser/components/urlbar/QuickActionsLoaderMessaging.sys.mjs QuickActionsLoaderMessaging.init
 category browser-idle-startup moz-src:///browser/components/urlbar/UrlbarSearchTermsPersistence.sys.mjs UrlbarSearchTermsPersistence.init
 category browser-idle-startup moz-src:///browser/components/search/SERPCategorization.sys.mjs SERPCategorization.init
-category browser-idle-startup resource://gre/modules/ContentRelevancyManager.sys.mjs ContentRelevancyManager.init
+category browser-idle-startup moz-src:///toolkit/components/contentrelevancy/ContentRelevancyManager.sys.mjs ContentRelevancyManager.init
 category browser-idle-startup resource://gre/modules/AppServicesTracing.sys.mjs RustLogForwarder.init
 category browser-idle-startup moz-src:///toolkit/components/contextualidentity/ContextualIdentityService.sys.mjs ContextualIdentityService.load
 category browser-idle-startup resource:///modules/asrouter/ASRouterTargeting.sys.mjs WebPushTargeting.init
@@ -239,7 +244,6 @@ category browser-quit-application-granted moz-src:///browser/components/places/I
 category browser-quit-application-granted moz-src:///browser/components/pagedata/PageDataService.sys.mjs PageDataService.uninit
 category browser-quit-application-granted resource://gre/modules/PageThumbs.sys.mjs PageThumbs.uninit
 category browser-quit-application-granted resource://gre/modules/NewTabUtils.sys.mjs NewTabUtils.uninit
-category browser-quit-application-granted resource://normandy/Normandy.sys.mjs Normandy.uninit
 category browser-quit-application-granted resource://gre/modules/RFPHelper.sys.mjs RFPHelper.uninit
 category browser-quit-application-granted resource:///modules/asrouter/ASRouterNewTabHook.sys.mjs ASRouterNewTabHook.destroy
 category browser-quit-application-granted moz-src:///browser/components/search/SERPCategorization.sys.mjs SERPCategorization.uninit

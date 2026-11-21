@@ -23,6 +23,10 @@ suites:
             DNS Benchmark: ""
             http3 raw: ""
             TRR Benchmark: ""
+    dom/webtransport/test/xpcshell:
+        description: "Performance tests from the 'dom/webtransport/test/xpcshell' folder."
+        tests:
+            WebTransport datagrams: ""
     testing/performance:
         description: "Performance tests from the 'testing/performance' folder."
         tests:
@@ -34,8 +38,6 @@ suites:
             pageload: ""
             JSConf (warm): ""
             perfstats: ""
-            webpagetest-firefox: ""
-            webpagetest-chrome: ""
 
     browser/base/content/test:
         description: "Performance tests from the 'browser/base/content/test' folder."
@@ -51,6 +53,12 @@ suites:
         description: "Performance tests for PDF.js features on Firefox Desktop"
         tests:
             "browser_pdfjs_alttext_perf.js": ""
+
+    toolkit/components/pdfjs/test/perf:
+        description: "Performance tests for the PDF.js viewer UI on Firefox Desktop, using PDFs with empty pages"
+        tests:
+            "browser_pdfjs_ui_interaction_perf.js": ""
+            "browser_pdfjs_ui_open_perf.js": ""
 
     browser/components/urlbar/tests/browser-ml:
         description: "Performance tests for urlbar features on Firefox Desktop"

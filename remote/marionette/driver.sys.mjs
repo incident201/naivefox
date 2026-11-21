@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
+
 const lazy = {};
 
 ChromeUtils.defineESModuleGetters(lazy, {
@@ -69,6 +71,13 @@ ChromeUtils.defineESModuleGetters(lazy, {
 ChromeUtils.defineLazyGetter(lazy, "logger", () =>
   lazy.Log.get(lazy.Log.TYPES.MARIONETTE)
 );
+
+if (AppConstants.MOZ_CODE_COVERAGE) {
+  ChromeUtils.defineESModuleGetters(lazy, {
+    PerTestCoverageUtils:
+      "chrome://remote/content/marionette/PerTestCoverageUtils.sys.mjs",
+  });
+}
 
 /**
  * @typedef {import("chrome://remote/content/shared/WindowManager.sys.mjs").WindowRect} WindowRect
@@ -875,6 +884,10 @@ export class GeckoDriver {
       this.currentSession.destroy();
       this.#currentSession = null;
     }
+
+    if (AppConstants.MOZ_CODE_COVERAGE) {
+      lazy.PerTestCoverageUtils.afterSuiteSync();
+    }
   }
 
   /**
@@ -1068,7 +1081,8 @@ export class GeckoDriver {
    *     Return the found element.
    *
    * @throws {NoSuchElementError}
-   *     If element represented by reference <var>element</var> is unknown.
+   *     If the element which is looked for with <var>value</var> was
+   *     not found.
    * @throws {NoSuchWindowError}
    *     Browsing context has been discarded.
    * @throws {StaleElementReferenceError}
@@ -1102,7 +1116,15 @@ export class GeckoDriver {
       all: false,
     };
 
-    return this.#getActor().findElement(using, value, opts);
+    const foundEls = await this.#getActor().findElements(using, value, opts);
+
+    if (!foundEls.length) {
+      throw new lazy.error.NoSuchElementError(
+        `Unable to locate element: ${value}`
+      );
+    }
+
+    return foundEls[0];
   }
 
   /**
@@ -1155,7 +1177,15 @@ export class GeckoDriver {
       timeout: this.currentSession.timeouts.implicit,
     };
 
-    return this.#getActor().findElement(using, value, opts);
+    const foundEls = await this.#getActor().findElements(using, value, opts);
+
+    if (!foundEls.length) {
+      throw new lazy.error.NoSuchElementError(
+        `Unable to locate element: ${value}`
+      );
+    }
+
+    return foundEls[0];
   }
 
   /**
@@ -3812,12 +3842,22 @@ export class GeckoDriver {
    *     True if the user requests a hash of the image data. Defaults to false.
    * @param {boolean=} cmd.parameters.scroll
    *     Scroll to element if |id| is provided. Defaults to true.
+   * @param {boolean=} cmd.parameters.readback
+   *     True to take our screenshot by reading from the composited framebuffer
+   *     with the drawWindow API, instead of re-rendering the document with the
+   *     drawSnapshot API. Only honored for a content-scope viewport capture;
+   *     ignored (treated as false) when <var>id</var> is defined (i.e. web
+   *     element captures), and for a full-document capture, and on macOS
+   *     outside of automation (to avoid the intentional crash described in
+   *     bug 2092304 comment 3). Defaults to false.
    *
    * @returns {string}
    *     If <var>hash</var> is false, PNG image encoded as Base64 encoded
    *     string.  If <var>hash</var> is true, hex digest of the SHA-256
    *     hash of the Base64 encoded string.
    *
+   * @throws {InvalidArgumentError}
+   *     If <var>readback</var> is not a boolean.
    * @throws {NoSuchElementError}
    *     If element represented by reference <var>id</var> is unknown.
    * @throws {NoSuchWindowError}
@@ -3831,18 +3871,40 @@ export class GeckoDriver {
     lazy.assert.open(this.getBrowsingContext({ top: true }));
     await this.#handleUserPrompts();
 
-    let { id, full, hash, scroll } = cmd.parameters;
+    let { id, full, hash, scroll, readback } = cmd.parameters;
     let format = hash ? lazy.capture.Format.Hash : lazy.capture.Format.Base64;
 
     full = typeof full == "undefined" ? true : full;
     scroll = typeof scroll == "undefined" ? true : scroll;
+
+    readback = typeof readback == "undefined" ? false : readback;
+    lazy.assert.boolean(
+      readback,
+      lazy.pprint`Expected "readback" to be a boolean, got ${cmd.parameters.readback}`
+    );
+
+    // Compositor readback only applies to content captures; a chrome-scope
+    // capture has no content area to read back and would never have used the
+    // readback path, so keep it on drawSnapshot.
+    if (readback && this.context !== lazy.Context.Content) {
+      lazy.logger.warn(
+        "Ignoring readback for a chrome-scope screenshot; using drawSnapshot instead"
+      );
+      readback = false;
+    }
 
     let webEl = id ? lazy.WebElement.fromUUID(id).toJSON() : null;
 
     // Only consider full screenshot if no element has been specified
     full = webEl ? false : full;
 
-    return this.#getActor().takeScreenshot(webEl, format, full, scroll);
+    return this.#getActor().takeScreenshot(
+      webEl,
+      format,
+      full,
+      scroll,
+      readback
+    );
   }
 
   /**

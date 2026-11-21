@@ -78,6 +78,7 @@ customkeys-file-focus-search = Focus the Search Bar
 
 customkeys-history-reopen-tab = Reopen Last Closed Tab
 customkeys-history-reopen-window = Reopen Last Closed window
+customkeys-history-reopen-tab-current-window = Reopen Last Closed Tab of the Current Window
 
 customkeys-sidebar-toggle = Toggle Sidebar
 
@@ -100,8 +101,10 @@ customkeys-dev-profiler-toggle = Start/Stop the Performance Profiler
 customkeys-dev-profiler-capture = Capture a Performance Profile
 
 customkeys-edit-find-previous = Find Previous
+customkeys-edit-find-selection = Use Selection for Find
 
 customkeys-tools-screenshot = Take a Screenshot
+customkeys-tools-lock-windows = Lock Private Windows
 
 customkeys-category-navigation-2 =
   .heading = Navigation

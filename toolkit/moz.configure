@@ -1163,18 +1163,6 @@ option(
 set_config("MOZ_PACKAGER_MINIFY_PDFJS", True, when="--enable-minify-pdfjs")
 
 
-@depends(host, build_project)
-def jar_maker_format(host, build_project):
-    # Multilocales for mobile/android use the same mergedirs for all locales,
-    # so we can't use symlinks for those builds.
-    if host.os == "WINNT" or build_project == "mobile/android":
-        return "flat"
-    return "symlink"
-
-
-set_config("MOZ_JAR_MAKER_FILE_FORMAT", jar_maker_format)
-
-
 @depends(toolkit, build_project)
 def omnijar_name(toolkit, build_project):
     # Fennec's static resources live in the assets/ folder of the
@@ -1196,12 +1184,6 @@ project_flag("MOZ_PLACES", help="Build Places if required", set_as_define=True)
 project_flag(
     "MOZ_SERVICES_HEALTHREPORT",
     help="Build Firefox Health Reporter Service",
-    set_as_define=True,
-)
-
-project_flag(
-    "MOZ_NORMANDY",
-    help="Enable Normandy recipe runner",
     set_as_define=True,
 )
 
@@ -2985,7 +2967,9 @@ with only_when(requires_wasm_sandboxing & compile_environment):
     def wasm_cxx_with_flags(wasm_cxx, wasi_sysroot_flags):
         return wasm_compiler_with_flags(wasm_cxx, wasi_sysroot_flags)
 
-    set_config("WASM_CXX", wasm_cxx_with_flags)
+    set_config("WASM_CXX", clang_plugin_compiler(wasm_cxx_with_flags, "clang++", "g++"))
+    # We do need to keep clang++ when building $(WASM_ARCHIVE).
+    set_config("WASM_CXX_LINK", wasm_cxx_with_flags)
 
     wasm_compile_flags = dependable(["-fno-exceptions", "-fno-strict-aliasing"])
     option(env="WASM_CFLAGS", nargs=1, help="Options to pass to WASM_CC")
@@ -3472,17 +3456,11 @@ set_config("MOZ_CRASHREPORTER_MOCK", True, when="MOZ_CRASHREPORTER_MOCK")
 
 # Wine
 # ==============================================================
-@depends(target, host)
-def want_wine(target, host):
-    return target.kernel == "WINNT" and host.kernel != "WINNT"
+@depends(wine, when=want_wine)
+def require_wine(wine):
+    if not wine:
+        die("Cannot find wine")
 
-
-wine = check_prog(
-    "WINE",
-    ["wine64", "wine"],
-    when=want_wine,
-    bootstrap="wine/bin",
-)
 
 # libevent
 # ==============================================================
@@ -3546,10 +3524,9 @@ with only_when(compile_environment):
     "MOZ_TELEMETRY_REPORTING",
     "MOZ_SERVICES_HEALTHREPORT",
     "--enable-crashreporter",
-    "MOZ_NORMANDY",
 )
-def data_reporting(telemetry, healthreport, crashreporter, normandy):
-    return telemetry or healthreport or crashreporter or normandy
+def data_reporting(telemetry, healthreport, crashreporter):
+    return telemetry or healthreport or crashreporter
 
 
 set_config("MOZ_DATA_REPORTING", True, when=data_reporting)
@@ -3936,14 +3913,12 @@ option(
     "MOZ_TEST_PACKAGE_ARCHIVES_SKIP",
     compile_environment,
     gtest_in_build,
-    build_project,
 )
 def test_package_configuration(
     available_archives,
     skipped_archives,
     compile_environment,
     gtest_in_build,
-    build_project,
 ):
     archives = set(available_archives) - set(skipped_archives)
 
@@ -3951,7 +3926,6 @@ def test_package_configuration(
         "stage-config",
         "stage-mach",
         "stage-extensions",
-        "stage-mochitest",
     ]
 
     # jittest is packaged directly from topsrcdir. Only jsreftest
@@ -3965,9 +3939,6 @@ def test_package_configuration(
     if gtest_in_build:
         archives.add("gtest")
         stage_targets.append("stage-gtest")
-
-    if build_project == "mobile/android":
-        stage_targets.append("stage-android")
 
     stage_targets.append("test-packages-manifest")
 
@@ -4086,7 +4057,7 @@ with only_when(target_is_osx):
 
     set_config("MOZ_GPU_PROCESS_BUNDLEID", moz_gpu_process_bundle_id)
 
-    with only_when(milestone.is_nightly & ~disable_smart_cards):
+    with only_when(~disable_smart_cards):
         # Security Module Helper
         #
         # Set up configuration strings for building and referencing the PKCS#11

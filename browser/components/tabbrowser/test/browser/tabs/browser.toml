@@ -149,9 +149,6 @@ support-files = [
   "wait-a-bit.sjs",
 ]
 tags = "vertical-tabs"
-fail-if =  [
-  "vertical_tab", # Bug 1932786, fails in the "vertical-tabs" variant
-]
 
 ["browser_link_in_tab_title_and_url_prefilled_normal_page_by_script.js"]
 support-files = [
@@ -161,9 +158,6 @@ support-files = [
   "wait-a-bit.sjs",
 ]
 tags = "vertical-tabs"
-fail-if =  [
-  "vertical_tab", # Bug 1932786, fails in the "vertical-tabs" variant
-]
 
 ["browser_link_in_tab_title_and_url_prefilled_normal_page_no_target.js"]
 support-files = [
@@ -173,9 +167,6 @@ support-files = [
   "wait-a-bit.sjs",
 ]
 tags = "vertical-tabs"
-fail-if =  [
-  "vertical_tab", # Bug 1932786, fails in the "vertical-tabs" variant
-]
 
 ["browser_link_in_tab_title_and_url_prefilled_normal_page_other_target.js"]
 support-files = [
@@ -185,9 +176,6 @@ support-files = [
   "wait-a-bit.sjs",
 ]
 tags = "vertical-tabs"
-fail-if =  [
-  "vertical_tab", # Bug 1932786, fails in the "vertical-tabs" variant
-]
 
 ["browser_list_all_tabs_menu_items.js"]
 
@@ -201,6 +189,9 @@ tags = "vertical-tabs"
 fail-if =  [
   "vertical_tab", # Bug 1932787, fails in the "vertical-tabs" variant
 ]
+
+["browser_moveTab.js"]
+tags = "vertical-tabs"
 
 ["browser_move_externally_opened_tabs_telemetry.js"]
 
@@ -299,7 +290,7 @@ run-if = [
   "os != 'mac'", # Skipped because macOS keyboard support requires changing system settings
 ]
 tags = "vertical-tabs"
-fail-if =  [
+skip-if = [
   "vertical_tab", # Bug 1932790, fails in the "vertical-tabs" variant
 ]
 
@@ -395,6 +386,8 @@ tags = "vertical-tabs"
 
 ["browser_preloading_tab_moving.js"]
 
+["browser_privilegedabout_popup_opener.js"]
+
 ["browser_privilegedmozilla_process_pref.js"]
 https_first_disabled = true
 
@@ -409,9 +402,6 @@ tags = "vertical-tabs"
 
 ["browser_reload_deleted_file.js"]
 tags = "vertical-tabs"
-skip-if = [
-  "os == 'mac' && os_version == '15.30' && arch == 'aarch64' && vertical_tab", # Bug 1936168
-]
 
 ["browser_removeAllTabsBut.js"]
 tags = "vertical-tabs"
@@ -463,9 +453,6 @@ tags = "vertical-tabs"
 
 ["browser_tabCloseProbes.js"]
 tags = "vertical-tabs"
-fail-if = [
-  "vertical_tab", # Bug 1976110, fails in the "vertical-tabs" variant
-]
 
 ["browser_tabCloseSpacer.js"]
 skip-if = [
@@ -597,6 +584,8 @@ skip-if = [
   "os == 'linux' && os_version == '24.04' && arch == 'x86_64' && display == 'x11' && opt && a11y_checks", # Bug 2010318
 ]
 
+["browser_tab_scroll_into_view_vertical.js"]
+
 ["browser_tab_splitview.js"]
 
 ["browser_tab_splitview_about_opentabs.js"]
@@ -687,6 +676,9 @@ skip-if = [
 
 ["browser_url_prefilled_on_startup.js"]
 support-files = ["startup-delayed-redirect.sjs"]
+
+["browser_vertical_tab_animations.js"]
+tags = "vertical-tabs"
 
 ["browser_viewSourceInTabOnViewSource.js"]
 

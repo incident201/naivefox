@@ -22,6 +22,9 @@ linux64-android-avd-x86_64-repack:
     description: "Android AVD (Linux) repack toolchain build"
     treeherder:
         symbol: TL(avd-x86_64)
+    worker-type: b-linux-kvm
+    worker:
+        kvm: true
     run:
         script: repack-android-avd-linux.sh
         arguments:
@@ -193,7 +196,7 @@ linux64-jdk-repack:
         toolchain-artifact: project/gecko/jdk/jdk-linux.tar.zst
         toolchain-alias: linux64-jdk
         toolchain-env:
-            JAVA_HOME: "/builds/worker/fetches/jdk/jdk-17.0.20.1+1"
+            JAVA_HOME: "/builds/worker/fetches/jdk/jdk-25.0.5.1+2"
 
 linux64-android-sdk-linux-repack:
     description: "Android SDK (Linux) repack toolchain build"
@@ -272,6 +275,8 @@ linux64-android-gradle-dependencies:
             - 'mobile/android/config/mozconfigs/android-arm-gradle-dependencies/**'
             - 'mobile/android/config/mozconfigs/common*'
             - 'mobile/android/gradle.configure'
+            - 'mobile/android/moz.configure'
+            - 'mobile/android/gradle/plugins/nimbus-gradle-plugin/src/**'
             # The enumeration passes live here.
             - 'mobile/android/mach_commands.py'
             - 'taskcluster/scripts/misc/android-gradle-dependencies/**'
@@ -340,6 +345,17 @@ linux64-android-gradle-dependencies-appservices:
             - linux64-jdk-repack
             - linux64-node
             - terser
+
+linux64-android-robolectric-jars:
+    description: "Robolectric android-all-instrumented jars repack toolchain build"
+    treeherder:
+        symbol: TL(robolectric-jars)
+    run:
+        script: android-robolectric-jars.sh
+        resources:
+            - 'gradle/libs.versions.toml'
+        toolchain-artifact: public/build/robolectric-android-all.tar.zst
+        toolchain-alias: android-robolectric-jars
 
 linux64-android-xmlstarlet:
     description: "Tool for finding xml paths on Android"

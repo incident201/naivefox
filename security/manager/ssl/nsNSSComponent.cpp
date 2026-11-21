@@ -480,14 +480,14 @@ LoadLoadableCertsTask::Run() {
              success ? "succeeded" : "failed"));
   }
 
-#if defined(NIGHTLY_BUILD) && !defined(MOZ_NO_SMART_CARDS)
+#if !defined(MOZ_NO_SMART_CARDS)
   if (PKCS11ModuleDB::UtilityProcessEnabled() && !GetInSafeMode()) {
     bool success = LoadRemoteCertsModule();
     MOZ_LOG(
         gPIPNSSLog, LogLevel::Debug,
         ("loading remote certs module %s", success ? "succeeded" : "failed"));
   }
-#endif  // NIGHTLY_BUILD && !MOZ_NO_SMART_CARDS
+#endif  // !MOZ_NO_SMART_CARDS
 
   {
     MonitorAutoLock rootsLoadedLock(mNSSComponent->mLoadableCertsLoadedMonitor);
@@ -571,8 +571,7 @@ nsresult CheckForSmartCardChanges() {
     StaticMutexAutoLock lock(sCheckForSmartCardChangesMutex);
     // Do this at most once every 3 seconds.
     TimeStamp now = TimeStamp::Now();
-    if (now - sLastCheckedForSmartCardChanges <
-        TimeDuration::FromSeconds(3.0)) {
+    if (now - sLastCheckedForSmartCardChanges < TimeDuration::FromSeconds(3)) {
       return NS_OK;
     }
     sLastCheckedForSmartCardChanges = now;
@@ -1981,6 +1980,15 @@ bool IsGeckoSearchingForClientAuthCertificates(uint64_t uniqueSlotID) {
 }
 
 AutoSearchingForCertificates::AutoSearchingForCertificates() {
+  // Cache remote cryptoki objects before acquiring the lock, so that it's not
+  // held while doing that work (which may involve waiting on a dispatch to the
+  // main thread).
+  // Also, doing this work first ensures that the results are already there
+  // when a call to IsGeckoSearchingForCertificates eventually returns true.
+#if !defined(MOZ_NO_SMART_CARDS)
+  CacheRemoteCryptokiObjects(SearchingFor::CACertificates);
+#endif  // !MOZ_NO_SMART_CARDS
+
   auto certificateSearchState = sCertificateSearchState.Lock();
   // If some other thread is already searching, there's no point in updating
   // any state here.
@@ -2000,6 +2008,11 @@ AutoSearchingForCertificates::~AutoSearchingForCertificates() {
 
 AutoSearchingForClientAuthCertificates::
     AutoSearchingForClientAuthCertificates() {
+  // See the comment for the corresponding CacheRemoteCryptokiObjects call in
+  // AutoSearchingForCertificates::AutoSearchingForCertificates().
+#if !defined(MOZ_NO_SMART_CARDS)
+  CacheRemoteCryptokiObjects(SearchingFor::ClientCertificates);
+#endif  // !MOZ_NO_SMART_CARDS
   auto clientCertificateSearchState = sClientCertificateSearchState.Lock();
   // If some other thread is already searching, there's no point in updating
   // any state here.

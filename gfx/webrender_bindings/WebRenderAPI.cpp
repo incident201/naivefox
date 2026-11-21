@@ -310,18 +310,14 @@ RefPtr<WebRenderAPI::CreatePromise> WebRenderAPI::Create(
                 renderThread->GetRenderBackendPool(),
                 renderThread->GlyphRasterThread().Raw(), &WebRenderMallocSizeOf,
                 &WebRenderMallocEnclosingSizeOf, 0, compositor.get(),
-                compositor->ShouldUseNativeCompositor(),
-                compositor->UsePartialPresent(),
-                compositor->GetMaxPartialPresentRects(),
-                compositor->ShouldDrawPreviousPartialPresentRegions(),
-                &docHandle, &wrRenderer, &maxTextureSize, &errorMessage,
+                compositor->ShouldUseNativeCompositor(), &docHandle,
+                &wrRenderer, &maxTextureSize, &errorMessage,
                 StaticPrefs::gfx_webrender_enable_gpu_markers_AtStartup(),
                 panic_on_gl_error, picTileWidth, picTileHeight,
                 gfx::gfxVars::WebRenderRequiresHardwareDriver(),
                 StaticPrefs::gfx_webrender_low_quality_pinch_zoom_AtStartup(),
                 StaticPrefs::gfx_webrender_max_shared_surface_size_AtStartup(),
                 StaticPrefs::gfx_webrender_enable_subpixel_aa_AtStartup(),
-                compositor->ShouldUseLayerCompositor(),
                 limitSdrYuvExternalComposites)) {
           // wr_window_new puts a message into gfxCriticalNote if it returns
           // false
@@ -543,7 +539,7 @@ layers::AsyncImagePipelineOps* WebRenderAPI::GetPendingAsyncImagePipelineOps(
 
 bool WebRenderAPI::CheckIsRemoteTextureReady(
     layers::RemoteTextureInfoList* aList, const TimeStamp& aTimeStamp) {
-  MOZ_ASSERT(layers::CompositorThreadHolder::IsInCompositorThread());
+  MOZ_RELEASE_ASSERT(layers::CompositorThreadHolder::IsInCompositorThread());
   MOZ_ASSERT(aList);
 
   RefPtr<WebRenderAPI> self = this;
@@ -559,7 +555,7 @@ bool WebRenderAPI::CheckIsRemoteTextureReady(
   while (!aList->mList.empty() && isReady) {
     auto& front = aList->mList.front();
     isReady &= layers::RemoteTextureMap::Get()->CheckRemoteTextureReady(
-        front, callback);
+        front, this, callback);
     if (isReady) {
       aList->mList.pop();
     }
@@ -589,7 +585,7 @@ bool WebRenderAPI::CheckIsRemoteTextureReady(
 
 void WebRenderAPI::WaitRemoteTextureReady(
     layers::RemoteTextureInfoList* aList) {
-  MOZ_ASSERT(layers::CompositorThreadHolder::IsInCompositorThread());
+  MOZ_RELEASE_ASSERT(layers::CompositorThreadHolder::IsInCompositorThread());
   MOZ_ASSERT(aList);
 
   while (!aList->mList.empty()) {
@@ -646,8 +642,8 @@ void WebRenderAPI::HandleWrTransactionEvents(RemoteTextureWaitType aType) {
           auto* list = front.RemoteTextureInfoList();
           while (!list->mList.empty()) {
             auto& front = list->mList.front();
-            layers::RemoteTextureMap::Get()->SuppressRemoteTextureReadyCheck(
-                front);
+            layers::RemoteTextureMap::Get()->CancelRemoteTextureReadyCheck(
+                front, this);
             list->mList.pop();
           }
         }
@@ -1308,14 +1304,32 @@ void DisplayListBuilder::End(layers::DisplayListData& aOutTransaction) {
   dlInternerDelta.inner.data = nullptr;
 }
 
-Maybe<wr::WrSpatialId> DisplayListBuilder::PushStackingContext(
-    const wr::StackingContextParams& aParams, const wr::LayoutRect& aBounds,
-    const wr::RasterSpace& aRasterSpace) {
-  WRDL_LOG(
-      "PushStackingContext b=%s t=%s id=0x%" PRIx64 "\n", mWrState,
-      ToString(aBounds).c_str(),
-      aParams.mTransformPtr ? ToString(*aParams.mTransformPtr).c_str() : "none",
-      aParams.animation ? aParams.animation->id : 0);
+wr::WrSpatialId DisplayListBuilder::DefineReferenceFrame(
+    const wr::LayoutPoint& aOrigin, const ReferenceFrameParams& aParams) {
+  auto spatialId = wr_dp_define_reference_frame(
+      mWrState, mCurrentSpaceAndClipChain.space, aOrigin, &aParams);
+  WRDL_LOG("DefineReferenceFrame id=%zu o=%s t=%s anim=%" PRIu64 "\n", mWrState,
+           spatialId.id, ToString(aOrigin).c_str(),
+           ToString(aParams.transform).c_str(), aParams.animation_id);
+  return spatialId;
+}
+
+wr::WrSpatialId DisplayListBuilder::DefineComputedFrame(
+    const wr::LayoutPoint& aOrigin, const wr::WrComputedTransformData& aData) {
+  auto spatialId = wr_dp_define_computed_frame(
+      mWrState, mCurrentSpaceAndClipChain.space, aOrigin, &aData);
+  WRDL_LOG("DefineComputedFrame id=%zu o=%s\n", mWrState, spatialId.id,
+           ToString(aOrigin).c_str());
+  return spatialId;
+}
+
+void DisplayListBuilder::PushStackingContext(
+    const wr::StackingContextParams& aParams,
+    const wr::RasterSpace& aRasterSpace,
+    const Maybe<wr::WrSpatialId>& aSpatialId) {
+  WRDL_LOG("PushStackingContext space=%zu anim=%" PRIu64 "\n", mWrState,
+           aSpatialId.valueOr(mCurrentSpaceAndClipChain.space).id,
+           aParams.animation ? aParams.animation->id : 0);
 
   // Diagnostics for bug 2031107: validate FFI inputs before crossing into
   // Rust to distinguish C++-side invariant violations from corruption that
@@ -1332,18 +1346,16 @@ Maybe<wr::WrSpatialId> DisplayListBuilder::PushStackingContext(
           alignof(wr::WrFilterData) ==
       0);
 
-  auto spatialId = wr_dp_push_stacking_context(
-      mWrState, aBounds, mCurrentSpaceAndClipChain.space, &aParams,
-      aParams.mTransformPtr, aParams.mFilters.Elements(),
-      aParams.mFilters.Length(), aParams.mFilterDatas.Elements(),
-      aParams.mFilterDatas.Length(), aRasterSpace);
-
-  return spatialId.id != 0 ? Some(spatialId) : Nothing();
+  wr_dp_push_stacking_context(
+      mWrState, aSpatialId.valueOr(mCurrentSpaceAndClipChain.space), &aParams,
+      aParams.mFilters.Elements(), aParams.mFilters.Length(),
+      aParams.mFilterDatas.Elements(), aParams.mFilterDatas.Length(),
+      aRasterSpace);
 }
 
-void DisplayListBuilder::PopStackingContext(bool aIsReferenceFrame) {
+void DisplayListBuilder::PopStackingContext() {
   WRDL_LOG("PopStackingContext\n", mWrState);
-  wr_dp_pop_stacking_context(mWrState, aIsReferenceFrame);
+  wr_dp_pop_stacking_context(mWrState);
 }
 
 wr::WrClipChainId DisplayListBuilder::DefineClipChain(
@@ -1391,6 +1403,15 @@ wr::WrClipId DisplayListBuilder::DefinePathClip(
                                 aCommands.Elements(), aCommands.Length(),
                                 aPoints.Elements(), aPoints.Length(), aAabb,
                                 aRect, aFillRule);
+}
+
+wr::WrClipId DisplayListBuilder::DefineBorderClip(
+    const wr::LayoutRect& aRect, const wr::LayoutSideOffsets& aWidths,
+    const Range<const wr::BorderSide>& aSides, const wr::BorderRadius& aRadius,
+    const wr::LayoutSideOffsets& aInset) {
+  return wr_dp_define_border_clip(mWrState, mCurrentSpaceAndClipChain.space,
+                                  aRect, aWidths, aSides[0], aSides[1],
+                                  aSides[2], aSides[3], aRadius, aInset);
 }
 
 wr::WrClipId DisplayListBuilder::DefineRectClip(Maybe<wr::WrSpatialId> aSpace,
@@ -1511,27 +1532,24 @@ void DisplayListBuilder::PushRoundedRect(const wr::LayoutRect& aBounds,
            ToString(aBounds).c_str(), ToString(aClip).c_str(),
            ToString(aRadii).c_str(), ToString(aColor).c_str());
 
-  // Draw the rounded rectangle as a border with rounded corners. We could also
-  // draw this as a rectangle clipped to a rounded rectangle, but:
-  // - clips are not cached; borders are
-  // - a simple border like this will be drawn as an image
-  // - Processing lots of clips is not WebRender's strong point.
-  //
-  // Made the borders thicker than one half the width/height, to avoid
-  // little white dots at the center at some magnifications.
-  wr::BorderSide side = {aColor, wr::BorderStyle::Solid};
-  float h = aBounds.width() * 0.6f;
-  float v = aBounds.height() * 0.6f;
-  wr::LayoutSideOffsets widths = {v, h, v, h};
-  wr::BorderRadius radii = {aRadii, aRadii, aRadii, aRadii,
-                            1.0f,   1.0f,   1.0f,   1.0f};
-  wr::LayoutSideOffsets inset = EmptyLayoutSideOffsets();
+  // Draw the rounded rectangle as a rectangle clipped to a rounded rectangle.
+  // WebRender applies clips with uniform circular radii directly when drawing
+  // the rectangle, without an intermediate clip mask.
+  wr::ComplexClipRegion region;
+  region.rect = aBounds;
+  region.radii = {aRadii, aRadii, aRadii, aRadii, 1.0f, 1.0f, 1.0f, 1.0f};
+  region.inset = EmptyLayoutSideOffsets();
+  region.mode = wr::ClipMode::Clip;
 
-  // Anti-aliased borders are required for rounded borders.
-  wr_dp_push_border(mWrState, aBounds, aClip, aIsBackfaceVisible,
-                    /* force_antialiasing = */ false,
-                    &mCurrentSpaceAndClipChain, wr::AntialiasBorder::Yes,
-                    widths, side, side, side, side, radii, inset);
+  auto clipId = DefineRoundedRectClip(Nothing(), region);
+  auto clipChainId =
+      DefineClipChain({&clipId, 1}, CurrentClipChainIdIfNotRoot());
+  auto spaceAndClip =
+      WrSpaceAndClipChain{mCurrentSpaceAndClipChain.space, clipChainId.id};
+
+  wr_dp_push_rect(mWrState, aBounds, aClip, aIsBackfaceVisible,
+                  /* force_antialiasing = */ false,
+                  /* is_checkerboard = */ false, &spaceAndClip, aColor);
 }
 
 void DisplayListBuilder::PushHitTest(

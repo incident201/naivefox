@@ -7,7 +7,6 @@
 #include "js/RootingAPI.h"
 #include "mozilla/ErrorResult.h"
 #include "mozilla/Maybe.h"
-#include "mozilla/StaticPrefs_dom.h"
 #include "mozilla/dom/CSPViolationData.h"
 #include "mozilla/dom/Document.h"
 #include "mozilla/dom/ElementBinding.h"
@@ -211,6 +210,14 @@ void ProcessValueWithADefaultPolicy(nsIGlobalObject& aGlobalObject,
     return;
   }
 
+  // Bug 2072122: Trusted Types readiness experiment only, to be removed.
+  if (nsPIDOMWindowInner* piDOMWindowInner = aGlobalObject.GetAsInnerWindow()) {
+    if (Document* doc = piDOMWindowInner->GetExtantDoc()) {
+      doc->SetTrustedTypesReadinessSignal(
+          TrustedTypesReadinessSignal::UsedPolicy);
+    }
+  }
+
   JS::Rooted<JS::Value> trustedTypeName{cx};
   using ExpectedTypeArg =
       std::remove_const_t<std::remove_reference_t<decltype(**aResult)>>;
@@ -406,18 +413,19 @@ static inline const nsAString* GetContent(
   return IsString(aInput) ? GetAsString(aInput) : GetAsTrustedType(aInput);
 }
 
+// Bug 2072122: Trusted Types readiness experiment only, to be removed.
+static inline bool IsTrustedHTML(const nsAString*) { return false; }
+static inline bool IsTrustedHTML(
+    const TrustedHTMLOrTrustedScriptOrTrustedScriptURLOrString& aInput) {
+  return aInput.IsTrustedHTML();
+}
+
 template <typename NodeOrGlobalObject>
 inline bool PrepareExecutionOfTrustedTypesDefaultPolicy(
     NodeOrGlobalObject& aNodeOrGlobalObject, nsIPrincipal* aPrincipalOrNull,
     nsIGlobalObject*& aGlobalObject, nsPIDOMWindowInner*& aPIDOMWindowInner,
     RequireTrustedTypesForDirectiveState* aRequireTrustedTypesForDirectiveState,
     ErrorResult& aError) {
-  if (!StaticPrefs::dom_security_trusted_types_enabled()) {
-    // A trusted type might've been created before the pref was set to `false`,
-    // so we cannot assume aInput.IsString().
-    return false;
-  }
-
   // Exempt web extension content scripts from trusted types policies defined by
   // the page in which they are running.
   if (auto* principal = BasePrincipal::Cast(aPrincipalOrNull)) {
@@ -499,9 +507,12 @@ inline bool PrepareExecutionOfTrustedTypesDefaultPolicy(
   } else if (IsWorkerGlobal(globalObject->GetGlobalJSObject())) {
     MOZ_ASSERT(!NS_IsMainThread());
     WorkerPrivate* workerPrivate = GetCurrentThreadWorkerPrivate();
-    const mozilla::ipc::CSPInfo& cspInfo = workerPrivate->GetCSPInfo();
+    Maybe<const mozilla::ipc::CSPInfo&> cspInfo = workerPrivate->GetCSPInfo();
+    if (!cspInfo) {
+      return false;
+    }
     requireTrustedTypesForDirectiveState =
-        cspInfo.requireTrustedTypesForDirectiveState();
+        cspInfo->requireTrustedTypesForDirectiveState();
     if (requireTrustedTypesForDirectiveState ==
         RequireTrustedTypesForDirectiveState::NONE) {
       return false;
@@ -732,10 +743,12 @@ MOZ_CAN_RUN_SCRIPT const nsAString* GetTrustedTypesCompliantAttributeValue(
     int32_t aAttributeNamespaceID, const TrustedTypeOrStringArg& aNewValue,
     nsIPrincipal* aPrincipalOrNull, Maybe<nsAutoString>& aResultHolder,
     ErrorResult& aError) {
-  if (!StaticPrefs::dom_security_trusted_types_enabled()) {
-    // A trusted type might've been created before the pref was set to `false`,
-    // so we cannot assume aNewValue.IsString().
-    return GetContent(aNewValue);
+  // Bug 2072122: Trusted Types readiness experiment only, to be removed.
+  // srcdoc is the only attribute that is a TrustedHTML sink.
+  if (aAttributeNamespaceID == kNameSpaceID_None &&
+      aAttributeName == nsGkAtoms::srcdoc &&
+      aElement.IsHTMLElement(nsGkAtoms::iframe)) {
+    aElement.OwnerDoc()->RecordTrustedTypesHTMLSink(IsTrustedHTML(aNewValue));
   }
 
   // In the common situation of non-data document without any
@@ -816,8 +829,7 @@ bool HostGetCodeForEval(JSContext* aCx, JS::Handle<JSObject*> aCode,
                         JS::MutableHandle<JSString*> aOutCode) {
   JS::Rooted<JSObject*> obj(aCx, aCode);
   TrustedScript* trustedScript;
-  if (StaticPrefs::dom_security_trusted_types_enabled() &&
-      NS_SUCCEEDED(UNWRAP_OBJECT(TrustedScript, &obj, trustedScript))) {
+  if (NS_SUCCEEDED(UNWRAP_OBJECT(TrustedScript, &obj, trustedScript))) {
     JS::Rooted<JS::Value> code(aCx);
     if (!xpc::NonVoidStringToJsval(aCx, trustedScript->mData, &code)) {
       return false;
@@ -845,8 +857,7 @@ bool AreArgumentsTrustedForEnsureCSPDoesNotBlockStringCompilation(
   // https://html.spec.whatwg.org/multipage/webappapis.html#hostensurecancompilestrings(realm,-parameterstrings,-bodystring,-codestring,-compilationtype,-parameterargs,-bodyarg)
   // https://tc39.es/proposal-dynamic-code-brand-checks/#sec-hostensurecancompilestrings
   // https://html.spec.whatwg.org/#timer-initialisation-steps
-  if (!StaticPrefs::dom_security_trusted_types_enabled() ||
-      aCompilationType == JS::CompilationType::Undefined) {
+  if (aCompilationType == JS::CompilationType::Undefined) {
     return true;
   }
 
@@ -876,9 +887,9 @@ bool AreArgumentsTrustedForEnsureCSPDoesNotBlockStringCompilation(
     }
     MOZ_ASSERT(!NS_IsMainThread());
     WorkerPrivate* workerPrivate = GetCurrentThreadWorkerPrivate();
-    const mozilla::ipc::CSPInfo& cspInfo = workerPrivate->GetCSPInfo();
-    if (cspInfo.requireTrustedTypesForDirectiveState() ==
-        RequireTrustedTypesForDirectiveState::NONE) {
+    Maybe<const mozilla::ipc::CSPInfo&> cspInfo = workerPrivate->GetCSPInfo();
+    if (!cspInfo || cspInfo->requireTrustedTypesForDirectiveState() ==
+                        RequireTrustedTypesForDirectiveState::NONE) {
       return true;
     }
   }

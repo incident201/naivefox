@@ -3310,6 +3310,19 @@ void nsCSSBorderRenderer::CreateWebRenderCommands(
                       wrsides, borderRadius, borderInset);
 }
 
+wr::WrClipId nsCSSBorderRenderer::CreateWebRenderClip(
+    wr::DisplayListBuilder& aBuilder) {
+  wr::BorderSide sides[4];
+  for (auto side : AllPhysicalSides()) {
+    sides[side] = wr::ToBorderSide(ToDeviceColor(NS_RGB(255, 255, 255)),
+                                   mBorderStyles[side]);
+  }
+  return aBuilder.DefineBorderClip(
+      wr::ToLayoutRect(LayoutDeviceRect::FromUnknownRect(mOuterRect)),
+      wr::ToBorderWidths(mBorderWidths), Range<const wr::BorderSide>(sides, 4),
+      wr::ToBorderRadius(mBorderRadii), wr::ToLayoutSideOffsets(mBorderInset));
+}
+
 /* static */
 Maybe<nsCSSBorderImageRenderer>
 nsCSSBorderImageRenderer::CreateBorderImageRenderer(
@@ -3516,12 +3529,12 @@ ImgDrawResult nsCSSBorderImageRenderer::DrawBorderImage(
 }
 
 ImgDrawResult nsCSSBorderImageRenderer::CreateWebRenderCommands(
-    nsDisplayItem* aItem, nsIFrame* aForFrame,
+    const WebRenderImageItemInfo& aItem, nsIFrame* aForFrame,
     mozilla::wr::DisplayListBuilder& aBuilder,
     mozilla::wr::IpcResourceUpdateQueue& aResources,
     const mozilla::layers::StackingContextHelper& aSc,
     mozilla::layers::RenderRootStateManager* aManager,
-    nsDisplayListBuilder* aDisplayListBuilder) {
+    uint32_t aImageDecodeFlags) {
   if (!mImageRenderer.IsReady()) {
     return ImgDrawResult::NOT_READY;
   }
@@ -3563,7 +3576,7 @@ ImgDrawResult nsCSSBorderImageRenderer::CreateWebRenderCommands(
         return ImgDrawResult::NOT_SUPPORTED;
       }
 
-      uint32_t flags = aDisplayListBuilder->GetImageDecodeFlags();
+      uint32_t flags = aImageDecodeFlags;
 
       LayoutDeviceRect imageRect = LayoutDeviceRect::FromAppUnits(
           nsRect(nsPoint(), mImageRenderer.GetSize()), appUnitsPerDevPixel);
@@ -3582,13 +3595,13 @@ ImgDrawResult nsCSSBorderImageRenderer::CreateWebRenderCommands(
 
       Maybe<wr::ImageKey> key =
           aManager->CommandBuilder().CreateImageProviderKey(
-              aItem, provider, drawResult, aResources);
+              aItem.mFrame, aItem.mPerFrameKey, provider, drawResult,
+              aResources);
       if (key.isNothing()) {
         break;
       }
 
-      auto rendering =
-          wr::ToImageRendering(aItem->Frame()->UsedImageRendering());
+      auto rendering = wr::ToImageRendering(aItem.mFrame->UsedImageRendering());
       wr::WrBorderImage params{
           wr::ToBorderWidths(widths[0], widths[1], widths[2], widths[3]),
           key.value(),
@@ -3600,7 +3613,7 @@ ImgDrawResult nsCSSBorderImageRenderer::CreateWebRenderCommands(
           wr::ToRepeatMode(mRepeatModeHorizontal),
           wr::ToRepeatMode(mRepeatModeVertical)};
 
-      aBuilder.PushBorderImage(dest, clip, !aItem->BackfaceIsHidden(), params);
+      aBuilder.PushBorderImage(dest, clip, !aItem.mBackfaceHidden, params);
       break;
     }
     case StyleImage::Tag::Gradient: {
@@ -3626,7 +3639,7 @@ ImgDrawResult nsCSSBorderImageRenderer::CreateWebRenderCommands(
             LayoutDevicePoint(dest.min.x, dest.min.y) + lineEnd;
 
         aBuilder.PushBorderGradient(
-            dest, clip, !aItem->BackfaceIsHidden(),
+            dest, clip, !aItem.mBackfaceHidden,
             wr::ToBorderWidths(widths[0], widths[1], widths[2], widths[3]),
             (float)(mImageSize.width) / appUnitsPerDevPixel,
             (float)(mImageSize.height) / appUnitsPerDevPixel, mFill,
@@ -3635,14 +3648,14 @@ ImgDrawResult nsCSSBorderImageRenderer::CreateWebRenderCommands(
             stops, extendMode);
       } else if (gradient.IsRadial()) {
         aBuilder.PushBorderRadialGradient(
-            dest, clip, !aItem->BackfaceIsHidden(),
+            dest, clip, !aItem.mBackfaceHidden,
             wr::ToBorderWidths(widths[0], widths[1], widths[2], widths[3]),
             mFill, wr::ToLayoutVector2D(lineStart),
             wr::ToLayoutSize(gradientRadius), stops, extendMode);
       } else {
         MOZ_ASSERT(gradient.IsConic());
         aBuilder.PushBorderConicGradient(
-            dest, clip, !aItem->BackfaceIsHidden(),
+            dest, clip, !aItem.mBackfaceHidden,
             wr::ToBorderWidths(widths[0], widths[1], widths[2], widths[3]),
             mFill, wr::ToLayoutVector2D(gradientCenter), gradientAngle, stops,
             extendMode);

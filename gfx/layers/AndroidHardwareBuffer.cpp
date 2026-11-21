@@ -5,6 +5,7 @@
 #include "AndroidHardwareBuffer.h"
 
 #include <android/sync.h>
+#include <errno.h>
 #include <sys/socket.h>
 
 #include "mozilla/TimeStamp.h"
@@ -58,7 +59,7 @@ uint64_t AndroidHardwareBuffer::GetNextId() {
 
 /* static */
 already_AddRefed<AndroidHardwareBuffer> AndroidHardwareBuffer::Create(
-    gfx::IntSize aSize, gfx::SurfaceFormat aFormat) {
+    gfx::IntSize aSize, gfx::SurfaceFormat aFormat, uint64_t aUsage) {
   if (aFormat != gfx::SurfaceFormat::R8G8B8A8 &&
       aFormat != gfx::SurfaceFormat::R8G8B8X8 &&
       aFormat != gfx::SurfaceFormat::B8G8R8A8 &&
@@ -71,10 +72,7 @@ already_AddRefed<AndroidHardwareBuffer> AndroidHardwareBuffer::Create(
   desc.width = aSize.width;
   desc.height = aSize.height;
   desc.layers = 1;  // number of images
-  desc.usage = AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN |
-               AHARDWAREBUFFER_USAGE_CPU_WRITE_OFTEN |
-               AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE |
-               AHARDWAREBUFFER_USAGE_GPU_COLOR_OUTPUT;
+  desc.usage = aUsage;
   desc.format = ToAHardwareBuffer_Format(aFormat);
 
   AHardwareBuffer* nativeBuffer = nullptr;
@@ -210,14 +208,32 @@ UniqueFileHandle AndroidHardwareBuffer::MergeFences(
 
   UniqueFileHandle fence1 = std::move(aFence1);
   UniqueFileHandle fence2 = std::move(aFence2);
-
-  int fd = sync_merge("MergeFences", fence1.get(), fence2.get());
-  if (fd < 0) {
+  auto merged = TryMergeFences(fence1, fence2);
+  if (!merged) {
     gfxCriticalNote << "AndroidHardwareBuffer::MergeFences: "
                        "failed to merge fences";
-    return UniqueFileHandle();
   }
+  return merged;
+}
 
+/* static */
+UniqueFileHandle AndroidHardwareBuffer::TryMergeFences(
+    const UniqueFileHandle& aFence1, const UniqueFileHandle& aFence2) {
+  MOZ_ASSERT(aFence1 && aFence2);
+
+#ifdef DEBUG
+  // Limit retries in debug builds so persistent EINTR does not go unnoticed.
+  const int kMaxEintrRetries = 100;
+  int eintrCounter = 0;
+#endif
+  int fd;
+  do {
+    fd = sync_merge("MergeFences", aFence1.get(), aFence2.get());
+  } while (fd == -1 && errno == EINTR
+#ifdef DEBUG
+           && eintrCounter++ < kMaxEintrRetries
+#endif
+  );
   return UniqueFileHandle(fd);
 }
 
@@ -230,7 +246,9 @@ void AndroidHardwareBuffer::SetReleaseFence(UniqueFileHandle&& aFenceFd) {
 void AndroidHardwareBuffer::SetAcquireFence(UniqueFileHandle&& aFenceFd) {
   MonitorAutoLock lock(mMonitor);
 
-  mAcquireFenceFd = std::move(aFenceFd);
+  // Preserve an unconsumed acquire fence rather than silently dropping it.
+  mAcquireFenceFd =
+      MergeFences(std::move(mAcquireFenceFd), std::move(aFenceFd));
 }
 
 UniqueFileHandle AndroidHardwareBuffer::GetAndResetReleaseFence() {

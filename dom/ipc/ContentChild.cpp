@@ -1195,8 +1195,8 @@ nsresult ContentChild::ProvideWindowCommon(
       aOpenWindowInfo->GetIsForPrinting(),
       aOpenWindowInfo->GetIsForWindowDotPrint(),
       aOpenWindowInfo->GetIsTopLevelCreatedByWebContent(), aURI, features,
-      aModifiers, triggeringPrincipal, policyContainer, referrerInfo,
-      aOpenWindowInfo->GetOriginAttributes(),
+      aModifiers, WrapNotNull(triggeringPrincipal), policyContainer,
+      referrerInfo, aOpenWindowInfo->GetOriginAttributes(),
       aLoadState ? aLoadState->HasValidUserGestureActivation() : false,
       aLoadState ? aLoadState->GetTextDirectiveUserActivation() : false,
       std::move(resolve), std::move(reject));
@@ -2341,6 +2341,13 @@ mozilla::ipc::IPCResult ContentChild::RecvNotifyVisited(
   return IPC_OK();
 }
 
+mozilla::ipc::IPCResult ContentChild::RecvNotifyGlobalHistoryCleared() {
+  if (nsCOMPtr<IHistory> history = components::History::Service()) {
+    history->NotifyHistoryCleared();
+  }
+  return IPC_OK();
+}
+
 mozilla::ipc::IPCResult ContentChild::RecvThemeChanged(
     FullLookAndFeel&& aLookAndFeelData, widget::ThemeChangeKind aKind) {
   LookAndFeel::SetData(std::move(aLookAndFeelData));
@@ -3190,7 +3197,8 @@ void ContentChild::ShutdownInternal() {
         CrashReporter::Annotation::ProfilerChildShutdownPhase,
         isProfiling ? "Profiling - SendShutdownProfile (sending)"
                     : "Not profiling - SendShutdownProfile (sending)");
-    if (const size_t len = shutdownProfileAndAdditionalInformation.SizeOf();
+    if (const size_t len =
+            shutdownProfileAndAdditionalInformation.InlineIPCSize();
         len >= size_t(IPC::Channel::kMaximumMessageSize)) {
       shutdownProfileAndAdditionalInformation.mProfile = nsPrintfCString(
           "*Profile from pid %u bigger (%zu) than IPC max (%zu)",
@@ -3357,7 +3365,7 @@ void ContentChild::FatalErrorIfNotUsingGPUProcess(const char* const aErrorMsg,
 }
 
 PURLClassifierChild* ContentChild::AllocPURLClassifierChild(
-    nsIPrincipal* aPrincipal, bool* aSuccess) {
+    NotNull<nsIPrincipal*> aPrincipal, bool* aSuccess) {
   *aSuccess = true;
   return new URLClassifierChild();
 }
@@ -3909,8 +3917,9 @@ mozilla::ipc::IPCResult ContentChild::RecvWindowFocus(
     return IPC_OK();
   }
 
+  LazyFocusActionId actionId(aActionId);
   nsGlobalWindowOuter::Cast(window)->FocusOuter(
-      aCallerType, /* aFromOtherProcess */ true, aActionId);
+      aCallerType, /* aFromOtherProcess */ true, actionId);
   return IPC_OK();
 }
 
@@ -3962,7 +3971,8 @@ mozilla::ipc::IPCResult ContentChild::RecvRaiseWindow(
   }
 
   if (RefPtr<nsFocusManager> fm = nsFocusManager::GetFocusManager()) {
-    fm->RaiseWindow(window, aCallerType, aActionId);
+    LazyFocusActionId actionId(aActionId);
+    fm->RaiseWindow(window, aCallerType, actionId);
   }
   return IPC_OK();
 }

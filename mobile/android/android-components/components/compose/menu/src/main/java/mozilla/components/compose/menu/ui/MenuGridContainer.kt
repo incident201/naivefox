@@ -20,11 +20,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
-import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.semantics.CollectionInfo
-import androidx.compose.ui.semantics.collectionInfo
-import androidx.compose.ui.semantics.isTraversalGroup
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import mozilla.components.compose.base.text.Text
@@ -44,6 +39,7 @@ import mozilla.components.ui.icons.R as iconsR
  * @param onInteraction The callback to invoke when a menu item is interacted with.
  * @param modifier The modifier to apply to this layout.
  * @param isSticky Whether this group is sticky.
+ * @param showTitles Whether to show the titles of the items. They are never shown if [isSticky].
  * @param backgroundColor The background color to apply to this group.
  */
 @Composable
@@ -52,20 +48,22 @@ internal fun MenuGridContainer(
     onInteraction: (MenuEvent) -> Unit,
     modifier: Modifier = Modifier,
     isSticky: Boolean = false,
+    showTitles: Boolean = true,
     backgroundColor: Color = if (isSticky) MaterialTheme.colorScheme.surface else Color.Transparent,
 ) {
-    val displayedItems = items.filter { it !is BannerMenuItem && it.icon != null }
+    val displayedItems = items.displayedInGrid()
     Row(
         modifier =
-            modifier.fillMaxWidth().height(IntrinsicSize.Min).applyGridGroupStyle(isSticky, backgroundColor).semantics {
-                isTraversalGroup = true
-                collectionInfo = CollectionInfo(rowCount = 1, columnCount = displayedItems.size)
-            },
+            modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Min)
+                .applyGridGroupStyle(isSticky, backgroundColor)
+                .menuGridGroupSemantics(displayedItems.size),
         horizontalArrangement =
-            Arrangement.spacedBy(if (isSticky) AcornTheme.layout.space.static50 else AcornTheme.layout.space.static25),
+            Arrangement.spacedBy(if (isSticky) AcornTheme.layout.space.static100 else AcornTheme.layout.space.static25),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        GridGroupContent(displayedItems, onInteraction, isSticky)
+        GridGroupContent(displayedItems, onInteraction, isSticky, showTitles = showTitles && !isSticky)
     }
 }
 
@@ -74,12 +72,11 @@ private fun Modifier.applyGridGroupStyle(
     isSticky: Boolean,
     backgroundColor: Color,
 ): Modifier {
-    val horizontal = if (isSticky) AcornTheme.layout.space.static50 else 0.dp
-    val vertical = if (isSticky) AcornTheme.layout.space.static150 else 0.dp
+    val horizontal = if (isSticky) AcornTheme.layout.space.static100 else 0.dp
 
     return this.let { if (isSticky) it else it.clip(MaterialTheme.shapes.extraLarge) }
         .background(backgroundColor)
-        .padding(horizontal = horizontal, vertical = vertical)
+        .padding(horizontal = horizontal)
 }
 
 @Composable
@@ -87,6 +84,7 @@ private fun RowScope.GridGroupContent(
     items: List<MenuItem>,
     onInteraction: (MenuEvent) -> Unit,
     isSticky: Boolean,
+    showTitles: Boolean,
 ) {
     items.forEachIndexed { index, item ->
         val icon = item.icon ?: return@forEachIndexed
@@ -98,8 +96,8 @@ private fun RowScope.GridGroupContent(
             }
 
         MenuGridItem(
-            title = item.title.text,
-            contentDescription = item.contentDescription,
+            title = if (showTitles) item.title.text else null,
+            contentDescription = item.contentDescription ?: if (showTitles) null else item.title.text,
             onClickEvent = item.onClickEvent,
             onInteraction = onInteraction,
             modifier = Modifier.weight(1f).fillMaxHeight(),
@@ -110,31 +108,6 @@ private fun RowScope.GridGroupContent(
             showContainer = !isSticky,
             shape = shape,
         )
-    }
-}
-
-@Composable
-private fun getGridItemShape(
-    index: Int,
-    total: Int,
-): Shape {
-    if (total == 1) {
-        return MaterialTheme.shapes.extraLarge
-    }
-    return when (index) {
-        0 ->
-            MaterialTheme.shapes.extraLarge.copy(
-                topEnd = MaterialTheme.shapes.extraSmall.topEnd,
-                bottomEnd = MaterialTheme.shapes.extraSmall.bottomEnd,
-            )
-
-        total - 1 ->
-            MaterialTheme.shapes.extraLarge.copy(
-                topStart = MaterialTheme.shapes.extraSmall.topStart,
-                bottomStart = MaterialTheme.shapes.extraSmall.bottomStart,
-            )
-
-        else -> MaterialTheme.shapes.extraSmall
     }
 }
 
@@ -159,6 +132,13 @@ private fun MenuGridContainerPreview() = AcornTheme {
                     state = MenuItemState.DISABLED,
                 ),
                 StandardMenuItem(
+                    title = MenuItemTitle(Text.String("Bookmark")),
+                    contentDescription = Text.String("Bookmark"),
+                    icon = MenuItemIconRes(iconsR.drawable.mozac_ic_bookmark_fill_24),
+                    onClickEvent = object : MenuEvent {},
+                    state = MenuItemState.ACTIVE,
+                ),
+                StandardMenuItem(
                     title = MenuItemTitle(Text.String("Share")),
                     contentDescription = Text.String("Share"),
                     icon = MenuItemIconRes(iconsR.drawable.mozac_ic_share_android_24),
@@ -173,6 +153,7 @@ private fun MenuGridContainerPreview() = AcornTheme {
             ),
         onInteraction = {},
         isSticky = true,
+        backgroundColor = MaterialTheme.colorScheme.surfaceContainer,
     )
 }
 

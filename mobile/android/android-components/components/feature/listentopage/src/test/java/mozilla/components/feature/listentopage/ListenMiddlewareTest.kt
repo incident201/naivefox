@@ -31,7 +31,7 @@ import mozilla.components.browser.state.state.ReaderState
 import mozilla.components.browser.state.state.createTab
 import mozilla.components.browser.state.store.BrowserStore
 import mozilla.components.feature.listentopage.content.Content
-import mozilla.components.feature.listentopage.content.ContentProvider
+import mozilla.components.feature.listentopage.content.ContentExtractor
 import mozilla.components.feature.listentopage.content.LanguageSource
 import mozilla.components.feature.listentopage.content.TextChunker
 import mozilla.components.feature.listentopage.facts.ListenToPageFacts
@@ -43,12 +43,16 @@ import mozilla.components.feature.listentopage.playback.ArticleDisplayData
 import mozilla.components.feature.listentopage.playback.AudioFileCache
 import mozilla.components.feature.listentopage.playback.DirectoryAudioFileCache
 import mozilla.components.feature.listentopage.playback.PlaybackController
+import mozilla.components.feature.listentopage.playback.PlaybackPhase
+import mozilla.components.feature.listentopage.playback.PlaybackSpeed
 import mozilla.components.feature.listentopage.playback.SEEK_BACK_INCREMENT_MS
 import mozilla.components.feature.listentopage.playback.SEEK_FORWARD_INCREMENT_MS
+import mozilla.components.feature.listentopage.settings.ListenEnabledState
 import mozilla.components.feature.listentopage.settings.ListenSettings
 import mozilla.components.feature.listentopage.synthesis.NoOfflineVoiceAvailableException
 import mozilla.components.feature.listentopage.synthesis.SpeechSynthesisException
 import mozilla.components.feature.listentopage.synthesis.SpeechSynthesizer
+import mozilla.components.feature.listentopage.voices.Voice
 import mozilla.components.lib.state.Middleware
 import mozilla.components.support.base.facts.Facts
 import mozilla.components.support.base.facts.processor.CollectionProcessor
@@ -128,7 +132,7 @@ class ListenMiddlewareTest {
             }
         store.listenAndPlay(TAB_ID, URL)
         advanceUntilIdle()
-        store.dispatch(ListenAction.Session.StopRequested())
+        store.dispatch(ListenAction.User.Session.StopRequested())
         advanceUntilIdle()
 
         store.listenAndPlay(TAB_ID, URL)
@@ -181,7 +185,7 @@ class ListenMiddlewareTest {
         val store = storeWith { extraction.await() }
         store.listenAndPlay(TAB_ID, URL)
         advanceUntilIdle()
-        store.dispatch(ListenAction.Session.StopRequested())
+        store.dispatch(ListenAction.User.Session.StopRequested())
         extraction.complete(Result.success(Content(text = "Article text", languageTag = "de-DE")))
         advanceUntilIdle()
 
@@ -310,7 +314,7 @@ class ListenMiddlewareTest {
                 Result.success(Content(text = "Article text.", languageTag = "en-US"))
             }
 
-        store.dispatch(ListenAction.Session.ListenRequested(TAB_ID, URL))
+        store.dispatch(ListenAction.User.Session.ListenRequested(TAB_ID, URL))
         advanceUntilIdle()
 
         assertEquals(listOf("en-US"), synthesizer.voiceRequests)
@@ -330,7 +334,7 @@ class ListenMiddlewareTest {
         playback.status.value = PlaybackState(phase = PlaybackPhase.Playing)
         advanceUntilIdle()
 
-        store.dispatch(ListenAction.Controls.PlayPauseClicked)
+        store.dispatch(ListenAction.User.Controls.PlayPauseClicked)
         advanceUntilIdle()
 
         assertEquals(1, playback.paused)
@@ -349,7 +353,7 @@ class ListenMiddlewareTest {
         playback.status.value = PlaybackState(phase = PlaybackPhase.Paused)
         advanceUntilIdle()
 
-        store.dispatch(ListenAction.Controls.PlayPauseClicked)
+        store.dispatch(ListenAction.User.Controls.PlayPauseClicked)
         advanceUntilIdle()
 
         assertEquals(0, playback.paused)
@@ -365,7 +369,7 @@ class ListenMiddlewareTest {
                 Result.success(Content(text = "Article text.", languageTag = "en-US"))
             }
 
-        store.dispatch(ListenAction.Session.ListenRequested(TAB_ID, URL))
+        store.dispatch(ListenAction.User.Session.ListenRequested(TAB_ID, URL))
         advanceTimeBy(500.milliseconds)
 
         assertTrue("the opening was already made", synthesizer.files.isEmpty())
@@ -381,8 +385,8 @@ class ListenMiddlewareTest {
                 Result.success(Content(text = "Article text.", languageTag = "en-US"))
             }
 
-        store.dispatch(ListenAction.Session.ListenRequested(TAB_ID, URL))
-        store.dispatch(ListenAction.Controls.PlayPauseClicked)
+        store.dispatch(ListenAction.User.Session.ListenRequested(TAB_ID, URL))
+        store.dispatch(ListenAction.User.Controls.PlayPauseClicked)
         advanceUntilIdle()
 
         assertEquals(listOf("Article text."), synthesizer.requests)
@@ -495,7 +499,7 @@ class ListenMiddlewareTest {
                 storeWith(browserStore = browserStoreWithOpenTabs(title = "An article")) {
                     Result.success(Content(text = "Article text.", languageTag = "en-US"))
                 }
-            store.dispatch(ListenAction.Session.ListenRequested(TAB_ID, URL))
+            store.dispatch(ListenAction.User.Session.ListenRequested(TAB_ID, URL))
             advanceUntilIdle()
 
             assertEquals("An article", store.state.title)
@@ -565,7 +569,7 @@ class ListenMiddlewareTest {
         store.listenAndPlay(TAB_ID, URL)
         advanceUntilIdle()
 
-        val ready = actions.filterIsInstance<ListenAction.Content.ContentReady>().single()
+        val ready = actions.filterIsInstance<ListenAction.System.Content.ContentReady>().single()
         assertEquals(LanguageSource.Fallback, ready.languageSource)
     }
 
@@ -1093,27 +1097,50 @@ class ListenMiddlewareTest {
     }
 
     @Test
-    fun `test that a request in place of a live session throws away only that session's audio`() = runTest {
+    fun `test that a request in place of a live session ends that session as a stop would`() = runTest {
         val cache = FakeAudioFileCache()
-        val synthesizer = FakeSpeechSynthesizer()
+        val playback = FakePlaybackController()
+        val engines = mutableListOf<FakeSpeechSynthesizer>()
         val store =
-            storeWith(synthesizerProvider = { synthesizer }, audioCache = cache) {
+            storeWith(
+                synthesizerProvider = { FakeSpeechSynthesizer().also { engines.add(it) } },
+                playbackController = playback,
+                audioCache = cache,
+            ) {
                 Result.success(Content(text = longArticle(), languageTag = "en-US"))
             }
         store.listenAndPlay(TAB_ID, URL)
         advanceUntilIdle()
-
-        // A session replacing another keeps the engine, so this one fake writes for both and its files stay uniquely
-        // named across them. Everything it wrote up to here belongs to the article the reader is leaving.
-        val leftBehind = synthesizer.files.toList()
-
         store.listenAndPlay(OTHER_TAB_ID, URL)
         advanceUntilIdle()
 
-        assertTrue("Nothing was made to delete", leftBehind.isNotEmpty())
-        assertEquals(leftBehind.toSet(), cache.deleted.toSet())
-        assertFalse(cache.cleared)
+        assertTrue(playback.released)
+        assertTrue(cache.cleared)
+        assertTrue(engines.first().closed)
     }
+
+    @Test
+    fun `test that a request in place of a live session stops its audio even when the new one cannot be read`() =
+        runTest {
+            val playback = FakePlaybackController()
+            // The second session's engine has no voice for its article, so its opening is never handed to the player.
+            val engines = ArrayDeque(listOf(FakeSpeechSynthesizer(), FakeSpeechSynthesizer(voices = emptyList())))
+            val store =
+                storeWith(synthesizerProvider = { engines.removeFirst() }, playbackController = playback) { tabId ->
+                    if (tabId == TAB_ID) {
+                        Result.success(Content(text = "Article text.", languageTag = "en-US"))
+                    } else {
+                        Result.success(Content(text = "Texte de l'article.", languageTag = "fr-FR"))
+                    }
+                }
+            store.listenAndPlay(TAB_ID, URL)
+            advanceUntilIdle()
+            store.listenAndPlay(OTHER_TAB_ID, URL)
+            advanceUntilIdle()
+
+            assertEquals(ListenError.NoOfflineVoice, store.state.error)
+            assertTrue(playback.released)
+        }
 
     @Test
     fun `test that a session starting while the last one is still ending keeps its own audio`() = runTest {
@@ -1131,7 +1158,7 @@ class ListenMiddlewareTest {
 
         // Nothing advanced between them, so the stop is still emptying the cache directory when the session after it
         // starts writing into it. Emptying is a recursive delete of the directory both of them share.
-        store.dispatch(ListenAction.Session.StopRequested())
+        store.dispatch(ListenAction.User.Session.StopRequested())
         store.listenAndPlay(OTHER_TAB_ID, URL)
         advanceUntilIdle()
 
@@ -1173,7 +1200,7 @@ class ListenMiddlewareTest {
         advanceUntilIdle()
         val readTo = playback.queued.last()
 
-        store.dispatch(ListenAction.Session.StopRequested())
+        store.dispatch(ListenAction.User.Session.StopRequested())
         advanceUntilIdle()
         store.listenAndPlay(OTHER_TAB_ID, URL)
         advanceUntilIdle()
@@ -1192,7 +1219,7 @@ class ListenMiddlewareTest {
             }
         store.listenAndPlay(TAB_ID, URL)
         advanceUntilIdle()
-        store.dispatch(ListenAction.Session.StopRequested())
+        store.dispatch(ListenAction.User.Session.StopRequested())
         advanceUntilIdle()
 
         assertTrue(playback.released)
@@ -1210,7 +1237,7 @@ class ListenMiddlewareTest {
 
         // Stop while the engine still has the request, so its write lands after the session has been told to stop.
         advanceTimeBy(500.milliseconds)
-        store.dispatch(ListenAction.Session.StopRequested())
+        store.dispatch(ListenAction.User.Session.StopRequested())
         advanceUntilIdle()
 
         assertEquals(emptyList<String>(), directory.list()?.toList().orEmpty())
@@ -1255,7 +1282,7 @@ class ListenMiddlewareTest {
         assertEquals(1, engines.size)
         assertFalse(engines[0].closed)
 
-        store.dispatch(ListenAction.Session.StopRequested())
+        store.dispatch(ListenAction.User.Session.StopRequested())
         advanceUntilIdle()
 
         assertTrue(engines[0].closed)
@@ -1276,7 +1303,7 @@ class ListenMiddlewareTest {
             }
         store.listenAndPlay(TAB_ID, URL)
         advanceUntilIdle()
-        store.dispatch(ListenAction.Content.ContentReady(languageTag = "en-US"))
+        store.dispatch(ListenAction.System.Content.ContentReady(languageTag = "en-US"))
         advanceUntilIdle()
 
         assertEquals(1, built)
@@ -1292,9 +1319,10 @@ class ListenMiddlewareTest {
         store.listenAndPlay(TAB_ID, URL)
         advanceUntilIdle()
 
-        assertFalse(audioCache.cleared)
+        // Starting a session ends whatever came before it, which empties the cache too.
+        audioCache.cleared = false
 
-        store.dispatch(ListenAction.Session.StopRequested())
+        store.dispatch(ListenAction.User.Session.StopRequested())
         advanceUntilIdle()
 
         assertTrue(audioCache.cleared)
@@ -1322,7 +1350,7 @@ class ListenMiddlewareTest {
         // The second session never gets its own article, so the first one's is all that is left in the field.
         store.listenAndPlay(OTHER_TAB_ID, URL)
         advanceUntilIdle()
-        store.dispatch(ListenAction.Content.ContentReady(languageTag = "en-US"))
+        store.dispatch(ListenAction.System.Content.ContentReady(languageTag = "en-US"))
         advanceUntilIdle()
 
         assertEquals(listOf("First article."), synthesizer.requests)
@@ -1341,11 +1369,11 @@ class ListenMiddlewareTest {
             }
         store.listenAndPlay(TAB_ID, URL)
         advanceUntilIdle()
-        store.dispatch(ListenAction.Session.StopRequested())
+        store.dispatch(ListenAction.User.Session.StopRequested())
         advanceUntilIdle()
 
         // The article is gone, so nothing is left to synthesize a second time.
-        store.dispatch(ListenAction.Content.ContentReady(languageTag = "en-US"))
+        store.dispatch(ListenAction.System.Content.ContentReady(languageTag = "en-US"))
         advanceUntilIdle()
 
         assertEquals(listOf("Article text."), synthesizer.requests)
@@ -1399,7 +1427,7 @@ class ListenMiddlewareTest {
             }
         store.listenAndPlay(TAB_ID, URL)
         advanceUntilIdle()
-        store.dispatch(ListenAction.Voices.VoiceSelected(Voice(id = "fr-fr-male", locale = Locale.FRANCE)))
+        store.dispatch(ListenAction.User.Voices.VoiceSelected(Voice(id = "fr-fr-male", locale = Locale.FRANCE)))
         advanceUntilIdle()
 
         assertEquals("fr-fr-male", settings.getSelectedVoiceId("fr"))
@@ -1420,7 +1448,7 @@ class ListenMiddlewareTest {
             }
         store.listenAndPlay(TAB_ID, URL)
         advanceUntilIdle()
-        store.dispatch(ListenAction.Voices.VoiceSelected(Voice("en-gb-male", Locale.UK)))
+        store.dispatch(ListenAction.User.Voices.VoiceSelected(Voice("en-gb-male", Locale.UK)))
         advanceUntilIdle()
 
         store.listenAndPlay(OTHER_TAB_ID, URL)
@@ -1443,7 +1471,7 @@ class ListenMiddlewareTest {
 
         assertEquals(listOf(Voice(id = "en-us-female", locale = Locale.US)), synthesizer.voicesSet)
 
-        store.dispatch(ListenAction.Voices.VoiceSelected(Voice(id = "en-us-male", locale = Locale.US)))
+        store.dispatch(ListenAction.User.Voices.VoiceSelected(Voice(id = "en-us-male", locale = Locale.US)))
         advanceUntilIdle()
 
         assertEquals(
@@ -1473,7 +1501,7 @@ class ListenMiddlewareTest {
 
         assertEquals(emptyList<File>(), audioCache.deleted)
 
-        store.dispatch(ListenAction.Voices.VoiceSelected(Voice(id = "en-us-male", locale = Locale.US)))
+        store.dispatch(ListenAction.User.Voices.VoiceSelected(Voice(id = "en-us-male", locale = Locale.US)))
         advanceUntilIdle()
 
         // Deleted chunk by chunk rather than by emptying the cache, because the playback carries on into the new voice
@@ -1502,7 +1530,7 @@ class ListenMiddlewareTest {
         store.listenAndPlay(TAB_ID, URL)
         advanceUntilIdle()
 
-        store.dispatch(ListenAction.Voices.VoiceSelected(Voice("en-us-female", Locale.US)))
+        store.dispatch(ListenAction.User.Voices.VoiceSelected(Voice("en-us-female", Locale.US)))
         advanceUntilIdle()
 
         assertEquals(emptyList<File>(), audioCache.deleted)
@@ -1525,7 +1553,7 @@ class ListenMiddlewareTest {
 
         assertNull(settings.getSelectedVoiceId("en"))
 
-        store.dispatch(ListenAction.Voices.VoiceSelected(Voice("en-us-female", Locale.US)))
+        store.dispatch(ListenAction.User.Voices.VoiceSelected(Voice("en-us-female", Locale.US)))
         advanceUntilIdle()
 
         assertEquals("en-us-female", settings.getSelectedVoiceId("en"))
@@ -1552,7 +1580,7 @@ class ListenMiddlewareTest {
                     before.chunkDurationsMs,
                 )!!
 
-            store.dispatch(ListenAction.Voices.VoiceSelected(Voice(id = "b", locale = Locale.UK)))
+            store.dispatch(ListenAction.User.Voices.VoiceSelected(Voice(id = "b", locale = Locale.UK)))
             advanceUntilIdle()
 
             val after = store.state.articleProgress
@@ -1579,7 +1607,7 @@ class ListenMiddlewareTest {
         advanceUntilIdle()
         val restartsBefore = playback.restartedPositionsMs.size
 
-        store.dispatch(ListenAction.Voices.VoiceSelected(Voice(id = "b", locale = Locale.UK)))
+        store.dispatch(ListenAction.User.Voices.VoiceSelected(Voice(id = "b", locale = Locale.UK)))
         advanceUntilIdle()
 
         assertEquals(restartsBefore + 1, playback.restartedPositionsMs.size)
@@ -1601,7 +1629,7 @@ class ListenMiddlewareTest {
         advanceUntilIdle()
         val restartsBefore = playback.restartedPositionsMs.size
 
-        store.dispatch(ListenAction.Voices.VoiceSelected(Voice(id = "b", locale = Locale.UK)))
+        store.dispatch(ListenAction.User.Voices.VoiceSelected(Voice(id = "b", locale = Locale.UK)))
         while (playback.restartedPositionsMs.size == restartsBefore) advanceTimeBy(100.milliseconds)
         runCurrent()
         val shown = store.state.articleProgress
@@ -1624,9 +1652,9 @@ class ListenMiddlewareTest {
         val playback = FakePlaybackController()
         val store = storeReadingHalfway(playback)
 
-        store.dispatch(ListenAction.Voices.VoiceSelected(Voice(id = "b", locale = Locale.UK)))
+        store.dispatch(ListenAction.User.Voices.VoiceSelected(Voice(id = "b", locale = Locale.UK)))
         advanceUntilIdle()
-        store.dispatch(ListenAction.Voices.VoiceSelected(Voice(id = "a", locale = Locale.US)))
+        store.dispatch(ListenAction.User.Voices.VoiceSelected(Voice(id = "a", locale = Locale.US)))
         advanceUntilIdle()
         val restartedMs = playback.restartedPositionsMs.last()
         playback.status.value =
@@ -1665,7 +1693,7 @@ class ListenMiddlewareTest {
         playback.status.value = PlaybackState(phase = PlaybackPhase.Playing, positionMs = 2_000)
         advanceUntilIdle()
 
-        store.dispatch(ListenAction.Playback.SeekRequested(0.5f))
+        store.dispatch(ListenAction.User.Controls.SeekRequested(0.5f))
         advanceUntilIdle()
         playback.status.value =
             PlaybackState(
@@ -1687,7 +1715,7 @@ class ListenMiddlewareTest {
             storeWith(synthesizerProvider = { FakeSpeechSynthesizer().also { built++ } }) {
                 Result.success(Content(text = "Article text.", languageTag = "en-US"))
             }
-        store.dispatch(ListenAction.Voices.VoiceSelected(Voice(id = "en-us-male", locale = Locale.US)))
+        store.dispatch(ListenAction.User.Voices.VoiceSelected(Voice(id = "en-us-male", locale = Locale.US)))
         advanceUntilIdle()
 
         assertEquals(0, built)
@@ -1716,10 +1744,10 @@ class ListenMiddlewareTest {
     }
 
     @Test
-    fun `test that a session on an article in the same language does not ask the engine again`() = runTest {
-        val synthesizer = FakeSpeechSynthesizer()
+    fun `test that a session replacing another in the same language gives its own engine a voice`() = runTest {
+        val engines = mutableListOf<FakeSpeechSynthesizer>()
         val store =
-            storeWith(synthesizerProvider = { synthesizer }) {
+            storeWith(synthesizerProvider = { FakeSpeechSynthesizer().also { engines.add(it) } }) {
                 Result.success(Content(text = "Article text.", languageTag = "en-US"))
             }
         store.listenAndPlay(TAB_ID, URL)
@@ -1727,7 +1755,9 @@ class ListenMiddlewareTest {
         store.listenAndPlay(OTHER_TAB_ID, URL)
         advanceUntilIdle()
 
-        assertEquals(listOf("en-US"), synthesizer.voiceRequests)
+        assertEquals(2, engines.size)
+        assertEquals(listOf("en-US"), engines[1].voiceRequests)
+        assertTrue(engines[1].voicesSet.isNotEmpty())
     }
 
     @Test
@@ -1817,7 +1847,7 @@ class ListenMiddlewareTest {
             }
         store.listenAndPlay(TAB_ID, URL)
         advanceUntilIdle()
-        store.dispatch(ListenAction.Session.StopRequested())
+        store.dispatch(ListenAction.User.Session.StopRequested())
         advanceUntilIdle()
 
         playback.status.value = PlaybackState(phase = PlaybackPhase.Playing, positionMs = 4_000)
@@ -1837,7 +1867,7 @@ class ListenMiddlewareTest {
             }
         store.listenAndPlay(TAB_ID, URL)
         advanceUntilIdle()
-        store.dispatch(ListenAction.Session.StopRequested())
+        store.dispatch(ListenAction.User.Session.StopRequested())
         advanceUntilIdle()
         store.listenAndPlay(OTHER_TAB_ID, URL)
         advanceUntilIdle()
@@ -1864,10 +1894,10 @@ class ListenMiddlewareTest {
 
         assertEquals(
             listOf(
-                ListenAction.Session.ListenRequested(TAB_ID, URL),
-                ListenAction.Session.StopRequested(ListenAction.Session.StopSource.TabClosed),
+                ListenAction.User.Session.ListenRequested(TAB_ID, URL),
+                ListenAction.User.Session.StopRequested(ListenAction.User.Session.StopSource.TabClosed),
             ),
-            actions.filterIsInstance<ListenAction.Session>(),
+            actions.filterIsInstance<ListenAction.User.Session>(),
         )
     }
 
@@ -1887,13 +1917,63 @@ class ListenMiddlewareTest {
 
         assertEquals(
             listOf(
-                ListenAction.Session.ListenRequested(TAB_ID, URL),
-                ListenAction.Session.StopRequested(ListenAction.Session.StopSource.MediaSessionEndedOutsideApp),
+                ListenAction.User.Session.ListenRequested(TAB_ID, URL),
+                ListenAction.User.Session.StopRequested(
+                    ListenAction.User.Session.StopSource.MediaSessionEndedOutsideApp
+                ),
             ),
-            actions.filterIsInstance<ListenAction.Session>(),
+            actions.filterIsInstance<ListenAction.User.Session>(),
         )
         assertNull(store.state.tabId)
         assertTrue(playback.released)
+    }
+
+    @Test
+    fun `test that turning the feature off stops the session and releases the playback`() = runTest {
+        val playback = FakePlaybackController()
+        val settings = ListenSettings.inMemory(enabled = ListenEnabledState.Enabled)
+        val actions = mutableListOf<ListenAction>()
+        val store =
+            storeWith(playbackController = playback, settings = settings, recordInto = actions) {
+                Result.success(Content(text = "Article text.", languageTag = "en-US"))
+            }
+        store.listenAndPlay(TAB_ID, URL)
+        advanceUntilIdle()
+
+        settings.setEnabled(false)
+        advanceUntilIdle()
+
+        assertEquals(
+            listOf(
+                ListenAction.User.Session.ListenRequested(TAB_ID, URL),
+                ListenAction.User.Session.StopRequested(ListenAction.User.Session.StopSource.FeatureDisabled),
+            ),
+            actions.filterIsInstance<ListenAction.User.Session>(),
+        )
+        assertNull(store.state.tabId)
+        assertTrue(playback.released)
+    }
+
+    @Test
+    fun `test that turning the feature off after the session was stopped does not stop it again`() = runTest {
+        val settings = ListenSettings.inMemory(enabled = ListenEnabledState.Enabled)
+        val actions = mutableListOf<ListenAction>()
+        val store =
+            storeWith(settings = settings, recordInto = actions) {
+                Result.success(Content(text = "Article text.", languageTag = "en-US"))
+            }
+        store.listenAndPlay(TAB_ID, URL)
+        advanceUntilIdle()
+        store.dispatch(ListenAction.User.Session.StopRequested())
+        advanceUntilIdle()
+
+        settings.setEnabled(false)
+        advanceUntilIdle()
+
+        assertEquals(
+            listOf(ListenAction.User.Session.ListenRequested(TAB_ID, URL), ListenAction.User.Session.StopRequested()),
+            actions.filterIsInstance<ListenAction.User.Session>(),
+        )
     }
 
     @Test
@@ -1906,7 +1986,7 @@ class ListenMiddlewareTest {
             }
         store.listenAndPlay(TAB_ID, URL)
         advanceUntilIdle()
-        store.dispatch(ListenAction.Session.StopRequested())
+        store.dispatch(ListenAction.User.Session.StopRequested())
         advanceUntilIdle()
 
         playback.sessionEnded.emit(Unit)
@@ -1914,10 +1994,10 @@ class ListenMiddlewareTest {
 
         assertEquals(
             listOf(
-                ListenAction.Session.ListenRequested(TAB_ID, URL),
-                ListenAction.Session.StopRequested(),
+                ListenAction.User.Session.ListenRequested(TAB_ID, URL),
+                ListenAction.User.Session.StopRequested(),
             ),
-            actions.filterIsInstance<ListenAction.Session>(),
+            actions.filterIsInstance<ListenAction.User.Session>(),
         )
     }
 
@@ -1936,8 +2016,8 @@ class ListenMiddlewareTest {
         advanceUntilIdle()
 
         assertEquals(
-            listOf(ListenAction.Session.ListenRequested(TAB_ID, URL)),
-            actions.filterIsInstance<ListenAction.Session>(),
+            listOf(ListenAction.User.Session.ListenRequested(TAB_ID, URL)),
+            actions.filterIsInstance<ListenAction.User.Session>(),
         )
     }
 
@@ -1957,10 +2037,10 @@ class ListenMiddlewareTest {
 
         assertEquals(
             listOf(
-                ListenAction.Session.ListenRequested(TAB_ID, URL),
-                ListenAction.Session.StopRequested(ListenAction.Session.StopSource.ReaderModeClosed),
+                ListenAction.User.Session.ListenRequested(TAB_ID, URL),
+                ListenAction.User.Session.StopRequested(ListenAction.User.Session.StopSource.ReaderModeClosed),
             ),
-            actions.filterIsInstance<ListenAction.Session>(),
+            actions.filterIsInstance<ListenAction.User.Session>(),
         )
     }
 
@@ -1979,8 +2059,8 @@ class ListenMiddlewareTest {
         advanceUntilIdle()
 
         assertEquals(
-            listOf(ListenAction.Session.ListenRequested(TAB_ID, URL)),
-            actions.filterIsInstance<ListenAction.Session>(),
+            listOf(ListenAction.User.Session.ListenRequested(TAB_ID, URL)),
+            actions.filterIsInstance<ListenAction.User.Session>(),
         )
     }
 
@@ -2000,10 +2080,10 @@ class ListenMiddlewareTest {
 
         assertEquals(
             listOf(
-                ListenAction.Session.ListenRequested(TAB_ID, URL),
-                ListenAction.Session.StopRequested(ListenAction.Session.StopSource.TabClosed),
+                ListenAction.User.Session.ListenRequested(TAB_ID, URL),
+                ListenAction.User.Session.StopRequested(ListenAction.User.Session.StopSource.TabClosed),
             ),
-            actions.filterIsInstance<ListenAction.Session>(),
+            actions.filterIsInstance<ListenAction.User.Session>(),
         )
     }
 
@@ -2036,8 +2116,8 @@ class ListenMiddlewareTest {
         advanceUntilIdle()
 
         assertEquals(
-            listOf(ListenAction.Session.ListenRequested(TAB_ID, READER_URL)),
-            actions.filterIsInstance<ListenAction.Session>(),
+            listOf(ListenAction.User.Session.ListenRequested(TAB_ID, READER_URL)),
+            actions.filterIsInstance<ListenAction.User.Session>(),
         )
     }
 
@@ -2056,8 +2136,8 @@ class ListenMiddlewareTest {
         advanceUntilIdle()
 
         assertEquals(
-            listOf(ListenAction.Session.ListenRequested(TAB_ID, URL)),
-            actions.filterIsInstance<ListenAction.Session>(),
+            listOf(ListenAction.User.Session.ListenRequested(TAB_ID, URL)),
+            actions.filterIsInstance<ListenAction.User.Session>(),
         )
     }
 
@@ -2079,10 +2159,10 @@ class ListenMiddlewareTest {
 
         assertEquals(
             listOf(
-                ListenAction.Session.ListenRequested(TAB_ID, URL),
-                ListenAction.Session.ListenRequested(OTHER_TAB_ID, URL),
+                ListenAction.User.Session.ListenRequested(TAB_ID, URL),
+                ListenAction.User.Session.ListenRequested(OTHER_TAB_ID, URL),
             ),
-            actions.filterIsInstance<ListenAction.Session>(),
+            actions.filterIsInstance<ListenAction.User.Session>(),
         )
     }
 
@@ -2207,7 +2287,7 @@ class ListenMiddlewareTest {
             "the player was moved inside a playlist that does not hold the chunk",
             playback.seekedChunkPositions.isEmpty(),
         )
-        assertTrue(actions.contains(ListenAction.Playback.PlaybackWaiting))
+        assertTrue(actions.contains(ListenAction.System.Playback.PlaybackWaiting))
         assertNull(store.state.error)
     }
 
@@ -2473,7 +2553,7 @@ class ListenMiddlewareTest {
         val before = store.state.articleProgress.positionMs
         positions.clear()
 
-        store.dispatch(ListenAction.Controls.ForwardClicked)
+        store.dispatch(ListenAction.User.Controls.ForwardClicked)
         advanceUntilIdle()
 
         assertEquals(listOf(before + SEEK_FORWARD_INCREMENT_MS), positions)
@@ -2497,7 +2577,7 @@ class ListenMiddlewareTest {
 
             // Short of the end, so it is played rather than finished at once, with little of the last chunk left.
             val durationMs = store.state.articleProgress.durationMs
-            store.dispatch(ListenAction.Playback.SeekRequested((durationMs - 1_000).toFloat() / durationMs))
+            store.dispatch(ListenAction.User.Controls.SeekRequested((durationMs - 1_000).toFloat() / durationMs))
             advanceUntilIdle()
             assertEquals("the last chunk was not restarted on", 1, playback.restartedPositionsMs.size)
 
@@ -2529,7 +2609,7 @@ class ListenMiddlewareTest {
             playback.status.value = PlaybackState(phase = PlaybackPhase.Playing, positionMs = 2_000)
             advanceUntilIdle()
 
-            store.dispatch(ListenAction.Playback.SeekRequested(1f))
+            store.dispatch(ListenAction.User.Controls.SeekRequested(1f))
             advanceUntilIdle()
 
             assertTrue("the last chunk was made to be played", playback.restartedPositionsMs.isEmpty())
@@ -2559,10 +2639,10 @@ class ListenMiddlewareTest {
         advanceUntilIdle()
         playback.status.value = PlaybackState(phase = PlaybackPhase.Playing, positionMs = 2_000)
         advanceUntilIdle()
-        store.dispatch(ListenAction.Playback.SeekRequested(1f))
+        store.dispatch(ListenAction.User.Controls.SeekRequested(1f))
         advanceUntilIdle()
 
-        store.dispatch(ListenAction.Controls.PlayPauseClicked)
+        store.dispatch(ListenAction.User.Controls.PlayPauseClicked)
         advanceUntilIdle()
 
         assertEquals(listOf(0 to 0L), playback.seekedChunkPositions)
@@ -2586,13 +2666,13 @@ class ListenMiddlewareTest {
         advanceUntilIdle()
         playback.status.value = PlaybackState(phase = PlaybackPhase.Playing, positionMs = 2_000)
         advanceUntilIdle()
-        store.dispatch(ListenAction.Playback.SeekRequested(1f))
+        store.dispatch(ListenAction.User.Controls.SeekRequested(1f))
         advanceUntilIdle()
 
         val phases = mutableListOf<PlaybackPhase>()
         store.observeManually { phases.add(it.playbackState.phase) }.resume()
 
-        store.dispatch(ListenAction.Playback.SeekRequested(0.5f))
+        store.dispatch(ListenAction.User.Controls.SeekRequested(0.5f))
         runCurrent()
 
         assertTrue("the chunk was not made again", playback.stopAndBufferPositionsMs.isNotEmpty())
@@ -2616,10 +2696,10 @@ class ListenMiddlewareTest {
         advanceUntilIdle()
         playback.status.value = PlaybackState(phase = PlaybackPhase.Playing, positionMs = 2_000)
         advanceUntilIdle()
-        store.dispatch(ListenAction.Playback.SeekRequested(1f))
+        store.dispatch(ListenAction.User.Controls.SeekRequested(1f))
         advanceUntilIdle()
 
-        store.dispatch(ListenAction.Controls.PlayPauseClicked)
+        store.dispatch(ListenAction.User.Controls.PlayPauseClicked)
         runCurrent()
 
         assertEquals(PlaybackPhase.Buffering, store.state.playbackState.phase)
@@ -2704,7 +2784,7 @@ class ListenMiddlewareTest {
                 assertTrue("forward=$forward: the article stopped at $now after $second s", now > last)
                 last = now
             }
-            store.dispatch(ListenAction.Session.StopRequested())
+            store.dispatch(ListenAction.User.Session.StopRequested())
             advanceUntilIdle()
         }
     }
@@ -2820,7 +2900,7 @@ class ListenMiddlewareTest {
         val playback = FakePlaybackController()
         val store = storeWithTwoChunkProgress(playback, positionMs = 45_000)
 
-        store.dispatch(ListenAction.Controls.RewindClicked)
+        store.dispatch(ListenAction.User.Controls.RewindClicked)
         advanceUntilIdle()
 
         assertEquals(listOf(0 to 35_000L), playback.seekedChunkPositions)
@@ -2831,7 +2911,7 @@ class ListenMiddlewareTest {
         val playback = FakePlaybackController()
         val store = storeWithTwoChunkProgress(playback, positionMs = 4_000)
 
-        store.dispatch(ListenAction.Controls.RewindClicked)
+        store.dispatch(ListenAction.User.Controls.RewindClicked)
         advanceUntilIdle()
 
         assertEquals(listOf(0 to 0L), playback.seekedChunkPositions)
@@ -2842,7 +2922,7 @@ class ListenMiddlewareTest {
         val playback = FakePlaybackController()
         val store = storeWithTwoChunkProgress(playback, positionMs = 20_000)
 
-        store.dispatch(ListenAction.Controls.ForwardClicked)
+        store.dispatch(ListenAction.User.Controls.ForwardClicked)
         advanceUntilIdle()
 
         assertEquals(listOf(1 to 50_000L), playback.seekedChunkPositions)
@@ -2853,7 +2933,7 @@ class ListenMiddlewareTest {
         val playback = FakePlaybackController()
         val store = storeWithTwoChunkProgress(playback, positionMs = 20_000)
 
-        store.dispatch(ListenAction.Controls.PlaybackSpeedSelected(PlaybackSpeed.X1_5))
+        store.dispatch(ListenAction.User.Controls.PlaybackSpeedSelected(PlaybackSpeed.X1_5))
         advanceUntilIdle()
 
         assertEquals(listOf(PlaybackSpeed.X1_5), playback.playbackSpeedSet)
@@ -2864,7 +2944,7 @@ class ListenMiddlewareTest {
         val playback = FakePlaybackController()
         val store = storeWithTwoChunkProgress(playback, positionMs = 70_000)
 
-        store.dispatch(ListenAction.Controls.ForwardClicked)
+        store.dispatch(ListenAction.User.Controls.ForwardClicked)
         advanceUntilIdle()
 
         assertTrue("playback was moved to the end to play nothing", playback.seekedChunkPositions.isEmpty())
@@ -2894,7 +2974,7 @@ class ListenMiddlewareTest {
         advanceUntilIdle()
         val before = store.state.articleProgress.positionMs
 
-        store.dispatch(ListenAction.Controls.RewindClicked)
+        store.dispatch(ListenAction.User.Controls.RewindClicked)
         advanceUntilIdle()
         val (chunk, positionMs) = playback.seekedChunkPositions.single()
         playback.status.value =
@@ -2960,7 +3040,7 @@ class ListenMiddlewareTest {
         }
         val queuedAhead = playback.queued.takeLast(AUDIO_WINDOW_RADIUS)
 
-        store.dispatch(ListenAction.Controls.RewindClicked)
+        store.dispatch(ListenAction.User.Controls.RewindClicked)
         advanceUntilIdle()
         val (chunk, positionMs) = playback.seekedChunkPositions.single()
         playback.status.value =
@@ -3013,7 +3093,7 @@ class ListenMiddlewareTest {
         advanceUntilIdle()
 
         store.dispatch(
-            ListenAction.Playback.ArticleProgressReverted(
+            ListenAction.System.Playback.ArticleProgressReverted(
                 positionMs = positionMs,
                 durationMs = 80_000,
                 chunkDurationsMs = listOf(40_000, 40_000),
@@ -3027,7 +3107,7 @@ class ListenMiddlewareTest {
         val playback = FakePlaybackController()
         val store = storeWith(playbackController = playback) { Result.success(Content("Article text", "en-US")) }
 
-        store.dispatch(ListenAction.Playback.SeekRequested(0.5f))
+        store.dispatch(ListenAction.User.Controls.SeekRequested(0.5f))
         advanceUntilIdle()
 
         assertTrue(playback.restartedPositionsMs.isEmpty())
@@ -3038,10 +3118,10 @@ class ListenMiddlewareTest {
     @Test
     fun `test that a seek with nowhere to go puts the elapsed time back where it was`() = runTest {
         val store = storeWith { Result.success(Content("Article text", "en-US")) }
-        store.dispatch(ListenAction.Playback.ArticleProgressReverted(positionMs = 30_000, durationMs = 60_000))
+        store.dispatch(ListenAction.System.Playback.ArticleProgressReverted(positionMs = 30_000, durationMs = 60_000))
         val before = store.state.articleProgress
 
-        store.dispatch(ListenAction.Playback.SeekRequested(0.75f))
+        store.dispatch(ListenAction.User.Controls.SeekRequested(0.75f))
 
         assertEquals(before, store.state.articleProgress)
     }
@@ -3168,7 +3248,7 @@ class ListenMiddlewareTest {
 
         store.seekTo(store.state.articleProgress.chunkDurationsMs.take(SEEK_TARGET_CHUNK).sum() + 1_000)
         advanceTimeBy(100.milliseconds)
-        store.dispatch(ListenAction.Session.StopRequested())
+        store.dispatch(ListenAction.User.Session.StopRequested())
         advanceUntilIdle()
 
         assertEquals(ArticleProgress(), store.state.articleProgress)
@@ -3508,7 +3588,7 @@ class ListenMiddlewareTest {
         advanceUntilIdle()
 
         synthesizer.updateVoices(newList)
-        store.dispatch(ListenAction.Controls.VoicesClicked)
+        store.dispatch(ListenAction.User.Voices.VoicesClicked)
         advanceUntilIdle()
 
         assertEquals(newList, store.state.voiceState.availableVoices)
@@ -3534,7 +3614,7 @@ class ListenMiddlewareTest {
         advanceUntilIdle()
 
         synthesizer.updateVoices(newList)
-        store.dispatch(ListenAction.Controls.VoicesClicked)
+        store.dispatch(ListenAction.User.Voices.VoicesClicked)
         advanceUntilIdle()
 
         assertEquals(newList, store.state.voiceState.availableVoices)
@@ -3560,7 +3640,7 @@ class ListenMiddlewareTest {
         advanceUntilIdle()
 
         synthesizer.updateVoices(newList)
-        store.dispatch(ListenAction.Controls.VoicesClicked)
+        store.dispatch(ListenAction.User.Voices.VoicesClicked)
         advanceUntilIdle()
 
         assertEquals(ListenError.NoOfflineVoice, store.state.error)
@@ -3592,7 +3672,7 @@ class ListenMiddlewareTest {
         assertEquals(ca, store.state.voiceState.selectedVoice)
 
         synthesizer.updateVoices(newList)
-        store.dispatch(ListenAction.Controls.VoicesClicked)
+        store.dispatch(ListenAction.User.Voices.VoicesClicked)
         advanceUntilIdle()
 
         assertEquals(ca, store.state.voiceState.selectedVoice)
@@ -3623,7 +3703,7 @@ class ListenMiddlewareTest {
         assertEquals(uk, store.state.voiceState.selectedVoice)
 
         synthesizer.updateVoices(newList)
-        store.dispatch(ListenAction.Controls.VoicesClicked)
+        store.dispatch(ListenAction.User.Voices.VoicesClicked)
         advanceUntilIdle()
 
         assertEquals(us, store.state.voiceState.selectedVoice)
@@ -3676,14 +3756,14 @@ class ListenMiddlewareTest {
 
     /** Starts a session, which reads the article out as soon as it can. */
     private fun ListenStore.listenAndPlay(tabId: String, url: String) {
-        dispatch(ListenAction.Session.ListenRequested(tabId, url))
+        dispatch(ListenAction.User.Session.ListenRequested(tabId, url))
     }
 
     /**
      * Seeks to [positionMs] into the article, as the progress bar does: as a share of the article's estimated length.
      */
     private fun ListenStore.seekTo(positionMs: Long) =
-        dispatch(ListenAction.Playback.SeekRequested(positionMs.toFloat() / state.articleProgress.durationMs))
+        dispatch(ListenAction.User.Controls.SeekRequested(positionMs.toFloat() / state.articleProgress.durationMs))
 
     /** The player reading chunk [chunk], two seconds in. */
     private fun playingIn(chunk: Int) =
@@ -3713,7 +3793,7 @@ class ListenMiddlewareTest {
             next(action)
             val after = store.state.articleProgress
             val isProgressAction =
-                action is PlayerReportReceived || action is ListenAction.Playback.ArticleProgressReverted
+                action is PlayerReportReceived || action is ListenAction.System.Playback.ArticleProgressReverted
             if (isProgressAction && after != before) into.add(after.positionMs)
         }
 
@@ -3726,7 +3806,7 @@ class ListenMiddlewareTest {
         browserStore: BrowserStore = browserStoreWithOpenTabs(),
         recordInto: MutableList<ListenAction>? = null,
         recordPositionsInto: MutableList<Long>? = null,
-        contentProvider: ContentProvider,
+        contentExtractor: ContentExtractor,
     ): ListenStore {
         val middlewareScope = CoroutineScope(StandardTestDispatcher(testScheduler))
         middlewareScopes.add(middlewareScope)
@@ -3740,7 +3820,7 @@ class ListenMiddlewareTest {
                     recordPositionsInto?.let(::positionRecordingMiddleware),
                     ListenMiddleware(
                         browserStore = browserStore,
-                        contentProvider = contentProvider,
+                        contentExtractor = contentExtractor,
                         synthesizerProvider = synthesizerProvider,
                         audioCache = audioCache,
                         playbackController = playbackController,

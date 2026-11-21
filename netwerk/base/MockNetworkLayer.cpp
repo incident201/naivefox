@@ -15,10 +15,12 @@ static PRDescIdentity sMockNetworkLayerIdentity;
 static PRIOMethods sMockNetworkLayeyMethods;
 static PRIOMethods* sMockNetworkLayeyMethodsPtr = nullptr;
 
-// Not used for now.
 class MockNetworkSecret {
  public:
   MockNetworkSecret() = default;
+
+  // The address the socket was asked to connect to.
+  NetAddr mPeerAddr;
 };
 
 static PRStatus MockNetworkConnect(PRFileDesc* fd, const PRNetAddr* addr,
@@ -30,6 +32,7 @@ static PRStatus MockNetworkConnect(PRFileDesc* fd, const PRNetAddr* addr,
   netAddr.ToAddrPortString(addrPort);
   SOCKET_LOG(
       ("MockNetworkConnect %p connect to [%s]\n", secret, addrPort.get()));
+  secret->mPeerAddr = netAddr;
   if (FindBlockedTCPConnect(netAddr)) {
     SOCKET_LOG(("MockNetworkConnect %p connect to [%s] blocked\n", secret,
                 addrPort.get()));
@@ -64,6 +67,12 @@ static PRInt32 MockNetworkSend(PRFileDesc* fd, const void* buf, PRInt32 amount,
   MockNetworkSecret* secret = reinterpret_cast<MockNetworkSecret*>(fd->secret);
   SOCKET_LOG(("MockNetworkSend %p\n", secret));
 
+  if (FindPausedTCPWrite(secret->mPeerAddr)) {
+    SOCKET_LOG(("MockNetworkSend %p write paused\n", secret));
+    PR_SetError(PR_WOULD_BLOCK_ERROR, 0);
+    return -1;
+  }
+
   PRInt32 rv =
       (fd->lower->methods->send)(fd->lower, buf, amount, flags, timeout);
   return rv;
@@ -88,6 +97,19 @@ static PRInt32 MockNetworkRecv(PRFileDesc* fd, void* buf, PRInt32 amount,
 
 static PRInt32 MockNetworkRead(PRFileDesc* fd, void* buf, PRInt32 amount) {
   return MockNetworkRecv(fd, buf, amount, 0, PR_INTERVAL_NO_WAIT);
+}
+
+static PRInt16 MockNetworkPoll(PRFileDesc* fd, PRInt16 in_flags,
+                               PRInt16* out_flags) {
+  MOZ_RELEASE_ASSERT(fd->identity == sMockNetworkLayerIdentity);
+
+  // Don't report a socket with paused writes as writable, or the caller would
+  // keep trying to write.
+  MockNetworkSecret* secret = reinterpret_cast<MockNetworkSecret*>(fd->secret);
+  if (FindPausedTCPWrite(secret->mPeerAddr)) {
+    in_flags &= ~PR_POLL_WRITE;
+  }
+  return fd->lower->methods->poll(fd->lower, in_flags, out_flags);
 }
 
 static PRStatus MockNetworkClose(PRFileDesc* fd) {
@@ -126,6 +148,14 @@ static PRInt32 MockNetworkSendTo(PRFileDesc* fd, const void* buf,
     PR_SetError(PR_CONNECT_REFUSED_ERROR, 0);
     return -1;
   }
+  if (FindResetUDPAddr(netAddr)) {
+    nsAutoCString addrPort;
+    netAddr.ToAddrPortString(addrPort);
+    SOCKET_LOG(
+        ("MockNetworkSendTo %p addr [%s] reset", secret, addrPort.get()));
+    PR_SetError(PR_CONNECT_RESET_ERROR, 0);
+    return -1;
+  }
   if (FindWouldBlockUDPAddr(netAddr)) {
     nsAutoCString addrPort;
     netAddr.ToAddrPortString(addrPort);
@@ -153,16 +183,23 @@ static PRInt32 PR_CALLBACK MockNetworkRecvFrom(PRFileDesc* fd, void* buf,
 
   MockNetworkSecret* secret = reinterpret_cast<MockNetworkSecret*>(fd->secret);
   SOCKET_LOG(("MockNetworkRecvFrom %p\n", secret));
+  // addr is only filled in by the lower layer, so receive first and then drop
+  // the datagram if its sender is blocked.
+  PRInt32 count = (fd->lower->methods->recvfrom)(fd->lower, buf, amount, flags,
+                                                 addr, timeout);
+  if (count < 0) {
+    return count;
+  }
   mozilla::net::NetAddr netAddr(addr);
   if (FindBlockedUDPAddr(netAddr)) {
     nsAutoCString addrPort;
     netAddr.ToAddrPortString(addrPort);
     SOCKET_LOG(("MockNetworkRecvFrom %p addr [%s] is blocked", secret,
                 addrPort.get()));
-    return PR_SUCCESS;
+    PR_SetError(PR_WOULD_BLOCK_ERROR, 0);
+    return -1;
   }
-  return (fd->lower->methods->recvfrom)(fd->lower, buf, amount, flags, addr,
-                                        timeout);
+  return count;
 }
 
 nsresult AttachMockNetworkLayer(PRFileDesc* fd) {
@@ -174,6 +211,7 @@ nsresult AttachMockNetworkLayer(PRFileDesc* fd) {
     sMockNetworkLayeyMethods.write = MockNetworkWrite;
     sMockNetworkLayeyMethods.recv = MockNetworkRecv;
     sMockNetworkLayeyMethods.read = MockNetworkRead;
+    sMockNetworkLayeyMethods.poll = MockNetworkPoll;
     sMockNetworkLayeyMethods.close = MockNetworkClose;
     sMockNetworkLayeyMethods.sendto = MockNetworkSendTo;
     sMockNetworkLayeyMethods.recvfrom = MockNetworkRecvFrom;

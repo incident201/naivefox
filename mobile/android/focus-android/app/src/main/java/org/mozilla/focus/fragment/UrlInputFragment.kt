@@ -19,6 +19,7 @@ import androidx.core.view.isVisible
 import androidx.fragment.app.activityViewModels
 import mozilla.components.browser.domains.autocomplete.CustomDomainsProvider
 import mozilla.components.browser.domains.autocomplete.ShippedDomainsProvider
+import mozilla.components.browser.state.search.SearchAccessPoint
 import mozilla.components.browser.state.selector.findTab
 import mozilla.components.browser.state.state.SessionState
 import mozilla.components.browser.state.state.TabSessionState
@@ -261,7 +262,7 @@ class UrlInputFragment : BaseFragment(), View.OnClickListener {
                     storage = requireComponents.topSitesStorage,
                     config = {
                         TopSitesConfig(
-                            totalSites = TOP_SITES_MAX_LIMIT,
+                            targetSitesCount = TOP_SITES_MAX_LIMIT,
                             frecencyConfig = null,
                             providerConfig = null,
                         )
@@ -601,9 +602,16 @@ class UrlInputFragment : BaseFragment(), View.OnClickListener {
             requireComponents.searchUseCases.defaultSearch.invoke(searchTerms, tab.id)
             requireComponents.appStore.dispatch(AppAction.FinishEdit(tab.id))
         } else {
+            val screen = requireComponents.appStore.state.screen
             requireComponents.searchUseCases.newPrivateTabSearch.invoke(
                 searchTerms = searchTerms,
                 source = SessionState.Source.Internal.UserEntered,
+                accessPoint =
+                    if (screen is Screen.Home) {
+                        screen.accessPoint
+                    } else {
+                        SearchAccessPoint.DEFAULT
+                    },
             )
         }
 

@@ -47,7 +47,6 @@
 #include "mozilla/webrender/RenderTextureHostSWGL.h"
 #include "mozilla/webrender/RenderThread.h"
 #include "mozilla/widget/CompositorWidget.h"
-#include "mozmemory.h"
 #include "nsExceptionHandler.h"
 
 #ifdef XP_WIN
@@ -167,57 +166,50 @@ namespace mozilla::layers {
 
 using namespace mozilla::gfx;
 
-#ifdef MOZ_MEMORY
-static bool sAllocAsjustmentTaskCancelled = false;
-static bool sIncreasedDirtyPageThreshold = false;
+static bool sRenderIdleCheckExtended = false;
+static bool sRenderIdleCheckPending = false;
 
-static void ResetDirtyPageModifier();
+static void NotifyRenderThreadIfIdle();
 
-static void ScheduleResetMaxDirtyPageModifier() {
+static void ScheduleRenderIdleCheck() {
   NS_DelayedDispatchToCurrentThread(
-      NewRunnableFunction("ResetDirtyPageModifier", &ResetDirtyPageModifier),
+      NewRunnableFunction("NotifyRenderThreadIfIdle",
+                          &NotifyRenderThreadIfIdle),
       100  // In ms.
   );
 }
 
-static void NeedIncreasedMaxDirtyPageModifier() {
-  if (sIncreasedDirtyPageThreshold) {
-    sAllocAsjustmentTaskCancelled = true;
+// Called whenever a transaction goes to WebRender. The render thread is told
+// once no further transaction followed within the check delay. Releasing dirty
+// pages to the OS is left to the deferred purge of the main thread.
+static void NoteRenderActivity() {
+  if (sRenderIdleCheckPending) {
+    sRenderIdleCheckExtended = true;
     return;
   }
 
-  moz_set_max_dirty_page_modifier(3);
-  sIncreasedDirtyPageThreshold = true;
-
-  ScheduleResetMaxDirtyPageModifier();
+  sRenderIdleCheckPending = true;
+  ScheduleRenderIdleCheck();
 }
 
-static void ResetDirtyPageModifier() {
-  if (!sIncreasedDirtyPageThreshold) {
+static void NotifyRenderThreadIfIdle() {
+  if (!sRenderIdleCheckPending) {
     return;
   }
 
-  if (sAllocAsjustmentTaskCancelled) {
-    sAllocAsjustmentTaskCancelled = false;
-    ScheduleResetMaxDirtyPageModifier();
+  if (sRenderIdleCheckExtended) {
+    sRenderIdleCheckExtended = false;
+    ScheduleRenderIdleCheck();
     return;
   }
-
-  moz_set_max_dirty_page_modifier(0);
 
   wr::RenderThread* renderThread = wr::RenderThread::Get();
   if (renderThread && !renderThread->HasShutdown()) {
     renderThread->NotifyIdle();
   }
 
-  jemalloc_free_excess_dirty_pages();
-
-  sIncreasedDirtyPageThreshold = false;
+  sRenderIdleCheckPending = false;
 }
-#else
-// Don't bother doing anything of the memory allocator doesn't support this.
-static void NeedIncreasedMaxDirtyPageModifier() {}
-#endif
 
 LazyLogModule gWebRenderBridgeParentLog("WebRenderBridgeParent");
 #define LOG(...) \
@@ -413,7 +405,7 @@ already_AddRefed<WebRenderBridgeParent> WebRenderBridgeParent::CreateDestroyed(
 }
 
 bool WebRenderBridgeParent::EnsureInitialized() {
-  MOZ_ASSERT(CompositorThreadHolder::IsInCompositorThread());
+  MOZ_RELEASE_ASSERT(CompositorThreadHolder::IsInCompositorThread());
   if (mDestroyed) {
     return false;
   }
@@ -426,7 +418,7 @@ bool WebRenderBridgeParent::EnsureInitialized() {
 void WebRenderBridgeParent::FinishInitialization(
     RefPtr<wr::WebRenderAPI>&& aApi,
     RefPtr<AsyncImagePipelineManager>&& aImageMgr) {
-  MOZ_ASSERT(NS_IsInCompositorThread());
+  MOZ_RELEASE_ASSERT(NS_IsInCompositorThread());
   MOZ_ASSERT(IsRootWebRenderBridgeParent());
   MOZ_ASSERT(mLateInit.isNothing());
   LOG("WebRenderBridgeParent::FinishInitialization() PipelineId %" PRIx64
@@ -479,7 +471,7 @@ void WebRenderBridgeParent::FinishInitializationError(nsCString&& aError) {
 }
 
 already_AddRefed<wr::WebRenderAPI> WebRenderBridgeParent::GetWebRenderAPI() {
-  MOZ_ASSERT(CompositorThreadHolder::IsInCompositorThread());
+  MOZ_RELEASE_ASSERT(CompositorThreadHolder::IsInCompositorThread());
   if (EnsureInitialized()) {
     return do_AddRef(mLateInit->mApi);
   }
@@ -487,7 +479,7 @@ already_AddRefed<wr::WebRenderAPI> WebRenderBridgeParent::GetWebRenderAPI() {
 }
 
 AsyncImagePipelineManager* WebRenderBridgeParent::AsyncImageManager() {
-  MOZ_ASSERT(CompositorThreadHolder::IsInCompositorThread());
+  MOZ_RELEASE_ASSERT(CompositorThreadHolder::IsInCompositorThread());
   if (EnsureInitialized()) {
     return mLateInit->mAsyncImageManager;
   }
@@ -495,7 +487,7 @@ AsyncImagePipelineManager* WebRenderBridgeParent::AsyncImageManager() {
 }
 
 CompositorVsyncScheduler* WebRenderBridgeParent::CompositorScheduler() {
-  MOZ_ASSERT(CompositorThreadHolder::IsInCompositorThread());
+  MOZ_RELEASE_ASSERT(CompositorThreadHolder::IsInCompositorThread());
   if (EnsureInitialized()) {
     return mLateInit->mCompositorScheduler.get();
   }
@@ -653,6 +645,34 @@ static bool ReadRawFont(const OpAddRawFont& aOp, wr::ShmSegmentsReader& aReader,
   return true;
 }
 
+static bool ValidateFontDescriptor(wr::Vec<uint8_t>& aBytes,
+                                   uint32_t& aFontIndex) {
+  gfx::FontType fontType =
+#ifdef WIN32
+      gfx::FontType::DWRITE
+#elif defined(XP_DARWIN)
+      gfx::FontType::MAC
+#elif defined(MOZ_WIDGET_GTK)
+      gfx::FontType::FONTCONFIG
+#elif defined(MOZ_WIDGET_ANDROID)
+      gfx::FontType::FREETYPE
+#else
+      gfx::FontType::UNKNOWN
+#endif
+      ;
+
+  std::string path;
+  if (!gfx::Factory::ValidateUnscaledFontDescriptor(
+          fontType, aBytes.Data(), aBytes.Length(), path, aFontIndex)) {
+    return false;
+  }
+  if (!path.empty()) {
+    aBytes.Clear();
+    aBytes.PushBytes(Range<uint8_t>((uint8_t*)path.c_str(), path.length()));
+  }
+  return true;
+}
+
 already_AddRefed<WebRenderBridgeParent>
 WebRenderBridgeParent::FindSnapshotSourceBridge(
     const wr::IdNamespace& aNamespace) {
@@ -751,8 +771,9 @@ bool WebRenderBridgeParent::UpdateResources(
 
         wr::Vec<uint8_t> bytes;
         if (reader.Read(op.bytes(), bytes)) {
-          aUpdates.AddBlobImage(op.key(), op.descriptor(), mBlobTileSize, bytes,
-                                wr::ToDeviceIntRect(op.visibleRect()));
+          aUpdates.AddBlobImage(op.key(), op.descriptor(),
+                                op.tiling() ? op.tiling() : mBlobTileSize,
+                                bytes, wr::ToDeviceIntRect(op.visibleRect()));
         } else {
           gfxCriticalNote << "TOpAddBlobImage failed";
           success = false;
@@ -879,8 +900,10 @@ bool WebRenderBridgeParent::UpdateResources(
         }
 
         wr::Vec<uint8_t> bytes;
-        if (reader.Read(op.bytes(), bytes)) {
-          aUpdates.AddFontDescriptor(op.key(), bytes, op.fontIndex());
+        uint32_t fontIndex = op.fontIndex();
+        if (reader.Read(op.bytes(), bytes) &&
+            ValidateFontDescriptor(bytes, fontIndex)) {
+          aUpdates.AddFontDescriptor(op.key(), bytes, fontIndex);
         } else {
           gfxCriticalNote << "TOpAddFontDescriptor failed";
           success = false;
@@ -1449,7 +1472,7 @@ bool WebRenderBridgeParent::SetDisplayList(
                                                          aTxnStartTime));
   }
 
-  NeedIncreasedMaxDirtyPageModifier();
+  NoteRenderActivity();
 
   mLateInit->mApi->SendTransaction(aTxn);
 
@@ -1693,7 +1716,7 @@ bool WebRenderBridgeParent::ProcessEmptyTransactionUpdates(
     // There are resource updates, then we update Epoch of transaction.
     txn.UpdateEpoch(mPipelineId, mWrEpoch);
     *aScheduleComposite = true;
-    NeedIncreasedMaxDirtyPageModifier();
+    NoteRenderActivity();
   } else {
     // If TransactionBuilder does not have resource updates nor display list,
     // ScheduleGenerateFrame is not triggered via SceneBuilder and there is no
@@ -1834,7 +1857,7 @@ mozilla::ipc::IPCResult WebRenderBridgeParent::RecvParentCommands(
   wr::TransactionBuilder txn(mLateInit->mApi);
   txn.SetLowPriority(!IsRootWebRenderBridgeParent());
   bool success = ProcessWebRenderParentCommands(aCommands, txn);
-  NeedIncreasedMaxDirtyPageModifier();
+  NoteRenderActivity();
   mLateInit->mApi->SendTransaction(txn);
 
   if (!success) {
@@ -1973,7 +1996,7 @@ bool WebRenderBridgeParent::ProcessWebRenderParentCommands(
 }
 
 void WebRenderBridgeParent::FlushSceneBuilds() {
-  MOZ_ASSERT(CompositorThreadHolder::IsInCompositorThread());
+  MOZ_RELEASE_ASSERT(CompositorThreadHolder::IsInCompositorThread());
 
   // Since we are sending transactions through the scene builder thread, we need
   // to block until all the inflight transactions have been processed. This
@@ -1997,7 +2020,7 @@ void WebRenderBridgeParent::FlushSceneBuilds() {
 }
 
 void WebRenderBridgeParent::FlushFrameGeneration(wr::RenderReasons aReasons) {
-  MOZ_ASSERT(CompositorThreadHolder::IsInCompositorThread());
+  MOZ_RELEASE_ASSERT(CompositorThreadHolder::IsInCompositorThread());
   MOZ_ASSERT(IsRootWebRenderBridgeParent());  // This function is only useful on
                                               // the root WRBP
 
@@ -2013,7 +2036,7 @@ void WebRenderBridgeParent::FlushFrameGeneration(wr::RenderReasons aReasons) {
 }
 
 void WebRenderBridgeParent::FlushFramePresentation() {
-  MOZ_ASSERT(CompositorThreadHolder::IsInCompositorThread());
+  MOZ_RELEASE_ASSERT(CompositorThreadHolder::IsInCompositorThread());
 
   // This sends a message to the render backend thread to send a message
   // to the renderer thread, and waits for that message to be processed. So
@@ -2240,6 +2263,13 @@ mozilla::ipc::IPCResult WebRenderBridgeParent::RecvGetSnapshot(
     return IPC_FAIL_NO_REASON(this);
   }
 
+  // Snapshots must include async remote texture frames that are not ready yet,
+  // which would otherwise only be shown by a later composite. Applying them
+  // may update the scene, so do so before flushing the scene builds.
+  if (mLateInit->mAsyncImageManager->WaitForPendingRemoteTextures()) {
+    FlushFrameGeneration(wr::RenderReasons::SNAPSHOT);
+  }
+
   FlushSceneBuilds();
   FlushFrameGeneration(wr::RenderReasons::SNAPSHOT);
   mLateInit->mApi->Readback(start, size, bufferTexture->GetFormat(),
@@ -2300,10 +2330,10 @@ void WebRenderBridgeParent::AddPipelineIdForCompositable(
 
   // The AsyncImagePipelineManager is shared by every bridge composited into
   // this window, including the window's root pipeline. A pipeline id must not
-  // collide with one that is already live there, possibly registered by
-  // another bridge. Pipeline ids are never legitimately reused, so reject
-  // collisions outright.
-  if (mLateInit->mAsyncImageManager->HasLivePipeline(aPipelineId)) {
+  // collide with one that is already registered there, possibly by another
+  // bridge. Pipeline ids are never legitimately reused, so reject collisions
+  // outright.
+  if (mLateInit->mAsyncImageManager->HasPipeline(aPipelineId)) {
     gfxCriticalNote << "Content attempted AddPipelineIdForCompositable with "
                        "pipelineId already registered";
     return;
@@ -2923,7 +2953,7 @@ void WebRenderBridgeParent::MaybeGenerateFrame(VsyncId aId,
   wr::RenderThread::Get()->IncPendingFrameCount(mLateInit->mApi->GetId(), aId,
                                                 start);
 
-  NeedIncreasedMaxDirtyPageModifier();
+  NoteRenderActivity();
 
   mLateInit->mApi->SendTransaction(fastTxn);
 
@@ -3414,7 +3444,7 @@ WebRenderBridgeParent::GetWebRenderBridgeParentRef() {
 WebRenderBridgeParentRef::WebRenderBridgeParentRef(
     WebRenderBridgeParent* aWebRenderBridge)
     : mWebRenderBridge(aWebRenderBridge) {
-  MOZ_ASSERT(CompositorThreadHolder::IsInCompositorThread());
+  MOZ_RELEASE_ASSERT(CompositorThreadHolder::IsInCompositorThread());
   MOZ_ASSERT(mWebRenderBridge);
 }
 
@@ -3423,12 +3453,12 @@ RefPtr<WebRenderBridgeParent> WebRenderBridgeParentRef::WrBridge() {
 }
 
 void WebRenderBridgeParentRef::Clear() {
-  MOZ_ASSERT(CompositorThreadHolder::IsInCompositorThread());
+  MOZ_RELEASE_ASSERT(CompositorThreadHolder::IsInCompositorThread());
   mWebRenderBridge = nullptr;
 }
 
 WebRenderBridgeParentRef::~WebRenderBridgeParentRef() {
-  MOZ_ASSERT(CompositorThreadHolder::IsInCompositorThread());
+  MOZ_RELEASE_ASSERT(CompositorThreadHolder::IsInCompositorThread());
   MOZ_ASSERT(!mWebRenderBridge);
 }
 

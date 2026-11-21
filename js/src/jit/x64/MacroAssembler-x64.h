@@ -108,6 +108,10 @@ class MacroAssemblerX64 : public MacroAssemblerX86Shared {
   // is the provided value in newShstkPtr.
   void unwindToShadowStackPtr(Register newShstkPtr, Register scratch);
 
+  // Switch to the shadow stack that newShstkPtr points to, leaving a restore
+  // token on the current shadow stack so that it can be switched back to later.
+  void switchToShadowStackPtr(Register newShstkPtr);
+
   void writeDataRelocation(const Value& val) {
     MOZ_ASSERT(val.isGCThing(), "only called for gc-things");
 
@@ -541,8 +545,8 @@ class MacroAssemblerX64 : public MacroAssemblerX86Shared {
   void testPtr(const Operand& lhs, Imm32 rhs) { testq(rhs, lhs); }
   void test64(Register lhs, Register rhs) { testq(rhs, lhs); }
   void test64(Register lhs, const Imm64 rhs) {
-    if ((intptr_t)rhs.value <= INT32_MAX && (intptr_t)rhs.value >= INT32_MIN) {
-      testq(Imm32((int32_t)rhs.value), lhs);
+    if (rhs.value <= INT32_MAX && rhs.value >= INT32_MIN) {
+      testq(Imm32(rhs.value), lhs);
     } else {
       ScratchRegisterScope scratch(asMasm());
       movq(ImmWord(rhs.value), scratch);

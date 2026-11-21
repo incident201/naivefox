@@ -138,11 +138,12 @@ bool HTMLImageElement::Complete() const {
     return true;
   }
 
-  if (mPendingRequest || HasPendingAlwaysLoadImageTask()) {
+  if ((mImageLoadData && mImageLoadData->mPendingRequest) ||
+      HasPendingAlwaysLoadImageTask()) {
     return false;
   }
 
-  if (!mCurrentRequest) {
+  if (!mImageLoadData || !mImageLoadData->mCurrentRequest) {
     // mCurrentRequest can be null in the following two cases:
     //   * This image has loading="lazy" attribute and the request hasn't yet
     //     started
@@ -154,7 +155,7 @@ bool HTMLImageElement::Complete() const {
   }
 
   uint32_t status;
-  mCurrentRequest->GetImageStatus(&status);
+  mImageLoadData->mCurrentRequest->GetImageStatus(&status);
   return (status &
           (imgIRequest::STATUS_LOAD_COMPLETE | imgIRequest::STATUS_ERROR)) != 0;
 }
@@ -1180,15 +1181,8 @@ void HTMLImageElement::InvalidateAttributeMapping() {
     return;
   }
 
-  // Note: Unfortunately, we have to use RESTYLE_SELF, instead of using
-  // RESTYLE_STYLE_ATTRIBUTE or other ways, to avoid re-selector-match because
-  // we are using Gecko_GetExtraContentStyleDeclarations() to retrieve the
-  // extra declaration block from |this|'s width and height attributes, and
-  // other restyle hints seems not enough.
-  // FIXME: We may refine this together with the restyle for presentation
-  // attributes in RestyleManger::AttributeChagned()
   presContext->RestyleManager()->PostRestyleEvent(
-      this, RestyleHint::RESTYLE_SELF, nsChangeHint(0));
+      this, RestyleHint::RESTYLE_PRES_HINTS, nsChangeHint(0));
 }
 
 void HTMLImageElement::SetResponsiveSelector(

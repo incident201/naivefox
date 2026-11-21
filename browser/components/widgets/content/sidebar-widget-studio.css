@@ -1,0 +1,224 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+:host {
+  position: relative;
+  background-color: var(--background-color-canvas);
+  display: flex;
+  flex-direction: column;
+  block-size: 100%;
+}
+
+#close-button,
+#compose-button {
+  --button-border-radius: var(--border-radius-circle);
+
+  @media not (forced-colors) {
+    --button-background-color-ghost: var(--background-color-box);
+    --button-background-color-ghost-hover: color-mix(in srgb, currentColor 14%, var(--background-color-box));
+    --button-background-color-ghost-active: color-mix(in srgb, currentColor 21%, var(--background-color-box));
+
+    &::part(button) {
+      box-shadow: var(--box-shadow-level-1);
+    }
+  }
+}
+
+#close-button {
+  position: absolute;
+  inset-block-start: var(--space-large);
+  inset-inline-end: var(--space-large);
+  z-index: 1;
+
+  /* The shared panel header provides the close button in this mode. */
+  @media -moz-pref("sidebar.visibility", "hide-launcher") {
+    display: none;
+  }
+}
+
+#compose-button {
+  align-self: end;
+  margin-block: auto var(--space-large);
+  margin-inline-end: var(--space-large);
+}
+
+widget-composer {
+  margin-block-start: auto;
+  padding: var(--space-large);
+}
+
+#sign-in-prompt {
+  --sign-in-background-color: light-dark(var(--color-violet-desaturated-10, var(--panel-background-color)), var(--panel-background-color));
+
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-medium);
+  box-sizing: border-box;
+  flex-shrink: 0;
+  overflow: hidden;
+  margin-block-start: calc(var(--space-large) * 2 + var(--size-item-large));
+  margin-inline: var(--space-large);
+  padding-block: var(--space-large) 0;
+  padding-inline: var(--space-large);
+  border: var(--border-width) solid var(--border-color-transparent);
+  border-radius: var(--border-radius-large);
+  background-color: var(--sign-in-background-color);
+  color: var(--text-color);
+
+  @media (prefers-contrast) {
+    border-color: var(--border-color);
+  }
+
+  @media (forced-colors) {
+    --sign-in-background-color: var(--background-color-canvas);
+  }
+
+  :where(h1, p) {
+    margin: 0;
+  }
+}
+
+#sign-in-title {
+  font-size: var(--font-size-large);
+  font-weight: var(--font-weight-bold);
+  overflow-wrap: anywhere;
+}
+
+#sign-in-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-medium);
+}
+
+#sign-in-learn-more {
+  color: var(--link-color);
+  text-decoration: underline;
+}
+
+#sign-in-example-heading {
+  margin-block-start: calc(var(--space-small) + var(--space-xxsmall));
+  padding-block-start: var(--space-large);
+  border-block-start: var(--border-width) solid color-mix(in srgb, currentColor 18%, transparent);
+}
+
+#sign-in-example-prompt {
+  display: flex;
+  align-items: center;
+  gap: var(--space-medium);
+  padding: var(--space-medium) var(--space-large);
+  border-radius: var(--border-radius-circle);
+  background-color: color-mix(in srgb, var(--background-color-box) 70%, transparent);
+  color: var(--text-color-deemphasized);
+  user-select: none;
+
+  img {
+    -moz-context-properties: fill;
+    fill: currentColor;
+  }
+}
+
+#sign-in-illustration {
+  --calendar-frame-color: var(--color-pink-40);
+  --calendar-done-background-color: var(--color-violet-50);
+  --calendar-done-text-color: var(--color-white);
+
+  position: relative;
+  margin-block-end: var(--space-medium);
+  margin-inline: calc(var(--space-xsmall) + var(--space-xxsmall));
+  padding: var(--space-small);
+  user-select: none;
+
+  @media (forced-colors) {
+    --calendar-frame-color: var(--border-color);
+  }
+}
+
+/* A CSS border ties dash length to border width, so an SVG rect draws the long, thin dashes. */
+#sign-in-frame {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  overflow: visible;
+  fill: none;
+  stroke: var(--calendar-frame-color);
+  stroke-dasharray: 8 4;
+
+  rect {
+    width: 100%;
+    height: 100%;
+    rx: var(--border-radius-large);
+  }
+}
+
+#sign-in-calendar {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-xxsmall);
+  overflow: hidden;
+  padding: var(--space-large);
+  border-radius: var(--border-radius-medium);
+  background-color: var(--background-color-box);
+  font-size: calc(var(--font-size-root) * 0.6);
+
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 40% 0 0;
+    background-image: linear-gradient(transparent, var(--background-color-box) 70%);
+  }
+}
+
+#sign-in-calendar-weekdays,
+#sign-in-calendar-days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  justify-items: center;
+  row-gap: var(--space-small);
+}
+
+#sign-in-calendar-weekdays {
+  margin-block-start: var(--space-small);
+  color: var(--text-color-deemphasized);
+}
+
+#sign-in-calendar-days > span {
+  display: grid;
+  place-items: center;
+  inline-size: 100%;
+  max-inline-size: 2.2em;
+  aspect-ratio: 1;
+  border-radius: var(--border-radius-circle);
+
+  &:first-child {
+    grid-column-start: 3;
+  }
+
+  &[data-state="done"] {
+    background-color: var(--calendar-done-background-color);
+    color: var(--calendar-done-text-color);
+    font-weight: var(--font-weight-bold);
+  }
+
+  &[data-state="today"] {
+    border: var(--border-width) solid var(--border-color);
+  }
+
+  &[data-state="upcoming"] {
+    color: var(--text-color-deemphasized);
+  }
+}
+
+#sign-in-kit {
+  position: absolute;
+  inset-block-end: 0;
+  inset-inline-start: calc(-1 * var(--space-xsmall));
+  inline-size: 50%;
+  max-inline-size: var(--size-layout-small);
+  block-size: auto;
+}

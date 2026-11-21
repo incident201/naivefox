@@ -126,9 +126,6 @@
 // Interfaces Needed
 #include "AccessCheck.h"
 #include "Crypto.h"
-#include "FxRWindowManager.h"
-#include "VRShMem.h"
-#include "gfxVR.h"
 #include "mozilla/BasePrincipal.h"
 #include "mozilla/DOMEventTargetHelper.h"
 #include "mozilla/EventDispatcher.h"
@@ -165,8 +162,6 @@
 #include "mozilla/dom/Selection.h"
 #include "mozilla/dom/ServiceWorkerRegistration.h"
 #include "mozilla/dom/VRDisplay.h"
-#include "mozilla/dom/VRDisplayEvent.h"
-#include "mozilla/dom/VRDisplayEventBinding.h"
 #include "mozilla/dom/VREventObserver.h"
 #include "mozilla/dom/WebIDLGlobalNameHash.h"
 #include "mozilla/dom/WindowBinding.h"
@@ -1330,7 +1325,6 @@ static JSObject* NewOuterWindowProxy(JSContext* cx,
 nsGlobalWindowOuter::nsGlobalWindowOuter(uint64_t aWindowID)
     : nsPIDOMWindowOuter(aWindowID),
       mFullscreenHasChangedDuringProcessing(false),
-      mForceFullScreenInWidget(false),
       mIsClosed(false),
       mInClose(false),
       mHavePendingClose(false),
@@ -4231,14 +4225,10 @@ nsresult nsGlobalWindowOuter::ProcessWidgetFullscreenRequest(
     appWin->SetIntrinsicallySized(false);
   }
 
-  // Sometimes we don't want the top-level widget to actually go fullscreen:
-  // - in the B2G desktop client, we don't want the emulated screen dimensions
-  //   to appear to increase when entering fullscreen mode; we just want the
-  //   content to fill the entire client area of the emulator window.
-  // - in FxR Desktop, we don't want fullscreen to take over the monitor, but
-  //   instead we want fullscreen to fill the FxR window in the the headset.
-  if (!StaticPrefs::full_screen_api_ignore_widgets() &&
-      !mForceFullScreenInWidget) {
+  // In the B2G desktop client, we don't want the emulated screen dimensions to
+  // appear to increase when entering fullscreen mode; we just want the content
+  // to fill the entire client area of the emulator window.
+  if (!StaticPrefs::full_screen_api_ignore_widgets()) {
     if (MakeWidgetFullscreen(this, aReason, aFullscreen)) {
       // The rest of code for switching fullscreen is in nsGlobalWindowOuter::
       // FinishFullscreenChange() which will be called after sizemodechange
@@ -4248,12 +4238,6 @@ nsresult nsGlobalWindowOuter::ProcessWidgetFullscreenRequest(
     }
   }
 
-#if defined(NIGHTLY_BUILD) && defined(XP_WIN)
-  if (FxRWindowManager::GetInstance()->IsFxRWindow(mWindowID)) {
-    mozilla::gfx::VRShMem shmem(nullptr, true /*aRequiresMutex*/);
-    shmem.SendFullscreenState(mWindowID, aFullscreen);
-  }
-#endif  // NIGHTLY_BUILD && XP_WIN
   FinishFullscreenChange(aFullscreen);
   return NS_OK;
 }
@@ -4380,14 +4364,6 @@ nsresult nsGlobalWindowOuter::SetFullscreenInternal(FullscreenReason aReason,
   return ProcessWidgetFullscreenRequest(aReason, aFullscreen);
 }
 
-// Support a per-window, dynamic equivalent of enabling
-// full-screen-api.ignore-widgets
-void nsGlobalWindowOuter::ForceFullScreenInWidget() {
-  MOZ_DIAGNOSTIC_ASSERT(XRE_IsParentProcess());
-
-  mForceFullScreenInWidget = true;
-}
-
 bool nsGlobalWindowOuter::TryMakeWidgetFullscreen(FullscreenReason aReason,
                                                   bool aIsFullscreen,
                                                   nsIWidget* aWidget) {
@@ -4449,8 +4425,7 @@ void nsGlobalWindowOuter::FullscreenWillChange(bool aIsFullscreen) {
       // fullscreen state, e.g. browser goes into fullscreen when widget
       // fullscreen is prevented, and then user triggers fullscreen from the OS
       // directly again.
-      MOZ_ASSERT(StaticPrefs::full_screen_api_ignore_widgets() ||
-                     mForceFullScreenInWidget,
+      MOZ_ASSERT(StaticPrefs::full_screen_api_ignore_widgets(),
                  "This should only happen when widget fullscreen is prevented");
     }
   }
@@ -4917,7 +4892,7 @@ void nsGlobalWindowOuter::PromptOuter(const nsAString& aMessage,
 
 void nsGlobalWindowOuter::FocusOuter(CallerType aCallerType,
                                      bool aFromOtherProcess,
-                                     uint64_t aActionId) {
+                                     LazyFocusActionId& aActionId) {
   RefPtr<nsFocusManager> fm = nsFocusManager::GetFocusManager();
   if (MOZ_UNLIKELY(!fm)) {
     return;
@@ -4960,6 +4935,9 @@ void nsGlobalWindowOuter::FocusOuter(CallerType aCallerType,
   // ensures that focus will be in this frame and not in a child.
   if (nsIContent* content = GetFocusedElement()) {
     if (HTMLIFrameElement::FromNode(content)) {
+      // ClearFocus can start newer focus actions, so reserve this one's slot
+      // first to keep it older than them.
+      aActionId.Get();
       fm->ClearFocus(this);
     }
   }
@@ -4976,7 +4954,7 @@ void nsGlobalWindowOuter::FocusOuter(CallerType aCallerType,
     if (!parent->IsInProcess()) {
       if (isActive) {
         OwningNonNull<nsGlobalWindowOuter> kungFuDeathGrip(*this);
-        fm->WindowRaised(kungFuDeathGrip, aActionId);
+        fm->WindowRaised(kungFuDeathGrip, aActionId.Get());
       } else {
         ContentChild* contentChild = ContentChild::GetSingleton();
         MOZ_ASSERT(contentChild);
@@ -5113,14 +5091,6 @@ Nullable<WindowProxyHolder> nsGlobalWindowOuter::Print(
   }
 
   RefPtr<Document> docToPrint = mDoc;
-  if (docToPrint) {
-    // This is needed so that lazily created shadow trees like <input>'s get
-    // cloned into the static document if needed.
-    // FIXME(emilio): Might want to differentiate between JS and non-JS widgets
-    // instead.
-    docToPrint->FlushPendingNotifications(FlushType::Layout);
-    docToPrint = mDoc;
-  }
   if (NS_WARN_IF(!docToPrint)) {
     aError.ThrowNotSupportedError("Document is gone");
     return nullptr;
@@ -5554,7 +5524,8 @@ void nsGlobalWindowOuter::SizeToContentOuter(
   }
 
   nsCOMPtr<nsIDocShellTreeOwner> treeOwner = GetTreeOwner();
-  if (!treeOwner) {
+  nsCOMPtr<nsIAppWindow> appWin = do_GetInterface(treeOwner);
+  if (!appWin) {
     return aError.Throw(NS_ERROR_FAILURE);
   }
 
@@ -5572,9 +5543,7 @@ void nsGlobalWindowOuter::SizeToContentOuter(
       presContext->CSSPixelsToDevPixels(cssSize.width),
       presContext->CSSPixelsToDevPixels(cssSize.height));
 
-  nsCOMPtr<nsIDocShell> docShell = mDocShell;
-  aError =
-      treeOwner->SizeShellTo(docShell, newDevSize.width, newDevSize.height);
+  aError = appWin->SetRootShellSize(newDevSize.width, newDevSize.height);
 }
 
 already_AddRefed<nsPIWindowRoot> nsGlobalWindowOuter::GetTopWindowRoot() {
@@ -6415,35 +6384,6 @@ Element* nsGlobalWindowOuter::GetFrameElement() {
 }
 
 namespace {
-class ChildCommandDispatcher : public Runnable {
- public:
-  ChildCommandDispatcher(nsPIWindowRoot* aRoot, nsIBrowserChild* aBrowserChild,
-                         nsPIDOMWindowOuter* aWindow, const nsAString& aAction)
-      : mozilla::Runnable("ChildCommandDispatcher"),
-        mRoot(aRoot),
-        mBrowserChild(aBrowserChild),
-        mWindow(aWindow),
-        mAction(aAction) {}
-
-  NS_IMETHOD Run() override {
-    AutoTArray<nsCString, 70> enabledCommands, disabledCommands;
-    mRoot->GetEnabledDisabledCommands(enabledCommands, disabledCommands);
-    if (enabledCommands.Length() || disabledCommands.Length()) {
-      BrowserChild* bc = static_cast<BrowserChild*>(mBrowserChild.get());
-      bc->SendEnableDisableCommands(mWindow->GetBrowsingContext(), mAction,
-                                    enabledCommands, disabledCommands);
-    }
-
-    return NS_OK;
-  }
-
- private:
-  nsCOMPtr<nsPIWindowRoot> mRoot;
-  nsCOMPtr<nsIBrowserChild> mBrowserChild;
-  nsCOMPtr<nsPIDOMWindowOuter> mWindow;
-  nsString mAction;
-};
-
 class CommandDispatcher : public Runnable {
  public:
   CommandDispatcher(nsIDOMXULCommandDispatcher* aDispatcher,
@@ -6465,11 +6405,22 @@ class CommandDispatcher : public Runnable {
 void nsGlobalWindowOuter::UpdateCommands(const nsAString& anAction) {
   // If this is a child process, redirect to the parent process.
   if (nsIDocShell* docShell = GetDocShell()) {
-    if (nsCOMPtr<nsIBrowserChild> child = docShell->GetBrowserChild()) {
-      nsCOMPtr<nsPIWindowRoot> root = GetTopWindowRoot();
-      if (root) {
-        nsContentUtils::AddScriptRunner(
-            MakeAndAddRef<ChildCommandDispatcher>(root, child, this, anAction));
+    if (BrowserChild::GetFrom(docShell)) {
+      // Collecting the state of all the commands and updating the commands in
+      // the parent process is expensive, so coalesce all the updates which
+      // happen during the current task, e.g. when focus moves repeatedly.
+      // They are sent at the end of the task rather than from a new task
+      // because a new task may run after higher priority input events whose
+      // shortcut keys the parent process handles with the command state.
+      if (mPendingCommandUpdateActions.Contains(anAction)) {
+        return;
+      }
+      mPendingCommandUpdateActions.AppendElement(anAction);
+      if (mPendingCommandUpdateActions.Length() == 1) {
+        nsContentUtils::RunInStableState(NewRunnableMethod(
+            "nsGlobalWindowOuter::SendPendingCommandUpdatesToParentProcess",
+            this,
+            &nsGlobalWindowOuter::SendPendingCommandUpdatesToParentProcess));
       }
       return;
     }
@@ -6492,6 +6443,35 @@ void nsGlobalWindowOuter::UpdateCommands(const nsAString& anAction) {
   if (xulCommandDispatcher) {
     nsContentUtils::AddScriptRunner(
         MakeAndAddRef<CommandDispatcher>(xulCommandDispatcher, anAction));
+  }
+}
+
+void nsGlobalWindowOuter::SendPendingCommandUpdatesToParentProcess() {
+  const AutoTArray<nsString, 1> actions =
+      std::move(mPendingCommandUpdateActions);
+  MOZ_ASSERT(!actions.IsEmpty());
+
+  nsIDocShell* docShell = GetDocShell();
+  if (!docShell) {
+    return;
+  }
+  RefPtr<BrowserChild> browserChild = BrowserChild::GetFrom(docShell);
+  if (!browserChild || browserChild->IsDestroyed()) {
+    return;
+  }
+  nsCOMPtr<nsPIWindowRoot> root = GetTopWindowRoot();
+  if (!root) {
+    return;
+  }
+
+  AutoTArray<nsCString, 70> enabledCommands, disabledCommands;
+  root->GetEnabledDisabledCommands(enabledCommands, disabledCommands);
+  if (enabledCommands.IsEmpty() && disabledCommands.IsEmpty()) {
+    return;
+  }
+  for (const nsString& action : actions) {
+    browserChild->SendEnableDisableCommands(GetBrowsingContext(), action,
+                                            enabledCommands, disabledCommands);
   }
 }
 

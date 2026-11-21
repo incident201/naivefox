@@ -544,7 +544,8 @@ newtab-wallpaper-firefox-peak-dark = A fox’s face at the left edge, on a dark 
 newtab-wallpaper-firefox-peak-light = A fox’s face at the left edge, on a light background
 newtab-wallpaper-firefox-sky-dark = Dark purple hills under a night sky
 newtab-wallpaper-firefox-sky-light = Light hills under a soft sky
-# “Wrexham AFC” is the name of a football club and should not be translated.
+# “Wrexham AFC” is the name of a football club. Use the name the club is known
+# by in your language, if it has one: in Welsh, “CPD Wrecsam”.
 # "crest" refers to the football club's logo (team badge).
 newtab-wallpaper-firefox-wrexham = The Wrexham AFC crest on a red background
 
@@ -578,7 +579,7 @@ newtab-weather-sponsored = { $provider } ∙ Sponsored
 newtab-weather-widget-open-menu-button =
     .title = Open weather menu
     .aria-label = Open weather menu
-newtab-weather-menu-change-location = Change location
+newtab-weather-menu-change-location = Change Location
 newtab-weather-change-location-search-input-placeholder =
     .placeholder = Search location
     .aria-label = Search location
@@ -593,23 +594,23 @@ newtab-weather-location-search-results =
 # "Current" refers to the user's physical/geographic location detected via geolocation.
 newtab-weather-change-location-search-use-current =
     .label = Use current location
-newtab-weather-menu-weather-display = Weather display
+newtab-weather-menu-weather-display = Weather Display
 newtab-weather-todays-forecast = Today’s forecast
 newtab-weather-see-full-forecast = See full forecast
 # Display options are:
 # - Simple: Displays a current weather condition icon and the current temperature
 # - Detailed: Include simple information plus a short text summary: e.g. "Mostly cloudy"
 newtab-weather-menu-weather-display-option-simple = Simple
-newtab-weather-menu-change-weather-display-simple = Switch to simple view
+newtab-weather-menu-change-weather-display-simple = Switch to Simple View
 newtab-weather-menu-weather-display-option-detailed = Detailed
-newtab-weather-menu-change-weather-display-detailed = Switch to detailed view
-newtab-weather-menu-temperature-units = Temperature units
+newtab-weather-menu-change-weather-display-detailed = Switch to Detailed View
+newtab-weather-menu-temperature-units = Temperature Units
 newtab-weather-menu-temperature-option-fahrenheit = Fahrenheit
 newtab-weather-menu-temperature-option-celsius = Celsius
 newtab-weather-menu-change-temperature-units-fahrenheit = Switch to Fahrenheit
 newtab-weather-menu-change-temperature-units-celsius = Switch to Celsius
-newtab-weather-menu-learn-more = Learn more
-newtab-weather-menu-detect-my-location = Detect my location
+newtab-weather-menu-learn-more = Learn More
+newtab-weather-menu-detect-my-location = Detect My Location
 # This message is shown if user is working offline
 newtab-weather-error-not-available = Weather data is not available right now.
 newtab-weather-opt-in-see-weather = Do you want to see the weather for your location?
@@ -772,6 +773,7 @@ newtab-download-mobile-highlight-image =
     .aria-label = QR code to download { -brand-product-name } for mobile
 
 ## Strings for reporting issues with ads and content
+## Preceded by "Why are you reporting this?"
 
 newtab-report-content-why-reporting-this =
   .label = Why are you reporting this?
@@ -781,6 +783,12 @@ newtab-report-ads-reason-inappropriate =
   .label = It’s inappropriate
 newtab-report-ads-reason-seen-it-too-many-times =
   .label = I’ve seen it too many times
+newtab-report-ads-reason-scam =
+  .label = Scam or fraudulent
+newtab-report-ads-reason-misleading =
+  .label = Misleading or false claims
+newtab-report-ads-reason-offensive =
+  .label = Offensive or inappropriate
 newtab-report-content-wrong-category =
   .label = Wrong category
 newtab-report-content-outdated =
@@ -814,8 +822,8 @@ newtab-section-toast-block =
 ## Strings for task / to-do list productivity widget
 
 newtab-widget-section-title = Widgets
-newtab-widget-menu-hide = Hide widget
-newtab-widget-menu-change-size = Change size
+newtab-widget-menu-hide = Hide Widget
+newtab-widget-menu-change-size = Change Size
 # Parent label for a submenu in the widget menu that reorders the widget
 # among its siblings. "Left" and "Right" appear as items inside this submenu.
 newtab-widget-menu-move = Move
@@ -825,6 +833,12 @@ newtab-widget-menu-move-left = Left
 # Submenu item under "Move"; moves the widget one position to the right.
 # RTL locales should translate this as "Left".
 newtab-widget-menu-move-right = Right
+# Submenu item under "Move"; pins the widget to Home, the New Tab space the
+# page opens on.
+newtab-widget-menu-move-to-home = Home
+# Submenu item under "Move"; moves the widget from Home back to the Widgets
+# space, the New Tab space that holds every widget not pinned to Home.
+newtab-widget-menu-move-to-widgets = Widgets
 newtab-widget-size-small = Small
 newtab-widget-size-medium = Medium
 newtab-widget-size-large = Large
@@ -849,9 +863,9 @@ newtab-widget-section-menu-button =
 newtab-widget-add-widgets-button =
     .aria-label = Add widget
     .title = Add widget
-newtab-widget-section-menu-manage = Manage widgets
-newtab-widget-section-menu-hide-all = Hide widgets
-newtab-widget-section-menu-learn-more = Learn more
+newtab-widget-section-menu-manage = Manage Widgets
+newtab-widget-section-menu-hide-all = Hide Widgets
+newtab-widget-section-menu-learn-more = Learn More
 newtab-widget-section-feedback = Tell us what you think
 # Button shown when additional widgets are hidden beyond the
 # first row, allowing users to show them.
@@ -861,6 +875,10 @@ newtab-widget-section-show-more =
 # allowing users to collapse it back to one row.
 newtab-widget-section-show-less =
     .label = Show fewer widgets
+# Shown in place of a widget's content when the widget could not be loaded.
+# The widget's name is shown and read out separately, just before this message,
+# so this message names no widget.
+newtab-widget-error-not-available = Widget unavailable. Check back later.
 newtab-widget-lists-name-default = Checklist
 newtab-widget-lists-name-label-default =
     .label = Task list
@@ -890,21 +908,21 @@ newtab-widget-lists-completed-list = Completed ({ $number })
 newtab-widget-lists-celebration-headline = Good work
 newtab-widget-lists-celebration-subhead = All clear
 newtab-widget-task-list-menu-copy = Copy
-newtab-widget-lists-menu-edit = Edit list name
+newtab-widget-lists-menu-edit = Edit List Name
 newtab-widget-lists-menu-edit2 =
     .aria-label = Edit list name
-newtab-widget-lists-menu-create = Create a new list
-newtab-widget-lists-menu-delete = Delete this list
-newtab-widget-lists-menu-copy = Copy list to clipboard
-newtab-widget-lists-menu-learn-more = Learn more
+newtab-widget-lists-menu-create = Create a New List
+newtab-widget-lists-menu-delete = Delete This List
+newtab-widget-lists-menu-copy = Copy List to Clipboard
+newtab-widget-lists-menu-learn-more = Learn More
 newtab-widget-lists-button-add-item = Add an item
 newtab-widget-lists-input-add-an-item2 =
     .placeholder = Add an item
     .aria-label = Add an item
 newtab-widget-lists-input-error = Please include text to add an item.
 newtab-widget-lists-input-menu-open-link = Open link
-newtab-widget-lists-input-menu-move-up = Move up
-newtab-widget-lists-input-menu-move-down = Move down
+newtab-widget-lists-input-menu-move-up = Move Up
+newtab-widget-lists-input-menu-move-down = Move Down
 newtab-widget-lists-input-menu-delete = Delete
 newtab-widget-lists-input-menu-edit = Edit
 newtab-widget-lists-input-menu-edit2 =
@@ -940,9 +958,9 @@ newtab-widget-timer-label-pause =
     .label = Pause
 newtab-widget-timer-reset =
     .title = Reset
-newtab-widget-timer-menu-notifications = Turn off notifications
-newtab-widget-timer-menu-notifications-on = Turn on notifications
-newtab-widget-timer-menu-learn-more = Learn more
+newtab-widget-timer-menu-notifications = Turn Off Notifications
+newtab-widget-timer-menu-notifications-on = Turn On Notifications
+newtab-widget-timer-menu-learn-more = Learn More
 # Tooltip and screen reader label for the icon-only button that opens the
 # widget's menu.
 newtab-widget-timer-open-menu-button =
@@ -956,10 +974,6 @@ newtab-widget-timer-open-menu-button =
 newtab-crossword-widget-open-menu-button =
     .title = Open crossword menu
     .aria-label = Open crossword menu
-
-# Context menu item linking to the Particle website, the provider of the
-# crossword. “Particle” is a brand name and should not be translated.
-newtab-crossword-menu-powered-by-particle = Powered by Particle
 
 ## Strings introduced by the Nova redesign of the Timer widget
 
@@ -1058,10 +1072,10 @@ newtab-nova-customization-callout-primary-button =
 
 ## Strings for the Clock widget
 
-newtab-clock-widget-menu-learn-more = Learn more
-newtab-clock-widget-menu-edit = Edit clocks
-newtab-clock-widget-menu-switch-to-12h = Switch to 12-hour format
-newtab-clock-widget-menu-switch-to-24h = Switch to 24-hour format
+newtab-clock-widget-menu-learn-more = Learn More
+newtab-clock-widget-menu-edit = Edit Clocks
+newtab-clock-widget-menu-switch-to-12h = Switch to 12-Hour Format
+newtab-clock-widget-menu-switch-to-24h = Switch to 24-Hour Format
 newtab-clock-widget-label-your-clocks = Your clocks
 # "Back" is an icon-only button next to the city search field form that returns to the list of clocks.
 newtab-clock-widget-search-back-button =
@@ -1073,10 +1087,18 @@ newtab-clock-widget-search-location-input2 =
 # "Nickname (optional)" refers to a custom, user-defined label for a saved location
 # (e.g., "Home", "Office", or "School") to make it easier to recognize.
 # Not to be translated as a legal name, username, or alias used for identity verification.
-newtab-clock-widget-input-nickname =
+# The description counts down as the user types.
+# Variables:
+#   $count (number) - How many more characters the nickname can have.
+newtab-clock-widget-input-nickname2 =
     .label = Nickname (optional)
     .placeholder = Add a nickname
     .aria-label = Nickname (optional)
+    .description =
+        { $count ->
+            [one] { $count } character left
+           *[other] { $count } characters left
+        }
 # "Add new clock" is an icon-only button in the widget toolbar — the
 # attributes are consumed as tooltip/screen-reader label only. The button
 # never renders visible text.
@@ -1342,7 +1364,7 @@ newtab-privacy-widget-label =
     .aria-label = Privacy
 
 # Context menu item linking to more information about the Privacy widget.
-newtab-privacy-menu-learn-more = Learn more
+newtab-privacy-menu-learn-more = Learn More
 
 # Tooltip and screen reader label for the icon-only button that opens the
 # widget's menu.
@@ -1385,6 +1407,9 @@ newtab-privacy-empty-state = { -brand-short-name } automatically blocks trackers
 # Here we are referring to the number of trackers blocked, which increases as the user browses.
 # An alternative can be "See a running total here"
 newtab-privacy-empty-state-tally = See a running tally here.
+# Shorter empty-state copy for the small card, shown as two separate lines.
+newtab-privacy-empty-state-small-title = Fewer trackers, faster browsing.
+newtab-privacy-empty-state-small-message = Browse to start blocking.
 
 ## Privacy widget — Enhanced Tracking Protection off state
 
@@ -1525,10 +1550,10 @@ newtab-stocks-list-watchlist = Watchlist
     .label = Watchlist
 
 # Context menu item that opens the stock search (by company name or ticker symbol).
-newtab-stocks-menu-search-stocks = Search by name or symbol
+newtab-stocks-menu-search-stocks = Search by Name or Symbol
 
 # Context menu item linking to more information about the Finance widget.
-newtab-stocks-menu-learn-more = Learn more
+newtab-stocks-menu-learn-more = Learn More
 
 # Shown in the Finance widget when its data could not be loaded.
 newtab-stocks-error-not-available = Stock data is not available.
@@ -1696,16 +1721,16 @@ newtab-picture-set-wallpaper2 =
     .aria-label = Set this picture as your wallpaper
 
 # Context menu item that opens the New Tab customization panel.
-newtab-picture-menu-manage-wallpaper = Manage wallpaper
+newtab-picture-menu-manage-wallpaper = Manage Wallpaper
 
 # Context menu item that hides the picture shown in the widget.
-newtab-picture-menu-hide-photo2 = Hide this picture
+newtab-picture-menu-hide-photo2 = Hide This Picture
 
 # Context menu item that restores the picture after it has been hidden.
-newtab-picture-menu-show-photo2 = Show picture
+newtab-picture-menu-show-photo2 = Show Picture
 
 # Context menu item linking to more information about the widget.
-newtab-picture-menu-learn-more = Learn more
+newtab-picture-menu-learn-more = Learn More
 
 # Icon button shown on the widget once the picture is hidden; restores it.
 newtab-picture-show-button2 =
@@ -1731,7 +1756,7 @@ newtab-search-widget-open-menu-button =
     .aria-label = Open search menu
 
 # Context menu item linking to more information about the widget.
-newtab-recent-searches-menu-learn-more = Learn more
+newtab-recent-searches-menu-learn-more = Learn More
 
 # Tab listing the searches the user has made recently.
 newtab-recent-searches-tab-recent = Recent searches
@@ -1773,7 +1798,7 @@ newtab-horoscopes-widget-open-menu-button =
     .aria-label = Open horoscopes menu
 
 # Context menu item linking to more information about the widget.
-newtab-horoscopes-menu-learn-more = Learn more
+newtab-horoscopes-menu-learn-more = Learn More
 
 # Context menu item linking to the Yahoo website, the provider of the
 # horoscopes. “Yahoo” is a brand name and should not be translated.
@@ -1792,7 +1817,7 @@ newtab-travel-widget-open-menu-button =
     .aria-label = Open travel menu
 
 # Context menu item linking to more information about the widget.
-newtab-travel-menu-learn-more = Learn more
+newtab-travel-menu-learn-more = Learn More
 
 # Context menu item linking to the Kayak website, the provider of the
 # travel search. “Kayak” is a brand name and should not be translated.
@@ -1812,7 +1837,36 @@ newtab-solitaire-widget-open-menu-button =
     .aria-label = Open solitaire menu
 
 # Context menu item linking to more information about the widget.
-newtab-solitaire-menu-learn-more = Learn more
+newtab-solitaire-menu-learn-more = Learn More
+
+## Strings for the Wrexham AFC widget. Wrexham AFC is a football club from
+## Wrexham, Wales. For now, the widget is only expected to be shown in Welsh
+## and British English. “Wrexham AFC” is the club’s name. Use the name the
+## club is known by in your language, if it has one: in Welsh, “CPD Wrecsam”.
+
+# The widget's name. .title is its heading and accessible name, .label its
+# Customize panel toggle, and .menu-label the screen reader label of the
+# button that opens its menu.
+newtab-custom-widget-wrexhamafc =
+    .title = Wrexham AFC
+    .label = Wrexham AFC
+    .menu-label = Open Wrexham AFC menu
+
+# Menu item opening a submenu that switches what the widget shows. “View” is a
+# noun here, as in “the view the widget shows”.
+newtab-widget-wrexhamafc-menu-view = View
+
+## Options in the View submenu, each switching the widget to a different view.
+## These are football terms: “Matches” shows the club’s latest or next match,
+## with its score once it has started; “Table” shows the league table, the
+## standings of the teams in the club’s league; and “Fixtures” lists the club’s
+## upcoming scheduled matches.
+
+newtab-widget-wrexhamafc-view-matches = Matches
+newtab-widget-wrexhamafc-view-table = Table
+newtab-widget-wrexhamafc-view-fixtures = Fixtures
+# Menu item opening the New Tab customize panel, where wallpapers are chosen.
+newtab-widget-wrexhamafc-menu-wallpapers = Wallpapers
 
 ## Strings for the navigable panels that new tab content area can be
 ## split into.

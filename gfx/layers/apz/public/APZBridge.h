@@ -220,6 +220,10 @@ struct APZEventResult {
 
   // Whether APZ found a horizontal scroll target.
   bool mTargetCanScrollHorizontally = false;
+
+  // Nothing if APZ cannot tell the swipable directions yet. If so, APZ
+  // notifies the widget of them later with mInputBlockId.
+  Maybe<SideBits> mSwipableDirectionsForTouch = Some(SideBits::eNone);
 };
 
 /**

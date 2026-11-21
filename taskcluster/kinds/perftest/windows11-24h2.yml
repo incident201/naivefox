@@ -113,7 +113,6 @@ domcount:
             --browsertime-node ${MOZ_FETCHES_DIR}/node/node.exe
             --output $MOZ_FETCHES_DIR/../artifacts
 
-
 livesites:
     description: Live site performance testing
     variants: [http3]
@@ -431,6 +430,44 @@ pdfjs-alttext-perf:
             --output $MOZ_FETCHES_DIR/../artifacts
             toolkit/components/pdfjs/test/browser_pdfjs_alttext_perf.js
 
+pdfjs-ui-interaction-perf:
+    description: Run the PDF.js viewer scroll, zoom and go to page performance test, with empty pages
+    treeherder:
+        symbol: perftest(pdfjs-ui-interaction)
+        tier: 2
+    attributes:
+        batch: false
+        cron: false
+    run-on-projects: [autoland, mozilla-central]
+    run:
+        command: >-
+            mkdir -p $MOZ_FETCHES_DIR/../artifacts &&
+            cd $MOZ_FETCHES_DIR &&
+            python3 python/mozperftest/mozperftest/runner.py
+            --mochitest-binary ${MOZ_FETCHES_DIR}/firefox/firefox.exe
+            --flavor mochitest
+            --output $MOZ_FETCHES_DIR/../artifacts
+            toolkit/components/pdfjs/test/perf/browser_pdfjs_ui_interaction_perf.js
+
+pdfjs-ui-open-perf:
+    description: Run the PDF.js viewer opening performance test, with empty pages
+    treeherder:
+        symbol: perftest(pdfjs-ui-open)
+        tier: 2
+    attributes:
+        batch: false
+        cron: false
+    run-on-projects: [autoland, mozilla-central]
+    run:
+        command: >-
+            mkdir -p $MOZ_FETCHES_DIR/../artifacts &&
+            cd $MOZ_FETCHES_DIR &&
+            python3 python/mozperftest/mozperftest/runner.py
+            --mochitest-binary ${MOZ_FETCHES_DIR}/firefox/firefox.exe
+            --flavor mochitest
+            --output $MOZ_FETCHES_DIR/../artifacts
+            toolkit/components/pdfjs/test/perf/browser_pdfjs_ui_open_perf.js
+
 semantichistory-perf-wasm: &semantichistory-perf
     description: Run the semantic history search end-to-end performance test (wasm ONNX backend)
     treeherder:
@@ -549,7 +586,6 @@ ml-llama-smollm2-smoke: &ml-llama-smollm2-smoke
             --output $MOZ_FETCHES_DIR/../artifacts
             --hooks toolkit/components/ml/tests/tools/hooks_local_hub.py
             toolkit/components/ml/tests/browser/browser_ml_llama_smollm2_smoke.js
-
 
 ml-llama-smollm2-smoke-hwinference:
     <<: *ml-llama-smollm2-smoke
@@ -1048,7 +1084,6 @@ smartwindow-perf:
         cron: false
     run-on-projects: [mozilla-central]
     run:
-        clone-with: hg
         command: >-
             mkdir -p $MOZ_FETCHES_DIR/../artifacts &&
             cd $MOZ_FETCHES_DIR &&

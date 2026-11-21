@@ -2,12 +2,30 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+/* global BrowserCommands, CreateContainerTabMenu, CustomTitlebar,
+   DynamicShortcutTooltip, gBrowser, gClickAndHoldListenersOnElement,
+   gMultiProcessBrowser, gSharedTabWarning, MozElements, RTL_UI */
+
+import { TabDragAndDrop } from "chrome://browser/content/tabbrowser/drag-and-drop.mjs";
+
 const DIRECTION_BACKWARD = -1;
 const DIRECTION_FORWARD = 1;
 
+const { Tabbrowser } = ChromeUtils.importESModule(
+  "moz-src:///browser/components/tabbrowser/Tabbrowser.sys.mjs"
+);
+const { XPCOMUtils } = ChromeUtils.importESModule(
+  "resource://gre/modules/XPCOMUtils.sys.mjs"
+);
 const { isTab, isTabGroup, isTabGroupLabel, isSplitViewWrapper } = Tabbrowser;
 
 const lazy = XPCOMUtils.declareLazy({
+  AppConstants: "resource://gre/modules/AppConstants.sys.mjs",
+  CustomizableUI:
+    "moz-src:///browser/components/customizableui/CustomizableUI.sys.mjs",
+  NewTabPagePreloading:
+    "moz-src:///browser/components/tabbrowser/NewTabPagePreloading.sys.mjs",
+  PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
   showTabHoverPreview: {
     pref: "browser.tabs.hoverPreview.enabled",
     default: false,
@@ -25,7 +43,12 @@ const lazy = XPCOMUtils.declareLazy({
 export class MozTabbrowserTabs extends MozElements.TabsBase {
   static observedAttributes = ["orient"];
 
-  #animatingGroups = new Set();
+  /**
+   * Number of collapse or expand animations still running, by tab group id.
+   *
+   * @type {Map<string, number>}
+   */
+  #animatingGroups = new Map();
 
   /** @type {Set<MozTabbrowserTab>} */
   #openingTabs = new Set();
@@ -54,6 +77,7 @@ export class MozTabbrowserTabs extends MozElements.TabsBase {
     this.addEventListener("SplitViewCreated", this);
     this.addEventListener("SplitViewRemoved", this);
     this.addEventListener("transitionend", this);
+    this.addEventListener("transitioncancel", this);
     this.addEventListener("dblclick", this);
     this.addEventListener("click", this);
     this.addEventListener("click", this, true);
@@ -82,6 +106,17 @@ export class MozTabbrowserTabs extends MozElements.TabsBase {
       "orient",
       this.getAttribute("orient")
     );
+    this._pinnedTabsMutationObserver = new MutationObserver(() => {
+      this.pinnedTabsContainer.toggleAttribute(
+        "hascontainertab",
+        Array.from(this.pinnedTabsContainer.children).some(child =>
+          child.hasAttribute("usercontextid")
+        )
+      );
+    });
+    this._pinnedTabsMutationObserver.observe(this.pinnedTabsContainer, {
+      childList: true,
+    });
 
     // Override arrowscrollbox.js method, since our scrollbox's children are
     // inherited from the scrollbox binding parent (this).
@@ -181,7 +216,7 @@ export class MozTabbrowserTabs extends MozElements.TabsBase {
     );
     this.#updateTabMinWidth(this._tabMinWidthPref);
 
-    CustomizableUI.addListener(this);
+    lazy.CustomizableUI.addListener(this);
     this._updateNewTabVisibility();
 
     // The base class set these up before we had the arrowscrollbox.
@@ -200,7 +235,7 @@ export class MozTabbrowserTabs extends MozElements.TabsBase {
 
     this.tooltip = "tabbrowser-tab-tooltip";
 
-    this.tabDragAndDrop = new window.TabDragAndDrop(this);
+    this.tabDragAndDrop = new TabDragAndDrop(this);
     this.tabDragAndDrop.init();
   }
 
@@ -352,21 +387,46 @@ export class MozTabbrowserTabs extends MozElements.TabsBase {
 
   on_TabGroupExpand(event) {
     this._invalidateCachedVisibleTabs();
-    this.#animatingGroups.add(event.target.id);
+    this.#startGroupAnimation(event.target.id);
   }
 
   on_TabGroupCollapse(event) {
     this._invalidateCachedVisibleTabs();
     this._unlockTabSizing();
-    this.#animatingGroups.add(event.target.id);
+    this.#startGroupAnimation(event.target.id);
+  }
+
+  #startGroupAnimation(id) {
+    this.#animatingGroups.set(id, (this.#animatingGroups.get(id) ?? 0) + 1);
   }
 
   on_TabGroupAnimationComplete(event) {
     // Delay clearing the animating flag so overflow/underflow handlers
     // triggered by the size change can observe it and skip auto-scroll.
-    window.requestAnimationFrame(() => {
-      this.#animatingGroups.delete(event.target.id);
-    });
+    // arrowscrollbox dispatches those from a requestAnimationFrame callback
+    // that its ResizeObserver queues after the layout flush, so queue ours
+    // after the layout flush the animation's last frame leaves pending.
+    let { id } = event.target;
+    let endAnimation = () => {
+      // A group restored collapsed completes an animation whose start
+      // happened before it was in the tab strip.
+      if (!this.#animatingGroups.has(id)) {
+        return;
+      }
+      let count = this.#animatingGroups.get(id) - 1;
+      if (count) {
+        this.#animatingGroups.set(id, count);
+      } else {
+        this.#animatingGroups.delete(id);
+      }
+    };
+    window
+      .promiseDocumentFlushed(() => {})
+      .then(
+        () => window.requestAnimationFrame(endAnimation),
+        // Without a pres shell, there is no overflow to wait for.
+        endAnimation
+      );
   }
 
   on_TabGroupCreate() {
@@ -389,7 +449,7 @@ export class MozTabbrowserTabs extends MozElements.TabsBase {
    * @param {TransitionEvent} event
    */
   on_transitionend(event) {
-    if (event.propertyName != "max-width") {
+    if (!this.#shouldHandleTransition(event)) {
       return;
     }
 
@@ -401,6 +461,64 @@ export class MozTabbrowserTabs extends MozElements.TabsBase {
       return;
     }
 
+    this.#finishTabAnimation(tab);
+  }
+
+  /**
+   * @param {TransitionEvent} event
+   */
+  on_transitioncancel(event) {
+    if (
+      this.#shouldHandleTransition(event) &&
+      !this.#hasPendingTransition(
+        /** @type {Element} */ (event.target),
+        event.propertyName
+      )
+    ) {
+      // Delegates to `transitionend` when cancellation has no replacement.
+      this.on_transitionend(event);
+    }
+  }
+
+  /**
+   * Check if the transition event is specifically meant for tab sizing.
+   *
+   * @param {TransitionEvent} event
+   * @returns {boolean}
+   */
+  #shouldHandleTransition(event) {
+    const target = /** @type {Element} */ (event.target);
+    return (
+      event.propertyName === "max-width" ||
+      (event.propertyName === "grid-template-rows" &&
+        target.hasAttribute("height-animating"))
+    );
+  }
+
+  /**
+   * Check if this tab has a pending transition for the given property.
+   *
+   * @param {Element} tab
+   * @param {string} propertyName
+   * @returns {boolean}
+   */
+  #hasPendingTransition(tab, propertyName) {
+    return tab
+      .getAnimations()
+      .some(
+        animation =>
+          CSSTransition.isInstance(animation) &&
+          animation.transitionProperty == propertyName
+      );
+  }
+
+  /**
+   * Finish the opening or closing animation for this tab.
+   *
+   * @param {MozTabbrowserTab} tab
+   */
+  #finishTabAnimation(tab) {
+    tab.toggleAttribute("height-animating", false);
     if (tab.hasAttribute("fadein")) {
       if (this.openAnimationFinished(tab)) {
         this._updateCloseButtons();
@@ -550,7 +668,7 @@ export class MozTabbrowserTabs extends MozElements.TabsBase {
   on_keydown(event) {
     let { altKey, shiftKey } = event;
     let [accel, nonAccel] =
-      AppConstants.platform == "macosx"
+      lazy.AppConstants.platform == "macosx"
         ? [event.metaKey, event.ctrlKey]
         : [event.ctrlKey, event.metaKey];
 
@@ -816,7 +934,7 @@ export class MozTabbrowserTabs extends MozElements.TabsBase {
   get emptyTabTitle() {
     // Normal tab title is used also in the permanent private browsing mode.
     const l10nId =
-      PrivateBrowsingUtils.isWindowPrivate(window) &&
+      lazy.PrivateBrowsingUtils.isWindowPrivate(window) &&
       !Services.prefs.getBoolPref("browser.privatebrowsing.autostart")
         ? "tabbrowser-empty-private-tab-title"
         : "tabbrowser-empty-tab-title";
@@ -1266,7 +1384,7 @@ export class MozTabbrowserTabs extends MozElements.TabsBase {
         // privacy.userContext.newTabContainerOnLeftClick.enabled.
         let containersEnabled =
           Services.prefs.getBoolPref("privacy.userContext.enabled") &&
-          !PrivateBrowsingUtils.isWindowPrivate(window);
+          !lazy.PrivateBrowsingUtils.isWindowPrivate(window);
 
         // This pref won't change so often, so just recreate the menu.
         const newTabLeftClickOpensContainersMenu = Services.prefs.getBoolPref(
@@ -1651,6 +1769,56 @@ export class MozTabbrowserTabs extends MozElements.TabsBase {
   }
 
   /**
+   * Fade in a tab. If it's a vertical tab, grow to its fully expanded height.
+   *
+   * @param {MozTabbrowserTab} tab
+   */
+  startTabOpening(tab) {
+    if (this.verticalMode) {
+      if (!tab.isConnected) {
+        return;
+      }
+      this.animateTabHeight(tab, true);
+    } else {
+      tab.toggleAttribute("height-animating", false);
+      tab.setAttribute("fadein", "true");
+    }
+  }
+
+  /**
+   * Start a height transition using the tab's intrinsic size.
+   *
+   * @param {MozTabbrowserTab} tab
+   * @param {boolean} isOpening
+   *   `true` if the tab is opening, `false` if it is closing.
+   */
+  animateTabHeight(tab, isOpening) {
+    tab.toggleAttribute("height-animating", true);
+    if (isOpening) {
+      tab.setAttribute("fadein", "true");
+    } else {
+      tab.removeAttribute("fadein");
+    }
+    window
+      .promiseDocumentFlushed(() =>
+        this.#hasPendingTransition(tab, "grid-template-rows")
+      )
+      .then(hasPendingTransition => {
+        if (
+          !tab.isConnected ||
+          !tab.hasAttribute("height-animating") ||
+          tab.hasAttribute("fadein") !== isOpening
+        ) {
+          return;
+        }
+        // Hidden tabs and reduced motion can prevent a transition from starting.
+        if (!hasPendingTransition) {
+          this.#finishTabAnimation(tab);
+        }
+      });
+  }
+
+  /**
    * Stops counting a tab that starts closing as opening.
    *
    * @param {MozTabbrowserTab} tab
@@ -1677,7 +1845,7 @@ export class MozTabbrowserTabs extends MozElements.TabsBase {
     // session restore), preload the next about:newtab if we don't
     // already have a preloaded browser.
     if (tab.linkedPanel) {
-      NewTabPagePreloading.maybeCreatePreloadedBrowser(window);
+      lazy.NewTabPagePreloading.maybeCreatePreloadedBrowser(window);
     }
 
     if (UserInteraction.running("browser.tabs.opening", window)) {
@@ -1780,7 +1948,7 @@ export class MozTabbrowserTabs extends MozElements.TabsBase {
     if (this.boundObserve) {
       Services.prefs.removeObserver("privacy.userContext", this.boundObserve);
     }
-    CustomizableUI.removeListener(this);
+    lazy.CustomizableUI.removeListener(this);
     this.previewPanel?.forceReset();
   }
 

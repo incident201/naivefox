@@ -304,6 +304,7 @@ class ContentChild final : public PContentChild,
                                                  const bool& haveBidiKeyboards);
 
   mozilla::ipc::IPCResult RecvNotifyVisited(nsTArray<VisitedQueryResult>&&);
+  mozilla::ipc::IPCResult RecvNotifyGlobalHistoryCleared();
 
   mozilla::ipc::IPCResult RecvThemeChanged(FullLookAndFeel&&,
                                            widget::ThemeChangeKind);
@@ -561,8 +562,8 @@ class ContentChild final : public PContentChild,
   }
 
   // PURLClassifierChild
-  PURLClassifierChild* AllocPURLClassifierChild(nsIPrincipal* aPrincipal,
-                                                bool* aSuccess);
+  PURLClassifierChild* AllocPURLClassifierChild(
+      NotNull<nsIPrincipal*> aPrincipal, bool* aSuccess);
   bool DeallocPURLClassifierChild(PURLClassifierChild* aActor);
 
   // PURLClassifierLocalChild

@@ -64,11 +64,21 @@ run-if = ["os == 'mac'"]
 
 ["browser_legacy_pane_mappings.js"]
 
+["browser_newsletter_signup.js"]
+
 ["browser_no_id_collision_between_categories_and_mainPane.js"]
 
 ["browser_open_migration_wizard.js"]
 
 ["browser_privacy_trustPanelBreachAlerts.js"]
+
+["browser_reorderable_list_accessible_names_containers.js"]
+
+["browser_reorderable_list_accessible_names_homepage.js"]
+
+["browser_reorderable_list_accessible_names_languages.js"]
+
+["browser_reorderable_list_accessible_names_search.js"]
 
 ["browser_sessionRestoreNewTab.js"]
 

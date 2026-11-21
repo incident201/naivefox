@@ -2,16 +2,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-buildscript {
-    repositories {
-        gradle.configureMavenRepositories(delegate)
-    }
-
-    dependencies {
-        classpath libs.mozilla.glean.gradle.plugin
-    }
-}
-
 plugins {
     id 'com.android.library'
     alias(libs.plugins.dependency.analysis)
@@ -79,16 +69,9 @@ ext.configurePublish(config.componentsGroupId, project.name, project.ext.descrip
 nimbus {
     // The path to the Nimbus feature manifest file
     manifestFile = "messaging.fml.yaml"
-
-    // This is an optional value, and updates the plugin to use a copy of application
-    // services. The path should be relative to the root project directory.
-    // *NOTE*: This example will not work for all projects, but should work for Fenix, Focus, and Android Components
-    applicationServicesDir = gradle.hasProperty('localProperties.autoPublish.application-services.dir')
-            ? gradle.getProperty('localProperties.autoPublish.application-services.dir') : null
 }
 
 ext {
     gleanNamespace = "mozilla.telemetry.glean"
-    gleanPythonEnvDir = gradle.mozconfig.substs.GRADLE_GLEAN_PARSER_VENV
 }
 apply plugin: "org.mozilla.telemetry.glean-gradle-plugin"

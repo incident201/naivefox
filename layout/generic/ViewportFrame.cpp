@@ -228,13 +228,6 @@ nsDisplayWrapList* ViewportFrame::BuildDisplayListForContentTopLayer(
     if (!frame) {
       continue;
     }
-    if (frame->GetContent() != elem->AsContent()) {
-      // area elements in image maps point to the image frame as their primary
-      // frame but we should treat them like they don't have their own frame
-      // here. See also bug 135040.
-      continue;
-    }
-
     if (frame->IsHiddenByContentVisibilityOnAnyAncestor(
             nsIFrame::IncludeContentVisibility::Hidden)) {
       continue;
@@ -351,12 +344,43 @@ nscoord ViewportFrame::IntrinsicISize(const IntrinsicSizeInput& aInput,
              : mFrames.FirstChild()->IntrinsicISize(aInput, aType);
 }
 
+bool ViewportFrame::ShouldCoverScrollbars(const nsIFrame* aKidFrame) {
+  const nsStyleDisplay* disp = aKidFrame->StyleDisplay();
+  if (disp->mTopLayer == StyleTopLayer::None ||
+      disp->mPosition != StylePositionProperty::Fixed) {
+    return false;
+  }
+
+  MOZ_ASSERT(nsLayoutUtils::MayBeReallyFixedPos(aKidFrame),
+             "aKidFrame should be a real fixed-pos frame!");
+
+  // FIXME(Bug 1874091): All the fixed-pos top-layer frames should cover the
+  // root scrollbars and scrollbar-gutter. The code below fixes only the
+  // fullscreen element and its ::backdrop.
+
+  // Get the originating element if aKidFrame is a ::backdrop.
+  const nsIContent* content = aKidFrame->GetContent();
+  const dom::Element* element =
+      content->IsGeneratedContentContainerForBackdrop()
+          ? content->GetParentElement()
+          : dom::Element::FromNode(content);
+  return element && element->State().HasState(dom::ElementState::FULLSCREEN);
+}
+
 nsRect ViewportFrame::GetContainingBlockAdjustedForScrollbars(
-    const ReflowInput& aReflowInput) const {
+    const ReflowInput& aReflowInput, const nsIFrame* aKidFrame) const {
+  MOZ_ASSERT(aReflowInput.mFrame == this,
+             "Caller should pass ViewportFrame's ReflowInput!");
+  MOZ_ASSERT(aKidFrame->GetParent() == this,
+             "aKidFrame should be ViewportFrame's child!");
+
   const WritingMode wm = aReflowInput.GetWritingMode();
 
   LogicalSize computedSize = aReflowInput.ComputedSize();
   const nsPoint& origin = [&]() {
+    if (ShouldCoverScrollbars(aKidFrame)) {
+      return nsPoint();
+    }
     // Get our prinicpal child frame and see if we're scrollable
     nsIFrame* kidFrame = mFrames.FirstChild();
     if (ScrollContainerFrame* scrollContainerFrame = do_QueryFrame(kidFrame)) {
@@ -372,7 +396,7 @@ nsRect ViewportFrame::GetContainingBlockAdjustedForScrollbars(
           std::max(0, aReflowInput.ComputedBSize() - scrollbars.BStartEnd(wm));
       return nsPoint(scrollbars.Left(wm), scrollbars.Top(wm));
     }
-    return nsPoint(0, 0);
+    return nsPoint();
   }();
 
   nsRect rect(origin, computedSize.GetPhysicalSize(wm));

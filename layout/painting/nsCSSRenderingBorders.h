@@ -105,6 +105,9 @@ class nsCSSBorderRenderer final {
       mozilla::wr::IpcResourceUpdateQueue& aResources,
       const mozilla::layers::StackingContextHelper& aSc);
 
+  mozilla::wr::WrClipId CreateWebRenderClip(
+      mozilla::wr::DisplayListBuilder& aBuilder);
+
   // utility function used for background painting as well as borders
   static void ComputeInnerRadii(const RectCornerRadii& aRadii,
                                 const Margin& aBorderSizes,
@@ -243,9 +246,6 @@ class nsCSSBorderRenderer final {
   // Draw the given dashed/dotted corner with solid style
   void DrawFallbackSolidCorner(mozilla::Side aSide, mozilla::Corner aCorner);
 
-  // Analyze if all border sides have the same width.
-  bool AllBordersSameWidth();
-
   // Analyze if all borders are 'solid' this also considers hidden or 'none'
   // borders because they can be considered 'solid' borders of 0 width and
   // with no color effect.
@@ -273,12 +273,12 @@ class nsCSSBorderImageRenderer final {
                                                 nsIFrame* aForFrame,
                                                 const nsRect& aDirtyRect);
   mozilla::image::ImgDrawResult CreateWebRenderCommands(
-      mozilla::nsDisplayItem* aItem, nsIFrame* aForFrame,
+      const mozilla::WebRenderImageItemInfo& aItem, nsIFrame* aForFrame,
       mozilla::wr::DisplayListBuilder& aBuilder,
       mozilla::wr::IpcResourceUpdateQueue& aResources,
       const mozilla::layers::StackingContextHelper& aSc,
       mozilla::layers::RenderRootStateManager* aManager,
-      mozilla::nsDisplayListBuilder* aDisplayListBuilder);
+      uint32_t aImageDecodeFlags);
 
   nsCSSBorderImageRenderer(const nsCSSBorderImageRenderer& aRhs);
   nsCSSBorderImageRenderer& operator=(const nsCSSBorderImageRenderer& aRhs);

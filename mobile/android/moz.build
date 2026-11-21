@@ -9,21 +9,25 @@ with Files("**"):
 with Files("geckoview_example/**"):
     BUG_COMPONENT = ("GeckoView", "General")
 
-with Files("fenix/**"):
-    BUG_COMPONENT = ("Firefox for Android", "General")
-    SCHEDULES.exclusive = ["android", "fenix"]
+with Files("geckoview/src/*/java/org/mozilla/gecko/media/**"):
+    BUG_COMPONENT = ("Core", "Audio/Video: Playback")
 
-with Files("focus-android/**"):
-    BUG_COMPONENT = ("Focus", "General")
-    SCHEDULES.exclusive = ["android", "focus-android"]
+with Files("geckoview/src/androidTest/assets/www/accessibility/**"):
+    BUG_COMPONENT = ("Core", "Disability Access APIs")
 
-with Files("android-components/**"):
-    BUG_COMPONENT = ("Firefox for Android", "General")
+with Files("gradle/**"):
+    BUG_COMPONENT = ("Firefox Build System", "Android Studio and Gradle Integration")
+
+with Files("gradle/plugins/apilint/**"):
+    BUG_COMPONENT = ("GeckoView", "General")
+
+with Files("test_infra/**"):
+    BUG_COMPONENT = ("Firefox for Android", "UI Tests")
 
 # The Android APKs are assembled in the `export` tier, which usually occurs
-# before the following files are generated. However, mechanisms in `recurse.mk`
-# are used to pull the generated files into the `pre-export` tier, so do not
-# require an explicit dependency here.
+# before the following files are generated. However, the build backend pulls
+# the generated files into the `pre-export` tier, so do not require an explicit
+# dependency here.
 config_keys = ("MOZ_ANDROID_CONTENT_SERVICE_COUNT",)
 flags = ["%s=%s" % (k, CONFIG[k] if CONFIG[k] else "") for k in config_keys]
 
@@ -63,6 +67,64 @@ GeneratedFile(
     script="/toolkit/crashreporter/annotations/generate.py",
     inputs=["!/toolkit/crashreporter/annotations/validated.yaml"],
 )
+
+if CONFIG["MOZ_WEBRTC"]:
+    # libwebrtc Java sources with a jni_zero @NativeMethods interface, relative
+    # to /third_party/libwebrtc. Each gets a generated FooJni implementation.
+    jni_zero_natives = [
+        "rtc_base/java/src/org/webrtc/Logging.java",
+        "sdk/android/api/org/webrtc/AudioTrack.java",
+        "sdk/android/api/org/webrtc/BuiltinAudioDecoderFactoryFactory.java",
+        "sdk/android/api/org/webrtc/BuiltinAudioEncoderFactoryFactory.java",
+        "sdk/android/api/org/webrtc/CallSessionFileRotatingLogSink.java",
+        "sdk/android/api/org/webrtc/DataChannel.java",
+        "sdk/android/api/org/webrtc/Dav1dDecoder.java",
+        "sdk/android/api/org/webrtc/DtmfSender.java",
+        "sdk/android/api/org/webrtc/Environment.java",
+        "sdk/android/api/org/webrtc/JavaI420Buffer.java",
+        "sdk/android/api/org/webrtc/LibaomAv1Encoder.java",
+        "sdk/android/api/org/webrtc/LibvpxVp8Decoder.java",
+        "sdk/android/api/org/webrtc/LibvpxVp8Encoder.java",
+        "sdk/android/api/org/webrtc/LibvpxVp9Decoder.java",
+        "sdk/android/api/org/webrtc/LibvpxVp9Encoder.java",
+        "sdk/android/api/org/webrtc/MediaSource.java",
+        "sdk/android/api/org/webrtc/MediaStreamTrack.java",
+        "sdk/android/api/org/webrtc/Metrics.java",
+        "sdk/android/api/org/webrtc/SoftwareVideoDecoderFactory.java",
+        "sdk/android/api/org/webrtc/SoftwareVideoEncoderFactory.java",
+        "sdk/android/api/org/webrtc/TimestampAligner.java",
+        "sdk/android/api/org/webrtc/TurnCustomizer.java",
+        "sdk/android/api/org/webrtc/VideoDecoderFallback.java",
+        "sdk/android/api/org/webrtc/VideoEncoderFallback.java",
+        "sdk/android/api/org/webrtc/VideoTrack.java",
+        "sdk/android/api/org/webrtc/YuvHelper.java",
+        "sdk/android/api/org/webrtc/audio/JavaAudioDeviceModule.java",
+        "sdk/android/src/java/org/webrtc/EglBase10Impl.java",
+        "sdk/android/src/java/org/webrtc/H264Utils.java",
+        "sdk/android/src/java/org/webrtc/NV12Buffer.java",
+        "sdk/android/src/java/org/webrtc/NV21Buffer.java",
+        "sdk/android/src/java/org/webrtc/NativeAndroidVideoTrackSource.java",
+        "sdk/android/src/java/org/webrtc/VideoDecoderWrapper.java",
+        "sdk/android/src/java/org/webrtc/VideoEncoderWrapper.java",
+        "sdk/android/src/java/org/webrtc/audio/WebRtcAudioRecord.java",
+        "sdk/android/src/java/org/webrtc/audio/WebRtcAudioTrack.java",
+    ]
+    for path in jni_zero_natives:
+        GeneratedFile(
+            "geckoview/src/main/java/%sJni.java" % path[path.index("org/") : -5],
+            script="gen_jni_zero_natives.py",
+            inputs=["/third_party/libwebrtc/" + path],
+        )
+
+    # JniCommon's natives are the only ones we implement, through WrapForJNI.
+    GeneratedFile(
+        "geckoview/src/main/java/org/webrtc/JniCommonJni.java",
+        script="gen_jni_zero_natives.py",
+        inputs=[
+            "/third_party/libwebrtc/sdk/android/src/java/org/webrtc/JniCommon.java"
+        ],
+        flags=["--wrap-for-jni"],
+    )
 
 include("/browser/extensions/webcompat/generate_files.mozbuild")
 include("/browser/extensions/webcompat/preprocessed_intervention_files.mozbuild")

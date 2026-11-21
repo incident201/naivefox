@@ -16,7 +16,11 @@ from typing import Optional as TOptional
 
 import mozpack.path as mozpath
 from taskgraph.transforms.base import TransformSequence
-from taskgraph.transforms.run import rewrite_when_to_optimization
+from taskgraph.transforms.run import (
+    SecretsEntrySchema,
+    rewrite_when_to_optimization,
+    use_secrets,
+)
 from taskgraph.util import json
 from taskgraph.util.copy import deepcopy
 from taskgraph.util.python_path import import_sibling_modules
@@ -125,6 +129,8 @@ class JobDescriptionSchema(Schema, kw_only=True):
     when: TOptional[WhenSchema] = None
     # A list of artifacts to install from 'fetch' tasks.
     fetches: TOptional[dict[str, list[Union[str, FetchArtifactSchema]]]] = None
+    # A list of secrets for run-task to fetch before running the job.
+    secrets: TOptional[list[SecretsEntrySchema]] = None
     # A description of how to run this job.
     run: JobRunSchema
     worker_type: TaskDescriptionSchema.__annotations__["worker_type"]  # noqa: F821
@@ -172,6 +178,9 @@ def set_label(config, jobs):
         if job.get("name"):
             del job["name"]
         yield job
+
+
+transforms.add(use_secrets)
 
 
 @transforms.add
@@ -368,7 +377,9 @@ def use_fetches(config, jobs):
         has_sccache = False
         for kind, artifacts in fetches.items():
             if kind in ("fetch", "toolchain"):
-                for fetch_name in artifacts:
+                for entry in artifacts:
+                    fetch = entry if isinstance(entry, dict) else {"name": entry}
+                    fetch_name = fetch["name"]
                     label = f"{kind}-{fetch_name}"
                     label = aliases.get(label, label)
                     if label not in artifact_names:
@@ -378,14 +389,19 @@ def use_fetches(config, jobs):
                     if label in extra_env:
                         env.update(extra_env[label])
 
-                    path = artifact_names[label]
-
                     dependencies[label] = label
-                    job_fetches.append({
-                        "artifact": path,
+                    job_fetch = {
+                        "artifact": fetch.get("artifact", artifact_names[label]),
                         "task": f"<{label}>",
-                        "extract": should_extract.get(label, True),
-                    })
+                        "extract": fetch.get(
+                            "extract", should_extract.get(label, True)
+                        ),
+                    }
+                    if (dest := fetch.get("dest")) is not None:
+                        job_fetch["dest"] = dest
+                    if verify_hash := fetch.get("verify-hash"):
+                        job_fetch["verify-hash"] = verify_hash
+                    job_fetches.append(job_fetch)
 
                     if kind == "toolchain" and fetch_name.endswith("-sccache"):
                         has_sccache = True

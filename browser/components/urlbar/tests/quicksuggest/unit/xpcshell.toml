@@ -11,6 +11,8 @@ prefs = [
 
 ["test_merinoClient.js"]
 
+["test_merinoClient_newtab.js"]
+
 ["test_merinoClient_sessions.js"]
 requesttimeoutfactor = 2  # Slow on Windows
 
@@ -79,6 +81,7 @@ requesttimeoutfactor = 2  # Slow on Mac in verify mode
 ["test_quicksuggest_temporal.js"]
 
 ["test_quicksuggest_temporalResults.js"]
+requesttimeoutfactor = 2  # Slow on Mac in verify mode
 
 ["test_quicksuggest_topPicks.js"]
 

@@ -24,6 +24,12 @@ run-if = [
   "os == 'win'",
 ]
 
+["test_Arc_spaces.js"]
+run-if = [
+  "os == 'mac'",
+  "os == 'win'",
+]
+
 ["test_BookmarksFileMigrator.js"]
 
 ["test_ChromeMigrationUtils.js"]
@@ -50,9 +56,6 @@ run-if = [
 ["test_Chrome_formdata.js"]
 
 ["test_Chrome_history.js"]
-run-if = [
-  "os == 'mac'", # Relies on ULibDir
-]
 
 ["test_Chrome_passwords.js"]
 run-if = [

@@ -2369,9 +2369,6 @@ sftk_doMACInit(CK_MECHANISM_TYPE mech, SFTKSessionContext *session,
         return crv;
     }
 
-    session->hashInfo = context;
-    session->multi = PR_TRUE;
-
     /* Required by FIPS 198 Section 4. Delay this check until after the MAC
      * has been initialized to steal the output size of the MAC. */
     if (isFIPS && (mac_size < 4 || mac_size < context->mac_size / 2)) {
@@ -2379,19 +2376,22 @@ sftk_doMACInit(CK_MECHANISM_TYPE mech, SFTKSessionContext *session,
         return CKR_BUFFER_TOO_SMALL;
     }
 
-    /* Configure our helper functions appropriately. Note that these casts
-     * ignore the return values. */
-    session->hashUpdate = SFTKHash_sftk_MAC_Update;
-    session->end = SFTKHash_sftk_MAC_End;
-    session->hashdestroy = SFTKHash_sftk_MAC_DestroyContext;
-
     intpointer = PORT_New(CK_ULONG);
     if (intpointer == NULL) {
         sftk_MAC_DestroyContext(context, PR_TRUE);
         return CKR_HOST_MEMORY;
     }
     *intpointer = mac_size;
+
     session->cipherInfo = intpointer;
+    session->hashInfo = context;
+    session->multi = PR_TRUE;
+
+    /* Configure our helper functions appropriately. Note that these casts
+     * ignore the return values. */
+    session->hashUpdate = SFTKHash_sftk_MAC_Update;
+    session->end = SFTKHash_sftk_MAC_End;
+    session->hashdestroy = SFTKHash_sftk_MAC_DestroyContext;
 
     /* Since we're only "hashing", copy the result from session->end to the
      * caller using sftk_SignCopy. */
@@ -4369,6 +4369,12 @@ NSC_Verify(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pData,
         /* VerifyFinal can't follow failed VerifyUpdate */
         if (CKR_OK == (crv = NSC_VerifyUpdate(hSession, pData, ulDataLen)))
             crv = NSC_VerifyFinal(hSession, pSignature, ulSignatureLen);
+    } else if (ulSignatureLen == 0) {
+        /* No signature is zero bytes long. pSignature may be NULL here, as
+         * NSC_VerifySignatureInit keeps an empty signature without a
+         * buffer, so don't pass it on. */
+        crv = CKR_SIGNATURE_LEN_RANGE;
+        sftk_TerminateOp(session, SFTK_VERIFY);
     } else {
         if (SECSuccess != (*context->verify)(context->cipherInfo, pSignature,
                                              ulSignatureLen, pData, ulDataLen))
@@ -4406,7 +4412,7 @@ NSC_VerifyFinal(CK_SESSION_HANDLE hSession,
 
     CHECK_FORK();
 
-    if (!pSignature)
+    if (!pSignature && ulSignatureLen != 0)
         return CKR_ARGUMENTS_BAD;
 
     /* make sure we're legal */
@@ -4414,7 +4420,12 @@ NSC_VerifyFinal(CK_SESSION_HANDLE hSession,
     if (crv != CKR_OK)
         return crv;
 
-    if (context->hashInfo) {
+    if (ulSignatureLen == 0) {
+        /* No signature is zero bytes long. pSignature may be NULL here, as
+         * NSC_VerifySignatureInit keeps an empty signature without a
+         * buffer. */
+        crv = CKR_SIGNATURE_LEN_RANGE;
+    } else if (context->hashInfo) {
         unsigned int digestLen;
         unsigned char tmpbuf[SFTK_MAX_MAC_LENGTH];
 
@@ -7583,6 +7594,11 @@ sftk_unwrapPrivateKey(SFTKObject *key, SECItem *bpki)
         mldsa_next:
             lpk->keyType = NSSLOWKEYMLDSAKey;
         pq_next:
+            /* RFC 9881 and RFC 9935: the parameters MUST be absent. */
+            if (pki->algorithm.parameters.len != 0) {
+                PORT_SetError(SEC_ERROR_INVALID_ALGORITHM);
+                goto loser;
+            }
             if (pki->privateKey.data == NULL || pki->privateKey.len == 0) {
                 PORT_SetError(SEC_ERROR_BAD_KEY);
                 goto loser;

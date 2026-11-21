@@ -10,7 +10,7 @@ use crate::pattern::PatternKind;
 use crate::telemetry::Telemetry;
 use euclid::default::Transform3D;
 use glyph_rasterizer::GlyphFormat;
-use crate::renderer::{
+use crate::renderer::{DEFAULT_PATH_AA_SAMPLES, 
     desc,
     BlendMode, DebugFlags, RendererError, WebRenderOptions,
     TextureSampler, VertexArrayKind, ShaderPrecacheFlags,
@@ -589,8 +589,13 @@ pub struct Shaders {
     cs_line_decoration: ShaderHandle,
     cs_svg_filter_node: ShaderHandle,
     cs_path_tile_ssaa4: ShaderHandle,
-    cs_path_tile_ssaa8: Option<ShaderHandle>,
+    cs_path_tile_ssaa8: ShaderHandle,
     cs_path_tile_analytical: Option<ShaderHandle>,
+    ps_path_tile_ssaa4: ShaderHandle,
+    ps_path_tile_ssaa8: ShaderHandle,
+    ps_path_tile_analytical: Option<ShaderHandle>,
+    /// See IntParameter::PathAaSamples.
+    pub path_aa_samples: i32,
 
     // The are "primitive shaders". These shaders draw and blend
     // final results on screen. They are aware of tile boundaries.
@@ -940,26 +945,50 @@ impl Shaders {
             &shader_list,
         )?;
 
-        let (cs_path_tile_ssaa8, cs_path_tile_analytical) =
+        let cs_path_tile_ssaa8 = loader.create_shader(
+            ShaderKind::Cache(VertexArrayKind::PathTile),
+            "cs_path_tile",
+            &["PATH_SSAA8"],
+            &shader_list,
+        )?;
+
+        let cs_path_tile_analytical =
             if shader_flags.contains(ShaderFeatureFlags::PATH_AA_ALL_MODES) {
-                (
-                    Some(loader.create_shader(
-                        ShaderKind::Cache(VertexArrayKind::PathTile),
-                        "cs_path_tile",
-                        &["PATH_SSAA8"],
-                        &shader_list,
-                    )?),
-                    Some(loader.create_shader(
-                        ShaderKind::Cache(VertexArrayKind::PathTile),
-                        "cs_path_tile",
-                        &[],
-                        &shader_list,
-                    )?),
-                )
+                Some(loader.create_shader(
+                    ShaderKind::Cache(VertexArrayKind::PathTile),
+                    "cs_path_tile",
+                    &[],
+                    &shader_list,
+                )?)
             } else {
-                (None, None)
+                None
             };
 
+        let ps_path_tile_ssaa4 = loader.create_shader(
+            ShaderKind::Primitive,
+            "ps_path_tile",
+            &["PATH_SSAA4"],
+            &shader_list,
+        )?;
+
+        let ps_path_tile_ssaa8 = loader.create_shader(
+            ShaderKind::Primitive,
+            "ps_path_tile",
+            &["PATH_SSAA8"],
+            &shader_list,
+        )?;
+
+        let ps_path_tile_analytical =
+            if shader_flags.contains(ShaderFeatureFlags::PATH_AA_ALL_MODES) {
+                Some(loader.create_shader(
+                    ShaderKind::Primitive,
+                    "ps_path_tile",
+                    &[],
+                    &shader_list,
+                )?)
+            } else {
+                None
+            };
 
         let cs_border_segment = loader.create_shader(
             ShaderKind::Cache(VertexArrayKind::Border),
@@ -1005,6 +1034,10 @@ impl Shaders {
             cs_path_tile_ssaa4,
             cs_path_tile_ssaa8,
             cs_path_tile_analytical,
+            ps_path_tile_ssaa4,
+            ps_path_tile_ssaa8,
+            ps_path_tile_analytical,
+            path_aa_samples: DEFAULT_PATH_AA_SAMPLES,
             ps_text_run,
             ps_text_run_dual_source,
             ps_quad_textured,
@@ -1186,6 +1219,13 @@ impl Shaders {
             BatchKind::SplitComposite => {
                 self.ps_split_composite
             }
+            BatchKind::Path => {
+                match self.path_aa_samples {
+                    0 => self.ps_path_tile_analytical.unwrap_or(self.ps_path_tile_ssaa8),
+                    1..=4 => self.ps_path_tile_ssaa4,
+                    _ => self.ps_path_tile_ssaa8,
+                }
+            }
             BatchKind::TextRun(glyph_format) => {
                 let text_shader = match key.blend_mode {
                     BlendMode::SubpixelDualSource => self.ps_text_run_dual_source.as_mut().unwrap(),
@@ -1203,15 +1243,15 @@ impl Shaders {
     pub fn cs_border_solid_superellipse(&mut self) -> &mut LazilyCompiledShader { self.loader.get(self.cs_border_solid_superellipse) }
     pub fn cs_line_decoration(&mut self) -> &mut LazilyCompiledShader { self.loader.get(self.cs_line_decoration) }
     pub fn cs_svg_filter_node(&mut self) -> &mut LazilyCompiledShader { self.loader.get(self.cs_svg_filter_node) }
-    /// See IntParameter::PathAaSamples. Falls back to the ssaa4 variant where
-    /// the other ones are not available.
+    /// See IntParameter::PathAaSamples. Falls back to the ssaa8 variant where
+    /// the analytical one is not available.
     pub fn cs_path_tile(&mut self, samples: i32) -> &mut LazilyCompiledShader {
         let handle = match samples {
-            0 => self.cs_path_tile_analytical,
-            1..=4 => None,
+            0 => self.cs_path_tile_analytical.unwrap_or(self.cs_path_tile_ssaa8),
+            1..=4 => self.cs_path_tile_ssaa4,
             _ => self.cs_path_tile_ssaa8,
         };
-        self.loader.get(handle.unwrap_or(self.cs_path_tile_ssaa4))
+        self.loader.get(handle)
     }
     pub fn ps_quad_textured(&mut self) -> &mut LazilyCompiledShader {
         self.loader.get(self.ps_quad_textured)

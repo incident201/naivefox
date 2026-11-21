@@ -23,6 +23,7 @@
 class nsCocoaWindow;
 class nsChildView;
 class nsMenuBarX;
+class nsMenuItemX;
 @class ChildView;
 
 namespace mozilla {
@@ -290,6 +291,11 @@ class nsCocoaWindow final : public nsIWidget {
   nsresult SynthesizeNativeTouchpadDoubleTap(LayoutDeviceIntPoint aPoint,
                                              uint32_t aModifierFlags) override;
 
+  nsresult SynthesizeNativeTouchpadPan(
+      TouchpadGesturePhase aEventPhase, LayoutDeviceIntPoint aPoint,
+      double aDeltaX, double aDeltaY, int32_t aModifierFlags,
+      nsISynthesizedEventCallback* aCallback) override;
+
   static bool DoHasPendingInputEvent();
   static uint32_t GetCurrentInputEventCount();
   static void UpdateCurrentInputEventCount();
@@ -452,6 +458,8 @@ class nsCocoaWindow final : public nsIWidget {
   nsresult ForceUpdateNativeMenuAt(const nsAString& indexString) override;
   nsresult GetNativeMenuItemKeyEquivalent(const nsAString& aElementId,
                                           nsAString& aResult) override;
+  nsresult GetNativeMenuItemTitle(const nsAString& aElementId,
+                                  nsAString& aResult) override;
   [[nodiscard]] nsresult GetSelectionAsPlaintext(nsAString& aResult) override;
   TextEventDispatcherListener* GetNativeTextEventDispatcherListener() override;
   [[nodiscard]] nsresult AttachNativeKeyEvent(
@@ -466,6 +474,7 @@ class nsCocoaWindow final : public nsIWidget {
   void SetColorScheme(const mozilla::Maybe<mozilla::ColorScheme>&) override;
   bool GetSupportsNativeFullscreen();
   void SetSupportsNativeFullscreen(bool aShow) override;
+  void SetPreventAppSwitching(bool aShouldPreventAppSwitching) override;
   void SetWindowAnimationType(WindowAnimationType aType) override;
   void SetHideTitlebarSeparator(bool) override;
   bool IsMacTitlebarDirectionRTL() override;
@@ -483,6 +492,9 @@ class nsCocoaWindow final : public nsIWidget {
 
   bool HasModalDescendants() const { return mNumModalDescendants > 0; }
   bool IsModal() const { return mModal; }
+  bool IsMediaPiPWindow() const {
+    return mPiPType == mozilla::widget::PiPType::MediaPiP;
+  }
 
   NSWindow* GetCocoaWindow() { return [[mWindow retain] autorelease]; }
 
@@ -679,6 +691,11 @@ class nsCocoaWindow final : public nsIWidget {
   bool mInResize = false;           // true if in a call to DoResize().
   bool mWindowTransformIsIdentity = true;
   bool mAlwaysOnTop = false;
+  // Whether hiding the OS chrome for this window should also keep the user
+  // from switching to another application. Set from the window's attributes
+  // before it can go fullscreen, so a hide and its matching unhide always
+  // agree.
+  bool mShouldPreventAppSwitching = false;
   bool mAspectRatioLocked = false;
   bool mIsAlert = false;  // True if this is an non-native alert window.
   // True if this window should not auto-enter native fullscreen on its initial
@@ -709,6 +726,10 @@ class nsCocoaWindow final : public nsIWidget {
       nullptr;
 
  private:
+  // Finds the item in this window's native menu bar that was built from the
+  // element with id aElementId. Only used by native menu test hooks.
+  nsMenuItemX* FindMenuBarItemByElementId(const nsAString& aElementId);
+
   // This is class state for tracking which nsCocoaWindow, if any, is in the
   // middle of a native fullscreen transition.
   static nsCocoaWindow* sWindowInNativeTransition;

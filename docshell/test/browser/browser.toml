@@ -102,6 +102,9 @@ skip-if = [
 ["browser_bfcache_pageswap_target_entry.js"]
 skip-if = ["!fission"]
 
+["browser_bfcache_parent_initiated_load.js"]
+skip-if = ["!fission"]
+
 ["browser_bfcache_previous_entry.js"]
 skip-if = ["!fission"]
 
@@ -114,6 +117,8 @@ https_first_disabled = true
 ["browser_browsingContext-embedder.js"]
 
 ["browser_browsingContext-getAllBrowsingContextsInSubtree.js"]
+
+["browser_browsingContext-getCurrentTopByBrowserId.js"]
 
 ["browser_browsingContext-getWindowByName.js"]
 
@@ -166,9 +171,6 @@ https_first_disabled = true
 ["browser_bug388121-2.js"]
 
 ["browser_bug420605.js"]
-skip-if = [
-  "verify-standalone",
-]
 
 ["browser_bug422543.js"]
 https_first_disabled = true
@@ -176,9 +178,6 @@ https_first_disabled = true
 ["browser_bug441169.js"]
 
 ["browser_bug503832.js"]
-skip-if = [
-  "os == 'win' && os_version == '11.26200' && arch == 'x86_64' && debug && msix && verify-standalone",
-]
 
 ["browser_bug554155.js"]
 
@@ -244,9 +243,6 @@ https_first_disabled = true
 ["browser_bug1705872.js"]
 
 ["browser_bug1716290-1.js"]
-skip-if = [
-  "verify-standalone",
-]
 
 ["browser_bug1716290-2.js"]
 

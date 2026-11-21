@@ -10,6 +10,8 @@
 ChromeUtils.defineESModuleGetters(this, {
   AIWindow:
     "moz-src:///browser/components/aiwindow/ui/modules/AIWindow.sys.mjs",
+  AIWindowToolbarButtons:
+    "moz-src:///browser/components/aiwindow/ui/modules/AIWindowToolbarButtons.sys.mjs",
   AIWindowUI:
     "moz-src:///browser/components/aiwindow/ui/modules/AIWindowUI.sys.mjs",
   AIWindowTestUtils: "resource://testing-common/AIWindowTestUtils.sys.mjs",
@@ -18,14 +20,19 @@ ChromeUtils.defineESModuleGetters(this, {
   Chat: "moz-src:///browser/components/aiwindow/models/Chat.sys.mjs",
   ChatConversation:
     "moz-src:///browser/components/aiwindow/ui/modules/ChatConversation.sys.mjs",
+  GET_OPEN_TABS: "moz-src:///browser/components/aiwindow/models/Tools.sys.mjs",
   getModelForChoice:
     "moz-src:///browser/components/aiwindow/models/Utils.sys.mjs",
   IntentClassifier:
     "moz-src:///browser/components/aiwindow/models/IntentClassifier.sys.mjs",
   MemoriesManager:
     "moz-src:///browser/components/aiwindow/models/memories/MemoriesManager.sys.mjs",
+  MEMORY_SENSITIVITY_CATEGORY_NOT_SENSITIVE:
+    "moz-src:///browser/components/aiwindow/models/memories/MemoriesConstants.sys.mjs",
   MENTION_TYPE:
     "moz-src:///browser/components/urlbar/SmartbarMentionsPanelSearch.sys.mjs",
+  MESSAGE_ROLE:
+    "moz-src:///browser/components/aiwindow/ui/modules/ChatEnums.sys.mjs",
   openAIEngine: "moz-src:///browser/components/aiwindow/models/Utils.sys.mjs",
   SmartbarMentionsPanelSearch:
     "moz-src:///browser/components/urlbar/SmartbarMentionsPanelSearch.sys.mjs",
@@ -53,6 +60,9 @@ const { _setRemoteClientForTesting, _clearRemoteClientForTesting } =
 
 const { JourneyManager } = ChromeUtils.importESModule(
   "moz-src:///browser/components/aiwindow/models/memories/journeys/JourneyManager.sys.mjs"
+);
+const { JourneyStore } = ChromeUtils.importESModule(
+  "moz-src:///browser/components/aiwindow/models/memories/journeys/JourneyStore.sys.mjs"
 );
 
 const {
@@ -139,73 +149,6 @@ const MOCK_RS_RECORDS = [
   // Chat resolves model+params from v2 kind:"params" records (one generic
   // fallback + one per model choice).
   .concat([
-    {
-      kind: "params",
-      feature: "chat",
-      model: "generic",
-      model_choice_id: "0",
-      service_type: "ai",
-      purpose: "chat",
-      parameters: {},
-      is_default: true,
-      version: "v10.0",
-    },
-    {
-      kind: "params",
-      feature: "chat",
-      model: "gemini-3.1-flash-lite",
-      model_choice_id: "1",
-      model_details: {
-        model: "gemini-3.1-flash-lite",
-        ownerName: "Google",
-        labelId: "fast",
-        shortName: "Gemini 3.1 Flash Lite",
-        brandName: "Gemini",
-      },
-      service_type: "ai",
-      purpose: "chat",
-      parameters: {},
-      prompts: "Test system prompt.",
-      version: "v10.0",
-    },
-    {
-      kind: "params",
-      feature: "chat",
-      model: "qwen3-235b-a22b-instruct-2507-maas",
-      model_choice_id: "2",
-      model_details: {
-        model: "qwen3-235b-a22b-instruct-2507-maas",
-        ownerName: "Alibaba",
-        labelId: "allpurpose",
-        shortName: "Qwen 3 235B",
-        brandName: "Qwen",
-      },
-      service_type: "ai",
-      purpose: "chat",
-      parameters: {},
-      prompts: "Test system prompt.",
-      version: "v10.0",
-    },
-    {
-      kind: "params",
-      feature: "chat",
-      model: "gpt-oss-120b",
-      model_choice_id: "3",
-      model_details: {
-        model: "gpt-oss-120b",
-        ownerName: "OpenAI",
-        labelId: "personal",
-        shortName: "GPT OSS 120B",
-        brandName: "GPT OSS",
-      },
-      service_type: "ai",
-      purpose: "chat",
-      parameters: {},
-      prompts: "Test system prompt.",
-      version: "v10.0",
-    },
-    // TODO 2053495
-    // v12 records for mistral release (browser.smartwindow.mistralRelease pref)
     {
       kind: "params",
       feature: "chat",
@@ -325,6 +268,47 @@ const MOCK_RS_RECORDS = [
       prompts: "Tabs:\n{titles}",
       version: "v2.0",
     },
+    // agent-monitor-setup resolves through the v2 modular path. Its prompts
+    // render what a suggestion is grounded in, so they need the placeholders
+    // and the block tags the real prompts have.
+    {
+      kind: "params",
+      feature: "agent-monitor-setup",
+      model: "test-model",
+      service_type: "agent",
+      purpose: "monitor",
+      parameters: {},
+      modules: [
+        { name: "system-instructions", version: "v1.0" },
+        { name: "user-data", version: "v1.0" },
+      ],
+      version: "v1.0",
+      is_default: true,
+    },
+    {
+      kind: "module",
+      feature: "agent-monitor-setup",
+      module: "system-instructions",
+      model: "test-model",
+      prompts: "Suggest a task name and a condition in {language}.",
+      version: "v1.0",
+    },
+    {
+      kind: "module",
+      feature: "agent-monitor-setup",
+      module: "user-data",
+      model: "test-model",
+      prompts: [
+        "{#pages}Pages to watch:\n{pages}\n{/pages}",
+        "{#existingTitles}Existing task names:\n{existingTitles}\n{/existingTitles}",
+        "{#memories}<memories>\n{memories}\n</memories>\n{/memories}",
+        "{#chatHistory}<recent_chat>\n{chatHistory}\n</recent_chat>\n{/chatHistory}",
+        "{#previousDrafts}<earlier_drafts>\n{previousDrafts}\n</earlier_drafts>\n{/previousDrafts}",
+        "{#pageText}<page_text>\n{pageText}\n</page_text>\n{/pageText}",
+        "Language: {language}",
+      ].join("\n"),
+      version: "v1.0",
+    },
     {
       kind: "module",
       feature: "browser-context",
@@ -343,7 +327,98 @@ const MOCK_RS_RECORDS = [
     },
   ]);
 
+// Auto's chat record, routing to an existing model choice like the real one.
+const MOCK_AUTO_RS_RECORD = (() => {
+  const {
+    AUTO_MODEL_CHOICE_ID,
+    FALLBACK_MODELS,
+    FEATURE_MAJOR_VERSIONS,
+    MODEL_FEATURES,
+  } = ChromeUtils.importESModule(
+    "moz-src:///browser/components/aiwindow/models/Utils.sys.mjs"
+  );
+  return {
+    kind: "params",
+    feature: MODEL_FEATURES.CHAT,
+    model: "auto",
+    inference_model: FALLBACK_MODELS[1].model,
+    model_details: FALLBACK_MODELS[1],
+    model_choice_id: AUTO_MODEL_CHOICE_ID,
+    service_type: "ai",
+    purpose: "chat",
+    parameters: {},
+    version: `v${FEATURE_MAJOR_VERSIONS[MODEL_FEATURES.CHAT]}.0`,
+  };
+})();
+
+const AUTO_MODEL_PREF = "browser.smartwindow.firstrun.singlePageWithAutoModel";
+
+/**
+ * Opens a Smart Window with a model choice and the auto model’s routing record
+ * in Remote Settings.
+ *
+ * @param {object} options
+ * @param {boolean} [options.enabled] - Value of the auto model pref
+ * @param {string} [options.modelChoice] - Default model choice
+ * @param {?object} [options.autoRecord] - The auto model’s routing record in
+ *   Remote Settings, or null for none
+ * @param {(fixture: {win: Window, browser: MozBrowser, engineManager: MockEngineManager}) => Promise<void>} task
+ */
+async function withModelChoiceWindow(
+  {
+    enabled = true,
+    modelChoice = Services.prefs.getStringPref(
+      "browser.smartwindow.firstrun.modelChoice",
+      ""
+    ),
+    autoRecord = MOCK_AUTO_RS_RECORD,
+  },
+  task
+) {
+  const { _clearModelsDataCacheForTesting } = ChromeUtils.importESModule(
+    "moz-src:///browser/components/aiwindow/models/Utils.sys.mjs"
+  );
+  const { MockEngineManager } = ChromeUtils.importESModule(
+    "resource://testing-common/AIWindowTestUtils.sys.mjs"
+  );
+  await SpecialPowers.pushPrefEnv({
+    set: [
+      [AUTO_MODEL_PREF, enabled],
+      ["browser.smartwindow.firstrun.modelChoice", modelChoice],
+    ],
+  });
+  const engineManager = new MockEngineManager();
+  let win;
+  try {
+    _setRemoteClientForTesting({
+      get: async () =>
+        autoRecord ? [...MOCK_RS_RECORDS, autoRecord] : MOCK_RS_RECORDS,
+    });
+    _clearModelsDataCacheForTesting();
+    win = await openAIWindow();
+    await task({ win, browser: win.gBrowser.selectedBrowser, engineManager });
+  } finally {
+    if (win) {
+      await BrowserTestUtils.closeWindow(win);
+    }
+    await engineManager.rejectAllRequests();
+    engineManager.cleanupMocks();
+    _setRemoteClientForTesting({ get: async () => MOCK_RS_RECORDS });
+    _clearModelsDataCacheForTesting();
+    await SpecialPowers.popPrefEnv();
+  }
+}
+
 add_setup(async function () {
+  if (parseInt(Services.env.get("MOZ_CHAOSMODE"), 16)) {
+    // When running chaos mode in --verify test runs, the amount of time
+    // that we spend on animations dramatically increases the time that
+    // tests take to run, to the point that some of the tests time out.
+    await SpecialPowers.pushPrefEnv({
+      set: [["ui.prefersReducedMotion", 1]],
+    });
+  }
+
   await SpecialPowers.pushPrefEnv({
     set: [
       ["browser.smartwindow.endpoint", "http://localhost:0/v1"],
@@ -391,6 +466,7 @@ add_setup(async function () {
   registerCleanupFunction(() => {
     _setLoadPromptForTesting(null);
   });
+  registerCleanupFunction(clearSmartWindowUsagePrefs);
 });
 
 /**
@@ -479,6 +555,54 @@ async function openAIWindowSidebar(win, url = "about:blank") {
 }
 
 /**
+ * Clears the prefs a Smart Window writes while it is in use, so they do not
+ * outlive the test file that opened it.
+ */
+function clearSmartWindowUsagePrefs() {
+  Services.prefs.clearUserPref("browser.smartwindow.lastSmartWindowUsageTime");
+  Services.prefs.clearUserPref("browser.smartwindow.lastLLMTelemetryRunTime");
+  Services.prefs.clearUserPref("places.semanticHistory.initialized");
+}
+
+/**
+ * Opens the Smart Window that a file's tests share, closed after them.
+ *
+ * @returns {Promise<ChromeWindow>}
+ */
+async function openSharedAIWindow() {
+  const win = await openAIWindow();
+  registerCleanupFunction(async () => {
+    await BrowserTestUtils.closeWindow(win);
+    clearSmartWindowUsagePrefs();
+  });
+  return win;
+}
+
+/**
+ * Replaces every tab in the window with a fresh Smart Window full page, so a
+ * test starts on a new page and the window only holds the tabs it opens. The
+ * replaced tabs skip session history, which the smartbar also offers. Needs
+ * browser.newtab.preload=false: the new tab can otherwise take the preloaded
+ * page and never finish loading.
+ *
+ * @param {ChromeWindow} win
+ * @returns {Promise<Element>} The page's ai-window element.
+ */
+async function openOnlyAIWindowTab(win) {
+  const tab = await BrowserTestUtils.openNewForegroundTab(
+    win.gBrowser,
+    AIWINDOW_URL
+  );
+  for (const other of win.gBrowser.tabs.filter(t => t != tab)) {
+    BrowserTestUtils.removeTab(other, { skipSessionStore: true });
+  }
+  return TestUtils.waitForCondition(
+    () => tab.linkedBrowser.contentDocument?.querySelector("ai-window"),
+    "Wait for ai-window element"
+  );
+}
+
+/**
  * NOTE: If using to navigate to https://example.com/ make sure
  * to use a trailing slash in the URL or this function will hang.
  *
@@ -529,19 +653,20 @@ async function getConversationId(browser) {
 }
 
 /**
- * Stubs resume generation for the supplied memories, cards, and URLs.
+ * Stores journeys for the supplied memories and URLs so they are suggested.
  *
  * @param {object} sb - Sinon sandbox, owned and restored by the caller
  * @param {object} options
  * @param {Array<object>} options.memories
- * @param {Array<object>} options.cards - Mocked headline-generation output
+ * @param {Array<{memoryId: string, headline: string, status: string}>} options.journeys
+ *   - Journey metadata stored for a subset of memories, cleared on cleanup
  * @param {Array<{url: string, title: string}>} options.urls - Inserted into
  *   Places and removed again on cleanup
  * @param {?string} [options.token]
  */
 async function _stubResumeActivityGenerationCore(
   sb,
-  { memories, cards, urls, token = null }
+  { memories, journeys, urls, token = null }
 ) {
   for (const [index, page] of urls.entries()) {
     await PlacesUtils.history.insert({
@@ -555,55 +680,51 @@ async function _stubResumeActivityGenerationCore(
     });
   }
 
-  const getMemoriesStub = sb
-    .stub(MemoriesManager, "getMemoriesByAttribute")
-    .resolves(memories);
-  // Keep cached results from being filtered as deleted.
   sb.stub(MemoriesManager, "getAllMemories").resolves(memories);
-  // Prevent cached results and dismissals from leaking between tests.
-  JourneyManager._clearResumeActivityCacheForTesting();
+  await JourneyStore.clear();
+  for (const journey of journeys) {
+    await JourneyStore.addOrUpdateJourney(journey);
+  }
+  const suggestSpy = sb.spy(JourneyManager, "suggestJourneysToResume");
+  // Prevent dismissals from leaking between tests.
   _clearDismissedResumeMemoriesForTesting();
   JourneyManager._setGetConversationsByIdForTesting(async () => []);
   JourneyManager._setLoadPromptForTesting(async () => ({
     prompt: "Test prompt",
   }));
-  JourneyManager._setBuildConversationForTesting(async () => ({
-    setSystemMessage() {},
-    addUserMessage() {},
-    securityProperties: {
-      setPrivateData() {},
-      setUntrustedInput() {},
-      commit() {},
-    },
-    run: sb.stub().resolves({ finalOutput: JSON.stringify(cards) }),
-  }));
   sb.stub(AuthProvider, "getToken").resolves(token);
 
   const originalAvailableLocales = Services.locale.availableLocales;
   const originalRequestedLocales = Services.locale.requestedLocales;
+  const hadRequestedPref = Services.prefs.prefHasUserValue(
+    "intl.locale.requested"
+  );
   Services.locale.availableLocales = ["en-US"];
   Services.locale.requestedLocales = ["en-US"];
 
   return {
-    getMemoriesStub,
+    suggestSpy,
     memories,
     async cleanup() {
       JourneyManager._setGetConversationsByIdForTesting(null);
       JourneyManager._setLoadPromptForTesting(null);
-      JourneyManager._setBuildConversationForTesting(null);
-      JourneyManager._clearResumeActivityCacheForTesting();
+      await JourneyStore.clear();
       _clearDismissedResumeMemoriesForTesting();
       for (const { url } of urls) {
         await PlacesUtils.history.remove(url);
       }
       Services.locale.availableLocales = originalAvailableLocales;
       Services.locale.requestedLocales = originalRequestedLocales;
+      // Setting requestedLocales leaves a user value even when restoring one.
+      if (!hadRequestedPref) {
+        Services.prefs.clearUserPref("intl.locale.requested");
+      }
     },
   };
 }
 
 /**
- * Stubs two candidates with one valid resume pill.
+ * Stubs two memories, only one of which has a stored journey.
  *
  * @param {object} sb - Sinon sandbox, owned and restored by the caller
  * @param {object} [options]
@@ -618,6 +739,7 @@ async function stubResumeActivityGeneration(sb, { token } = {}) {
     {
       id: "memory-1",
       memory_summary: "Research project",
+      sensitivity_category: MEMORY_SENSITIVITY_CATEGORY_NOT_SENSITIVE,
       lifetime_accessed_count: 0,
       recent_accessed_counts: {},
       source_ids: {
@@ -629,6 +751,7 @@ async function stubResumeActivityGeneration(sb, { token } = {}) {
     {
       id: "memory-2",
       memory_summary: "Trip planning",
+      sensitivity_category: MEMORY_SENSITIVITY_CATEGORY_NOT_SENSITIVE,
       lifetime_accessed_count: 0,
       recent_accessed_counts: {},
       source_ids: {
@@ -636,19 +759,23 @@ async function stubResumeActivityGeneration(sb, { token } = {}) {
       },
     },
   ];
-  const cards = [
-    { id: 0, headline: "Pick up your research", status: "Continue reading" },
+  const journeys = [
+    {
+      memoryId: "memory-1",
+      headline: "Pick up your research",
+      status: "Continue reading",
+    },
   ];
   return _stubResumeActivityGenerationCore(sb, {
     memories,
-    cards,
+    journeys,
     urls,
     token,
   });
 }
 
 /**
- * Stubs `memoryCount` ranked candidates with valid headlines.
+ * Stubs `memoryCount` memories, each with a stored journey.
  *
  * @param {object} sb - Sinon sandbox, owned and restored by the caller
  * @param {number} memoryCount
@@ -658,24 +785,33 @@ async function stubResumeActivityGenerationPool(sb, memoryCount) {
     url: `https://example.com/pool-${i}`,
     title: `Example ${i}`,
   }));
+  // Memory `i` is `i` days old with `i` component summaries, so suggestions
+  // keep pool order and each card's telemetry is predictable.
   const memories = urls.map((page, i) => ({
     id: `pool-memory-${i}`,
     memory_summary: `Research topic ${i}`,
+    strength: i * 4.25,
+    created_at: Date.now() - i * 24 * 60 * 60 * 1000,
+    component_summaries: Array.from({ length: i }, () => ({
+      memory_summary: "Merged topic",
+      reasoning: "Merged",
+    })),
+    sensitivity_category: MEMORY_SENSITIVITY_CATEGORY_NOT_SENSITIVE,
     source_ids: {
       history_source_ids: [PlacesUtils.history.hashURL(page.url)],
     },
   }));
-  const cards = memories.map((memory, i) => ({
-    id: i,
+  const journeys = memories.map(memory => ({
+    memoryId: memory.id,
     headline: `Pick up ${memory.memory_summary}`,
     status: "Continue",
   }));
-  return _stubResumeActivityGenerationCore(sb, { memories, cards, urls });
+  return _stubResumeActivityGenerationCore(sb, { memories, journeys, urls });
 }
 
 /**
  * Shared setup/teardown for tests that click a resume pill: enables the
- * memories prefs, stubs resume-activity generation so a real pill renders,
+ * memories prefs, stores a journey so a real pill renders,
  * opens the AI Window, and hands the caller its buttons to click. `run`
  * supplies whatever additional stubs it needs (engine build, fetchWithHistory,
  * etc.) via its own sandbox before calling this.
@@ -996,6 +1132,44 @@ async function submitSmartbar(browser, { useButton = false } = {}) {
 }
 
 /**
+ * Chat turn that includes a get_open_tabs tool call:
+ * Returns the tool result message.
+ *
+ * @param {object} options
+ * @param {MockEngineManager} options.mockEngineManager
+ * @param {ChatConversation} options.conversation
+ * @param {string} options.callId
+ */
+async function triggerGetOpenTabsToolCall({
+  mockEngineManager,
+  conversation,
+  callId,
+}) {
+  await mockEngineManager.respondTo({
+    purpose: "chat",
+    response: {
+      text: "",
+      tokens: null,
+      isPrompt: false,
+      toolCalls: [
+        {
+          id: callId,
+          function: { name: GET_OPEN_TABS, arguments: "{}" },
+        },
+      ],
+    },
+  });
+
+  return TestUtils.waitForCondition(
+    () =>
+      conversation.messages.find(
+        m => m.role === MESSAGE_ROLE.TOOL && m.content.name === GET_OPEN_TABS
+      ),
+    "A result for get_open_tabs should be returned in the conversation."
+  );
+}
+
+/**
  * Select the first search engine from the smartbar CTA "Search with…" submenu.
  *
  * @param {MozBrowser} browser - The browser element
@@ -1156,7 +1330,15 @@ async function typeInSmartbar(browser, text) {
       "Wait for smartbar to receive focus"
     );
     info("typeInSmartbar: focus received, sending string");
+    // The editor applies typed text from a mutation observer after sendString
+    // returns, so wait for its input event before reading
+    // lastQueryContextPromise.
+    const textApplied = ContentTaskUtils.waitForEvent(
+      smartbar.inputField,
+      "input"
+    );
     EventUtils.sendString(searchText, content);
+    await textApplied;
     info("typeInSmartbar: string sent, awaiting lastQueryContextPromise");
     await smartbar.lastQueryContextPromise;
     info("typeInSmartbar: query complete");
@@ -1256,16 +1438,19 @@ async function assertSmartbarSuggestionsVisible(
 
   const viewRect = urlbarView.getBoundingClientRect();
   const inputRect = smartbarElement.inputField.getBoundingClientRect();
+  // DOMRect values are only float32-precise, so edges that touch in layout
+  // can differ by a rounding error once the view holds several rows.
+  const roundingTolerance = 0.001;
   if (expectedPosition == "top") {
     Assert.lessOrEqual(
       viewRect.bottom,
-      inputRect.top,
+      inputRect.top + roundingTolerance,
       "Suggestions should open above the input"
     );
   } else {
     Assert.greaterOrEqual(
       viewRect.top,
-      inputRect.bottom,
+      inputRect.bottom - roundingTolerance,
       "Suggestions should open below the input"
     );
   }
@@ -1516,16 +1701,17 @@ async function switchSmartbarModel(browser, modelChoiceId) {
     );
     const modelSelect = smartbar.querySelector("input-model-select");
     const triggerButton = modelSelect.shadowRoot.querySelector("moz-button");
-    triggerButton.click();
-
     const panelList = modelSelect.shadowRoot.querySelector("panel-list");
-    await ContentTaskUtils.waitForMutationCondition(
-      panelList,
-      { attributes: true },
-      () => panelList.hasAttribute("open")
-    );
+    const shown = ContentTaskUtils.waitForEvent(panelList, "shown");
+    triggerButton.click();
+    await shown;
 
-    const modelKeys = Object.keys(modelSelect.availableModels);
+    const { getModelDisplayOrder } = ChromeUtils.importESModule(
+      "moz-src:///browser/components/aiwindow/models/Utils.sys.mjs"
+    );
+    const modelKeys = ["0", ...getModelDisplayOrder()].filter(
+      id => id in modelSelect.availableModels
+    );
     const index = modelKeys.indexOf(choiceId);
     if (index === -1) {
       throw new Error(`Model choice "${choiceId}" not available`);
@@ -1825,5 +2011,22 @@ async function getUserMessageChipTypes(browser, messageIndex) {
     );
     const { websites } = chipContainer().wrappedJSObject;
     return websites.map(website => website.type);
+  });
+}
+
+/**
+ * Waits for the expected model in the smartbar model select.
+ *
+ * @param {MozBrowser} browser - The browser element
+ * @param {string} expectedModel - The expected model name
+ */
+async function waitForSelectedModel(browser, expectedModel) {
+  await SpecialPowers.spawn(browser, [expectedModel], async expected => {
+    const aiWindowElement = content.document.querySelector("ai-window");
+    await ContentTaskUtils.waitForMutationCondition(
+      aiWindowElement,
+      { attributes: true },
+      () => aiWindowElement.selectedModelId === expected
+    );
   });
 }

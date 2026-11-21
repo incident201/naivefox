@@ -339,6 +339,12 @@ urlbar:
         pref: browser.urlbar.autoFill.dismissalBlockDurationMs
         branch: user
       description: Duration in ms to block an origin or URL after user dismissal.
+    contextMenuFeatureGate:
+      type: boolean
+      fallbackPref: browser.urlbar.contextMenu.featureGate
+      description: >-
+        Whether a user interaction, such as right-clicking a urlbar result,
+        opens the result's context menu.
     deduplicationEnabled:
       type: boolean
       setPref:
@@ -474,14 +480,16 @@ urlbar:
         picks. If the user's query matches an AMP suggestion and the query is at
         least this many characters long, the suggestion will be shown as a top
         pick. Set to zero to disable.
-    quickSuggestAmpTopPickUseNovaIconSize:
-      type: boolean
+    quickSuggestAmpTopPickScoreForLargeIcon:
+      type: string
       setPref:
         branch: default
-        pref: browser.urlbar.quicksuggest.ampTopPickUseNovaIconSize
+        pref: browser.urlbar.quicksuggest.ampTopPickScoreForLargeIcon
       description: >-
-        Whether or not use the Nova icon size for AMP suggestion.
-        Otherwise, use standard rich-suggestion size.
+        The minimum score a top-pick AMP suggestion must have to be shown with
+        the large-icon UI treatment used for other top picks, as a decimal
+        string (e.g., "1.0"). If it's an empty string or otherwise can't be
+        parsed with parseFloat, the small-icon UI treatment will be used.
     quickSuggestDynamicSuggestionTypes:
       type: string
       setPref:
@@ -632,6 +640,12 @@ urlbar:
       description: >-
         When selecting and hovering over certain types of urlbar results,
         replace their URLs with strings that explain why they're shown.
+    resultTargetMenuFeatureGate:
+      type: boolean
+      fallbackPref: browser.urlbar.resultTargetMenu.featureGate
+      description: >-
+        Whether urlbar result menus offer "Open in New Tab", "Open in New
+        Window", etc.
     semanticHistoryEnable:
       type: boolean
       setPref:
@@ -1084,10 +1098,7 @@ preonboarding:
 moreFromMozilla:
   description: "New page on about:preferences to suggest more Mozilla products"
   owner: omc-core@mozilla.com
-  hasExposure: true
-  exposureDescription: >-
-    Exposure is sent once per browsing session when the about:preferences URL is
-    first accessed.
+  hasExposure: false
   variables:
     enabled:
       type: boolean
@@ -1278,6 +1289,13 @@ newtabAdsReporting:
         pref:  browser.newtabpage.activity-stream.discoverystream.reportAds.enabled
       description: >-
         Enable reporting for ads
+    reportAdsNewReasonsEnabled:
+      type: boolean
+      setPref:
+        branch: user
+        pref: browser.newtabpage.activity-stream.discoverystream.reportAds.newReasons.enabled
+      description: >-
+        Enable updated reporting reasons for ads
 
 newtabContextualContent:
   description: about:newtab contextual content feed
@@ -2374,6 +2392,21 @@ autofill-suppress-unrecognized-autocomplete:
         unclassified: it is offered no dropdown of its own, and it is not
         filled when autofill is triggered from another field in the same form.
 
+autocomplete-remove-records:
+  description: >-
+    Let users remove saved records directly from the autocomplete dropdown.
+  owner: klu@mozilla.com
+  hasExposure: false
+  variables:
+    enabled:
+      type: boolean
+      setPref:
+        branch: default
+        pref: browser.autocomplete.removeRecords.enabled
+      description: >-
+        If true, dropdown entries for saved logins, credit cards, addresses,
+        and form history show an action that removes that record.
+
 autofill-addresses-rust-storage:
   description: Application Services (Rust) storage backend for saved addresses
   owner: dlee@mozilla.com
@@ -2401,6 +2434,32 @@ autofill-credit-cards-rust-storage:
       setPref:
         branch: user
         pref: extensions.formautofill.creditCards.storage.rust.enabled
+
+autofill-credit-cards-drop-undecryptable:
+  description: >-
+    Leave saved credit cards whose number cannot be decrypted out of the
+    migration to the Rust autofill store, instead of failing the migration.
+  owner: dlee@mozilla.com
+  hasExposure: false
+  variables:
+    enabled:
+      description: >-
+        If true, a migration leaves out credit cards whose number cannot be
+        decrypted when another card's number decrypted in the same attempt, or
+        once afterAttempts attempts have failed and the last of them failed to
+        decrypt a card too. If false, such cards fail the migration.
+      type: boolean
+      setPref:
+        branch: user
+        pref: extensions.formautofill.creditCards.storage.rust.dropUndecryptable
+    afterAttempts:
+      description: >-
+        How many migration attempts must have failed before cards whose number
+        cannot be decrypted are left out even when no other card decrypted.
+      type: int
+      setPref:
+        branch: user
+        pref: extensions.formautofill.creditCards.storage.rust.dropUndecryptableAfterAttempts
 
 shellService:
   description: "Interface with OS, e.g., pinning and set default"
@@ -4336,8 +4395,8 @@ legacyHeartbeat:
   owner: beth@mozilla.com
   hasExposure: false
   schema:
-    uri: "resource://normandy/schemas/LegacyHeartbeat.schema.json"
-    path: "toolkit/components/normandy/schemas/LegacyHeartbeat.schema.json"
+    uri: "chrome://nimbus/content/schemas/LegacyHeartbeat.schema.json"
+    path: "browser/components/nimbus/schemas/LegacyHeartbeat.schema.json"
   variables:
     survey:
       type: json
@@ -5152,6 +5211,12 @@ nimbusTelemetry:
         Configuration for the nimbus_targeting_environment telemetry category.
       type: json
 
+    reducedEnrollmentStatusTelemetryEnabled:
+      description: >
+        Whether or not the client should submit reduced enrollment status
+        telemetry.
+      type: boolean
+
   schema:
     uri: resource://nimbus/schemas/NimbusTelemetryFeature.schema.json
     path: toolkit/components/nimbus/schemas/NimbusTelemetryFeature.schema.json
@@ -5495,6 +5560,34 @@ linkPreviews:
         sub-pref and values objects indicating the desired branch and value
         defaulting to clearing the user branch value.
 
+generatedWidgets:
+  description: >-
+    Custom widgets: lets users create widgets from a prompt with AI and shows
+    the Widget Studio panel in the sidebar.
+  owner: fchasen@mozilla.com
+  hasExposure: false
+  variables:
+    enabled:
+      type: boolean
+      setPref:
+        branch: user
+        pref: browser.widgets.generated.enabled
+      description: >-
+        If true, shows the Widget Studio panel in the sidebar and lets users
+        create widgets.
+
+resourceMonitor:
+  description: Resource Monitor sidebar panel
+  owner: tthorne@mozilla.com
+  hasExposure: false
+  variables:
+    enabled:
+      type: boolean
+      setPref:
+        branch: user
+        pref: browser.resourceMonitor.enabled
+      description: If true, the Resource Monitor sidebar panel is available.
+
 sidebar:
   description: Sidebar feature configuration
   owner: elee@mozilla.com
@@ -5552,6 +5645,11 @@ setToDefaultPrompt:
     message:
       description: Message to show instead of the default prompt
       type: json
+    disablePrompt:
+      description: >-
+        Don't show the startup default browser prompt, either the built-in
+        prompt or the spotlight version.
+      type: boolean
 
 tabNotes:
   description: >-
@@ -5992,6 +6090,23 @@ fireButton:
         that can delete everything or open the clear browsing data dialog.
         "direct" opens the clear browsing data dialog.
 
+windowLock:
+  description: >-
+    Covers windows with a lock screen requiring OS authentication when the OS
+    session gets locked, starts the screensaver or goes to sleep. Only
+    supported on macOS and Windows.
+  owner: mraiber@mozilla.com
+  hasExposure: false
+  variables:
+    enabled:
+      type: boolean
+      setPref:
+        branch: default
+        pref: browser.privatebrowsing.lockOnScreenLock.featureGate
+      description: >-
+        Whether locking windows is available. If false, windows never get
+        locked and the setting in Privacy & Security is hidden.
+
 ipProtection:
   description: Prefs to control IP Protection feature
   owner: fchasen@mozilla.com
@@ -6344,6 +6459,41 @@ smartWindow:
         Enables Smart Page creation entries in the page, tab, and tab group
         context menus. Existing Smart Window and AI Tab eligibility checks
         still apply.
+    authImpl:
+      type: string
+      enum:
+        - ""
+        - guest
+        - fxa
+      description: >-
+        The Smart Window auth provider: "" to use a guest token until the user
+        signs in to a Mozilla account, "guest" to always use a guest token, or
+        "fxa" to require a Mozilla account. Written to
+        browser.smartwindow.auth.impl, replacing any value it has. Not reset
+        on unenrollment: the guest token fallback switches back to FxA.
+    guestMode:
+      type: string
+      setPref:
+        branch: user
+        pref: browser.smartwindow.auth.guest.mode
+      enum:
+        - fetch
+        - tab
+      description: >-
+        How Smart Window obtains a guest token: "fetch" requests it in the
+        background, "tab" opens the guest verification page in a tab.
+    smartbarIntent:
+      type: string
+      fallbackPref: browser.smartwindow.smartbar.intent
+      enum:
+        - ""
+        - search
+        - chat
+      description: >-
+        "search" or "chat" pins the smart bar to that action instead of the
+        intent classifier. The urlbar Ask suggestion still appears when pinned
+        to search. While pinned, detected_intent telemetry reports the pinned
+        value rather than the classifier's for non-navigate requests.
 
 smartWindowAgentWatch:
   description: >-
@@ -6362,14 +6512,6 @@ smartWindowAgentWatch:
       description: >-
         Enables the Smart Window Agent Watch feature when true. Set to false
         to disable the rollout.
-    supportedRegions:
-      type: string
-      setPref:
-        branch: default
-        pref: browser.smartwindow.agent.supportedRegions
-      description: >-
-        Comma-separated list of region codes where the agent watch command is
-        available, for example "US,CA".
     monitorAnnouncement:
       type: boolean
       setPref:
@@ -6628,3 +6770,20 @@ nova:
         branch: default
         pref: browser.nova.enabled
       description: Whether Nova is enabled.
+
+# Bug 2072122: Trusted Types readiness experiment only, to be removed.
+trustedTypesReadinessTelemetry:
+  description: >-
+    Recording of the security.trusted_types_readiness Glean metric, which
+    measures per document how ready pages are to adopt Trusted Types.
+  owner: fbraun@mozilla.com
+  hasExposure: false
+  variables:
+    enabled:
+      type: boolean
+      setPref:
+        branch: default
+        pref: dom.security.trusted_types.readiness_telemetry.enabled
+      description: >-
+        Whether the security.trusted_types_readiness metric is recorded at
+        document destruction.

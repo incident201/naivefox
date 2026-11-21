@@ -404,8 +404,8 @@ function rectRelativeToScreen(aElement) {
 // guarantee anything; you probably want to use one of the other functions below
 // which actually wait for results.
 // aX and aY are relative to the top-left of |aTarget|'s bounding rect.
-// aDeltaX and aDeltaY are pixel deltas, and aObserver can be left undefined
-// if not needed.
+// aDeltaX and aDeltaY are pixel deltas, positive when scrolling to the left or
+// up, and aObserver can be left undefined if not needed.
 async function synthesizeNativeWheel(
   aTarget,
   aX,
@@ -503,7 +503,7 @@ async function synthesizeNativePanGestureEvent(
 
 // Sends a native touchpad pan event and resolve the returned promise once the
 // request has been successfully made to the OS.
-// NOTE: This works only on Windows and Linux.
+// NOTE: This works only on Windows, Linux and Mac.
 // You can specify nsIDOMWindowUtils.PHASE_BEGIN, PHASE_UPDATE and PHASE_END
 // for |aPhase|.
 async function promiseNativeTouchpadPanEventAndWaitForObserver(
@@ -514,7 +514,11 @@ async function promiseNativeTouchpadPanEventAndWaitForObserver(
   aDeltaY,
   aPhase
 ) {
-  if (getPlatform() != "windows" && getPlatform() != "linux") {
+  if (
+    getPlatform() != "windows" &&
+    getPlatform() != "linux" &&
+    getPlatform() != "mac"
+  ) {
     throw new Error(
       `promiseNativeTouchpadPanEventAndWaitForObserver doesn't work on ${getPlatform()}`
     );
@@ -1764,32 +1768,7 @@ async function doubleTapOn(element, x, y, useTouchpad) {
   await promiseApzFlushedRepaints();
 }
 
-const NativePanHandlerForLinux = {
-  beginPhase: SpecialPowers.DOMWindowUtils.PHASE_BEGIN,
-  updatePhase: SpecialPowers.DOMWindowUtils.PHASE_UPDATE,
-  endPhase: SpecialPowers.DOMWindowUtils.PHASE_END,
-  promiseNativePanEvent: promiseNativeTouchpadPanEventAndWaitForObserver,
-  delta: -50,
-};
-
-const NativePanHandlerForWindows = {
-  beginPhase: SpecialPowers.DOMWindowUtils.PHASE_BEGIN,
-  updatePhase: SpecialPowers.DOMWindowUtils.PHASE_UPDATE,
-  endPhase: SpecialPowers.DOMWindowUtils.PHASE_END,
-  promiseNativePanEvent: promiseNativeTouchpadPanEventAndWaitForObserver,
-  delta: 50,
-};
-
-const NativePanHandlerForMac = {
-  // From https://developer.apple.com/documentation/coregraphics/cgscrollphase/kcgscrollphasebegan?language=occ , etc.
-  beginPhase: 1, // kCGScrollPhaseBegan
-  updatePhase: 2, // kCGScrollPhaseChanged
-  endPhase: 4, // kCGScrollPhaseEnded
-  promiseNativePanEvent: promiseNativePanGestureEventAndWaitForObserver,
-  delta: -50,
-};
-
-const NativePanHandlerForHeadless = {
+const DefaultNativePanHandler = {
   beginPhase: SpecialPowers.DOMWindowUtils.PHASE_BEGIN,
   updatePhase: SpecialPowers.DOMWindowUtils.PHASE_UPDATE,
   endPhase: SpecialPowers.DOMWindowUtils.PHASE_END,
@@ -1799,16 +1778,14 @@ const NativePanHandlerForHeadless = {
 
 function getPanHandler() {
   if (SpecialPowers.isHeadless) {
-    return NativePanHandlerForHeadless;
+    return DefaultNativePanHandler;
   }
 
   switch (getPlatform()) {
     case "linux":
-      return NativePanHandlerForLinux;
     case "windows":
-      return NativePanHandlerForWindows;
     case "mac":
-      return NativePanHandlerForMac;
+      return DefaultNativePanHandler;
     default:
       throw new Error(
         "There's no native pan handler on platform " + getPlatform()
@@ -1817,9 +1794,10 @@ function getPanHandler() {
 }
 
 // Lazily get `NativePanHandler` to avoid an exception where we don't support
-// native pan events (e.g. Android).
-if (!window.hasOwnProperty("NativePanHandler")) {
-  Object.defineProperty(window, "NativePanHandler", {
+// native pan events (e.g. Android). Define it on `this`, not `window`, so that
+// browser-chrome tests get a getter bound to their own test-scope.
+if (!this.hasOwnProperty("NativePanHandler")) {
+  Object.defineProperty(this, "NativePanHandler", {
     get() {
       return getPanHandler();
     },
@@ -2051,8 +2029,9 @@ async function synthesizeNativeTouchForFastFling(aTarget, aX, aY, aType) {
   // On Android if subsequent touch event don't happen within 40ms, any fast
   // fling animation is never triggered.
   // [1] https://searchfox.org/firefox-main/rev/6301b01791f9c98637ae8d5b7a81dd004d48d468/gfx/layers/apz/src/AndroidVelocityTracker.cpp#44-46
-  if (getPlatform() != "android") {
-    // Wait 50ms.
-    await new Promise(resolve => setTimeout(resolve, 50));
-  }
+  // But Android touch event timestamps have millisecond resolution and the
+  // velocity tracker merges samples less than 1ms apart, so the events still
+  // need to be spaced out a bit to produce distinct samples.
+  const delayMs = getPlatform() == "android" ? 5 : 50;
+  await new Promise(resolve => setTimeout(resolve, delayMs));
 }

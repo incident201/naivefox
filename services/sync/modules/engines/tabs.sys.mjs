@@ -22,6 +22,9 @@ import {
   SyncTelemetry,
 } from "resource://services-sync/telemetry.sys.mjs";
 import { BridgedEngine } from "resource://services-sync/bridged_engine.sys.mjs";
+import { Weave } from "resource://services-sync/main.sys.mjs";
+
+const TABS_PUBLISHED_PREF = "tabs.publishedInMetaGlobal";
 
 const lazy = {};
 
@@ -83,7 +86,14 @@ TabEngine.prototype = {
 
     // We shouldn't upload tabs past what the server will accept
     const maxPayloadSize = this.service.getMaxRecordPayloadSize();
-    let tabsInfo = await TabProvider.getLocalTabsInfo(maxPayloadSize);
+    let tabsInfo = this.enabled
+      ? await TabProvider.getLocalTabsInfo(maxPayloadSize)
+      : new lazy.LocalTabsInfo({
+          tabs: [],
+          tabGroups: new Map(),
+          windows: new Map(),
+          tabsDisabled: true,
+        });
 
     await this._rustStore.setLocalTabsInfo(tabsInfo);
 
@@ -120,8 +130,27 @@ TabEngine.prototype = {
   },
 
   async _syncStartup() {
+    if (Weave.perDeviceEngineChoices) {
+      await this._maybePruneRemoteTabs();
+    }
     await super._syncStartup();
     await this.prepareTheBridge();
+  },
+
+  // A legacy client disabling tabs deletes the collection and our meta/global
+  // entry. Incremental syncs never see its record go, so refetch everything.
+  async _maybePruneRemoteTabs() {
+    let meta = await this.service.recordManager.get(this.metaURL);
+    let published = !!meta?.payload.engines?.[this.name];
+    if (!published && Svc.PrefBranch.getBoolPref(TABS_PUBLISHED_PREF, true)) {
+      this._log.info("Tabs left meta/global; refetching remote tabs");
+      let syncID = await this.getSyncID();
+      await this._bridge.reset();
+      if (syncID) {
+        await this.ensureCurrentSyncID(syncID);
+      }
+    }
+    Svc.PrefBranch.setBoolPref(TABS_PUBLISHED_PREF, published);
   },
 
   async initialize() {
@@ -137,6 +166,7 @@ TabEngine.prototype = {
     // these values for now (which is fine for now as these hardly ever change)
     this._bridge.storageVersion = STORAGE_VERSION;
     this._bridge.allowSkippedRecord = true;
+    this._bridge.getSyncId = async () => this._bridge.syncId();
 
     this._log.info("Got a bridged engine!");
     this._tracker.modified = true;
@@ -181,6 +211,22 @@ TabEngine.prototype = {
   async removeClientData() {
     let url = this.engineURL + "/" + this.service.clientsEngine.localID;
     await this.service.resource(url).delete();
+  },
+
+  // Other clients only fetch changed records, so a delete wouldn't reach them.
+  async maybeUploadEmptyRecord() {
+    if (
+      !Weave.perDeviceEngineChoices ||
+      this.enabled ||
+      this.service.status.enforceBackoff ||
+      !(await this.getLastSync()) ||
+      this.locked
+    ) {
+      return;
+    }
+    if (await this._engineLock("tabs.js: emptyWrite", this._doQuickWrite)()) {
+      await this.resetLastSync();
+    }
   },
 
   async trackRemainingChanges() {
@@ -292,7 +338,7 @@ TabEngine.prototype = {
       );
       let coll = new Collection(this.engineURL, this._recordObj, this.service);
       let resp = await coll.postSingleRawRecord(record);
-      if (!resp.success) {
+      if (!resp.success || Object.keys(resp.obj.failed).length) {
         this._log.warn(`quick-write POST failed: ${resp.status}`);
         throw resp;
       }

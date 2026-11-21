@@ -6,6 +6,7 @@ package org.mozilla.fenix.ui.efficiency.selectors
 
 import mozilla.components.browser.toolbar.R as toolbarR
 import mozilla.components.compose.browser.awesomebar.AwesomeBarTestTags
+import mozilla.components.compose.browser.awesomebar.R as awesomebarR
 import mozilla.components.compose.browser.toolbar.concept.BrowserToolbarTestTags.ADDRESSBAR_SEARCH_BOX
 import mozilla.components.compose.browser.toolbar.concept.BrowserToolbarTestTags.SEARCH_SELECTOR
 import mozilla.components.feature.qr.R as qrR
@@ -14,9 +15,14 @@ import org.mozilla.fenix.helpers.DataGenerationHelper.getStringResource
 import org.mozilla.fenix.ui.efficiency.helpers.PageReadinessProfiles
 import org.mozilla.fenix.ui.efficiency.helpers.Selector
 import org.mozilla.fenix.ui.efficiency.helpers.SelectorContainer
+import org.mozilla.fenix.ui.efficiency.helpers.SelectorGroup
 import org.mozilla.fenix.ui.efficiency.helpers.SelectorStrategy
 
 object SearchBarSelectors : SelectorContainer {
+    enum class Group : SelectorGroup {
+        AWESOME_BAR_CURRENT_SITE_ITEMS
+    }
+
     // Page-identity anchor for the edit-mode search bar. Must be an EDIT-mode-only handle: the redesigned Home/browser
     // display toolbar shows the SEARCH_SELECTOR chip too, so anchoring on that alone makes mozIsOnPageNow() (and thus
     // navigateToPage) falsely believe edit mode is already open and skip the tap that opens it. ADDRESSBAR_SEARCH_BOX
@@ -135,6 +141,13 @@ object SearchBarSelectors : SelectorContainer {
             description = "Search suggestion '$suggestionText'",
         )
 
+    val AWESOMEBAR_SUGGESTION_REMOVE_BUTTON =
+        Selector(
+            strategy = SelectorStrategy.COMPOSE_BY_CONTENT_DESCRIPTION,
+            value = getStringResource(awesomebarR.string.mozac_browser_awesomebar_remove_suggestion),
+            description = "Awesomebar suggestion remove (X) button",
+        )
+
     val SCAN_BUTTON =
         Selector(
             strategy = SelectorStrategy.COMPOSE_BY_CONTENT_DESCRIPTION,
@@ -165,5 +178,52 @@ object SearchBarSelectors : SelectorContainer {
             strategy = SelectorStrategy.COMPOSE_BY_CONTENT_DESCRIPTION,
             value = getStringResource(R.string.lens_search_content_description),
             description = "Google Lens button (search with image)",
+        )
+
+    val AWESOME_BAR_CURRENT_SITE_DETAILS =
+        Selector(
+            strategy = SelectorStrategy.COMPOSE_BY_TAG,
+            value = AwesomeBarTestTags.CURRENT_SITE_DETAILS,
+            description = "AwesomeBar current site details",
+            groups = setOf(Group.AWESOME_BAR_CURRENT_SITE_ITEMS),
+        )
+
+    val AWESOME_BAR_CURRENT_SITE_SHARE_BUTTON =
+        Selector(
+            strategy = SelectorStrategy.COMPOSE_BY_TAG,
+            value = AwesomeBarTestTags.SHARE_CURRENT_SITE_DETAILS_BUTTON,
+            description = "AwesomeBar current site share button",
+            groups = setOf(Group.AWESOME_BAR_CURRENT_SITE_ITEMS),
+        )
+
+    val AWESOME_BAR_CURRENT_SITE_COPY_BUTTON =
+        Selector(
+            strategy = SelectorStrategy.COMPOSE_BY_TAG,
+            value = AwesomeBarTestTags.COPY_CURRENT_SITE_DETAILS_BUTTON,
+            description = "AwesomeBar current site copy button",
+            groups = setOf(Group.AWESOME_BAR_CURRENT_SITE_ITEMS),
+        )
+
+    val AWESOME_BAR_CURRENT_SITE_EDIT_BUTTON =
+        Selector(
+            strategy = SelectorStrategy.COMPOSE_BY_TAG,
+            value = AwesomeBarTestTags.EDIT_CURRENT_SITE_URL_BUTTON,
+            description = "AwesomeBar current site edit button",
+            groups = setOf(Group.AWESOME_BAR_CURRENT_SITE_ITEMS),
+        )
+
+    val RECENT_SEARCHES_HEADER =
+        Selector(
+            strategy = SelectorStrategy.COMPOSE_BY_TEXT,
+            value = getStringResource(R.string.recent_searches_header),
+            description = "Recent searches header",
+        )
+
+    @Suppress("ktlint:standard:function-naming", "FunctionName")
+    fun TRENDING_SEARCHES_HEADER(searchEngineName: String) =
+        Selector(
+            strategy = SelectorStrategy.COMPOSE_BY_TEXT,
+            value = getStringResource(R.string.trending_searches_header_2, searchEngineName),
+            description = "Trending searches header",
         )
 }

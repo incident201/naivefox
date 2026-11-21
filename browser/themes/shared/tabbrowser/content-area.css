@@ -499,6 +499,10 @@
         border: none;
         outline: none;
       }
+
+      &::after {
+        content: none;
+      }
     }
 
     .split-view-panel {
@@ -523,6 +527,20 @@
       /* The selected panel's dialogs need to sit above the non-selected tab panels. */
       &.deck-selected > .browserContainer {
         z-index: 1;
+        outline: none;
+      }
+
+      /* The page is composited over the container's own
+       * outline, and when the panel isn't aligned to device pixels the page's
+       * rounded clip doesn't line up with the snapped ring, so the page bleeds
+       * into the ring and thins it at the corners. */
+      &.deck-selected::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+        pointer-events: none;
+        border-radius: var(--border-radius-medium);
         outline: var(--focus-outline);
       }
     }
@@ -561,8 +579,8 @@
       }
     }
 
-    /* Display split view footer within inactive panels. */
-    .split-view-panel:not(.deck-selected) > .browserContainer > .browserStack > split-view-footer {
+    /* Display the address footer within inactive split view panels. */
+    .split-view-panel:not(.deck-selected) > .browserContainer > .browserStack > address-footer {
       display: flex;
 
       &[hidden] {
@@ -589,12 +607,15 @@
     border: var(--border-width) solid var(--chrome-content-separator-color);
   }
 
-  /* Set active panel border color to match the focus outline, and reduce the
-   * outline width by the border width so the two combined still total
-   * --focus-outline-width, keeping the same expected ring size. */
+  /* Set active panel border color to match the focus outline, and pull the
+   * outline in over the border so the ring keeps its expected size while
+   * being painted as a single shape. */
   #tabbrowser-tabpanels[splitview] .split-view-panel.deck-selected > .browserContainer {
     border-color: var(--focus-outline-color);
-    outline-width: calc(var(--focus-outline-width) - var(--border-width));
+  }
+
+  #tabbrowser-tabpanels[splitview] .split-view-panel.deck-selected::after {
+    outline-offset: calc(-1 * var(--border-width));
   }
 
   /* In split view the notification box is inside the panel's browserContainer.
@@ -606,17 +627,17 @@
     --info-bar-background-color: var(--toolbar-background-color);
   }
 
-  /* Make sure the split-view-footer aligns with the true outer edge after
+  /* Make sure the address-footer aligns with the true outer edge after
    * factoring in the browserContainer's border width. */
-  #tabbrowser-tabpanels[splitview] .split-view-panel:not(.deck-selected) > .browserContainer split-view-footer {
+  #tabbrowser-tabpanels[splitview] .split-view-panel:not(.deck-selected) > .browserContainer address-footer {
     inset-block-end: calc(-1 * var(--border-width));
     inset-inline-end: calc(-1 * var(--border-width));
   }
 }
 
-/* Split view */
+/* Address footer */
 
-split-view-footer {
+address-footer {
   max-width: calc(100% - var(--space-xsmall));
   display: none;
   position: absolute;
@@ -650,23 +671,23 @@ split-view-footer {
   }
 }
 
-.split-view-icon {
+.address-footer-icon {
   width: var(--icon-size);
   height: var(--icon-size);
 }
 
-.split-view-icon-insecure {
+.address-footer-icon-insecure {
   -moz-context-properties: fill, stroke;
   stroke: var(--icon-color-critical);
 }
 
-.split-view-uri {
+.address-footer-uri {
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-split-view-footer,
-.split-view-security-warning {
+address-footer,
+.address-footer-security-warning {
   align-items: center;
   gap: var(--space-small);
   white-space: nowrap;
@@ -736,7 +757,7 @@ split-view-footer,
 }
 
 #statuspanel-label,
-split-view-footer {
+address-footer {
   color-scheme: env(-moz-content-preferred-color-scheme);
   background-color: -moz-dialog;
   border-color: ThreeDShadow;
@@ -908,23 +929,91 @@ split-view-footer {
     display: block;
   }
 
-  &[copied] {
-    #more-actions-button,
-    #more-actions-separator {
-      display: none;
+  &[copied] #more-actions-button {
+    display: none;
+  }
+}
+
+@media -moz-pref("browser.highlightToSearch.featureGate") {
+  #selection-shortcut-action-panel {
+    --selection-button-size: 36px;
+    --panel-subview-body-padding: 1px;
+    --panel-border-radius: var(--border-radius-circle);
+
+    moz-button {
+      --button-min-height: var(--selection-button-size);
+      --button-size-icon: var(--selection-button-size);
+    }
+
+    #ai-action-button::part(button)::after {
+      margin-inline-start: var(--space-xsmall);
+    }
+
+    .copy-action-confirmation {
+      block-size: var(--selection-button-size);
+      margin-block: 1px;
+    }
+
+    .copy-action-confirmation-icon {
+      inline-size: var(--selection-button-size);
+      block-size: var(--selection-button-size);
+    }
+  }
+
+  #selection-more-actions-panel > .panel-subview-body {
+    font: menu;
+  }
+}
+
+#selection-more-actions-panel {
+  --selection-row-icon-inset: calc((var(--size-item-large) - var(--icon-size)) / 2);
+  --selection-row-switch-inset: calc((var(--size-item-large) - var(--size-item-small)) / 2);
+
+  &::part(content) {
+    padding: var(--space-small);
+  }
+
+  > .panel-subview-body {
+    gap: 0;
+    padding-block: 0;
+  }
+
+  moz-toggle {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: var(--size-item-large);
+    padding-inline: var(--selection-row-icon-inset) var(--selection-row-switch-inset);
+    border-radius: var(--button-border-radius);
+    --space-small: var(--selection-row-icon-inset);
+
+    &:hover {
+      background-color: var(--button-background-color-ghost-hover);
+      color: var(--button-text-color-ghost-hover);
     }
   }
 }
 
-#selection-more-actions-panel > .panel-subview-body {
-  gap: var(--space-medium);
+#more-actions-manage-settings {
+  --button-font-weight: normal;
+
+  &::part(button) {
+    gap: var(--selection-row-icon-inset);
+    padding-block: var(--space-xsmall);
+    padding-inline: calc(var(--selection-row-icon-inset) - var(--border-width))
+      calc(var(--selection-row-switch-inset) + var(--size-item-large) + var(--space-medium));
+  }
 }
 
 .more-actions-notice {
-  /* Wrap the notice instead of letting it stretch the panel to one long line. */
-  max-width: 260px;
-  margin: 0;
-  color: var(--text-color-deemphasized);
+  /* Take the width of the rows instead of stretching the panel. */
+  width: 0;
+  min-width: 100%;
+  box-sizing: border-box;
+  margin: 0 0 var(--space-xsmall);
+  padding: var(--space-small) var(--space-medium);
+  border-radius: var(--border-radius-large);
+  background-color: var(--background-color-warning);
 }
 
 .more-actions-notice-chevron {
@@ -1117,6 +1206,18 @@ split-view-footer {
   max-width: 345px;
 }
 
+@media -moz-pref("browser.highlightToSearch.featureGate") {
+  #ask-chat-shortcuts {
+    min-width: 240px;
+    max-width: 320px;
+
+    toolbarbutton.subviewbutton {
+      min-height: var(--size-item-large);
+      padding-block: 0;
+    }
+  }
+}
+
 .ask-chat-shortcut-warning {
   margin: var(--panel-menuitem-margin);
   margin-bottom: var(--space-xsmall);
@@ -1144,6 +1245,7 @@ split-view-footer {
      be defined when DevTools is not visible/docked to a different position so we need
      to provide meaningful fallback in those cases.
   */
+  /* physical left/right are more appropriate than the equivalent logical properties here */
   left: max(anchor(--browser-with-dialog left), anchor(--devtools-left-host right, 0));
   right: max(anchor(--browser-with-dialog right), anchor(--devtools-right-host left, 0));
   bottom: max(anchor(--browser-with-dialog bottom), anchor(--devtools-bottom-host top, 0));

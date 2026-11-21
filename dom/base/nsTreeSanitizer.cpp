@@ -22,6 +22,7 @@
 #include "mozilla/dom/SRIMetadata.h"
 #include "mozilla/dom/SanitizerBinding.h"
 #include "mozilla/dom/ShadowIncludingTreeIterator.h"
+#include "mozilla/dom/ShadowRoot.h"
 #include "nsAtom.h"
 #include "nsAttrName.h"
 #include "nsComponentManagerUtils.h"
@@ -191,7 +192,7 @@ const nsStaticAtom* const kAttributesHTML[] = {
   nsGkAtoms::cols,
   nsGkAtoms::colspan,
   nsGkAtoms::content,
-  nsGkAtoms::contenteditable,
+  // nsGkAtoms::contenteditable is checked in SanitizeAttributes.
   nsGkAtoms::contextmenu,
   nsGkAtoms::controls,
   nsGkAtoms::coords,
@@ -1235,9 +1236,10 @@ void nsTreeSanitizer::SanitizeAttributes(mozilla::dom::Element* aElement,
         // <link rel itemprop>
         continue;
       }
-      if (!mDropForms && attrLocal == nsGkAtoms::_for) {
-        // Accept "for" attribute unless SanitizerDropForms is set.
-        // This is primarily meant for <label for>.
+      if (!mDropForms && (attrLocal == nsGkAtoms::_for ||
+                          attrLocal == nsGkAtoms::contenteditable)) {
+        // Unless SanitizerDropForms is set, accept "for" attribute (this is
+        // primarily meant for <label for>) and the "contenteditable" attribute.
         continue;
       }
       const char16_t* localStr = attrLocal->GetUTF16String();
@@ -1412,6 +1414,12 @@ void nsTreeSanitizer::SanitizeChildren(nsINode* aRoot) {
         mFullDocument = false;
         RefPtr<DocumentFragment> frag = templateEl->Content();
         SanitizeChildren(frag);
+        mFullDocument = wasFullDocument;
+      }
+      if (RefPtr<ShadowRoot> shadow = elt->GetShadowRoot()) {
+        bool wasFullDocument = mFullDocument;
+        mFullDocument = false;
+        SanitizeChildren(shadow);
         mFullDocument = wasFullDocument;
       }
       if (nsGkAtoms::style == localName) {

@@ -13,8 +13,6 @@ export const AppConstants: Readonly<{
 
   RELEASE_OR_BETA: boolean;
 
-  EARLY_BETA_OR_EARLIER: boolean;
-
   IS_ESR: boolean;
 
   ACCESSIBILITY: boolean;
@@ -65,8 +63,6 @@ export const AppConstants: Readonly<{
   isPlatformAndVersionAtMost(platform: Platform, version: string): boolean;
 
   MOZ_CRASHREPORTER: boolean;
-
-  MOZ_NORMANDY: boolean;
 
   MOZ_MAINTENANCE_SERVICE: boolean;
 

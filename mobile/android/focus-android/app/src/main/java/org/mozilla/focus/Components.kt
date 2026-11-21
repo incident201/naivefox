@@ -73,6 +73,7 @@ import mozilla.components.support.remotesettings.DefaultRemoteSettingsSyncSchedu
 import mozilla.components.support.remotesettings.RemoteSettingsServer
 import mozilla.components.support.remotesettings.RemoteSettingsService
 import mozilla.components.support.remotesettings.into
+import mozilla.components.support.utils.BuildMetadata
 import mozilla.components.support.utils.DateTimeProvider
 import mozilla.components.support.utils.DefaultDateTimeProvider
 import mozilla.components.support.utils.DefaultDownloadFileUtils
@@ -121,7 +122,7 @@ class Components(
     val appStore: AppStore by lazy {
         AppStore(
             AppState(
-                screen = if (context.settings.isFirstRun) Screen.FirstRun else Screen.Home,
+                screen = if (context.settings.isFirstRun) Screen.FirstRun else Screen.Home(),
                 topSites = emptyList(),
                 isPinningSupported = null,
             )
@@ -233,10 +234,10 @@ class Components(
                             searchEngineSelectorConfig = getSearchEngineSelectorConfig(context),
                         ),
                         SearchFilterMiddleware(),
-                        PromptMiddleware(),
+                        PromptMiddleware(applicationScope),
                         AdsTelemetryMiddleware(adsTelemetry),
                         BlockedTrackersMiddleware(context),
-                        RecordingDevicesMiddleware(context, notificationsDelegate),
+                        RecordingDevicesMiddleware(context, notificationsDelegate, applicationScope),
                         CfrMiddleware(appStore, settings),
                         FileUploadsDirCleanerMiddleware(fileUploadsDirCleaner),
                     ) +
@@ -282,6 +283,8 @@ class Components(
     val appLinksUseCases: AppLinksUseCases by lazy { AppLinksUseCases(context.applicationContext) }
 
     val customTabsUseCases: CustomTabsUseCases by lazy { CustomTabsUseCases(store, sessionUseCases.loadUrl) }
+
+    val buildMetadata: BuildMetadata by lazy { BuildMetadata.fromAssets(context.assets) }
 
     val crashReporter: CrashReporter by lazy { createCrashReporter(context) }
 

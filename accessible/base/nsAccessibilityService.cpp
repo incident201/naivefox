@@ -926,14 +926,10 @@ void nsAccessibilityService::ComboboxOptionMaybeChanged(
 
   for (nsIContent* cur = aMutatingNode; cur; cur = cur->GetParent()) {
     if (cur->IsHTMLElement(nsGkAtoms::option)) {
-      if (LocalAccessible* accessible = document->GetAccessible(cur)) {
-        document->FireDelayedEvent(nsIAccessibleEvent::EVENT_NAME_CHANGE,
-                                   accessible);
-        break;
-      }
-      if (cur->IsHTMLElement(nsGkAtoms::select)) {
-        break;
-      }
+      HTMLComboboxAccessible::SelectedOptionLabelMaybeChanged(document, cur);
+    }
+    if (cur->IsHTMLElement(nsGkAtoms::select)) {
+      break;
     }
   }
 }
@@ -1348,11 +1344,6 @@ LocalAccessible* nsAccessibilityService::CreateAccessible(
       newAcc = MakeRefPtr<HyperTextAccessible>(content, document);
     }
 
-    if (content->IsElement() && content->AsElement()->GetPseudoElementType() ==
-                                    PseudoStyleType::Picker) {
-      newAcc = MakeRefPtr<HTMLComboboxListAccessible>(content, document);
-    }
-
     // If there's still no Accessible but we do have an entry in the markup
     // map for this non-presentational element, create a generic
     // HyperTextAccessible.
@@ -1398,28 +1389,6 @@ LocalAccessible* nsAccessibilityService::CreateAccessible(
       }
     }
   }
-
-  if (frame->GetContent() != content) {
-    // Not the main content for this frame. This happens because <area>
-    // elements return the image frame as their primary frame. The main content
-    // for the image frame is the image content. If the frame is not an image
-    // frame or the node is not an area element then null is returned.
-    // This setup will change when bug 135040 is fixed. Make sure we don't
-    // create area accessible here. Hopefully assertion below will handle that.
-
-#ifdef DEBUG
-    nsImageFrame* imageFrame = do_QueryFrame(frame);
-    NS_ASSERTION(imageFrame && content->IsHTMLElement(nsGkAtoms::area),
-                 "Unknown case of not main content for the frame!");
-#endif
-    return nullptr;
-  }
-
-#ifdef DEBUG
-  nsImageFrame* imageFrame = do_QueryFrame(frame);
-  NS_ASSERTION(!imageFrame || !content->IsHTMLElement(nsGkAtoms::area),
-               "Image map manages the area accessible creation!");
-#endif
 
   // Attempt to create an accessible based on what we know.
   RefPtr<LocalAccessible> newAcc;
@@ -1541,8 +1510,13 @@ LocalAccessible* nsAccessibilityService::CreateAccessible(
     // expose their native roles.
     if (!roleMapEntry && newAcc && aContext->HasStrongARIARole()) {
       if (frame->AccessibleType() == eHTMLTableRowType) {
-        const nsRoleMapEntry* contextRoleMap = aContext->ARIARoleMap();
-        if (!contextRoleMap->IsOfType(eTable)) {
+        LocalAccessible* table = aContext;
+        if (!aContext->IsTable() &&
+            aContext->ARIARoleMap()->role == roles::ROWGROUP) {
+          table = aContext->LocalParent();
+        }
+        if (table->HasStrongARIARole() &&
+            !table->ARIARoleMap()->IsOfType(eTable)) {
           roleMapEntry = &aria::gEmptyRoleMap;
         }
 
@@ -2127,8 +2101,8 @@ void nsAccessibilityService::NotifyOfConsumersChange() {
 
   nsAutoString consumers;
   GetConsumers(consumers);
-  observerService->NotifyObservers(nullptr, "a11y-consumers-changed",
-                                   consumers.get());
+  observerService->NotifyWhenScriptSafe(nullptr, "a11y-consumers-changed",
+                                        consumers.get());
 }
 
 const mozilla::a11y::MarkupMapInfo* nsAccessibilityService::GetMarkupMapInfoFor(

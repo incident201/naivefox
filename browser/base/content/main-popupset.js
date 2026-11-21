@@ -304,15 +304,8 @@ document.addEventListener(
             let popup = event.target.parentElement;
             let tabGroupId = getContextTabGroupId(popup);
             dismissTabGroupPanel(popup);
-            SessionStore.forgetSavedTabGroup(tabGroupId);
+            SessionStore.forgetSavedTabGroup(tabGroupId, "user-deleted");
           }
-          break;
-        // == editBookmarkPanel ==
-        case "editBookmarkPanelDoneButton":
-          StarUI.panel.hidePopup();
-          break;
-        case "editBookmarkPanelRemoveButton":
-          StarUI.removeBookmarkButtonCommand();
           break;
 
         // == sidebarMenu-popup ==
@@ -544,6 +537,16 @@ document.addEventListener(
         .openPopup(userContextIcons, "after_start", 0, 0, false, false, event);
     });
 
+    const userContextIndicatorMenu = document.getElementById(
+      "userContext-indicator-menu"
+    );
+    userContextIndicatorMenu.addEventListener("popupshowing", () => {
+      userContextIcons.setAttribute("open", "true");
+    });
+    userContextIndicatorMenu.addEventListener("popuphidden", () => {
+      userContextIcons.removeAttribute("open");
+    });
+
     const containerHistoryPopup = document.getElementById(
       "sidebar-history-context-menu-container-popup"
     );
@@ -593,13 +596,16 @@ document.addEventListener(
       });
 
     // when pref browser.tabs.contextmenu.altstructure.enabled is enabled, the
-    // move tab to new group menu item is a child of the #context_moveTabOptions menu
+    // group items live in the #context_addTabToGroup menu
     for (let menu of [
       document.getElementById("context_moveTabToGroupPopupMenu"),
-      document.getElementById("context_moveTabOptions"),
+      document.getElementById("context_addTabToGroup"),
     ]) {
       menu.addEventListener("command", event => {
-        if (event.target.id == "context_moveTabToGroupNewGroup") {
+        if (
+          event.target.id == "context_moveTabToGroupNewGroup" ||
+          event.target.id == "context_addTabToGroupNewGroup"
+        ) {
           TabContextMenu.moveTabsToNewGroup();
           return;
         }

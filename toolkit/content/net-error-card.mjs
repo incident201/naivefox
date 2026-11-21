@@ -21,7 +21,6 @@ import {
   gNoConnectivity,
   getLoopbackInfo,
   retryThis,
-  VPN_ACTIVE,
   detectClockSkew,
 } from "chrome://global/content/aboutNetErrorHelpers.mjs";
 import { initializeRegistry } from "chrome://global/content/errors/error-registry.mjs";
@@ -118,7 +117,6 @@ export class NetErrorCard extends MozLitElement {
       errorCodeString: errorInfo.errorCodeString,
       gErrorCode,
       noConnectivity: gNoConnectivity,
-      vpnActive: VPN_ACTIVE,
     });
 
     // Bug 2038887: the felt privacy error page does not surface the DoH
@@ -155,6 +153,7 @@ export class NetErrorCard extends MozLitElement {
     this.searchCTAQuery = "";
     this.searchCTAAction = "";
     this.searchCTAOfflineAborted = false;
+    this.vpnError = false;
     // Exit-outcome tracking (bug 2055717): plain, non-reactive flags mapped to
     // an exit_reason at pagehide.
     this.ctaClicked = false;
@@ -254,7 +253,7 @@ export class NetErrorCard extends MozLitElement {
       errorCodeString: this.errorInfo.errorCodeString,
       gErrorCode,
       noConnectivity: gNoConnectivity,
-      vpnActive: VPN_ACTIVE,
+      vpnError: this.vpnError,
     });
     this.errorConfig = this.getErrorConfig();
     this.hideExceptionButton = this.shouldHideExceptionButton();
@@ -823,7 +822,6 @@ export class NetErrorCard extends MozLitElement {
         ? html` <moz-button
             id="exception-button"
             data-l10n-id="fp-certerror-override-exception-button-2"
-            data-l10n-attrs="accesskey"
             data-l10n-args=${JSON.stringify({ hostname: this.hostname })}
             data-telemetry-id="exception_button"
             @click=${this.handleProceedToUrlClick}
@@ -891,6 +889,7 @@ export class NetErrorCard extends MozLitElement {
       buttons: {
         tryAgain: config.buttons?.showTryAgain,
         goBack: config.buttons?.showGoBack && window.self === window.top,
+        continueWithoutVPN: config.buttons?.showContinueWithoutVPN,
       },
       useAdvancedSection: config.buttons?.showAdvanced,
     };
@@ -916,10 +915,18 @@ export class NetErrorCard extends MozLitElement {
     return html`<moz-button
       type="primary"
       data-l10n-id="fp-certerror-return-to-previous-page-recommended-button-2"
-      data-l10n-attrs="accesskey"
       data-telemetry-id="return_button_adv"
       id="returnButton"
       @click=${this.handleGoBackClick}
+    ></moz-button>`;
+  }
+
+  continueWithoutVPNButtonTemplate() {
+    return html`<moz-button
+      id="continueWithoutVPNButton"
+      data-l10n-id="fp-neterror-vpn-error-continue-button"
+      data-l10n-attrs="accesskey"
+      @click=${this.handleContinueWithoutVPNClick}
     ></moz-button>`;
   }
 
@@ -928,7 +935,6 @@ export class NetErrorCard extends MozLitElement {
       id="tryAgainButton"
       type="primary"
       data-l10n-id="neterror-try-again-button-2"
-      data-l10n-attrs="accesskey"
       data-telemetry-id="try_again_button"
       @click=${this.handleTryAgain}
     ></moz-button>`;
@@ -1011,7 +1017,6 @@ export class NetErrorCard extends MozLitElement {
       type="primary"
       iconSrc="chrome://global/skin/icons/search-glass.svg"
       data-l10n-id="neterror-search-cta-search-button"
-      data-l10n-attrs="accesskey"
       @click=${this.handleSearchCTAClick}
     ></moz-button>`;
   }
@@ -1021,7 +1026,6 @@ export class NetErrorCard extends MozLitElement {
       id="reloadButton"
       iconSrc="chrome://global/skin/icons/reload.svg"
       data-l10n-id="neterror-search-cta-reload-button"
-      data-l10n-attrs="accesskey"
       data-telemetry-id="try_again_button"
       @click=${this.handleReloadClick}
     ></moz-button>`;
@@ -1045,7 +1049,11 @@ export class NetErrorCard extends MozLitElement {
       useAdvancedSection,
     } = params;
 
-    const { goBack = false, tryAgain = false } = buttons;
+    const {
+      goBack = false,
+      tryAgain = false,
+      continueWithoutVPN = false,
+    } = buttons;
 
     // Format the learn more link with base URL if it's a SUMO slug
     let learnMoreHref = learnMoreSupportPage;
@@ -1122,9 +1130,12 @@ export class NetErrorCard extends MozLitElement {
             data-l10n-args=${JSON.stringify({ error: errorCode })}
           ></p>`
         : null}
-      ${tryAgain
+      ${tryAgain || continueWithoutVPN
         ? html`<moz-button-group>
-            ${this.tryAgainButtonTemplate()}
+            ${tryAgain ? this.tryAgainButtonTemplate() : null}
+            ${continueWithoutVPN
+              ? this.continueWithoutVPNButtonTemplate()
+              : null}
             ${this.showTrrSettingsButton
               ? html`<moz-button
                   id="trrSettingsButton"
@@ -1208,7 +1219,7 @@ export class NetErrorCard extends MozLitElement {
 
     return html`<div
       id="certificateErrorDebugInformation"
-      class="advanced-panel"
+      class="advanced-panel container"
     >
       <moz-button
         id="copyToClipboardTop"
@@ -1231,6 +1242,10 @@ export class NetErrorCard extends MozLitElement {
     RPMSendAsyncMessage("Browser:SSLErrorGoBack");
   }
 
+  handleContinueWithoutVPNClick() {
+    RPMSendAsyncMessage("IPP:ContinueWithoutVPN");
+  }
+
   handleProceedToUrlClick(e) {
     this.handleTelemetryClick(e);
     const isPermanent =
@@ -1246,6 +1261,10 @@ export class NetErrorCard extends MozLitElement {
 
   handleTryAgain(e) {
     this.handleTelemetryClick(e);
+    if (this.resolvedErrorId === "vpnFailure") {
+      RPMSendAsyncMessage("IPP:TryAgain");
+      return;
+    }
     retryThis(e);
   }
 

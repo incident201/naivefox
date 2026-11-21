@@ -18,6 +18,8 @@ prefs = [
 
 ["browser_atspi_interfaces.js"]
 
+["browser_editabletext.js"]
+
 ["browser_forceEnabled.js"]
 
 ["browser_groupPosition.js"]
@@ -29,3 +31,5 @@ prefs = [
 ["browser_role.js"]
 
 ["browser_table.js"]
+
+["browser_valuetext.js"]

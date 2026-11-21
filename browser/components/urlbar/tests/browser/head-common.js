@@ -9,7 +9,7 @@ ChromeUtils.defineESModuleGetters(this, {
   SearchService: "moz-src:///toolkit/components/search/SearchService.sys.mjs",
   sinon: "resource://testing-common/Sinon.sys.mjs",
   TelemetryTestUtils: "resource://testing-common/TelemetryTestUtils.sys.mjs",
-  TopSites: "resource:///modules/topsites/TopSites.sys.mjs",
+  TopSites: "moz-src:///browser/components/topsites/TopSites.sys.mjs",
   UrlbarParentController:
     "moz-src:///browser/components/urlbar/UrlbarParentController.sys.mjs",
   UrlbarProvider: "moz-src:///browser/components/urlbar/UrlbarUtils.sys.mjs",
@@ -72,12 +72,14 @@ ChromeUtils.defineLazyGetter(this, "SearchTestUtils", () => {
  *
  * @param {string} url
  *   The URL to make a top site.
+ * @returns {Promise<Function>}
+ *   The cleanup function returned by updateTopSites().
  */
 async function addTopSites(url) {
   for (let i = 0; i < 5; i++) {
     await PlacesTestUtils.addVisits(url);
   }
-  await updateTopSites(sites => {
+  return updateTopSites(sites => {
     return sites && sites[0] && sites[0].url == url;
   });
 }
@@ -128,6 +130,9 @@ async function withHttpServer(
  *   A callback that returns true after Top Sites are successfully updated.
  * @param {boolean} searchShortcuts
  *   True if Top Sites search shortcuts should be enabled.
+ * @returns {Promise<Function>}
+ *   An async function popping the pref env this pushes. Call it before popping
+ *   any pref env pushed earlier.
  */
 async function updateTopSites(condition, searchShortcuts = false) {
   // Toggle the pref to clear the feed cache and force an update.
@@ -170,6 +175,9 @@ async function updateTopSites(condition, searchShortcuts = false) {
     );
     await feed?._latestRefreshPromise;
   }
+
+  // TODO Bug 2095218: callers outside browser-engagementTelemetry ignore this.
+  return () => SpecialPowers.popPrefEnv();
 }
 
 async function installPersistTestEngines(globalDefault = "Example") {
@@ -221,24 +229,6 @@ async function installPersistTestEngines(globalDefault = "Example") {
   return () => {
     persistSandbox.restore();
   };
-}
-
-async function resetApplicationProvidedEngines() {
-  let settingsWritten = SearchTestUtils.promiseSearchNotification(
-    "write-settings-to-disk-complete"
-  );
-  await SearchTestUtils.updateRemoteSettingsConfig();
-  await settingsWritten;
-}
-
-/**
- * Wait for 10 idle dispatches. This function should not be used in new tests.
- * Bug 2032010 will investigate removing it.
- */
-async function flakyWaitForManyIdles() {
-  for (let i = 0; i < 10; i++) {
-    await new Promise(resolve => Services.tm.idleDispatchToMainThread(resolve));
-  }
 }
 
 async function startCustomizing(win = window) {

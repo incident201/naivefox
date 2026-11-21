@@ -48,6 +48,7 @@ from mozbuild.base import MachCommandConditions as conditions
 from mozbuild.util import (
     MOZBUILD_METRICS_PATH,
     ForwardingArgumentParser,
+    compiler_cache_env,
     ensure_l10n_central,
     get_latest_file,
 )
@@ -421,6 +422,7 @@ def _run_cargo_command(
     )
     if configured_path := command_context.substs.get("PATH"):
         env["PATH"] = configured_path
+    env.update(compiler_cache_env(command_context.substs))
     argv = compose_mach_cargo_argv(
         command,
         substs,
@@ -1516,6 +1518,11 @@ def android_gtest(
     return exit_code
 
 
+def _source_url(repo, changeset):
+    rev_path = "/rev/" if "hg.mozilla.org" in repo else "/commit/"
+    return f"{repo}{rev_path}{changeset}"
+
+
 @Command(
     "source-package",
     category="misc",
@@ -1606,8 +1613,8 @@ def source_package(command_context, output, upload):
             with open(sourcestamp_path, "w") as fd:
                 fd.write(
                     f"{buildid}\n"
-                    f"{comm_repo}/rev/{comm_changeset}\n"
-                    f"{gecko_repo}/rev/{gecko_changeset}\n"
+                    f"{_source_url(comm_repo, comm_changeset)}\n"
+                    f"{_source_url(gecko_repo, gecko_changeset)}\n"
                 )
         else:
             source_url = ""
@@ -1615,7 +1622,7 @@ def source_package(command_context, output, upload):
                 repo = substs.get("MOZ_SOURCE_REPO")
                 changeset = substs.get("MOZ_SOURCE_CHANGESET")
                 if repo and changeset:
-                    source_url = f"{repo}/rev/{changeset}"
+                    source_url = _source_url(repo, changeset)
 
             with open(sourcestamp_path, "w") as fd:
                 fd.write(f"{buildid}\n{source_url}")
@@ -4143,6 +4150,15 @@ def package_l10n(command_context, locales, verbose=False, package_tests=False):
             pass_thru=True,
             ensure_exit_code=True,
         )
+
+    command_context.log(
+        logging.WARNING,
+        "package-multi-locale",
+        {"locales": locales},
+        "A later `./mach build` rewrites the chrome manifests in dist/bin "
+        "without the registrations for {locales}. After a build, run "
+        "`./mach package-multi-locale` again before packaging.",
+    )
 
     return 0
 

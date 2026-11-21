@@ -83,15 +83,22 @@ bool IsKdeDesktopEnvironment();
 nsTArray<nsCString> ParseTextURIList(const nsACString& data);
 
 using FocusRequestPromise = MozPromise<nsCString, bool, false>;
-RefPtr<FocusRequestPromise> RequestWaylandFocusPromise();
+// Ask the compositor for an xdg-activation token.
+//
+// By default the token can move focus to the activated window. With
+// aUseFocusSource = false it can't, and activating with it only requests
+// attention for that window.
+RefPtr<FocusRequestPromise> RequestWaylandFocusPromise(
+    bool aUseFocusSource = true);
 
 bool IsCancelledGError(GError* aGError);
 
 #if defined(MOZ_X11)
 // Used by startup notifications
 nsCString SynthesizeStartupToken();
+uint32_t GetX11StartupUserTime(GdkDisplay* aDisplay, uintptr_t aWindow);
 void FindLatestUserTime(GdkDisplay* aDisplay, uintptr_t aWindow,
-                        uint32_t* aLatestTime);
+                        uint32_t aCurrentTime, uint32_t* aLatestTime);
 #endif
 
 }  // namespace mozilla::widget

@@ -6,6 +6,7 @@
 #include <unordered_set>
 
 #include "NativeMenuMac.h"
+#include "TextInputHandler.h"
 #include "gfxPlatform.h"
 #include "mozilla/EventForwards.h"
 #include "mozilla/dom/Document.h"
@@ -22,7 +23,9 @@
 #include "nsMenuX.h"
 #include "nsObjCExceptions.h"
 #include "nsPIDOMWindow.h"
+#include "nsPresContext.h"
 #include "nsQueryObject.h"
+#include "nsUnicharUtils.h"
 
 using namespace mozilla;
 
@@ -53,16 +56,112 @@ void nsMenuUtilsX::DispatchCommandTo(nsIContent* aTargetContent,
   }
 }
 
-NSString* nsMenuUtilsX::GetTruncatedCocoaLabel(const nsString& itemLabel) {
+// System Settings stores the key as typed on the keyboard layout in use: a
+// letter or digit on its own, with Shift in the modifier mask or as an
+// uppercase letter, and a character that needs Shift, such as "@", as that
+// character. So the pressed key is compared through what it produces on the
+// current layout with and without Shift, and Option and Control never change
+// the character that counts.
+bool nsMenuUtilsX::EventMatchesKeyEquivalent(
+    NSEvent* aEvent, NSString* aKeyEquivalent,
+    NSEventModifierFlags aModifierMask) {
+  if (aKeyEquivalent.length != 1) {
+    return false;
+  }
+  uint32_t key = [aKeyEquivalent characterAtIndex:0];
+  uint32_t lowercaseKey = ToLowerCase(key);
+
+  const NSEventModifierFlags relevantFlags =
+      NSEventModifierFlagCommand | NSEventModifierFlagOption |
+      NSEventModifierFlagControl | NSEventModifierFlagShift;
+  NSEventModifierFlags eventFlags = aEvent.modifierFlags & relevantFlags;
+  NSEventModifierFlags requiredFlags = aModifierMask & relevantFlags;
+  if (lowercaseKey != key) {
+    // AppKit expresses Shift through an uppercase key equivalent.
+    requiredFlags |= NSEventModifierFlagShift;
+  }
+
+  mozilla::widget::TISInputSourceWrapper& inputSource =
+      mozilla::widget::TISInputSourceWrapper::CurrentInputSource();
+  uint32_t unshifted = inputSource.CharForKeyCode(aEvent.keyCode, 0);
+  uint32_t shifted = inputSource.CharForKeyCode(aEvent.keyCode, shiftKey);
+  // The layout gives function keys, arrows, Home, End and similar keys no
+  // character or a control character, while AppKit names them with its own
+  // characters, such as NSF14FunctionKey. Such keys are compared through the
+  // character AppKit gives the event.
+  if (mozilla::widget::IsControlChar(unshifted) &&
+      mozilla::widget::IsControlChar(shifted)) {
+    NSString* characters = aEvent.charactersIgnoringModifiers;
+    return characters.length == 1 && [characters characterAtIndex:0] == key &&
+           eventFlags == requiredFlags;
+  }
+  if (unshifted && ToLowerCase(unshifted) == lowercaseKey) {
+    return eventFlags == requiredFlags;
+  }
+  if (shifted && shifted == key) {
+    return eventFlags == (requiredFlags | NSEventModifierFlagShift);
+  }
+  return false;
+}
+
+NSString* nsMenuUtilsX::TruncateLabelToWidth(NSString* aLabel, NSFont* aFont,
+                                             CGFloat aMaxWidth) {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK;
 
-  // We want to truncate long strings to some reasonable pixel length but there
-  // is no good API for doing that which works for all OS versions and
-  // architectures. For now we'll do nothing for consistency and depend on good
-  // user interface design to limit string lengths.
-  return [NSString
-      stringWithCharacters:reinterpret_cast<const unichar*>(itemLabel.get())
-                    length:itemLabel.Length()];
+  NSDictionary* attrs = @{NSFontAttributeName : aFont};
+  if ([aLabel sizeWithAttributes:attrs].width <= aMaxWidth) {
+    return aLabel;
+  }
+
+  NSString* ellipsis = @"…";
+  NSUInteger low = 0;
+  NSUInteger high = aLabel.length;
+  while (low < high) {
+    NSUInteger mid = (low + high + 1) / 2;
+    NSString* candidate =
+        [[aLabel substringToIndex:mid] stringByAppendingString:ellipsis];
+    if ([candidate sizeWithAttributes:attrs].width <= aMaxWidth) {
+      low = mid;
+    } else {
+      high = mid - 1;
+    }
+  }
+  if (low < aLabel.length) {
+    low = [aLabel rangeOfComposedCharacterSequenceAtIndex:low].location;
+  }
+  return [[aLabel substringToIndex:low] stringByAppendingString:ellipsis];
+
+  NS_OBJC_END_TRY_ABORT_BLOCK;
+}
+
+NSString* nsMenuUtilsX::GetTruncatedCocoaLabel(const nsString& aLabel,
+                                               nsIContent* aContent) {
+  NS_OBJC_BEGIN_TRY_ABORT_BLOCK;
+
+  NSString* label = nsCocoaUtils::ToNSString(aLabel);
+  if (!aContent || !aContent->IsElement()) {
+    return label;
+  }
+
+  RefPtr<const ComputedStyle> style =
+      nsComputedDOMStyle::GetComputedStyleNoFlush(aContent->AsElement());
+  if (!style) {
+    return label;
+  }
+
+  // Native menu items usually have no frame and never use anchor positioning.
+  const AnchorPosResolutionParams params{
+      nullptr, style->StyleDisplay()->mPosition, nullptr, {}};
+  const auto maxWidth = style->StylePosition()->GetMaxWidth(params);
+  if (!maxWidth->ConvertsToLength()) {
+    return label;
+  }
+  const CGFloat maxWidthPx =
+      nsPresContext::AppUnitsToFloatCSSPixels(maxWidth->ToLength());
+
+  return TruncateLabelToWidth(
+      label, [NSFont menuFontOfSize:style->StyleFont()->mSize.ToCSSPixels()],
+      maxWidthPx);
 
   NS_OBJC_END_TRY_ABORT_BLOCK;
 }
@@ -196,7 +295,19 @@ NSAttributedString* nsMenuUtilsX::AttributedStringForContent(
   }
 
   NSFont* font = [NSFont menuFontOfSize:zoom * fontSize];
-  NSDictionary* attrs = @{NSFontAttributeName : font};
+  NSMutableParagraphStyle* paragraphStyle =
+      [[[NSMutableParagraphStyle alloc] init] autorelease];
+  if (style->StyleVisibility()->mDirection == StyleDirection::Rtl) {
+    paragraphStyle.alignment = NSTextAlignmentRight;
+  } else {
+    paragraphStyle.alignment = NSTextAlignmentLeft;
+  }
+  paragraphStyle.lineBreakMode = NSLineBreakByTruncatingTail;
+
+  NSDictionary* attrs = @{
+    NSFontAttributeName : font,
+    NSParagraphStyleAttributeName : paragraphStyle
+  };
 
   return [[[NSAttributedString alloc] initWithString:aLabel
                                           attributes:attrs] autorelease];

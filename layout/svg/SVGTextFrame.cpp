@@ -3475,12 +3475,10 @@ WebRenderCommandsResult SVGTextFrame::CreateWebRenderCommands(
       // The text frame is painted at the origin of a reference frame that
       // carries the run transform, so glyph positions reach WebRender
       // untransformed and WebRender applies the scale and rotation.
-      wr::WrTransformInfo transformInfo;
-      transformInfo.transform =
+      wr::ReferenceFrameParams rfParams;
+      rfParams.transform =
           wr::ToLayoutTransform(gfx::Matrix4x4::From2D(ToMatrix(runTransform)));
       wr::StackingContextParams params;
-      params.mTransformPtr = &transformInfo;
-      params.reference_frame_kind = wr::WrReferenceFrameKind::Transform;
       params.clip =
           wr::WrStackingContextClip::ClipChain(aBuilder.CurrentClipChainId());
       params.prim_flags = aItem->BackfaceIsHidden()
@@ -3491,14 +3489,12 @@ WebRenderCommandsResult SVGTextFrame::CreateWebRenderCommands(
           LayoutDeviceRect::FromAppUnits(frame->InkOverflowRect(), auPerDevPx);
       runBounds.Inflate(1);
 
-      Maybe<wr::WrSpatialId> spatialId = aBuilder.PushStackingContext(
-          params, wr::ToLayoutRect(LayoutDeviceRect()),
-          wr::RasterSpace::Screen());
+      wr::WrSpatialId spatialId = aBuilder.DefineReferenceFrame(
+          wr::ToLayoutPoint(LayoutDevicePoint()), rfParams);
+      aBuilder.PushStackingContext(params, wr::RasterSpace::Screen(),
+                                   Some(spatialId));
       {
-        Maybe<wr::SpaceAndClipChainHelper> spaceHelper;
-        if (spatialId) {
-          spaceHelper.emplace(aBuilder, *spatialId);
-        }
+        wr::SpaceAndClipChainHelper spaceHelper(aBuilder, spatialId);
         textDrawer->SetBounds(runBounds);
         context.SetMatrix(gfx::Matrix());
 
@@ -3512,7 +3508,7 @@ WebRenderCommandsResult SVGTextFrame::CreateWebRenderCommands(
                          inheritedOpacity);
         textDrawer->TerminateShadows();
       }
-      aBuilder.PopStackingContext(spatialId.isSome());
+      aBuilder.PopStackingContext();
     }
 
     ok = !textDrawer->CheckHasUnsupportedFeatures();
@@ -5140,6 +5136,15 @@ void SVGTextFrame::DoGlyphPositioning() {
     return;
   }
 
+  if (kid && HasAnyStateBits(NS_STATE_SVG_TEXT_CORRESPONDENCE_DIRTY) &&
+      kid->HasAnyStateBits(NS_BLOCK_NEEDS_BIDI_RESOLUTION) &&
+      PresContext()->BidiEnabled()) {
+    // Resolving bidi creates continuation frames that haven't been reflowed,
+    // so wait for the next reflow to do that.
+    AddStateBits(NS_STATE_SVG_POSITIONING_DIRTY);
+    return;
+  }
+
   // Since we can be called directly via GetBBoxContribution, our correspondence
   // may not be up to date.
   TextNodeCorrespondenceRecorder::RecordCorrespondence(this);
@@ -5363,6 +5368,14 @@ void SVGTextFrame::UpdateGlyphPositioning() {
     return;
   }
 
+  if (HasAnyStateBits(NS_STATE_SVG_TEXT_IN_REFLOW)) {
+    // The anonymous block's frames are being modified (see
+    // MaybeResolveBidiForAnonymousBlockChild), so positions can't be computed
+    // now. Leave no stale positions behind for callers to iterate over.
+    mPositions.Clear();
+    return;
+  }
+
   if (HasAnyStateBits(NS_STATE_SVG_POSITIONING_DIRTY)) {
     DoGlyphPositioning();
   }
@@ -5375,7 +5388,15 @@ void SVGTextFrame::MaybeResolveBidiForAnonymousBlockChild() {
       PresContext()->BidiEnabled()) {
     MOZ_ASSERT(static_cast<nsBlockFrame*>(do_QueryFrame(kid)),
                "Expect anonymous child to be an nsBlockFrame");
+    // Inserting continuations can synchronously notify rendering observers,
+    // which may re-enter this frame (e.g. via a bbox query) or reflow its
+    // block and invalidate the line state that bidi resolution is holding.
+    const bool wasInReflow = HasAnyStateBits(NS_STATE_SVG_TEXT_IN_REFLOW);
+    AddStateBits(NS_STATE_SVG_TEXT_IN_REFLOW);
     nsBidiPresUtils::Resolve(static_cast<nsBlockFrame*>(kid));
+    if (!wasInReflow) {
+      RemoveStateBits(NS_STATE_SVG_TEXT_IN_REFLOW);
+    }
   }
 }
 

@@ -6,14 +6,17 @@ package org.mozilla.fenix.components.ipprotection
 
 import android.content.Context
 import androidx.lifecycle.ProcessLifecycleOwner
+import mozilla.components.ExperimentalAndroidComponentsApi
 import mozilla.components.browser.state.store.BrowserStore
 import mozilla.components.concept.engine.Engine
+import mozilla.components.concept.engine.ipprotection.IPProtectionHandler.SignedOutAuth
 import mozilla.components.feature.ipprotection.IPProtectionFeature
 import mozilla.components.feature.ipprotection.auth.gpi.IPProtectionGpiProvider
+import mozilla.components.feature.ipprotection.storage.DefaultIPProtectionLocationRepository
 import mozilla.components.feature.ipprotection.storage.IPProtectionStorageSynchronizer
-import mozilla.components.feature.ipprotection.store.DefaultIPProtectionLocationRepository
-import mozilla.components.feature.ipprotection.store.IPProtectionLocationMiddleware
 import mozilla.components.feature.ipprotection.store.IPProtectionStore
+import mozilla.components.feature.ipprotection.store.middleware.IPProtectionEngineMiddleware
+import mozilla.components.feature.ipprotection.store.middleware.IPProtectionLocationMiddleware
 import mozilla.components.lib.integrity.googleplay.GooglePlayIntegrityClient
 import mozilla.components.service.fxa.manager.FxaAccountManager
 import mozilla.components.service.fxa.store.SyncStore
@@ -22,6 +25,7 @@ import org.mozilla.fenix.Config
 import org.mozilla.fenix.R
 import org.mozilla.fenix.components.AppStore
 import org.mozilla.fenix.components.LogMiddleware
+import org.mozilla.fenix.ipprotection.IPProtectionAccountObserver
 import org.mozilla.fenix.ipprotection.store.DefaultIPProtectionRepository
 import org.mozilla.fenix.ipprotection.store.FenixIPProtectionEligibilityStorage
 import org.mozilla.fenix.ipprotection.store.IPProtectionPreferencesMiddleware
@@ -49,6 +53,8 @@ class IPProtection(
     val settings: Settings,
     val context: Context,
 ) {
+    val ipProtectionRepository by lazy { DefaultIPProtectionRepository(settings) }
+
     val store by lazy {
         IPProtectionStore(
             middleware =
@@ -63,8 +69,9 @@ class IPProtection(
                         messages = snackbarMessages,
                     ),
                     IPProtectionTelemetryMiddleware(),
-                    IPProtectionPreferencesMiddleware(DefaultIPProtectionRepository(settings)),
+                    IPProtectionPreferencesMiddleware(ipProtectionRepository),
                     IPProtectionLocationMiddleware(repository = DefaultIPProtectionLocationRepository(context)),
+                    engineMiddleware,
                 )
         )
     }
@@ -78,16 +85,15 @@ class IPProtection(
         )
     }
 
+    @OptIn(ExperimentalAndroidComponentsApi::class)
     val feature by lazy {
-        // N.B. Temporary: requires a restart. Should update automatically once we support
-        // switching the auth provider without a restart.
-        engine.settings.ipProtectionAuthProvider = if (settings.ipProtectionUseGpi) "gpi" else "fxa"
-
         IPProtectionFeature(
             store = store,
             engine = engine,
             accountManager = authSources.fxaAccountManager.value,
+            engineMiddleware = engineMiddleware,
             extraAuthProvider = IPProtectionGpiProvider(authSources.integrityClient.value),
+            signedOutAuth = if (settings.ipProtectionUseGpi) SignedOutAuth.Gpi else SignedOutAuth.None,
         )
     }
 
@@ -100,10 +106,21 @@ class IPProtection(
         )
     }
 
+    private val accountObserver by lazy { IPProtectionAccountObserver(ipProtectionRepository) }
+
+    private val engineMiddleware by lazy { IPProtectionEngineMiddleware() }
+
     private val snackbarMessages by lazy {
         IPProtectionSnackbarMessages(
             connectionError = context.getString(R.string.ip_protection_connection_error_snackbar),
             locationSelectionReset = context.getString(R.string.ip_protection_location_selection_reset_snackbar),
         )
+    }
+
+    /** Initializes IP Protection related components. * */
+    fun initialize() {
+        feature.initialize()
+        storageSynchronizer.initialize()
+        authSources.fxaAccountManager.value.register(accountObserver)
     }
 }

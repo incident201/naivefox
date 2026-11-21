@@ -17,6 +17,7 @@
 #    include "mozilla/a11y/nsWinUtils.h"
 #  endif
 #endif
+#include "mozilla/AntiTrackingUtils.h"
 #include "mozilla/AppShutdown.h"
 #include "mozilla/dom/CanonicalBrowsingContext.h"
 #include "mozilla/dom/BindingIPCUtils.h"
@@ -158,6 +159,31 @@ DEFINE_IPC_SERIALIZER_WITH_FIELDS(mozilla::dom::EmbedderColorSchemes, mUsed,
 
 }  // namespace IPC
 
+namespace geckoprofiler::markers {
+
+class NavigationRateLimitedMarker
+    : public mozilla::BaseMarkerType<NavigationRateLimitedMarker> {
+ public:
+  static constexpr const char* Name = "NavigationRateLimited";
+  static constexpr const char* Description =
+      "A location or history API call was ignored because the navigation rate "
+      "limit was reached.";
+
+  using MS = mozilla::MarkerSchema;
+  static constexpr MS::PayloadField PayloadFields[] = {
+      {"limit", MS::InputType::Uint32, "Limit", MS::Format::Integer},
+      {"timespan", MS::InputType::TimeDuration, "Timespan",
+       MS::Format::Duration}};
+
+  static constexpr MS::Location Locations[] = {MS::Location::MarkerChart,
+                                               MS::Location::MarkerTable};
+  static constexpr const char* TableLabel =
+      "Limit of {marker.data.limit} calls per {marker.data.timespan} reached";
+  static constexpr const char* ChartLabel = "{marker.name}";
+};
+
+}  // namespace geckoprofiler::markers
+
 namespace mozilla {
 namespace dom {
 
@@ -174,23 +200,27 @@ static LazyLogModule gBrowsingContextLog("BrowsingContext");
 static LazyLogModule gBrowsingContextSyncLog("BrowsingContextSync");
 
 typedef nsTHashMap<nsUint64HashKey, BrowsingContext*> BrowsingContextMap;
+using CurrentTopByBrowserIdMap =
+    nsTHashMap<nsUint64HashKey, WeakPtr<BrowsingContext>>;
 
 // All BrowsingContexts indexed by Id
 static StaticAutoPtr<BrowsingContextMap> sBrowsingContexts;
 // Top-level Content BrowsingContexts only, indexed by BrowserId instead of Id
-static StaticAutoPtr<BrowsingContextMap> sCurrentTopByBrowserId;
+static StaticAutoPtr<CurrentTopByBrowserIdMap> sCurrentTopByBrowserId;
 
 static bool gIPCEnabledAnnotation = false;
 static bool gFissionEnabledAnnotation = false;
 
-static void UnregisterBrowserId(BrowsingContext* aBrowsingContext) {
-  if (!aBrowsingContext->IsTopContent() || !sCurrentTopByBrowserId) {
+// static
+void BrowsingContext::UnregisterBrowserId(BrowsingContext* aBrowsingContext) {
+  const Maybe<uint64_t> key =
+      std::move(aBrowsingContext->mCurrentTopBrowserIdKey);
+  if (!key || !sCurrentTopByBrowserId) {
     return;
   }
 
   // Avoids an extra lookup
-  auto browserIdEntry =
-      sCurrentTopByBrowserId->Lookup(aBrowsingContext->BrowserId());
+  auto browserIdEntry = sCurrentTopByBrowserId->Lookup(*key);
   if (browserIdEntry && browserIdEntry.Data() == aBrowsingContext) {
     browserIdEntry.Remove();
   }
@@ -198,10 +228,7 @@ static void UnregisterBrowserId(BrowsingContext* aBrowsingContext) {
 
 static void Register(BrowsingContext* aBrowsingContext) {
   sBrowsingContexts->InsertOrUpdate(aBrowsingContext->Id(), aBrowsingContext);
-  if (aBrowsingContext->IsTopContent()) {
-    sCurrentTopByBrowserId->InsertOrUpdate(aBrowsingContext->BrowserId(),
-                                           aBrowsingContext);
-  }
+  BrowsingContext::UpdateCurrentTopByBrowserId(aBrowsingContext);
 
   aBrowsingContext->Group()->Register(aBrowsingContext);
 }
@@ -209,10 +236,16 @@ static void Register(BrowsingContext* aBrowsingContext) {
 // static
 void BrowsingContext::UpdateCurrentTopByBrowserId(
     BrowsingContext* aNewBrowsingContext) {
-  if (aNewBrowsingContext->IsTopContent()) {
-    sCurrentTopByBrowserId->InsertOrUpdate(aNewBrowsingContext->BrowserId(),
-                                           aNewBrowsingContext);
+  if (!aNewBrowsingContext->IsTopContent()) {
+    return;
   }
+
+  const uint64_t browserId = aNewBrowsingContext->BrowserId();
+  if (aNewBrowsingContext->mCurrentTopBrowserIdKey != Some(browserId)) {
+    UnregisterBrowserId(aNewBrowsingContext);
+  }
+  sCurrentTopByBrowserId->InsertOrUpdate(browserId, aNewBrowsingContext);
+  aNewBrowsingContext->mCurrentTopBrowserIdKey = Some(browserId);
 }
 
 BrowsingContext* BrowsingContext::GetParent() const {
@@ -267,7 +300,7 @@ WindowContext* BrowsingContext::GetTopWindowContext() const {
 void BrowsingContext::Init() {
   if (!sBrowsingContexts) {
     sBrowsingContexts = new BrowsingContextMap();
-    sCurrentTopByBrowserId = new BrowsingContextMap();
+    sCurrentTopByBrowserId = new CurrentTopByBrowserIdMap();
     ClearOnShutdown(&sBrowsingContexts);
     ClearOnShutdown(&sCurrentTopByBrowserId);
     CrashReporter::RegisterAnnotationBool(
@@ -299,7 +332,7 @@ already_AddRefed<BrowsingContext> BrowsingContext::GetCurrentTopByBrowserId(
   // The map is cleared on shutdown but callers may still run afterwards (e.g.
   // during cycle collector teardown), so mirror Get() and null-check it.
   if (sCurrentTopByBrowserId) {
-    return do_AddRef(sCurrentTopByBrowserId->Get(aBrowserId));
+    return do_AddRef(sCurrentTopByBrowserId->Get(aBrowserId).get());
   }
 
   return nullptr;
@@ -1194,7 +1227,8 @@ void BrowsingContext::Detach(bool aFromIPC) {
     if (XRE_IsParentProcess() && Canonical()->IsReplaced()) {
       why = u"replace";
     }
-    obs->NotifyObservers(ToSupports(this), "browsing-context-discarded", why);
+    obs->NotifyWhenScriptSafe(ToSupports(this), "browsing-context-discarded",
+                              why);
   }
 
   // NOTE: Doesn't use SetClosed, as it will be set in all processes
@@ -2020,9 +2054,7 @@ NS_IMETHODIMP BrowsingContext::GetUseTrackingProtection(
   *aUseTrackingProtection = false;
 
   if (GetForceEnableTrackingProtection() ||
-      StaticPrefs::privacy_trackingprotection_enabled() ||
-      (UsePrivateBrowsing() &&
-       StaticPrefs::privacy_trackingprotection_pbmode_enabled())) {
+      AntiTrackingUtils::IsTrackingProtectionEnabled(UsePrivateBrowsing())) {
     *aUseTrackingProtection = true;
     return NS_OK;
   }
@@ -2109,6 +2141,7 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(BrowsingContext)
     sBrowsingContexts->Remove(tmp->Id());
   }
   UnregisterBrowserId(tmp);
+  NS_IMPL_CYCLE_COLLECTION_UNLINK_WEAK_PTR
 
   if (tmp->GetIsPopupSpam()) {
     PopupBlocker::UnregisterOpenPopupSpam();
@@ -2544,6 +2577,9 @@ nsresult BrowsingContext::InternalLoad(nsDocShellLoadState* aLoadState) {
   // Note: We do this check both here and in `nsDocShell::InternalLoad`.
   // Same reason as for the sandbox flags.
   MOZ_TRY(CheckFramebusting(aLoadState));
+
+  // Ensure we don't keep a strong reference to the source element for too long.
+  aLoadState->SetSourceElement(nullptr);
 
   if (XRE_IsParentProcess()) {
     ContentParent* cp = Canonical()->GetContentParent();
@@ -3172,6 +3208,11 @@ BrowsingContext::IPCInitializer BrowsingContext::GetIPCInitializer() {
   IPCInitializer init;
   init.mId = Id();
   init.mParentId = mParentWindow ? mParentWindow->Id() : 0;
+  if (RefPtr<BrowsingContext> opener = GetOpener()) {
+    if (WindowContext* openerWindow = opener->GetCurrentWindowContext()) {
+      init.mOpenerInnerWindowId = openerWindow->Id();
+    }
+  }
   init.mWindowless = mWindowless;
   init.mUseRemoteTabs = mUseRemoteTabs;
   init.mUseRemoteSubframes = mUseRemoteSubframes;
@@ -4445,7 +4486,7 @@ void BrowsingContext::SessionHistoryCommit(
 void BrowsingContext::SetActiveSessionHistoryEntry(
     const Maybe<nsPoint>& aPreviousScrollPos, SessionHistoryInfo* aInfo,
     SessionHistoryInfo* aPreviousActiveEntry, uint32_t aLoadType,
-    uint32_t aUpdatedCacheKey, bool aUpdateLength) {
+    uint32_t aUpdatedCacheKey) {
   if (XRE_IsContentProcess()) {
     // XXX Why we update cache key only in content process case?
     if (aUpdatedCacheKey != 0) {
@@ -4453,14 +4494,12 @@ void BrowsingContext::SetActiveSessionHistoryEntry(
     }
 
     nsID changeID = {};
-    if (aUpdateLength) {
-      RefPtr<ChildSHistory> shistory = Top()->GetChildSessionHistory();
-      if (shistory) {
-        // We try to mimic what will happen in
-        // CanonicalBrowsingContext::SendSetActiveSessionHistoryEntry
-        if (AddSHEntryWouldIncreaseLength(aPreviousActiveEntry)) {
-          changeID = shistory->AddPendingHistoryChange();
-        }
+    RefPtr<ChildSHistory> shistory = Top()->GetChildSessionHistory();
+    if (shistory) {
+      // We try to mimic what will happen in
+      // CanonicalBrowsingContext::SendSetActiveSessionHistoryEntry
+      if (AddSHEntryWouldIncreaseLength(aPreviousActiveEntry)) {
+        changeID = shistory->AddPendingHistoryChange();
       }
     }
     ContentChild::GetSingleton()->SendSetActiveSessionHistoryEntry(
@@ -4590,6 +4629,12 @@ bool BrowsingContext::CheckNavigationRateLimit(CallerType aCallerType) {
                                       "NavigationChangeFloodingPrevented");
     }
 
+    PROFILER_MARKER(
+        "Navigation rate limited", DOM,
+        MarkerOptions(MarkerStack::Capture(),
+                      MarkerInnerWindowId(GetCurrentInnerWindowId())),
+        NavigationRateLimitedMarker, limitCount, throttleSpan);
+
     return false;
   }
 
@@ -4689,7 +4734,8 @@ bool ParamTraits<MaybeDiscarded<BrowsingContext>>::Read(
 }
 
 IMPLEMENT_IPC_SERIALIZER_WITH_FIELDS(BrowsingContext::IPCInitializer, mId,
-                                     mParentId, mWindowless, mUseRemoteTabs,
+                                     mParentId, mOpenerInnerWindowId,
+                                     mWindowless, mUseRemoteTabs,
                                      mUseRemoteSubframes, mCreatedDynamically,
                                      mChildOffset, mOriginAttributes,
                                      mRequestContextId, mSessionHistoryIndex,

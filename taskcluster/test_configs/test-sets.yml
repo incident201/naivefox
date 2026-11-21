@@ -74,6 +74,8 @@ talos:
     - talos-realworld-webextensions
     - talos-webgl
     - talos-pdfpaint
+    - talos-pdfpaint-main-hwa
+    - talos-pdfpaint-main-sw
     # - talos-h1 Bug 1487031 - Disabled for not finding actionable regressions
     # - talos-h2 Bug 1487031 - Disabled for not finding actionable regressions
 
@@ -228,6 +230,7 @@ linux-tests:
     - reftest
     - telemetry-tests-client
     - test-verify
+    - test-verify-path
     - test-verify-gpu
     - test-verify-wpt
     - xpcshell
@@ -261,6 +264,7 @@ linux-2404-tsan-tests:
     - reftest
     - telemetry-tests-client
     - test-verify
+    - test-verify-path
     - test-verify-gpu
     - test-verify-wpt
     - xpcshell
@@ -302,6 +306,7 @@ linux2204-wayland-tests:
     - reftest
     - telemetry-tests-client
     - test-verify
+    - test-verify-path
     - test-verify-gpu
     - test-verify-wpt
     - xpcshell
@@ -323,6 +328,7 @@ windows32-tests:
     - mochitest-media
     - reftest
     - test-verify
+    - test-verify-path
     - test-verify-gpu
     - test-verify-wpt
     - xpcshell
@@ -382,6 +388,7 @@ windows11-25h2-tests:
     - mochitest-webgl2-ext
     - telemetry-tests-client
     - test-verify
+    - test-verify-path
     - test-verify-gpu
     - test-verify-wpt
     - xpcshell
@@ -442,6 +449,8 @@ windows-talos:
     - talos-tabswitch
     - talos-realworld-webextensions
     - talos-pdfpaint
+    - talos-pdfpaint-main-hwa
+    - talos-pdfpaint-main-sw
 
 windows-ref-hw-tests:
     - browsertime-video-playback-latency
@@ -479,6 +488,7 @@ macosx1500-64-tests:
     - reftest
     - telemetry-tests-client
     - test-verify
+    - test-verify-path
     - test-verify-gpu
     - test-verify-wpt
     - xpcshell
@@ -501,6 +511,7 @@ macosx1500-aarch64-tests:
     - mochitest-a11y
     - mochitest-browser-a11y
     - mochitest-browser-chrome
+    - mochitest-browser-chrome-ml-models
     - mochitest-browser-media
     - mochitest-browser-translations
     - mochitest-chrome
@@ -518,6 +529,7 @@ macosx1500-aarch64-tests:
     - reftest
     - telemetry-tests-client
     - test-verify
+    - test-verify-path
     - test-verify-gpu
     - test-verify-wpt
     - web-platform-tests
@@ -553,6 +565,7 @@ macosx1500-aarch64-vms-tests:
 
 macosx1470-64-tests:
     - cppunittest
+    - mochitest-speech-recognition
 
 macosx1015-64-qr-tests:
     - crashtest
@@ -584,15 +597,13 @@ macosx64-talos:
     - talos-webgl
     - talos-tabswitch
     - talos-pdfpaint
+    - talos-pdfpaint-main-hwa
+    - talos-pdfpaint-main-sw
     # - talos-h1 # too long to unpack profile- Bug 1442893
-
-macosx1500-64-perftests:
-    - browsertime-benchmark
-    - browsertime-nav-bench
-    - browsertime-tp6-essential
 
 macosx2700-aarch64-perftests:
     - browsertime-benchmark
+    - browsertime-video-playback-latency
 
 # Android
 
@@ -678,6 +689,8 @@ android-em-arm64-benchmark-tests:
     - browsertime-benchmark-speedometer3-mobile
     - browsertime-benchmark-jetstream3
     - browsertime-youtube-playback-mobile
+    - browsertime-nav-bench-m
+    - browsertime-tp6m-essential
 
 android-hw-speedometer3-nightlyasrelease:
     - browsertime-benchmark-speedometer3-mobile

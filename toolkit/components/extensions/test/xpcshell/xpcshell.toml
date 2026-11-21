@@ -62,6 +62,8 @@ skip-if = [
 ["test_csp_custom_policies.js"]
 
 ["test_csp_validator.js"]
+# url-hash-source expressions are only parsed with this pref enabled.
+prefs = ["security.csp.url-hashes.enabled=true"]
 
 ["test_ext_clear_cached_resources.js"]
 
@@ -141,6 +143,12 @@ head = "head.js head_schemas.js"
 ["test_ext_unknown_permissions.js"]
 
 ["test_ext_urlclassifier.js"]
+# Covers url-classifier's own harmful-addon feature, so keep url-classifier
+# as the channel classifier even where the content classifier is the default.
+prefs = [
+  "privacy.trackingprotection.content.mirror.mode=0",
+  "privacy.trackingprotection.urlclassifier.disable_for_channel_classifier=false",
+]
 
 ["test_ext_webRequest_handlerBehaviorChanged.js"]
 

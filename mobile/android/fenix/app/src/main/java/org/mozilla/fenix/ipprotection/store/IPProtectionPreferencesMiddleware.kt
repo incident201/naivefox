@@ -4,7 +4,7 @@
 
 package org.mozilla.fenix.ipprotection.store
 
-import mozilla.components.ExperimentalAndroidComponentsApi
+import kotlin.time.Instant
 import mozilla.components.feature.ipprotection.store.IPProtectionAction
 import mozilla.components.feature.ipprotection.store.state.IPProtectionState
 import mozilla.components.lib.state.Middleware
@@ -14,6 +14,7 @@ import org.mozilla.fenix.utils.Settings
 /** Interface providing access to IP Protection related [android.content.SharedPreferences]. */
 interface IPProtectionRepository {
     var hasAlreadyUsedVpn: Boolean
+    var lastDataLimitNoticeCycleResetTime: Instant?
 }
 
 /** The default implementation of [IPProtectionRepository] proxying calls to global Fenix [Settings]. */
@@ -23,10 +24,15 @@ class DefaultIPProtectionRepository(private val settings: Settings) : IPProtecti
         set(value) {
             settings.hasAlreadyUsedVpn = value
         }
+
+    override var lastDataLimitNoticeCycleResetTime: Instant?
+        get() = settings.ipProtectionLastDataLimitNoticeCycleResetTime?.let(Instant::parseOrNull)
+        set(value) {
+            settings.ipProtectionLastDataLimitNoticeCycleResetTime = value?.toString()
+        }
 }
 
 /** [Middleware] responsible for intercepting a toggle action and persistently recording the initial VPN interaction. */
-@OptIn(ExperimentalAndroidComponentsApi::class)
 internal class IPProtectionPreferencesMiddleware(private val preferences: IPProtectionRepository) :
     Middleware<IPProtectionState, IPProtectionAction> {
 

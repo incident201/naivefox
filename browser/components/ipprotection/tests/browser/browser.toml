@@ -14,6 +14,8 @@ prefs = [
 
 ["browser_IPPProxyManager.js"]
 
+["browser_IPPTabRuleProvider.js"]
+
 ["browser_IPPUsageHelper.js"]
 
 ["browser_IPProtectionService.js"]
@@ -35,6 +37,8 @@ prefs = [
 ["browser_ipprotection_content_site_rules.js"]
 
 ["browser_ipprotection_content_unauthenticated.js"]
+
+["browser_ipprotection_extra_locations_confirmation_message.js"]
 
 ["browser_ipprotection_header.js"]
 

@@ -1263,6 +1263,9 @@
 - name: BigIntMod
   gen_boilerplate: false
 
+- name: BigIntMulMod
+  gen_boilerplate: false
+
 - name: BigIntPow
   gen_boilerplate: false
 
@@ -5044,6 +5047,9 @@
   gen_boilerplate: false
 
 - name: WasmLoadField
+  gen_boilerplate: false
+
+- name: WasmLoadInternalField
   gen_boilerplate: false
 
 - name: WasmLoadElement

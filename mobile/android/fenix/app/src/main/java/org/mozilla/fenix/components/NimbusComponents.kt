@@ -7,7 +7,6 @@ package org.mozilla.fenix.components
 import android.content.Context
 import java.io.File
 import mozilla.appservices.remotesettings.RemoteSettingsService
-import mozilla.components.ExperimentalAndroidComponentsApi
 import mozilla.components.concept.engine.Engine
 import mozilla.components.service.nimbus.NimbusApi
 import mozilla.components.service.nimbus.messaging.FxNimbusMessaging
@@ -26,10 +25,8 @@ import org.mozilla.fenix.experiments.createNimbus
 import org.mozilla.fenix.experiments.prefhandling.NimbusGeckoPrefHandler
 import org.mozilla.fenix.ext.components
 import org.mozilla.fenix.messaging.CustomAttributeProvider
-import org.mozilla.fenix.perf.lazyMonitored
 
 /** Component group for access to Nimbus and other Nimbus services. */
-@OptIn(ExperimentalAndroidComponentsApi::class)
 class NimbusComponents(
     private val context: Context,
     private val engine: Lazy<Engine>,
@@ -40,7 +37,7 @@ class NimbusComponents(
      * The main entry point for the Nimbus SDK. Note that almost all access to feature configuration should be mediated
      * through a FML generated class, e.g. [FxNimbus].
      */
-    val sdk: NimbusApi by lazyMonitored {
+    val sdk: NimbusApi by lazy {
         createNimbus(
             context,
             context.components.settings,
@@ -51,7 +48,7 @@ class NimbusComponents(
     }
 
     /** Bridge between Nimbus and Gecko to allow enrollment, unenrollment, and observation of Gecko pref experiments. */
-    val geckoPrefHandler by lazyMonitored {
+    val geckoPrefHandler by lazy {
         NimbusGeckoPrefHandler(engine = engine, nimbusApi = lazy { sdk })
     }
 
@@ -64,7 +61,7 @@ class NimbusComponents(
      *
      * Read access to the event store should be done through the JEXL helper available from [createJexlHelper].
      */
-    val events: NimbusEventStore by lazyMonitored {
+    val events: NimbusEventStore by lazy {
         sdk.events
     }
 
@@ -96,7 +93,7 @@ class NimbusComponents(
      * The main entry point for UI surfaces to interact with (get, click, dismiss) messages from the Nimbus Messaging
      * component.
      */
-    val messaging: NimbusMessagingControllerInterface by lazyMonitored {
+    val messaging: NimbusMessagingControllerInterface by lazy {
         NimbusMessagingController(
             messagingStorage = messagingStorage,
             deepLinkScheme = BuildConfig.DEEP_LINK_SCHEME,
@@ -108,7 +105,7 @@ class NimbusComponents(
      *
      * The app should access this through a [mozilla.components.service.nimbus.messaging.NimbusMessagingController].
      */
-    private val messagingStorage by lazyMonitored {
+    private val messagingStorage by lazy {
         NimbusMessagingStorage(
             context = context,
             metadataStorage = OnDiskMessageMetadataStorage(context),

@@ -137,6 +137,11 @@ export class CustomKeysParent extends JSWindowActorParent {
       "customkeys-history-reopen-tab"
     );
     add(cat, "key_undoCloseWindow", "customkeys-history-reopen-window");
+    add(
+      cat,
+      "key_undoCloseTab",
+      "customkeys-history-reopen-tab-current-window"
+    );
     const sidebarCat = topWin.document.getElementById(
       "viewSidebarMenuMenu"
     ).label;
@@ -161,8 +166,19 @@ export class CustomKeysParent extends JSWindowActorParent {
     );
     add(cat, "key_findPrevious", "customkeys-edit-find-previous");
     add(cat, "key_findPrevious2", "customkeys-edit-find-previous");
+    if (isMac) {
+      add(cat, "key_findSelection", "customkeys-edit-find-selection");
+    }
     cat = keys[toolsCat];
     add(cat, "key_screenshot", "customkeys-tools-screenshot");
+    // The shortcut is disabled unless locking windows is enabled in settings.
+    if (
+      !topWin.document
+        .getElementById("key_lockWindows")
+        ?.hasAttribute("disabled")
+    ) {
+      add(cat, "key_lockWindows", "customkeys-tools-lock-windows");
+    }
     const browserToolsCat =
       topWin.document.getElementById("browserToolsMenu").label;
     cat = keys[browserToolsCat];

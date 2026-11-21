@@ -65,10 +65,6 @@ add_task(async function test_wt_datagram() {
   let pSize = new Promise(resolve => {
     listener.onMaxDatagramSize = resolve;
   });
-  let pOutcome = new Promise(resolve => {
-    listener.onDatagramOutcome = resolve;
-  });
-
   webTransport.asyncConnect(
     NetUtil.newURI(`https://${host}/success`),
     true,
@@ -87,33 +83,15 @@ add_task(async function test_wt_datagram() {
   let rawData = new Uint8Array(size);
   rawData.fill(42);
 
-  webTransport.sendDatagram(rawData, 1, 0, 0);
-  let { id, outcome } = await pOutcome;
-  Assert.equal(id, 1);
-  Assert.equal(outcome, Ci.WebTransportSessionEventListener.SENT);
+  // The default max age is short enough for a loaded test machine to exceed.
+  webTransport.setDatagramMaxAge(Infinity);
+  webTransport.sendDatagram(rawData, 0, 0);
 
   let chan = makeChan(`https://${host}/get_webtransport_datagram`);
   let [req, buffer] = await channelOpenPromise(chan);
   Assert.equal(req.protocolVersion, "h3");
 
   Assert.deepEqual(bytesFromString(buffer), rawData);
-
-  webTransport.getMaxDatagramSize();
-  size = await pSize;
-  info("max size:" + size);
-
-  rawData = new Uint8Array(size + 1);
-  webTransport.sendDatagram(rawData, 2, 0, 0);
-
-  pOutcome = new Promise(resolve => {
-    listener.onDatagramOutcome = resolve;
-  });
-  ({ id, outcome } = await pOutcome);
-  Assert.equal(id, 2);
-  Assert.equal(
-    outcome,
-    Ci.WebTransportSessionEventListener.DROPPED_TOO_MUCH_DATA
-  );
 
   webTransport.closeSession(0, "");
 });
@@ -462,4 +440,34 @@ add_task(async function test_multple_webtransport_connnection() {
   for (let i = 0; i < 3; i++) {
     webTransports[i].closeSession(0, "");
   }
+});
+
+// WebTransport over HTTP/2 is not fully implemented, so it is refused unless
+// network.webtransport.http2.enabled is set.
+add_task(async function test_wt_over_http2_disabled() {
+  let webTransport = NetUtil.newWebTransport();
+  let listener = new WebTransportListener().QueryInterface(
+    Ci.WebTransportSessionEventListener
+  );
+  let closed = new Promise(resolve => {
+    listener.closed = resolve;
+  });
+  listener.ready = () => {
+    Assert.ok(false, "The session must not be established");
+  };
+
+  Assert.throws(
+    () =>
+      webTransport.asyncConnect(
+        NetUtil.newURI(`https://${host}/success`),
+        true,
+        [],
+        Services.scriptSecurityManager.getSystemPrincipal(),
+        Ci.nsILoadInfo.SEC_ALLOW_CROSS_ORIGIN_SEC_CONTEXT_IS_NULL,
+        listener,
+        Ci.nsIWebTransport.h2
+      ),
+    /NS_ERROR_NOT_AVAILABLE/
+  );
+  await closed;
 });

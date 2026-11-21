@@ -44,50 +44,6 @@ try-xpcshell:
             --xpcshell-nodejs ${MOZ_FETCHES_DIR}/node/bin/node
             --xpcshell-xre-path ${MOZ_FETCHES_DIR}/firefox
 
-webpagetest-firefox:
-    description: Run webpagetest performance pageload tests on Firefox against Alexa top 50 websites
-    treeherder:
-        symbol: perftest(webpagetest)
-        tier: 2
-    attributes:
-        cron: false
-    scopes:
-        - secrets:get:project/perftest/gecko/level-{level}/perftest-login
-    run:
-        command: >-
-            mkdir -p $MOZ_FETCHES_DIR/../artifacts &&
-            cd $MOZ_FETCHES_DIR &&
-            python3 python/mozperftest/mozperftest/runner.py
-            testing/performance/perftest_WPT_firefox_init_file.js
-            --flavor=webpagetest
-            --app=firefox
-            --webpagetest
-            --perfherder
-            --perfherder-metrics median
-            --output $MOZ_FETCHES_DIR/../artifacts
-
-webpagetest-chrome:
-    description: Run webpagetest performance pageload tests on Chrome against Alexa top 50 websites
-    treeherder:
-        symbol: perftest-chrome(linux-webpagetest)
-        tier: 2
-    attributes:
-        cron: false
-    scopes:
-        - secrets:get:project/perftest/gecko/level-{level}/perftest-login
-    run:
-        command: >-
-            mkdir -p $MOZ_FETCHES_DIR/../artifacts &&
-            cd $MOZ_FETCHES_DIR &&
-            python3 python/mozperftest/mozperftest/runner.py
-            testing/performance/perftest_WPT_chrome_init_file.js
-            --flavor=webpagetest
-            --app=chrome
-            --webpagetest
-            --perfherder
-            --perfherder-metrics median
-            --output $MOZ_FETCHES_DIR/../artifacts
-
 try-browsertime:
     description: Run ./mach perftest on Linux
     treeherder:
@@ -199,6 +155,25 @@ http3:
             --xpcshell-mozinfo ${MOZ_FETCHES_DIR}/target.mozinfo.json
             --xpcshell-nodejs ${MOZ_FETCHES_DIR}/node/bin/node
             --xpcshell-cycles 13
+            --xpcshell-xre-path ${MOZ_FETCHES_DIR}/firefox
+
+webtransport-datagrams:
+    description: Run WebTransport datagram test
+    treeherder:
+        symbol: perftest(wt-dgram)
+    attributes:
+        batch: false
+    run:
+        command: >-
+            mkdir -p $MOZ_FETCHES_DIR/../artifacts &&
+            cd $MOZ_FETCHES_DIR &&
+            python3 python/mozperftest/mozperftest/runner.py
+            xpcshell/tests/dom/webtransport/test/xpcshell/test_datagram_perf.js
+            --flavor xpcshell
+            --output $MOZ_FETCHES_DIR/../artifacts
+            --xpcshell-binary ${MOZ_FETCHES_DIR}/bin/xpcshell
+            --xpcshell-mozinfo ${MOZ_FETCHES_DIR}/target.mozinfo.json
+            --xpcshell-nodejs ${MOZ_FETCHES_DIR}/node/bin/node
             --xpcshell-xre-path ${MOZ_FETCHES_DIR}/firefox
 
 busy-trr:
@@ -580,6 +555,44 @@ pdfjs-alttext-perf:
             --output $MOZ_FETCHES_DIR/../artifacts
             toolkit/components/pdfjs/test/browser_pdfjs_alttext_perf.js
 
+pdfjs-ui-interaction-perf:
+    description: Run the PDF.js viewer scroll, zoom and go to page performance test, with empty pages
+    treeherder:
+        symbol: perftest(pdfjs-ui-interaction)
+        tier: 2
+    attributes:
+        batch: false
+        cron: false
+    run-on-projects: [autoland, mozilla-central]
+    run:
+        command: >-
+            mkdir -p $MOZ_FETCHES_DIR/../artifacts &&
+            cd $MOZ_FETCHES_DIR &&
+            python3 python/mozperftest/mozperftest/runner.py
+            --mochitest-binary ${MOZ_FETCHES_DIR}/firefox/firefox-bin
+            --flavor mochitest
+            --output $MOZ_FETCHES_DIR/../artifacts
+            toolkit/components/pdfjs/test/perf/browser_pdfjs_ui_interaction_perf.js
+
+pdfjs-ui-open-perf:
+    description: Run the PDF.js viewer opening performance test, with empty pages
+    treeherder:
+        symbol: perftest(pdfjs-ui-open)
+        tier: 2
+    attributes:
+        batch: false
+        cron: false
+    run-on-projects: [autoland, mozilla-central]
+    run:
+        command: >-
+            mkdir -p $MOZ_FETCHES_DIR/../artifacts &&
+            cd $MOZ_FETCHES_DIR &&
+            python3 python/mozperftest/mozperftest/runner.py
+            --mochitest-binary ${MOZ_FETCHES_DIR}/firefox/firefox-bin
+            --flavor mochitest
+            --output $MOZ_FETCHES_DIR/../artifacts
+            toolkit/components/pdfjs/test/perf/browser_pdfjs_ui_open_perf.js
+
 semantichistory-perf:
     description: Run the semantic history search end-to-end performance test
     treeherder:
@@ -685,7 +698,6 @@ ml-llama-smollm2-smoke: &ml-llama-smollm2-smoke
             --output $MOZ_FETCHES_DIR/../artifacts
             --hooks toolkit/components/ml/tests/tools/hooks_local_hub.py
             toolkit/components/ml/tests/browser/browser_ml_llama_smollm2_smoke.js
-
 
 ml-llama-smollm2-smoke-hwinference:
     <<: *ml-llama-smollm2-smoke
@@ -1166,7 +1178,6 @@ smartwindow-perf:
         cron: false
     run-on-projects: [mozilla-central]
     run:
-        clone-with: hg
         command: >-
             mkdir -p $MOZ_FETCHES_DIR/../artifacts &&
             cd $MOZ_FETCHES_DIR &&

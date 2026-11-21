@@ -277,35 +277,17 @@ static TimeStamp EnsurePaintIsScheduled(Document& aDoc) {
   return rd->MostRecentRefresh();
 }
 
-void Animation::RemovedNamedTimelineReferenceFromJS(const nsAtom* aName) {
-  if (!AsCSSAnimation()) {
-    MOZ_ASSERT_UNREACHABLE("How?");
-    return;
-  }
-  auto* animationManager = [&]() -> nsAnimationManager* {
-    auto* doc = GetRenderedDocument();
-    if (!doc) {
-      return nullptr;
-    }
-    auto* presContext = doc->GetPresContext();
-    if (!presContext) {
-      return nullptr;
-    }
-    return presContext->AnimationManager();
-  }();
-  if (!animationManager) {
-    return;
-  }
-  animationManager->RemoveNamedTimelineAnimation(aName, AsCSSAnimation());
-}
-
 void Animation::SetTimelineFromJS(AnimationTimeline* aTimeline) {
   PropertiesWillSetFromJS(CSSAnimationProperties::Timeline);
   // Can't refer to timeline by name from JS side.
   const auto prevTimelineName = GetTimelineName();
   SetTimeline(aTimeline, {}, FromJS::Yes);
   if (prevTimelineName.mName) {
-    RemovedNamedTimelineReferenceFromJS(prevTimelineName.mName);
+    // Only CSS animations are tracked by name in nsAnimationManager. Other
+    // animations get the name from the timeline they share with one.
+    if (auto* cssAnimation = AsCSSAnimation()) {
+      cssAnimation->RemovedNamedTimelineReference(prevTimelineName.mName);
+    }
   }
 }
 
@@ -448,7 +430,7 @@ bool Animation::SetTimelineNoUpdate(AnimationTimeline* aTimeline,
           mStartTime.IsNull()) {
         // If we don't have the start time aligned, and no valid (normalized)
         // time.
-        return Some(TimeDuration::FromMilliseconds(0.0));
+        return Some(TimeDuration::Zero());
       }
 
       if (previousProgress.IsNull()) {
@@ -1671,14 +1653,18 @@ int32_t Animation::CompareCompositeOrder(
   // 2. CSS Animations sort next
   {
     auto asCSSAnimationForSorting =
-        [](const Animation& anim) -> const CSSAnimation* {
+        [](const Animation& anim,
+           const Maybe<EventContext>& aContext) -> const CSSAnimation* {
       const CSSAnimation* animation = anim.AsCSSAnimation();
-      return animation && animation->IsTiedToMarkup() ? animation : nullptr;
+      return animation && (aContext || animation->IsTiedToMarkup()) ? animation
+                                                                    : nullptr;
     };
-    auto thisAnimation = asCSSAnimationForSorting(*this);
-    auto otherAnimation = asCSSAnimationForSorting(aOther);
+    const auto* const thisAnimation = asCSSAnimationForSorting(*this, aContext);
+    const auto* const otherAnimation =
+        asCSSAnimationForSorting(aOther, aOtherContext);
     if (thisAnimation && otherAnimation) {
-      return thisAnimation->CompareCompositeOrder(*otherAnimation, aCache);
+      return thisAnimation->CompareCompositeOrder(aContext, *otherAnimation,
+                                                  aOtherContext, aCache);
     }
     if (thisAnimation || otherAnimation) {
       return thisAnimation ? -1 : 1;

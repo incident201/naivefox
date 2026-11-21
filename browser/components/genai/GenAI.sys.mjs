@@ -17,7 +17,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
   ASRouterTargeting: "resource:///modules/asrouter/ASRouterTargeting.sys.mjs",
   BrowserSearchTelemetry:
     "moz-src:///browser/components/search/BrowserSearchTelemetry.sys.mjs",
-  ContentAnalysisUtils: "resource://gre/modules/ContentAnalysisUtils.sys.mjs",
+  ContentAnalysisUtils:
+    "moz-src:///toolkit/components/contentanalysis/ContentAnalysisUtils.sys.mjs",
   E10SUtils: "resource://gre/modules/E10SUtils.sys.mjs",
   EveryWindow: "resource:///modules/EveryWindow.sys.mjs",
   NimbusFeatures: "resource://nimbus/ExperimentAPI.sys.mjs",
@@ -26,6 +27,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
   ReaderMode: "moz-src:///toolkit/components/reader/ReaderMode.sys.mjs",
   SearchService: "moz-src:///toolkit/components/search/SearchService.sys.mjs",
   SearchUIUtils: "moz-src:///browser/components/search/SearchUIUtils.sys.mjs",
+  SelectionUtils: "resource://gre/modules/SelectionUtils.sys.mjs",
   SidebarManager:
     "moz-src:///browser/components/sidebar/SidebarManager.sys.mjs",
 });
@@ -361,7 +363,7 @@ export const GenAI = {
         id: "localhost",
         link1: "https://llamafile.ai",
         linksId: "genai-settings-chat-localhost-links",
-        maxLength: 8192,
+        maxLength: 32768,
         name: "localhost",
       },
     ],
@@ -682,19 +684,8 @@ export const GenAI = {
     const searchActionButton = panel.querySelector("#search-action-button");
 
     // Matches the context menu's "Search <engine> for <selection>" label.
-    const truncateSelection = selection => {
-      const collapsed = selection.replace(/\s+/g, " ").trim();
-      if (collapsed.length <= 15) {
-        return collapsed;
-      }
-      let truncLength = 15;
-      const truncChar = collapsed[15].charCodeAt(0);
-      // Handle surrogate pairs.
-      if (truncChar >= 0xdc00 && truncChar <= 0xdfff) {
-        truncLength++;
-      }
-      return collapsed.substring(0, truncLength) + Services.locale.ellipsis;
-    };
+    const truncateSelection = selection =>
+      lazy.SelectionUtils.truncateForDisplay(selection, 15);
 
     // Returns the engine the action searches with, or null if the action ends
     // up hidden, so callers can tell whether the menu has anything to offer.
@@ -975,12 +966,65 @@ export const GenAI = {
         0
       );
     };
-    panel.hide = () => {
+    const openBelowBar = popup => {
+      if (lazy.highlightToSearchFeatureGate) {
+        const content = panel.shadowRoot?.querySelector("[part=content]");
+        popup.openPopup(content ?? panel, "after_start", 0, 2);
+      } else {
+        popup.openPopup(panel, "after_start", 0, 10);
+      }
+    };
+    panel.hideDropdowns = () => {
       chatShortcutsOptionsPanel.hidePopup();
       moreActionsPanel.hidePopup();
+    };
+    panel.hide = () => {
+      panel.hideDropdowns();
       panel.hideCallout();
       panel.hidePopup();
     };
+
+    // Tell the page whether a dropdown is open, so that Escape in the page
+    // closes just the dropdown.
+    const sendDropdownState = () => {
+      if (!lazy.highlightToSearchFeatureGate) {
+        return;
+      }
+      const open =
+        chatShortcutsOptionsPanel.state != "closed" ||
+        moreActionsPanel.state != "closed";
+      const windowGlobal = panel.selectionData?.windowGlobal;
+      if (windowGlobal?.isCurrentGlobal) {
+        windowGlobal.getActor("GenAI").sendAsyncMessage("DropdownState", open);
+      }
+    };
+    for (const dropdown of [chatShortcutsOptionsPanel, moreActionsPanel]) {
+      for (const type of ["popupshown", "popuphidden"]) {
+        dropdown.addEventListener(type, event => {
+          if (event.target == dropdown) {
+            sendDropdownState();
+          }
+        });
+      }
+    }
+    document.addEventListener("keydown", event => {
+      if (
+        event.key != "Escape" ||
+        event.defaultPrevented ||
+        !lazy.highlightToSearchFeatureGate ||
+        panel.state != "open"
+      ) {
+        return;
+      }
+      if (
+        chatShortcutsOptionsPanel.state != "closed" ||
+        moreActionsPanel.state != "closed"
+      ) {
+        panel.hideDropdowns();
+      } else {
+        panel.hide();
+      }
+    });
     panel.startDisplay = smartWindow => {
       panel.display = {
         start: ChromeUtils.now(),
@@ -1077,6 +1121,12 @@ export const GenAI = {
       lazy.highlightToSearchCopyEnabled;
 
     for (const { toggle, action, pref } of moreActionToggles) {
+      toggle.addEventListener("click", event => {
+        const target = event.composedTarget;
+        if (target != toggle.buttonEl && !toggle.labelEl?.contains(target)) {
+          toggle.buttonEl.click();
+        }
+      });
       toggle.addEventListener("toggle", () => {
         panel.editingActions = true;
         try {
@@ -1151,7 +1201,7 @@ export const GenAI = {
         return;
       }
       moreActionsButton.setAttribute("type", buttonActiveState);
-      moreActionsPanel.openPopup(panel, "after_start", 0, 10);
+      openBelowBar(moreActionsPanel);
       const state = toggle => {
         if (toggle.hidden) {
           return "absent";
@@ -1260,7 +1310,9 @@ export const GenAI = {
         } else if (chatProvider?.name) {
           textAreaL10nId = "genai-input-ask-provider";
         } else {
-          textAreaL10nId = "genai-input-ask-generic";
+          textAreaL10nId = lazy.highlightToSearchFeatureGate
+            ? "genai-input-ask-ai"
+            : "genai-input-ask-generic";
         }
         document.l10n.setAttributes(textAreaEl, textAreaL10nId, {
           provider: chatProvider?.name,
@@ -1313,7 +1365,7 @@ export const GenAI = {
         });
       }
 
-      chatShortcutsOptionsPanel.openPopup(panel, "after_start", 0, 10);
+      openBelowBar(chatShortcutsOptionsPanel);
       Glean.genaiChatbot.shortcutsExpanded.record({
         selection: panel.selectionData.selection.length,
         provider: this.getProviderId(),
@@ -1370,8 +1422,9 @@ export const GenAI = {
    * }} data for the message
    * @param {MozBrowser} browser that provided the message
    * @param {nsIURI} [documentURI] URI of the frame that sent the message
+   * @param {WindowGlobalParent} [windowGlobal] frame that sent the message
    */
-  handleShortcutsMessage(name, data, browser, documentURI) {
+  handleShortcutsMessage(name, data, browser, documentURI, windowGlobal) {
     const isInBrowserStack = browser?.closest(".browserStack");
 
     const isSmartWindow =
@@ -1415,6 +1468,9 @@ export const GenAI = {
     }
 
     switch (name) {
+      case "GenAI:HideDropdowns":
+        shortcutPanel.hideDropdowns();
+        break;
       case "GenAI:HideShortcuts": {
         // For an IME selection change, hide via CSS
         // to avoid hidePopup() cancelling the active IME composition.
@@ -1438,7 +1494,7 @@ export const GenAI = {
       }
       case "GenAI:ShowShortcuts": {
         // Save the latest selection so it can be used by popup
-        shortcutPanel.selectionData = { ...data, browser };
+        shortcutPanel.selectionData = { ...data, browser, windowGlobal };
         shortcutPanel.resetCopyConfirmation();
 
         // Smart Window has its own separate gate above and only ever offers
@@ -1485,12 +1541,35 @@ export const GenAI = {
         }
         shortcutPanel.startDisplay(isSmartWindow);
 
-        // Position the shortcuts relative to the browser's top-left corner
         const screenYBase = data.screenYDevPx / devicePixelRatio;
+        const screenX = data.screenXDevPx / devicePixelRatio;
+
+        if (
+          lazy.highlightToSearchFeatureGate &&
+          data.selectionTopDevPx != null
+        ) {
+          const menuHeight = 44;
+          const viewportHeight = browser.getBoundingClientRect().height;
+          const selectionTop = data.selectionTopDevPx / devicePixelRatio;
+          const fitsBelow =
+            screenYBase + menuHeight <= browser.screenY + viewportHeight;
+          const fitsAbove = selectionTop - menuHeight >= browser.screenY;
+          shortcutPanel.openPopupAtScreenRect(
+            fitsBelow ? "after_start" : "before_start",
+            screenX,
+            fitsBelow || !fitsAbove ? screenYBase : selectionTop,
+            0,
+            0,
+            false
+          );
+          keepPanelInBrowser(shortcutPanel, browser);
+          break;
+        }
+
+        // Position the shortcuts relative to the browser's top-left corner
         const safeSpace = window.outerHeight - 40;
         // Remove padding if the popup would be offscreen
         const bottomPadding = screenYBase > safeSpace ? 0 : 40;
-        const screenX = data.screenXDevPx / devicePixelRatio;
         const screenY = screenYBase + bottomPadding;
 
         const isRTL = Services.locale.isAppLocaleRTL;
@@ -1861,7 +1940,10 @@ export const GenAI = {
       return;
     }
 
-    item.setAttribute("label", summarize.label);
+    item.setAttribute(
+      "label",
+      await lazy.l10n.formatValue("genai-menu-summarize-with-ai")
+    );
     if (summarize.badge && lazy.chatPageMenuBadge) {
       item.setAttribute("badge", summarize.badge);
     } else {
@@ -2278,7 +2360,12 @@ export const GenAI = {
         const text = promptObj.label
           ? `${promptObj.label}: ${content}`
           : `${promptObj.value}\n\n${content}`;
-        aiWindowEl.submitChatMessage({ text, submitType: "shortcuts" });
+        aiWindowEl.submitChatMessage({
+          text,
+          submitType: "shortcuts",
+          untrustedInput: true,
+          privateData: true,
+        });
       }
       return;
     }
@@ -2514,6 +2601,31 @@ function updateIgnoredSites() {
     .split(",")
     .map(site => site.trim().toLowerCase())
     .filter(site => site);
+}
+
+/**
+ * Once the panel is showing, move it back into the page area if its width put
+ * it over a sidebar or past the window edge.
+ *
+ * @param {XULPopupElement} panel
+ * @param {MozBrowser} browser
+ */
+function keepPanelInBrowser(panel, browser) {
+  const abort = new AbortController();
+  panel.addEventListener(
+    "popupshown",
+    () => {
+      const outer = panel.getOuterScreenRect();
+      const left = browser.screenX;
+      const right = left + browser.getBoundingClientRect().width;
+      const x = Math.max(left, Math.min(outer.x, right - outer.width));
+      if (x != outer.x) {
+        panel.moveTo(x, outer.y);
+      }
+    },
+    { once: true, signal: abort.signal }
+  );
+  panel.addEventListener("popuphidden", () => abort.abort(), { once: true });
 }
 
 /**

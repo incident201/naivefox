@@ -1,5 +1,12 @@
 [DEFAULT]
 head = "head_urlclassifier.js"
+# These tests exercise url-classifier's own tracking protection features, so
+# keep it as the channel classifier even where the content classifier is the
+# default engine.
+prefs = [
+  "privacy.trackingprotection.content.mirror.mode=0",
+  "privacy.trackingprotection.urlclassifier.disable_for_channel_classifier=false",
+]
 tags = "condprof"
 skip-if = [
   "os == 'android'",
@@ -50,6 +57,10 @@ run-sequentially = ["true"] # shares the list manager singleton
 ["test_prefixset.js"]
 
 ["test_provider_url.js"]
+
+["test_realtime_key_service.js"]
+prefs = ["security.storage.encryption.sqlite.enabled=false"]
+tags = "remote-settings"
 
 ["test_rsListService.js"]
 prefs = ["security.storage.encryption.sqlite.enabled=false"]

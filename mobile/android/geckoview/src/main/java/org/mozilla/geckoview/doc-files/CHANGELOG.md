@@ -13,6 +13,53 @@ exclude: true
 
 ⚠️  breaking change and deprecation notices
 
+## v162
+- [`setKeepActive`][162.1] now returns whether a `GeckoView` skipped deactivating the session while it was kept active. ([bug 2075323]({{bugzilla}}2075323))
+- Added experimental [`GeckoRuntimeSettings.Builder.creditCardSecurityCodeEnabled`][162.2],
+    [`GeckoRuntimeSettings.setCreditCardSecurityCodeEnabled`][162.3] and
+    [`GeckoRuntimeSettings.getCreditCardSecurityCodeEnabled`][162.4] to control whether credit card
+    security codes (CVV) are captured from web forms.
+    ([bug 2089899]({{bugzilla}}2089899))
+- Added experimental [`IPProtectionController.AuthProvider#onTokenRejected`][162.5] so embedders can
+    drop an authentication token that was rejected and mint a fresh one for the next request.
+- Added [`SessionPdfFileSaver.save(boolean)`][162.6] to save the current PDF with its annotations,
+    such as signatures, drawn into the page content. Form fields are flattened too, so they can no
+    longer be filled in. ([bug 2075337]({{bugzilla}}2075337))
+- Added [`IPProtectionController.init(String)`][162.7], which takes an [`IPProtectionController.SignedOutAuth`][162.8]: [`SIGNED_OUT_AUTH_NONE`][162.9] or [`SIGNED_OUT_AUTH_GPI`][162.10]. [`IPProtectionController.init()`][162.11] initializes with `SIGNED_OUT_AUTH_NONE`. ([bug 2052469]({{bugzilla}}2052469))
+- ⚠️ Removed `GeckoRuntimeSettings.setIpProtectionAuthProvider`, `getIpProtectionAuthProvider`, `GeckoRuntimeSettings.IpProtectionAuthProvider`, `IP_PROTECTION_AUTH_PROVIDER_FXA` and `IP_PROTECTION_AUTH_PROVIDER_GPI`. Pass the auth provider used while no account is signed in to [`IPProtectionController.init(String)`][162.7] instead. ([bug 2052469]({{bugzilla}}2052469))
+- Added [`IPProtectionController.Delegate.onCurrentAuthProviderChanged`][162.12], called with [`CURRENT_AUTH_PROVIDER_FXA`][162.13], [`CURRENT_AUTH_PROVIDER_GPI`][162.14] or `null` when the auth provider the IP protection service uses changes. ([bug 2089076]({{bugzilla}}2089076))
+
+[162.1]: {{javadoc_uri}}/PictureInPictureController.SessionPictureInPicture.html#setKeepActive(boolean)
+[162.2]: {{javadoc_uri}}/GeckoRuntimeSettings.Builder.html#creditCardSecurityCodeEnabled(boolean)
+[162.3]: {{javadoc_uri}}/GeckoRuntimeSettings.html#setCreditCardSecurityCodeEnabled(boolean)
+[162.4]: {{javadoc_uri}}/GeckoRuntimeSettings.html#getCreditCardSecurityCodeEnabled()
+[162.5]: {{javadoc_uri}}/IPProtectionController.AuthProvider.html#onTokenRejected(java.lang.String)
+[162.6]: {{javadoc_uri}}/SessionPdfFileSaver.html#save(boolean)
+[162.7]: {{javadoc_uri}}/IPProtectionController.html#init(java.lang.String)
+[162.8]: {{javadoc_uri}}/IPProtectionController.SignedOutAuth.html
+[162.9]: {{javadoc_uri}}/IPProtectionController.html#SIGNED_OUT_AUTH_NONE
+[162.10]: {{javadoc_uri}}/IPProtectionController.html#SIGNED_OUT_AUTH_GPI
+[162.11]: {{javadoc_uri}}/IPProtectionController.html#init()
+[162.12]: {{javadoc_uri}}/IPProtectionController.Delegate.html#onCurrentAuthProviderChanged(java.lang.String)
+[162.13]: {{javadoc_uri}}/IPProtectionController.html#CURRENT_AUTH_PROVIDER_FXA
+[162.14]: {{javadoc_uri}}/IPProtectionController.html#CURRENT_AUTH_PROVIDER_GPI
+
+## v161
+- Added [`Autocomplete.CreditCard.securityCode`][161.1] and
+    [`Autocomplete.CreditCard.Builder.securityCode`][161.2] so the credit card security code (CVV)
+    can be passed to and from the [`Autocomplete.StorageDelegate`][161.3].
+    ([bug 2085419]({{bugzilla}}2085419))
+- Added [`GeckoRuntimeSettings.Builder.proguardUuid`][161.4] and
+    [`GeckoRuntimeSettings.getProguardUuid`][161.5] to set the UUID of the embedding app's
+    R8/ProGuard mapping file. It is recorded as `meta.proguardUuid` in Gecko profiles.
+    ([bug 2064150]({{bugzilla}}2064150))
+
+[161.1]: {{javadoc_uri}}/Autocomplete.CreditCard.html#securityCode
+[161.2]: {{javadoc_uri}}/Autocomplete.CreditCard.Builder.html#securityCode(java.lang.String)
+[161.3]: {{javadoc_uri}}/Autocomplete.StorageDelegate.html
+[161.4]: {{javadoc_uri}}/GeckoRuntimeSettings.Builder.html#proguardUuid(java.lang.String)
+[161.5]: {{javadoc_uri}}/GeckoRuntimeSettings.html#getProguardUuid()
+
 ## v160
 - The `content-disposition` header of the [`WebResponse`][65.15] passed to
     [`ContentDelegate.onExternalResponse`][160.1] now contains a filename validated with the same
@@ -2108,4 +2155,4 @@ to allow adding gecko profiler markers.
 [65.24]: {{javadoc_uri}}/CrashReporter.html#sendCrashReport(android.content.Context,android.os.Bundle,java.lang.String)
 [65.25]: {{javadoc_uri}}/GeckoResult.html
 
-[api-version]: a2a30400e084298e8b1eb6a7570971d3f03979fc
+[api-version]: 3178a28d2e02b0ea9be0beb5d7c15ba598177d00

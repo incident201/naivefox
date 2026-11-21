@@ -107,16 +107,22 @@ void LIRGenerator::visitTableSwitch(MTableSwitch* tableswitch) {
     return;
   }
 
-  // If we don't know the type.
-  if (opd->type() == MIRType::Value) {
-    add(newLTableSwitchV(useBox(opd)), tableswitch);
+  // Case indices are numeric, so types known to be non-numeric will always go
+  // to the default case.
+  if (opd->type() != MIRType::Value && opd->type() != MIRType::Int32 &&
+      opd->type() != MIRType::Double) {
+    add(new (alloc()) LGoto(tableswitch->getDefault()));
     return;
   }
 
-  // Case indices are numeric, so other types will always go to the default
-  // case.
-  if (opd->type() != MIRType::Int32 && opd->type() != MIRType::Double) {
-    add(new (alloc()) LGoto(tableswitch->getDefault()));
+  // Switch table dispatch to the case blocks uses an indirect jump.
+  for (size_t i = 0; i < tableswitch->numCases(); i++) {
+    tableswitch->getCase(i)->lir()->setIsIndirectJumpTarget();
+  }
+
+  // If we don't know the type.
+  if (opd->type() == MIRType::Value) {
+    add(newLTableSwitchV(useBox(opd)), tableswitch);
     return;
   }
 
@@ -2689,6 +2695,14 @@ void LIRGenerator::visitBigIntMod(MBigIntMod* ins) {
   assignSafepoint(lir, ins);
 }
 
+void LIRGenerator::visitBigIntMulMod(MBigIntMulMod* ins) {
+  auto* lir = new (alloc()) LBigIntMulMod(useRegisterAtStart(ins->lhs()),
+                                          useRegisterAtStart(ins->rhs()),
+                                          useRegisterAtStart(ins->modulus()));
+  defineReturn(lir, ins);
+  assignSafepoint(lir, ins);
+}
+
 void LIRGenerator::visitBigIntPow(MBigIntPow* ins) {
   auto* lir = new (alloc()) LBigIntPow(useRegisterAtStart(ins->lhs()),
                                        useRegisterAtStart(ins->rhs()));
@@ -2816,7 +2830,7 @@ void LIRGenerator::visitBigIntPtrDiv(MBigIntPtrDiv* ins) {
   if (ins->rhs()->isConstant()) {
     intptr_t rhs = ins->rhs()->toConstant()->toIntPtr();
     if (std::has_single_bit(mozilla::Abs(rhs))) {
-      int32_t shift = mozilla::FloorLog2(mozilla::Abs(rhs));
+      int32_t shift = std::countr_zero(mozilla::Abs(rhs));
       auto* lir = new (alloc())
           LBigIntPtrDivPowTwo(useRegister(ins->lhs()), shift, rhs < 0);
       if (shift == 0 && rhs < 0) {
@@ -2837,7 +2851,7 @@ void LIRGenerator::visitBigIntPtrMod(MBigIntPtrMod* ins) {
   if (ins->rhs()->isConstant()) {
     intptr_t rhs = ins->rhs()->toConstant()->toIntPtr();
     if (std::has_single_bit(mozilla::Abs(rhs))) {
-      int32_t shift = mozilla::FloorLog2(mozilla::Abs(rhs));
+      int32_t shift = std::countr_zero(mozilla::Abs(rhs));
       auto* lir = new (alloc())
           LBigIntPtrModPowTwo(useRegister(ins->lhs()), temp(), shift);
       define(lir, ins);
@@ -7457,6 +7471,8 @@ void LIRGenerator::visitWasmReturnCall(MWasmReturnCall* ins) {
 }
 
 void LIRGenerator::visitWasmCallLandingPrePad(MWasmCallLandingPrePad* ins) {
+  // Exception handling jumps indirectly to the start of this block.
+  ins->block()->lir()->setIsIndirectJumpTarget();
   add(new (alloc()) LWasmCallLandingPrePad, ins);
 }
 
@@ -7762,6 +7778,9 @@ void LIRGenerator::visitGeneratorResume(MGeneratorResume* ins) {
       tempFixed(CallTempReg3), tempFixed(CallTempReg4));
   defineReturn(lir, ins);
   assignSafepoint(lir, ins);
+
+  // The JIT call and the VM call share the safepoint.
+  lirGraph_.addExtraSafepointUses(1);
 }
 
 void LIRGenerator::visitCanSkipAwait(MCanSkipAwait* ins) {
@@ -8891,9 +8910,16 @@ void LIRGenerator::visitWasmLoadField(MWasmLoadField* ins) {
                                        ins->maybeTrap()),
            ins);
   }
-  if (ins->keepAlive() != ins->base()) {
-    add(new (alloc()) LKeepAliveObject(useKeepalive(ins->keepAlive())), ins);
+  if (ins->wasmObject() != ins->base()) {
+    add(new (alloc()) LKeepAliveObject(useKeepalive(ins->wasmObject())), ins);
   }
+}
+
+void LIRGenerator::visitWasmLoadInternalField(MWasmLoadInternalField* ins) {
+  LAllocation object = useRegisterAtStart(ins->object());
+  define(new (alloc()) LWasmLoadSlot(object, ins->offset(), ins->type(),
+                                     MWideningOp::None, ins->maybeTrap()),
+         ins);
 }
 
 void LIRGenerator::visitWasmLoadElement(MWasmLoadElement* ins) {
@@ -8938,8 +8964,8 @@ void LIRGenerator::visitWasmStoreField(MWasmStoreField* ins) {
                                      narrowingOp, ins->maybeTrap()),
         ins);
   }
-  if (ins->keepAlive() != ins->base()) {
-    add(new (alloc()) LKeepAliveObject(useKeepalive(ins->keepAlive())), ins);
+  if (ins->wasmObject() != ins->base()) {
+    add(new (alloc()) LKeepAliveObject(useKeepalive(ins->wasmObject())), ins);
   }
 }
 
@@ -8953,8 +8979,8 @@ void LIRGenerator::visitWasmStoreFieldRef(MWasmStoreFieldRef* ins) {
   add(new (alloc()) LWasmStoreRef(instance, base, value, temp(), offset,
                                   ins->maybeTrap(), ins->preBarrierKind()),
       ins);
-  if (ins->keepAlive() != ins->base()) {
-    add(new (alloc()) LKeepAliveObject(useKeepalive(ins->keepAlive())), ins);
+  if (ins->wasmObject() != ins->base()) {
+    add(new (alloc()) LKeepAliveObject(useKeepalive(ins->wasmObject())), ins);
   }
 }
 

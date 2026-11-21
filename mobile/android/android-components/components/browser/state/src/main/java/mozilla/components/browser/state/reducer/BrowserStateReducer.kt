@@ -20,8 +20,10 @@ import mozilla.components.browser.state.action.ExtensionsProcessAction
 import mozilla.components.browser.state.action.HistoryMetadataAction
 import mozilla.components.browser.state.action.InitAction
 import mozilla.components.browser.state.action.LastAccessAction
+import mozilla.components.browser.state.action.ListenToPageAction
 import mozilla.components.browser.state.action.LocaleAction
 import mozilla.components.browser.state.action.MediaSessionAction
+import mozilla.components.browser.state.action.PictureInPictureAction
 import mozilla.components.browser.state.action.ReaderAction
 import mozilla.components.browser.state.action.RecentlyClosedAction
 import mozilla.components.browser.state.action.RestoreCompleteAction
@@ -81,6 +83,8 @@ internal object BrowserStateReducer {
             is UpdateDistribution -> state.copy(distributionId = action.distributionId)
             is DefaultDesktopModeAction -> DesktopModeReducer.reduce(state = state, action = action)
             is SystemPermissionRequestAction -> SystemPermissionReducer.reduce(state, action)
+            is ListenToPageAction -> ListenToPageReducer.reduce(state, action)
+            is PictureInPictureAction -> PictureInPictureStateReducer.reduce(state, action)
         }
     }
 }

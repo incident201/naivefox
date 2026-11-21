@@ -3,10 +3,10 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 import { AITabStore } from "moz-src:///browser/components/aiwindow/ui/modules/AITabStore.sys.mjs";
+import { isAITabPageEditable } from "moz-src:///browser/components/aiwindow/ui/modules/AITabPageTypes.sys.mjs";
 import { getHeadingFont } from "moz-src:///browser/components/aiwindow/ui/modules/AITabHeadingFont.sys.mjs";
 import { ConversationStore } from "moz-src:///browser/components/aiwindow/ui/modules/ConversationStore.sys.mjs";
 import { getSmartPageName } from "chrome://browser/content/aiwindow/modules/TrustedInternalURLs.mjs";
-import { A2UI } from "../modules/A2UI.mjs";
 
 /**
  * A stored AI Tab record.
@@ -17,7 +17,7 @@ import { A2UI } from "../modules/A2UI.mjs";
 /**
  * A page prepared for rendering.
  *
- * @typedef {import("../modules/A2UI.mjs").HydratedAITabData} HydratedAITabData
+ * @typedef {import("../modules/A2UI.sys.mjs").HydratedAITabData} HydratedAITabData
  */
 
 /**
@@ -30,10 +30,12 @@ import { A2UI } from "../modules/A2UI.mjs";
  */
 
 /**
- * Page data sent to the viewer, including hydrated content and a localized date.
+ * Page data sent to the viewer, including hydrated content, a localized date,
+ * and whether its page type allows the page to be revised.
  *
  * @typedef {AITabRow & HydratedAITabData & {
- *   createdAtLabel: string
+ *   createdAtLabel: string,
+ *   editable: boolean
  * }} AITabData
  */
 
@@ -44,9 +46,13 @@ import { A2UI } from "../modules/A2UI.mjs";
  *   {success: false, error: string}} AITabPageLookupResponse
  */
 
+const SMART_PAGE_ICON_URL =
+  "chrome://browser/content/aiwindow/assets/smart-page-16.svg";
+
 const lazy = {};
 
 ChromeUtils.defineESModuleGetters(lazy, {
+  A2UI: "moz-src:///browser/components/aiwindow/ui/modules/A2UI.sys.mjs",
   AIWINDOW_URL:
     "moz-src:///browser/components/aiwindow/ui/modules/AIWindow.sys.mjs",
   AITab: "moz-src:///browser/components/aiwindow/models/aitab/AITab.sys.mjs",
@@ -57,6 +63,19 @@ ChromeUtils.defineESModuleGetters(lazy, {
 ChromeUtils.defineLazyGetter(lazy, "fluentStrings", () => {
   return new Localization(["preview/aiWindow.ftl"], true);
 });
+
+let smartPageIconDataURI = null;
+
+async function getSmartPageIconDataURI() {
+  if (!smartPageIconDataURI) {
+    const response = await fetch(SMART_PAGE_ICON_URL);
+    const svg = await response.text();
+    smartPageIconDataURI = Services.io.newURI(
+      `data:image/svg+xml,${encodeURIComponent(svg)}`
+    );
+  }
+  return smartPageIconDataURI;
+}
 
 /**
  * Renders the eyebrow shown above a generated page's title.
@@ -261,13 +280,14 @@ export class AITabParent extends JSWindowActorParent {
       return null;
     }
 
-    const a2ui = new A2UI(surface);
+    const a2ui = new lazy.A2UI(surface);
     const page = a2ui.toUI();
 
     return {
       ...pageData,
       ...page,
       createdAtLabel: formatCreatedAt(pageData.createdAt),
+      editable: isAITabPageEditable(pageData.pageType),
     };
   }
 
@@ -300,6 +320,7 @@ export class AITabParent extends JSWindowActorParent {
         return { success: true, page: null };
       }
 
+      this.#storeFavicon(url).catch(console.error);
       this.#pageUuid = pageData.uuid;
       return { success: true, page };
     } catch (error) {
@@ -401,6 +422,25 @@ export class AITabParent extends JSWindowActorParent {
   async #removeFromHistory(slug, tabURL) {
     const urls = new Set([lazy.AITab.buildViewerURL(slug), tabURL]);
     await lazy.PlacesUtils.history.remove([...urls]);
+  }
+
+  /**
+   * Stores the smart page icon in Places for the page URL, so page-icon:
+   * lookups (mention chips, chat links, urlbar) resolve it. The tab icon is a
+   * chrome: URL, which FaviconLoader never stores. Skipped wherever the visit
+   * itself would not be kept.
+   *
+   * @param {string} url - The tab URL, already validated by #currentPage.
+   */
+  async #storeFavicon(url) {
+    if (!Services.prefs.getBoolPref("places.history.enabled", true)) {
+      return;
+    }
+    await lazy.PlacesUtils.favicons.setFaviconForPage(
+      Services.io.newURI(url),
+      Services.io.newURI(SMART_PAGE_ICON_URL),
+      await getSmartPageIconDataURI()
+    );
   }
 
   /**

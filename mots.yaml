@@ -8,7 +8,7 @@
 # documentation and how to modify this file.
 repo: mozilla-central
 created_at: '2021-10-14T12:50:40.073465'
-updated_at: '2026-10-19T23:26:51.625727+00:00'
+updated_at: '2026-11-20T18:30:34.130881+00:00'
 export:
   path: ./docs/mots/index.md
   format: md
@@ -865,8 +865,7 @@ people:
     bmo_id: 585815
     name: Micah Tigley
     nick: micah
-  - &mikokm
-    bmo_id: 547538
+  - bmo_id: 547538
     name: Miko Mynttinen
     nick: mikokm
   - &mimi
@@ -1017,6 +1016,10 @@ people:
     bmo_id: 580428
     name: ''
     nick: prathiksha
+  - &ralkhulaidi
+    bmo_id: 790803
+    name: Rana Al-Khulaidi
+    nick: ralkhulaidi
   - &rbs
     bmo_id: 5630
     name: ''
@@ -2231,6 +2234,7 @@ modules:
       - *jld
       - *mccr8
       - *handyman
+      - *afranchuk
     machine_name: core_ipc
 
   - name: 'Core: JavaScript'
@@ -3258,26 +3262,26 @@ modules:
     machine_name: core_web_audio
 
   - name: 'Core: Web Painting'
-    description: painting, display lists, and layer construction
+    description: painting and display lists
     includes:
       - layout/painting/**/*
-      # TODO: "the display list and layer related methods on nsIFrame and its subclasses"
+      # TODO: "the display list related methods on nsIFrame and its subclasses"
     meta:
       group: dev-platform
       url: '{doc}`/layout/index`'
       components:
-        - 'Core::Layout: Web Painting'
+        - Core::Web Painting
       owners_emeritus:
         - Matt Woodrow
       peers_emeritus:
         - David Baron
         - Robert O'Callahan
+        - Miko Mynttinen (mikokm)
       review_group: layout-reviewers
     owners:
     peers:
       - *tnikkel
       - *mstange
-      - *mikokm
       - *jnicol
     machine_name: core_web_painting
 
@@ -3785,7 +3789,7 @@ modules:
         meta:
           components:
             - Firefox::Address Bar
-          review_group: urlbar-reviewers
+          review_group: urlbar-reviewers-rotation
 
       - name: Application Update
         description: The application update services.
@@ -3828,6 +3832,7 @@ modules:
         peers:
           - *adw
           - *daisuke
+          - *jteow
           - *standard8
         machine_name: bookmarks_history
 
@@ -3843,7 +3848,7 @@ modules:
           components:
             - Firefox::Theme
             - Toolkit::Themes
-          review_group: desktop-theme-reviewers
+          review_group: desktop-theme-reviewers-rotation
         owners:
           - *dao
           - *hjones
@@ -3909,13 +3914,13 @@ modules:
           systems.
         includes:
           - browser/components/nimbus/**/*
-          - toolkit/components/normandy/**/*
           - toolkit/components/nimbus/**/*
         meta:
           owners_emeritus:
             - Michael Cooper
           peers_emeritus:
             - Daniel Thorn
+            - Gijs Kruitbosch
           components:
             - Firefox::Normandy
             - Firefox::Nimbus Desktop Client
@@ -3924,10 +3929,10 @@ modules:
         owners:
           - *beth
         peers:
-          - *Gijs
           - *emcminn
           - *charlie
           - *aminomancer
+          - *ralkhulaidi
         machine_name: normandy
 
       - machine_name: firefox_view
@@ -4178,7 +4183,7 @@ modules:
             - Firefox::Search
           peers_emeritus:
             - Michael de Boer
-          review_group: search-reviewers
+          review_group: search-reviewers-rotation
         owners:
           - *standard8
         peers:
@@ -4273,7 +4278,7 @@ modules:
         meta:
           components:
             - Firefox::Tabbed Browser
-          review_group: tabbrowser-reviewers
+          review_group: tabbrowser-reviewers-rotation
           peers_emeritus:
             - Jared Wein
             - Matthew N
@@ -5076,5 +5081,5 @@ modules:
         - Ryan Tilder
       group: dev-platform
 hashes:
-  config: 0fa1edd1eb9e634b8f3b5cd772db6bf9be49af8f
-  export: 0a1dc9b3b63a79c423de97a6d3fb023bdd50a70f
+  config: ba181b5af70cb7515dab697a6934585c04359d1e
+  export: 9b96c6babf6dd5ba48f9378c997779633d6dcd1b

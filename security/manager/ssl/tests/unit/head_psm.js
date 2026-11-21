@@ -27,7 +27,7 @@ const { XPCOMUtils } = ChromeUtils.importESModule(
 );
 
 const { X509 } = ChromeUtils.importESModule(
-  "resource://gre/modules/psm/X509.sys.mjs"
+  "moz-src:///security/manager/ssl/X509.sys.mjs"
 );
 
 const gIsDebugBuild = Cc["@mozilla.org/xpcom/debug;1"].getService(
@@ -104,6 +104,8 @@ const MOZILLA_PKIX_ERROR_NOT_YET_VALID_CERTIFICATE =
   MOZILLA_PKIX_ERROR_BASE + 5;
 const MOZILLA_PKIX_ERROR_NOT_YET_VALID_ISSUER_CERTIFICATE =
   MOZILLA_PKIX_ERROR_BASE + 6;
+const MOZILLA_PKIX_ERROR_SIGNATURE_ALGORITHM_MISMATCH =
+  MOZILLA_PKIX_ERROR_BASE + 7;
 const MOZILLA_PKIX_ERROR_OCSP_RESPONSE_FOR_CERT_MISSING =
   MOZILLA_PKIX_ERROR_BASE + 8;
 const MOZILLA_PKIX_ERROR_REQUIRED_TLS_FEATURE_MISSING =

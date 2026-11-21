@@ -129,6 +129,13 @@ async function navigateToNewTabAndRunActivationWindowCheck(
 }
 
 add_setup(async () => {
+  await SpecialPowers.pushPrefEnv({
+    set: [
+      ["browser.newtabpage.activity-stream.feeds.discoverystreamfeed", true],
+    ],
+  });
+  registerCleanupFunction(() => SpecialPowers.popPrefEnv());
+
   NewTabPagePreloading.removePreloadedBrowser(window);
 
   await AboutNewTab.activityStreamPromise;
@@ -160,6 +167,7 @@ add_setup(async () => {
         "browser.newtabpage.activity-stream.discoverystream.endpoints",
         "https://example.com",
       ],
+      [WIDGETS_PREF, false],
     ],
   });
 

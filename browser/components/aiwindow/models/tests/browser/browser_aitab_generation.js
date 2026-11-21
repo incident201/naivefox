@@ -18,6 +18,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
   Chat: "moz-src:///browser/components/aiwindow/models/Chat.sys.mjs",
   ConversationStore:
     "moz-src:///browser/components/aiwindow/ui/modules/ConversationStore.sys.mjs",
+  createAITab: "moz-src:///browser/components/aiwindow/models/Tools.sys.mjs",
   MLTestUtils: "resource://testing-common/MLTestUtils.sys.mjs",
   MODEL_FEATURES: "moz-src:///browser/components/aiwindow/models/Utils.sys.mjs",
   PURPOSES: "moz-src:///browser/components/aiwindow/models/Utils.sys.mjs",
@@ -133,6 +134,43 @@ add_task(async function test_generateAITab_honors_aborted_signal() {
   Assert.ok(!result.surface, "no surface is returned when canceled");
 });
 
+add_task(async function test_createAITab_does_not_save_canceled_page() {
+  const mockEngine = new lazy.MockEngineManager();
+  const controller = new AbortController();
+  const conversation = lazy.newConversation();
+
+  try {
+    const resultPromise = lazy.createAITab(
+      { raw_content: "Hotels in Lisbon", focus: "Make a hotel comparison" },
+      conversation,
+      controller.signal
+    );
+    await mockEngine.captureRequest({
+      purpose: lazy.MODEL_FEATURES.AITAB,
+    });
+
+    controller.abort();
+    const result = await resultPromise;
+
+    Assert.ok(
+      !result.success,
+      "A canceled generation process does not create an AITab"
+    );
+    Assert.ok(
+      result.toolResult.includes("canceled"),
+      "The result reports cancellation of the generation process"
+    );
+    Assert.deepEqual(
+      await lazy.AITabStore.getAITabPagesByConvId(conversation.id),
+      [],
+      "The canceled AITab is not saved"
+    );
+  } finally {
+    await mockEngine.rejectAllRequests();
+    mockEngine.cleanupMocks();
+  }
+});
+
 add_task(async function test_generateAITab_success() {
   const mockEngine = new lazy.MockEngineManager();
   const { url: GEN_URL, cleanup: stopServing } = servePage();
@@ -232,6 +270,11 @@ add_task(async function test_generateAITab_telemetry_success() {
       ["Page", "Header", "TextBlock"],
       "components are listed in render order"
     );
+    Assert.equal(
+      complete.extra.components_converted,
+      "[]",
+      "no conversions when every block renders as sent"
+    );
     Assert.greater(
       Number(complete.extra.num_chars_read),
       "some notes".length,
@@ -270,6 +313,59 @@ add_task(async function test_generateAITab_telemetry_failure() {
     "[]",
     "no components on failure"
   );
+  Assert.equal(
+    complete.extra.components_converted,
+    "[]",
+    "no conversions on failure"
+  );
+});
+
+add_task(async function test_generateAITab_telemetry_conversions() {
+  Services.fog.testResetFOG();
+  const mockEngine = new lazy.MockEngineManager();
+  const { url: GEN_URL, cleanup: stopServing } = servePage();
+  try {
+    const conversation = await lazy.newChatConversation();
+    const call = generatePage(mockEngine, conversation, {
+      url_list: [GEN_URL],
+    });
+    // A Highlights block with one statement renders as a TextBlock.
+    const surface = structuredClone(GENERATED_SURFACE);
+    surface.components[0].children.push("verdict");
+    surface.components.push({
+      id: "verdict",
+      component: "Highlights",
+      title: "Verdict",
+      items: [
+        {
+          title: "Budget Central Hostel is the pick.",
+          body: "It is $72 / night and has free breakfast.",
+        },
+      ],
+    });
+    await mockEngine.respondTo({
+      purpose: lazy.MODEL_FEATURES.AITAB,
+      response: JSON.stringify(surface),
+    });
+    await storedPage(await call);
+
+    const [complete] = Glean.smartWindow.aitabCreateComplete.testGetValue();
+    Assert.deepEqual(
+      JSON.parse(complete.extra.components_used),
+      ["Page", "Header", "TextBlock", "Highlights"],
+      "components_used lists the types that the model sent"
+    );
+    Assert.deepEqual(
+      JSON.parse(complete.extra.components_converted),
+      ["Highlights>TextBlock"],
+      "components_converted lists the block that renders as another type"
+    );
+  } finally {
+    await mockEngine.rejectAllRequests();
+    await stopServing();
+    mockEngine.cleanupMocks();
+    await lazy.AITabStore.destroyDatabase();
+  }
 });
 
 add_task(async function test_generateAITab_includes_page_image() {
@@ -515,6 +611,9 @@ add_task(async function test_generateAITab_hydrates_favicon_for_denied_url() {
     conversation.securityProperties.setUntrustedInput();
     conversation.securityProperties.commit();
     conversation.addSerpUrlsForAnonymousFetch([ALLOWED_URL]);
+    // A refused URL may only be linked when the chat has seen it, as it would
+    // have from history search.
+    conversation.addSeenUrls([DENIED_URL]);
     const call = generatePage(mockEngine, conversation, {
       url_list: [DENIED_URL, ALLOWED_URL],
     });

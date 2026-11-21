@@ -26,13 +26,15 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToLong
-import mozilla.components.compose.base.modifier.debouncedClickable
+import mozilla.components.compose.base.modifier.thenConditional
 import mozilla.components.compose.base.theme.ThemedValue
 import mozilla.components.compose.base.theme.ThemedValueProvider
 import mozilla.components.feature.ipprotection.store.state.DataVolume
@@ -69,6 +71,8 @@ internal fun IPProtectionMenuItem(
         } else {
             Role.Switch
         }
+    val isEnabled = state.status != IPProtectionStatus.DataLimitReached
+    val defaultColors = ListItemDefaults.colors()
 
     IconListItem(
         label = stringResource(R.string.ip_protection_toggle_label),
@@ -76,13 +80,22 @@ internal fun IPProtectionMenuItem(
             Modifier.wrapContentSize()
                 .clip(MaterialTheme.shapes.extraSmall)
                 .background(MaterialTheme.colorScheme.surfaceBright)
-                .debouncedClickable(role = role) { onToggle() }
-                .semantics {
+                .thenConditional(Modifier.clickable(role = role) { onToggle() }) { isEnabled }
+                .semantics(mergeDescendants = true) {
                     stateDescription = statusDescription
+                    if (!isEnabled) {
+                        disabled()
+                        this.role = role
+                    }
                 },
-        colors = ListItemDefaults.colors(supportingColor = MaterialTheme.colorScheme.error),
+        colors =
+            ListItemDefaults.colors(
+                headlineColor = if (isEnabled) defaultColors.headlineColor else defaultColors.disabledHeadlineColor,
+                supportingColor = MaterialTheme.colorScheme.error,
+            ),
         description = descriptionText(state),
         minHeight = MENU_ITEM_MIN_HEIGHT,
+        beforeIconTint = if (isEnabled) defaultColors.leadingIconColor else defaultColors.disabledLeadingIconColor,
         beforeIconPainter = painterResource(iconsR.drawable.mozac_ic_globe_24),
         contentPaddingListItem = PaddingValues(start = FirefoxTheme.layout.space.dynamic200),
     ) {
@@ -159,7 +172,7 @@ private fun badgeState(status: IPProtectionStatus): MenuItemState =
         IPProtectionStatus.AwaitingService,
         IPProtectionStatus.Activating -> MenuItemState.ACTIVE
         IPProtectionStatus.ConnectionError -> MenuItemState.WARNING
-        IPProtectionStatus.DataLimitReached -> MenuItemState.DISABLED
+        IPProtectionStatus.DataLimitReached,
         IPProtectionStatus.Unavailable,
         IPProtectionStatus.Uninitialized,
         IPProtectionStatus.Disabled,

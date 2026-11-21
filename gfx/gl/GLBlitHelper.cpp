@@ -972,7 +972,7 @@ bool GLBlitHelper::BlitSdToFramebuffer(const layers::SurfaceDescriptor& asd,
             fencesHolderMap->GetWriteFence(sd.fencesHolderId().ref());
         RefPtr<layers::GpuFence> gpuFence =
             fence ? fence->AsGpuFence() : nullptr;
-        if (gpuFence && gpuFence->ServerWait(mGL, TimeDuration::Forever())) {
+        if (gpuFence && !gpuFence->ServerWait(mGL, TimeDuration::Forever())) {
           return false;
         }
       }
@@ -1006,7 +1006,7 @@ bool GLBlitHelper::BlitSdToFramebuffer(const layers::SurfaceDescriptor& asd,
     case layers::SurfaceDescriptor::TAndroidImageReaderImageDescriptor: {
       const auto& sd = asd.get_AndroidImageReaderImageDescriptor();
 
-      auto* imageReaderMap = layers::GpuProcessAndroidImageReaderMap::Get();
+      auto imageReaderMap = layers::GpuProcessAndroidImageReaderMap::Get();
       if (!imageReaderMap) {
         return false;
       }
@@ -1156,11 +1156,10 @@ bool GLBlitHelper::Blit(layers::AndroidImageReader* imageReader,
   ScopedTexture tex(mGL);
   ScopedBindTexture bindTex(mGL, tex.Texture(), LOCAL_GL_TEXTURE_EXTERNAL);
 
-  mGL->TexParams_SetClampNoMips(LOCAL_GL_TEXTURE_EXTERNAL);
-
-  RefPtr<layers::AndroidImageWrapper> image;
-  if (!imageReader->UpdateTexImage(frameId, mGL, tex.Texture(),
-                                   getter_AddRefs(image))) {
+  RefPtr<layers::AndroidImageWrapper> image =
+      imageReader->AcquireImage(frameId);
+  if (!image || !image->WaitForWriteFence(mGL) ||
+      !image->BindToTexture(mGL, tex.Texture())) {
     return false;
   }
 
@@ -1175,6 +1174,24 @@ bool GLBlitHelper::Blit(layers::AndroidImageReader* imageReader,
                                            fbSize, destRect, texSize};
   prog.Draw(baseArgs);
 
+  // Keep this AImage unavailable to the decoder until the blit has read it.
+  const auto& egl = GLContextEGL::Cast(mGL)->mEgl;
+  if (egl->IsExtensionSupported(EGLExtension::ANDROID_native_fence_sync) &&
+      egl->IsExtensionSupported(EGLExtension::KHR_fence_sync)) {
+    if (EGLSync sync =
+            egl->fCreateSyncKHR(LOCAL_EGL_SYNC_NATIVE_FENCE_ANDROID, nullptr)) {
+      mGL->fFlush();
+      UniqueFileHandle readFence(egl->fDupNativeFenceFDANDROID(sync));
+      egl->fDestroySync(sync);
+      if (readFence && image->SetReadFenceFd(std::move(readFence))) {
+        return true;
+      }
+    }
+  }
+
+  // If the read fence could not be exported or stored, finish the blit
+  // before releasing our image reference.
+  mGL->fFinish();
   return true;
 }
 
@@ -1727,21 +1744,13 @@ bool GLBlitHelper::Blit(DMABufSurface* surface, const gfx::IntRect& destRect,
 
   const char* fragSample = nullptr;
   auto fragConvert = kFragConvert_None;
-  // Determine the reorder from source and destination formats. The blit
-  // output is RGBA-ordered for every source shape (the YUV color matrix and
-  // EGL named-channel imports expose RGB in .rgb), while the destination
-  // may store the opposite, BGRA order (e.g. canvas2d); swap R/B exactly
-  // when the two orders differ.
-  const bool srcIsBGRA = false;
   const bool dstIsBGRA = aDestFormat == gfx::SurfaceFormat::B8G8R8A8 ||
                          aDestFormat == gfx::SurfaceFormat::B8G8R8X8;
-  const bool swapRB = srcIsBGRA != dstIsBGRA;
   switch (pixelFormat) {
     case DMABufSurface::SURFACE_RGBA:
       fragSample = kFragSample_OnePlane;
-      if (swapRB) {
-        fragConvert = kFragConvert_BGR;
-      }
+      // TODO: The surface format of single-plane surfaces is unreliable, so it
+      // can't be used currently to determine a BGRA swizzle.
       break;
     case DMABufSurface::SURFACE_YUV:
       if (surface->GetTextureCount() == 2) {
@@ -1754,8 +1763,11 @@ bool GLBlitHelper::Blit(DMABufSurface* surface, const gfx::IntRect& destRect,
         return false;
       }
       pYuvArgs = &yuvArgs;
+      // YUV sources are converted to RGB by the color matrix, while the
+      // destination may store the opposite, BGRA order (e.g. canvas2d). Swap
+      // R/B when the destination is BGRA to compensate.
       fragConvert =
-          swapRB ? kFragConvert_ColorMatrixBGR : kFragConvert_ColorMatrix;
+          dstIsBGRA ? kFragConvert_ColorMatrixBGR : kFragConvert_ColorMatrix;
       break;
     default:
       return false;

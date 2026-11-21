@@ -42,6 +42,10 @@
 #include "vm/JSScript-inl.h"
 #include "vm/Probes-inl.h"
 
+#ifdef JS_HW_SHADOW_STACK
+#  include "util/HardwareShadowStack.h"
+#endif
+
 namespace js {
 namespace jit {
 
@@ -83,20 +87,6 @@ static uint32_t NumArgAndLocalSlots(const InlineFrameIterator& frame) {
   JSScript* script = frame.script();
   return CountArgSlots(script, frame.maybeCalleeTemplate()) + script->nfixed();
 }
-
-#ifdef JS_HW_SHADOW_STACK
-// Advance the tracked shadow stack pointer by one entry if it matches the
-// native JIT frame. This ensures that we unwind the shadow stack only for
-// native stack frames corresponding to real calls.
-static void MaybeUnwindShadowStackEntry(CommonFrameLayout* frame,
-                                        ResumeFromException* rfe) {
-  if (rfe->shadowStackPointer &&
-      *rfe->shadowStackPointer ==
-          reinterpret_cast<uintptr_t>(frame->returnAddress())) {
-    rfe->shadowStackPointer++;
-  }
-}
-#endif
 
 static TrampolineNative TrampolineNativeForFrame(
     JSRuntime* rt, TrampolineNativeFrameLayout* layout) {
@@ -761,6 +751,9 @@ void HandleException(ResumeFromException* rfe) {
   });
 
   rfe->kind = ExceptionResumeKind::EntryFrame;
+#ifdef JS_HW_SHADOW_STACK
+  rfe->shadowStackSwitchPointer = nullptr;
+#endif
 
   JitSpew(JitSpew_IonInvalidate, "handling exception");
 
@@ -786,20 +779,24 @@ void HandleException(ResumeFromException* rfe) {
     keepAlive = activation->wasmExitInstance()->object();
   }
 
-  JitFrameIter iter(activation, /* mustUnwindActivation = */ true);
+  uintptr_t* shadowStackPointer = nullptr;
+#ifdef JS_HW_SHADOW_STACK
+  shadowStackPointer = rfe->shadowStackPointer;
+#endif
+  JitFrameIter iter(activation, /* mustUnwindActivation = */ true,
+                    shadowStackPointer);
 
 #ifdef JS_HW_SHADOW_STACK
-  if (rfe->shadowStackPointer && iter.isJSJit() &&
-      iter.asJSJit().isUnwoundJitExit()) {
-    uintptr_t returnAddress =
-        reinterpret_cast<uintptr_t>(iter.asJSJit().current()->returnAddress());
-    if (*rfe->shadowStackPointer != returnAddress) {
-      // An already-unwound frame can leave one extra shadow stack entry, for
-      // example when DebugEpilogue discards its VM exit frame.
-      MOZ_RELEASE_ASSERT(rfe->shadowStackPointer[1] == returnAddress);
-      rfe->shadowStackPointer++;
-    }
-  }
+  auto syncShadowStackPointer = mozilla::MakeScopeExit([&] {
+    rfe->shadowStackPointer = iter.shadowStackPointer();
+    // We expect to require switching shadow stacks only when resuming in a Wasm
+    // catch handler, and the shadow stack we switch to must have a valid
+    // restore token.
+    MOZ_ASSERT_IF(rfe->shadowStackSwitchPointer,
+                  rfe->kind == ExceptionResumeKind::WasmCatch);
+    MOZ_ASSERT_IF(rfe->shadowStackSwitchPointer,
+                  CanSwitchToShadowStack(rfe->shadowStackSwitchPointer));
+  });
 #endif
 
   CommonFrameLayout* prevJitFrame = nullptr;
@@ -832,8 +829,9 @@ void HandleException(ResumeFromException* rfe) {
 
       // Invalidation state will be the same for all inlined scripts in the
       // frame.
-      IonScript* ionScript = nullptr;
-      bool invalidated = frame.checkInvalidation(&ionScript);
+      IonScript* rawIonScript = nullptr;
+      bool invalidated = frame.checkInvalidation(&rawIonScript);
+      RootedBuffer<IonScript> ionScript(cx, rawIonScript);
 
       // If we hit OOM or overrecursion while bailing out, we don't
       // attempt to bail out a second time for this Ion frame. Just unwind
@@ -845,7 +843,7 @@ void HandleException(ResumeFromException* rfe) {
         if (rfe->kind == ExceptionResumeKind::Bailout ||
             rfe->kind == ExceptionResumeKind::ForcedReturnIon) {
           if (invalidated) {
-            ionScript->decrementInvalidationCount(cx->gcContext());
+            ionScript->decrementInvalidationCount();
           }
           return;
         }
@@ -872,7 +870,7 @@ void HandleException(ResumeFromException* rfe) {
       // If invalidated, decrement the number of frames remaining on the
       // stack for the given IonScript.
       if (invalidated) {
-        ionScript->decrementInvalidationCount(cx->gcContext());
+        ionScript->decrementInvalidationCount();
       }
 
     } else if (frame.isBaselineJS()) {
@@ -897,13 +895,6 @@ void HandleException(ResumeFromException* rfe) {
 
     prevJitFrame = frame.current();
     ++iter;
-#ifdef JS_HW_SHADOW_STACK
-    if (!iter.done()) {
-      // Unwind the topmost entry on the shadow stack if it corresponds to the
-      // native-stack frame we just processed.
-      MaybeUnwindShadowStackEntry(prevJitFrame, rfe);
-    }
-#endif
   }
 
   // Return to C++ code by returning to the activation's JS or Wasm entry frame.
@@ -1090,7 +1081,7 @@ static void TraceIonJSFrame(JSTracer* trc, const JSJitFrameIter& frame) {
     // This frame has been invalidated, meaning that its IonScript is no
     // longer reachable through the callee token (JSFunction/JSScript->ion
     // is now nullptr or recompiled). Manually trace it here.
-    ionScript->trace(trc);
+    TraceEdgeAndBuffer(trc, &ionScript, "ion-frame-ionscript");
   } else {
     ionScript = frame.ionScriptFromCalleeToken();
   }
@@ -1559,6 +1550,14 @@ void TraceJitFrames(JSTracer* trc, JitActivation* activation) {
           // the stack will be traced below.
           wasmFrameIter.contStack()->traceFields(trc);
         }
+        // Trace the initial function's instance, which the base-frame stub
+        // stashed in the crossed base frame; no stack map covers it, and a
+        // return_call may have collapsed the frame that otherwise held it.
+        if (wasm::Instance* contBaseInstance =
+                wasmFrameIter.contBaseInstance()) {
+          wasm::TraceInstanceEdge(trc, contBaseInstance,
+                                  "cont base frame instance");
+        }
       }
 #endif
       wasm::Instance* instance = wasmFrameIter.instance();
@@ -1777,6 +1776,15 @@ SnapshotIterator::SnapshotIterator()
       machine_(nullptr),
       ionScript_(nullptr),
       instructionResults_(nullptr) {}
+
+void SnapshotIterator::trace(JSTracer* trc) {
+  void* prior = ionScript_;
+  TraceBufferEdge(trc, &ionScript_, "SnapshotIterator::ionScript_");
+
+  // Interior pointers in snapshot_ and recover_ need to be updated if buffers
+  // can move.
+  MOZ_RELEASE_ASSERT(ionScript_ == prior);
+}
 
 uintptr_t SnapshotIterator::fromStack(int32_t offset) const {
   return ReadFrameSlot(fp_, offset);
@@ -2461,17 +2469,22 @@ Value SnapshotIterator::maybeReadAllocByIndex(size_t index) {
 
 InlineFrameIterator::InlineFrameIterator(JSContext* cx,
                                          const JSJitFrameIter* iter)
-    : calleeTemplate_(cx), script_(cx), pc_(nullptr), numActualArgs_(0) {
+    : CustomAutoRooter(cx),
+      calleeTemplate_(nullptr),
+      script_(nullptr),
+      pc_(nullptr),
+      numActualArgs_(0) {
   resetOn(iter);
 }
 
 InlineFrameIterator::InlineFrameIterator(JSContext* cx,
                                          const InlineFrameIterator* iter)
-    : frame_(iter ? iter->frame_ : nullptr),
+    : CustomAutoRooter(cx),
+      frame_(iter ? iter->frame_ : nullptr),
       framesRead_(0),
       frameCount_(iter ? iter->frameCount_ : UINT32_MAX),
-      calleeTemplate_(cx),
-      script_(cx),
+      calleeTemplate_(nullptr),
+      script_(nullptr),
       pc_(nullptr),
       numActualArgs_(0) {
   if (frame_) {
@@ -2483,6 +2496,13 @@ InlineFrameIterator::InlineFrameIterator(JSContext* cx,
     framesRead_ = iter->framesRead_ - 1;
     findNextFrame();
   }
+}
+
+void InlineFrameIterator::trace(JSTracer* trc) {
+  start_.trace(trc);
+  si_.trace(trc);
+  TraceRoot(trc, &calleeTemplate_, "InlineFrameIterator::calleeTemplate_");
+  TraceRoot(trc, &script_, "InlineFrameIterator::script_");
 }
 
 void InlineFrameIterator::resetOn(const JSJitFrameIter* iter) {

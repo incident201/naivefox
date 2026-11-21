@@ -512,22 +512,24 @@ class WebExecutorTest {
 
         val stream = response.body!!
         stream.close()
-        stream.readBytes()
+        stream.read(ByteArray(1))
     }
 
     @Test(expected = IOException::class)
     fun readTimeout() {
-        val expectedCount = 10
+        // Must outlast any thread stall at 1 byte per 250 ms; a fully buffered body never times out.
+        val expectedCount = 200
         val response = executor.fetch(webRequest("$TEST_ENDPOINT/trickle/$expectedCount")).pollDefault()!!
 
         assertThat("Status code should match", response.statusCode, equalTo(200))
         assertThat("Content-Length should match", response.headers["Content-Length"]!!.toInt(), equalTo(expectedCount))
 
-        // Only allow 1ms of blocking. This should reliably timeout with 1MB of data.
+        // Only allow 1ms of blocking.
         response.setReadTimeoutMillis(1)
 
         val stream = response.body!!
-        stream.readBytes()
+        val buffer = ByteArray(expectedCount)
+        while (stream.read(buffer) != -1) {}
     }
 
     @Test

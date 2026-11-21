@@ -5,7 +5,6 @@
 package org.mozilla.fenix.components.menu
 
 import android.content.Context
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlin.LazyThreadSafetyMode.NONE
 import kotlinx.coroutines.CoroutineScope
 import mozilla.components.browser.state.store.BrowserStore
@@ -15,6 +14,7 @@ import mozilla.components.concept.fetch.Client
 import mozilla.components.concept.storage.BookmarksStorage
 import mozilla.components.feature.addons.AddonManager
 import mozilla.components.feature.ipprotection.store.IPProtectionStore
+import mozilla.components.feature.tabdata.coordinator.TabDataCoordinator
 import mozilla.components.feature.top.sites.PinnedSiteStorage
 import mozilla.components.service.fxa.store.SyncStore
 import org.mozilla.fenix.R
@@ -29,16 +29,18 @@ import org.mozilla.fenix.browser.RefreshMenuItemProvider
 import org.mozilla.fenix.browser.ShareMenuItemProvider
 import org.mozilla.fenix.browser.applinks.OpenInAppMenuItemProvider
 import org.mozilla.fenix.browser.applinks.OpenInFirefoxMenuItemProvider
+import org.mozilla.fenix.browser.browsingmode.BrowsingModeManager
 import org.mozilla.fenix.browser.menu.MoreMenuItemsProvider
 import org.mozilla.fenix.browser.menu.MoveToNormalTabsMenuItemProvider
+import org.mozilla.fenix.browser.menu.NewPrivateTabMenuItemProvider
+import org.mozilla.fenix.browser.menu.NewTabMenuItemProvider
 import org.mozilla.fenix.browser.readermode.ReaderViewMenuItemProvider
-import org.mozilla.fenix.collections.SaveToCollectionMenuItemProvider
 import org.mozilla.fenix.components.AppStore
 import org.mozilla.fenix.components.FindInPageMenuItemProvider
 import org.mozilla.fenix.components.PermissionStorage
-import org.mozilla.fenix.components.TabCollectionStorage
 import org.mozilla.fenix.components.UseCases
 import org.mozilla.fenix.components.accounts.MozillaAccountMenuItemProvider
+import org.mozilla.fenix.components.menu.configuration.FenixMenuItem
 import org.mozilla.fenix.customtabs.CustomTabAppMenuItemProvider
 import org.mozilla.fenix.downloads.DownloadsMenuItemProvider
 import org.mozilla.fenix.home.CustomizeHomepageMenuItemProvider
@@ -59,6 +61,8 @@ import org.mozilla.fenix.shortcut.AddToHomeScreenMenuItemProvider
 import org.mozilla.fenix.summarization.SummarizePageMenuItemProvider
 import org.mozilla.fenix.summarization.eligibility.SummarizationEligibilityChecker
 import org.mozilla.fenix.summarization.onboarding.FenixSummarizationFeatureConfiguration
+import org.mozilla.fenix.tabgroups.TabGroupMenuItemProvider
+import org.mozilla.fenix.tabgroups.TabGroupsFeatureDiscoveryConfiguration
 import org.mozilla.fenix.translations.TranslationsEnabledSettings
 import org.mozilla.fenix.translations.TranslationsMenuItemProvider
 import org.mozilla.fenix.utils.Settings
@@ -80,7 +84,6 @@ class MenuItemProvidersFactory(
     private val historyStorage: PlacesHistoryStorage,
     private val bookmarksStorage: BookmarksStorage,
     private val pinnedSiteStorage: PinnedSiteStorage,
-    private val tabCollectionStorage: TabCollectionStorage,
     private val permissionStorage: PermissionStorage,
     private val useCases: UseCases,
     private val addonManager: AddonManager,
@@ -90,17 +93,35 @@ class MenuItemProvidersFactory(
     private val summarizeEligibilityChecker: SummarizationEligibilityChecker,
     private val translationsSettings: TranslationsEnabledSettings,
     private val isAndroidAutomotiveAvailable: Boolean,
-    private val materialAlertDialogBuilder: MaterialAlertDialogBuilder,
     private val quitApplicationDelegate: () -> Unit,
     private val setAsDefaultBrowserDelegate: () -> Unit,
+    private val tabDataCoordinator: TabDataCoordinator,
     private val menuViewScope: CoroutineScope,
     private val applicationScope: CoroutineScope,
+    private val browsingModeManager: BrowsingModeManager,
+    private val tabGroupFeatureConfiguration: TabGroupsFeatureDiscoveryConfiguration,
 ) {
 
     /** Build a [MenuItemProvider] for the given [FenixMenuItem]. */
     @Suppress("LongMethod", "CyclomaticComplexMethod")
     fun buildProviderFor(item: FenixMenuItem): MenuItemProvider =
         when (item) {
+            FenixMenuItem.NewTab ->
+                NewTabMenuItemProvider(
+                    target = target,
+                    fenixBrowserUseCases = useCases.fenixBrowserUseCases,
+                    settings = settings,
+                    browsingModeManager = browsingModeManager,
+                )
+
+            FenixMenuItem.NewPrivateTab ->
+                NewPrivateTabMenuItemProvider(
+                    target = target,
+                    fenixBrowserUseCases = useCases.fenixBrowserUseCases,
+                    settings = settings,
+                    browsingModeManager = browsingModeManager,
+                )
+
             FenixMenuItem.DefaultBrowserBanner ->
                 DefaultBrowserMenuItemProvider(
                     settings = settings,
@@ -243,8 +264,6 @@ class MenuItemProvidersFactory(
                     areShortcutsEnabled = settings.showTopSitesFeature,
                     topSitesUseCases = useCases.topSitesUseCase,
                     appStore = appStore,
-                    settings = settings,
-                    materialAlertDialogBuilder = materialAlertDialogBuilder,
                     scope = menuViewScope,
                     applicationScope = applicationScope,
                 )
@@ -258,12 +277,13 @@ class MenuItemProvidersFactory(
                     scope = menuViewScope,
                 )
 
-            FenixMenuItem.SaveToCollection ->
-                SaveToCollectionMenuItemProvider(
-                    settings = settings,
-                    tabCollectionStorage = tabCollectionStorage,
-                    browserStore = browserStore,
+            FenixMenuItem.TabGroup ->
+                TabGroupMenuItemProvider(
+                    tabDataCoordinator = tabDataCoordinator,
                     target = target,
+                    isVisible = tabGroupFeatureConfiguration.showMenuItem,
+                    scope = menuViewScope,
+                    discoveryConfiguration = tabGroupFeatureConfiguration,
                 )
 
             FenixMenuItem.OpenInApp ->

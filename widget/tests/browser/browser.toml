@@ -89,6 +89,11 @@ support-files = [
   "../file_test_ime_state_in_text_control_on_reframe.js",
 ]
 
+["browser_test_ime_state_no_redundant_set_input_context_in_remote_content.js"]
+skip-if = [
+  "tsan", # Bug 1804081 - The profiler times out on TSan
+]
+
 ["browser_test_ime_state_on_editable_state_change_in_remote_content.js"]
 support-files = ["../file_ime_state_test_helper.js"]
 
@@ -121,6 +126,11 @@ run-if = [
   "os == 'mac'",
 ]
 
+["browser_test_menu_label_truncation.js"]
+run-if = [
+  "os == 'mac'",
+]
+
 ["browser_test_scrollbar_colors.js"]
 support-files = ["helper_scrollbar_colors.html"]
 
@@ -136,4 +146,101 @@ support-files = [
 skip-if = [
   "os == 'linux' && os_version == '22.04' && arch == 'x86_64' && display == 'wayland' && opt", # Bug 2059565
   "os == 'linux' && os_version == '24.04' && arch == 'x86_64' && display == 'x11'", # Bug 1784772
+]
+
+["browser_test_touchscreen_swipe_gesture.js"]
+support-files = [
+  "helper_swipe_gesture.html",
+  "helper_touchscreen_swipe_navigation.html",
+  "!/gfx/layers/apz/test/mochitest/apz_test_native_event_utils.js",
+  "!/gfx/layers/apz/test/mochitest/apz_test_utils.js",
+]
+skip-if = [
+  "os == 'linux'" # TODO: Support Linux.
+]
+
+["browser_test_touchscreen_swipe_gesture_events.js"]
+support-files = [
+  "helper_swipe_gesture.html",
+  "!/gfx/layers/apz/test/mochitest/apz_test_native_event_utils.js",
+  "!/gfx/layers/apz/test/mochitest/apz_test_utils.js",
+]
+skip-if = [
+  "os == 'linux'", # TODO: Support Linux.
+]
+
+["browser_test_touchscreen_swipe_gesture_while_waiting.js"]
+support-files = [
+  "helper_swipe_gesture.html",
+  "helper_touchscreen_swipe_navigation.html",
+  "!/gfx/layers/apz/test/mochitest/apz_test_native_event_utils.js",
+  "!/gfx/layers/apz/test/mochitest/apz_test_utils.js",
+]
+skip-if = [
+  "os == 'linux'", # TODO: Support Linux.
+]
+
+["browser_test_touchscreen_swipe_gesture_with_content_response_timeout.js"]
+support-files = [
+  "helper_touchscreen_swipe_navigation.html",
+  "!/gfx/layers/apz/test/mochitest/apz_test_native_event_utils.js",
+  "!/gfx/layers/apz/test/mochitest/apz_test_utils.js",
+]
+skip-if = [
+  "os == 'linux'", # TODO: Support Linux.
+]
+
+["browser_test_touchscreen_swipe_gesture_with_css.js"]
+support-files = [
+  "helper_swipe_gesture.html",
+  "helper_touchscreen_swipe_overscroll.html",
+  "!/gfx/layers/apz/test/mochitest/apz_test_native_event_utils.js",
+  "!/gfx/layers/apz/test/mochitest/apz_test_utils.js",
+]
+skip-if = [
+  "os == 'linux'", # TODO: Support Linux.
+]
+
+["browser_test_touchscreen_swipe_gesture_with_dispatch_to_content.js"]
+support-files = [
+  "helper_swipe_gesture.html",
+  "!/gfx/layers/apz/test/mochitest/apz_test_native_event_utils.js",
+  "!/gfx/layers/apz/test/mochitest/apz_test_utils.js",
+]
+skip-if = [
+  "os == 'linux'", # TODO: Support Linux.
+]
+
+["browser_test_touchscreen_swipe_gesture_with_irregular_area.js"]
+support-files = [
+  "helper_touchscreen_swipe_irregular_area.html",
+  "helper_touchscreen_swipe_irregular_scrollers.html",
+  "!/gfx/layers/apz/test/mochitest/apz_test_native_event_utils.js",
+  "!/gfx/layers/apz/test/mochitest/apz_test_utils.js",
+]
+skip-if = [
+  "os == 'linux'", # TODO: Support Linux.
+]
+
+["browser_test_touchscreen_swipe_gesture_with_multitouch.js"]
+support-files = [
+  "helper_swipe_gesture.html",
+  "!/gfx/layers/apz/test/mochitest/apz_test_native_event_utils.js",
+  "!/gfx/layers/apz/test/mochitest/apz_test_utils.js",
+]
+skip-if = [
+  "os == 'linux'", # TODO: Support Linux.
+]
+
+["browser_test_touchscreen_swipe_gesture_with_pan_gesture.js"]
+support-files = [
+  "helper_swipe_gesture.html",
+  "!/gfx/layers/apz/test/mochitest/apz_test_native_event_utils.js",
+  "!/gfx/layers/apz/test/mochitest/apz_test_utils.js",
+]
+skip-if = [
+  "os == 'linux'", # TODO: Support Linux.
+  # HeadlessWidget::SynthesizeNativeTouchpadPan in widget/headless/HeadlessWidget.cpp
+  # calls DispatchPanGestureInput directly, bypassing the widget's swipe tracker.
+  "headless",
 ]

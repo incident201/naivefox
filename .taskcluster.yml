@@ -219,7 +219,8 @@ tasks:
                                 GECKO_HEAD_REF: '${push.revision}'
                                 GECKO_HEAD_REV: '${push.revision}'
                                 HG_STORE_PATH: /builds/worker/checkouts/hg-store
-                                TASKCLUSTER_CACHES: /builds/worker/checkouts
+                                UV_CACHE_DIR: /builds/worker/.task-cache/uv
+                                TASKCLUSTER_CACHES: /builds/worker/checkouts;/builds/worker/.task-cache/uv
                                 TASKCLUSTER_VOLUMES: /builds/worker/artifacts
                                 MOZ_UPLOAD_DIR: /builds/worker/artifacts
                                 MOZ_AUTOMATION: '1'
@@ -238,6 +239,7 @@ tasks:
 
                       cache:
                           "${trustDomain}-level-${repository.level}-checkouts-sparse-v4": /builds/worker/checkouts
+                          "${trustDomain}-level-${repository.level}-decision-uv-v1": /builds/worker/.task-cache/uv
 
                       features:
                           taskclusterProxy: true
@@ -359,6 +361,7 @@ tasks:
                       - trustDomain: gecko
                         isPullRequest: false
                         prNumber: null
+                        baseRef: ''
                         eventType: '${tasks_for}'
                         eventAction: null
                       - $switch:
@@ -398,6 +401,7 @@ tasks:
                                 # to fetch all tags from the repo just on the off-chance it is a tag.
                                 ref: 'refs/heads/${event.pull_request.head.ref}'
                                 baseRev: '${event.pull_request.base.sha}'
+                                baseRef: '${event.pull_request.base.ref}'
                                 headRev: '${event.pull_request.head.sha}'
                                 prNumber: '${event.pull_request.number}'
                                 isPullRequest: true
@@ -412,6 +416,7 @@ tasks:
                               'repoUrl == "https://github.com/mozilla-releng/staging-firefox"': "dev"
                               'repoUrl == "https://github.com/mozilla-firefox/firefox-dev"': "dev"
                               'repoUrl == "https://github.com/mozilla-firefox/firefox-dev-secure"': "dev"
+                              'repoUrl == "https://github.com/mozilla-firefox/firefox-crb"': "dev"
                               'repoUrl == "https://github.com/mozilla-firefox/firefox"': "prod"
                               $default: null
                       shortRef:
@@ -535,6 +540,7 @@ tasks:
                                       $merge:
                                           - GECKO_BASE_REPOSITORY: '${baseRepoUrl}'
                                             GECKO_BASE_REV: '${baseRev}'
+                                            GECKO_BASE_REF: '${baseRef}'
                                             GECKO_HEAD_REPOSITORY: '${repoUrl}'
                                             GECKO_HEAD_REF: '${ref}'
                                             GECKO_HEAD_REV: '${headRev}'
@@ -544,6 +550,9 @@ tasks:
                                             TASKCLUSTER_VOLUMES: /builds/worker/artifacts
                                             MOZ_UPLOAD_DIR: /builds/worker/artifacts
                                             MOZ_AUTOMATION: '1'
+                                            RUN_TASK_STARTUP_HOOK: /builds/worker/bin/run_task_resource_monitor.py
+                                            RUN_TASK_RESOURCE_USAGE: /builds/worker/artifacts/profile_run-task-resource-usage.json
+                                            RUN_TASK_RESOURCE_USAGE_NAME: "Decision Task (${tasks_for})"
                                             # mach generates pyc files when reading `mach_commands.py`
                                             # This causes cached_task digest generation to be random for
                                             # some tasks. Disable bytecode generation to work around that.
@@ -563,10 +572,10 @@ tasks:
                                       taskclusterProxy: true
                                       chainOfTrust: true
 
-                                  image: mozillareleases/taskgraph:run-task-latest
+                                  image: 'mozillareleases/gecko_decision:6.0.0@sha256:e17e2b35c915d7059de5ccb0295d53b04cdc1c4970c8a69d34a079abe3a47729'
                                   maxRunTime: 1800
                                   command:
-                                      - run-task
+                                      - /builds/worker/bin/run-task-git
                                       - '--gecko-checkout=/builds/worker/checkouts/gecko'
                                       - '--gecko-shallow-clone'
                                       - '--'
@@ -598,7 +607,8 @@ tasks:
                                                --repository-type=git \
                                                --tasks-for='${tasks_for}' \
                                                --base-repository='${baseRepoUrl}' \
-                                               --base-rev='${baseRev}' \
+                                               --base-rev="$GECKO_BASE_REV" \
+                                               --base-ref="$GECKO_BASE_REF" \
                                                --head-repository='${repoUrl}' \
                                                --head-ref='${ref}' \
                                                --head-rev='${headRev}' \

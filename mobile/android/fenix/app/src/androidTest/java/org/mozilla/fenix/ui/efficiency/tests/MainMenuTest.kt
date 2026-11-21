@@ -9,14 +9,10 @@ import mozilla.components.support.ktx.util.PromptAbuserDetector
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
-import org.mozilla.fenix.R
 import org.mozilla.fenix.customannotations.Critical
 import org.mozilla.fenix.customannotations.SmokeTest
 import org.mozilla.fenix.helpers.Constants
 import org.mozilla.fenix.helpers.Constants.PackageName.PRINT_SPOOLER
-import org.mozilla.fenix.helpers.DataGenerationHelper.getStringResource
-import org.mozilla.fenix.helpers.FeatureSettingsHelper.Companion.settings
-import org.mozilla.fenix.helpers.MockBrowserDataHelper
 import org.mozilla.fenix.helpers.TestAssetHelper.articleSummaryAsset
 import org.mozilla.fenix.helpers.TestAssetHelper.firstForeignWebPageAsset
 import org.mozilla.fenix.helpers.TestAssetHelper.getGenericAsset
@@ -28,7 +24,6 @@ import org.mozilla.fenix.ui.efficiency.selectors.AddToHomeScreenSelectors
 import org.mozilla.fenix.ui.efficiency.selectors.BookmarksSelectors
 import org.mozilla.fenix.ui.efficiency.selectors.BookmarksSelectors.DELETE_BOOKMARK_BUTTON
 import org.mozilla.fenix.ui.efficiency.selectors.BrowserPageSelectors
-import org.mozilla.fenix.ui.efficiency.selectors.CollectionsSelectors
 import org.mozilla.fenix.ui.efficiency.selectors.DownloadsSelectors
 import org.mozilla.fenix.ui.efficiency.selectors.HistorySelectors
 import org.mozilla.fenix.ui.efficiency.selectors.HistorySelectors.NAVIGATE_BACK_BUTTON
@@ -255,38 +250,6 @@ class MainMenuTest : BaseTest() {
         on.mainMenu.navigateToPage().mozVerify(DESKTOP_SITE_OFF)
     }
 
-    // TestRail link: https://mozilla.testrail.io/index.php?/cases/view/3080115
-    @SmokeTest
-    @Test
-    fun verifyTheSaveToCollectionSubMenuOptionTest() {
-        val collectionTitle = "First Collection"
-        val firstTestPage = mockWebServer.getGenericAsset(1)
-        val secondTestPage = mockWebServer.getGenericAsset(2)
-
-        composeRule.activityRule.applySettingsExceptions {
-            // Disabling these features to have better visibility of the Collections view
-            it.isRecentlyVisitedFeatureEnabled = false
-            it.isRecentTabsFeatureEnabled = false
-        }
-
-        MockBrowserDataHelper.createCollection(
-            Pair(firstTestPage.url.toString(), firstTestPage.title),
-            title = collectionTitle,
-        )
-
-        on.browserPage
-            .navigateToPage(secondTestPage.url.toString())
-            .mozClick(BrowserPageSelectors.MAIN_MENU_BUTTON)
-            .mozClick(MainMenuSelectors.MORE_BUTTON)
-            .mozClick(MainMenuSelectors.SAVE_TO_COLLECTIONS_BUTTON)
-            .mozClick(CollectionsSelectors.EXISTING_COLLECTION_WITH_TITLE(collectionTitle))
-        on.home
-            .navigateToPage()
-            .mozClick(CollectionsSelectors.COLLECTION_WITH_TITLE(collectionTitle))
-            .mozVerify(CollectionsSelectors.COLLECTION_TAB_WITH_TITLE(firstTestPage.title))
-            .mozVerify(CollectionsSelectors.COLLECTION_TAB_WITH_TITLE(secondTestPage.title))
-    }
-
     // TestRail link: https://mozilla.testrail.io/index.php?/cases/view/3080111
     @SmokeTest
     @Test
@@ -351,7 +314,7 @@ class MainMenuTest : BaseTest() {
             .mozClickIfPresent(AddToHomeScreenSelectors.ADD_DIALOG_BUTTON)
             .mozClick(AddToHomeScreenSelectors.SYSTEM_PROMPT_ADD_TO_HOME_SCREEN_BUTTON)
             .mozClickIfPresent(AddToHomeScreenSelectors.HOME_SCREEN_SHORTCUT(testPage.title))
-        on.browserPage.navigateToPage().verifyPageContent(testPage.content)
+        on.browserPage.verifyPageContent(testPage.content)
     }
 
     // TestRail link: https://mozilla.testrail.io/index.php?/cases/view/3080118
@@ -493,7 +456,7 @@ class MainMenuTest : BaseTest() {
             .navigateToPage()
             .mozVerify(MainMenuSelectors.TRY_RECOMMENDED_EXTENSION_BUTTON)
             .mozClick(MainMenuSelectors.EXTENSIONS_BUTTON)
-        val extension = on.mainMenu.installFirstRecommendedExtension()
+        val extension = on.mainMenu.installKnownRecommendedExtension()
 
         // Remove it through Manage extensions -> the add-ons manager.
         on.browserPage.navigateToPage(genericURL.url.toString(), forceNavigation = true)
@@ -517,7 +480,7 @@ class MainMenuTest : BaseTest() {
             .navigateToPage()
             .mozVerify(MainMenuSelectors.TRY_RECOMMENDED_EXTENSION_BUTTON)
             .mozClick(MainMenuSelectors.EXTENSIONS_BUTTON)
-        val extension = on.mainMenu.installFirstRecommendedExtension()
+        val extension = on.mainMenu.installKnownRecommendedExtension()
 
         // Manage extensions opens the add-ons manager, where the extension is listed under Enabled.
         // Parity: legacy verifyAddonIsInstalled asserted the addon's install (+) button was invisible;
@@ -543,7 +506,7 @@ class MainMenuTest : BaseTest() {
             .navigateToPage()
             .mozVerify(MainMenuSelectors.TRY_RECOMMENDED_EXTENSION_BUTTON)
             .mozClick(MainMenuSelectors.EXTENSIONS_BUTTON)
-        val extension = on.mainMenu.installFirstRecommendedExtension()
+        val extension = on.mainMenu.installKnownRecommendedExtension()
 
         // Re-open the Extensions submenu: the collapsed Extensions row now advertises the installed
         // extension, the extension is listed in the submenu, and "Discover more" has been replaced by
@@ -570,7 +533,7 @@ class MainMenuTest : BaseTest() {
             .navigateToPage()
             .mozVerify(MainMenuSelectors.TRY_RECOMMENDED_EXTENSION_BUTTON)
             .mozClick(MainMenuSelectors.EXTENSIONS_BUTTON)
-        val extension = on.mainMenu.installFirstRecommendedExtension()
+        val extension = on.mainMenu.installKnownRecommendedExtension()
 
         // Open the installed extension's detail from Manage extensions and disable it.
         on.browserPage.navigateToPage(genericURL.url.toString(), forceNavigation = true)
@@ -628,17 +591,6 @@ class MainMenuTest : BaseTest() {
             it.isRecentlyVisitedFeatureEnabled = false
         }
 
-        // The privacy report row's label follows the longfox flag exactly as HomeSettingsFragment sets it, so derive
-        // the
-        // expected text from the same setting to keep this locator valid on every channel (developer/debug shows
-        // "Help catch trackers"; nightly/beta/release show "Privacy report").
-        val privacyReportLabel =
-            if (settings.longfoxEnabled) {
-                getStringResource(R.string.help_catch_trackers)
-            } else {
-                getStringResource(R.string.customize_toggle_privacy_report)
-            }
-
         on.settingsHomepage
             .navigateToPage(
                 navigationOptions =
@@ -647,7 +599,7 @@ class MainMenuTest : BaseTest() {
             .mozVerify(SettingsHomepageSelectors.WALLPAPERS_BUTTON)
             .mozVerifyOptionSwitchIsChecked(SettingsHomepageSelectors.SHORTCUTS_SWITCH)
             .mozVerifyOptionCheckBoxIsChecked(SettingsHomepageSelectors.SPONSORED_SHORTCUTS_CHECKBOX)
-            .mozVerifyOptionSwitchIsChecked(SettingsHomepageSelectors.PRIVACY_REPORT_SWITCH(privacyReportLabel))
+            .mozVerifyOptionSwitchIsChecked(SettingsHomepageSelectors.PRIVACY_REPORT_SWITCH)
             .mozVerifyOptionSwitchIsChecked(SettingsHomepageSelectors.CONTINUE_SWITCH)
             .mozVerifyOptionSwitchIsNotChecked(SettingsHomepageSelectors.BOOKMARKS_SWITCH)
             .mozVerifyOptionSwitchIsNotChecked(SettingsHomepageSelectors.RECENTLY_VISITED_SWITCH)

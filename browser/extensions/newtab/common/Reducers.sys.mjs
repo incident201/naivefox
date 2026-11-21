@@ -5,11 +5,15 @@
 import { actionTypes as at } from "resource://newtab/common/Actions.mjs";
 import { Dedupe } from "resource:///modules/Dedupe.sys.mjs";
 
-export {
-  TOP_SITES_DEFAULT_ROWS,
-  TOP_SITES_MAX_ROWS,
-  TOP_SITES_MAX_SITES_PER_ROW,
-} from "resource:///modules/topsites/constants.mjs";
+/**
+ * @backward-compat { version 162 }
+ *
+ * Switch back to re-exporting these from
+ * moz-src:///browser/components/topsites/constants.mjs once 162 hits release.
+ */
+export const TOP_SITES_DEFAULT_ROWS = 1;
+export const TOP_SITES_MAX_SITES_PER_ROW = 8;
+export const TOP_SITES_MAX_ROWS = 4;
 
 const dedupe = new Dedupe(site => site && site.url);
 
@@ -30,6 +34,7 @@ export const INITIAL_STATE = {
     // specific wallpaper category (e.g. "firefox"), this holds that category id
     // so WallpaperCategories can open it. Cleared when the panel closes.
     customizePanelWallpaperCategory: null,
+    customizePanelSource: null,
   },
   Ads: {
     initialized: false,
@@ -315,6 +320,9 @@ export const INITIAL_STATE = {
     initialized: false,
     results: [],
   },
+  // Framed widget documents from the Merino framed widgets manifest, keyed by
+  // widget id: { url, status }. See resolveWidgetFrame.
+  FramedWidgets: {},
 };
 
 function App(prevState = INITIAL_STATE.App, action) {
@@ -358,11 +366,13 @@ function App(prevState = INITIAL_STATE.App, action) {
       return Object.assign({}, prevState, {
         customizeMenuVisible: true,
         customizePanelWallpaperCategory: action.data?.wallpaperCategory ?? null,
+        customizePanelSource: action.data?.source ?? null,
       });
     case at.HIDE_PERSONALIZE:
       return Object.assign({}, prevState, {
         customizeMenuVisible: false,
         customizePanelWallpaperCategory: null,
+        customizePanelSource: null,
       });
     default:
       return prevState;
@@ -815,12 +825,13 @@ function DiscoveryStream(prevState = INITIAL_STATE.DiscoveryStream, action) {
       ...prevState.feeds,
       data: Object.keys(prevState.feeds.data).reduce(
         (accumulator, feed_url) => {
+          const feedData = prevState.feeds.data[feed_url].data;
           accumulator[feed_url] = {
             data: {
-              ...prevState.feeds.data[feed_url].data,
-              recommendations: handleSites(
-                prevState.feeds.data[feed_url].data.recommendations
-              ),
+              ...feedData,
+              recommendations: Array.isArray(feedData.recommendations)
+                ? handleSites(feedData.recommendations)
+                : feedData.recommendations,
             },
           };
           return accumulator;
@@ -1303,6 +1314,20 @@ function RecentSearches(prevState = INITIAL_STATE.RecentSearches, action) {
   }
 }
 
+function FramedWidgets(prevState = INITIAL_STATE.FramedWidgets, action) {
+  switch (action.type) {
+    case at.FRAMED_WIDGETS_UPDATE:
+      return action.data;
+    // Dispatched in content when a widget's document fails to load. The
+    // marker hides the widget in that tab, even with a trainhop URL override,
+    // until the next manifest update replaces the state.
+    case at.FRAMED_WIDGET_UNAVAILABLE:
+      return { ...prevState, [action.data.id]: { unavailable: true } };
+    default:
+      return prevState;
+  }
+}
+
 function Travel(prevState = INITIAL_STATE.Travel, action) {
   switch (action.type) {
     case at.WIDGETS_TRAVEL_UPDATE:
@@ -1520,4 +1545,5 @@ export const reducers = {
   PictureOfTheDay,
   RecentSearches,
   Travel,
+  FramedWidgets,
 };

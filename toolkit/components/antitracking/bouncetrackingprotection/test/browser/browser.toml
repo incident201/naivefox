@@ -21,6 +21,8 @@ support-files = [
 
 ["browser_bouncetracking_bfcache_restore_redirect.js"]
 
+["browser_bouncetracking_clearing.js"]
+
 ["browser_bouncetracking_clearingPurgeLogCrash.js"]
 
 ["browser_bouncetracking_cookie_behavior.js"]
@@ -49,7 +51,7 @@ support-files = [
 
 ["browser_bouncetracking_purge.js"]
 
-["browser_bouncetracking_remoteExceptions.js"]
+["browser_bouncetracking_remotePermissions.js"]
 
 ["browser_bouncetracking_schemes.js"]
 

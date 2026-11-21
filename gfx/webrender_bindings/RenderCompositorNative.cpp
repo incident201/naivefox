@@ -17,6 +17,7 @@
 #include "mozilla/layers/NativeLayer.h"
 #if defined(MOZ_WAYLAND)
 #  include "mozilla/layers/NativeLayerWayland.h"
+#  include "mozilla/webrender/RenderLinuxTextureHost.h"
 #endif
 #include "mozilla/layers/ProfilerScreenshots.h"
 #include "mozilla/layers/SurfacePool.h"
@@ -253,7 +254,15 @@ void RenderCompositorNative::WaitUntilPresentationFlushed() {
   mNativeLayerRoot->WaitUntilCommitToScreenHasBeenProcessed();
 }
 
+// Without the native compositor, WebRender's only swapchain is
+// mNativeLayerForEntireWindow, which BeginFrame and EndFrame manage, so the
+// base class implementations apply.
+
 void RenderCompositorNative::CompositorBeginFrame() {
+  if (!ShouldUseNativeCompositor()) {
+    RenderCompositor::CompositorBeginFrame();
+    return;
+  }
   mAddedLayers.Clear();
   mAddedTilePixelCount = 0;
   mAddedClippedPixelCount = 0;
@@ -263,6 +272,10 @@ void RenderCompositorNative::CompositorBeginFrame() {
 }
 
 void RenderCompositorNative::CompositorEndFrame() {
+  if (!ShouldUseNativeCompositor()) {
+    RenderCompositor::CompositorEndFrame();
+    return;
+  }
   if (profiler_thread_is_being_profiled_for_markers()) {
     auto bufferSize = GetBufferSize();
     uint64_t windowPixelCount = uint64_t(bufferSize.width) * bufferSize.height;
@@ -331,6 +344,7 @@ void RenderCompositorNative::CreateSurface(wr::NativeSurfaceId aId,
 
 void RenderCompositorNative::CreateExternalSurface(wr::NativeSurfaceId aId,
                                                    bool aIsOpaque) {
+  MOZ_RELEASE_ASSERT(ShouldUseNativeCompositor());
   MOZ_RELEASE_ASSERT(mSurfaces.find(aId) == mSurfaces.end());
 
   RefPtr<layers::NativeLayer> layer =
@@ -377,19 +391,22 @@ void RenderCompositorNativeOGL::AttachExternalImage(
   RenderTextureHost* image =
       RenderThread::Get()->GetRenderTexture(aExternalImage);
 
-  // image->Lock only uses the channel index to populate the returned
-  // `WrExternalImage`. Since we don't use that, it doesn't matter
-  // what channel index we pass.
-  // A DMABUF buffer is attached to the wl_surface as-is and is never sampled
-  // here, so locking it without a GL context skips a per-frame EGLImage import
-  // and BO mapping. Every other backend still requires a context (e.g.
-  // RenderMacIOSurfaceTextureHost).
-  image->Lock(0, image->AsRenderDMABUFTextureHost() ? nullptr : mGL.get());
+  bool useGL = true;
+#if defined(MOZ_WAYLAND)
+  // LinuxTextureHost doesn't use GL context for direct composition.
+  useGL = !(image->AsRenderLinuxTextureHost() &&
+            image->AsRenderLinuxTextureHost()->SupportsDirectComposition());
+#endif
+  image->Lock(0, useGL ? mGL.get() : nullptr);
 
   RenderCompositorNative::AttachExternalImage(aId, aExternalImage);
 }
 
 void RenderCompositorNative::DestroySurface(NativeSurfaceId aId) {
+  if (!ShouldUseNativeCompositor()) {
+    RenderCompositor::DestroySurface(aId);
+    return;
+  }
   auto surfaceCursor = mSurfaces.find(aId);
   MOZ_RELEASE_ASSERT(surfaceCursor != mSurfaces.end());
 
@@ -451,6 +468,11 @@ void RenderCompositorNative::AddSurface(
     wr::NativeSurfaceId aId, const wr::CompositorSurfaceTransform& aTransform,
     wr::DeviceIntRect aClipRect, wr::ImageRendering aImageRendering,
     wr::DeviceIntRect aRoundedClipRect, wr::ClipRadius aClipRadius) {
+  if (!ShouldUseNativeCompositor()) {
+    RenderCompositor::AddSurface(aId, aTransform, aClipRect, aImageRendering,
+                                 aRoundedClipRect, aClipRadius);
+    return;
+  }
   MOZ_RELEASE_ASSERT(!mCurrentlyBoundNativeLayer);
 
   auto surfaceCursor = mSurfaces.find(aId);

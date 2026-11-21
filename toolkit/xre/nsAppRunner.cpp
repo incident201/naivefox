@@ -26,6 +26,7 @@
 #include "mozilla/ProcessType.h"
 #include "mozilla/ResultExtensions.h"
 #include "mozilla/RuntimeExceptionModule.h"
+#include "mozilla/SHA1.h"
 #include "mozilla/FileUtils.h"
 #include "mozilla/ScopeExit.h"
 #include "mozilla/StaticPrefs_browser.h"
@@ -113,6 +114,7 @@
 #ifdef XP_WIN
 #  include "nsIWinAppHelper.h"
 #  include <windows.h>
+#  include <userenv.h>
 #  include <intrin.h>
 #  include <math.h>
 #  include "cairo/cairo-features.h"
@@ -218,6 +220,12 @@
 
 #if defined(XP_MACOSX)
 #  include <Carbon/Carbon.h>
+#  include <IOKit/IOKitLib.h>
+#endif
+
+#if defined(XP_LINUX)
+#  include <fstream>
+#  include <string>
 #endif
 
 #ifdef DEBUG
@@ -290,6 +298,10 @@ static const char kPrefHealthReportUploadEnabled[] =
     "datareporting.healthreport.uploadEnabled";
 #endif  // defined(MOZ_BLOCK_PROFILE_DOWNGRADE) || defined(MOZ_LAUNCHER_PROCESS)
         // || defined(MOZ_DEFAULT_BROWSER_AGENT)
+#ifdef MOZ_BLOCK_PROFILE_DOWNGRADE
+// Holds a hash of the machine ID. Never send this in telemetry.
+static const char kPrefMachineId[] = "toolkit.profiles.machineID";
+#endif
 #if defined(MOZ_DEFAULT_BROWSER_AGENT)
 static const char kPrefDefaultAgentEnabled[] = "default-browser-agent.enabled";
 
@@ -550,7 +562,6 @@ static ArgResult CheckArgExists(const char* aArg) {
 }
 
 bool gSafeMode = false;
-bool gFxREmbedded = false;
 
 enum E10sStatus {
   kE10sEnabledByDefault,
@@ -3407,6 +3418,101 @@ static mozilla::Maybe<uint64_t> ReadInstallTimestamp(nsIFile* aJsonFile,
 }
 #  endif  // !XP_MACOSX
 
+#  if defined(XP_LINUX)
+static nsresult ReadLinuxMachineId(const char* aPath, nsACString& aMachineId) {
+  std::ifstream input(aPath);
+  if (!input.is_open()) {
+    return NS_ERROR_FAILURE;
+  }
+  std::string line;
+  if (!std::getline(input, line) || line.empty()) {
+    return NS_ERROR_FAILURE;
+  }
+  aMachineId.Assign(line.c_str(), line.length());
+  return NS_OK;
+}
+#  endif
+
+static nsresult GetRawMachineId(nsACString& aMachineId) {
+#  if defined(XP_WIN)
+  wchar_t guid[64];
+  DWORD size = sizeof(guid);
+  if (::RegGetValueW(HKEY_LOCAL_MACHINE, L"SOFTWARE\\Microsoft\\Cryptography",
+                     L"MachineGuid", RRF_RT_REG_SZ | RRF_SUBKEY_WOW6464KEY,
+                     nullptr, guid, &size) != ERROR_SUCCESS) {
+    return NS_ERROR_FAILURE;
+  }
+  CopyUTF16toUTF8(nsDependentString(guid), aMachineId);
+  return NS_OK;
+#  elif defined(XP_MACOSX)
+  io_service_t platformExpert = IOServiceGetMatchingService(
+      MACH_PORT_NULL, IOServiceMatching("IOPlatformExpertDevice"));
+  if (!platformExpert) {
+    return NS_ERROR_FAILURE;
+  }
+
+  CFTypeRef uuid = IORegistryEntryCreateCFProperty(
+      platformExpert, CFSTR(kIOPlatformUUIDKey), kCFAllocatorDefault, 0);
+  IOObjectRelease(platformExpert);
+  if (!uuid) {
+    return NS_ERROR_FAILURE;
+  }
+  auto releaseUuid = MakeScopeExit([&] { CFRelease(uuid); });
+
+  char buffer[128];
+  if (CFGetTypeID(uuid) != CFStringGetTypeID() ||
+      !CFStringGetCString(static_cast<CFStringRef>(uuid), buffer,
+                          sizeof(buffer), kCFStringEncodingUTF8) ||
+      !buffer[0]) {
+    return NS_ERROR_FAILURE;
+  }
+  aMachineId.Assign(buffer);
+  return NS_OK;
+#  elif defined(XP_LINUX)
+  if (NS_SUCCEEDED(ReadLinuxMachineId("/etc/machine-id", aMachineId))) {
+    return NS_OK;
+  }
+  return ReadLinuxMachineId("/var/lib/dbus/machine-id", aMachineId);
+#  else
+  return NS_ERROR_NOT_AVAILABLE;
+#  endif
+}
+
+/**
+ * Returns the hash of a unique identifier for the current device. As a unique
+ * identifier this must not be included in telemetry data without passing a
+ * sensitive data review.
+ *
+ * We use SHA1 as the hashing function as it is available without starting NSS
+ * and we only need to use it for comparison purposes.
+ */
+nsresult GetMachineId(nsACString& aMachineId) {
+  nsAutoCString rawId;
+  nsresult rv = GetRawMachineId(rawId);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  SHA1Sum sha1;
+  sha1.update(kPrefMachineId, sizeof(kPrefMachineId) - 1);
+  sha1.update(rawId.BeginReading(), rawId.Length());
+  SHA1Sum::Hash hash;
+  sha1.finish(hash);
+
+  aMachineId.Truncate();
+  for (uint8_t byte : hash) {
+    aMachineId.AppendPrintf("%02x", byte);
+  }
+  return NS_OK;
+}
+
+static void StoreMachineId() {
+  nsAutoCString machineId;
+  if (NS_SUCCEEDED(GetMachineId(machineId))) {
+    Preferences::SetCString(kPrefMachineId, machineId);
+  } else {
+    Preferences::ClearUser(kPrefMachineId);
+  }
+}
+
 Maybe<mozilla::PathString> GenerateDowngradeTelemetry(
     const nsACString& aPingId, const nsCString& aLastVersion, bool aHasSync,
     int32_t aButton, const nsACString& aChannel,
@@ -3442,7 +3548,30 @@ Maybe<mozilla::PathString> GenerateDowngradeTelemetry(
     // Don't early return.
     NS_ERROR("Failed to get property: hasWinPackageId");
   }
+
+  const char* profileType = nullptr;
+  DWORD profileFlags = 0;
+  if (::GetProfileType(&profileFlags)) {
+    if (profileFlags & PT_TEMPORARY) {
+      profileType = "temporary";
+    } else if (profileFlags & PT_MANDATORY) {
+      profileType = "mandatory";
+    } else if (profileFlags & (PT_ROAMING | PT_ROAMING_PREEXISTING)) {
+      profileType = "roaming";
+    } else {
+      profileType = "normal";
+    }
+  }
 #  endif
+
+  mozilla::Maybe<bool> maybeIsDifferentMachine;
+  nsCString lastMachineId;
+  if (NS_SUCCEEDED(prefBranch->GetCharPref(kPrefMachineId, lastMachineId))) {
+    nsAutoCString machineId;
+    if (NS_SUCCEEDED(GetMachineId(machineId))) {
+      maybeIsDifferentMachine = mozilla::Some(lastMachineId != machineId);
+    }
+  }
 
   mozilla::Maybe<PRTime> maybeInstallTime;
   mozilla::Maybe<PRTime> maybeUpdateTime;
@@ -3591,6 +3720,16 @@ Maybe<mozilla::PathString> GenerateDowngradeTelemetry(
                        PromiseFlatCString(aProfileSelectionReason));
 
       w.BoolProperty("isDifferentInstall", aIsDifferentInstall);
+
+      if (maybeIsDifferentMachine) {
+        w.BoolProperty("isDifferentMachine", *maybeIsDifferentMachine);
+      }
+
+#  ifdef XP_WIN
+      if (profileType) {
+        w.StringProperty("profileType", MakeStringSpan(profileType));
+      }
+#  endif
 
       if (aReplacedLockTime) {
         // aReplacedLockTime is in milliseconds.
@@ -4555,7 +4694,7 @@ int XREMain::XRE_mainInit(bool* aExitFlag) {
 #ifdef XP_MACOSX
   mozilla::MacAutoreleasePool pool;
 
-  DisableAppNap();
+  RegisterEarlyUserDefaults();
 #endif
 
 #ifdef MOZ_BACKGROUNDTASKS
@@ -4598,10 +4737,6 @@ int XREMain::XRE_mainInit(bool* aExitFlag) {
     ChaosMode::SetChaosFeature(feature);
     ChaosMode::enterChaosMode();
     MOZ_ASSERT(ChaosMode::isActive(ChaosFeature::Any));
-  }
-
-  if (CheckArgExists("fxr")) {
-    gFxREmbedded = true;
   }
 
   if (ChaosMode::isActive(ChaosFeature::Any)) {
@@ -4906,11 +5041,9 @@ int XREMain::XRE_mainInit(bool* aExitFlag) {
   if (CheckArg("foreground")) {
     // The original process communicates that it was in the foreground by
     // adding this argument.  This new process, which is taking over for
-    // the old one, should make itself the active application.
-    ProcessSerialNumber psn;
-    if (::GetCurrentProcess(&psn) == noErr) {
-      ::SetFrontProcess(&psn);
-    }
+    // the old one, should make itself the active application once AppKit has
+    // finished launching.
+    ActivateMacAppAfterLaunch();
   }
 #endif
 
@@ -4921,6 +5054,14 @@ int XREMain::XRE_mainInit(bool* aExitFlag) {
   if (CheckArg("os-restarted", nullptr, CheckArgFlag::RemoveArg) == ARG_FOUND) {
     gRestartedByOS = true;
   }
+
+#ifdef MOZ_X11
+  // An XSMP session manager restarting us passes --sm-client-id. The argument
+  // is consumed by nsNativeAppSupportUnix::Start later on.
+  if (CheckArgExists("sm-client-id") == ARG_FOUND) {
+    gRestartedByOS = true;
+  }
+#endif
 
   gRestartArgc = gArgc;
   gRestartArgv =
@@ -5327,11 +5468,9 @@ int XREMain::XRE_mainStartup(bool* aExitFlag) {
     if (const char* currentDesktop = PR_GetEnv("XDG_CURRENT_DESKTOP")) {
       useXI2 |= (nsDependentCString(currentDesktop) == "gamescope"_ns);
     }
-#    ifdef EARLY_BETA_OR_EARLIER
     // We tried 3.24.0+ but had problems, let's retry with newer versions. See
     // bug 1660212.
     useXI2 |= !gtk_check_version(3, 24, 49);
-#    endif
   }
   if (!useXI2) {
     gdk_disable_multidevice();
@@ -6237,6 +6376,13 @@ nsresult XREMain::XRE_mainRun() {
       }
     }
 
+#if defined(MOZ_SANDBOX) && defined(XP_WIN)
+    // Now that the profile has been set, we can cache the directories needed
+    // for sandbox policy rules. Doing this before profile migration means that
+    // any sandboxed processes it launches also get these rules.
+    mozilla::SandboxBroker::CacheGeckoDirs();
+#endif
+
     // We'd like to initialize the JSContext *after* reading the user prefs.
     // Unfortunately that's not possible if we have to do profile migration
     // because that requires us to execute JS before reading user prefs.
@@ -6357,16 +6503,6 @@ nsresult XREMain::XRE_mainRun() {
       }
     }
 
-#if defined(MOZ_SANDBOX) && defined(XP_WIN)
-    // Now that we have preferences and the directory provider, we can
-    // finish initializing SandboxBroker. This must happen before the GFX
-    // platform is initialized (which will launch the GPU process), which
-    // occurs when the "app-startup" category is started up below
-    //
-    // After this completes, we are ready to launch sandboxed processes
-    mozilla::SandboxBroker::GeckoDependentInitialize();
-#endif
-
     nsCOMPtr<nsIFile> workingDir;
     rv = NS_GetSpecialDirectory(NS_OS_CURRENT_WORKING_DIR,
                                 getter_AddRefs(workingDir));
@@ -6389,6 +6525,10 @@ nsresult XREMain::XRE_mainRun() {
     NS_ENSURE_TRUE(appStartup, NS_ERROR_FAILURE);
 
     mDirProvider.DoStartup();
+
+#ifdef MOZ_BLOCK_PROFILE_DOWNGRADE
+    StoreMachineId();
+#endif
 
 #ifdef XP_WIN
     // It needs to be called on the main thread because it has to use
@@ -6488,6 +6628,9 @@ nsresult XREMain::XRE_mainRun() {
 #endif
 
 #if defined(MOZ_WIDGET_GTK)
+      nsAppShell::InitLaunchActivationToken(mXDGActivationToken.IsEmpty()
+                                                ? mDesktopStartupID
+                                                : mXDGActivationToken);
       // Clear the environment variables so they won't be inherited by child
       // processes and confuse things.
       for (const auto& name : kStartupTokenNames) {
@@ -7086,16 +7229,8 @@ bool XRE_UseNativeEventProcessing() {
 namespace mozilla {
 
 uint32_t GetMaxWebProcessCount() {
-  // multiOptOut is in int to allow us to run multiple experiments without
-  // introducing multiple prefs a la the autostart.N prefs.
-  if (Preferences::GetInt("dom.ipc.multiOptOut", 0) >=
-      nsIXULRuntime::E10S_MULTI_EXPERIMENT) {
-    return 1;
-  }
-
-  const char* optInPref = "dom.ipc.processCount";
-  uint32_t optInPrefValue = Preferences::GetInt(optInPref, 1);
-  return std::max(1u, optInPrefValue);
+  int32_t processCount = Preferences::GetInt("dom.ipc.processCount", 1);
+  return static_cast<uint32_t>(std::max(1, processCount));
 }
 
 const char* PlatformBuildID() { return gToolkitBuildID; }

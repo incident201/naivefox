@@ -75,10 +75,6 @@ WINDOWS_WORKER_TYPES = {
         "virtual-with-gpu": "win11-64-24h2-gpu",
         "hardware": "win11-64-24h2-hw",
     },
-    "windows11-64-24h2-artifact": {
-        "virtual": "win11-64-24h2",
-        "virtual-with-gpu": "win11-64-24h2-gpu",
-    },
     "windows11-64-24h2-ccov": {
         "virtual": "win11-64-24h2",
         "virtual-with-gpu": "win11-64-24h2-gpu",
@@ -126,6 +122,10 @@ WINDOWS_WORKER_TYPES = {
         "virtual": "win11-64-25h2",
         "virtual-with-gpu": "win11-64-25h2-gpu",
         "hardware": "win11-64-24h2-hw",
+    },
+    "windows11-64-25h2-artifact": {
+        "virtual": "win11-64-25h2",
+        "virtual-with-gpu": "win11-64-25h2-gpu",
     },
     "windows11-64-25h2-ccov": {
         "virtual": "win11-64-25h2",
@@ -286,6 +286,19 @@ def set_wayland_env(config, tasks):
         env["MOZ_ENABLE_WAYLAND"] = "1"
         env["WAYLAND_DISPLAY"] = "wayland-0"
         env["NEED_GNOME_KEYRING"] = "true"
+        yield task
+
+
+@transforms.add
+def set_ml_accelerator_env(config, tasks):
+    """Tell the ML tests that llama.cpp must find an accelerator (Metal)."""
+    for task in tasks:
+        if (
+            task["test-platform"].startswith("macosx")
+            and task["worker-type"] == MACOSX_WORKER_TYPES["macosx1500-aarch64"]
+        ):
+            env = task.setdefault("worker", {}).setdefault("env", {})
+            env["MOZ_ML_EXPECT_ACCELERATOR"] = "1"
         yield task
 
 

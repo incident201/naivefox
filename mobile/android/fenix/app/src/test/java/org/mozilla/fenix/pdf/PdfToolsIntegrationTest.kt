@@ -18,7 +18,8 @@ import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
 import kotlin.test.assertIs
-import kotlinx.coroutines.Dispatchers
+import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import mozilla.components.browser.state.action.BrowserAction
 import mozilla.components.browser.state.action.ContentAction
@@ -59,6 +60,8 @@ class PdfToolsIntegrationTest {
     private val activity = Robolectric.buildActivity(ComponentActivity::class.java).setup().get()
 
     private val container = CoordinatorLayout(activity)
+
+    private val testDispatcher = StandardTestDispatcher()
 
     private val captureActionsMiddleware = CaptureActionsMiddleware<BrowserState, BrowserAction>()
 
@@ -101,7 +104,7 @@ class PdfToolsIntegrationTest {
             browserStore = store,
             isAddressBarAtBottom = isAddressBarAtBottom,
             customTabSessionId = customTabSessionId,
-            mainDispatcher = Dispatchers.Unconfined,
+            mainDispatcher = testDispatcher,
         )
 
     @Before
@@ -113,6 +116,11 @@ class PdfToolsIntegrationTest {
 
     private val layoutParams: CoordinatorLayout.LayoutParams
         get() = container.getChildAt(0).layoutParams as CoordinatorLayout.LayoutParams
+
+    private fun advancePastAddingWait() {
+        testDispatcher.scheduler.advanceTimeBy(ADDING_SIGNATURE_WAIT_STATE_MS.milliseconds)
+        testDispatcher.scheduler.runCurrent()
+    }
 
     @Test
     fun `WHEN the feature is started and stopped THEN the tools are added then removed`() {
@@ -182,10 +190,12 @@ class PdfToolsIntegrationTest {
         val onResult = slot<() -> Unit>()
         every { engineSession.addSignatureToPdf(any(), capture(onResult), any()) } returns Unit
         val integration = integration(store = storeOf(pdfTabWith(engineSession)))
+        integration.start()
         integration.handleSignClick()
         integration.signatureState.signature.setTextAndPlaceCursorAtEnd("Test User")
 
         integration.handleSignAddClick()
+        advancePastAddingWait()
 
         verify { engineSession.addSignatureToPdf(eq("Test User"), any(), any()) }
         assertTrue("The dialog stays up until the engine has the signature.", integration.signatureState.isSigning)
@@ -204,8 +214,10 @@ class PdfToolsIntegrationTest {
         integration.handleSignClick()
         integration.signatureState.signature.setTextAndPlaceCursorAtEnd("Test User")
 
+        integration.start()
         integration.handleSignAddClick()
         integration.handleSignAddClick()
+        advancePastAddingWait()
         onResult.captured()
         integration.handleSignAddClick()
 
@@ -218,9 +230,11 @@ class PdfToolsIntegrationTest {
         val onResult = slot<() -> Unit>()
         every { engineSession.addSignatureToPdf(any(), capture(onResult), any()) } returns Unit
         val integration = integration(store = storeOf(pdfTabWith(engineSession)))
+        integration.start()
         integration.handleSignClick()
         integration.signatureState.signature.setTextAndPlaceCursorAtEnd("Test User")
         integration.handleSignAddClick()
+        advancePastAddingWait()
 
         integration.handleSignCloseClick()
         integration.handleSignClick()
@@ -232,6 +246,66 @@ class PdfToolsIntegrationTest {
 
         assertFalse(integration.signatureState.isSigning)
         assertEquals("", integration.signatureState.signature.text.toString())
+    }
+
+    @Test
+    fun `GIVEN an answered signature WHEN the next signature gets no response THEN only the next one times out`() {
+        val engineSession = mockk<EngineSession>()
+        val onResult = slot<() -> Unit>()
+        every { engineSession.addSignatureToPdf(any(), capture(onResult), any()) } returns Unit
+        val integration = integration(store = storeOf(pdfTabWith(engineSession)))
+        integration.start()
+        integration.handleSignClick()
+        integration.handleSignAddClick()
+        advancePastAddingWait()
+        onResult.captured()
+        integration.handleSignClick()
+        integration.signatureState.signature.setTextAndPlaceCursorAtEnd("Test User")
+
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertTrue("An answered signature does not time out.", integration.signatureState.isSigning)
+
+        integration.handleSignAddClick()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertFalse(integration.signatureState.isSigning)
+        assertFalse(integration.signatureState.isAddingSignature)
+    }
+
+    @Test
+    fun `GIVEN the wait state is shown WHEN the feature is stopped and started THEN the signature can be added again`() {
+        val engineSession = mockk<EngineSession>(relaxed = true)
+        val integration = integration(store = storeOf(pdfTabWith(engineSession)))
+        integration.start()
+        integration.handleSignClick()
+        integration.signatureState.signature.setTextAndPlaceCursorAtEnd("Test User")
+        integration.handleSignAddClick()
+
+        integration.stop()
+        integration.start()
+        integration.handleSignAddClick()
+        advancePastAddingWait()
+
+        verify { engineSession.addSignatureToPdf(eq("Test User"), any(), any()) }
+    }
+
+    @Test
+    fun `GIVEN the signature was sent WHEN the feature is stopped and started and the engine never responds THEN the timeout closes the dialog`() {
+        val engineSession = mockk<EngineSession>(relaxed = true)
+        val integration = integration(store = storeOf(pdfTabWith(engineSession)))
+        integration.start()
+        integration.handleSignClick()
+        integration.signatureState.signature.setTextAndPlaceCursorAtEnd("Test User")
+        integration.handleSignAddClick()
+        advancePastAddingWait()
+
+        integration.stop()
+        integration.start()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertFalse(integration.signatureState.isSigning)
+        assertFalse(integration.signatureState.isAddingSignature)
     }
 
     @Test
@@ -339,6 +413,7 @@ class PdfToolsIntegrationTest {
         integration.handleSignClick()
 
         browserStore.dispatch(ContentAction.ExitedPdfViewer(tabId))
+        testDispatcher.scheduler.advanceUntilIdle()
 
         assertFalse(integration.signatureState.isSigning)
     }
@@ -367,10 +442,12 @@ class PdfToolsIntegrationTest {
         val engineSession = mockk<EngineSession>(relaxed = true)
         val integration =
             integration(store = storeWithCustomTab(customPdfTabWith(engineSession)), customTabSessionId = customTabId)
+        integration.start()
         integration.handleSignClick()
         integration.signatureState.signature.setTextAndPlaceCursorAtEnd("Test User")
 
         integration.handleSignAddClick()
+        advancePastAddingWait()
 
         verify { engineSession.addSignatureToPdf(eq("Test User"), any(), any()) }
     }
@@ -384,10 +461,12 @@ class PdfToolsIntegrationTest {
         integration.handleSignClick()
 
         store.dispatch(ContentAction.ExitedPdfViewer(tabId))
+        testDispatcher.scheduler.advanceUntilIdle()
 
         assertTrue("The selected tab leaving does not affect the custom tab.", integration.signatureState.isSigning)
 
         store.dispatch(ContentAction.ExitedPdfViewer(customTabId))
+        testDispatcher.scheduler.advanceUntilIdle()
 
         assertFalse(integration.signatureState.isSigning)
     }

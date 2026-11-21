@@ -165,23 +165,30 @@ export class AmpSuggestions extends SuggestProvider {
         lazy.UrlbarPrefs.get("quickSuggestSponsoredPriority");
     }
 
+    // TODO: `richSuggestionIconSize` is unused in Nova and should be removed.
+    let bestMatchType;
     let richSuggestionIconSize;
     if (!isTopPick) {
       richSuggestionIconSize = 16;
-    } else if (
-      !lazy.UrlbarPrefs.get("quicksuggest.ampTopPickUseNovaIconSize")
-    ) {
-      // Use the standard rich-suggestion size.
-      richSuggestionIconSize = 28;
+      bestMatchType = lazy.UrlbarShared.BEST_MATCH_TYPE.NONE;
+    } else {
+      let minScore = parseFloat(
+        lazy.UrlbarPrefs.get("quicksuggest.ampTopPickScoreForLargeIcon")
+      );
+      if (minScore && minScore <= suggestion.score) {
+        richSuggestionIconSize = 52;
+        bestMatchType = lazy.UrlbarShared.BEST_MATCH_TYPE.LARGE;
+      } else {
+        richSuggestionIconSize = 28;
+        bestMatchType = lazy.UrlbarShared.BEST_MATCH_TYPE.SMALL;
+      }
     }
-    // Else, leave `richSuggestionIconSize` undefined so
-    // `UrlbarProviderQuickSuggest` uses the standard Nova size.
 
     return new lazy.UrlbarResult({
       type: lazy.UrlbarShared.RESULT_TYPE.URL,
       source: lazy.UrlbarShared.RESULT_SOURCE.SEARCH,
       isBottomUrlSuggestion: true,
-      isBestMatch: isTopPick,
+      bestMatchType,
       richSuggestionIconSize,
       payload: {
         url: normalized.url,
@@ -211,7 +218,7 @@ export class AmpSuggestions extends SuggestProvider {
       commands.push({
         name: "show_less_frequently",
         l10n: {
-          id: "urlbar-result-menu-show-less-frequently2",
+          id: "urlbar-result-menu-show-less-frequently3",
         },
       });
     }

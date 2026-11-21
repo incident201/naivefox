@@ -24,8 +24,13 @@ xul|findbar {
   transition-timing-function: ease-in-out, linear;
   padding-block: var(--findbar-padding-block);
   border-top: var(--findbar-border-top-width) solid var(--chrome-content-separator-color);
-  background-color: var(--toolbar-background-color);
-  color: -moz-dialogtext;
+  background-color: var(--background-color-box);
+  color: var(--text-color);
+
+  @media (-moz-native-theme) {
+    background-color: var(--toolbar-background-color);
+    color: var(--toolbar-text-color);
+  }
 
   @media not -moz-pref("browser.nova.enabled") {
     border-top-color: ThreeDShadow;
@@ -68,7 +73,7 @@ xul|findbar {
   margin-inline-start: 8px;
   overflow-inline: hidden; /* Ensures the close button stays visible. */
   transition: opacity 150ms ease-in-out;
-  height: var(--findbar-container-height);
+  min-height: var(--findbar-container-height);
   padding-inline-start: var(--space-xsmall);
 }
 
@@ -223,8 +228,9 @@ xul|findbar {
   transition: opacity 150ms ease-in-out;
   border-radius: var(--border-radius-circle);
   border: var(--border-width) solid var(--toolbarbutton-outline-color);
-  padding: var(--space-xsmall) var(--space-small);
+  padding: 0;
   width: auto;
+  aspect-ratio: 1;
 
   &:hover {
     background-color: var(--toolbarbutton-background-color-hover, rgba(190, 190, 190, 0.2));

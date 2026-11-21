@@ -22,6 +22,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
   LoginHelper: "resource://gre/modules/LoginHelper.sys.mjs",
   LoginManagerContextMenu:
     "resource://gre/modules/LoginManagerContextMenu.sys.mjs",
+  MiniWindowManager:
+    "moz-src:///browser/components/miniwindow/MiniWindowManager.sys.mjs",
   NetUtil: "resource://gre/modules/NetUtil.sys.mjs",
   NimbusFeatures: "resource://nimbus/ExperimentAPI.sys.mjs",
   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
@@ -32,6 +34,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
   SearchService: "moz-src:///toolkit/components/search/SearchService.sys.mjs",
   SearchUIUtils: "moz-src:///browser/components/search/SearchUIUtils.sys.mjs",
   SearchUtils: "moz-src:///toolkit/components/search/SearchUtils.sys.mjs",
+  SelectionUtils: "resource://gre/modules/SelectionUtils.sys.mjs",
   ShortcutUtils: "resource://gre/modules/ShortcutUtils.sys.mjs",
   TranslationsParent: "resource://gre/actors/TranslationsParent.sys.mjs",
   TranslationsUtils:
@@ -97,13 +100,23 @@ XPCOMUtils.defineLazyServiceGetter(
   Ci.nsIClipboardHelper
 );
 
+XPCOMUtils.defineLazyPreferenceGetter(
+  lazy,
+  "VIEW_PASSWORDS_DISABLED",
+  "pref.privacy.disable_button.view_passwords",
+  false
+);
+
 const PASSWORD_FIELDNAME_HINTS = ["current-password", "new-password"];
 const USERNAME_FIELDNAME_HINT = "username";
 
-const ALLOWED_CHROME_IMAGE_URLS = new Set([
-  "chrome://global/skin/illustrations/security-error.svg",
-  "chrome://global/skin/illustrations/no-connection.svg",
-]);
+function isContentAccessibleResource(spec) {
+  if (!spec.startsWith("resource:")) {
+    return false;
+  }
+  const url = URL.parse(spec);
+  return url?.protocol == "resource:" && url.host == "content-accessible";
+}
 
 const IMAGE_ONLY_PROTOCOLS = [
   "cached-favicon:",
@@ -414,6 +427,16 @@ export class nsContextMenu {
     }
   }
 
+  /**
+   * Returns whether the menu was opened on a link while anything in the
+   * document is selected, including a selection made by right click.
+   *
+   * @returns {boolean}
+   */
+  #isLinkWithSelection() {
+    return this.onLink && this.isContentSelected;
+  }
+
   initTextFragmentItems() {
     const shouldShow =
       !(
@@ -422,7 +445,9 @@ export class nsContextMenu {
         this.onEditable ||
         this.browser.currentURI.schemeIs("view-source")
       ) &&
-      (this.hasTextFragments || this.isContentSelected);
+      (this.hasTextFragments || this.isContentSelected) &&
+      !this.onLink &&
+      !this.#isLinkWithSelection();
     this.showItem("context-copy-link-to-highlight", shouldShow);
     this.showItem(
       "context-copy-clean-link-to-highlight",
@@ -511,7 +536,7 @@ export class nsContextMenu {
 
       document.l10n.setAttributes(
         item,
-        "main-context-menu-open-link-in-container-tab",
+        "main-context-menu-open-link-in-container-tab-2",
         {
           containerName: label,
         }
@@ -527,9 +552,25 @@ export class nsContextMenu {
     let showSplitViews = Services.prefs.getBoolPref(
       "browser.tabs.splitView.enabled"
     );
+
+    // TODO: Bug 2094287 - Support opening links in a mini window from popups and Document
+    // Picture-in-Picture windows.
+    let showMiniWindow =
+      Services.prefs.getBoolPref("browser.mini-window.enabled", false) &&
+      this.window.toolbar.visible &&
+      !this.window.browsingContext.isDocumentPiP;
     let currentTabInSplitView = !!window.gBrowser?.selectedTab?.splitview;
     let showSmartWindow = lazy.AIWindow.isAIWindowEnabled();
     this.showItem("context-openlink", shouldShow && !isWindowPrivate);
+    let miniWindowItem = this.document.getElementById(
+      "context-openlinkminiwindow"
+    );
+    this.showItem(miniWindowItem, shouldShow && showMiniWindow);
+    this.#setFeatureBadge(
+      miniWindowItem,
+      shouldShow && showMiniWindow,
+      BADGE_TYPE.BETA
+    );
     this.showItem(
       "context-openlinkprivate",
       shouldShow && lazy.PrivateBrowsingUtils.enabled
@@ -843,7 +884,8 @@ export class nsContextMenu {
       !this.inAboutDevtoolsToolbox &&
         this.isContentSelected &&
         this.selectionInfo.isDocumentLevelSelection &&
-        lazy.gPrintEnabled
+        lazy.gPrintEnabled &&
+        !this.#isLinkWithSelection()
     );
 
     var showViewSource = !(
@@ -935,16 +977,21 @@ export class nsContextMenu {
     this.showTranslateSelectionItem();
     this.showItem(
       "context-turn-on-highlight-menu",
-      this.isTextSelected &&
+      !(this.onLink || this.onPlainTextLink) &&
+        this.isTextSelected &&
         !this.onTextInput &&
         lazy.GenAI.canTurnOnSelectionMenu(this.window)
     );
-    lazy.GenAI.buildAskChatMenu(document.getElementById("context-ask-chat"), {
-      browser: this.browser,
-      selectionInfo: this.selectionInfo,
-      showItem: this.showItem.bind(this),
-      source: "page",
-    });
+    if (this.onLink || this.onPlainTextLink) {
+      this.showItem("context-ask-chat", false);
+    } else {
+      lazy.GenAI.buildAskChatMenu(document.getElementById("context-ask-chat"), {
+        browser: this.browser,
+        selectionInfo: this.selectionInfo,
+        showItem: this.showItem.bind(this),
+        source: "page",
+      });
+    }
     this.showItem(
       "context-create-aitab",
       lazy.AIWindowMenu.canShowAITabMenu(this.window, [this.browser.currentURI])
@@ -1041,7 +1088,24 @@ export class nsContextMenu {
     this.showItem("context-undo", this.onTextInput);
     this.showItem("context-redo", this.onTextInput);
     this.showItem("context-cut", this.onTextInput);
-    this.showItem("context-copy", this.isContentSelected || this.onTextInput);
+
+    // For selected links, do not show the Copy item.
+    const canShowCopy =
+      (this.isContentSelected || this.onTextInput) &&
+      !this.#isLinkWithSelection();
+    if (canShowCopy) {
+      let copyItem = this.document.getElementById("context-copy");
+      // For selected plain text links outside of inputs, move Copy next to
+      // "Copy Link" and "Copy Clean Link".
+      // Otherwise, keep it with other items.
+      if (this.isContentSelected && this.onPlainTextLink && !this.onTextInput) {
+        this.document.getElementById("context-copylink").before(copyItem);
+      } else {
+        this.document.getElementById("context-paste").before(copyItem);
+      }
+    }
+    this.showItem("context-copy", canShowCopy);
+
     this.showItem("context-paste", this.onTextInput);
     this.showItem("context-paste-no-formatting", this.isDesignMode);
     this.showItem("context-delete", this.onTextInput);
@@ -1087,11 +1151,6 @@ export class nsContextMenu {
 
     let disabledAttr = this.#canStripParams() ? null : true;
     this.setItemAttr("context-stripOnShareLink", "disabled", disabledAttr);
-
-    let sendLinkSeparator = this.document.getElementById(
-      "context-sep-sendlinktodevice"
-    );
-    sendLinkSeparator.toggleAttribute("ensureHidden", !this.syncItemsShown);
 
     this.showItem("context-copyvideourl", this.onVideo);
     this.showItem("context-copyaudiourl", this.onAudio);
@@ -1221,7 +1280,7 @@ export class nsContextMenu {
       if (!this.isLoginForm()) {
         return;
       }
-      showManage = true;
+      showManage = !lazy.VIEW_PASSWORDS_DISABLED;
 
       // Disable the fill option if the user hasn't unlocked with their primary password
       // or if the password field or target field are disabled.
@@ -1334,7 +1393,7 @@ export class nsContextMenu {
   }
 
   initSyncItems() {
-    this.syncItemsShown = this.window.gSync.updateContentContextMenu(this);
+    this.window.gSync.updateContentContextMenu(this);
   }
 
   initViewSourceItems() {
@@ -1624,6 +1683,19 @@ export class nsContextMenu {
     win.openLinkIn(this.linkURL, "tab", this._openLinkInParameters(params));
   }
 
+  // Open linked-to URL in a new mini window.
+  openLinkInMiniWindow() {
+    lazy.MiniWindowManager.openURL(
+      this.window,
+      this.linkURL,
+      "link_context_menu",
+      this._openLinkInParameters({
+        userContextId: this.contentData.userContextId,
+        ...this._getGlobalHistoryOptions(),
+      })
+    );
+  }
+
   // open URL in current tab
   openLinkInCurrent() {
     this.window.openLinkIn(
@@ -1823,8 +1895,9 @@ export class nsContextMenu {
         });
       }, console.error);
     } else {
-      const isAllowedChromeImage = ALLOWED_CHROME_IMAGE_URLS.has(this.mediaURL);
-      const principal = isAllowedChromeImage ? systemPrincipal : this.principal;
+      const principal = isContentAccessibleResource(this.mediaURL)
+        ? systemPrincipal
+        : this.principal;
 
       this.window.urlSecurityCheck(
         this.mediaURL,
@@ -2222,8 +2295,7 @@ export class nsContextMenu {
         );
       }, console.error);
     } else if (this.onImage) {
-      const isAllowedChromeImage = ALLOWED_CHROME_IMAGE_URLS.has(this.mediaURL);
-      const principal = isAllowedChromeImage
+      const principal = isContentAccessibleResource(this.mediaURL)
         ? Services.scriptSecurityManager.getSystemPrincipal()
         : this.principal;
 
@@ -2350,15 +2422,16 @@ export class nsContextMenu {
    * that are known to us will be removed from the URI.
    */
   copyStrippedLink(uri = this.linkURI) {
-    let strippedLinkURI = this.getStrippedLink(uri);
-    let strippedLinkURL =
-      Services.io.createExposableURI(strippedLinkURI)?.displaySpec;
-    if (strippedLinkURL) {
-      lazy.clipboard.copyString(
-        strippedLinkURL,
-        this.actor.manager.browsingContext.currentWindowGlobal
-      );
+    if (!uri) {
+      return;
     }
+    let strippedLinkURL = lazy.BrowserUtils.getExposableURI(uri, {
+      stripTracking: true,
+    }).displaySpec;
+    lazy.clipboard.copyString(
+      strippedLinkURL,
+      this.actor.manager.browsingContext.currentWindowGlobal
+    );
   }
 
   async addSearchFieldAsEngine() {
@@ -2468,29 +2541,6 @@ export class nsContextMenu {
     }
 
     return null;
-  }
-
-  /**
-   * Strips any known query params from the link URI.
-   *
-   * @returns {nsIURI|null} - the stripped version of the URI,
-   * or the original URI if we could not strip any query parameter.
-   */
-  getStrippedLink(uri = this.linkURI) {
-    if (!uri) {
-      return null;
-    }
-    let strippedLinkURI = null;
-    try {
-      strippedLinkURI = lazy.QueryStringStripper.stripForCopyOrShare(uri);
-    } catch (e) {
-      console.warn(`getStrippedLink: ${e.message}`);
-      return uri;
-    }
-
-    // If nothing can be stripped, we return the original URI
-    // so the feature can still be used.
-    return strippedLinkURI ?? uri;
   }
 
   /**
@@ -2853,11 +2903,11 @@ export class nsContextMenu {
       isPrivateSearchMenuitem: true,
     });
 
-    let frameSeparator = document.getElementById("frame-sep");
+    let searchSeparator = document.getElementById("context-sep-search");
 
     // Add a divider between "Search X for Y" and "This Frame", and between
     // "Search X for Y" and "Check Spelling", but no divider in other cases.
-    frameSeparator.toggleAttribute(
+    searchSeparator.toggleAttribute(
       "ensureHidden",
       menuItem.hidden && this.inFrame
     );
@@ -2867,18 +2917,7 @@ export class nsContextMenu {
       return;
     }
 
-    // Copied to alert.js' prefillAlertInfo().
-    // If the JS character after our truncation point is a trail surrogate,
-    // include it in the truncated string to avoid splitting a surrogate pair.
-    if (selectedText.length > 15) {
-      let truncLength = 15;
-      let truncChar = selectedText[15].charCodeAt(0);
-      if (truncChar >= 0xdc00 && truncChar <= 0xdfff) {
-        truncLength++;
-      }
-      selectedText =
-        selectedText.substr(0, truncLength) + Services.locale.ellipsis;
-    }
+    selectedText = lazy.SelectionUtils.truncateForDisplay(selectedText, 15);
 
     const { gNavigatorBundle } = this.window;
     // format "Search <engine> for <selection>" string to show in menu

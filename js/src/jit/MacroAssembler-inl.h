@@ -118,6 +118,23 @@ void MacroAssembler::PopRegs(const Regs&... regs) {
 }
 
 // ===============================================================
+// Indirect call/jump targets.
+
+CodeOffset MacroAssembler::indirectTarget(TargetKind kind) {
+  return CodeOffset(currentOffset());
+}
+
+void MacroAssembler::bindIndirectTarget(Label* label, TargetKind kind) {
+  CodeOffset offset = indirectTarget(kind);
+  bind(label, BufferOffset(offset.offset()));
+}
+
+void MacroAssembler::bindIndirectTarget(CodeLabel* label, TargetKind kind) {
+  CodeOffset offset = indirectTarget(kind);
+  label->target()->bind(offset.offset());
+}
+
+// ===============================================================
 // Simple call functions.
 
 void MacroAssembler::call(TrampolinePtr code) { call(ImmPtr(code.value)); }
@@ -317,6 +334,24 @@ void MacroAssembler::branchIfNotActivationEntryFrame(Register scratch,
   load32(Address(FramePointer, CommonFrameLayout::offsetOfDescriptor()),
          scratch);
   and32(Imm32(FrameDescriptor::TypeMask), scratch);
+  if (JitOptions.emitInterpreterEntryTrampoline) {
+    // A frame entered through a per-script entry trampoline is still the
+    // activation's entry frame if the trampoline frame is.
+    Label isEntryFrame;
+    branch32(Assembler::Equal, scratch, Imm32(uint32_t(FrameType::CppToJSJit)),
+             &isEntryFrame);
+    branch32(Assembler::NotEqual, scratch,
+             Imm32(uint32_t(FrameType::BaselineInterpreterEntry)),
+             notEntryFrame);
+    loadPtr(Address(FramePointer, CommonFrameLayout::offsetOfCallerFramePtr()),
+            scratch);
+    load32(Address(scratch, CommonFrameLayout::offsetOfDescriptor()), scratch);
+    and32(Imm32(FrameDescriptor::TypeMask), scratch);
+    branch32(Assembler::NotEqual, scratch,
+             Imm32(uint32_t(FrameType::CppToJSJit)), notEntryFrame);
+    bind(&isEntryFrame);
+    return;
+  }
   branch32(Assembler::NotEqual, scratch, Imm32(uint32_t(FrameType::CppToJSJit)),
            notEntryFrame);
 }
@@ -439,10 +474,13 @@ void MacroAssembler::moveValue(const ConstantOrRegister& src,
 // ===============================================================
 // Copy instructions
 
-void MacroAssembler::copy64(const Address& src, const Address& dest,
-                            Register scratch) {
+template <typename T>
+void MacroAssembler::copy64(const T& src, const T& dest, Register scratch) {
 #if JS_BITS_PER_WORD == 32
   MOZ_RELEASE_ASSERT(src.base != scratch && dest.base != scratch);
+  if constexpr (std::is_base_of_v<BaseIndex, T>) {
+    MOZ_RELEASE_ASSERT(src.index != scratch && dest.index != scratch);
+  }
   load32(LowWord(src), scratch);
   store32(scratch, LowWord(dest));
   load32(HighWord(src), scratch);
@@ -926,6 +964,7 @@ void MacroAssembler::branchFloat32NotInUInt64Range(Address src, Register temp,
 
 // ========================================================================
 // Canonicalization primitives.
+#ifndef JS_CODEGEN_RISCV64
 void MacroAssembler::canonicalizeFloatNaN(FloatRegister reg) {
   Label notNaN;
   branchFloat(DoubleOrdered, reg, reg, &notNaN);
@@ -939,6 +978,7 @@ void MacroAssembler::canonicalizeDoubleNaN(FloatRegister reg) {
   loadConstantDouble(JS::GenericNaN(), reg);
   bind(&notNaN);
 }
+#endif  // !JS_CODEGEN_RISCV64
 
 void MacroAssembler::canonicalizeDoubleZero(FloatRegister reg,
                                             FloatRegister scratch) {
@@ -1142,15 +1182,15 @@ void MacroAssembler::lookupMFBT(Register hashTable, Register hashCode,
   match();
   bind(&primaryCollision);
 
-  // Otherwise, we've had a collision. Double-hash.
-  Register hash2 = scratch4;
+  // Otherwise, we've had a collision. Probe.
+  Register stride = scratch4;
   Register sizeMask = scratch3;
-  computeHash2MFBT<Table>(hashTable, hashCode, hash2, sizeMask, scratch);
+  initProbeSequenceMFBT<Table>(hashTable, stride, sizeMask);
 
   Label loop;
   bind(&loop);
 
-  applyDoubleHashMFBT(hash1, hash2, sizeMask);
+  nextProbeMFBT(hash1, stride, sizeMask);
   checkForMatchMFBT<Table>(hashTable, hash1, hashCode, scratch, scratch2,
                            missing, &loop);
   match();

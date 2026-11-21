@@ -7,13 +7,16 @@
 
 #include "mozilla/Assertions.h"  // MOZ_ASSERT
 #include "mozilla/Atomics.h"     // mozilla::Atomic, mozilla::Relaxed
-#include "mozilla/Attributes.h"  // MOZ_STACK_CLASS
+#include "mozilla/Attributes.h"  // MOZ_ALWAYS_INLINE, MOZ_STACK_CLASS
+#include "mozilla/Likely.h"      // MOZ_UNLIKELY
 #include "mozilla/Maybe.h"       // mozilla::Maybe
 
 #include <stddef.h>  // size_t
 
 #include "js/AllocPolicy.h"  // SystemAllocPolicy, AllocFunction
 #include "js/ErrorReport.h"  // JSErrorCallback, JSErrorFormatString
+#include "js/experimental/CompileScript.h"  // JS::FrontendContextCreationOptions
+#include "js/friend/StackLimits.h"  // js::AutoCheckRecursionLimit, js::ReportOverRecursed
 #include "js/Stack.h"  // JS::NativeStackSize, JS::NativeStackLimit, JS::NativeStackLimitMax
 #include "js/Vector.h"          // Vector
 #include "vm/ErrorReporting.h"  // CompileError
@@ -125,6 +128,21 @@ class FrontendContext {
         nameCollectionPool_(nullptr),
         ownNameCollectionPool_(false),
         scriptDataTableHolder_(&js::globalSharedScriptDataTableHolder) {}
+
+  explicit FrontendContext(const JS::FrontendContextCreationOptions* options)
+      : alloc_(this),
+        nameCollectionPool_(nullptr),
+        ownNameCollectionPool_(false),
+        scriptDataTableHolder_(!options || options->shareScriptData
+                                   ? &js::globalSharedScriptDataTableHolder
+                                   : nullptr) {
+#ifdef DEBUG
+    if (options && options->allowCancellingCompilation) {
+      setAllowCancellingCompilation();
+    }
+#endif
+  }
+
   ~FrontendContext();
 
   void setStackQuota(JS::NativeStackSize stackSize);
@@ -143,6 +161,8 @@ class FrontendContext {
         "Either allocateOwnedPool or setCurrentJSContext must be called");
     return *nameCollectionPool_;
   }
+
+  bool hasScriptDataTableHolder() const { return !!scriptDataTableHolder_; }
 
   js::SharedScriptDataTableHolder* scriptDataTableHolder() {
     MOZ_ASSERT(scriptDataTableHolder_);
@@ -242,6 +262,31 @@ class FrontendContext {
   void addPendingOutOfMemory();
 };
 
+// AutoCheckRecursionLimit's FrontendContext overloads are defined here, where
+// they can read the stack limit inline.
+
+MOZ_ALWAYS_INLINE bool AutoCheckRecursionLimit::check(
+    FrontendContext* fc) const {
+  if (MOZ_UNLIKELY(!checkDontReport(fc))) {
+    ReportOverRecursed(fc);
+    return false;
+  }
+  return true;
+}
+
+MOZ_ALWAYS_INLINE bool AutoCheckRecursionLimit::checkDontReport(
+    FrontendContext* fc) const {
+  return checkWithStackPointerDontReport(fc, __builtin_frame_address(0));
+}
+
+MOZ_ALWAYS_INLINE bool AutoCheckRecursionLimit::checkWithStackPointerDontReport(
+    FrontendContext* fc, void* sp) const {
+#ifdef DEBUG
+  fc->checkAndUpdateFrontendContextRecursionLimit(sp);
+#endif
+  return checkLimitImpl(fc->stackLimit(), sp);
+}
+
 // Automatically report any pending exception when leaving the scope.
 class MOZ_STACK_CLASS AutoReportFrontendContext : public FrontendContext {
   // The target JSContext to report the errors to.
@@ -308,7 +353,8 @@ class ManualReportFrontendContext : public FrontendContext {
 
 // Create function for FrontendContext, which is manually allocated and
 // exclusively owned.
-extern FrontendContext* NewFrontendContext();
+extern FrontendContext* NewFrontendContext(
+    const JS::FrontendContextCreationOptions* options = nullptr);
 
 // Destroy function for FrontendContext, which was allocated with
 // NewFrontendContext.

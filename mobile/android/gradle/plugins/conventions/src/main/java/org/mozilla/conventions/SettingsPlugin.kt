@@ -54,6 +54,7 @@ abstract class SettingsPlugin : Plugin<Settings> {
         }
 
         settings.gradle.allprojects {
+            pluginManager.apply(MozsearchPlugin::class.java)
             pluginManager.apply(ProjectPlugin::class.java)
             extensions.configure(ProjectExtension::class.java) {
                 androidComponentsProject.set(
@@ -70,7 +71,6 @@ abstract class SettingsPlugin : Plugin<Settings> {
         initializeBuildMetrics(settings, configStartMs)
     }
 
-    @Suppress("UNCHECKED_CAST")
     private fun loadBuildConfig(settings: Settings) {
         val mozconfig = settings.gradle.extensions.extraProperties["mozconfig"] as Map<*, *>
         val topsrcdir = mozconfig["topsrcdir"] as String

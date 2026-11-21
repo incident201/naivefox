@@ -10,7 +10,7 @@
 # Tests in the other wrench reftest directories run with enable-compositor-clips
 # so they never exercise the compositor clip code path.
 
-options(enable-compositor-clips) color_targets(3) == rounded-corners-1.yaml rounded-corners-1-ref.yaml
+options(enable-compositor-clips) if(not(platform(swgl)),color_targets(2)) if(platform(swgl),color_targets(3)) == rounded-corners-1.yaml rounded-corners-1-ref.yaml
 # options(enable-compositor-clips) color_targets(2) == rounded-corners-2.yaml rounded-corners-2-ref.yaml
 options(enable-compositor-clips) == rounded-corners-3.yaml rounded-corners-3-ref.yaml
 # options(enable-compositor-clips) fuzzy(2,106) == rounded-corners-4.yaml rounded-corners-4-ref.yaml
@@ -34,3 +34,4 @@ options(enable-compositor-clips) == corner-shape.yaml corner-shape-ref.yaml
 options(enable-compositor-clips) fuzzy(1,50) == scrolled-clip.yaml scrolled-clip-ref.yaml
 options(enable-compositor-clips) fuzzy(1,50) == nested-clip.yaml nested-clip-ref.yaml
 options(enable-compositor-clips) scale(1,2) fuzzy(1,400) == rounded-clip.yaml rounded-clip-ref.yaml
+options(enable-compositor-clips) == preserve-3d-backdrop-clip.yaml preserve-3d-backdrop-clip-ref.yaml

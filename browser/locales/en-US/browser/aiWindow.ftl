@@ -4,8 +4,8 @@
 
 ## Chrome
 
-main-context-menu-open-link-new-smart-window =
-    .label = Open Link in New { -smart-window-brand-name }
+main-context-menu-open-link-new-smart-window-2 =
+    .label = Open in New { -smart-window-brand-name }
     .accesskey = S
 
 appmenuitem-new-ai-window =
@@ -117,27 +117,15 @@ aiwindow-website-chip-remove-button =
 ## Firstrun onboarding
 
 aiwindow-firstrun-title = Welcome to { -smart-window-brand-name }
-aiwindow-firstrun-model-title = What’s important to you?
 aiwindow-firstrun-model-title-v2 = Pick a model to start
-aiwindow-firstrun-model-subtitle = Pick a model to power { -smart-window-brand-name }. Switch anytime.
 aiwindow-firstrun-model-subtitle-v2 = Each model can help you to summarize, compare, and explore across your tabs. Switch anytime.
 
-# $model (string) - The name of the AI model
-# $ownerName (string) - The name of the model owner/provider
-# $shortName (string) - The short name of the model version
-aiwindow-firstrun-model-chip-subtitle = Model { $model } by { $ownerName }
-aiwindow-firstrun-model-personal-label = Personal
-aiwindow-firstrun-model-personal-body = Most tailored answers
 # $shortName (string) - The short name of the model version
 aiwindow-firstrun-model-personal-label-v2 = Personal: { $shortName }
 aiwindow-firstrun-model-personal-body-v2 = Built for personalized help across languages
-aiwindow-firstrun-model-fast-label = Fast
-aiwindow-firstrun-model-fast-body = Answers quickly
 # $shortName (string) - The short name of the model version
 aiwindow-firstrun-model-fast-label-v2 = Fast: { $shortName }
 aiwindow-firstrun-model-fast-body-v2 = Best for quick answers when you’re moving fast
-aiwindow-firstrun-model-allpurpose-label = Flexible
-aiwindow-firstrun-model-allpurpose-body = Solid fit for most needs
 # $shortName (string) - The short name of the model version
 aiwindow-firstrun-model-flexible-label = Flexible: { $shortName }
 aiwindow-firstrun-model-flexible-body = Ready for a variety of tasks
@@ -155,17 +143,26 @@ aiwindow-input-model-select-button-label-fast = Fast
 aiwindow-input-model-select-button-label-allpurpose = Flexible
 aiwindow-input-model-select-button-label-personal = Personal
 aiwindow-input-model-select-button-label-custom = Custom
-aiwindow-input-model-select-button-description-custom = Use your own LLM
+# Auto lets Smart Window pick the model for each request.
+aiwindow-input-model-select-button-label-auto = Auto
 
-# Variables:
-# $ownerName (string) - The name of the model owner/provider
-# $model (string) - The model name
-aiwindow-input-model-select-menu-item-description = { $ownerName } { $model }
-aiwindow-input-model-select-menu-item-description-custom = Use your own LLM
 aiwindow-input-model-select-default-badge =
     .label = Default
     .title = The selected default model
+# Badge next to the Auto model in the smartbar model select, shown when Auto
+# isn't the default model.
+aiwindow-input-model-select-recommended-badge =
+    .label = Recommended
+    .title = The recommended model
 aiwindow-input-model-select-settings-link = Model settings
+
+## Descriptions shown under each model in the smartbar model select when the
+## Auto model is offered.
+
+aiwindow-input-model-select-auto-description = { -smart-window-brand-name } picks the best model for your task
+aiwindow-input-model-select-fast-description = Quick answers when you’re moving fast
+aiwindow-input-model-select-flexible-description = Ready for a variety of tasks
+aiwindow-input-model-select-personal-description = Good if you chat and browse in multiple languages
 
 ## Firstrun memories onboarding
 
@@ -409,6 +406,15 @@ aiwindow-starter-browsing-history = Find tabs in history
 aiwindow-starter-browsing-summarize = Summarize tabs
 aiwindow-starter-browsing-compare = Compare tabs
 
+## Smart Window digest starter dismiss button
+## Shown on hover over a digest starter pill. Turns off the digest and
+## removes its pill from the starter row.
+## Variables:
+##   $text (String) - The label of the pill, which is the digest's title, for example "Morning News"
+
+aiwindow-starter-digest-dismiss =
+    .aria-label = Dismiss { $text }
+
 ## Conversation Starter Scroll Buttons
 ## Scrolls the conversation-starter pill row toward its start/end.
 
@@ -425,3 +431,35 @@ aiwindow-starter-scroll-end =
 aiwindow-starter-dismiss =
     .title = Dismiss { $text }
     .aria-label = Dismiss { $text }
+
+## Single-page onboarding
+
+# The line break is intentional and is preserved when displayed.
+smartwindow-onboarding-welcome-subtitle =
+    It works alongside you to get stuff done.
+    Plan, compare, explore, and more.
+smartwindow-onboarding-title = Let’s make it yours
+smartwindow-onboarding-subtitle = Set up { -smart-window-brand-name } the way you like. Make changes anytime in settings.
+smartwindow-onboarding-model-label = Pick your AI model
+smartwindow-onboarding-model-description = The model powers chats and actions in { -smart-window-brand-name }.
+smartwindow-onboarding-model-auto = Auto
+# Badge identifying the recommended model during onboarding: Mistral in the EEA, Auto elsewhere.
+smartwindow-onboarding-model-recommended = Recommended
+smartwindow-onboarding-model-auto-description = { -smart-window-brand-name } picks the best model for your task
+smartwindow-onboarding-model-mistral-description = Good if you chat and browse in multiple languages
+smartwindow-onboarding-model-gemini-description = Quick answers when you’re moving fast
+smartwindow-onboarding-memories-label = Choose how { -smart-window-brand-name } learns about you
+smartwindow-onboarding-memories-description = { -smart-window-brand-name } can learn from chats, browsing, or both to create memories. It uses them to personalize your experience over time.
+smartwindow-onboarding-memories-both = Chats and browsing
+smartwindow-onboarding-memories-browsing = Browsing only
+smartwindow-onboarding-memories-chats = Chats only
+smartwindow-onboarding-memories-none = Don’t learn from activity
+smartwindow-onboarding-memories-both-description = Chats in { -smart-window-brand-name }, browsing across { -brand-short-name }
+smartwindow-onboarding-memories-browsing-description = Browsing across { -brand-short-name }
+smartwindow-onboarding-memories-chats-description = Chats in { -smart-window-brand-name }
+smartwindow-onboarding-memories-none-description = You’ll see fewer tailored suggestions and may need to repeat details across chats.
+smartwindow-onboarding-default-window =
+    .label = Start in { -smart-window-brand-name }
+    .description = Use it when { -brand-short-name } starts, restarts, or opens links from other apps.
+smartwindow-onboarding-save =
+    .label = Save and go

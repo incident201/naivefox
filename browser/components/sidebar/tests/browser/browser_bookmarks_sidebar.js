@@ -125,6 +125,11 @@ async function testBookmarkTitleRendering(bookmarkInfo, title, message) {
   const { component } = await showBookmarksSidebar(window);
   const row = await getBookmarkRow(component.bookmarkList, bookmark);
   Assert.equal(row.title, title, message);
+  await assertRowTooltip(
+    row,
+    `${title}\n${bookmark.url.href}`,
+    "Tooltip shows the title and URL."
+  );
 
   await PlacesUtils.bookmarks.remove(bookmark);
   SidebarTestUtils.closePanel(window);
@@ -371,7 +376,20 @@ add_task(async function test_bookmarks_context_menu_bookmark() {
     "Show in Folder is hidden when not searching."
   );
 
+  const promiseHidden = BrowserTestUtils.waitForPopupEvent(
+    contextMenu,
+    "hidden"
+  );
   contextMenu.hidePopup();
+  await promiseHidden;
+
+  info("Open bookmark in new tab.");
+  await assertOpenInNewTabRespectsLoadInBackground(
+    row.mainEl,
+    "sidebar-bookmarks-context-open-in-tab",
+    row.url
+  );
+
   await PlacesUtils.bookmarks.remove(bm);
   SidebarTestUtils.closePanel(window);
 });

@@ -54,18 +54,6 @@ perf arguments:
   -q QUERY, --query QUERY
                         Query to run in either the perf-category selector, or the fuzzy selector if --show-all/--full is
                         provided.
-  --browsertime-upload-apk BROWSERTIME_UPLOAD_APK
-                        Path to an APK to upload. Note that this will replace the APK installed in all Android Performance
-                        tests. If the Activity, Binary Path, or Intents required change at all relative to the existing
-                        GeckoView, and Fenix tasks, then you will need to make fixes in the associated taskcluster files
-                        (e.g. taskcluster/kinds/browsertime/mobile.yml). Alternatively, set MOZ_FIREFOX_ANDROID_APK_OUTPUT
-                        to a path to an APK, and then run the command with --browsertime-upload-apk firefox-android. This
-                        option will only copy the APK for browsertime, see --mozperftest-upload-apk to upload APKs for
-                        startup tests.
-  --mozperftest-upload-apk MOZPERFTEST_UPLOAD_APK
-                        See --browsertime-upload-apk. This option does the same thing except it's for MozPerftest tests
-                        such as the startup ones. Note that those tests only exist through --show-all/--full as they aren't
-                        contained in any existing categories.
   --detect-changes      Adds a task that detects performance changes using MWU.
   --comparator COMPARATOR
                         Either a path to a file to setup a custom comparison, or a builtin name. See the Firefox source
@@ -365,7 +353,7 @@ Calculated try_task_config.json:
 
 ## Adding a New Category
 
-It's very easy to add a new category if needed, and you can do so by modifying the {searchfox}`PerfParser categories attribute here <tools/tryselect/selectors/perf.py#179>`. The following is an example of a complex category that gives a good idea of what you have available:
+It's very easy to add a new category if needed, and you can do so by modifying the `categories` property of `ClassificationProvider` in {searchfox}`tools/tryselect/selectors/perfselector/classification.py`. The following is an example of a complex category that gives a good idea of what you have available:
 
 ```
 "Resource Usage": {

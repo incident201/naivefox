@@ -74,16 +74,6 @@ object HomeSelectors : SelectorContainer {
             groups = setOf(Group.PRIVATE_BROWSING),
         )
 
-    // Shown on the private browsing homepage header only under the Private Mode and Stories entry-point
-    // experiment (isPrivateModeAndStoriesEntryPointEnabled); tapping it returns to normal browsing.
-    val PRIVATE_BROWSING_HOME_BUTTON =
-        Selector(
-            strategy = SelectorStrategy.COMPOSE_BY_CONTENT_DESCRIPTION,
-            value = getStringResource(R.string.content_description_normal_browsing),
-            description = "Private browsing homepage Home button",
-            groups = setOf(Group.PRIVATE_BROWSING),
-        )
-
     val HOME_WORDMARK_LOGO =
         Selector(
             strategy = SelectorStrategy.COMPOSE_BY_TAG,
@@ -283,8 +273,8 @@ object HomeSelectors : SelectorContainer {
         )
 
     // The "blocked trackers" widget pill. We assert this (a COMPOSE_BY_TAG handle) rather than the card's
-    // label text because the label is state-dependent: a fresh homepage reads "Help catch trackers" while a
-    // homepage that has blocked at least one tracker reads "You're protected". The protectionStatusPill tag
+    // label text because the label is state-dependent: a fresh homepage reads "You're protected" while a
+    // homepage that has blocked at least one tracker reads "N trackers blocked". The protectionStatusPill tag
     // (TRACKERS_BLOCKED_CARD) is present in both states, so it is a stable, state-independent presence check;
     // asserting either label would flake as soon as the tracker count changes.
     val TRACKERS_BLOCKED_CARD =
@@ -295,8 +285,8 @@ object HomeSelectors : SelectorContainer {
             groups = setOf(Group.HOME_SCREEN_UI),
         )
 
-    // Private-browsing button in the experimental homepage header (left side). Only rendered when
-    // isPrivateModeAndStoriesEntryPointEnabled is on, so it is not a page-identity anchor.
+    // Private-browsing toggle in the homepage header. Hidden when the middle search bar is enabled, so it is not a
+    // page-identity anchor.
     val PRIVATE_MODE_BUTTON =
         Selector(
             strategy = SelectorStrategy.COMPOSE_BY_TAG,
@@ -305,8 +295,7 @@ object HomeSelectors : SelectorContainer {
             groups = setOf(Group.HOME_SCREEN_UI),
         )
 
-    // Stories entry point in the experimental homepage header (right side). Only rendered when
-    // isPrivateModeAndStoriesEntryPointEnabled and showPocketRecommendationsFeature (Pocket) are both on,
+    // Stories entry point in the homepage header. Only rendered when showPocketRecommendationsFeature (Pocket) is on,
     // so it is not a page-identity anchor.
     val STORIES_BUTTON =
         Selector(

@@ -151,7 +151,15 @@ class SharingUtilsCls {
     }
   }
 
-  async showQRCodePanel(win, browser, url) {
+  /**
+   * @param {Window} win
+   * @param {MozBrowser} browser
+   * @param {string} url
+   * @param {object} [options]
+   * @param {string} [options.titleL10nId] Fluent ID overriding the dialog heading.
+   * @param {boolean} [options.hideActions] Hides the Save and Copy buttons.
+   */
+  async showQRCodePanel(win, browser, url, options = {}) {
     let tab = win.gBrowser.getTabForBrowser(browser);
     if (tab && win.gBrowser.selectedTab !== tab) {
       let wait = null;
@@ -184,15 +192,20 @@ class SharingUtilsCls {
     let params = {
       url,
       qrCodeDataURI,
+      titleL10nId: options.titleL10nId,
+      hideActions: !!options.hideActions,
     };
 
-    win.gBrowser
+    let { closedPromise, dialog } = win.gBrowser
       .getTabDialogBox(browser)
       .open(
         "chrome://browser/content/qrcode/qrcode-dialog.html",
         { features: "resizable=no", allowDuplicateDialogs: false },
         params
       );
+    if (dialog) {
+      await closedPromise;
+    }
   }
 
   #waitForTabRestored(tab) {
@@ -221,8 +234,7 @@ class SharingUtilsCls {
     if (browser) {
       let maybeToShare = BrowserUtils.getShareableURL(browser.currentURI);
       if (maybeToShare) {
-        let { gURLBar } = node.documentGlobal;
-        urlToShare = gURLBar.makeURIReadable(maybeToShare).displaySpec;
+        urlToShare = BrowserUtils.getExposableURI(maybeToShare).displaySpec;
         titleToShare = browser.contentTitle;
       }
     }
@@ -245,9 +257,8 @@ class SharingUtilsCls {
       }
       let maybeToShare = BrowserUtils.getShareableURL(browser.currentURI);
       if (maybeToShare) {
-        let { gURLBar } = node.documentGlobal;
         links.push({
-          url: gURLBar.makeURIReadable(maybeToShare).displaySpec,
+          url: BrowserUtils.getExposableURI(maybeToShare).displaySpec,
           title: browser.contentTitle,
         });
       }

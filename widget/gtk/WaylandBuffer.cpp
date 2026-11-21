@@ -74,7 +74,7 @@ bool WaylandBuffer::IsAttached(const WaylandSurfaceLock& aSurfaceLock) const {
 BufferTransaction* WaylandBuffer::GetTransaction(
     const WaylandSurfaceLock& aSurfaceLock) {
   for (const auto& transaction : mBufferTransactions) {
-    if (transaction->CanRecycle(aSurfaceLock.GetWaylandSurface())) {
+    if (transaction->CanRecycle(aSurfaceLock.GetSurface())) {
       LOGWAYLAND("WaylandBuffer::GetTransaction() [%p] reuse transaction [%d]",
                  (void*)this, (int)mBufferTransactions.Length());
       return transaction;
@@ -95,7 +95,7 @@ BufferTransaction* WaylandBuffer::GetTransaction(
       "WaylandBuffer::GetTransaction() create new [%p] wl_buffer [%p] "
       "transactions [%d] external buffer [%d] WaylandSurface [%p]",
       (void*)this, buffer, (int)mBufferTransactions.Length(),
-      !!mExternalWlBuffer, aSurfaceLock.GetWaylandSurface());
+      !!mExternalWlBuffer, aSurfaceLock.GetSurface());
 
   auto* transaction = new BufferTransaction(this, buffer, !!mExternalWlBuffer);
   mBufferTransactions.AppendElement(transaction);
@@ -173,6 +173,26 @@ RefPtr<WaylandBuffer> WaylandBuffer::CreateSHM(
 }
 
 /* static */
+already_AddRefed<WaylandBuffer> WaylandBuffer::CreateMappableDMABuf(
+    const LayoutDeviceIntSize& aSize, RefPtr<DRMFormat> aFormat) {
+  RefPtr<WaylandBuffer> buffer = new WaylandBuffer(aSize);
+
+  LOGWAYLAND("WaylandBuffer::CreateMappableDMABuf() [%p] [%d x %d]",
+             (void*)buffer, aSize.width, aSize.height);
+
+  buffer->mBufferSurface = DMABufSurfaceRGBA::CreateDMABufSurface(
+      nullptr, aSize.width, aSize.height, DMABUF_ALPHA | DMABUF_CPU_ACCESS,
+      aFormat);
+  if (!buffer->mBufferSurface) {
+    LOGWAYLAND("  failed to create DMABufSurface");
+    return nullptr;
+  }
+
+  LOGWAYLAND("  created [%p]\n", buffer.get());
+  return buffer.forget();
+}
+
+/* static */
 already_AddRefed<WaylandBuffer> WaylandBuffer::CreateDMABuf(
     const LayoutDeviceIntSize& aSize, GLContext* aGL,
     RefPtr<DRMFormat> aFormat) {
@@ -193,8 +213,9 @@ already_AddRefed<WaylandBuffer> WaylandBuffer::CreateDMABuf(
 }
 
 WaylandBufferHolder::WaylandBufferHolder(BufferSurface* aSurface,
-                                         wl_buffer* aWLBuffer)
-    : mWLBuffer(aWLBuffer) {
+                                         wl_buffer* aWLBuffer,
+                                         RefPtr<WaylandBuffer> aWaylandBuffer)
+    : mWLBuffer(aWLBuffer), mWaylandBuffer(std::move(aWaylandBuffer)) {
   mUID = aSurface->GetUID();
   mPID = aSurface->GetPID();
   LOGWAYLAND(
@@ -208,12 +229,42 @@ WaylandBufferHolder::~WaylandBufferHolder() {
       "WaylandBufferHolder::~WaylandBufferHolder wl_buffer [%p] "
       "UID %d PID %d",
       mWLBuffer, mUID, mPID);
-
   MozClearPointer(mWLBuffer, wl_buffer_destroy);
 }
 
-bool WaylandBufferHolder::Matches(BufferSurface* aSurface) const {
-  return mUID == aSurface->GetUID() && mPID == aSurface->GetPID();
+bool WaylandBufferHolder::CheckForRecycle(
+    const WaylandSurfaceLock& aSurfaceLock) {
+  // We can recycle buffer holders without active transaction.
+  if (!mTransaction) {
+    mWaylandBuffer = nullptr;
+    return true;
+  }
+  // Remove finished transaction and wayland buffer references
+  // to release them.
+  if (mTransaction->IsDeleted()) {
+    mTransaction = nullptr;
+    mWaylandBuffer = nullptr;
+    return true;
+  }
+  return false;
+}
+
+bool WaylandBufferHolder::CanRecycle(const WaylandSurfaceLock& aSurfaceLock,
+                                     BufferSurface* aSurface) {
+  return CheckForRecycle(aSurfaceLock) && mUID == aSurface->GetUID() &&
+         mPID == aSurface->GetPID();
+}
+
+void WaylandBufferHolder::Recycle(const WaylandSurfaceLock& aSurfaceLock,
+                                  RefPtr<WaylandBuffer> aWaylandBuffer) {
+  MOZ_RELEASE_ASSERT(!mTransaction, "Already used?");
+  MOZ_RELEASE_ASSERT(!mWaylandBuffer, "Already used?");
+  mWaylandBuffer = std::move(aWaylandBuffer);
+}
+
+bool WaylandBufferHolder::Matches(const WaylandSurfaceLock& aSurfaceLock,
+                                  WaylandBuffer* aWaylandBuffer) const {
+  return mWaylandBuffer == aWaylandBuffer;
 }
 
 wl_buffer* BufferTransaction::BufferBorrowLocked(
@@ -221,15 +272,14 @@ wl_buffer* BufferTransaction::BufferBorrowLocked(
   LOGWAYLAND(
       "BufferTransaction::BufferBorrow() [%p] widget [%p] WaylandSurface [%p] "
       "WaylandBuffer [%p]",
-      this, aSurfaceLock.GetWaylandSurface()->GetLoggingWidget(),
-      aSurfaceLock.GetWaylandSurface(), mBuffer.get());
+      this, aSurfaceLock.GetSurface()->GetLoggingWidget(),
+      aSurfaceLock.GetSurface(), mBuffer.get());
 
-  MOZ_DIAGNOSTIC_ASSERT(
-      !mSurface || mSurface == aSurfaceLock.GetWaylandSurface(),
-      "Can't transfer transaction between WaylandSurfaces!");
+  MOZ_DIAGNOSTIC_ASSERT(!mSurface || mSurface == aSurfaceLock.GetSurface(),
+                        "Can't transfer transaction between WaylandSurfaces!");
   MOZ_DIAGNOSTIC_ASSERT(mBufferState == BufferState::Detached);
 
-  mSurface = aSurfaceLock.GetWaylandSurface();
+  mSurface = aSurfaceLock.GetSurface();
 
   // We don't take reference to this. Some compositors doesn't send
   // buffer release callback and we may leak BufferTransaction then.

@@ -72,7 +72,7 @@ task-defaults:
                     - win64-samply
                     - profiler-node-tools
                 win.*32.*:
-                    - win32-node
+                    - win64-node
                     - win32-minidump-stackwalk
                     - win32-fix-stacks
                     - win32-samply
@@ -125,7 +125,6 @@ task-defaults:
                 by-test-platform:
                     linux.*64/debug: 1
                     default: 2
-            geckoview-isolated-process: 2
             default: default
     mozharness:
         requires-signed-builds:
@@ -164,11 +163,12 @@ tasks:
         loopback-video: true
         virtualization: virtual
         variants:
-            - aab+no-fission
+            - aab
             - conditioned_profile
             - xorigin
             - no-fission
             - standalone
+            - repeat
             - headless
             - http3
             - http2
@@ -197,7 +197,7 @@ tasks:
                         linux.*64-ccov/opt: ['mozilla-central']
                         android-em.*: ['trunk']
                         default: []
-                aab+no-fission:
+                aab:
                     by-test-platform:
                         android-em.*/debug: built-projects
                         default: []
@@ -210,6 +210,7 @@ tasks:
                         windows.*-64-[^-/]+/debug: ['autoland', 'mozilla-central']
                         windows.*-64-[^-/]+/opt: ['autoland']
                         default: []
+                repeat: []
                 headless:
                     by-test-platform:
                         .*-wayland.*: []
@@ -217,7 +218,6 @@ tasks:
                         default: []
                 no-fission:
                     by-test-platform:
-                        android.*: built-projects
                         linux2404-64/debug: ['mozilla-central']
                         linux2404-64-asan/opt: ['mozilla-central']
                         linux2404-64(-shippable)?/opt: ['mozilla-central']
@@ -258,12 +258,13 @@ tasks:
                         default: 20
                 default:
                     by-test-platform:
-                        android.*/debug: 10
-                        linux.*/debug: 16
-                        linux.*64-tsan/opt: 20
+                        android.*/debug: 11
+                        linux.*/debug: 12
+                        linux.*64-tsan/opt: 18
                         .*-ccov.*: 10
-                        .*-asan.*: 10
-                        linux.*/opt: 8
+                        .*-asan.*: 15
+                        android.*/opt: 8
+                        linux.*/opt: 6
                         windows.*/debug: 8
                         default: 5
         tier:
@@ -281,6 +282,7 @@ tasks:
         max-run-time:
             by-variant:
                 standalone: 5400
+                repeat: 7200
                 default: 3600
         allow-software-gl-layers: false
         mozharness:
@@ -322,7 +324,7 @@ tasks:
                         - win64-samply
                         - profiler-node-tools
                     win.*32.*:
-                        - win32-node
+                        - win64-node
                         - win32-minidump-stackwalk
                         - win32-fix-stacks
                         - win32-samply
@@ -369,6 +371,7 @@ tasks:
             - webrender-sw+a11y-checks
             - msix
             - standalone
+            - repeat
             - vertical-tabs
             - inc-origin-init
             - trainhop-beta
@@ -413,6 +416,15 @@ tasks:
                         windows11-64.*: built-projects
                         default: []
                 standalone:
+                    by-test-platform:
+                        linux.*-64-shippable/opt: ['mozilla-central']
+                        linux.*-64/debug: ['autoland', 'mozilla-central']
+                        linux.*-64/opt: ['autoland']
+                        windows.*-64-[^-/]+-shippable/opt: ['mozilla-central']
+                        windows.*-64-[^-/]+/debug: ['autoland', 'mozilla-central']
+                        windows.*-64-[^-/]+/opt: ['autoland']
+                        default: []
+                repeat:
                     by-test-platform:
                         linux.*-64-shippable/opt: ['mozilla-central']
                         linux.*-64/debug: ['autoland', 'mozilla-central']
@@ -480,19 +492,26 @@ tasks:
                         default: 40
                 default:
                     by-test-platform:
-                        linux.*/debug: 16
-                        linux.*64-asan/opt: 20
-                        linux.*64-tsan/opt: 32
-                        windows.*-asan.*/opt: 20
-                        windows.*-ccov.*/.*: 14
-                        macosx.*64.*/opt: 10
-                        windows11.*/opt: 10
-                        .*/debug: 12
-                        default: 8
+                        linux.*/debug: 40
+                        linux.*64-asan/opt: 45
+                        linux.*64-tsan/opt: 70
+                        windows.*-asan.*/opt: 50
+                        windows.*-ccov.*/.*: 25
+                        macosx.*64.*/opt: 15
+                        windows11.*/opt: 15
+                        macosx.*/debug: 20
+                        .*/debug: 28
+                        default: 18
         max-run-time:
             by-variant:
                 msix: 5400
                 standalone: 5400
+                repeat:
+                    by-test-platform:
+                        linux.*/opt: 10800
+                        macosx.*-vms.*/opt: 10800
+                        .*/debug: 10800
+                        default: 7200
                 default:
                     by-test-platform:
                         linux.*64-ccov/opt: 9000
@@ -500,6 +519,7 @@ tasks:
                         linux.*/opt: 5400
                         windows.*-ccov.*/.*: 10800
                         windows.*-asan.*/opt: 5400
+                        macosx1500-aarch64-vms.*/opt: 5400
                         .*/debug: 5400
                         default: 3600
         mozharness:
@@ -689,12 +709,14 @@ tasks:
         treeherder-symbol: M(bc-ml)
         schedules-component: mochitest-browser-chrome-ml-models
         loopback-video: true
+        tier: 2
         run-on-projects:
             by-test-platform:
                 # Shippable Linux opt only. The `.*` glob previously also
                 # matched sanitizer variants (asan/tsan), which abort on
                 # upstream ggml UB in the native llama.cpp backend.
                 linux2404-64-shippable/opt: ['mozilla-central']
+                macosx1500-aarch64-shippable/opt: ['mozilla-central']
                 default: []
         max-run-time: 1800
         mozharness:
@@ -711,6 +733,7 @@ tasks:
             - 1proc
             - webrender-sw+1proc
             - standalone
+            - repeat+1proc
             - inc-origin-init
         run-on-projects:
             by-variant:
@@ -736,6 +759,15 @@ tasks:
                         windows.*-64-[^-/]+/debug: ['autoland', 'mozilla-central']
                         windows.*-64-[^-/]+/opt: ['autoland']
                         default: []
+                repeat+1proc:
+                    by-test-platform:
+                        linux.*-64-shippable/opt: ['mozilla-central']
+                        linux.*-64/debug: ['autoland', 'mozilla-central']
+                        linux.*-64/opt: ['autoland']
+                        windows.*-64-[^-/]+-shippable/opt: ['mozilla-central']
+                        windows.*-64-[^-/]+/debug: ['autoland', 'mozilla-central']
+                        windows.*-64-[^-/]+/opt: ['autoland']
+                        default: []
                 inc-origin-init: []
         chunks: dynamic
         default-chunks:
@@ -744,10 +776,12 @@ tasks:
                 default:
                     by-test-platform:
                         .*-tsan.*/opt: 6
+                        windows.*-asan/opt: 5
                         default: 3
         max-run-time:
             by-variant:
                 standalone: 5400
+                repeat+1proc: 7200
                 default: 3600
         mozharness:
             mochitest-flavor: chrome
@@ -767,6 +801,7 @@ tasks:
         variants:
             - a11y-checks
             - standalone
+            - repeat
             - http3
         run-on-projects:
             by-variant:
@@ -775,6 +810,15 @@ tasks:
                         linux.*64(-shippable)?/opt: ['trunk']
                         default: []
                 standalone:
+                    by-test-platform:
+                        linux.*-64-shippable/opt: ['mozilla-central']
+                        linux.*-64/debug: ['autoland', 'mozilla-central']
+                        linux.*-64/opt: ['autoland']
+                        windows.*-64-[^-/]+-shippable/opt: ['mozilla-central']
+                        windows.*-64-[^-/]+/debug: ['autoland', 'mozilla-central']
+                        windows.*-64-[^-/]+/opt: ['autoland']
+                        default: []
+                repeat:
                     by-test-platform:
                         linux.*-64-shippable/opt: ['mozilla-central']
                         linux.*-64/debug: ['autoland', 'mozilla-central']
@@ -795,11 +839,14 @@ tasks:
                         default: built-projects
         tier: default
         max-run-time:
-            by-test-platform:
-                windows.*-ccov.*/.*: 10800
-                linux.*64-ccov.*/.*: 7200
-                linux.*64-tsan/opt: 7200
-                default: 5400
+            by-variant:
+                repeat: 10800
+                default:
+                    by-test-platform:
+                        windows.*-ccov.*/.*: 10800
+                        linux.*64-ccov.*/.*: 7200
+                        linux.*64-tsan/opt: 7200
+                        default: 5400
         chunks: dynamic
         default-chunks:
             by-variant:
@@ -810,13 +857,14 @@ tasks:
                         default: 16
                 default:
                     by-test-platform:
-                        .*-ccov.*: 12
+                        .*-ccov.*: 10
                         linux.*-wayland.*/debug: 14
-                        linux.*64/debug: 14
+                        linux.*/debug: 15
                         macosx.*64(-qr)?/debug: 8
-                        win.*/debug: 8
-                        .*-asan/opt: 8
-                        .*-tsan/opt: 16
+                        win.*/debug: 10
+                        .*-asan/opt: 17
+                        .*-tsan/opt: 26
+                        linux.*/opt: 7
                         default: 5
         mozharness:
             mochitest-flavor: chrome
@@ -856,7 +904,7 @@ tasks:
                         - win64-samply
                         - profiler-node-tools
                     win.*32.*:
-                        - win32-node
+                        - win64-node
                         - win32-minidump-stackwalk
                         - win32-fix-stacks
                         - win32-samply
@@ -921,17 +969,18 @@ tasks:
             - no-fission
             - webrender-sw+no-fission
             - webrender-sw
+            - geckoview-isolated-process
         run-on-projects:
             by-variant:
                 webrender-sw+no-fission:
                     by-test-platform:
-                        android-em.*/debug: built-projects
                         linux.*-asan.*: ['mozilla-central']
                         linux.*64/debug: ['mozilla-central']
                         linux.*64(-shippable)?/opt: ['mozilla-central']
                         default: []
                 webrender-sw:
                     by-test-platform:
+                        android-em.*/debug: built-projects
                         linux.*64/debug: built-projects
                         default: []
                 no-fission:
@@ -940,7 +989,10 @@ tasks:
                         .*-tsan/opt: []
                         .*-wayland.*: []
                         linux.*: ['mozilla-central']  # linux opt/debug/asan
-                        android.*: built-projects
+                        default: []
+                geckoview-isolated-process:
+                    by-test-platform:
+                        android-em.*/debug: built-projects
                         default: []
                 default: built-projects
         virtualization: virtual-with-gpu
@@ -950,7 +1002,6 @@ tasks:
                     by-test-platform:
                         linux.*64.*: 2
                         default: default
-                geckoview-isolated-process: 3
                 default: default
         mozharness:
             mochitest-flavor: plain
@@ -1065,8 +1116,6 @@ tasks:
                 webrender-sw+no-fission:
                     by-test-platform:
                         .*hw-ref.*: []
-                        android-em-14.*/debug: []  # Bug 1984064
-                        android-em.*/debug: ['autoland', 'mozilla-central']
                         linux2404-64/.*: ['mozilla-central']
                         linux2404-64-shippable/opt: ['mozilla-central']
                         linux2404-64-asan/opt: ['mozilla-central']
@@ -1079,11 +1128,7 @@ tasks:
                         default: []
                 no-fission:
                     by-test-platform:
-                        android-hw-.*/opt: []
                         .*hw-ref.*: []
-                        android-hw-.*-arm7.*/(?:debug)?: ['trunk', 'mozilla-beta', 'mozilla-release']
-                        android-em-14.*/debug: []  # Bug 1984064
-                        android.*: built-projects
                         linux2404-64/.*: ['mozilla-central']
                         linux2404-64-shippable/opt: ['mozilla-central']
                         linux2404-64-asan/opt: ['mozilla-central']
@@ -1129,7 +1174,7 @@ tasks:
                     by-test-platform:
                         android.*/opt: 1
                         macosx.*/opt: 1
-                        windows11-64-24h2-asan/opt: 2
+                        windows11-64-25h2-asan/opt: 2
                         windows11-.*/opt: 1
                         linux.*/debug: 3
                         linux.*64-tsan/opt: 5
@@ -1160,7 +1205,6 @@ tasks:
                     by-test-platform:
                         linux.*64.*: 2
                         default: default
-                geckoview-isolated-process: 2
                 default:
                     by-test-platform:
                         .*-ccov.*: 2
@@ -1225,15 +1269,15 @@ tasks:
                         default: []
                 no-fission:
                     by-test-platform:
-                        android-hw-.*(?<!-shippable)(-qr)?/opt: ['mozilla-central', 'mozilla-beta', 'mozilla-release']
-                        android-hw.*aarch.*-shippable(-qr)?/opt: ['mozilla-central']
-                        android-hw.*aarch.*(-qr)?/debug: ['mozilla-central']
                         linux2404-64/debug: ['trunk']
                         linux2404-64(-shippable)?/opt: ['trunk']
                         linux2404-64-asan/opt: ['trunk']
                         default: []
                 default:
                     by-test-platform:
+                        android-hw-.*(?<!-shippable)(-qr)?/opt: ['mozilla-central', 'mozilla-beta', 'mozilla-release']
+                        android-hw.*aarch.*-shippable(-qr)?/opt: ['mozilla-central']
+                        android-hw.*aarch.*(-qr)?/debug: ['mozilla-central']
                         android.*: []
                         .*-tsan.*: []
                         default: built-projects
@@ -1273,15 +1317,15 @@ tasks:
                         default: []
                 no-fission:
                     by-test-platform:
-                        android-hw-.*(?<!-shippable)(-qr)?/opt: ['mozilla-central', 'mozilla-beta', 'mozilla-release']
-                        android-hw.*aarch.*-shippable(-qr)?/opt: ['mozilla-central']
-                        android-hw.*aarch.*(-qr)?/debug: ['mozilla-central']
                         linux2404-64/.*: ['trunk']
                         linux2404-64-shippable/opt: ['trunk']
                         linux2404-64-asan/opt: ['trunk']
                         default: []
                 default:
                     by-test-platform:
+                        android-hw-.*(?<!-shippable)(-qr)?/opt: ['mozilla-central', 'mozilla-beta', 'mozilla-release']
+                        android-hw.*aarch.*-shippable(-qr)?/opt: ['mozilla-central']
+                        android-hw.*aarch.*(-qr)?/debug: ['mozilla-central']
                         android.*: []
                         .*-tsan.*: []
                         default: built-projects
@@ -1324,15 +1368,15 @@ tasks:
                         default: []
                 no-fission:
                     by-test-platform:
-                        android-hw-.*(?<!-shippable)(-qr)?/opt: ['mozilla-central', 'mozilla-beta', 'mozilla-release']
-                        android-hw.*aarch.*-shippable(-qr)?/opt: ['mozilla-central']
-                        android-hw.*aarch.*(-qr)?/debug: ['mozilla-central']
                         linux2404-64/.*: ['trunk']
                         linux2404-64-shippable/opt: ['trunk']
                         linux2404-64-asan/opt: ['trunk']
                         default: []
                 default:
                     by-test-platform:
+                        android-hw-.*(?<!-shippable)(-qr)?/opt: ['mozilla-central', 'mozilla-beta', 'mozilla-release']
+                        android-hw.*aarch.*-shippable(-qr)?/opt: ['mozilla-central']
+                        android-hw.*aarch.*(-qr)?/debug: ['mozilla-central']
                         android.*: []
                         .*-tsan.*: []
                         .*-wayland.*: []

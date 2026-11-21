@@ -7,14 +7,10 @@ package mozilla.components.compose.menu.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -22,21 +18,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.semantics.CollectionItemInfo
 import androidx.compose.ui.semantics.Role.Companion.Button
-import androidx.compose.ui.semantics.collectionItemInfo
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.Hyphens
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.PreviewLightDark
-import mozilla.components.compose.base.badge.BADGE_SIZE_SMALL
-import mozilla.components.compose.base.badge.BadgedIcon
 import mozilla.components.compose.base.text.Text
 import mozilla.components.compose.base.text.value
 import mozilla.components.compose.base.theme.AcornTheme
-import mozilla.components.compose.base.theme.information
 import mozilla.components.compose.menu.store.MenuEvent
 import mozilla.components.compose.menu.ui.MenuItemState.DEFAULT
 import mozilla.components.ui.icons.R as iconsR
@@ -44,7 +30,7 @@ import mozilla.components.ui.icons.R as iconsR
 /**
  * A menu item shown as a cell in a grid.
  *
- * @param title The title of the menu item.
+ * @param title The title of the menu item, or null to show only the icon inside a circle.
  * @param icon An icon of the menu item.
  * @param onClickEvent Optional [MenuEvent] to dispatch when the menu item is clicked.
  * @param onInteraction The callback to invoke when the menu item is interacted with.
@@ -58,7 +44,7 @@ import mozilla.components.ui.icons.R as iconsR
  */
 @Composable
 internal fun MenuGridItem(
-    title: Text,
+    title: Text?,
     icon: MenuItemIcon,
     onClickEvent: MenuEvent?,
     onInteraction: (MenuEvent) -> Unit,
@@ -102,63 +88,9 @@ internal fun MenuGridItem(
                 containerModifier
             },
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = if (title.value.isNotEmpty()) Arrangement.Top else Arrangement.Center,
+        verticalArrangement = if (title != null) Arrangement.Top else Arrangement.Center,
     ) {
         MenuGridItemContent(title, icon, state)
-    }
-}
-
-@Composable
-private fun Modifier.menuGridItemSemantics(
-    index: Int?,
-    description: String?,
-    onClickEvent: MenuEvent?,
-    onLongClickEvent: MenuEvent?,
-): Modifier {
-    return this.semantics(mergeDescendants = true) {
-        index?.let {
-            this.collectionItemInfo =
-                CollectionItemInfo(
-                    rowIndex = 0,
-                    rowSpan = 1,
-                    columnIndex = it,
-                    columnSpan = 1,
-                )
-        }
-        description?.let { this.contentDescription = it }
-        if (onClickEvent != null || onLongClickEvent != null) {
-            this.role = Button
-        }
-    }
-}
-
-@Composable
-private fun MenuGridItemContent(
-    title: Text,
-    icon: MenuItemIcon,
-    state: MenuItemState,
-) {
-    BadgedIcon(
-        painter = icon.painter,
-        isHighlighted = icon.isHighlighted,
-        modifier = Modifier.size(AcornTheme.layout.size.static300),
-        size = BADGE_SIZE_SMALL,
-        contentDescription = null,
-        containerColor = MaterialTheme.colorScheme.information,
-        tint = state.secondaryContentColor,
-    )
-
-    if (title.value.isNotEmpty()) {
-        Spacer(modifier = Modifier.height(AcornTheme.layout.space.static50))
-
-        Text(
-            text = title.value,
-            style = AcornTheme.typography.caption.copy(hyphens = Hyphens.Auto),
-            color = state.contentColor,
-            maxLines = 2,
-            softWrap = true,
-            textAlign = TextAlign.Center,
-        )
     }
 }
 
@@ -195,6 +127,25 @@ private fun MenuGridItemWithContainerPreview() {
                 icon = MenuItemIconRes(iconsR.drawable.mozac_ic_globe_24),
                 showContainer = true,
                 shape = MaterialTheme.shapes.extraLarge,
+            )
+        }
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun MenuGridItemActivePreview() {
+    AcornTheme {
+        Surface(color = MaterialTheme.colorScheme.surfaceContainer) {
+            MenuGridItem(
+                title = null,
+                contentDescription = Text.String("Bookmarked"),
+                onClickEvent = object : MenuEvent {},
+                onInteraction = {},
+                index = 0,
+                modifier = Modifier.fillMaxWidth(),
+                icon = MenuItemIconRes(iconsR.drawable.mozac_ic_bookmark_fill_24),
+                state = MenuItemState.ACTIVE,
             )
         }
     }

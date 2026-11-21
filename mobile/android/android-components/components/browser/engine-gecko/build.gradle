@@ -4,16 +4,6 @@
 
 import static org.mozilla.conventions.BuildConfigKt.getBuildId
 
-buildscript {
-    repositories {
-        gradle.configureMavenRepositories(delegate)
-    }
-
-    dependencies {
-        classpath libs.mozilla.glean.gradle.plugin
-    }
-}
-
 plugins {
     id 'com.android.library'
     alias(libs.plugins.dependency.analysis)
@@ -82,7 +72,6 @@ dependencies {
 
 ext {
     gleanNamespace = "mozilla.telemetry.glean"
-    gleanPythonEnvDir = gradle.mozconfig.substs.GRADLE_GLEAN_PARSER_VENV
 }
 apply plugin: "org.mozilla.telemetry.glean-gradle-plugin"
 apply from: '../../../common-config.gradle'
@@ -90,12 +79,6 @@ apply from: '../../../publish.gradle'
 nimbus {
     // The path to the Nimbus feature manifest file
     manifestFile = "geckoview.fml.yaml"
-
-    // This is an optional value, and updates the plugin to use a copy of application
-    // services. The path should be relative to the root project directory.
-    // *NOTE*: This example will not work for all projects, but should work for Fenix, Focus, and Android Components
-    applicationServicesDir = gradle.hasProperty('localProperties.autoPublish.application-services.dir')
-            ? gradle.getProperty('localProperties.autoPublish.application-services.dir') : null
 }
 ext.configurePublish(config.componentsGroupId, project.name, project.ext.description)
 
@@ -151,7 +134,9 @@ def computeArtifactId() {
 
 def getGeckoViewDependency() {
     // on try, relax geckoview version pin to allow for --use-existing-task
-    if ('https://hg.mozilla.org/try' == System.env.GECKO_HEAD_REPOSITORY) {
+    // (MOZ_SOURCE_REPO names the push's repository even when the task clones
+    // it from the git mirror, GECKO_HEAD_REPOSITORY then names the mirror)
+    if ('https://hg.mozilla.org/try' == System.env.MOZ_SOURCE_REPO) {
         rootProject.logger.lifecycle("Getting geckoview on try: ${computeArtifactId()}:+")
         return "org.mozilla.geckoview:${computeArtifactId()}:+"
     }

@@ -26,6 +26,7 @@
 #include "mozilla/dom/ContentProcessManager.h"
 #include "mozilla/dom/Document.h"
 #include "mozilla/dom/Element.h"
+#include "mozilla/dom/LoadedOriginSet.h"
 #include "mozilla/dom/ServiceWorkerUtils.h"
 #include "mozilla/dom/WindowGlobalParent.h"
 #include "mozilla/ipc/BackgroundUtils.h"
@@ -1116,17 +1117,12 @@ mozilla::ipc::IPCResult HttpChannelParent::RecvDocumentChannelCleanup(
 }
 
 mozilla::ipc::IPCResult HttpChannelParent::RecvRemoveCorsPreflightCacheEntry(
-    nsIURI* uri, const mozilla::ipc::PrincipalInfo& requestingPrincipal,
+    nsIURI* uri, NotNull<nsIPrincipal*> requestingPrincipal,
     const OriginAttributes& originAttributes) {
   if (!uri) {
     return IPC_FAIL_NO_REASON(this);
   }
-  auto principalOrErr = PrincipalInfoToPrincipal(requestingPrincipal);
-  if (NS_WARN_IF(principalOrErr.isErr())) {
-    return IPC_FAIL_NO_REASON(this);
-  }
-  nsCOMPtr<nsIPrincipal> principal = principalOrErr.unwrap();
-  nsCORSListenerProxy::RemoveFromCorsPreflightCache(uri, principal,
+  nsCORSListenerProxy::RemoveFromCorsPreflightCache(uri, requestingPrincipal,
                                                     originAttributes);
   return IPC_OK();
 }
@@ -1320,11 +1316,16 @@ HttpChannelParent::OnStartRequest(nsIRequest* aRequest) {
   chan->GetRedirectCount(&args.redirectCount());
   chan->GetHasHTTPSRR(&args.hasHTTPSRR());
 
-  chan->GetIsProxyUsed(&args.isProxyUsed());
+  (void)chan->GetProxyType(&args.proxyType());
 
   nsCOMPtr<nsILoadInfo> loadInfo = chan->LoadInfo();
   mozilla::ipc::LoadInfoToParentLoadInfoForwarder(loadInfo,
                                                   &args.loadInfoForwarder());
+  if (mEarlyHintPreloaderId) {
+    loadInfo->GetResultPrincipalURI(
+        getter_AddRefs(args.earlyHintResultPrincipalURI()));
+    chan->GetURI(getter_AddRefs(args.earlyHintFinalURI()));
+  }
 
   nsHttpResponseHead* responseHead = chan->GetResponseHead();
   bool useResponseHead = !!responseHead;
@@ -2043,12 +2044,12 @@ void HttpChannelParent::UpdateAltDataBindingOrigin(HttpBaseChannel* aChannel) {
     if (Manager() && Manager()->Manager()) {
       cp = static_cast<ContentParent*>(Manager()->Manager());
     }
+    // Require the exact origin to have been loaded by this process.
     if (!cp ||
-        !cp->ValidatePrincipal(
-            principal, {ValidatePrincipalOptions::AllowSystemIfLoaded})) {
+        !cp->LoadedOrigins()->Has(principal, LoadedOriginSet::Level::Full)) {
       LOG(
           ("HttpChannelParent::UpdateAltDataBindingOrigin [this=%p] principal "
-           "not valid for the content process",
+           "not loaded by the content process",
            this));
       return;
     }
@@ -2057,13 +2058,21 @@ void HttpChannelParent::UpdateAltDataBindingOrigin(HttpBaseChannel* aChannel) {
   principal->GetOrigin(mAltDataBindingOrigin);
 }
 
-// Records, atomically with the alt-data write, the origin of the principal
-// that produced the alt-data.
-static void RecordAltDataPrincipal(nsICacheEntry* aCacheEntry,
-                                   const nsACString& aOrigin) {
+// Records, atomically with the alt-data write, the remote type of the process
+// and the origin of the principal that produced the alt-data.  The remote type
+// comes from the IPC actor, so the content process cannot choose it.
+static void RecordAltDataBinding(nsICacheEntry* aCacheEntry,
+                                 const nsACString& aOrigin,
+                                 PNeckoParent* aNeckoParent) {
   if (!aCacheEntry) {
     return;
   }
+  aCacheEntry->SetMetaDataElement(
+      "alt-data-from-child",
+      static_cast<ContentParent*>(aNeckoParent->Manager())
+          ->GetRemoteType()
+          .Stringify()
+          .get());
   if (aOrigin.IsEmpty()) {
     // Fail closed: without a known principal, clear any binding so that reads
     // reject this alt-data.
@@ -2089,8 +2098,7 @@ CacheEntryWriteHandleParent::OpenAlternativeOutputStream(
   nsresult rv =
       mCacheEntry->OpenAlternativeOutputStream(type, predictedSize, _retval);
   if (NS_SUCCEEDED(rv)) {
-    mCacheEntry->SetMetaDataElement("alt-data-from-child", "1");
-    RecordAltDataPrincipal(mCacheEntry, mBindingOrigin);
+    RecordAltDataBinding(mCacheEntry, mBindingOrigin, Manager());
   }
   return rv;
 }
@@ -2110,8 +2118,7 @@ nsresult HttpChannelParent::OpenAlternativeOutputStream(
   nsresult rv =
       mCacheEntry->OpenAlternativeOutputStream(type, predictedSize, _retval);
   if (NS_SUCCEEDED(rv)) {
-    mCacheEntry->SetMetaDataElement("alt-data-from-child", "1");
-    RecordAltDataPrincipal(mCacheEntry, mAltDataBindingOrigin);
+    RecordAltDataBinding(mCacheEntry, mAltDataBindingOrigin, Manager());
   }
   return rv;
 }

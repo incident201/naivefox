@@ -237,7 +237,14 @@ class IPProtectionControllerTest : BaseSessionTest() {
 
     private class StubAuthProvider(private val token: GeckoResult<String> = GeckoResult.fromValue("stub-token")) :
         IPProtectionController.AuthProvider {
+        val rejectedTokens = mutableListOf<String>()
+
         override fun onTokenRequest(): GeckoResult<String> = token
+
+        override fun onTokenRejected(token: String): GeckoResult<Void> {
+            rejectedTokens.add(token)
+            return GeckoResult.fromValue(null)
+        }
     }
 
     @Test
@@ -284,30 +291,56 @@ class IPProtectionControllerTest : BaseSessionTest() {
     }
 
     private fun assertGetTokenError(expected: String) {
+        assertQueryError("GeckoView:IPProtection:GetToken", expected)
+    }
+
+    private fun assertQueryError(event: String, expected: String, message: GeckoBundle? = null) {
         val thrown =
             assertThrows(RuntimeException::class.java) {
-                sessionRule.waitForResult(EventDispatcher.getInstance().queryBundle("GeckoView:IPProtection:GetToken"))
+                sessionRule.waitForResult(EventDispatcher.getInstance().queryBundle(event, message))
             }
         val cause = thrown.cause as EventDispatcher.QueryException
         assertThat(cause.data.toString(), equalTo(expected))
     }
 
+    private fun tokenBundle(token: String) = GeckoBundle().apply { putString("token", token) }
+
+    private fun rejectToken(message: GeckoBundle): GeckoResult<Void> =
+        EventDispatcher.getInstance().queryVoid("GeckoView:IPProtection:TokenRejected", message)
+
+    private fun assertRejectTokenError(expected: String, message: GeckoBundle) {
+        assertQueryError("GeckoView:IPProtection:TokenRejected", expected, message)
+    }
+
     @Test
-    fun notifySignInStateChangedDispatchesAuthStateChanged() {
-        ipProtectionController.setAuthProvider(StubAuthProvider())
-        val result = GeckoResult<Boolean>()
-        val listener = BundleEventListener { _, message, callback ->
-            result.complete(message.getBoolean("isSignedIn", false))
-            callback?.sendSuccess(null)
-        }
-        EventDispatcher.getInstance().registerUiThreadListener(listener, "GeckoView:IPProtection:AuthStateChanged")
-        try {
-            sessionRule.waitForResult(ipProtectionController.notifySignInStateChanged(true))
-            assertThat(sessionRule.waitForResult(result), equalTo(true))
-        } finally {
-            EventDispatcher.getInstance()
-                .unregisterUiThreadListener(listener, "GeckoView:IPProtection:AuthStateChanged")
-        }
+    fun tokenRejectedEventIsRoutedToAuthProvider() {
+        val provider = StubAuthProvider()
+        ipProtectionController.setAuthProvider(provider)
+        sessionRule.waitForResult(rejectToken(tokenBundle("dead-token")))
+        assertThat(provider.rejectedTokens, equalTo(listOf("dead-token")))
+    }
+
+    // The callback must be answered on every path: Gecko awaits invalidation with
+    // no timeout, so dropping it would wedge the rejected request forever.
+    @Test
+    fun tokenRejectedEventAlwaysAnswers() {
+        ipProtectionController.setAuthProvider(null)
+        assertRejectTokenError("no_auth_provider", tokenBundle("dead-token"))
+
+        val provider = StubAuthProvider()
+        ipProtectionController.setAuthProvider(provider)
+        assertRejectTokenError("login_needed", GeckoBundle())
+
+        assertThat(provider.rejectedTokens.isEmpty(), equalTo(true))
+    }
+
+    // Unlike onTokenRequest, the default resolves rather than failing: an embedder
+    // whose tokens are owned elsewhere has nothing to invalidate.
+    @Test
+    fun tokenRejectedEventDefaultImplementationSucceeds() {
+        ipProtectionController.setAuthProvider(object : IPProtectionController.AuthProvider {})
+
+        sessionRule.waitForResult(rejectToken(tokenBundle("dead-token")))
     }
 
     @Test
@@ -566,6 +599,11 @@ class IPProtectionControllerTest : BaseSessionTest() {
     }
 
     companion object {
+        private const val ENTITLEMENT_CACHE_PREF = "browser.ipProtection.entitlementCache"
+
+        private const val CACHED_ENTITLEMENT_JSON =
+            """{"subscribed":false,"uid":42,"maxBytes":"0","limited_bandwidth":false}"""
+
         private const val SERVER_LIST_JSON =
             """[{"name":"United States","code":"US","cities":[{"name":"Test City",""" +
                 """"code":"TC","servers":[{"hostname":"us.example.com","port":443,""" +
@@ -640,10 +678,135 @@ class IPProtectionControllerTest : BaseSessionTest() {
     }
 
     @Test
-    fun gpiWarmUpWithNoProviderIsSilentlyDropped() {
-        ipProtectionController.setGpiProvider(null)
-        // Should not crash when no provider is set.
-        EventDispatcher.getInstance().dispatch("GeckoView:IPProtection:GPI:WarmUp", null)
+    fun gpiWarmUpWithNoProviderDispatchesWarmUpFailed() {
+        val warmUpFailed = GeckoResult<Boolean>()
+        val listener = BundleEventListener { _, _, callback ->
+            warmUpFailed.complete(true)
+            callback?.sendSuccess(null)
+        }
+        EventDispatcher.getInstance().registerUiThreadListener(listener, "GeckoView:IPProtection:GPI:WarmUpFailed")
+        try {
+            ipProtectionController.setGpiProvider(null)
+            EventDispatcher.getInstance().dispatch("GeckoView:IPProtection:GPI:WarmUp", null)
+            assertThat(sessionRule.waitForResult(warmUpFailed), equalTo(true))
+        } finally {
+            EventDispatcher.getInstance()
+                .unregisterUiThreadListener(listener, "GeckoView:IPProtection:GPI:WarmUpFailed")
+        }
+    }
+
+    @Test
+    fun gpiSignedOutAuthUsesGpiOnlyWhileSignedOut() {
+        val firstWarmUp = GeckoResult<Void>()
+        val secondWarmUp = GeckoResult<Void>()
+        val gpiProvider = WarmUpRecordingGpiProvider(firstWarmUp, secondWarmUp)
+        val authProviderReports = List(5) { GeckoResult<String?>() }
+        var authProviderReportCount = 0
+        ipProtectionController.setAuthProvider(StubAuthProvider())
+        ipProtectionController.setGpiProvider(gpiProvider)
+        ipProtectionController.setDelegate(
+            object : IPProtectionController.Delegate {
+                override fun onCurrentAuthProviderChanged(authProvider: String?) {
+                    authProviderReports.getOrNull(authProviderReportCount++)?.complete(authProvider)
+                }
+            }
+        )
+
+        sessionRule.waitForResult(ipProtectionController.init(IPProtectionController.SIGNED_OUT_AUTH_GPI))
+        assertThat("GPI is not warmed up before a sign-in state is reported", gpiProvider.warmUpCount, equalTo(0))
+        assertThat(
+            "no auth provider is reported before a sign-in state is reported",
+            authProviderReportCount,
+            equalTo(0),
+        )
+
+        sessionRule.waitForResult(ipProtectionController.notifySignInStateChanged(true))
+        assertThat("GPI is not warmed up while signed in", gpiProvider.warmUpCount, equalTo(0))
+        assertThat(
+            sessionRule.waitForResult(authProviderReports[0]),
+            equalTo(IPProtectionController.CURRENT_AUTH_PROVIDER_FXA),
+        )
+
+        sessionRule.waitForResult(ipProtectionController.notifySignInStateChanged(false))
+        sessionRule.waitForResult(firstWarmUp)
+        assertThat(
+            sessionRule.waitForResult(authProviderReports[1]),
+            equalTo(IPProtectionController.CURRENT_AUTH_PROVIDER_GPI),
+        )
+
+        sessionRule.waitForResult(ipProtectionController.notifySignInStateChanged(true))
+        assertThat(
+            sessionRule.waitForResult(authProviderReports[2]),
+            equalTo(IPProtectionController.CURRENT_AUTH_PROVIDER_FXA),
+        )
+
+        sessionRule.waitForResult(ipProtectionController.notifySignInStateChanged(false))
+        sessionRule.waitForResult(secondWarmUp)
+        assertThat(
+            sessionRule.waitForResult(authProviderReports[3]),
+            equalTo(IPProtectionController.CURRENT_AUTH_PROVIDER_GPI),
+        )
+
+        sessionRule.waitForResult(ipProtectionController.uninit())
+        assertThat(
+            "null is reported after the service is uninitialized",
+            sessionRule.waitForResult(authProviderReports[4]),
+            nullValue(),
+        )
+    }
+
+    @Test
+    fun gpiSignedOutAuthReportsGpiFirstWhenSignedOutAtStartUp() {
+        val warmUp = GeckoResult<Void>()
+        val firstAuthProviderReport = GeckoResult<String?>()
+        var authProviderReportCount = 0
+        ipProtectionController.setAuthProvider(StubAuthProvider())
+        ipProtectionController.setGpiProvider(WarmUpRecordingGpiProvider(warmUp))
+        ipProtectionController.setDelegate(
+            object : IPProtectionController.Delegate {
+                override fun onCurrentAuthProviderChanged(authProvider: String?) {
+                    if (authProviderReportCount++ == 0) {
+                        firstAuthProviderReport.complete(authProvider)
+                    }
+                }
+            }
+        )
+
+        sessionRule.waitForResult(ipProtectionController.init(IPProtectionController.SIGNED_OUT_AUTH_GPI))
+        sessionRule.waitForResult(ipProtectionController.notifySignInStateChanged(false))
+        sessionRule.waitForResult(warmUp)
+
+        assertThat(
+            "the first auth provider reported after a signed-out start is GPI",
+            sessionRule.waitForResult(firstAuthProviderReport),
+            equalTo(IPProtectionController.CURRENT_AUTH_PROVIDER_GPI),
+        )
+    }
+
+    @Test
+    fun gpiSignedOutAuthClearsCachedEntitlementOnSignOut() {
+        sessionRule.setPrefsUntilTestEnd(mapOf(ENTITLEMENT_CACHE_PREF to CACHED_ENTITLEMENT_JSON))
+        ipProtectionController.setAuthProvider(StubAuthProvider())
+        ipProtectionController.setGpiProvider(WarmUpRecordingGpiProvider())
+
+        sessionRule.waitForResult(ipProtectionController.init(IPProtectionController.SIGNED_OUT_AUTH_GPI))
+        sessionRule.waitForResult(ipProtectionController.notifySignInStateChanged(true))
+        sessionRule.waitForResult(ipProtectionController.notifySignInStateChanged(false))
+
+        assertThat(
+            "the cached entitlement is cleared on sign-out",
+            sessionRule.getPrefs(ENTITLEMENT_CACHE_PREF).get(0) as String,
+            equalTo(""),
+        )
+    }
+
+    @Test
+    fun noSignedOutAuthResolvesSignInStateChanges() {
+        ipProtectionController.setAuthProvider(StubAuthProvider())
+        sessionRule.waitForResult(ipProtectionController.init(IPProtectionController.SIGNED_OUT_AUTH_NONE))
+
+        sessionRule.waitForResult(ipProtectionController.notifySignInStateChanged(true))
+        sessionRule.waitForResult(ipProtectionController.notifySignInStateChanged(false))
     }
 
     @Test
@@ -691,5 +854,18 @@ class IPProtectionControllerTest : BaseSessionTest() {
             }
         val cause = thrown.cause as EventDispatcher.QueryException
         assertThat(cause.data.toString(), equalTo(expected))
+    }
+
+    private class WarmUpRecordingGpiProvider(private vararg val warmUpRequests: GeckoResult<Void>) :
+        IPProtectionController.GpiProvider {
+        var warmUpCount = 0
+            private set
+
+        override fun warmUp(): GeckoResult<Void> {
+            warmUpRequests.getOrNull(warmUpCount++)?.complete(null)
+            return GeckoResult()
+        }
+
+        override fun onTokenRequest(): GeckoResult<String> = GeckoResult.fromValue("stub-gpi-token")
     }
 }

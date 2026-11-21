@@ -423,8 +423,6 @@ module.exports = {
         // Stylelint does not support negating the file glob within an overrides section,
         // so these rules get re-enabled for some devtools files in the section below
         "devtools/**",
-        // FXR is no longer maintained and is not expected to use design tokens
-        "browser/fxr/**",
         // Android does not use design tokens
         "mobile/android/**",
         "toolkit/themes/mobile/global/aboutLicense.css",
@@ -438,6 +436,9 @@ module.exports = {
         "testing/**",
         "**/test/**",
         "**/tests/**",
+        // Shared with the DevTools highlighters, which do not use design tokens
+        "toolkit/themes/shared/eyedropper-common.css",
+        "toolkit/themes/shared/eyedropper.css",
         // UA Widgets should not use design tokens
         "toolkit/themes/shared/colorpicker-common.css",
         "toolkit/themes/shared/colorpicker.css",
@@ -490,9 +491,14 @@ module.exports = {
       },
     },
     {
-      // non-logical properties make sense in devtools/ where physical positioning always makes sense
       name: "logical-properties-rule-off",
-      files: ["devtools/**"],
+      files: [
+        // non-logical properties make sense in devtools/ where physical positioning always makes sense
+        "devtools/**",
+        // the Windows WebBrowser engine does not support all logical properties
+        "browser/installer/windows/nsis/content/**",
+        "browser/branding/**/stubinstaller/**",
+      ],
       rules: {
         "csstools/use-logical": null,
       },

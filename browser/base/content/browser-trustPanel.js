@@ -10,17 +10,18 @@ ChromeUtils.defineESModuleGetters(this, {
     "moz-src:///toolkit/components/passwordmgr/BreachAlertsData.sys.mjs",
   BrowserUtils: "resource://gre/modules/BrowserUtils.sys.mjs",
   ContentBlockingAllowList:
-    "resource://gre/modules/ContentBlockingAllowList.sys.mjs",
+    "moz-src:///toolkit/components/antitracking/ContentBlockingAllowList.sys.mjs",
   E10SUtils: "resource://gre/modules/E10SUtils.sys.mjs",
   FX_MONITOR_OAUTH_CLIENT_ID: "resource://gre/modules/FxAccountsCommon.sys.mjs",
-  identifyType: "resource://gre/modules/TrackingDBService.sys.mjs",
+  identifyType:
+    "moz-src:///toolkit/components/antitracking/TrackingDBService.sys.mjs",
   NimbusFeatures: "resource://nimbus/ExperimentAPI.sys.mjs",
   PanelMultiView:
     "moz-src:///browser/components/customizableui/PanelMultiView.sys.mjs",
   PlacesUtils: "resource://gre/modules/PlacesUtils.sys.mjs",
   privacyMetricsStatsCategories:
     "moz-src:///browser/components/protections/PrivacyMetricsService.sys.mjs",
-  QWACs: "resource://gre/modules/psm/QWACs.sys.mjs",
+  QWACs: "moz-src:///security/manager/ssl/QWACs.sys.mjs",
   SiteDataManager: "resource:///modules/SiteDataManager.sys.mjs",
   TrustPanelTrackerLogs:
     "moz-src:///browser/components/controlcenter/TrustPanelTrackerLogs.sys.mjs",
@@ -105,6 +106,20 @@ const ETP_DISABLED_ASSETS = {
   description: "trustpanel-etp-description-disabled",
   header: "trustpanel-header-disabled",
   innerDescription: "trustpanel-description-disabled",
+};
+
+const ETP_ASSETS_REDESIGN = {
+  label: "trustpanel-etp-label-redesign",
+  enabled: {
+    description: "trustpanel-etp-description-enabled",
+    header: "trustpanel-header-enabled",
+    innerDescription: "trustpanel-description-enabled2",
+  },
+  disabled: {
+    description: "trustpanel-etp-description-disabled",
+    header: "trustpanel-header-disabled",
+    innerDescription: "trustpanel-description-disabled",
+  },
 };
 
 // Map from blocker name to the Glean metric for the
@@ -257,6 +272,10 @@ class TrustPanel {
     // Add an observer to listen for FxAccounts logout to clear OAuth cache
     Services.obs.addObserver(this, "fxaccounts:onlogout");
 
+    // Watch the tracker count pref so the icon reacts to it being changed from
+    // anywhere, including about:preferences.
+    UrlbarPrefs.addObserver(this);
+
     customElements.whenDefined("breach-alert-panel").then(() => {
       const breachAlertElement = document.getElementById(
         "trustpanel-breach-alert-section"
@@ -282,6 +301,7 @@ class TrustPanel {
 
     Services.obs.removeObserver(this, "smartblock:open-protections-panel");
     Services.obs.removeObserver(this, "fxaccounts:onlogout");
+    UrlbarPrefs.removeObserver(this);
   }
 
   get #popup() {
@@ -292,11 +312,47 @@ class TrustPanel {
     return UrlbarPrefs.get("trustPanel.featureGate");
   }
 
+  /**
+   * Whether the tracker count feature is on for this window, regardless of
+   * whether the current site has ETP turned off. Visit bookkeeping
+   * (#continuesSiteVisit and friends) uses this so that visits keep being
+   * tracked while on allow-listed sites; showing the count uses
+   * #trackerCountActive.
+   */
   get #trackerCountEnabled() {
     return (
       UrlbarPrefs.get("trackerCountFeatureGate") &&
       UrlbarPrefs.get("trackerCount.enabled")
     );
+  }
+
+  /**
+   * Whether the tracker count should be shown for the current page, i.e. the
+   * feature is on and the site doesn't have ETP turned off.
+   */
+  get #trackerCountActive() {
+    return this.#trackerCountEnabled && this.#trackingProtectionEnabled;
+  }
+
+  get #isRedesign() {
+    return Services.prefs.getBoolPref(
+      "browser.protectionsPanelRedesign.enabled",
+      false
+    );
+  }
+
+  #getElement(baseId) {
+    if (!this.#isRedesign) {
+      return document.getElementById(baseId);
+    }
+
+    // Map base IDs to redesigned IDs where they differ
+    const redesignIdMap = {
+      "trustpanel-clear-cookies-button": "trustpanel-delete-site-data-button",
+    };
+
+    const elementId = redesignIdMap[baseId] || `${baseId}-redesign`;
+    return document.getElementById(elementId);
   }
 
   handleProtectionsButtonEvent(event) {
@@ -360,25 +416,94 @@ class TrustPanel {
       let wrapper = document.getElementById("template-trustpanel-popup");
       wrapper.replaceWith(wrapper.content);
 
-      document
-        .getElementById("trustpanel-popup-connection")
-        .addEventListener("click", event =>
+      const addEventListeners = (suffix = "") => {
+        const getId = id => (suffix ? `${id}${suffix}` : id);
+        document
+          .getElementById(getId("trustpanel-popup-connection"))
+          .addEventListener("click", event =>
+            this.#openSecurityInformationSubview(event)
+          );
+        document
+          .getElementById(getId("trustpanel-blocker-see-all"))
+          .addEventListener("click", event => this.#openBlockerSubview(event));
+        document
+          .getElementById(getId("trustpanel-privacy-link"))
+          .addEventListener("click", () => {
+            this.#hidePopup(CLOSING_REASONS.PRIVACY_SETTINGS_OPENED);
+            window.openTrustedLinkIn("about:preferences#privacy", "tab");
+          });
+        document
+          .getElementById(getId("trustpanel-clear-cookies-button"))
+          .addEventListener("command", event =>
+            this.#showClearCookiesSubview(event)
+          );
+        document
+          .getElementById(getId("trustpanel-toggle"))
+          .addEventListener("click", () => this.#toggleTrackingProtection());
+      };
+
+      addEventListeners("");
+
+      // Redesigned panel uses different button IDs - add listeners if elements exist
+      const connectionRedesign = document.getElementById(
+        "trustpanel-popup-connection-redesign"
+      );
+      if (connectionRedesign) {
+        connectionRedesign.addEventListener("click", event =>
           this.#openSecurityInformationSubview(event)
         );
-      document
-        .getElementById("trustpanel-blocker-see-all")
-        .addEventListener("click", event => this.#openBlockerSubview(event));
-      document
-        .getElementById("trustpanel-privacy-link")
-        .addEventListener("click", () => {
+      }
+
+      const seeTrackersButton = document.getElementById(
+        "trustpanel-blocker-see-trackers-button"
+      );
+      if (seeTrackersButton) {
+        seeTrackersButton.addEventListener("click", event =>
+          this.#openBlockerSubview(event)
+        );
+      }
+
+      const manageSettingsButton = document.getElementById(
+        "trustpanel-manage-settings-button"
+      );
+      if (manageSettingsButton) {
+        manageSettingsButton.addEventListener("click", () => {
           this.#hidePopup(CLOSING_REASONS.PRIVACY_SETTINGS_OPENED);
           window.openTrustedLinkIn("about:preferences#privacy", "tab");
         });
-      document
-        .getElementById("trustpanel-clear-cookies-button")
-        .addEventListener("command", event =>
+      }
+
+      const deleteSiteDataButton = document.getElementById(
+        "trustpanel-delete-site-data-button"
+      );
+      if (deleteSiteDataButton) {
+        deleteSiteDataButton.addEventListener("command", event =>
           this.#showClearCookiesSubview(event)
         );
+      }
+
+      const toggleRedesign = document.getElementById(
+        "trustpanel-toggle-redesign"
+      );
+      if (toggleRedesign) {
+        toggleRedesign.addEventListener("click", () =>
+          this.#toggleTrackingProtection()
+        );
+      }
+
+      document
+        .getElementById("trustpanel-breach-alert-section")
+        .addEventListener("trustpanel:breach-alert:opened", this);
+      document
+        .getElementById("trustpanel-breach-alert-section")
+        .addEventListener("trustpanel:breach-alert:closed", this);
+      document
+        .getElementById("trustpanel-breach-alert-section-redesign")
+        .addEventListener("trustpanel:breach-alert:opened", this);
+      document
+        .getElementById("trustpanel-breach-alert-section-redesign")
+        .addEventListener("trustpanel:breach-alert:closed", this);
+
       document
         .getElementById("trustpanel-siteinformation-morelink")
         .addEventListener("click", () => this.#showSecurityPopup());
@@ -389,8 +514,8 @@ class TrustPanel {
         .getElementById("trustpanel-clear-cookie-clear")
         .addEventListener("click", () => this.#clearSiteData());
       document
-        .getElementById("trustpanel-toggle")
-        .addEventListener("click", () => this.#toggleTrackingProtection());
+        .getElementById("trackercount-toggle")
+        .addEventListener("click", () => this.#toggleTrackerCount());
       document
         .getElementById("identity-popup-remove-cert-exception")
         .addEventListener("click", () => this.#removeCertException());
@@ -410,6 +535,19 @@ class TrustPanel {
     anchor?.setAttribute("open", "true");
 
     this.#initializePopup();
+
+    // Switch mainView based on protections panel redesign pref
+    // Skip this when opening from SmartBlock placeholder, which sets its own mainViewId
+    const multiView = document.getElementById("trustpanel-popup-multiView");
+    if (multiView && opts.reason != OPENING_REASONS.EMBED_PLACEHOLDER_BUTTON) {
+      const mainViewId = Services.prefs.getBoolPref(
+        "browser.protectionsPanelRedesign.enabled",
+        false
+      )
+        ? "trustpanel-popup-mainView-redesign"
+        : "trustpanel-popup-mainView";
+      multiView.setAttribute("mainViewId", mainViewId);
+    }
 
     // Kick off background determination of QWAC status.
     if (this.#isSecureContext && !this.#qwacStatusPromise) {
@@ -510,6 +648,26 @@ class TrustPanel {
   }
 
   /**
+   * Whether loading `uri` in the selected tab continues its visit to the
+   * current site. A tab whose tracker count hasn't shown a visit to that site
+   * yet, like a restored tab or one loaded before the tracker count was
+   * enabled, starts a new visit even though its URI was already on that site.
+   *
+   * @param {nsIURI} uri
+   * @returns {boolean}
+   */
+  #continuesSiteVisit(uri) {
+    if (!this.#trackerCountEnabled) {
+      return this.#isSameSite(uri, this.#uri);
+    }
+    const site = this.#siteKey(uri);
+    return (
+      !!site &&
+      TrustPanelTrackerLogs.getVisitedSite(gBrowser.selectedBrowser) === site
+    );
+  }
+
+  /**
    * Called at navigation start (before the security state is known) so the icon
    * drops to the "scanning" shield immediately, rather than showing the previous
    * page's secure check until updateIdentity runs on the security change.
@@ -521,7 +679,7 @@ class TrustPanel {
     // The page being navigated away from is still current, so store its log
     // now to include trackers blocked since the last content-blocking event.
     this.#recordCurrentPageLog(gBrowser.selectedBrowser);
-    const isSameSite = this.#isSameSite(targetURI, this.#uri);
+    const isSameSite = this.#continuesSiteVisit(targetURI);
     // Set this early (before the new page's content-blocking events) to avoid a
     // race with updateIdentity. STATE_START can fire without a URI.
     if (targetURI) {
@@ -551,21 +709,15 @@ class TrustPanel {
    *    because `onContentBlockingEvent` only gets called when a particular
    *    category of trackers is first blocked (e.g. fingerprinters), not for
    *    every blocked origin, leaving the count incomplete.
-   * 2. Set `this.#blockersChecked` and call `#updateUrlBarIcon`, to ensure
-   *    the scanning state gets resolved to the final secure/insecure state.
+   * 2. Set `this.#blockersChecked` and redraw the icon, to ensure the scanning
+   *    state gets resolved to the final secure/insecure state.
    */
   onNavigationComplete() {
     if (!this.#enabled || !this.#uri) {
       return;
     }
-    if (!this.#trackerCountEnabled) {
-      return;
-    }
+    this.#blockersChecked = true;
     this.#updateToolbarTrackerCount();
-    if (!this.#blockersChecked) {
-      this.#blockersChecked = true;
-      this.#updateUrlbarIcon();
-    }
   }
 
   updateIdentity(state, uri) {
@@ -595,7 +747,21 @@ class TrustPanel {
       // If the user visits the same site in different tabs, then switches between those tabs,
       // that results in two `updateIdentity` calls with the same site, but that should not
       // be considered a same-site navigation:
-      this.#sameTabNavigation && this.#isSameSite(uri, this.#uri);
+      this.#sameTabNavigation && this.#continuesSiteVisit(uri);
+    // Tab switches don't start a visit, and neither does a restored tab
+    // reporting its URI before its document loads, so that a restored tab's
+    // first load still shows the long form.
+    const site = this.#siteKey(uri);
+    if (
+      this.#sameTabNavigation &&
+      this.#trackerCountEnabled &&
+      site &&
+      this.#siteKey(
+        browser.browsingContext?.currentWindowGlobal?.documentURI
+      ) === site
+    ) {
+      TrustPanelTrackerLogs.setVisitedSite(browser, site);
+    }
     if (!this.#sameTabNavigation) {
       // Store the log of the tab being switched away from, in case it navigates
       // while in the background.
@@ -675,6 +841,9 @@ class TrustPanel {
   }
 
   #updateUrlbarIcon() {
+    if (!this.#enabled || !this.#uri) {
+      return;
+    }
     let icon = document.getElementById("trust-icon-container");
     let targetClasses = new Set();
     targetClasses.add(this.#isSecurePage() ? "secure" : "insecure");
@@ -692,7 +861,7 @@ class TrustPanel {
       targetClasses.add("entry-page");
     }
     // Added after "entry-page" so the tracker-count pill animation stays in sync.
-    if (this.#trackerCountEnabled && this.#getCumulativeTrackerCount() > 0) {
+    if (this.#trackerCountActive && this.#getCumulativeTrackerCount() > 0) {
       targetClasses.add("has-blocked-trackers");
     }
 
@@ -704,7 +873,7 @@ class TrustPanel {
       targetClasses.has("secure") &&
       !targetClasses.has("breached") &&
       !targetClasses.has("warning") &&
-      this.#trackerCountEnabled
+      this.#trackerCountActive
     ) {
       targetClasses = new Set(["scanning"]);
     }
@@ -717,10 +886,10 @@ class TrustPanel {
     const browser = gBrowser.selectedBrowser;
     // Handle the breach animation guard (restart only on fresh URI).
     if (targetClasses.has("breached")) {
-      if (browser.lastAnimatedBreachURI !== this.#uri?.spec) {
+      if (browser.lastAnimatedBreachURI !== this.#uri.spec) {
         // This is a fresh visit: trigger the animation.
         targetClasses.add("breach-animating");
-        browser.lastAnimatedBreachURI = this.#uri?.spec;
+        browser.lastAnimatedBreachURI = this.#uri.spec;
 
         Glean.trustpanel.breachAlertShieldAnimated.record({
           breach_status: this.#breachedStatus,
@@ -740,9 +909,9 @@ class TrustPanel {
 
     if (
       targetClasses.has("has-blocked-trackers") &&
-      browser.lastTrackerCountShownURI !== this.#uri?.spec
+      browser.lastTrackerCountShownURI !== this.#uri.spec
     ) {
-      browser.lastTrackerCountShownURI = this.#uri?.spec;
+      browser.lastTrackerCountShownURI = this.#uri.spec;
       this.#isFirstVisit(this.#uri.host).then(isFirstVisit => {
         Glean.trustpanel.trackerCountShown.record({
           first_site_load_in_tab: targetClasses.has("entry-page"),
@@ -775,14 +944,21 @@ class TrustPanel {
   }
 
   async #updateMainView() {
-    let assets = this.#trackingProtectionEnabled
-      ? ETP_ENABLED_ASSETS
-      : ETP_DISABLED_ASSETS;
+    let assets;
+    if (this.#isRedesign) {
+      const state = this.#trackingProtectionEnabled ? "enabled" : "disabled";
+      assets = {
+        label: ETP_ASSETS_REDESIGN.label,
+        ...ETP_ASSETS_REDESIGN[state],
+      };
+    } else {
+      assets = this.#trackingProtectionEnabled
+        ? ETP_ENABLED_ASSETS
+        : ETP_DISABLED_ASSETS;
+    }
 
-    const graphicSection = document.getElementById(
-      "trustpanel-graphic-section"
-    );
-    const breachAlertGraphicSection = document.getElementById(
+    const graphicSection = this.#getElement("trustpanel-graphic-section");
+    const breachAlertGraphicSection = this.#getElement(
       "trustpanel-breach-alert-section"
     );
 
@@ -809,11 +985,10 @@ class TrustPanel {
 
     if (this.#uri) {
       let favicon = await PlacesUtils.favicons.getFaviconForPage(this.#uri);
-      document.getElementById("trustpanel-popup-icon").src =
-        favicon?.uri.spec ?? "";
+      this.#getElement("trustpanel-popup-icon").src = favicon?.uri.spec ?? "";
     }
 
-    let toggle = document.getElementById("trustpanel-toggle");
+    let toggle = this.#getElement("trustpanel-toggle");
     toggle.toggleAttribute("pressed", this.#trackingProtectionEnabled);
     document.l10n.setAttributes(
       toggle,
@@ -823,42 +998,58 @@ class TrustPanel {
       { host: this.#displayHost }
     );
 
-    let hostElement = document.getElementById("trustpanel-popup-host");
+    let trackerCountToggle = document.getElementById("trackercount-toggle");
+    trackerCountToggle.toggleAttribute(
+      "pressed",
+      UrlbarPrefs.get("trackerCount.enabled")
+    );
+
+    let hostElement = this.#getElement("trustpanel-popup-host");
     hostElement.setAttribute("value", this.#displayHost);
     hostElement.setAttribute("tooltiptext", this.#displayHost);
 
     document.l10n.setAttributes(
-      document.getElementById("trustpanel-etp-label"),
+      this.#getElement("trustpanel-etp-label"),
       assets.label
     );
+    if (!this.#isRedesign) {
+      document.l10n.setAttributes(
+        this.#getElement("trustpanel-etp-description"),
+        assets.description
+      );
+      document.l10n.setAttributes(
+        this.#getElement("trustpanel-header"),
+        assets.header
+      );
+      document.l10n.setAttributes(
+        this.#getElement("trustpanel-description"),
+        assets.innerDescription
+      );
+    }
     document.l10n.setAttributes(
-      document.getElementById("trustpanel-etp-description"),
-      assets.description
-    );
-    document.l10n.setAttributes(
-      document.getElementById("trustpanel-header"),
-      assets.header
-    );
-    document.l10n.setAttributes(
-      document.getElementById("trustpanel-description"),
-      assets.innerDescription
-    );
-    document.l10n.setAttributes(
-      document.getElementById("trustpanel-connection-label"),
+      this.#getElement("trustpanel-connection-label"),
       this.#connectionLabel()
     );
 
+    const toggleElement = this.#isRedesign
+      ? this.#getElement("trustpanel-toggle-checkbox-container")
+      : this.#getElement("trustpanel-toggle-section");
     this.#updateAttribute(
-      document.getElementById("trustpanel-toggle-section"),
+      toggleElement,
       "disabled",
       !ContentBlockingAllowList.canHandle(window.gBrowser.selectedBrowser)
+    );
+    this.#updateAttribute(
+      document.getElementById("trackercount-toggle-section"),
+      "hidden",
+      !UrlbarPrefs.get("trackerCountFeatureGate")
     );
 
     // TODO(Bug 1751045): Show the clear site data footer in private browsing
     // when clearing data in private browsing is supported.
     const isPrivate = PrivateBrowsingUtils.isWindowPrivate(window);
     this.#updateAttribute(
-      document.getElementById("trustpanel-clear-cookies-footer"),
+      this.#getElement("trustpanel-clear-cookies-footer"),
       "hidden",
       isPrivate
     );
@@ -867,7 +1058,7 @@ class TrustPanel {
         let baseDomain = SiteDataManager.getBaseDomainFromHost(this.#uri.host);
         SiteDataManager.hasSiteData(baseDomain).then(hasSiteData => {
           this.#updateAttribute(
-            document.getElementById("trustpanel-clear-cookies-button"),
+            this.#getElement("trustpanel-clear-cookies-button"),
             "disabled",
             !hasSiteData
           );
@@ -876,7 +1067,7 @@ class TrustPanel {
     }
 
     this.#updateAttribute(
-      document.getElementById("trustpanel-toggle"),
+      this.#getElement("trustpanel-toggle"),
       "disabled",
       !ContentBlockingAllowList.canHandle(window.gBrowser.selectedBrowser)
     );
@@ -898,7 +1089,9 @@ class TrustPanel {
   }
 
   #updateToolbarTrackerCount() {
-    if (!this.#trackerCountEnabled) {
+    if (!this.#trackerCountActive) {
+      this.#resetTrackerCount();
+      this.#updateUrlbarIcon();
       return;
     }
     let count = this.#getCumulativeTrackerCount();
@@ -1033,21 +1226,78 @@ class TrustPanel {
       .getElementById("trustpanel-smartblock-section")
       .toggleAttribute("hidden", !this.#smartblockEmbedTogglesShown);
 
+    // For redesigned panel, always show the blocker section (we'll toggle content inside)
+    // For regular panel, hide section when count is 0
     this.#updateAttribute(
-      document.getElementById("trustpanel-blocker-section"),
+      this.#getElement("trustpanel-blocker-section"),
       "hidden",
       // avoids a misleading "0 trackers blocked" for trackers that are detected
       // but not blocked, which happens transiently during page load, since
       // detection events can arrive before the blocking ones.
-      count === 0
+      this.#isRedesign ? false : count === 0
     );
 
     // This element is in the main view but updated in case
     // any content blocking events were missed.
-    document.l10n.setArgs(
-      document.getElementById("trustpanel-blocker-section-header"),
-      { count }
-    );
+    const blockerHeader = this.#getElement("trustpanel-blocker-section-header");
+    if (blockerHeader) {
+      document.l10n.setArgs(blockerHeader, { count });
+    }
+
+    // For redesigned panel, toggle between ETP off, trackers-blocked, and no-trackers states
+    if (this.#isRedesign) {
+      const etpOff = !this.#trackingProtectionEnabled;
+      const hasTrackers = count > 0;
+
+      // Show/hide trackers blocked content (hidden when ETP off or no trackers)
+      if (blockerHeader) {
+        this.#updateAttribute(blockerHeader, "hidden", etpOff || !hasTrackers);
+      }
+      const blockerDesc = document.getElementById(
+        "trustpanel-blocker-description-text-redesign"
+      );
+      if (blockerDesc) {
+        this.#updateAttribute(blockerDesc, "hidden", etpOff || !hasTrackers);
+      }
+
+      // Show/hide no trackers content (hidden when ETP off or has trackers)
+      const noTrackersHeader = document.getElementById(
+        "trustpanel-no-trackers-header-redesign"
+      );
+      if (noTrackersHeader) {
+        this.#updateAttribute(
+          noTrackersHeader,
+          "hidden",
+          etpOff || hasTrackers
+        );
+      }
+      const noTrackersDesc = document.getElementById(
+        "trustpanel-no-trackers-description-text-redesign"
+      );
+      if (noTrackersDesc) {
+        this.#updateAttribute(noTrackersDesc, "hidden", etpOff || hasTrackers);
+      }
+
+      // Show/hide ETP off content (only shown when ETP is off)
+      const etpOffDesc = document.getElementById(
+        "trustpanel-etp-off-description-text-redesign"
+      );
+      if (etpOffDesc) {
+        this.#updateAttribute(etpOffDesc, "hidden", !etpOff);
+      }
+
+      // Show/hide button (hidden when ETP off or no trackers)
+      const blockerButtonGroup = document.getElementById(
+        "trustpanel-blocker-button-group-redesign"
+      );
+      if (blockerButtonGroup) {
+        this.#updateAttribute(
+          blockerButtonGroup,
+          "hidden",
+          etpOff || !hasTrackers
+        );
+      }
+    }
   }
 
   async #showSecurityPopup() {
@@ -1348,6 +1598,56 @@ class TrustPanel {
     this.#closingReason = CLOSING_REASONS.ETP_TOGGLED;
     PanelMultiView.hidePopup(this.#popup);
     window.BrowserCommands.reload();
+    // Disabling ETP also disables the tracker count,
+    // so we should treat that as a toggle event:
+    this.#onTrackerCountToggle();
+  }
+
+  #toggleTrackerCount() {
+    const enabled = !UrlbarPrefs.get("trackerCount.enabled");
+    Glean.trustpanel.trackerCountToggled.record({ enabled });
+    // #onTrackerCountToggle handles actually enabling/disabling the
+    // tracker count:
+    UrlbarPrefs.set("trackerCount.enabled", enabled);
+  }
+
+  onPrefChanged(pref) {
+    if (pref == "trackerCount.enabled") {
+      this.#onTrackerCountToggle();
+    }
+  }
+
+  onNimbusChanged(name) {
+    if (name == "trackerCountFeatureGate") {
+      this.#onTrackerCountToggle();
+    }
+  }
+
+  #onTrackerCountToggle() {
+    this.#updateToolbarTrackerCount();
+  }
+
+  #resetTrackerCount() {
+    const icon = document.getElementById("trust-icon-container");
+    const trackerCountShortform = document.getElementById(
+      "trust-icon-tracker-count-shortform"
+    );
+    if (
+      !icon.classList.contains("has-blocked-trackers") &&
+      Number(trackerCountShortform?.textContent ?? 0) === 0
+    ) {
+      return;
+    }
+    document.l10n.setArgs(icon, { count: 0 });
+    const trackerCountLongform = document.getElementById(
+      "trust-icon-tracker-count-longform"
+    );
+    if (trackerCountLongform) {
+      document.l10n.setArgs(trackerCountLongform, { count: 0 });
+    }
+    if (trackerCountShortform) {
+      trackerCountShortform.textContent = 0;
+    }
   }
 
   #isHttpsOnlyModeActive(isWindowPrivate) {
@@ -1506,13 +1806,13 @@ class TrustPanel {
     }
   }
 
+  get #isQWAC() {
+    return this.#isSecureConnection && !!this.#qwac;
+  }
+
   get #isEV() {
-    // If a <browser> is included within a chrome document, then this._state
-    // will refer to the security state for the <browser> and not the top level
-    // document. In this case, don't upgrade the security state in the UI
-    // with the EV state of the embedded <browser>.
     return (
-      !this.#isURILoadedFromFile &&
+      this.#isSecureConnection &&
       this.#state & Ci.nsIWebProgressListener.STATE_IDENTITY_EV_TOPLEVEL
     );
   }
@@ -1637,7 +1937,7 @@ class TrustPanel {
 
     // Fill in organization information if we have a valid EV certificate or
     // QWAC.
-    if (this.#isEV || this.#qwac) {
+    if (this.#isEV || this.#isQWAC) {
       let identityData = this.#getIdentityData(
         this.#qwac || this.#secInfo.serverCert
       );
@@ -1711,7 +2011,7 @@ class TrustPanel {
       connection = "extension";
     } else if (this.#isURILoadedFromFile) {
       connection = "file";
-    } else if (this.#qwac) {
+    } else if (this.#isQWAC) {
       connection = "secure-etsi";
     } else if (this.#isEV) {
       connection = "secure-ev";
@@ -2319,7 +2619,7 @@ class TrustPanel {
    * @param {MozBrowser} browser
    */
   #recordCurrentPageLog(browser) {
-    if (!this.#trackerCountEnabled) {
+    if (!UrlbarPrefs.get("trackerCountFeatureGate")) {
       return;
     }
     const windowGlobal = browser?.browsingContext?.currentWindowGlobal;
@@ -2355,14 +2655,14 @@ class TrustPanel {
    * The content-blocking logs of every page visited on the current site in the
    * selected tab, in the order they were first visited. A page restored from
    * the back-forward cache keeps its single entry, so it isn't counted twice.
-   * When the tracker count feature is disabled, only the current page's log is
+   * When the tracker count feature gate is off, only the current page's log is
    * returned.
    *
    * @returns {object[]} Content-blocking logs for visited pages on the current site.
    */
   #getTrackerLogs() {
     const browser = gBrowser.selectedBrowser;
-    if (!this.#trackerCountEnabled) {
+    if (!UrlbarPrefs.get("trackerCountFeatureGate")) {
       const log = browser.getContentBlockingLog();
       return log ? [JSON.parse(log)] : [];
     }

@@ -273,7 +273,7 @@ nsXMLContentSink::DidBuildModel(bool aTerminated) {
       // We're pretty-printing now.  See whether we should wait up on
       // stylesheet loads
       css::Loader* cssLoader = mDocument->GetExistingCSSLoader();
-      if (cssLoader && cssLoader->HasPendingLoads()) {
+      if (cssLoader && cssLoader->HasPendingNonDeferredLoads()) {
         cssLoader->AddObserver(this);
         // wait for those sheets to load
         startLayout = false;
@@ -367,6 +367,8 @@ nsresult nsXMLContentSink::OnTransformDone(Document* aSourceDocument,
     // Transform succeeded, or it failed and we have an error document to
     // display.
     mDocument = aResultDocument;
+    // Layout state from the source document doesn't apply to the result.
+    mLayoutStarted = false;
     aResultDocument->SetDocWriteDisabled(false);
 
     // Notify document observers that all the content has been stuck
@@ -421,7 +423,7 @@ nsXMLContentSink::StyleSheetLoaded(StyleSheet* aSheet, bool aWasDeferred,
   }
 
   if (mDocument->GetExistingCSSLoader() &&
-      !mDocument->GetExistingCSSLoader()->HasPendingLoads()) {
+      !mDocument->GetExistingCSSLoader()->HasPendingNonDeferredLoads()) {
     mDocument->GetExistingCSSLoader()->RemoveObserver(this);
     StartLayout(false);
     ScrollToRef();
@@ -1370,7 +1372,7 @@ nsresult nsXMLContentSink::AddAttributes(const char16_t** aAtts,
   // Add tag attributes to the content attributes
   RefPtr<nsAtom> prefix, localName;
   // Custom element constructors might have set our attributes already.
-  const bool hadAttrs = aContent->HasAttrs();
+  const bool mightHaveAttrs = aContent->HasCustomElementData();
   while (*aAtts) {
     int32_t nameSpaceID;
     nsContentUtils::SplitExpatName(aAtts[0], getter_AddRefs(prefix),
@@ -1378,8 +1380,8 @@ nsresult nsXMLContentSink::AddAttributes(const char16_t** aAtts,
 
     // Add attribute to content
     aContent->SetAttr(nameSpaceID, localName, prefix,
-                      nsDependentString(aAtts[1]), false,
-                      IsKnownNewAttr(!hadAttrs));
+                      nsDependentString(aAtts[1]), mightHaveAttrs,
+                      IsKnownNewAttr(!mightHaveAttrs));
     aAtts += 2;
   }
 

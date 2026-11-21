@@ -51,6 +51,37 @@ interface MozFindbar extends XULElement {
 interface MozToolbarbutton extends XULElement {
   readonly menupopup: XULPopupElement | null;
   readonly icon: Element | null;
+  disabled: boolean;
+}
+
+// The base of <menu> and <menuitem> in toolkit/content/widgets/menu.js, which
+// tsc cannot see. `disabled` comes from MozElements.BaseControl in
+// toolkit/content/customElements.js. Declares only the members tabbrowser
+// uses.
+interface MozMenuItemBase extends XULElement {
+  disabled: boolean;
+}
+
+// toolkit/content/widgets/moz-checkbox, whose Lit reactive properties tsc
+// cannot see. Declares only the members tabbrowser uses.
+interface MozCheckbox extends HTMLElement {
+  label: string;
+  iconSrc: string;
+  checked: boolean;
+}
+
+// toolkit/content/widgets/moz-visual-picker, whose Lit reactive properties tsc
+// cannot see. Declares only the members tabbrowser uses.
+interface MozVisualPicker extends HTMLElement {
+  name: string;
+  value: string | null;
+  disabled: boolean;
+}
+
+// toolkit/content/widgets/moz-visual-picker, whose Lit reactive properties tsc
+// cannot see. Declares only the members tabbrowser uses.
+interface MozVisualPickerItem extends HTMLElement {
+  value: string;
 }
 
 // toolkit/content/widgets/arrowscrollbox.js, which tsc cannot see. Declares

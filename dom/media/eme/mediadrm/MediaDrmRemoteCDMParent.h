@@ -130,7 +130,8 @@ class MediaDrmRemoteCDMParent final : public RemoteCDMParent {
                                  size_t aNumKeys, bool aHasNewUsableKey);
 
   void HandleEvent(nsString&& aSessionId, AMediaDrmEventType aEventType,
-                   int aExtra, nsTArray<uint8_t>&& aData);
+                   int aExtra, nsTArray<uint8_t>&& aData,
+                   bool aProvisioned = false);
 
   void HandleExpirationUpdate(nsString&& aSessionId, int64_t aExpiryTimeInMS);
 
@@ -140,8 +141,13 @@ class MediaDrmRemoteCDMParent final : public RemoteCDMParent {
   using InternalPromise =
       MozPromise<bool, MediaResult, /* IsExclusive */ false>;
 
-  RefPtr<InternalPromise> EnsureHasAMediaCrypto();
+  // If aProvisioned is true, provisioning was just attempted, so a further not
+  // provisioned status is an error rather than a reason to provision again.
+  RefPtr<InternalPromise> EnsureHasAMediaCrypto(bool aProvisioned = false);
   RefPtr<InternalPromise> EnsureProvisioned();
+
+  void DoCreateSession(RemoteCDMCreateSessionRequestIPDL&& aRequest,
+                       CreateSessionResolver&& aResolver, bool aProvisioned);
 
   void Destroy();
 
@@ -151,10 +157,18 @@ class MediaDrmRemoteCDMParent final : public RemoteCDMParent {
   struct SessionEntry {
     AMediaDrmSessionId id;
     nsAutoCString mimeType;
+    // The last message sent for this session was a service certificate
+    // request, so the next key request event is expected for it.
+    bool awaitingCertificate = false;
   };
 
   std::map<nsString, SessionEntry> mSessions;
   MozPromiseHolder<InternalPromise> mProvisionPromise;
+
+  // Before Android 10, key request events have no session ID. Sessions that
+  // have been given a service certificate are queued here in the order the
+  // events are expected for them.
+  nsTArray<nsString> mCertificateQueue;
 
   mutable Mutex mMutex;
   RefPtr<MediaDrmCrypto> mCrypto MOZ_GUARDED_BY(mMutex);
@@ -166,8 +180,6 @@ class MediaDrmRemoteCDMParent final : public RemoteCDMParent {
   AMediaDrm* mDrm = nullptr;
 
   AMediaDrmSessionId mCryptoSessionId;
-  Maybe<MediaResult> mCryptoError;
-  Maybe<MediaResult> mProvisionError;
 };
 
 }  // namespace mozilla

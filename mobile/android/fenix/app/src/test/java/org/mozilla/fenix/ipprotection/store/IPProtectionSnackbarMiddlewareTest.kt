@@ -2,13 +2,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-@file:OptIn(ExperimentalAndroidComponentsApi::class)
-
 package org.mozilla.fenix.ipprotection.store
 
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
-import mozilla.components.ExperimentalAndroidComponentsApi
 import mozilla.components.feature.ipprotection.store.ActivationOperation
 import mozilla.components.feature.ipprotection.store.CachedLocationStatus
 import mozilla.components.feature.ipprotection.store.IPProtectionAction
@@ -28,6 +25,7 @@ class IPProtectionSnackbarMiddlewareTest {
     private lateinit var captureMiddleware: CaptureActionsMiddleware<AppState, AppAction>
     private lateinit var appStore: AppStore
     private lateinit var ipProtectionStore: IPProtectionStore
+    private lateinit var repository: FakeIPProtectionRepository
 
     @Before
     fun setup() {
@@ -47,6 +45,7 @@ class IPProtectionSnackbarMiddlewareTest {
                         )
                     )
             )
+        repository = FakeIPProtectionRepository()
     }
 
     @Test
@@ -92,6 +91,7 @@ class IPProtectionSnackbarMiddlewareTest {
                     store = ipProtectionStore,
                     appStore = appStore,
                     errorMessages = ErrorMessages(dataLimitReached = "Data limit reached"),
+                    repository = repository,
                     mainDispatcher = StandardTestDispatcher(testScheduler),
                 )
             newPrompter.start()

@@ -262,6 +262,8 @@ class BrowserParent final : public PBrowserParent,
 
   void CacheFrameLoader(nsFrameLoader* aFrameLoader);
 
+  void SetOwnerFrameLoader(nsFrameLoader* aFrameLoader);
+
   void Destroy();
 
   void RemoveWindowListeners();
@@ -278,6 +280,9 @@ class BrowserParent final : public PBrowserParent,
   // TODO: Use MOZ_CAN_RUN_SCRIPT when it gains IPDL support (bug 1539864)
   MOZ_CAN_RUN_SCRIPT_BOUNDARY mozilla::ipc::IPCResult RecvReplyKeyEvent(
       const WidgetKeyboardEvent& aEvent, const nsID& aUUID);
+  // TODO: Use MOZ_CAN_RUN_SCRIPT when it gains IPDL support (bug 1539864)
+  MOZ_CAN_RUN_SCRIPT_BOUNDARY mozilla::ipc::IPCResult RecvReplyMouseEvent(
+      bool aDefaultPrevented, const nsID& aUUID);
 
   // TODO: Use MOZ_CAN_RUN_SCRIPT when it gains IPDL support (bug 1539864)
   MOZ_CAN_RUN_SCRIPT_BOUNDARY mozilla::ipc::IPCResult RecvAccessKeyNotHandled(
@@ -668,7 +673,8 @@ class BrowserParent final : public PBrowserParent,
       nsTArray<IPCTransferableData>&& aTransferables, const uint32_t& aAction,
       Maybe<BigBuffer>&& aVisualDnDData, const uint32_t& aStride,
       const gfx::SurfaceFormat& aFormat, const LayoutDeviceIntRect& aDragRect,
-      nsIPrincipal* aPrincipal, nsIPolicyContainer* aPolicyContainer,
+      Tainted<RefPtr<nsIPrincipal>>&& aPrincipal,
+      nsIPolicyContainer* aPolicyContainer,
       const CookieJarSettingsArgs& aCookieJarSettingsArgs,
       const MaybeDiscarded<WindowContext>& aSourceWindowContext,
       const MaybeDiscarded<WindowContext>& aSourceTopWindowContext);
@@ -700,6 +706,9 @@ class BrowserParent final : public PBrowserParent,
   bool GetHasLayers();
   bool GetRenderLayers();
   void SetRenderLayers(bool aRenderLayers);
+  // The epoch of the last RenderLayers request sent to the child.
+  uint64_t GetRenderLayersEpoch() const { return mRenderLayersEpoch; }
+  uint64_t NextRenderLayersEpoch() { return ++mRenderLayersEpoch; }
   bool GetPriorityHint();
   void SetPriorityHint(bool aPriorityHint);
   void PreserveLayers(bool aPreserveLayers);
@@ -884,7 +893,8 @@ class BrowserParent final : public PBrowserParent,
   // We keep a strong reference to the frameloader after we've sent the
   // Destroy message and before we've received __delete__. This allows us to
   // dispatch message manager messages during this time.
-  RefPtr<nsFrameLoader> mFrameLoader;
+  RefPtr<nsFrameLoader> mDestroyingFrameLoader;
+  WeakPtr<nsFrameLoader> mOwnerFrameLoader;
   uint32_t mChromeFlags;
 
   // Pointer back to BrowserBridgeParent if there is one associated with
@@ -926,6 +936,8 @@ class BrowserParent final : public PBrowserParent,
     CopyableTArray<AlternativeCharCode> mAlternativeCharCodes;
   };
   nsTArray<SentKeyEventData> mWaitingReplyKeyboardEvents;
+  struct SentMouseEventData;
+  nsTArray<SentMouseEventData> mWaitingReplyMouseEvents;
 
   LayoutDeviceIntRect mRect;
   LayoutDeviceIntSize mDimensions;
@@ -969,6 +981,8 @@ class BrowserParent final : public PBrowserParent,
   nsIWidget::Cursor mCursor;
 
   nsTArray<nsString> mVerifyDropLinks;
+
+  uint64_t mRenderLayersEpoch = 0;
 
 #ifdef DEBUG
   int32_t mActiveSuppressDisplayportCount = 0;

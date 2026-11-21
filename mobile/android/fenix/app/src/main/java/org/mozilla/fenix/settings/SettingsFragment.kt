@@ -32,6 +32,7 @@ import androidx.navigation.fragment.navArgs
 import androidx.preference.Preference
 import androidx.preference.PreferenceCategory
 import androidx.preference.PreferenceFragmentCompat
+import androidx.preference.R as preferenceR
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import java.lang.ref.WeakReference
@@ -88,6 +89,7 @@ import org.mozilla.fenix.nimbus.FxNimbus
 import org.mozilla.fenix.perf.ProfilerViewModel
 import org.mozilla.fenix.perf.ProfilerViewModelFactory
 import org.mozilla.fenix.settings.account.AccountUiView
+import org.mozilla.fenix.settings.account.SignInPromoPreference
 import org.mozilla.fenix.snackbar.FenixSnackbarDelegate
 import org.mozilla.fenix.snackbar.SnackbarBinding
 import org.mozilla.fenix.utils.Settings
@@ -154,6 +156,15 @@ class SettingsFragment : PreferenceFragmentCompat(), SystemInsetsPaddedFragment 
                 accountManager = requireComponents.backgroundServices.accountManager,
                 httpClient = requireComponents.core.client,
             )
+
+        requirePreference<SignInPromoPreference>(R.string.pref_key_sign_in_promo).onClick = {
+            SettingsMetrics.signIntoSync.add()
+            navigateFromSettings(
+                SettingsFragmentDirections.actionSettingsFragmentToTurnOnSyncFragment(
+                    entrypoint = FenixFxAEntryPoint.SettingsMenu
+                )
+            )
+        }
 
         addonFilePicker = AddonFilePicker(requireContext(), requireComponents.addonManager)
         addonFilePicker.registerForResults(this)
@@ -286,7 +297,7 @@ class SettingsFragment : PreferenceFragmentCompat(), SystemInsetsPaddedFragment 
         )
 
         requireView()
-            .findViewById<RecyclerView>(R.id.recycler_view)
+            .findViewById<RecyclerView>(preferenceR.id.recycler_view)
             ?.hideInitialScrollBar(viewLifecycleOwner.lifecycleScope)
 
         args.preferenceToScrollTo?.let {
@@ -362,7 +373,7 @@ class SettingsFragment : PreferenceFragmentCompat(), SystemInsetsPaddedFragment 
     @Suppress("LongMethod", "CyclomaticComplexMethod")
     override fun onPreferenceTreeClick(preference: Preference): Boolean {
         // Hide the scrollbar so the animation looks smoother
-        val recyclerView = requireView().findViewById<RecyclerView>(R.id.recycler_view)
+        val recyclerView = requireView().findViewById<RecyclerView>(preferenceR.id.recycler_view)
         recyclerView.isVerticalScrollBarEnabled = false
 
         val directions: NavDirections? =

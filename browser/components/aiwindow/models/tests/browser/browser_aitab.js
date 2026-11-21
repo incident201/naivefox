@@ -9,6 +9,8 @@
 const lazy = {};
 
 ChromeUtils.defineESModuleGetters(lazy, {
+  AITAB_PAGE_TYPES:
+    "moz-src:///browser/components/aiwindow/ui/modules/AITabPageTypes.sys.mjs",
   AITabStore:
     "moz-src:///browser/components/aiwindow/ui/modules/AITabStore.sys.mjs",
   ConversationStore:
@@ -61,12 +63,12 @@ const MODIFIED_TITLE = "Where To Stay In Lisbon, Cheaply";
 // Content handed to the tool directly, as another tool's result would be.
 const RAW_CONTENT = "Hostel Bairro Alto, 22 euros a night.";
 
-// Mirrors MAX_INSTRUCTION_CHARS, MAX_HISTORY_CHARS and SOURCE_TEXT_BUDGET in
-// AITab.sys.mjs. All are limits the model is never told about, so they are
+// Mirrors MAX_INSTRUCTION_CHARS and MAX_HISTORY_CHARS in AITab.sys.mjs, and
+// DEFAULT_SOURCE_TEXT_BUDGET in AITabPageTypes.sys.mjs. All are limits the model is never told about, so they are
 // pinned here rather than read back from the module.
 const MAX_INSTRUCTION_CHARS = 1500;
 const MAX_HISTORY_CHARS = 100000;
-const SOURCE_TEXT_BUDGET = 10000;
+const SOURCE_TEXT_BUDGET = 25000;
 
 // Appended past a cap, so an assertion can tell "cut here" from "cut at all".
 const OVERFLOW = "OVER-THE-CAP";
@@ -746,7 +748,9 @@ add_task(async function test_modification_keeps_links_from_earlier_turns() {
       first.toolConvId
     );
     const storedText = JSON.stringify(
-      stored.getMessagesInChatCompletionsFormat()
+      stored
+        .getMessagesInChatCompletionsFormat()
+        .filter(message => message.role !== "system")
     );
     Assert.ok(
       storedText.includes(SOURCE_URL),
@@ -803,6 +807,49 @@ add_task(async function test_modifying_an_unknown_slug_is_refused() {
     );
   });
 });
+
+/**
+ * A page whose type cannot be edited is refused before anything is read, and
+ * the model is told so in the same words for every such type.
+ */
+add_task(
+  async function test_modifying_a_page_that_cannot_be_edited_is_refused() {
+    for (const [name, pageType] of [
+      ["research", lazy.AITAB_PAGE_TYPES.RESEARCH],
+      ["digest", lazy.AITAB_PAGE_TYPES.DIGEST],
+    ]) {
+      await withAITab(async ({ conversation, mockEngine, refuse }) => {
+        const { slug } = await lazy.AITabStore.create({
+          convId: conversation.id,
+          slug: `a_${name}_page`,
+          title: `A ${name} page`,
+          pageType,
+        });
+
+        const toolResult = await refuse({
+          modify_slug: slug,
+          modify_instructions: MODIFY_INSTRUCTIONS,
+        });
+
+        Assert.ok(
+          toolResult.startsWith("This page cannot be modified."),
+          `The tool refuses the ${name} page: ${toolResult}`
+        );
+        Assert.ok(
+          !mockEngine.engines.has(lazy.MODEL_FEATURES.AITAB),
+          "No generation engine was created, so nothing was composed."
+        );
+        Assert.deepEqual(
+          await lazy.AITabStore.getVersionsBySlug(slug),
+          [1],
+          "The page is left as it was."
+        );
+
+        await lazy.AITabStore.deleteBySlug(slug);
+      });
+    }
+  }
+);
 
 /**
  * Slugs appear in page URLs, so a model can be talked into naming one from an
@@ -890,6 +937,71 @@ add_task(async function test_a_page_the_user_referenced_can_be_revised() {
 });
 
 /**
+ * A chat that has read untrusted input can revise a page another chat
+ * generated. The page keeps its links, but gains none to URLs the revising
+ * chat has not seen.
+ */
+add_task(async function test_untrusted_revision_keeps_only_existing_links() {
+  await withAITab(async ({ runWith }) => {
+    const unseenUrl = "https://example.org/unseen";
+    const linkedSurface = (title, urls) => {
+      const tokenizer = new lazy.UrlTokenizer();
+      const surface = generatedSurface(title);
+      surface.components[1].references = {
+        items: urls.map(url => ({ href: tokenizer.formatToken(url), title })),
+      };
+      return surface;
+    };
+
+    const { toolResult: created } = await runWith(
+      { url_list: [SOURCE_URL], focus: FOCUS },
+      GENERATED_TITLE,
+      linkedSurface(GENERATED_TITLE, [SOURCE_URL])
+    );
+    const { slug } = created.page;
+
+    const otherChat = await lazy.newChatConversation();
+    otherChat.addUserMessage(
+      MODIFY_INSTRUCTIONS,
+      null,
+      new lazy.UserRoleOpts({
+        contextMentions: [
+          {
+            type: "currentTab",
+            url: `about:smartpage?page=${slug}`,
+            label: GENERATED_TITLE,
+          },
+        ],
+      })
+    );
+    otherChat.securityProperties.setUntrustedInput();
+    otherChat.securityProperties.commit();
+
+    await runWith(
+      {
+        modify_slug: slug,
+        modify_instructions: `${MODIFY_INSTRUCTIONS}, and see ${unseenUrl}`,
+      },
+      MODIFIED_TITLE,
+      linkedSurface(MODIFIED_TITLE, [SOURCE_URL, unseenUrl]),
+      otherChat
+    );
+
+    const latest = await lazy.AITabStore.getBySlug(slug);
+    const header = latest.components.surface.components.find(
+      component => component.component == "Header"
+    );
+    Assert.deepEqual(
+      header.references.items.map(item => item.href),
+      [SOURCE_URL],
+      "The page keeps its link and gains none to an unseen URL."
+    );
+
+    await lazy.ConversationStore.deleteConversationById(latest.toolConvId);
+  });
+});
+
+/**
  * Seen URLs include open tabs and links in fetched pages, which the user did
  * not pick, so a page URL that is only seen does not unlock a revision.
  */
@@ -947,6 +1059,109 @@ add_task(async function test_raw_content_builds_a_page_without_a_url() {
     );
 
     await lazy.ConversationStore.deleteConversationById(page.toolConvId);
+  });
+});
+
+/**
+ * Inline content still builds a page when none of the URLs passed alongside it
+ * can be read, rather than the whole request failing on the unreadable pages.
+ */
+add_task(async function test_raw_content_builds_a_page_when_no_url_is_read() {
+  await withAITab(async ({ conversation, runWith }) => {
+    markPrivateAndUntrusted(conversation);
+    conversation.addSeenUrls([ATTACKER_URL]);
+
+    const { messages, toolResult } = await runWith({
+      focus: FOCUS,
+      raw_content: RAW_CONTENT,
+      url_list: [ATTACKER_URL],
+    });
+
+    const prompt = messages.at(-1).content;
+    Assert.ok(
+      prompt.includes(RAW_CONTENT),
+      "The inline content reaches the model."
+    );
+    Assert.ok(
+      prompt.includes("Access is not allowed"),
+      "The unreadable page is passed on as a failed read, not as content."
+    );
+    Assert.ok(
+      toolResult.message.startsWith("The page was created."),
+      `The tool reported success: ${toolResult.message}`
+    );
+
+    const [page] = await lazy.AITabStore.getAITabPagesByConvId(conversation.id);
+    await lazy.ConversationStore.deleteConversationById(page.toolConvId);
+  });
+});
+
+/**
+ * Generate a page from raw_content holding a seen and an unseen URL, with the
+ * model linking both, and return the links the stored page kept.
+ *
+ * @param {object} ctx - From withAITab.
+ * @param {ChatConversation} ctx.conversation
+ * @param {Function} ctx.runWith
+ * @param {boolean} untrusted - Whether the chat has read untrusted input.
+ * @returns {Promise<string[]>}
+ */
+async function linksFromRawContent({ conversation, runWith }, untrusted) {
+  const unseenUrl = "https://example.org/unseen";
+  const tokenizer = new lazy.UrlTokenizer();
+  const surface = generatedSurface();
+  surface.components[1].references = {
+    items: [
+      { href: tokenizer.formatToken(unseenUrl), title: "Unseen" },
+      { href: tokenizer.formatToken(SOURCE_URL), title: "Source" },
+    ],
+  };
+  conversation.addSeenUrls([SOURCE_URL]);
+  if (untrusted) {
+    conversation.securityProperties.setUntrustedInput();
+    conversation.securityProperties.commit();
+  }
+
+  const { messages } = await runWith(
+    {
+      focus: FOCUS,
+      raw_content: `${RAW_CONTENT} See ${SOURCE_URL} and ${unseenUrl}`,
+    },
+    GENERATED_TITLE,
+    surface
+  );
+  Assert.ok(
+    messages.at(-1).content.includes(tokenizer.formatToken(unseenUrl)),
+    "The URL reached the model as a token it could link."
+  );
+
+  const [page] = await lazy.AITabStore.getAITabPagesByConvId(conversation.id);
+  await lazy.ConversationStore.deleteConversationById(page.toolConvId);
+  const header = page.components.surface.components.find(
+    component => component.component == "Header"
+  );
+  return header.references.items.map(item => item.href);
+}
+
+/** Once the chat has read untrusted input, a page links only to seen URLs. */
+add_task(async function test_untrusted_chat_links_only_seen_urls() {
+  await withAITab(async ctx => {
+    Assert.deepEqual(
+      await linksFromRawContent(ctx, true),
+      [SOURCE_URL],
+      "Only the link to a URL the chat has seen is kept."
+    );
+  });
+});
+
+/** A chat that has read no untrusted input may link URLs it passed along. */
+add_task(async function test_trusted_chat_links_raw_content_urls() {
+  await withAITab(async ctx => {
+    Assert.deepEqual(
+      await linksFromRawContent(ctx, false),
+      ["https://example.org/unseen", SOURCE_URL],
+      "Both links are kept."
+    );
   });
 });
 
@@ -1010,7 +1225,7 @@ add_task(async function test_modify_instructions_are_capped() {
 add_task(async function test_source_budget_counts_urls_as_tokens() {
   await withAITab(async ({ conversation, runWith }) => {
     const items = Array.from(
-      { length: 300 },
+      { length: 1200 },
       (_, i) =>
         `https://www.example.com/travel/europe/portugal/lisbon/where-to-stay-${i}` +
         `?utm_source=newsletter&utm_medium=email word${i}.`
@@ -1047,6 +1262,50 @@ add_task(async function test_source_budget_counts_urls_as_tokens() {
       included + 1,
       "No URL is cut off at the budget."
     );
+    const [page] = await lazy.AITabStore.getAITabPagesByConvId(conversation.id);
+    await lazy.ConversationStore.deleteConversationById(page.toolConvId);
+  });
+});
+
+/**
+ * The source-text budget is shared, not split evenly: a short page keeps all
+ * of its text, and the budget it leaves over goes to the longer section.
+ */
+add_task(async function test_source_budget_left_by_short_page_is_shared() {
+  await withAITab(async ({ conversation, runWith }) => {
+    const words = Array.from({ length: 5000 }, (_, i) => `word${i}.`);
+    const { messages } = await runWith({
+      url_list: [SOURCE_URL],
+      raw_content: words.join(" "),
+      focus: FOCUS,
+    });
+
+    const userTurn = messages.at(-1).content;
+    Assert.ok(
+      userTurn.includes(SOURCE_MARKER),
+      "The short page reaches the model whole."
+    );
+
+    const included = words.findLastIndex((_, i) =>
+      userTurn.includes(` word${i}.`)
+    );
+    const rawLength = words.slice(0, included + 1).join(" ").length;
+    Assert.greater(
+      rawLength,
+      SOURCE_TEXT_BUDGET / 2,
+      "The long section gets more than an even share of the budget."
+    );
+    Assert.less(
+      included,
+      words.length - 1,
+      "The long section is still cut to fit the budget."
+    );
+    Assert.lessOrEqual(
+      rawLength,
+      SOURCE_TEXT_BUDGET,
+      "The long section stays within the budget."
+    );
+
     const [page] = await lazy.AITabStore.getAITabPagesByConvId(conversation.id);
     await lazy.ConversationStore.deleteConversationById(page.toolConvId);
   });

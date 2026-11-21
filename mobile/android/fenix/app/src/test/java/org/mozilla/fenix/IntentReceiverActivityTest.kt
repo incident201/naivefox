@@ -44,6 +44,8 @@ import org.mozilla.fenix.ext.components
 import org.mozilla.fenix.helpers.FenixGleanTestRule
 import org.mozilla.fenix.helpers.perf.TestStrictModeManager
 import org.mozilla.fenix.home.intent.StartSearchIntentProcessor
+import org.mozilla.fenix.onboarding.FenixOnboarding
+import org.mozilla.fenix.settings.account.AuthCustomTabActivity
 import org.mozilla.fenix.settings.account.AuthIntentReceiverActivity
 import org.mozilla.fenix.shortcut.NewTabShortcutIntentProcessor
 import org.mozilla.fenix.shortcut.PasswordManagerIntentProcessor
@@ -57,6 +59,7 @@ class IntentReceiverActivityTest {
 
     private lateinit var settings: Settings
     private lateinit var intentProcessors: IntentProcessors
+    private lateinit var fenixOnboarding: FenixOnboarding
 
     @get:Rule val gleanTestRule = FenixGleanTestRule(testContext)
 
@@ -64,6 +67,7 @@ class IntentReceiverActivityTest {
     fun setup() {
         settings = mockk()
         intentProcessors = mockk()
+        fenixOnboarding = mockk()
 
         every { settings.openLinksInAPrivateTab } returns false
         every { settings.enableHomepageAsNewTab } returns false
@@ -77,6 +81,10 @@ class IntentReceiverActivityTest {
         every { intentProcessors.webNotificationsIntentProcessor } returns mockIntentProcessor()
         every { intentProcessors.passwordManagerIntentProcessor } returns mockIntentProcessor()
         every { settings.isUserPairingCampaignAttributed } returns false
+        every { settings.overrideFxAServer } returns ""
+        every { settings.overrideSyncTokenServer } returns ""
+        every { fenixOnboarding.userHasBeenOnboarded() } returns true
+        every { settings.onboardingFeatureEnabled } returns true
 
         coEvery { intentProcessors.intentProcessor.process(any()) } returns true
     }
@@ -371,7 +379,7 @@ class IntentReceiverActivityTest {
     }
 
     @Test
-    fun `GIVEN a pairing link intent WHEN processing the intent THEN it opens in the auth custom tab instead of a tab`() =
+    fun `GIVEN onboarding is complete and a pairing link intent WHEN processing the intent THEN it opens in the auth custom tab instead of a tab`() =
         runTest {
             val url = "https://accounts.firefox.com/pair#channel_id=test_id&channel_key=test_key&v=2"
             val intent = Intent(Intent.ACTION_VIEW, url.toUri())
@@ -383,11 +391,32 @@ class IntentReceiverActivityTest {
             val actualIntent = shadowOf(activity).peekNextStartedActivity()
             assertThat(actualIntent, hasComponent(AuthIntentReceiverActivity::class.java.name))
             assertThat(actualIntent, hasExtraWithKey(CustomTabsIntent.EXTRA_SESSION))
-            assertEquals(url, actualIntent.dataString)
+            assertTrue(actualIntent.getBooleanExtra(AuthCustomTabActivity.EXTRA_OPEN_HOME_ON_AUTHENTICATED, false))
+            assertEquals(
+                "https://accounts.firefox.com/pair?embed=customtab#channel_id=test_id&channel_key=test_key&v=2",
+                actualIntent.dataString,
+            )
             assertTrue(activity.isFinishing)
             assertNull(Events.openedLink.testGetValue())
             coVerify(exactly = 0) { intentProcessors.intentProcessor.process(any()) }
             coVerify(exactly = 0) { intentProcessors.customTabIntentProcessor.process(any()) }
+        }
+
+    @Test
+    fun `GIVEN a pairing link with a query WHEN processing the intent THEN the embed parameter is appended after the existing query`() =
+        runTest {
+            val url = "https://accounts.firefox.com/pair?test=value#channel_id=test_id&channel_key=test_key&v=2"
+            val intent = Intent(Intent.ACTION_VIEW, url.toUri())
+
+            val activity = Robolectric.buildActivity(IntentReceiverActivity::class.java, intent).get()
+            attachMocks(activity)
+            activity.processIntent(intent)
+
+            val actualIntent = shadowOf(activity).peekNextStartedActivity()
+            assertEquals(
+                "https://accounts.firefox.com/pair?test=value&embed=customtab#channel_id=test_id&channel_key=test_key&v=2",
+                actualIntent.dataString,
+            )
         }
 
     @Test
@@ -412,6 +441,27 @@ class IntentReceiverActivityTest {
         }
 
     @Test
+    fun `GIVEN a pairing link for a server the app is not configured for WHEN processing the intent THEN it opens as a normal link`() =
+        runTest {
+            val intent =
+                Intent(
+                    Intent.ACTION_VIEW,
+                    "https://accounts.stage.mozaws.net/pair#channel_id=test_id&channel_key=test_key&v=2".toUri(),
+                )
+
+            val activity = Robolectric.buildActivity(IntentReceiverActivity::class.java, intent).get()
+            attachMocks(activity)
+            activity.processIntent(intent)
+
+            assertNull(SyncAuth.pairingLinkOpened.testGetValue())
+            coVerify { intentProcessors.intentProcessor.process(any()) }
+            assertThat(
+                shadowOf(activity).peekNextStartedActivity(),
+                not(hasComponent(AuthIntentReceiverActivity::class.java.name)),
+            )
+        }
+
+    @Test
     fun `GIVEN a non-pairing link intent WHEN processing the intent THEN pairingLinkOpened is not recorded`() =
         runTest {
             val intent =
@@ -428,36 +478,151 @@ class IntentReceiverActivityTest {
         }
 
     @Test
-    fun `GIVEN a production pairing link intent WHEN isFxaPairingLink is called THEN it returns true`() {
-        assertTrue(
-            isFxaPairingLink("https://accounts.firefox.com/pair#channel_id=test_id&channel_key=test_key&v=2".toUri())
-        )
+    fun `GIVEN onboarding is not complete WHEN processing a pairing link intent THEN it opens the home activity without the link`() =
+        runTest {
+            every { fenixOnboarding.userHasBeenOnboarded() } returns false
+            val url = "https://accounts.firefox.com/pair#channel_id=test_id&channel_key=test_key&v=2"
+            val intent = Intent(Intent.ACTION_VIEW, url.toUri())
+
+            val activity = Robolectric.buildActivity(IntentReceiverActivity::class.java, intent).get()
+            attachMocks(activity)
+            activity.processIntent(intent)
+
+            val actualIntent = shadowOf(activity).peekNextStartedActivity()
+            assertEquals(HomeActivity::class.java.name, actualIntent.component?.className)
+            assertNull(actualIntent.data)
+            assertTrue(activity.isFinishing)
+            coVerify(exactly = 0) { intentProcessors.intentProcessor.process(any()) }
+        }
+
+    @Test
+    fun `GIVEN onboarding is not complete WHEN processing a pairing link intent THEN pairingLinkOpened is not recorded`() =
+        runTest {
+            every { fenixOnboarding.userHasBeenOnboarded() } returns false
+            val url = "https://accounts.firefox.com/pair#channel_id=test_id&channel_key=test_key&v=2"
+            val intent = Intent(Intent.ACTION_VIEW, url.toUri())
+
+            val activity = Robolectric.buildActivity(IntentReceiverActivity::class.java, intent).get()
+            attachMocks(activity)
+            activity.processIntent(intent)
+
+            assertNull(SyncAuth.pairingLinkOpened.testGetValue())
+        }
+
+    @Test
+    fun `GIVEN onboarding is disabled WHEN processing a pairing link intent THEN it opens in the auth custom tab`() =
+        runTest {
+            every { fenixOnboarding.userHasBeenOnboarded() } returns false
+            every { settings.onboardingFeatureEnabled } returns false
+            val url = "https://accounts.firefox.com/pair#channel_id=test_id&channel_key=test_key&v=2"
+            val intent = Intent(Intent.ACTION_VIEW, url.toUri())
+
+            val activity = Robolectric.buildActivity(IntentReceiverActivity::class.java, intent).get()
+            attachMocks(activity)
+            activity.processIntent(intent)
+
+            val actualIntent = shadowOf(activity).peekNextStartedActivity()
+            assertThat(actualIntent, hasComponent(AuthIntentReceiverActivity::class.java.name))
+            assertEquals(
+                "https://accounts.firefox.com/pair?embed=customtab#channel_id=test_id&channel_key=test_key&v=2",
+                actualIntent.dataString,
+            )
+        }
+
+    @Test
+    fun `GIVEN onboarding is not complete WHEN processing a non-pairing link intent THEN it is forwarded with its link`() =
+        runTest {
+            every { fenixOnboarding.userHasBeenOnboarded() } returns false
+            val url = "https://mozilla.org"
+            val intent = Intent(Intent.ACTION_VIEW, url.toUri())
+
+            val activity = Robolectric.buildActivity(IntentReceiverActivity::class.java, intent).get()
+            attachMocks(activity)
+            activity.processIntent(intent)
+
+            val actualIntent = shadowOf(activity).peekNextStartedActivity()
+            assertEquals(HomeActivity::class.java.name, actualIntent.component?.className)
+            assertEquals(url, actualIntent.dataString)
+            coVerify { intentProcessors.intentProcessor.process(any()) }
+        }
+
+    @Test
+    fun `WHEN the uri is on the given fxaServerUrl THEN isFxaPairingLink returns true`() {
+        assertTrue(isFxaPairingLink("$FXA_SERVER_URL$PAIRING_PATH_WITH_CHANNEL".toUri(), FXA_SERVER_URL))
     }
 
     @Test
-    fun `GIVEN a stage pairing link intent WHEN isFxaPairingLink is called THEN it returns true`() {
-        assertTrue(
+    fun `WHEN the uri is on a different server to fxaServerUrl THEN isFxaPairingLink returns false`() {
+        assertFalse(
+            isFxaPairingLink("https://accounts.stage.mozaws.net$PAIRING_PATH_WITH_CHANNEL".toUri(), FXA_SERVER_URL)
+        )
+        assertFalse(
             isFxaPairingLink(
-                "https://accounts.stage.mozaws.net/pair#channel_id=test_id&channel_key=test_key&v=2".toUri()
+                "https://accounts.firefox.com.example.com$PAIRING_PATH_WITH_CHANNEL".toUri(),
+                FXA_SERVER_URL,
             )
         )
     }
 
     @Test
-    fun `GIVEN a non-pairing link intent WHEN isFxaPairingLink is called THEN it returns false`() {
-        assertFalse(isFxaPairingLink("https://example.com".toUri()))
+    fun `WHEN fxaServerUrl has a trailing slash THEN isFxaPairingLink still returns true`() {
+        assertTrue(isFxaPairingLink("$FXA_SERVER_URL$PAIRING_PATH_WITH_CHANNEL".toUri(), "$FXA_SERVER_URL/"))
     }
 
     @Test
-    fun `GIVEN a pairing link intent with an unexpected scheme WHEN isFxaPairingLink is called THEN it returns false`() {
-        assertFalse(
-            isFxaPairingLink("http://accounts.firefox.com/pair#channel_id=test_id&channel_key=test_key&v=2".toUri())
+    fun `WHEN the uri host differs from fxaServerUrl only in case THEN isFxaPairingLink returns true`() {
+        assertTrue(
+            isFxaPairingLink(
+                "https://Accounts.Firefox.com/pair#channel_id=test_id&channel_key=test_key&v=2".toUri(),
+                FXA_SERVER_URL,
+            )
         )
     }
 
     @Test
-    fun `GIVEN a pairing link intent with an unexpected path WHEN isFxaPairingLink is called THEN it returns false`() {
-        assertFalse(isFxaPairingLink("https://accounts.firefox.com/signin".toUri()))
+    fun `WHEN the uri scheme differs from fxaServerUrl only in case THEN isFxaPairingLink returns true`() {
+        assertTrue(isFxaPairingLink("HTTPS://accounts.firefox.com/pair".toUri(), FXA_SERVER_URL))
+    }
+
+    @Test
+    fun `WHEN the uri has query parameters THEN isFxaPairingLink returns true`() {
+        assertTrue(isFxaPairingLink("https://accounts.firefox.com/pair?test=value".toUri(), FXA_SERVER_URL))
+    }
+
+    @Test
+    fun `WHEN the uri port differs from fxaServerUrl THEN isFxaPairingLink returns false`() {
+        assertFalse(isFxaPairingLink("https://accounts.firefox.com:8443/pair".toUri(), FXA_SERVER_URL))
+    }
+
+    @Test
+    fun `WHEN the uri or fxaServerUrl spells out the default port THEN isFxaPairingLink returns true`() {
+        assertTrue(isFxaPairingLink("https://accounts.firefox.com:443/pair".toUri(), FXA_SERVER_URL))
+        assertTrue(isFxaPairingLink("https://accounts.firefox.com/pair".toUri(), "$FXA_SERVER_URL:443"))
+    }
+
+    @Test
+    fun `WHEN the uri has no host THEN isFxaPairingLink returns false`() {
+        assertFalse(isFxaPairingLink("/pair".toUri(), FXA_SERVER_URL))
+    }
+
+    @Test
+    fun `WHEN the uri scheme differs from fxaServerUrl THEN isFxaPairingLink returns false`() {
+        assertFalse(
+            isFxaPairingLink(
+                "http://accounts.firefox.com/pair#channel_id=test_id&channel_key=test_key&v=2".toUri(),
+                FXA_SERVER_URL,
+            )
+        )
+    }
+
+    @Test
+    fun `WHEN the uri path is not exactly the pairing path THEN isFxaPairingLink returns false`() {
+        assertFalse(isFxaPairingLink("https://accounts.firefox.com".toUri(), FXA_SERVER_URL))
+        assertFalse(isFxaPairingLink("https://accounts.firefox.com/pair/supp".toUri(), FXA_SERVER_URL))
+        assertFalse(isFxaPairingLink("https://accounts.firefox.com/pairing".toUri(), FXA_SERVER_URL))
+        assertFalse(isFxaPairingLink("https://accounts.firefox.com/pair/".toUri(), FXA_SERVER_URL))
+        assertFalse(isFxaPairingLink("https://accounts.firefox.com/Pair".toUri(), FXA_SERVER_URL))
+        assertFalse(isFxaPairingLink("https://accounts.firefox.com/signin".toUri(), FXA_SERVER_URL))
     }
 
     private fun attachMocks(activity: Activity) {
@@ -466,11 +631,17 @@ class IntentReceiverActivityTest {
         every { activity.components.core } returns mockk(relaxed = true)
         every { activity.components.intentProcessors } returns intentProcessors
         every { activity.components.strictMode } returns TestStrictModeManager()
+        every { activity.components.fenixOnboarding } returns fenixOnboarding
     }
 
     private inline fun <reified T : IntentProcessor> mockIntentProcessor(): T {
         return mockk {
             coEvery { process(any()) } returns false
         }
+    }
+
+    companion object {
+        private const val FXA_SERVER_URL = "https://accounts.firefox.com"
+        private const val PAIRING_PATH_WITH_CHANNEL = "/pair#channel_id=test_id&channel_key=test_key&v=2"
     }
 }

@@ -262,6 +262,10 @@ class MultiTouchInput : public InputData {
   // the touch interaction, so we sstore it in the event.
   ExternalPoint mScreenOffset;
   bool mHandledByAPZ;
+  // Whether the caller is still considering this touch block for a browser
+  // swipe. This is false after the caller accepts or rejects the swipe, or
+  // when the caller does not consider it at all on MULTITOUCH_START.
+  bool mMayTriggerSwipe = false;
   // These button fields match to the corresponding fields in
   // WidgetMouseEventBase, except mButton defaults to -1 to follow PointerEvent.
   int16_t mButton = eNotPressed;
@@ -435,6 +439,14 @@ class PanGestureInput : public InputData {
 
   bool IsMomentum() const;
 
+  // Returns whether this event, after being handled by APZ, should be
+  // dispatched to content as a wheel event. A zero-delta event does not result
+  // in a DOM wheel event, so content cannot prevent it, and its content
+  // response would not reflect the page's wheel listeners. Such an event is
+  // only dispatched if it may be the last event in its input block, so that
+  // the block still gets a content response.
+  bool ShouldDispatchToContentAfterAPZ() const;
+
   WidgetWheelEvent ToWidgetEvent(nsIWidget* aWidget) const;
 
   bool TransformToLocal(const ScreenToParentLayerMatrix4x4& aTransform);
@@ -554,8 +566,8 @@ class PinchGestureInput : public InputData {
       TRACKPAD, // From trackpad pinch gesture
       MOUSEWHEEL // Synthesized from modifier+mousewheel
 
-      // If adding more items here, increase n_values for the
-      // APZ_ZOOM_PINCHSOURCE Telemetry and glean::apz_zoom::pinchsource metrics.
+      // If adding more items here, increase range_max and bucket_count of the
+      // glean::apz_zoom::pinchsource metric.
   ));
   // clang-format on
 

@@ -65,6 +65,13 @@ void GetURLSpecFromChannel(nsITimedChannel* aChannel, nsAString& aSpec) {
   CopyUTF8toUTF16(spec, aSpec);
 }
 
+bool MatchesNameAndType(PerformanceEntry* aEntry, const nsAString& aName,
+                        const Optional<nsAString>& aEntryType) {
+  return aEntry && aEntry->GetName()->Equals(aName) &&
+         (!aEntryType.WasPassed() ||
+          aEntry->GetEntryType()->Equals(aEntryType.Value()));
+}
+
 }  // namespace
 
 NS_IMPL_CYCLE_COLLECTION_CLASS(PerformanceMainThread)
@@ -78,7 +85,7 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN_INHERITED(PerformanceMainThread,
       mInteractionMetrics, mCurrentEventTimingEntry, mPendingLCPCandidate)
   tmp->mTextFrameUnions.Clear();
   tmp->mContainerTimingRecords.Clear();
-  mozilla::DropJSObjects(tmp);
+  tmp->mMozMemory = nullptr;
 NS_IMPL_CYCLE_COLLECTION_UNLINK_END
 
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INHERITED(PerformanceMainThread,
@@ -182,8 +189,7 @@ PerformanceTiming* PerformanceMainThread::Timing() {
 
 void PerformanceMainThread::DispatchResourceTimingBufferFullEvent() {
   RefPtr<Event> event = NS_NewDOMEvent(this, nullptr, nullptr);
-  // it bubbles, and it isn't cancelable
-  event->InitEvent(u"resourcetimingbufferfull"_ns, true, false);
+  event->InitEvent(u"resourcetimingbufferfull"_ns, false, false);
   event->SetTrusted(true);
   DispatchEvent(*event);
 }
@@ -433,7 +439,7 @@ void PerformanceMainThread::DispatchPendingEventTimingEntries() {
       RefPtr<PerformanceEventTiming> entry =
           mPendingEventTimingEntries.popFirst();
       UpdateInteractionTelemetry(entry);
-      if (entry->RawDuration().valueOr(0) >= kDefaultEventTimingMinDuration) {
+      if (entry->Duration() >= kDefaultEventTimingMinDuration) {
         QueueEntry(entry);
       }
 
@@ -739,6 +745,10 @@ void PerformanceMainThread::GetEntries(
   if (mFCPTiming) {
     aRetval.AppendElement(mFCPTiming);
   }
+
+  if (mFirstInputEvent) {
+    aRetval.AppendElement(mFirstInputEvent);
+  }
   aRetval.Sort(PerformanceEntryComparator());
 }
 
@@ -797,18 +807,18 @@ void PerformanceMainThread::GetEntriesByName(
     nsTArray<RefPtr<PerformanceEntry>>& aRetval) {
   Performance::GetEntriesByName(aName, aEntryType, aRetval);
 
-  if (mFCPTiming && mFCPTiming->GetName()->Equals(aName) &&
-      (!aEntryType.WasPassed() ||
-       mFCPTiming->GetEntryType()->Equals(aEntryType.Value()))) {
-    aRetval.AppendElement(mFCPTiming);
-    return;
+  if (MatchesNameAndType(mFCPTiming, aName, aEntryType)) {
+    aRetval.InsertElementSorted(mFCPTiming, PerformanceEntryComparator());
+  }
+
+  if (MatchesNameAndType(mFirstInputEvent, aName, aEntryType)) {
+    aRetval.InsertElementSorted(mFirstInputEvent, PerformanceEntryComparator());
   }
 
   // The navigation entry is the first one. If it exists and the name matches,
   // let put it in front.
-  if (mDocEntry && mDocEntry->GetName()->Equals(aName)) {
+  if (MatchesNameAndType(mDocEntry, aName, aEntryType)) {
     aRetval.InsertElementAt(0, mDocEntry);
-    return;
   }
 }
 

@@ -15,6 +15,8 @@ import "chrome://browser/content/aiwindow/components/aitab-timeline.mjs";
 import "chrome://browser/content/aiwindow/components/aitab-table.mjs";
 // eslint-disable-next-line import-x/no-unassigned-import
 import "chrome://browser/content/aiwindow/components/aitab-highlights.mjs";
+// eslint-disable-next-line import-x/no-unassigned-import
+import "chrome://browser/content/aiwindow/components/aitab-image.mjs";
 
 // eslint-disable-next-line import-x/no-unassigned-import
 import "chrome://browser/content/aiwindow/components/aitab-error.mjs";
@@ -231,6 +233,7 @@ export class AITabPage extends MozLitElement {
       <aitab-header
         data-aitab-component=${componentTypeName(header)}
         .createdAt=${this.page?.createdAtLabel ?? ""}
+        .editable=${this.page?.editable ?? true}
         .title=${header.title ?? ""}
         .subhead=${header.subhead ?? ""}
         .references=${header.references?.items ?? []}

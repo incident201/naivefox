@@ -22,6 +22,7 @@
 #include "mozilla/SSE.h"
 #include "mozilla/ScopeExit.h"
 #include "mozilla/StaticPrefs_gfx.h"
+#include "mozilla/StaticPrefs_layers.h"
 #include "mozilla/StaticPrefs_media.h"
 #include "mozilla/XREAppData.h"
 #include "mozilla/gfx/Logging.h"
@@ -1275,6 +1276,17 @@ const nsTArray<RefPtr<GfxDriverInfo>>& GfxInfo::GetGfxDriverInfo() {
         "");
 #endif
 
+    // Bug 2076178: Mutter imports NV12/P010 chroma as GR88/GR1616, which
+    // NVIDIA EGL rejects. Use WebRender's RGB fallback until this is fixed.
+    // Lift this block for fixed Mutter versions once they can be identified.
+    APPEND_TO_DRIVER_BLOCKLIST_EXT(
+        OperatingSystem::Linux, ScreenSizeStatus::All, BatteryStatus::All,
+        WindowProtocol::Wayland, DriverVendor::NonMesaAll,
+        DeviceFamily::NvidiaAll,
+        nsIGfxInfo::FEATURE_DMABUF_YUV_DIRECT_COMPOSITION,
+        nsIGfxInfo::FEATURE_BLOCKED_DEVICE, DRIVER_COMPARISON_IGNORED,
+        V(0, 0, 0, 0), "FEATURE_FAILURE_BUG_2076178", "");
+
     ////////////////////////////////////
     // FEATURE_HARDWARE_VIDEO_DECODING
     APPEND_TO_DRIVER_BLOCKLIST_EXT(
@@ -1359,12 +1371,20 @@ const nsTArray<RefPtr<GfxDriverInfo>>& GfxInfo::GetGfxDriverInfo() {
     // 1) we need to enable HDR early to use WEBRENDER_COMPOSITOR
     // 2) advertise HDR/WEBRENDER_COMPOSITOR at about:support
     bool hdrEnabled = false;
+
+    // However, the native compositor is required when Wayland gpu process is
+    // active.
+    bool nativeCompositorRequired = false;
 #ifdef MOZ_WAYLAND
     hdrEnabled = GdkIsWaylandDisplay() &&
                  ((WaylandDisplayGet()->IsHDREnabled() &&
                    WaylandDisplayGet()->GetFractionalScaleManager() &&
                    StaticPrefs::gfx_color_management_hdr()) ||
                   StaticPrefs::gfx_color_management_hdr_force_enabled());
+    nativeCompositorRequired =
+        GdkIsWaylandDisplay() &&
+        (StaticPrefs::layers_gpu_process_enabled_AtStartup() ||
+         StaticPrefs::layers_gpu_process_force_enabled_AtStartup());
 #endif
     if (!hdrEnabled) {
       APPEND_TO_DRIVER_BLOCKLIST(OperatingSystem::Linux, DeviceFamily::All,
@@ -1372,6 +1392,8 @@ const nsTArray<RefPtr<GfxDriverInfo>>& GfxInfo::GetGfxDriverInfo() {
                                  nsIGfxInfo::FEATURE_BLOCKED_DEVICE,
                                  DRIVER_COMPARISON_IGNORED, V(0, 0, 0, 0),
                                  "FEATURE_VIDEO_HDR_DISABLED", "");
+    }
+    if (!hdrEnabled && !nativeCompositorRequired) {
       APPEND_TO_DRIVER_BLOCKLIST(
           OperatingSystem::Linux, DeviceFamily::All,
           nsIGfxInfo::FEATURE_WEBRENDER_COMPOSITOR,
@@ -1656,11 +1678,6 @@ GfxInfo::GetDWriteVersion(nsAString& aDwriteVersion) {
 
 NS_IMETHODIMP GfxInfo::GetHasBattery(bool* aHasBattery) {
   return NS_ERROR_NOT_IMPLEMENTED;
-}
-
-NS_IMETHODIMP
-GfxInfo::GetEmbeddedInFirefoxReality(bool* aEmbeddedInFirefoxReality) {
-  return NS_ERROR_FAILURE;
 }
 
 NS_IMETHODIMP

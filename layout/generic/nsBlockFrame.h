@@ -339,7 +339,7 @@ class nsBlockFrame : public nsContainerFrame {
   /**
    * Determine if this block is a margin root at the top/bottom edges.
    */
-  void IsMarginRoot(bool* aBStartMarginRoot, bool* aBEndMarginRoot);
+  void IsMarginRoot(bool* aBStartMarginRoot, bool* aBEndMarginRoot) const;
 
   static bool BlockNeedsFloatManager(nsIFrame* aBlock);
 
@@ -493,6 +493,7 @@ class nsBlockFrame : public nsContainerFrame {
                     nscoord aBEndEdgeOfChildren);
   // Stash the effective align-content shift value between reflows
   NS_DECLARE_FRAME_PROPERTY_SMALL_VALUE(AlignContentShift, nscoord)
+  NS_DECLARE_FRAME_PROPERTY_SMALL_VALUE(InheritedBEndMarginTrim, bool)
 
   /**
    * Helper method for Reflow(). Computes the overflow areas created by our
@@ -590,6 +591,10 @@ class nsBlockFrame : public nsContainerFrame {
    * we perform a single retry in order to correctly apply trim-end at a
    * fragment boundary.
    *
+   * For inherited margin-trim, a completed untrimmed reflow determines whether
+   * descendant block-end margins collapse out of the block. If they do, we
+   * retry with trimming enabled for those margins.
+   *
    * This record is used to manage the state of these "trial reflows", and
    * return results from the final trial.
    */
@@ -600,11 +605,14 @@ class nsBlockFrame : public nsContainerFrame {
     bool mNeedFloatManager;
     // [out] Whether reflowing resulted in use of an overflow-wrap break.
     bool mUsedOverflowWrap = false;
+    // [out] Whether line-clamp was applied during this trial.
+    bool mDidApplyLineClamp = false;
     // Settings for the current trial.
     bool mBalancing = false;
-    // Set when we are auto line clamping, driven by
-    // ReflowInput::mFlags::mDimensionsReadyForLineClampAuto
+    // Set when we are line clamping, driven by
+    // ReflowInput::mFlags::mDimensionsReadyForLineClamp
     bool mLineClamping = false;
+    bool mShouldTrimInheritedBEndMargins = false;
     nscoord mInset = 0;
     // Results computed during the trial reflow. Values from the final trial
     // will be used by the remainder of Reflow().
@@ -627,6 +635,7 @@ class nsBlockFrame : public nsContainerFrame {
       mBlockEndEdgeOfChildren = 0;
       mContainerWidth = 0;
       mUsedOverflowWrap = false;
+      mDidApplyLineClamp = false;
     }
 
     // Adjust the inset amount, and reset state for a new trial.
@@ -768,7 +777,7 @@ class nsBlockFrame : public nsContainerFrame {
   Maybe<LineClampTarget> FindLineClampAutoTarget(
       const ReflowInput& aReflowInput, nsBlockFrame* aLineClampRoot);
   Maybe<LineClampTarget> FindLineClampNumberedTarget(
-      nscoord aCollapsingBEndMargin, nsBlockFrame* aLineClampRoot) const;
+      nsBlockFrame* aLineClampRoot) const;
   void ApplyLineClamp(LineClampTarget aLineClampTarget,
                       nsBlockFrame* aLineClampRoot);
   // Helper for calling ApplyLineClamp with automatic and line-based sizing.
@@ -776,6 +785,14 @@ class nsBlockFrame : public nsContainerFrame {
       Maybe<nsBlockFrame::LineClampTarget> aLineClampAutoTarget,
       Maybe<nsBlockFrame::LineClampTarget> aLineClampNumberedTarget,
       nsBlockFrame* aLineClampRoot);
+
+  // Resolved descendant maximum block size, including border and padding.
+  NS_DECLARE_FRAME_PROPERTY_SMALL_VALUE(LineClampDescendantMaxBSize, nscoord);
+  Maybe<nscoord> GetLineClampDescendantMaxBSize() const {
+    bool found = false;
+    const nscoord maxBSize = GetProperty(LineClampDescendantMaxBSize(), &found);
+    return found ? mozilla::Some(maxBSize) : Nothing();
+  }
 
   struct LineClampAutoInfo {
     Maybe<nscoord> lineClampRootMaxHeight = Nothing();
@@ -996,6 +1013,16 @@ class nsBlockFrame : public nsContainerFrame {
   // Used for text-box-trim.
   bool IsLastFormattedLine(LineIterator aLine);
 
+  /**
+   * Determines whether a block-level child's margin adjoins our block-start
+   * or block-end content edge. For block-start, the current line is being
+   * reflowed and for block-end, aLine is the candidate line.
+   *
+   * These are used to decide which children `margin-trim` applies to.
+   */
+  bool IsLineAdjacentToBStart(BlockReflowState& aState);
+  bool IsLineAdjacentToBEnd(LineIterator aLine);
+
   void DeleteLine(BlockReflowState& aState, nsLineList::iterator aLine,
                   nsLineList::iterator aLineEnd);
 
@@ -1193,6 +1220,11 @@ class nsBlockFrame : public nsContainerFrame {
   // ownership of all frames in the list.
   [[nodiscard]] nsFrameList* StealFloats();
 
+  // Return the last pushed float at the start of our floats list (not our
+  // pushed floats list), or nullptr if our floats list doesn't start with a
+  // pushed float.
+  nsIFrame* GetLastPushedFloat() const;
+
   // Return true if this frame has pushed floats.
   bool HasPushedFloats() const;
 
@@ -1216,6 +1248,11 @@ class nsBlockFrame : public nsContainerFrame {
 #ifdef DEBUG
   void VerifyLines(bool aFinalCheckOK);
   void VerifyOverflowSituation();
+
+  // Assert that pushed floats are at the start of our floats list, before any
+  // float whose placeholder is in this block.
+  void VerifyPushedFloatsAtStart() const;
+
   int32_t GetDepth() const;
 #endif
 
@@ -1224,6 +1261,7 @@ class nsBlockFrame : public nsContainerFrame {
   nsLineList mLines;
 
   friend class mozilla::BlockReflowState;
+  friend class LineClampLineIterator;
   friend class nsBlockInFlowLineIterator;
 
 #ifdef DEBUG

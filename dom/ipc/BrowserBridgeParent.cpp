@@ -18,6 +18,7 @@
 #include "mozilla/dom/WindowGlobalParent.h"
 #include "mozilla/ipc/Endpoint.h"
 #include "mozilla/layers/InputAPZContext.h"
+#include "nsFrameLoader.h"
 
 using namespace mozilla::ipc;
 using namespace mozilla::layout;
@@ -128,6 +129,7 @@ nsresult BrowserBridgeParent::InitWithProcess(
   // back pointer any earlier, as Destroy() only clears it once we own it.
   mBrowserParent = std::move(browserParent);
   mBrowserParent->SetBrowserBridgeParent(this);
+  mBrowserParent->SetOwnerFrameLoader(aParentBrowser->mOwnerFrameLoader);
   mBrowserParent->SetOwnerElement(aParentBrowser->GetOwnerElement());
   mBrowserParent->InitRendering();
 
@@ -207,7 +209,8 @@ IPCResult BrowserBridgeParent::RecvUpdateRemotePrintSettings(
 }
 
 IPCResult BrowserBridgeParent::RecvRenderLayers(const bool& aEnabled) {
-  (void)mBrowserParent->SendRenderLayers(aEnabled);
+  (void)mBrowserParent->SendRenderLayers(
+      aEnabled, mBrowserParent->NextRenderLayersEpoch());
   return IPC_OK();
 }
 

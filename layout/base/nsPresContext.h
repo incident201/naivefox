@@ -257,6 +257,8 @@ class nsPresContext : public nsISupports,
     return mDocument;
   }
 
+  bool IsInPrivateBrowsing() const;
+
   inline mozilla::ServoStyleSet* StyleSet() const;
 
   bool HasPendingMediaQueryUpdates() const {
@@ -1046,10 +1048,11 @@ class nsPresContext : public nsISupports,
   /**
    * If we have a presshell, and if the given content's current
    * document is the same as our presshell's document, return the
-   * content's primary frame.  Otherwise, return null.  Only use this
-   * if you care about which presshell the primary frame is in.
+   * content's primary frame, or the image frame if the content is an
+   * <area>.  Otherwise, return null.  Only use this if you care about
+   * which presshell the frame is in.
    */
-  nsIFrame* GetPrimaryFrameFor(nsIContent* aContent);
+  nsIFrame* GetPrimaryOrAreaImageFrameFor(nsIContent* aContent);
 
   virtual size_t SizeOfExcludingThis(mozilla::MallocSizeOf aMallocSizeOf) const;
   virtual size_t SizeOfIncludingThis(
@@ -1135,7 +1138,6 @@ class nsPresContext : public nsISupports,
   void DoUpdateHiddenByContentVisibilityForAnimations();
   friend class nsRunnableMethod<nsPresContext>;
   MOZ_CAN_RUN_SCRIPT void ThemeChangedInternal();
-  void RefreshSystemMetrics();
 
   // Update device context's resolution from the widget
   void UIResolutionChangedInternal();

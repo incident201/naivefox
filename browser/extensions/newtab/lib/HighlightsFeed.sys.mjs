@@ -6,10 +6,18 @@
 
 import { actionTypes as at } from "resource://newtab/common/Actions.mjs";
 
-import {
-  TOP_SITES_DEFAULT_ROWS,
-  TOP_SITES_MAX_SITES_PER_ROW,
-} from "resource:///modules/topsites/constants.mjs";
+import { ImportHelper } from "resource://newtab/lib/ImportHelper.sys.mjs";
+
+/**
+ * @backward-compat { version 162 }
+ *
+ * Switch back to a normal import once 162 hits release.
+ */
+const { TOP_SITES_DEFAULT_ROWS, TOP_SITES_MAX_SITES_PER_ROW } =
+  ImportHelper.import(
+    "moz-src:///browser/components/topsites/constants.mjs",
+    "resource:///modules/topsites/"
+  );
 import { Dedupe } from "resource:///modules/Dedupe.sys.mjs";
 
 const lazy = {};
@@ -201,6 +209,10 @@ export class HighlightsFeed {
       checkedAdult
     );
 
+    // Before the loop: image callbacks started there expect the section rows
+    // set by updateSection, so nothing may be awaited in between.
+    await this._addLastVisitDates(deduped);
+
     // Keep all "bookmark"s and at most one (most recent) "history" per host
     const highlights = [];
     const hosts = new Set();
@@ -261,6 +273,36 @@ export class HighlightsFeed {
       shouldBroadcast,
       options.isStartup
     );
+  }
+
+  /**
+   * Set lastVisitDate (in ms) on each non-download highlight.
+   *
+   * @param {object[]} highlights
+   */
+  async _addLastVisitDates(highlights) {
+    const pages = highlights.filter(page => page.type !== "download");
+    if (!pages.length) {
+      return;
+    }
+    const urls = JSON.stringify(pages.map(page => page.url));
+    let rows;
+    try {
+      rows = await lazy.NewTabUtils.activityStreamProvider.executePlacesQuery(
+        `SELECT url, last_visit_date / 1000 FROM moz_places
+         WHERE url_hash IN (SELECT hash(value) FROM json_each(:urls))
+           AND url IN (SELECT value FROM json_each(:urls))`,
+        { params: { urls } }
+      );
+    } catch (e) {
+      // The date is decoration, so a failure must not block highlights.
+      console.error(e);
+      return;
+    }
+    const lastVisitDates = new Map(rows);
+    for (const page of pages) {
+      page.lastVisitDate = lastVisitDates.get(page.url);
+    }
   }
 
   /**

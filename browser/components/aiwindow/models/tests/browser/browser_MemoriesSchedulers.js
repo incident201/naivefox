@@ -9,6 +9,12 @@ const { MemoriesSchedulers } = ChromeUtils.importESModule(
 const { MemoriesManager } = ChromeUtils.importESModule(
   "moz-src:///browser/components/aiwindow/models/memories/MemoriesManager.sys.mjs"
 );
+const { JourneyManager } = ChromeUtils.importESModule(
+  "moz-src:///browser/components/aiwindow/models/memories/journeys/JourneyManager.sys.mjs"
+);
+const { JourneyStore } = ChromeUtils.importESModule(
+  "moz-src:///browser/components/aiwindow/models/memories/journeys/JourneyStore.sys.mjs"
+);
 const { MemoryStore } = ChromeUtils.importESModule(
   "moz-src:///browser/components/aiwindow/services/MemoryStore.sys.mjs"
 );
@@ -18,22 +24,18 @@ const {
 } = ChromeUtils.importESModule(
   "moz-src:///browser/components/aiwindow/models/memories/MemoriesConstants.sys.mjs"
 );
-const { ChatStore, ChatConversation, ChatMessage, MESSAGE_ROLE } =
-  ChromeUtils.importESModule(
-    "moz-src:///browser/components/aiwindow/ui/modules/ChatStore.sys.mjs"
-  );
+const { ChatStore } = ChromeUtils.importESModule(
+  "moz-src:///browser/components/aiwindow/ui/modules/ChatStore.sys.mjs"
+);
 const { PURPOSES } = ChromeUtils.importESModule(
   "moz-src:///browser/components/aiwindow/models/Utils.sys.mjs"
 );
 const { AIWindowTestUtils, MockEngineManager } = ChromeUtils.importESModule(
   "resource://testing-common/AIWindowTestUtils.sys.mjs"
 );
-const { PlacesTestUtils } = ChromeUtils.importESModule(
-  "resource://testing-common/PlacesTestUtils.sys.mjs"
-);
 
 const PREF_FIRSTRUN_HAS_COMPLETED = "browser.smartwindow.firstrun.hasCompleted";
-const PREF_TOS_CONSENT_TIME = "browser.smartwindow.tos.consentTime";
+const PREF_TOU_CONSENT_TIME = "browser.smartwindow.tos.consentTime";
 const PREF_LAST_USAGE_TIME = "browser.smartwindow.lastSmartWindowUsageTime";
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -80,6 +82,31 @@ async function addDueMemory() {
   return { id: memory.id, updatedAt: memory.updated_at };
 }
 
+// The maintenance run recorded for a store holding one memory from
+// addDueMemory: aged, too young to change type, and kept.
+const DUE_MEMORY_MAINTENANCE_RUN = Object.freeze({
+  memories_before: 1,
+  soft_deleted_removed: 0,
+  memories_skipped: 0,
+  memories_aged: 1,
+  promoted_to_long_term: 0,
+  promoted_to_durable: 0,
+  demoted_to_long_term: 0,
+  demoted_to_short_term: 0,
+  memories_decayed: 0,
+  memories_after: 1,
+  outcome: "success",
+});
+
+// The journey maintenance run recorded when no journeys are stored.
+const EMPTY_JOURNEY_MAINTENANCE_RUN = Object.freeze({
+  journeys_before: 0,
+  journeys_removed: 0,
+  journeys_after: 0,
+  journeys_eligible_after: 0,
+  outcome: "success",
+});
+
 /**
  * Read a memory's maintenance clock after a tick.
  *
@@ -92,93 +119,6 @@ async function getUpdatedAt(id) {
     memoryIds: new Set([id]),
   });
   return memory?.updated_at ?? null;
-}
-
-/**
- * Store a user chat message at an exact `created_date` so tasks can place
- * messages on either side of the watermark boundary. Goes through the real
- * ChatStore, so the scheduler's chat trigger reads it back over real SQL.
- *
- * @param {number} createdDate  Message creation time in ms since epoch
- * @param {string} body         Message body
- */
-async function addChatMessage(createdDate, body) {
-  await ChatStore.updateConversation(
-    new ChatConversation({
-      title: body,
-      description: "",
-      pageUrl: new URL("https://example.com/chat"),
-      pageMeta: {},
-      messages: [
-        new ChatMessage({
-          createdDate,
-          ordinal: 0,
-          role: MESSAGE_ROLE.USER,
-          content: { body },
-          pageUrl: new URL("https://example.com/chat"),
-        }),
-      ],
-    })
-  );
-}
-
-/**
- * Store a page visit at an exact visit date so tasks can place visits on either
- * side of the watermark boundary.
- *
- * `getRecentHistory` reads page visits from moz_places_metadata rather than
- * moz_historyvisits, so the metadata row has to be written by hand. Its
- * `total_view_time` must exceed the source's own minimum viewtime filter for the
- * visit to be returned at all.
- *
- * @param {string} url            URL to record a visit for
- * @param {string} title          Page title, which cannot be null or the source
- *                                filters the visit out
- * @param {number} visitDateMs    Visit time in ms since epoch
- */
-async function writePageVisitToMozPlaces(url, title, visitDateMs) {
-  await PlacesUtils.history.insertMany([
-    { url, title, visits: [{ date: new Date(visitDateMs) }] },
-  ]);
-
-  await PlacesUtils.withConnectionWrapper(
-    "browser_MemoriesSchedulers-metadata",
-    async db => {
-      const rows = await db.execute(
-        "SELECT id FROM moz_places WHERE url_hash = hash(:url) AND url = :url",
-        { url }
-      );
-      await db.execute(
-        `INSERT INTO moz_places_metadata
-           (place_id, created_at, updated_at, total_view_time,
-            typing_time, key_presses, scrolling_time, scrolling_distance, document_type)
-         VALUES
-           (:place_id, :created_at, :created_at, 30000, 0, 0, 0, 0, 0)`,
-        {
-          place_id: rows[0].getResultByName("id"),
-          created_at: visitDateMs,
-        }
-      );
-    }
-  );
-}
-
-/**
- * Record a page visit and wait for the resulting "page-visited" notification to
- * have been dispatched, arming the scheduler's browsing trigger.
- *
- * @param {string} url  The URL to record a visit for
- */
-async function visitPage(url) {
-  const visited = new Promise(resolve => {
-    const listener = () => {
-      PlacesUtils.observers.removeListener(["page-visited"], listener);
-      resolve();
-    };
-    PlacesUtils.observers.addListener(["page-visited"], listener);
-  });
-  await PlacesTestUtils.addVisits(url);
-  await visited;
 }
 
 add_setup(async function () {
@@ -225,7 +165,7 @@ add_setup(async function () {
 /**
  * Run a task against a freshly constructed scheduler with every enablement gate
  * genuinely satisfied: a real AI Window is open, and the source, firstrun and
- * ToS consent prefs are really set.
+ * ToU consent prefs are really set.
  *
  * Maintenance is spied rather than stubbed, so it runs for real against the
  * MemoryStore and tasks can assert both that it was reached and what it did.
@@ -248,7 +188,8 @@ add_setup(async function () {
  *                                                Pass false to run the real pipeline,
  *                                                which a task must keep clear of the
  *                                                model. `generate` is then a spy.
- * @param {Function} task   Receives `{ scheduler, sandbox, maintenance, generate, merge }`
+ * @param {Function} task   Receives `{ scheduler, sandbox, maintenance, generate, merge,
+ *                          journeyMaintenance, journeys }`
  */
 async function withScheduler(
   {
@@ -262,16 +203,18 @@ async function withScheduler(
 ) {
   // Clear the browser state and set prefs clean
   await clearMemories();
+  await JourneyStore.clear();
   await SpecialPowers.pushPrefEnv({
     set: [
       [PREF_GENERATE_MEMORIES_FROM_HISTORY, historyEnabled],
       [PREF_GENERATE_MEMORIES_FROM_CONVERSATION, conversationEnabled],
       [PREF_FIRSTRUN_HAS_COMPLETED, true],
-      [PREF_TOS_CONSENT_TIME, Math.floor(Date.now() / 1000)],
+      [PREF_TOU_CONSENT_TIME, Math.floor(Date.now() / 1000)],
     ],
   });
   await MemoriesManager.setLastSessionMemoryTimestamp(watermarkMs);
   await MemoriesManager.setLastGenerationRunTimestamp(lastGenerationMs);
+  Services.fog.testResetFOG();
 
   const sandbox = sinon.createSandbox();
   const maintenance = sandbox.spy(MemoriesManager, "runMemoryMaintenance");
@@ -281,6 +224,11 @@ async function withScheduler(
         .resolves([{}])
     : sandbox.spy(MemoriesManager, "generateMemoriesFromSessions");
   const merge = sandbox.stub(MemoriesManager, "mergeMemories").resolves();
+  const journeyMaintenance = sandbox.spy(
+    JourneyManager,
+    "runJourneyMaintenance"
+  );
+  const journeys = sandbox.spy(JourneyManager, "generateAndPersistJourneys");
 
   // Restart the memories scheduler clean
   MemoriesSchedulers.stop();
@@ -292,10 +240,19 @@ async function withScheduler(
 
   // Run the test task and reset after completed
   try {
-    await task({ scheduler, sandbox, maintenance, generate, merge });
+    await task({
+      scheduler,
+      sandbox,
+      maintenance,
+      generate,
+      merge,
+      journeyMaintenance,
+      journeys,
+    });
   } finally {
     MemoriesSchedulers.stop();
     sandbox.restore();
+    await JourneyStore.clear();
     await SpecialPowers.popPrefEnv();
     await MemoriesManager.setLastSessionMemoryTimestamp(0);
     await MemoriesManager.setLastGenerationRunTimestamp(0);
@@ -306,13 +263,20 @@ async function withScheduler(
 
 /**
  * A full tick with the cooldown cleared and a real page visit pending runs
- * maintenance, generation and merging, in that order, and the maintenance pass
- * actually ages the store.
+ * maintenance, journey maintenance, generation, merging and journey generation,
+ * in that order, and the maintenance pass actually ages the store.
  */
 add_task(async function test_full_run_order() {
   await withScheduler(
     { watermarkMs: Date.now() - COOLDOWN_MS - HOUR_MS },
-    async ({ scheduler, maintenance, generate, merge }) => {
+    async ({
+      scheduler,
+      maintenance,
+      generate,
+      merge,
+      journeyMaintenance,
+      journeys,
+    }) => {
       const memory = await addDueMemory();
       await visitPage("https://example.com/scheduler-tick");
 
@@ -321,7 +285,18 @@ add_task(async function test_full_run_order() {
       Assert.ok(maintenance.calledOnce, "Maintenance should have run.");
       Assert.ok(generate.calledOnce, "Generation should have run.");
       Assert.ok(merge.calledOnce, "Merging should have run.");
-      sinon.assert.callOrder(maintenance, generate, merge);
+      Assert.ok(journeys.calledOnce, "Journey generation should have run.");
+      sinon.assert.callOrder(
+        maintenance,
+        journeyMaintenance,
+        generate,
+        merge,
+        journeys
+      );
+      Assert.ok(
+        journeys.firstCall.args[0].some(({ id }) => id === memory.id),
+        "Journey generation should receive the live memories."
+      );
 
       Assert.greater(
         await getUpdatedAt(memory.id),
@@ -340,7 +315,14 @@ add_task(async function test_maintenance_runs_when_cooldown_unmet() {
   await withScheduler(
     // Generation watermark set to `now`, so generation should not run, only maintenance
     { watermarkMs: Date.now() },
-    async ({ scheduler, maintenance, generate, merge }) => {
+    async ({
+      scheduler,
+      maintenance,
+      generate,
+      merge,
+      journeyMaintenance,
+      journeys,
+    }) => {
       const memory = await addDueMemory();
       await visitPage("https://example.com/cooldown-unmet");
 
@@ -355,11 +337,27 @@ add_task(async function test_maintenance_runs_when_cooldown_unmet() {
         "Generation should be held by the cooldown."
       );
       Assert.ok(merge.notCalled, "Merging should be held by the cooldown.");
+      Assert.ok(
+        journeyMaintenance.calledOnce,
+        "Journey maintenance should run despite the generation cooldown."
+      );
+      Assert.ok(
+        journeys.notCalled,
+        "Journey generation should be held by the cooldown."
+      );
 
       Assert.greater(
         await getUpdatedAt(memory.id),
         memory.updatedAt,
         "The memory should have been aged while generation was held."
+      );
+      assertGenerationRunEvent(
+        Glean.smartWindow.memoriesMaintenanceRun,
+        DUE_MEMORY_MAINTENANCE_RUN
+      );
+      assertGenerationRunEvent(
+        Glean.smartWindow.journeysMaintenanceRun,
+        EMPTY_JOURNEY_MAINTENANCE_RUN
       );
     }
   );
@@ -373,8 +371,20 @@ add_task(async function test_maintenance_runs_when_no_trigger_met() {
   await withScheduler(
     // Generation watermark set long enough that the gate should pass
     { watermarkMs: Date.now() - COOLDOWN_MS - HOUR_MS },
-    async ({ scheduler, maintenance, generate, merge }) => {
+    async ({
+      scheduler,
+      maintenance,
+      generate,
+      merge,
+      journeyMaintenance,
+      journeys,
+    }) => {
       const memory = await addDueMemory();
+      await JourneyStore.addOrUpdateJourney({
+        memoryId: "orphan",
+        headline: "Orphan",
+        status: "Started",
+      });
 
       // No page visited and the chat source is off, so generation shouldn't run
       // despite the watermark being old enough
@@ -386,12 +396,33 @@ add_task(async function test_maintenance_runs_when_no_trigger_met() {
       );
       Assert.ok(generate.notCalled, "Generation needs a trigger.");
       Assert.ok(merge.notCalled, "Merging needs a trigger.");
+      Assert.ok(journeys.notCalled, "Journey generation needs a trigger.");
+      Assert.ok(
+        journeyMaintenance.calledOnce,
+        "Journey maintenance should run with no generation trigger met."
+      );
 
       Assert.greater(
         await getUpdatedAt(memory.id),
         memory.updatedAt,
         "The memory should have been aged with no trigger armed."
       );
+      Assert.equal(
+        await JourneyStore.get("orphan"),
+        null,
+        "The orphaned journey should have been removed with no trigger armed."
+      );
+      assertGenerationRunEvent(
+        Glean.smartWindow.memoriesMaintenanceRun,
+        DUE_MEMORY_MAINTENANCE_RUN
+      );
+      assertGenerationRunEvent(Glean.smartWindow.journeysMaintenanceRun, {
+        journeys_before: 1,
+        journeys_removed: 1, // The orphaned journey
+        journeys_after: 0,
+        journeys_eligible_after: 0,
+        outcome: "success",
+      });
     }
   );
 });
@@ -403,7 +434,7 @@ add_task(async function test_maintenance_runs_when_no_trigger_met() {
 add_task(async function test_maintenance_skipped_within_interval() {
   await withScheduler(
     { watermarkMs: Date.now() - COOLDOWN_MS - HOUR_MS },
-    async ({ scheduler, maintenance }) => {
+    async ({ scheduler, maintenance, journeyMaintenance }) => {
       await addDueMemory();
 
       await scheduler.runNowForTesting();
@@ -413,6 +444,18 @@ add_task(async function test_maintenance_skipped_within_interval() {
       Assert.ok(
         maintenance.calledOnce,
         "Maintenance should run once across three back-to-back ticks."
+      );
+      Assert.ok(
+        journeyMaintenance.calledOnce,
+        "Journey maintenance should run once across three back-to-back ticks."
+      );
+      assertGenerationRunEvent(
+        Glean.smartWindow.memoriesMaintenanceRun,
+        DUE_MEMORY_MAINTENANCE_RUN
+      );
+      assertGenerationRunEvent(
+        Glean.smartWindow.journeysMaintenanceRun,
+        EMPTY_JOURNEY_MAINTENANCE_RUN
       );
     }
   );
@@ -424,7 +467,7 @@ add_task(async function test_maintenance_skipped_within_interval() {
 add_task(async function test_maintenance_runs_again_after_interval() {
   await withScheduler(
     { watermarkMs: Date.now() },
-    async ({ scheduler, maintenance }) => {
+    async ({ scheduler, maintenance, journeyMaintenance }) => {
       await addDueMemory();
 
       await scheduler.runNowForTesting();
@@ -432,6 +475,15 @@ add_task(async function test_maintenance_runs_again_after_interval() {
         maintenance.calledOnce,
         "Maintenance should run on first tick."
       );
+      assertGenerationRunEvent(
+        Glean.smartWindow.memoriesMaintenanceRun,
+        DUE_MEMORY_MAINTENANCE_RUN
+      );
+      assertGenerationRunEvent(
+        Glean.smartWindow.journeysMaintenanceRun,
+        EMPTY_JOURNEY_MAINTENANCE_RUN
+      );
+      Services.fog.testResetFOG();
 
       // Set maintenance watermark beyond check threshold, so it runs again
       scheduler.setLastMaintenanceMsForTesting(
@@ -444,6 +496,21 @@ add_task(async function test_maintenance_runs_again_after_interval() {
         2,
         "Maintenance should run again once its interval has elapsed."
       );
+      Assert.equal(
+        journeyMaintenance.callCount,
+        2,
+        "Journey maintenance should run again once its interval has elapsed."
+      );
+      // The first run aged the memory, so the second skips it.
+      assertGenerationRunEvent(Glean.smartWindow.memoriesMaintenanceRun, {
+        ...DUE_MEMORY_MAINTENANCE_RUN,
+        memories_skipped: 1,
+        memories_aged: 0,
+      });
+      assertGenerationRunEvent(
+        Glean.smartWindow.journeysMaintenanceRun,
+        EMPTY_JOURNEY_MAINTENANCE_RUN
+      );
     }
   );
 });
@@ -455,7 +522,13 @@ add_task(async function test_maintenance_runs_again_after_interval() {
 add_task(async function test_maintenance_skipped_during_backoff() {
   await withScheduler(
     { watermarkMs: Date.now() - COOLDOWN_MS - HOUR_MS },
-    async ({ scheduler, maintenance, generate }) => {
+    async ({
+      scheduler,
+      maintenance,
+      generate,
+      journeyMaintenance,
+      journeys,
+    }) => {
       const memory = await addDueMemory();
       await visitPage("https://example.com/backoff");
 
@@ -465,12 +538,27 @@ add_task(async function test_maintenance_skipped_during_backoff() {
       await scheduler.runNowForTesting();
 
       Assert.ok(maintenance.notCalled, "Backoff should skip maintenance.");
+      Assert.ok(
+        journeyMaintenance.notCalled,
+        "Backoff should skip journey maintenance."
+      );
       Assert.ok(generate.notCalled, "Backoff should skip generation.");
+      Assert.ok(journeys.notCalled, "Backoff should skip journey generation.");
 
       Assert.equal(
         await getUpdatedAt(memory.id),
         memory.updatedAt,
         "The memory should be untouched while backed off."
+      );
+      Assert.equal(
+        Glean.smartWindow.memoriesMaintenanceRun.testGetValue(),
+        null,
+        "No maintenance run should be recorded while backed off."
+      );
+      Assert.equal(
+        Glean.smartWindow.journeysMaintenanceRun.testGetValue(),
+        null,
+        "No journey maintenance run should be recorded while backed off."
       );
 
       scheduler.setBackoffUntilMsForTesting(0);
@@ -479,6 +567,10 @@ add_task(async function test_maintenance_skipped_during_backoff() {
       Assert.ok(
         maintenance.calledOnce,
         "Maintenance should resume once the backoff clears."
+      );
+      Assert.ok(
+        journeyMaintenance.calledOnce,
+        "Journey maintenance should resume once the backoff clears."
       );
     }
   );
@@ -655,7 +747,20 @@ add_task(async function test_history_pull_excludes_watermark_boundary() {
 add_task(async function test_maintenance_failure_is_contained() {
   await withScheduler(
     { watermarkMs: Date.now() - COOLDOWN_MS - HOUR_MS },
-    async ({ scheduler, sandbox, maintenance, generate, merge }) => {
+    async ({
+      scheduler,
+      sandbox,
+      maintenance,
+      generate,
+      merge,
+      journeyMaintenance,
+      journeys,
+    }) => {
+      Services.fog.testResetFOG();
+      // Merge is stubbed, so record the status the real merge would.
+      merge.callsFake(async ({ stats } = {}) => {
+        stats.merge_status = "ran";
+      });
       // Stub getMemories to simulate a broken maintenance run
       sandbox
         .stub(MemoryStore, "getMemories")
@@ -676,12 +781,111 @@ add_task(async function test_maintenance_failure_is_contained() {
         merge.calledOnce,
         "A maintenance failure should not block merging."
       );
+      Assert.ok(
+        journeyMaintenance.calledOnce,
+        "A memory maintenance failure should not block journey maintenance."
+      );
+      // The broken store also fails the memory read that feeds journey generation.
+      Assert.ok(
+        journeys.notCalled,
+        "Journey generation should not run when the memory store is unavailable."
+      );
 
       await scheduler.runNowForTesting();
 
       Assert.ok(
         maintenance.calledOnce,
         "A failed maintenance pass should not retry on the next tick but wait until enough time has elapsed based on its watermark."
+      );
+
+      // The run is still recorded. The memory counts can't be read from the
+      // broken store, so they are left out rather than failing the run.
+      assertGenerationRunEvent(Glean.smartWindow.memoriesGenerationRun, {
+        generation_triggered: true,
+        merge_status: "ran",
+        outcome: "success",
+      });
+      // The failed maintenance run is recorded once, with nothing counted.
+      assertGenerationRunEvent(Glean.smartWindow.memoriesMaintenanceRun, {
+        outcome: "error",
+        error_type: "firefox_internal",
+      });
+      // Journey maintenance reads memories from the same broken store. Only
+      // the stored journey count, which doesn't, is recorded.
+      assertGenerationRunEvent(Glean.smartWindow.journeysMaintenanceRun, {
+        journeys_after: 0,
+        outcome: "error",
+        error_type: "firefox_internal",
+      });
+    }
+  );
+});
+
+/**
+ * A failed journey maintenance pass is contained: memory maintenance,
+ * generation, merging and journey generation still run, and the failed attempt
+ * is stamped so the next tick does not immediately retry.
+ */
+add_task(async function test_journey_maintenance_failure_is_contained() {
+  await withScheduler(
+    { watermarkMs: Date.now() - COOLDOWN_MS - HOUR_MS },
+    async ({
+      scheduler,
+      sandbox,
+      maintenance,
+      generate,
+      merge,
+      journeyMaintenance,
+      journeys,
+    }) => {
+      // Replace the spy with a stub to simulate a broken journey maintenance run
+      journeyMaintenance.restore();
+      const failingJourneyMaintenance = sandbox
+        .stub(JourneyManager, "runJourneyMaintenance")
+        .rejects(new Error("Journey store unavailable"));
+      await addDueMemory();
+      await visitPage("https://example.com/journey-maintenance-failure");
+
+      await scheduler.runNowForTesting();
+
+      Assert.ok(
+        failingJourneyMaintenance.calledOnce,
+        "Journey maintenance should have been attempted."
+      );
+      Assert.ok(
+        maintenance.calledOnce,
+        "A journey maintenance failure should not block memory maintenance."
+      );
+      Assert.ok(
+        generate.calledOnce,
+        "A journey maintenance failure should not block generation."
+      );
+      Assert.ok(
+        merge.calledOnce,
+        "A journey maintenance failure should not block merging."
+      );
+      Assert.ok(
+        journeys.calledOnce,
+        "A journey maintenance failure should not block journey generation."
+      );
+
+      await scheduler.runNowForTesting();
+
+      Assert.ok(
+        failingJourneyMaintenance.calledOnce,
+        "A failed journey maintenance pass should not retry on the next tick."
+      );
+      const events =
+        Glean.smartWindow.journeysMaintenanceRun.testGetValue() ?? [];
+      Assert.equal(
+        events.length,
+        1,
+        "Only the failed journey maintenance run should be recorded."
+      );
+      Assert.equal(
+        events[0].extra.outcome,
+        "error",
+        "A journey maintenance run that fails before reading anything is recorded as an error."
       );
     }
   );
@@ -798,14 +1002,19 @@ add_task(async function test_no_trigger_stamps_the_cooldown_clock() {
 add_task(async function test_retryable_failure_leaves_the_clock_unstamped() {
   await withScheduler(
     { watermarkMs: Date.now() - COOLDOWN_MS - HOUR_MS },
-    async ({ scheduler, generate, merge }) => {
+    async ({ scheduler, generate, merge, journeys }) => {
       generate.rejects({ status: 503 });
+      await addDueMemory();
       await visitPage("https://example.com/retryable-failure");
 
       await scheduler.runNowForTesting();
 
       Assert.ok(generate.calledOnce, "Generation should have been attempted.");
       Assert.ok(merge.notCalled, "A failed generation should not merge.");
+      Assert.ok(
+        journeys.notCalled,
+        "A failed generation should not generate journeys."
+      );
       Assert.equal(
         (await MemoryStore.getMeta()).last_generation_run_ts,
         0,
@@ -822,6 +1031,83 @@ add_task(async function test_retryable_failure_leaves_the_clock_unstamped() {
         2,
         "Generation should retry once the transient backoff clears rather than wait out the cooldown."
       );
+      Assert.ok(
+        journeys.calledOnce,
+        "Journey generation should run once generation succeeds."
+      );
+    }
+  );
+});
+
+/**
+ * A retryable journey generation failure puts the scheduler into the transient
+ * backoff, but the generation clock is already stamped so memories are not
+ * regenerated when the backoff clears.
+ */
+add_task(async function test_retryable_journey_failure_backs_off() {
+  await withScheduler(
+    { watermarkMs: Date.now() - COOLDOWN_MS - HOUR_MS },
+    async ({ scheduler, sandbox, maintenance, generate, merge, journeys }) => {
+      Services.fog.testResetFOG();
+      // Merge is stubbed, so record the status the real merge would.
+      merge.callsFake(async ({ stats } = {}) => {
+        stats.merge_status = "ran";
+      });
+      // Replace the spy with a stub to simulate a retryable journey failure
+      journeys.restore();
+      const failingJourneys = sandbox
+        .stub(JourneyManager, "generateAndPersistJourneys")
+        .rejects({ status: 503 });
+      await addDueMemory();
+      await visitPage("https://example.com/retryable-journey-failure");
+
+      await scheduler.runNowForTesting();
+
+      Assert.ok(generate.calledOnce, "Generation should have run.");
+      Assert.ok(merge.calledOnce, "Merging should have run.");
+      Assert.ok(
+        failingJourneys.calledOnce,
+        "Journey generation should have been attempted."
+      );
+      Assert.greater(
+        (await MemoryStore.getMeta()).last_generation_run_ts,
+        0,
+        "A journey failure should not leave the generation clock unstamped."
+      );
+
+      scheduler.setLastMaintenanceMsForTesting(0);
+      await scheduler.runNowForTesting();
+
+      Assert.ok(
+        maintenance.calledOnce,
+        "The transient backoff should skip the next tick."
+      );
+
+      scheduler.setBackoffUntilMsForTesting(0);
+      await scheduler.runNowForTesting();
+
+      Assert.ok(
+        generate.calledOnce,
+        "Memories should not be regenerated after a journey failure."
+      );
+
+      // Journey generation isn't part of the run, so its failure doesn't
+      // change the recorded outcome.
+      assertGenerationRunEvent(Glean.smartWindow.memoriesGenerationRun, {
+        generation_triggered: true,
+        memories_before: 1,
+        merge_status: "ran",
+        memories_after: 1,
+        outcome: "success",
+      });
+      // The stub throws before filling in any stats, so the scheduler records
+      // it as other.
+      assertGenerationRunEvent(Glean.smartWindow.journeysGenerationRun, {
+        journeys_eligible_after: 0,
+        outcome: "error",
+        error_stage: "other",
+        error_type: "transient",
+      });
     }
   );
 });

@@ -313,7 +313,7 @@ In order to deliver settings to subsets of the population, you can set targets o
 From the client API standpoint, this is completely transparent: the `.get()` method — as well as the event data — will always filter the entries on which the target matches.
 
 :::{note}
-The remote settings targets follow the same approach as the {ref}`Normandy recipe client <components-normandy>` (ie. JEXL filter expressions).
+Remote Settings targets use JEXL filter expressions.
 :::
 
 (services-settings-uptake-telemetry)=
@@ -532,7 +532,7 @@ For example, they leverage advanced customization options (bucket, content-signa
 
 ```js
 const {RemoteSecuritySettings} =
-  ChromeUtils.importESModule("resource://gre/modules/psm/RemoteSecuritySettings.sys.mjs");
+  ChromeUtils.importESModule("moz-src:///security/manager/ssl/RemoteSecuritySettings.sys.mjs");
 
 RemoteSecuritySettings.init();
 

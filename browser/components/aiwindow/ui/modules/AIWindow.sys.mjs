@@ -27,21 +27,7 @@ const PREF_MEMORIES_HISTORY =
   "browser.smartwindow.memories.generateFromHistory";
 const PREF_SEMANTIC_HISTORY_SMARTWINDOW_FEATURE_GATE =
   "places.semanticHistory.smartwindow.featureGate";
-const PREF_AUTO_TAB_GROUPING = "browser.smartwindow.autoTabGrouping.enabled";
-const PREF_AUTO_TAB_GROUPING_LOCALES =
-  "browser.smartwindow.autoTabGrouping.supportedLocales";
 const PREF_FIRSTRUN_HAS_COMPLETED = "browser.smartwindow.firstrun.hasCompleted";
-const PREF_AGENT = "browser.smartwindow.agent.enabled";
-const PREF_AGENT_TOOLBAR = "browser.smartwindow.agent.toolbar.enabled";
-const PREF_AGENT_SUPPORTED_REGIONS =
-  "browser.smartwindow.agent.supportedRegions";
-const MONITOR_WIDGET_ID = "smartwindow-monitor-button";
-const GROUP_TABS_BUTTON_ID = "smartwindow-group-tabs-button";
-// Nimbus-controlled, on the default branch: whether to announce the feature as
-// new. Dismissing writes false to the user branch, which outranks the default
-// branch, so the announcement does not come back when Nimbus re-applies it.
-const PREF_MONITOR_ANNOUNCEMENT =
-  "browser.smartwindow.agent.monitorAnnouncement";
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
@@ -52,25 +38,25 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "moz-src:///browser/components/aiwindow/ui/modules/AIWindowTabStatesManager.sys.mjs",
   AIWindowMenu:
     "moz-src:///browser/components/aiwindow/ui/modules/AIWindowMenu.sys.mjs",
+  AIWindowToolbarButtons:
+    "moz-src:///browser/components/aiwindow/ui/modules/AIWindowToolbarButtons.sys.mjs",
+  AuthImplSelector:
+    "moz-src:///browser/components/aiwindow/models/auth/AuthImplSelector.sys.mjs",
   AuthProvider:
     "moz-src:///browser/components/aiwindow/models/AuthProvider.sys.mjs",
-  AutoTabGroupingSuggestions:
-    "moz-src:///browser/components/aiwindow/ui/modules/AutoTabGroupingSuggestions.sys.mjs",
+  FxaSignedInWatcher:
+    "moz-src:///browser/components/aiwindow/models/auth/FxaSignedInWatcher.sys.mjs",
   BrowserWindowTracker: "resource:///modules/BrowserWindowTracker.sys.mjs",
   HomePage: "resource:///modules/HomePage.sys.mjs",
   AIWindowUI:
     "moz-src:///browser/components/aiwindow/ui/modules/AIWindowUI.sys.mjs",
   ChatStore:
     "moz-src:///browser/components/aiwindow/ui/modules/ChatStore.sys.mjs",
-  CustomizableUI:
-    "moz-src:///browser/components/customizableui/CustomizableUI.sys.mjs",
   MemoryStore:
     "moz-src:///browser/components/aiwindow/services/MemoryStore.sys.mjs",
   NewTabPagePreloading:
     "moz-src:///browser/components/tabbrowser/NewTabPagePreloading.sys.mjs",
   NimbusFeatures: "resource://nimbus/ExperimentAPI.sys.mjs",
-  PanelMultiView:
-    "moz-src:///browser/components/customizableui/PanelMultiView.sys.mjs",
   PlacesUtils: "resource://gre/modules/PlacesUtils.sys.mjs",
   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
   SearchService: "moz-src:///toolkit/components/search/SearchService.sys.mjs",
@@ -81,14 +67,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "moz-src:///browser/components/aiwindow/models/memories/MemoriesSchedulers.sys.mjs",
   MonitorAgent:
     "moz-src:///browser/components/aiwindow/models/agents/MonitorAgent.sys.mjs",
-  MONITOR_CONDITION_MET_TOPIC:
-    "moz-src:///browser/components/aiwindow/models/agents/Monitor.sys.mjs",
-  MONITOR_RUN_FAILED_TOPIC:
-    "moz-src:///browser/components/aiwindow/models/agents/Monitor.sys.mjs",
-  MonitorAttention:
-    "moz-src:///browser/components/aiwindow/ui/modules/MonitorAttention.sys.mjs",
-  MonitorUIUtils:
-    "moz-src:///browser/components/aiwindow/ui/modules/MonitorUIUtils.sys.mjs",
+  SmartActionsToolbar:
+    "moz-src:///browser/components/aiwindow/ui/modules/SmartActionsToolbar.sys.mjs",
   SmartWindowLocation:
     "moz-src:///browser/components/aiwindow/models/SmartWindowLocation.sys.mjs",
   SmartWindowTelemetry:
@@ -113,40 +93,6 @@ XPCOMUtils.defineLazyPreferenceGetter(
     hasCompleted && AIWindow._startSchedulers()
 );
 
-XPCOMUtils.defineLazyPreferenceGetter(
-  lazy,
-  "agentEnabled",
-  PREF_AGENT,
-  false,
-  () => AIWindow._updateMonitorWidgetRegistration()
-);
-
-XPCOMUtils.defineLazyPreferenceGetter(
-  lazy,
-  "agentToolbarEnabled",
-  PREF_AGENT_TOOLBAR,
-  false,
-  () => AIWindow._updateMonitorWidgetRegistration()
-);
-
-XPCOMUtils.defineLazyPreferenceGetter(
-  lazy,
-  "autoTabGroupingEnabled",
-  PREF_AUTO_TAB_GROUPING,
-  true,
-  () => AIWindow._updateGroupTabsWidgetRegistration()
-);
-
-// Enrolling mid-session has to light the dot without waiting for a restart.
-XPCOMUtils.defineLazyPreferenceGetter(
-  lazy,
-  "monitorAnnouncement",
-  PREF_MONITOR_ANNOUNCEMENT,
-  false,
-  () =>
-    AIWindow._forEachWindow(win => AIWindow._updateMonitorButtonForWindow(win))
-);
-
 /**
  * AI Window Service
  */
@@ -155,9 +101,6 @@ export const AIWindow = {
   _initialized: false,
   _windowStates: new WeakMap(),
   _aiWindowMenu: null,
-  _switcherWidgetCreated: false,
-  _monitorWidgetCreated: false,
-  _groupTabsWidgetCreated: false,
 
   /**
    * A WeakMap<window, AIWindowTabStatesManager> that keeps references
@@ -172,9 +115,8 @@ export const AIWindow = {
   init(win) {
     if (!this._windowStates.has(win)) {
       this._windowStates.set(win, {});
-      this._updateHamburgerMenuPosition(win);
-      this._initializeAskButtonOnToolbox(win);
-      this._updateMonitorButtonForWindow(win);
+      lazy.AIWindowToolbarButtons.updateWindow(win);
+      lazy.SmartActionsToolbar.init(win);
       const windowArgs = win?.arguments?.[1];
       if (
         windowArgs instanceof Ci.nsIPropertyBag2 &&
@@ -218,17 +160,11 @@ export const AIWindow = {
       "AuthProvider:Logout",
       this.onAuthProviderLogout
     );
-    Services.obs.addObserver(this, "tabstrip-orientation-change");
-    Services.obs.addObserver(this, "browser-region-updated");
-    Services.prefs.addObserver(PREF_AGENT_SUPPORTED_REGIONS, this);
-    Services.prefs.addObserver(PREF_AUTO_TAB_GROUPING_LOCALES, this);
     lazy.SmartWindowTelemetry.init();
     lazy.getAllModelsData(); // loads model data into cache for about:preferences
     lazy.NimbusFeatures.smartWindow.onUpdate(this.onNimbusUpdate);
     this._initialized = true;
-    this._updateGroupTabsWidgetRegistration();
-    this._updateSwitcherWidgetRegistration();
-    this._updateMonitorWidgetRegistration();
+    lazy.AIWindowToolbarButtons.init();
   },
 
   _startSchedulers() {
@@ -266,10 +202,7 @@ export const AIWindow = {
       "AuthProvider:Logout",
       this.onAuthProviderLogout
     );
-    Services.obs.removeObserver(this, "tabstrip-orientation-change");
-    Services.obs.removeObserver(this, "browser-region-updated");
-    Services.prefs.removeObserver(PREF_AGENT_SUPPORTED_REGIONS, this);
-    Services.prefs.removeObserver(PREF_AUTO_TAB_GROUPING_LOCALES, this);
+    lazy.AIWindowToolbarButtons.uninit();
 
     lazy.PlacesUtils.observers.removeListener(
       ["page-removed", "history-cleared"],
@@ -285,33 +218,11 @@ export const AIWindow = {
     if (lazy.NimbusFeatures.smartWindow.getVariable("enabled")) {
       Services.prefs.setBoolPref(PREF_SMARTWINDOW_ENABLED, true);
     }
+    lazy.AuthImplSelector.applyNimbusAuthImpl();
   },
 
   onAuthProviderLogout() {
     AIWindow._onAccountLogout();
-  },
-
-  observe(_subject, topic, data) {
-    if (topic === "tabstrip-orientation-change") {
-      this._onTabstripOrientationChange();
-    } else if (
-      topic === "nsPref:changed" &&
-      data === PREF_AUTO_TAB_GROUPING_LOCALES
-    ) {
-      // Nimbus applies this pref after session restore, so windows that built
-      // the button before then have to catch up.
-      this._updateGroupTabsButtons();
-    } else if (
-      topic === "browser-region-updated" ||
-      topic === "nsPref:changed"
-    ) {
-      // Both inputs to the region gate on the monitor button.
-      this._updateMonitorWidgetRegistration();
-    } else if (topic === lazy.MONITOR_CONDITION_MET_TOPIC) {
-      this.showMonitorAttention(data);
-    } else if (topic === lazy.MONITOR_RUN_FAILED_TOPIC) {
-      this.showMonitorErrorAttention(data);
-    }
   },
 
   // Switches all active AI Windows back to classic mode when the user signs out.
@@ -385,24 +296,9 @@ export const AIWindow = {
     return aiWindowElement.classList.contains("chat-active");
   },
 
-  _forEachWindow(callback) {
-    ChromeUtils.nondeterministicGetWeakMapKeys(this._windowStates).forEach(
-      win => {
-        if (win && !win.closed) {
-          callback(win);
-        }
-      }
-    );
-  },
-
   _onAIWindowEnabledPrefChange() {
-    this._updateGroupTabsWidgetRegistration();
-    this._updateSwitcherWidgetRegistration();
-    this._updateMonitorWidgetRegistration();
-    const widget = lazy.CustomizableUI.getWidget("ai-window-toggle");
-    for (const { node } of widget?.instances ?? []) {
-      this._updateButtonVisibility(node);
-    }
+    lazy.AIWindowToolbarButtons.updateRegistrations();
+    lazy.SmartActionsToolbar.updateAll();
     Services.prefs.setBoolPref(
       PREF_SEMANTIC_HISTORY_SMARTWINDOW_FEATURE_GATE,
       this.isAvailable
@@ -411,257 +307,6 @@ export const AIWindow = {
       this._onAccountLogout();
     }
     lazy.MonitorAgent.onBlockedStateChanged().catch(console.error);
-  },
-
-  _updateButtonVisibility(node) {
-    if (node) {
-      node.hidden = !this.isAIWindowEnabled();
-    }
-  },
-
-  _onTabstripOrientationChange() {
-    this._forEachWindow(win => this._updateHamburgerMenuPosition(win));
-  },
-
-  /**
-   * Move the hamburger menu next to the window controls on Smart Window and Vertical
-   * tabs, and restores it to its default nav-bar position for Classic.
-   * The mode switcher button itself is a customizable widget, so its
-   * placement is owned by CustomizableUI and not touched here.
-   *
-   * @param {Window} win The window to update.
-   * @param {object} [options]
-   * @param {boolean} [options.isToggling]
-   */
-  _updateHamburgerMenuPosition(win, { isToggling = false } = {}) {
-    const hamburgerMenu = win.document.getElementById("PanelUI-button");
-    const targetToolbar = win.document.getElementById(
-      this.verticalTabsEnabled ? "nav-bar" : "TabsToolbar"
-    );
-    const titlebarContainer = targetToolbar.querySelector(
-      ".titlebar-buttonbox-container"
-    );
-
-    if (this.isAIWindowActive(win) || this.verticalTabsEnabled) {
-      titlebarContainer.after(hamburgerMenu);
-    } else if (isToggling) {
-      // Restore hamburger menu to its original position in nav-bar.
-      const postTabsSpacer = win.document
-        .getElementById("nav-bar")
-        .querySelector('.titlebar-spacer[type="post-tabs"]');
-      postTabsSpacer.before(hamburgerMenu);
-    }
-  },
-
-  /*
-   * Initializes the toolbox button that opens the assistant sidebar.
-   */
-  _initializeAskButtonOnToolbox(win) {
-    const askButton = win.document.getElementById("smartwindow-ask-button");
-    if (!askButton) {
-      return;
-    }
-    askButton.hidden = !this.isAIWindowActive(win);
-  },
-
-  /**
-   * Shows the "Organize Tabs" button only in a Smart Window.
-   *
-   * @param {Element} [node] This window's button, if it has one: the user can
-   *   remove it from the toolbar.
-   */
-  _updateGroupTabsButtonVisibility(node) {
-    if (!node) {
-      return;
-    }
-    node.hidden = !(
-      lazy.autoTabGroupingEnabled &&
-      this.isAIWindowActive(node.documentGlobal) &&
-      lazy.AutoTabGroupingSuggestions.isAvailable
-    );
-    if (!node.hidden) {
-      lazy.AutoTabGroupingSuggestions.preloadModels();
-    }
-  },
-
-  _updateGroupTabsButtons() {
-    const widget = lazy.CustomizableUI.getWidget(GROUP_TABS_BUTTON_ID);
-    for (const { node } of widget?.instances ?? []) {
-      this._updateGroupTabsButtonVisibility(node);
-    }
-  },
-
-  /**
-   * Whether the monitor toolbar button is enabled. It is the toolbar surface of
-   * the Smart Window agent, so it needs Smart Window to be enabled, the
-   * agent feature and its own toolbar gate, and the same region gate the rest of
-   * the feature uses. Where the button cannot create a monitor
-   * it should not appear
-   *
-   * @returns {boolean}
-   */
-  get monitorButtonEnabled() {
-    return (
-      this.isAIWindowEnabled() &&
-      lazy.agentEnabled &&
-      lazy.agentToolbarEnabled &&
-      lazy.MonitorUIUtils.isMonitorRegionSupported()
-    );
-  },
-
-  /**
-   * The monitor button is a CustomizableUI button, it must not exist
-   * when the feature is off or when Smart Window is blocked by browser.ai.control.
-   */
-  _updateMonitorWidgetRegistration() {
-    if (this.monitorButtonEnabled && !this.isBlocked) {
-      this._createMonitorWidget();
-      return;
-    }
-    this._destroyMonitorWidget();
-  },
-
-  _createMonitorWidget() {
-    if (this._monitorWidgetCreated) {
-      return;
-    }
-
-    lazy.CustomizableUI.createWidget({
-      id: MONITOR_WIDGET_ID,
-      l10nId: "smartwindow-monitor-button",
-      defaultArea: lazy.CustomizableUI.AREA_NAVBAR,
-      removable: true,
-      showInPrivateBrowsing: false,
-      onCreated: node => {
-        node.setAttribute("aria-haspopup", "dialog");
-        node.setAttribute("aria-expanded", "false");
-        // Must be set before the node is connected, the toolbarbutton custom
-        // element only builds the badge stack once, on its first render.
-        node.setAttribute("badged", "true");
-        node.hidden = !this._shouldShowMonitorButton(node.documentGlobal);
-        this._updateMonitorAttentionForNode(node);
-      },
-      onCommand: event => {
-        lazy.AIWindowUI.toggleMonitorPanel(event.view);
-      },
-    });
-    Services.obs.addObserver(this, lazy.MONITOR_CONDITION_MET_TOPIC);
-    Services.obs.addObserver(this, lazy.MONITOR_RUN_FAILED_TOPIC);
-    this._monitorWidgetCreated = true;
-  },
-
-  _destroyMonitorWidget() {
-    if (!this._monitorWidgetCreated) {
-      return;
-    }
-
-    Services.obs.removeObserver(this, lazy.MONITOR_CONDITION_MET_TOPIC);
-    Services.obs.removeObserver(this, lazy.MONITOR_RUN_FAILED_TOPIC);
-    lazy.CustomizableUI.destroyWidget(MONITOR_WIDGET_ID);
-    this._monitorWidgetCreated = false;
-  },
-
-  /**
-   * Placement is global across windows, so the button is hidden per window to
-   * keep it out of Classic Windows. Unlike the ask button it stays visible in
-   * the immersive view.
-   *
-   * @param {Window} win
-   */
-  _updateMonitorButtonForWindow(win) {
-    const button = win.document.getElementById(MONITOR_WIDGET_ID);
-    if (!button) {
-      return;
-    }
-    button.hidden = !this._shouldShowMonitorButton(win);
-    this._updateMonitorAttentionForNode(button);
-  },
-
-  /**
-   * Monitors that matched their condition and that the user has not been shown
-   * the panel for since, newest match first. A monitor that only failed to
-   * check is not here: it lights the dot but the panel leaves it where it is.
-   *
-   * @returns {string[]} Monitor ids.
-   */
-  get monitorAttentionIds() {
-    return lazy.MonitorAttention.matchedIds;
-  },
-
-  /**
-   * Whether the feature is still being announced as new. How long the
-   * announcement runs is the rollout's business: unenrolling restores the
-   * default branch and the dot goes with it.
-   *
-   * @returns {boolean}
-   */
-  get hasMonitorAnnouncement() {
-    return lazy.monitorAnnouncement;
-  },
-
-  /**
-   * The dot means "there is something here for you" whichever reason put it
-   * there, so the button does not need to tell the two apart.
-   *
-   * @returns {boolean} Whether the monitor button should carry the dot.
-   */
-  get hasMonitorAttention() {
-    return lazy.MonitorAttention.hasAttention || this.hasMonitorAnnouncement;
-  },
-
-  /**
-   * The ids to highlight, clearing them so the next panel opening starts fresh.
-   * Reading and clearing are one step because the two must not drift: clearing
-   * first loses the highlight, reading first risks never clearing the dot.
-   *
-   * @returns {string[]} Monitor ids, newest match first.
-   */
-  takeMonitorAttentionIds() {
-    const ids = this.monitorAttentionIds;
-    this.clearMonitorAttention();
-    return ids;
-  },
-
-  /**
-   * @param {string} monitorId - The monitor whose run met its condition.
-   */
-  showMonitorAttention(monitorId) {
-    lazy.MonitorAttention.recordMatch(monitorId);
-    this._forEachWindow(win => this._updateMonitorButtonForWindow(win));
-  },
-
-  /**
-   * A monitor that could not check is worth the same dot as one that matched:
-   * either way there is something in the panel the user has not seen.
-   *
-   * @param {string} monitorId - The monitor whose run failed.
-   */
-  showMonitorErrorAttention(monitorId) {
-    lazy.MonitorAttention.recordError(monitorId);
-    this._forEachWindow(win => this._updateMonitorButtonForWindow(win));
-  },
-
-  /**
-   * Retires every reason the dot is showing. Opening the panel answers the
-   * announcement as much as it answers a match, so both go at once.
-   */
-  clearMonitorAttention() {
-    lazy.MonitorAttention.clearAttention();
-    // Only dismiss an announcement that is actually running so we do not mask
-    // a rollout that starts later.
-    if (lazy.monitorAnnouncement) {
-      Services.prefs.setBoolPref(PREF_MONITOR_ANNOUNCEMENT, false);
-      return;
-    }
-    this._forEachWindow(win => this._updateMonitorButtonForWindow(win));
-  },
-
-  _updateMonitorAttentionForNode(node) {
-    node.toggleAttribute("monitor-attention", this.hasMonitorAttention);
-  },
-
-  _shouldShowMonitorButton(win) {
-    return this.monitorButtonEnabled && this.isAIWindowActive(win);
   },
 
   get isDefaultWindow() {
@@ -703,7 +348,7 @@ export const AIWindow = {
 
     if (this.isAIWindowActive(win)) {
       // Window already opened as Smart via the BrowserContentHandler
-      // startup gate, which uses ToS consentTime as a synchronous proxy for
+      // startup gate, which uses ToU consentTime as a synchronous proxy for
       // "previously signed in". Verify the actual auth state now and prompt
       // sign-in if the user has since logged out — without this, signed-out
       // users would get a Smart Window with broken auth-gated features.
@@ -812,53 +457,6 @@ export const AIWindow = {
     }
 
     return args;
-  },
-
-  /**
-   * Show Window Switcher button in tabs toolbar
-   *
-   * @param {object} win caller window
-   */
-  handleAIWindowSwitcher(win) {
-    let view = lazy.PanelMultiView.getViewNode(
-      win.document,
-      "ai-window-toggle-view"
-    );
-
-    const isPrivateWindow = lazy.PrivateBrowsingUtils.isWindowPrivate(win);
-    const isAIActive = this.isAIWindowActive(win);
-
-    if (!isPrivateWindow) {
-      let classicSwitchButton = view.querySelector("#ai-window-switch-classic");
-      let smartSwitchButton = view.querySelector("#ai-window-switch-ai");
-      classicSwitchButton.hidden = false;
-      smartSwitchButton.hidden = false;
-      classicSwitchButton.toggleAttribute("checked", !isAIActive);
-      smartSwitchButton.toggleAttribute("checked", isAIActive);
-    }
-
-    let windowState = this._windowStates.get(win);
-    if (!windowState) {
-      windowState = {};
-      this._windowStates.set(win, windowState);
-    }
-
-    if (windowState.viewInitialized) {
-      return;
-    }
-
-    view.addEventListener("command", event => {
-      switch (event.target.id) {
-        case "ai-window-switch-classic":
-          this.toggleAIWindow(win, false);
-          break;
-        case "ai-window-switch-ai":
-          this.launchWindow(win.gBrowser.selectedBrowser, false, "switch");
-          break;
-      }
-    });
-
-    windowState.viewInitialized = true;
   },
 
   /**
@@ -1132,20 +730,16 @@ export const AIWindow = {
    *   not available yet, in which case the tab count is reported as 0
    */
   recordOpenWindowTelemetry(trigger, win) {
-    let signedIn = false;
     const opened_tabs = win?.gBrowser?.tabs.length ?? 0;
-    lazy.AuthProvider.isSignedIn()
-      .then(result => {
-        signedIn = result;
-      })
-      .finally(() => {
-        Glean.smartWindow.openWindow.record({
-          trigger,
-          fxa: signedIn,
-          onboarding: !lazy.hasFirstrunCompleted,
-          opened_tabs,
-        });
+    this.getAuthTelemetryExtras().then(({ fxa, provider }) => {
+      Glean.smartWindow.openWindow.record({
+        trigger,
+        fxa,
+        onboarding: !lazy.hasFirstrunCompleted,
+        opened_tabs,
+        auth_provider: provider,
       });
+    });
   },
 
   /**
@@ -1158,18 +752,29 @@ export const AIWindow = {
    * @param {boolean} openNewWindow - Whether a new window will be opened
    */
   recordLaunchCommandTelemetry(trigger, openNewWindow) {
-    let signedIn = false;
-    lazy.AuthProvider.isSignedIn()
-      .then(result => {
-        signedIn = result;
-      })
-      .finally(() => {
-        Glean.smartWindow.launchCommandInvoked.record({
-          trigger,
-          fxa: signedIn,
-          new_window: openNewWindow,
-        });
+    this.getAuthTelemetryExtras().then(({ fxa, provider }) => {
+      Glean.smartWindow.launchCommandInvoked.record({
+        trigger,
+        fxa,
+        new_window: openNewWindow,
+        auth_provider: provider,
       });
+    });
+  },
+
+  /**
+   * Reads the fxa and provider extras recorded on open_window and
+   * launch_command_invoked. fxa reflects the Mozilla account only, whichever
+   * provider is active.
+   *
+   * @returns {Promise<{fxa: boolean, provider: string|undefined}>}
+   */
+  async getAuthTelemetryExtras() {
+    const [fxa, provider] = await Promise.all([
+      lazy.FxaSignedInWatcher.isFxaSignedIn(),
+      lazy.AuthProvider.getProviderName().catch(() => undefined),
+    ]);
+    return { fxa, provider };
   },
 
   /**
@@ -1196,12 +801,9 @@ export const AIWindow = {
       win.document.documentElement.toggleAttribute("ai-window");
 
       this._reconcileNewTabPages(win, newTabPref, homePagePref);
-      this._updateHamburgerMenuPosition(win, { isToggling: true });
-      this._initializeAskButtonOnToolbox(win);
-      this._updateMonitorButtonForWindow(win);
-      this._updateGroupTabsButtonVisibility(
-        win.document.getElementById(GROUP_TABS_BUTTON_ID)
-      );
+      lazy.AIWindowToolbarButtons.updateWindow(win);
+      lazy.AIWindowToolbarButtons.updateGroupTabsButton(win);
+      lazy.SmartActionsToolbar.update(win);
       Services.obs.notifyObservers(
         win,
         "ai-window-state-changed",
@@ -1233,6 +835,9 @@ export const AIWindow = {
         // SessionStore entry before closeSidebar fires.
         this._uninitTabStateManager(win);
         lazy.AIWindowUI.closeSidebar(win);
+        // Classic windows don't need the hidden sidebar document;
+        // ensureBrowserIsAppended recreates it.
+        win.document.getElementById(lazy.AIWindowUI.BROWSER_ID)?.remove();
         this._recordSmartWindowUsage();
         Glean.smartWindow.classicSwitch.record({ duration_ms, opened_tabs });
       }
@@ -1281,6 +886,7 @@ export const AIWindow = {
       this._recordSmartWindowUsage();
     }
     this._uninitTabStateManager(win);
+    lazy.SmartActionsToolbar.uninit(win);
     this._windowStates.delete(win);
   },
 
@@ -1414,7 +1020,7 @@ export const AIWindow = {
       root.toggleAttribute("hide-ai-sidebar", shouldHideSidebarForNewtab);
       root.removeAttribute("aiwindow-immersive-view");
       root.removeAttribute("aiwindow-first-run");
-      this._updateMonitorButtonForWindow(win);
+      lazy.AIWindowToolbarButtons.updateWindow(win);
       return;
     }
 
@@ -1442,12 +1048,7 @@ export const AIWindow = {
     root.toggleAttribute("aiwindow-first-run", isFirstRunView);
     root.toggleAttribute("aiwindow-immersive-view", isImmersiveView);
 
-    const askButton = win.document.getElementById("smartwindow-ask-button");
-    if (askButton) {
-      askButton.hidden = isImmersiveView;
-    }
-
-    this._updateMonitorButtonForWindow(win);
+    lazy.AIWindowToolbarButtons.updateWindow(win);
 
     // Set attr on the specific browser that has content to override color scheme
     win.gBrowser.selectedBrowser?.toggleAttribute(
@@ -1494,100 +1095,6 @@ export const AIWindow = {
     let { contentDocument } = window.gBrowser.selectedBrowser;
     let aiWindowCE = contentDocument?.querySelector("ai-window");
     return aiWindowCE?.shadowRoot.getElementById("ai-window-smartbar");
-  },
-
-  _createSwitcherWidget() {
-    if (this._switcherWidgetCreated) {
-      return;
-    }
-
-    lazy.CustomizableUI.createWidget({
-      id: "ai-window-toggle",
-      l10nId: "toolbar-switcher-customizable-label-v2",
-      type: "view",
-      viewId: "ai-window-toggle-view",
-      defaultArea: lazy.CustomizableUI.AREA_TABSTRIP,
-      defaultAreaVerticalTabs: lazy.CustomizableUI.AREA_NAVBAR,
-      removable: true,
-      showInPrivateBrowsing: false,
-      onCreated: node => {
-        node.setAttribute("badged", "true");
-        node.classList.add("subviewbutton-nav");
-        node.setAttribute("aria-haspopup", "true");
-        this._updateButtonVisibility(node);
-      },
-      onViewShowing: event => {
-        const win = event.target.documentGlobal;
-        this.handleAIWindowSwitcher(win);
-      },
-    });
-    this._switcherWidgetCreated = true;
-  },
-
-  _createGroupTabsWidget() {
-    if (this._groupTabsWidgetCreated) {
-      return;
-    }
-
-    lazy.CustomizableUI.createWidget({
-      id: GROUP_TABS_BUTTON_ID,
-      l10nId: "smartwindow-organize-tabs-button",
-      defaultArea: lazy.CustomizableUI.AREA_TABSTRIP,
-      defaultAreaVerticalTabs: lazy.CustomizableUI.AREA_NAVBAR,
-      removable: true,
-      showInPrivateBrowsing: false,
-      onCreated: node => {
-        node.setAttribute("aria-haspopup", "dialog");
-        node.setAttribute("aria-expanded", "false");
-        this._updateGroupTabsButtonVisibility(node);
-      },
-      onCommand: event => {
-        lazy.AIWindowUI.toggleGroupTabsPanel(event.target.documentGlobal);
-      },
-    });
-    this._groupTabsWidgetCreated = true;
-  },
-
-  _destroyGroupTabsWidget() {
-    if (!this._groupTabsWidgetCreated) {
-      return;
-    }
-
-    lazy.CustomizableUI.destroyWidget(GROUP_TABS_BUTTON_ID);
-    this._groupTabsWidgetCreated = false;
-  },
-
-  /**
-   * The "Organize Tabs" button is a CustomizableUI button, it must not exist
-   * when the feature is off or when Smart Window is blocked by
-   * browser.ai.control.
-   */
-  _updateGroupTabsWidgetRegistration() {
-    if (lazy.autoTabGroupingEnabled && !this.isBlocked) {
-      this._createGroupTabsWidget();
-      return;
-    }
-    this._destroyGroupTabsWidget();
-  },
-
-  _destroySwitcherWidget() {
-    if (!this._switcherWidgetCreated) {
-      return;
-    }
-
-    lazy.CustomizableUI.destroyWidget("ai-window-toggle");
-    this._switcherWidgetCreated = false;
-  },
-
-  // The window switcher must not appear anywhere in the customizable UI (toolbar or
-  // customize palette) when Smart Window is blocked by the browser.ai.control
-  // or browser.ai.control.smartWindow.
-  _updateSwitcherWidgetRegistration() {
-    if (this.isBlocked) {
-      this._destroySwitcherWidget();
-    } else {
-      this._createSwitcherWidget();
-    }
   },
 
   // AIFeature interface implementation
@@ -1677,7 +1184,7 @@ export const AIWindow = {
    * @returns {Promise<void>}
    */
   async makeAvailable() {
-    lazy.AuthProvider.clearToSConsent();
+    lazy.AuthProvider.clearToUConsent();
     // Set memory generation pref to default
     Services.prefs.setBoolPref(PREF_MEMORIES_CONVERSATION, true);
     Services.prefs.setBoolPref(PREF_MEMORIES_HISTORY, true);
@@ -1716,7 +1223,7 @@ export const AIWindow = {
     const memories = await lazy.MemoryStore.getMemories();
     for (const memory of memories) {
       try {
-        await lazy.MemoryStore.hardDeleteMemory(memory.id);
+        await lazy.MemoryStore.hardDeleteMemory(memory.id, "other");
       } catch (err) {
         console.error("Failed to delete memory:", memory.id, err);
       }
@@ -1751,11 +1258,4 @@ XPCOMUtils.defineLazyPreferenceGetter(
   PREF_AI_CONTROL_DEFAULT,
   "available",
   AIWindow._onAIWindowEnabledPrefChange.bind(AIWindow)
-);
-
-XPCOMUtils.defineLazyPreferenceGetter(
-  AIWindow,
-  "verticalTabsEnabled",
-  "sidebar.verticalTabs",
-  false
 );

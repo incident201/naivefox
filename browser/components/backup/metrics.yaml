@@ -72,6 +72,11 @@ browser.backup:
     notification_emails:
       - mconley@mozilla.com
     expires: never
+    send_in_pings:
+      - metrics
+      - events # Temporary until bug 2087139
+    no_lint:
+      - METRIC_ON_EVENTS_LIFETIME
 
   scheduler_toggle_source:
     type: string
@@ -677,7 +682,7 @@ browser.backup:
               the last backup;
             - "missed" if the user was idle, sufficiently long has passed since
               the last backup, and this backup was scheduled to happen before;
-            - "user deleted some data" if cookies or other user data was
+            - "user deleted some data" if user data included in backups was
               deleted;
             - "encryption" if the password was added, changed, or removed;
             - "location" if the location changed (not implemented yet, see

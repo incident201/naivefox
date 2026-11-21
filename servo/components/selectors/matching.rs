@@ -88,6 +88,10 @@ bitflags! {
         /// A child of this element may be using sibling-index() or sibling-count(),
         /// and must be recascaded if other children are added or removed.
         const MAY_HAVE_TREE_COUNTING_FUNCTION = 1 << 11;
+
+        /// The element was evaluated as a container for a container query with
+        /// `attr()` functions whose attribute names can't be known at parse time.
+        const CONTAINER_QUERY_WITH_UNPARSED_ATTR = 1 << 12;
     }
 }
 
@@ -98,7 +102,8 @@ impl ElementSelectorFlags {
             | ElementSelectorFlags::ANCHORS_RELATIVE_SELECTOR
             | ElementSelectorFlags::ANCHORS_RELATIVE_SELECTOR_NON_SUBJECT
             | ElementSelectorFlags::RELATIVE_SELECTOR_SEARCH_DIRECTION_SIBLING
-            | ElementSelectorFlags::RELATIVE_SELECTOR_SEARCH_DIRECTION_ANCESTOR)
+            | ElementSelectorFlags::RELATIVE_SELECTOR_SEARCH_DIRECTION_ANCESTOR
+            | ElementSelectorFlags::CONTAINER_QUERY_WITH_UNPARSED_ATTR)
     }
 
     /// Returns the subset of flags that apply to the parent.
@@ -1183,7 +1188,7 @@ pub(crate) fn compound_matches_featureless_host<Impl: SelectorImpl>(
 
 /// Determines whether the given element matches the given compound selector.
 #[inline]
-fn matches_compound_selector<E>(
+pub fn matches_compound_selector<E>(
     selector_iter: &mut SelectorIter<E::Impl>,
     element: E,
     context: &mut MatchingContext<E::Impl>,

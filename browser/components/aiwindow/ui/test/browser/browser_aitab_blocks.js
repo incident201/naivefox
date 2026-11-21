@@ -507,6 +507,10 @@ add_task(async function test_text_block_content() {
         !block.shadowRoot.querySelector(".aitab-text-block-p"),
         "No paragraph is rendered before there are any"
       );
+      Assert.ok(
+        !block.shadowRoot.querySelector("h2"),
+        "No empty heading is rendered without a heading"
+      );
 
       block.heading = heading;
       block.paragraphs = Cu.cloneInto(paragraphs, content);
@@ -579,5 +583,102 @@ add_task(async function test_text_block_references() {
         { href: "https://neep.org" },
       ],
     ]
+  );
+});
+
+const IMAGE_SRC =
+  "chrome://browser/content/aiwindow/assets/aitab-error-kit.svg";
+
+add_task(async function test_image_renders() {
+  await withAITabDocument(
+    async src => {
+      await content.customElements.whenDefined("aitab-image");
+      const element = content.document.createElement("aitab-image");
+      // Lazy images only load once on screen, so keep it above the page.
+      content.document.body.prepend(element);
+      const image = element.wrappedJSObject;
+      await image.updateComplete;
+
+      Assert.ok(
+        !image.shadowRoot.querySelector(".aitab-image"),
+        "Nothing is rendered without a src"
+      );
+
+      image.src = src;
+      image.alt = "Smart Page illustration";
+      await image.updateComplete;
+      const img = image.shadowRoot.querySelector("img");
+      Assert.equal(img.alt, "Smart Page illustration", "The alt text renders");
+      await ContentTaskUtils.waitForCondition(
+        () => img.complete && img.naturalWidth,
+        "The image loads"
+      );
+    },
+    [IMAGE_SRC]
+  );
+});
+
+add_task(async function test_image_fails_quietly() {
+  await withAITabDocument(
+    async (src, blockedSrc) => {
+      await content.customElements.whenDefined("aitab-image");
+      const element = content.document.createElement("aitab-image");
+      // Lazy images only load once on screen, so keep it above the page.
+      content.document.body.prepend(element);
+      const image = element.wrappedJSObject;
+
+      image.src = blockedSrc;
+      await image.updateComplete;
+      Assert.ok(
+        image.shadowRoot.querySelector(".aitab-image"),
+        "The frame holds the space while the image loads"
+      );
+      await ContentTaskUtils.waitForCondition(
+        () => !image.shadowRoot.querySelector(".aitab-image"),
+        "Nothing is rendered once the page CSP blocks the image"
+      );
+
+      image.src = src;
+      await image.updateComplete;
+      Assert.ok(
+        image.shadowRoot.querySelector("img"),
+        "A new src is tried again after a failure"
+      );
+    },
+    [
+      IMAGE_SRC,
+      // Remote images are blocked until they have a vetted path to the page.
+      "https://example.com/image.png",
+    ]
+  );
+});
+
+add_task(async function test_image_radius_follows_width() {
+  await withAITabDocument(
+    async src => {
+      await content.customElements.whenDefined("aitab-image");
+      const element = content.document.createElement("aitab-image");
+      content.document.body.append(element);
+      const image = element.wrappedJSObject;
+      image.src = src;
+      await image.updateComplete;
+      const frame = image.shadowRoot.querySelector(".aitab-image");
+
+      const radii = [640, 374, 144].map(width => {
+        element.style.inlineSize = `${width}px`;
+        return content.getComputedStyle(frame).borderTopLeftRadius;
+      });
+      Assert.deepEqual(
+        radii,
+        ["50px", "24px", "10px"],
+        "Lead images, cards and thumbnails each get their own corner radius"
+      );
+      Assert.equal(
+        frame.getBoundingClientRect().height,
+        81,
+        "The frame keeps a 16:9 aspect ratio"
+      );
+    },
+    [IMAGE_SRC]
   );
 });

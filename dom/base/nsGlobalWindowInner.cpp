@@ -175,7 +175,6 @@
 #include "mozilla/dom/TrustedTypeUtils.h"
 #include "mozilla/dom/TrustedTypesConstants.h"
 #include "mozilla/dom/VRDisplay.h"
-#include "mozilla/dom/VRDisplayEvent.h"
 #include "mozilla/dom/VRDisplayEventBinding.h"
 #include "mozilla/dom/VREventObserver.h"
 #include "mozilla/dom/VisualViewport.h"
@@ -2495,16 +2494,6 @@ nsresult nsGlobalWindowInner::PostHandleEvent(EventChainPostVisitor& aVisitor) {
     if (mVREventObserver) {
       mVREventObserver->NotifyAfterLoad();
     }
-
-    uint32_t autoActivateVRDisplayID = 0;
-    nsGlobalWindowOuter* outer = GetOuterWindowInternal();
-    if (outer) {
-      autoActivateVRDisplayID = outer->GetAutoActivateVRDisplayID();
-    }
-    if (autoActivateVRDisplayID) {
-      DispatchVRDisplayActivate(autoActivateVRDisplayID,
-                                VRDisplayEventReason::Navigation);
-    }
   }
 
   return NS_OK;
@@ -3526,6 +3515,21 @@ bool nsGlobalWindowInner::DoResolve(
     return ResolveComponentsShim(aCx, aObj, aDesc);
   }
 
+  // Bug 2072122: Trusted Types readiness experiment only, to be removed.
+  // React DOM looks up this global when it loads. A lookup that reaches us
+  // means the page does not define it; we never resolve it.
+  if (StaticPrefs::dom_security_trusted_types_readiness_telemetry_enabled() &&
+      aId == XPCJSRuntime::Get()->GetStringID(
+                 XPCJSContext::IDX_REACT_DEVTOOLS_GLOBAL_HOOK) &&
+      !xpc::IsXrayWrapper(aObj)) {
+    if (Document* doc = GetExtantDoc();
+        doc && !doc->IsDetectingTrustedTypesLibrary()) {
+      doc->SetTrustedTypesReadinessSignal(
+          TrustedTypesReadinessSignal::LookedUpReactDevToolsHook);
+    }
+    return true;
+  }
+
   // We also support a "window.controllers" thing; apparently some
   // sites use it for browser-sniffing.  See bug 1010577.
 #ifdef USE_CONTROLLERS_SHIM
@@ -3582,6 +3586,13 @@ bool nsGlobalWindowInner::MayResolve(jsid aId) {
                  XPCJSContext::IDX_CONTROLLERS_CLASS)) {
     // We only resolve .controllers/.Controllers in release builds and on
     // non-chrome windows, but let's not worry about any of that stuff.
+    return true;
+  }
+
+  // Bug 2072122: Trusted Types readiness experiment only, to be removed.
+  if (StaticPrefs::dom_security_trusted_types_readiness_telemetry_enabled() &&
+      aId == XPCJSRuntime::Get()->GetStringID(
+                 XPCJSContext::IDX_REACT_DEVTOOLS_GLOBAL_HOOK)) {
     return true;
   }
 
@@ -4039,10 +4050,10 @@ void nsGlobalWindowInner::Prompt(const nsAString& aMessage,
 }
 
 void nsGlobalWindowInner::Focus(CallerType aCallerType, ErrorResult& aError) {
-  FORWARD_TO_OUTER_OR_THROW(FocusOuter,
-                            (aCallerType, /* aFromOtherProcess */ false,
-                             nsFocusManager::GenerateFocusActionId()),
-                            aError, );
+  LazyFocusActionId actionId;
+  FORWARD_TO_OUTER_OR_THROW(
+      FocusOuter, (aCallerType, /* aFromOtherProcess */ false, actionId),
+      aError, );
 }
 
 nsresult nsGlobalWindowInner::Focus(CallerType aCallerType) {
@@ -7016,7 +7027,7 @@ void nsGlobalWindowInner::GetGamepads(nsTArray<RefPtr<Gamepad>>& aGamepads) {
   // mGamepads.Count() may not be sufficient, but it's not harmful.
   aGamepads.SetCapacity(mGamepads.Count());
   for (const auto& entry : mGamepads) {
-    Gamepad* gamepad = entry.GetWeak();
+    Gamepad* gamepad = entry.GetRawPtr();
     aGamepads.EnsureLengthAtLeast(gamepad->Index() + 1);
     aGamepads[gamepad->Index()] = gamepad;
   }
@@ -7055,7 +7066,7 @@ void nsGlobalWindowInner::SyncGamepadState() {
   if (mHasSeenGamepadInput) {
     RefPtr<GamepadManager> gamepadManager(GamepadManager::GetService());
     for (const auto& entry : mGamepads) {
-      gamepadManager->SyncGamepadState(entry.GetKey(), this, entry.GetWeak());
+      gamepadManager->SyncGamepadState(entry.GetKey(), this, entry.GetRawPtr());
     }
   }
 }
@@ -7085,154 +7096,6 @@ void nsGlobalWindowInner::NotifyPresentationGenerationChanged(
   for (const auto& display : mVRDisplays) {
     if (display->DisplayId() == aDisplayID) {
       display->OnPresentationGenerationChanged();
-    }
-  }
-}
-
-void nsGlobalWindowInner::DispatchVRDisplayActivate(
-    uint32_t aDisplayID, mozilla::dom::VRDisplayEventReason aReason) {
-  // Ensure that our list of displays is up to date
-  VRDisplay::UpdateVRDisplays(mVRDisplays, this);
-
-  // Search for the display identified with aDisplayID and fire the
-  // event if found.
-  for (const auto& display : mVRDisplays) {
-    if (display->DisplayId() == aDisplayID) {
-      if (aReason != VRDisplayEventReason::Navigation &&
-          display->IsAnyPresenting(gfx::kVRGroupContent)) {
-        // We only want to trigger this event if nobody is presenting to the
-        // display already or when a page is loaded by navigating away
-        // from a page with an active VR Presentation.
-        continue;
-      }
-
-      VRDisplayEventInit init;
-      init.mBubbles = false;
-      init.mCancelable = false;
-      init.mDisplay = display;
-      init.mReason.Construct(aReason);
-
-      RefPtr<VRDisplayEvent> event =
-          VRDisplayEvent::Constructor(this, u"vrdisplayactivate"_ns, init);
-      // vrdisplayactivate is a trusted event, allowing VRDisplay.requestPresent
-      // to be used in response to link traversal, user request (chrome UX), and
-      // HMD mounting detection sensors.
-      event->SetTrusted(true);
-      // VRDisplay.requestPresent normally requires a user gesture; however, an
-      // exception is made to allow it to be called in response to
-      // vrdisplayactivate during VR link traversal.
-      display->StartHandlingVRNavigationEvent();
-      DispatchEvent(*event);
-      display->StopHandlingVRNavigationEvent();
-      // Once we dispatch the event, we must not access any members as an event
-      // listener can do anything, including closing windows.
-      return;
-    }
-  }
-}
-
-void nsGlobalWindowInner::DispatchVRDisplayDeactivate(
-    uint32_t aDisplayID, mozilla::dom::VRDisplayEventReason aReason) {
-  // Ensure that our list of displays is up to date
-  VRDisplay::UpdateVRDisplays(mVRDisplays, this);
-
-  // Search for the display identified with aDisplayID and fire the
-  // event if found.
-  for (const auto& display : mVRDisplays) {
-    if (display->DisplayId() == aDisplayID && display->IsPresenting()) {
-      // We only want to trigger this event to content that is presenting to
-      // the display already.
-
-      VRDisplayEventInit init;
-      init.mBubbles = false;
-      init.mCancelable = false;
-      init.mDisplay = display;
-      init.mReason.Construct(aReason);
-
-      RefPtr<VRDisplayEvent> event =
-          VRDisplayEvent::Constructor(this, u"vrdisplaydeactivate"_ns, init);
-      event->SetTrusted(true);
-      DispatchEvent(*event);
-      // Once we dispatch the event, we must not access any members as an event
-      // listener can do anything, including closing windows.
-      return;
-    }
-  }
-}
-
-void nsGlobalWindowInner::DispatchVRDisplayConnect(uint32_t aDisplayID) {
-  // Ensure that our list of displays is up to date
-  VRDisplay::UpdateVRDisplays(mVRDisplays, this);
-
-  // Search for the display identified with aDisplayID and fire the
-  // event if found.
-  for (const auto& display : mVRDisplays) {
-    if (display->DisplayId() == aDisplayID) {
-      // Fire event even if not presenting to the display.
-      VRDisplayEventInit init;
-      init.mBubbles = false;
-      init.mCancelable = false;
-      init.mDisplay = display;
-      // VRDisplayEvent.reason is not set for vrdisplayconnect
-
-      RefPtr<VRDisplayEvent> event =
-          VRDisplayEvent::Constructor(this, u"vrdisplayconnect"_ns, init);
-      event->SetTrusted(true);
-      DispatchEvent(*event);
-      // Once we dispatch the event, we must not access any members as an event
-      // listener can do anything, including closing windows.
-      return;
-    }
-  }
-}
-
-void nsGlobalWindowInner::DispatchVRDisplayDisconnect(uint32_t aDisplayID) {
-  // Ensure that our list of displays is up to date
-  VRDisplay::UpdateVRDisplays(mVRDisplays, this);
-
-  // Search for the display identified with aDisplayID and fire the
-  // event if found.
-  for (const auto& display : mVRDisplays) {
-    if (display->DisplayId() == aDisplayID) {
-      // Fire event even if not presenting to the display.
-      VRDisplayEventInit init;
-      init.mBubbles = false;
-      init.mCancelable = false;
-      init.mDisplay = display;
-      // VRDisplayEvent.reason is not set for vrdisplaydisconnect
-
-      RefPtr<VRDisplayEvent> event =
-          VRDisplayEvent::Constructor(this, u"vrdisplaydisconnect"_ns, init);
-      event->SetTrusted(true);
-      DispatchEvent(*event);
-      // Once we dispatch the event, we must not access any members as an event
-      // listener can do anything, including closing windows.
-      return;
-    }
-  }
-}
-
-void nsGlobalWindowInner::DispatchVRDisplayPresentChange(uint32_t aDisplayID) {
-  // Ensure that our list of displays is up to date
-  VRDisplay::UpdateVRDisplays(mVRDisplays, this);
-
-  // Search for the display identified with aDisplayID and fire the
-  // event if found.
-  for (const auto& display : mVRDisplays) {
-    if (display->DisplayId() == aDisplayID) {
-      // Fire event even if not presenting to the display.
-      VRDisplayEventInit init;
-      init.mBubbles = false;
-      init.mCancelable = false;
-      init.mDisplay = display;
-      // VRDisplayEvent.reason is not set for vrdisplaypresentchange
-      RefPtr<VRDisplayEvent> event =
-          VRDisplayEvent::Constructor(this, u"vrdisplaypresentchange"_ns, init);
-      event->SetTrusted(true);
-      DispatchEvent(*event);
-      // Once we dispatch the event, we must not access any members as an event
-      // listener can do anything, including closing windows.
-      return;
     }
   }
 }

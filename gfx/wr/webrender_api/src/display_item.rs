@@ -6,14 +6,11 @@ use euclid::{SideOffsets2D, Angle};
 use peek_poke::PeekPoke;
 use std::ops::Not;
 // local imports
-use crate::{font, SnapshotImageKey};
+use crate::SnapshotImageKey;
 use crate::{APZScrollGeneration, HasScrollLinkedEffect, PipelineId, PropertyBinding};
 use crate::serde::{Serialize, Deserialize};
 use crate::color::ColorF;
-use crate::image::{ColorDepth, ImageKey};
-use crate::key_types::{EdgeMask, StretchSizeKey};
-use crate::interning;
-use crate::path::Path;
+use crate::image::ImageKey;
 use crate::units::*;
 use std::hash::{Hash, Hasher};
 
@@ -163,24 +160,21 @@ pub enum DisplayItem {
     // Clips
     RectClip(RectClipDisplayItem),
     RoundedRectClip(RoundedRectClipDisplayItem),
+    BorderClip(BorderClipDisplayItem),
     ImageMaskClip(ImageMaskClipDisplayItem),
     PathClip(PathClipDisplayItem),
     ClipChain(ClipChainItem),
 
     // Spaces and Frames that content can be scoped under.
     Iframe(IframeDisplayItem),
-    PushReferenceFrame(ReferenceFrameDisplayListItem),
     PushStackingContext(PushStackingContextDisplayItem),
 
     // These marker items indicate an array of data follows, to be used for the
     // next non-marker item.
-    SetGradientStops,
     SetFilterOps,
     SetFilterData,
-    SetPoints,
 
     // These marker items terminate a scope introduced by a previous item.
-    PopReferenceFrame,
     PopStackingContext,
 
     // For debugging purposes.
@@ -195,7 +189,7 @@ pub enum DisplayItem {
 pub enum DebugDisplayItem {
     Rectangle(RectangleDisplayItem),
     HitTest(HitTestDisplayItem),
-    Text(TextDisplayItem, Vec<font::GlyphInstance>),
+    Text(TextDisplayItem),
     Line(LineDisplayItem),
     Border(BorderDisplayItem),
     BoxShadow(BoxShadowDisplayItem),
@@ -209,19 +203,16 @@ pub enum DebugDisplayItem {
     ImageMaskClip(ImageMaskClipDisplayItem),
     PathClip(PathClipDisplayItem),
     RoundedRectClip(RoundedRectClipDisplayItem),
+    BorderClip(BorderClipDisplayItem),
     RectClip(RectClipDisplayItem),
     ClipChain(ClipChainItem, Vec<ClipId>),
 
     Iframe(IframeDisplayItem),
-    PushReferenceFrame(ReferenceFrameDisplayListItem),
     PushStackingContext(PushStackingContextDisplayItem),
 
-    SetGradientStops(Vec<GradientStop>),
     SetFilterOps(Vec<FilterOp>),
     SetFilterData(FilterData),
-    SetPoints(Vec<LayoutPoint>),
 
-    PopReferenceFrame,
     PopStackingContext,
 
     DebugMarker(u32)
@@ -231,22 +222,23 @@ pub enum DebugDisplayItem {
 pub struct ImageMaskClipDisplayItem {
     pub id: ClipId,
     pub spatial_id: SpatialId,
-    pub image_mask: ImageMask,
-    pub fill_rule: FillRule,
-} // IMPLICIT points: Vec<LayoutPoint>
+    /// The mask's rect; the image key and the polygon, if any, are in the
+    /// interned entry.
+    pub rect: LayoutRect,
+    pub clip: crate::interning::Handle<crate::interned_prims::ClipItemKey>,
+}
 
 /// Clips content to the interior of a path.
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Serialize, PeekPoke)]
 pub struct PathClipDisplayItem {
     pub id: ClipId,
     pub spatial_id: SpatialId,
-    /// Interned by the display list builder, see `DisplayListBuilder::define_clip_path`.
-    pub path: interning::Handle<Path>,
     /// Rect the path is positioned in, in the spatial node's local space. The
     /// path's coordinates are relative to the rect's origin, and content
     /// outside of the rect is clipped out.
     pub rect: LayoutRect,
-    pub fill_rule: FillRule,
+    /// The path, fill rule and origin live in the interned entry.
+    pub clip: crate::interning::Handle<crate::interned_prims::ClipItemKey>,
 }
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Serialize, PeekPoke)]
@@ -259,13 +251,18 @@ pub struct RectClipDisplayItem {
     /// Used for clips defined in the same space as anti-aliased content (e.g.
     /// SVG user space).
     pub anti_aliased: bool,
+    /// Always the one rectangle-in-clip-mode entry, but carried so every clip
+    /// item names its shape the same way.
+    pub clip: crate::interning::Handle<crate::interned_prims::ClipItemKey>,
 }
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Serialize, PeekPoke)]
 pub struct RoundedRectClipDisplayItem {
     pub id: ClipId,
     pub spatial_id: SpatialId,
-    pub clip: ComplexClipRegion,
+    pub rect: LayoutRect,
+    /// The radii, inset and mode live in the interned entry.
+    pub clip: crate::interning::Handle<crate::interned_prims::ClipItemKey>,
     /// Layout-space outset applied when snapping this clip's rect. Non-zero
     /// only for the internal zero-blur box-shadow desugar, where the inner
     /// ClipOut edge must stay a constant distance from the snapped element
@@ -273,6 +270,15 @@ pub struct RoundedRectClipDisplayItem {
     pub snap_outset: f32,
     /// See `RectClipDisplayItem::anti_aliased`.
     pub anti_aliased: bool,
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Serialize, PeekPoke)]
+pub struct BorderClipDisplayItem {
+    pub id: ClipId,
+    pub spatial_id: SpatialId,
+    pub clip_rect: LayoutRect,
+    /// The border styles, radii, widths and inset live in the interned entry.
+    pub clip: crate::interning::Handle<crate::interned_prims::ClipItemKey>,
 }
 
 /// The minimum and maximum allowable offset for a sticky frame in a single dimension.
@@ -424,22 +430,17 @@ pub enum GlyphShadowMode {
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Serialize, PeekPoke)]
 pub struct TextDisplayItem {
-    pub common: CommonItemProperties,
-    /// The area all the glyphs should be found in. Strictly speaking this isn't
-    /// necessarily needed, but layout engines should already "know" this, and we
-    /// use it cull and size things quickly before glyph layout is done. Currently
-    /// the glyphs *can* be outside these bounds, but that should imply they
-    /// can be cut off.
-    // FIXME: these are currently sometimes ignored to keep some old wrench tests
-    // working, but we should really just fix the tests!
-    pub bounds: LayoutRect,
-    pub font_key: font::FontInstanceKey,
-    pub color: ColorF,
-    pub glyph_options: Option<font::GlyphOptions>,
-    /// Set by the display-list builder's shadow desugaring on the offset copies
-    /// of shadowed text. `None` for ordinary text.
-    pub shadow: GlyphShadowMode,
-} // IMPLICIT: glyphs: Vec<font::GlyphInstance>
+    pub spatial_id: SpatialId,
+    pub clip_chain_id: ClipChainId,
+    /// The run's entry in the builder's interner, which holds the font, colour,
+    /// glyph options, pen positions, shadow mode and raster space. Everything
+    /// about the run other than where it sits reaches the receiver through
+    /// this, including the glyphs, which is the point: an unchanged run then
+    /// costs eight bytes rather than twelve per glyph. `Handle::INVALID` marks
+    /// a fully transparent run captured inside a shadow scope only so its copy
+    /// can be drawn.
+    pub text_run: crate::interning::Handle<crate::interned_prims::TextRunKey>,
+}
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, MallocSizeOf, PartialEq, Serialize, PeekPoke)]
 pub struct NormalBorder {
@@ -573,18 +574,33 @@ pub struct NinePatchBorder {
     pub repeat_vertical: RepeatMode,
 }
 
+/// What a caller hands `push_border`. The item records a `BorderKind`.
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize, PeekPoke)]
 pub enum BorderDetails {
     Normal(NormalBorder),
     NinePatch(NinePatchBorder),
 }
 
+/// What a border item carries: a bare handle whichever kind it is. A
+/// gradient-sourced nine-patch is interned as the gradient it is, and an image
+/// one as an image border; both keys hold the nine-patch descriptor, widths
+/// included. A normal border's key holds its four sides, radii (already
+/// clamped to the border box), inset, AA flag and widths.
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize, PeekPoke)]
+pub enum BorderKind {
+    Normal(crate::interning::Handle<crate::interned_prims::NormalBorderKey>),
+    NinePatchImage(crate::interning::Handle<crate::interned_prims::ImageBorderKey>),
+    NinePatchLinearGradient(crate::interning::Handle<crate::interned_prims::LinearGradientKey>),
+    NinePatchRadialGradient(crate::interning::Handle<crate::interned_prims::RadialGradientKey>),
+    NinePatchConicGradient(crate::interning::Handle<crate::interned_prims::ConicGradientKey>),
+}
+
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Serialize, PeekPoke)]
 pub struct BorderDisplayItem {
-    pub common: CommonItemProperties,
-    pub bounds: LayoutRect,
-    pub widths: LayoutSideOffsets,
-    pub details: BorderDetails,
+    pub spatial_id: SpatialId,
+    pub clip_chain_id: ClipChainId,
+    /// The bounds and widths are in the key, whichever kind it is.
+    pub details: BorderKind,
 }
 
 #[repr(C)]
@@ -629,6 +645,17 @@ impl BorderRadius {
         self.shape_top_right == 1.0 &&
         self.shape_bottom_left == 1.0 &&
         self.shape_bottom_right == 1.0
+    }
+
+    pub fn has_uniform_radii(&self) -> bool {
+        let r = self.top_left.width;
+        self.top_left.height == r
+            && self.top_right.width == r
+            && self.top_right.height == r
+            && self.bottom_right.width == r
+            && self.bottom_right.height == r
+            && self.bottom_left.width == r
+            && self.bottom_left.height == r
     }
 }
 
@@ -720,7 +747,7 @@ pub struct Gradient {
     pub end: LayoutVector2D,
     pub extend_mode: ExtendMode,
     pub alpha_mode: AlphaMode,
-} // IMPLICIT: stops: Vec<GradientStop>
+}
 
 impl Gradient {
     pub fn is_valid(&self) -> bool {
@@ -734,17 +761,15 @@ impl Gradient {
 /// The area
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Serialize, PeekPoke)]
 pub struct GradientDisplayItem {
-    /// NOTE: common.clip_rect is the area the gradient covers
-    pub common: CommonItemProperties,
-    /// The area to tile the gradient over (first tile starts at origin of this rect)
-    // FIXME: this should ideally just be `tile_origin` here, with the clip_rect
-    // defining the bounds of the item. Needs non-trivial backend changes.
-    pub bounds: LayoutRect,
-    /// How big a tile of the of the gradient should be (common case: bounds.size)
-    pub tile_size: LayoutSize,
-    /// The space between tiles of the gradient (common case: 0)
-    pub tile_spacing: LayoutSize,
-    pub gradient: Gradient,
+    pub spatial_id: SpatialId,
+    pub clip_chain_id: ClipChainId,
+    /// The gradient's entry in the builder's interner, which holds the stops,
+    /// the endpoints, the extend mode, the tile stretch ratio and spacing. The
+    /// stops are the point: they were twenty bytes each on every paint. Its
+    /// prim rect is the gradient's local rect, already through
+    /// `optimize_linear_gradient`: simplified, clipped to the clip rect and
+    /// with the tile size folded in.
+    pub gradient: crate::interning::Handle<crate::interned_prims::LinearGradientKey>,
 }
 
 #[repr(C)]
@@ -763,7 +788,7 @@ pub struct RadialGradient {
     pub end_offset: f32,
     pub extend_mode: ExtendMode,
     pub alpha_mode: AlphaMode,
-} // IMPLICIT stops: Vec<GradientStop>
+}
 
 impl RadialGradient {
     pub fn is_valid(&self) -> bool {
@@ -783,7 +808,7 @@ pub struct ConicGradient {
     pub end_offset: f32,
     pub extend_mode: ExtendMode,
     pub alpha_mode: AlphaMode,
-} // IMPLICIT stops: Vec<GradientStop>
+}
 
 impl ConicGradient {
     pub fn is_valid(&self) -> bool {
@@ -804,30 +829,22 @@ pub struct ClipChainItem {
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Serialize, PeekPoke)]
 pub struct RadialGradientDisplayItem {
-    pub common: CommonItemProperties,
-    /// The area to tile the gradient over (first tile starts at origin of this rect)
-    // FIXME: this should ideally just be `tile_origin` here, with the clip_rect
-    // defining the bounds of the item. Needs non-trivial backend changes.
-    pub bounds: LayoutRect,
-    pub gradient: RadialGradient,
-    pub tile_size: LayoutSize,
-    pub tile_spacing: LayoutSize,
-    /// Which edges get anti-aliased under a transform. Narrowed by
-    /// `optimize_radial_gradient` where the gradient abuts a solid margin it
-    /// split off; see `RectangleDisplayItem::rect`.
-    pub transformed_aa_edges: EdgeMask,
+    pub spatial_id: SpatialId,
+    pub clip_chain_id: ClipChainId,
+    /// The key's prim rect is the gradient's local rect, already through
+    /// `optimize_radial_gradient`, which is also what emitted the solid margin
+    /// rects that precede this item; its edge mask is narrowed where a margin
+    /// covers an edge.
+    pub gradient: crate::interning::Handle<crate::interned_prims::RadialGradientKey>,
 }
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Serialize, PeekPoke)]
 pub struct ConicGradientDisplayItem {
-    pub common: CommonItemProperties,
-    /// The area to tile the gradient over (first tile starts at origin of this rect)
-    // FIXME: this should ideally just be `tile_origin` here, with the clip_rect
-    // defining the bounds of the item. Needs non-trivial backend changes.
-    pub bounds: LayoutRect,
-    pub gradient: ConicGradient,
-    pub tile_size: LayoutSize,
-    pub tile_spacing: LayoutSize,
+    pub spatial_id: SpatialId,
+    pub clip_chain_id: ClipChainId,
+    /// The key's prim rect is the gradient's local rect, already clipped by
+    /// `apply_gradient_local_clip`.
+    pub gradient: crate::interning::Handle<crate::interned_prims::ConicGradientKey>,
 }
 
 /// Renders a filtered region of its backdrop
@@ -836,10 +853,6 @@ pub struct BackdropFilterDisplayItem {
     pub common: CommonItemProperties,
 }
 // IMPLICIT: filters: Vec<FilterOp>, filter_datas: Vec<FilterData>, filter_primitives: Vec<FilterPrimitive>
-
-#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Serialize, PeekPoke)]
-pub struct ReferenceFrameDisplayListItem {
-}
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Serialize, PeekPoke)]
 pub struct ReferenceFrameDescriptor {
@@ -987,8 +1000,9 @@ pub struct StackingContext {
     pub clip_chain_id: Option<ClipChainId>,
     /// Raster space already resolved against the enclosing stacking contexts by
     /// `DisplayListBuilder::push_stacking_context`, not the space its caller
-    /// requested. Resolving on the builder means one raster space stack rather
-    /// than two that have to agree.
+    /// requested. Resolving on the builder means the one raster space stack that
+    /// text interning needs is also the one the receiver reads, rather than two
+    /// that have to agree.
     pub raster_space: RasterSpace,
     pub flags: StackingContextFlags,
     /// Non-zero for a shadow emitted by the display list builder's shadow
@@ -1983,6 +1997,10 @@ impl FilterData {
 pub struct IframeDisplayItem {
     pub bounds: LayoutRect,
     pub clip_rect: LayoutRect,
+    /// The rectangle clip the scene builder defines from `clip_rect` as the
+    /// iframe pipeline's root clip. Interned by the builder like any other
+    /// clip, since the scene builder has no interner of its own to mint one.
+    pub clip: crate::interning::Handle<crate::interned_prims::ClipItemKey>,
     pub space_and_clip: SpaceAndClipInfo,
     pub pipeline_id: PipelineId,
     pub ignore_missing_pipeline: bool,
@@ -1990,25 +2008,18 @@ pub struct IframeDisplayItem {
 
 /// An image drawn over `bounds`, either stretched to fill it or tiled across
 /// it. The builder's `push_image` and `push_repeating_image` both produce this
-/// item; which one it was is in `stretch_size`.
+/// item; which one it was is in the interned entry's stretch size.
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Serialize, PeekPoke)]
 pub struct ImageDisplayItem {
-    pub common: CommonItemProperties,
-    /// The area to tile the image over (first tile starts at origin of this rect)
-    // FIXME: this should ideally just be `tile_origin` here, with the clip_rect
-    // defining the bounds of the item. Needs non-trivial backend changes.
-    pub bounds: LayoutRect,
-    /// How large to make a single tile of the image. An axis that fills the
-    /// bounds is recorded as such rather than by its size, so a stretched
-    /// image's key does not depend on how big it is drawn.
-    pub stretch_size: StretchSizeKey,
-    /// The space between tiles (common case: 0)
-    pub tile_spacing: LayoutSize,
-    pub image_key: ImageKey,
-    pub image_rendering: ImageRendering,
-    pub alpha_type: AlphaType,
-    /// A hack used by gecko to color a simple bitmap font used for tofu glyphs
-    pub color: ColorF,
+    pub spatial_id: SpatialId,
+    pub clip_chain_id: ClipChainId,
+    /// The image key, tile size and spacing, rendering, alpha type and colour
+    /// live in the interned entry. Its prim rect is the area to tile the image
+    /// over (first tile starts at its origin), already collapsed to one tile on
+    /// any axis a single tile covers.
+    // FIXME: the prim rect should ideally just be a tile origin, with the clip
+    // rect defining the bounds of the item. Needs non-trivial backend changes.
+    pub image: crate::interning::Handle<crate::interned_prims::ImagePrimKey>,
 }
 
 #[repr(u8)]
@@ -2027,13 +2038,11 @@ pub enum AlphaType {
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Serialize, PeekPoke)]
 pub struct YuvImageDisplayItem {
-    pub common: CommonItemProperties,
-    pub bounds: LayoutRect,
-    pub yuv_data: YuvData,
-    pub color_depth: ColorDepth,
-    pub color_space: YuvColorSpace,
-    pub color_range: ColorRange,
-    pub image_rendering: ImageRendering,
+    pub spatial_id: SpatialId,
+    pub clip_chain_id: ClipChainId,
+    /// The planes, format, colour depth, space and range and the rendering
+    /// live in the interned entry, with the bounds as its prim rect.
+    pub yuv_image: crate::interning::Handle<crate::interned_prims::YuvImagePrimKey>,
 }
 
 #[repr(u8)]
@@ -2448,6 +2457,7 @@ impl DisplayItem {
             DisplayItem::HitTest(..) => "hit_test",
             DisplayItem::RectClip(..) => "rect_clip",
             DisplayItem::RoundedRectClip(..) => "rounded_rect_clip",
+            DisplayItem::BorderClip(..) => "border_clip",
             DisplayItem::ImageMaskClip(..) => "image_mask_clip",
             DisplayItem::PathClip(..) => "path_clip",
             DisplayItem::ClipChain(..) => "clip_chain",
@@ -2456,16 +2466,12 @@ impl DisplayItem {
             DisplayItem::Iframe(..) => "iframe",
             DisplayItem::Image(..) => "image",
             DisplayItem::Line(..) => "line",
-            DisplayItem::PopReferenceFrame => "pop_reference_frame",
             DisplayItem::PopStackingContext => "pop_stacking_context",
-            DisplayItem::PushReferenceFrame(..) => "push_reference_frame",
             DisplayItem::PushStackingContext(..) => "push_stacking_context",
             DisplayItem::SetFilterOps => "set_filter_ops",
             DisplayItem::SetFilterData => "set_filter_data",
-            DisplayItem::SetPoints => "set_points",
             DisplayItem::RadialGradient(..) => "radial_gradient",
             DisplayItem::Rectangle(..) => "rectangle",
-            DisplayItem::SetGradientStops => "set_gradient_stops",
             DisplayItem::Text(..) => "text",
             DisplayItem::YuvImage(..) => "yuv_image",
             DisplayItem::BackdropFilter(..) => "backdrop_filter",
@@ -2493,6 +2499,7 @@ impl_default_for_enums! {
     RepeatMode => Stretch,
     NinePatchBorderSource => Image(ImageKey::default(), ImageRendering::Auto),
     BorderDetails => Normal(NormalBorder::default()),
+    BorderKind => Normal(crate::interning::Handle::INVALID),
     BorderRadiusKind => Uniform,
     BorderStyle => None,
     BoxShadowClipMode => Outset,

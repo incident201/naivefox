@@ -361,6 +361,31 @@ void NrIceCtx::DestroyStream(const std::string& id) {
   }
 }
 
+nsresult NrIceCtx::ResizeCandidatePool(uint8_t aSize, const std::string& aUfrag,
+                                       const std::string& aPwd) {
+  ASSERT_ON_THREAD(sts_target_);
+
+  int r = nr_ice_ctx_resize_candidate_pool(ctx_, aSize, aUfrag.c_str(),
+                                           aPwd.c_str());
+  if (r) {
+    MOZ_MTLOG(ML_ERROR, "Couldn't resize the candidate pool for '"
+                            << name_ << "': error=" << r);
+    return NS_ERROR_FAILURE;
+  }
+
+  return NS_OK;
+}
+
+void NrIceCtx::EmptyCandidatePool() {
+  ASSERT_ON_THREAD(sts_target_);
+  nr_ice_ctx_empty_candidate_pool(ctx_);
+}
+
+uint8_t NrIceCtx::CandidatePoolSize() const {
+  ASSERT_ON_THREAD(sts_target_);
+  return nr_ice_ctx_candidate_pool_size(ctx_);
+}
+
 // Handler callbacks
 int NrIceCtx::select_pair(void* obj, nr_ice_media_stream* stream,
                           int component_id, nr_ice_cand_pair** potentials,
@@ -442,9 +467,7 @@ int NrIceCtx::stream_checking(void* obj, nr_ice_media_stream* stream) {
   NrIceCtx* ctx = static_cast<NrIceCtx*>(obj);
   RefPtr<NrIceMediaStream> s = ctx->FindStream(stream);
 
-  MOZ_ASSERT(s);
-
-  if (!s->AnyGenerationIsConnected()) {
+  if (s && !s->AnyGenerationIsConnected()) {
     // the checking state only applies if we aren't connected
     ctx->SignalConnectionStateChange(s, ICE_CTX_CHECKING);
   }
@@ -1002,16 +1025,23 @@ void NrIceCtx::SetCtxFlags(bool default_route_only) {
   }
 }
 
-nsresult NrIceCtx::StartGathering(bool default_route_only,
-                                  bool obfuscate_host_addresses) {
+void NrIceCtx::SetGatheringFlags(bool default_route_only,
+                                 bool obfuscate_host_addresses) {
   ASSERT_ON_THREAD(sts_target_);
-  MOZ_MTLOG(ML_NOTICE, "NrIceCtx(" << name_ << "): " << __func__);
 
   if (obfuscate_host_addresses) {
     nr_ice_ctx_add_flags(ctx_, NR_ICE_CTX_FLAGS_OBFUSCATE_HOST_ADDRESSES);
   }
 
   SetCtxFlags(default_route_only);
+}
+
+nsresult NrIceCtx::StartGathering(bool default_route_only,
+                                  bool obfuscate_host_addresses) {
+  ASSERT_ON_THREAD(sts_target_);
+  MOZ_MTLOG(ML_NOTICE, "NrIceCtx(" << name_ << "): " << __func__);
+
+  SetGatheringFlags(default_route_only, obfuscate_host_addresses);
 
   // This might start gathering for the first time, or again after
   // renegotiation, or might do nothing at all if gathering has already
@@ -1021,6 +1051,13 @@ nsresult NrIceCtx::StartGathering(bool default_route_only,
   if (r && r != R_WOULDBLOCK) {
     MOZ_MTLOG(ML_ERROR, "ICE FAILED: Couldn't gather ICE candidates for '"
                             << name_ << "', error=" << r);
+    // nICEr does not fire stream_gathered when nr_ice_gather fails before
+    // the streams are initialized. Gathering is over, so content must still
+    // get end-of-candidates.
+    for (auto& [id, stream] : streams_) {
+      (void)id;
+      stream->GatheringFailed();
+    }
     SignalAllStreamsFailed();
     return NS_ERROR_FAILURE;
   }

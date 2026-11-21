@@ -38,6 +38,7 @@ import androidx.core.text.HtmlCompat
 import androidx.core.view.OnApplyWindowInsetsListener
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavController
 import androidx.navigation.fragment.findNavController
@@ -68,6 +69,7 @@ import mozilla.components.browser.state.state.CustomTabSessionState
 import mozilla.components.browser.state.state.SessionState
 import mozilla.components.browser.state.state.TabSessionState
 import mozilla.components.browser.state.state.content.DownloadState
+import mozilla.components.browser.state.state.selectedOrDefaultSearchEngine
 import mozilla.components.browser.state.store.BrowserStore
 import mozilla.components.browser.thumbnails.BrowserThumbnails
 import mozilla.components.browser.thumbnails.facts.BrowserThumbnailsFacts
@@ -177,7 +179,9 @@ import org.mozilla.fenix.bindings.SummarizeToolbarCFRBinding
 import org.mozilla.fenix.biometricauthentication.AuthenticationStatus
 import org.mozilla.fenix.biometricauthentication.BiometricAuthenticationManager
 import org.mozilla.fenix.browser.applinks.AppLinksPromptFragment
+import org.mozilla.fenix.browser.applinks.BrowserFirstHosts
 import org.mozilla.fenix.browser.browsingmode.BrowsingMode
+import org.mozilla.fenix.browser.browsingmode.BrowsingModeObserver
 import org.mozilla.fenix.browser.permissions.FenixSitePermissionLearnMoreUrlProvider
 import org.mozilla.fenix.browser.readermode.DefaultReaderModeController
 import org.mozilla.fenix.browser.readermode.ReaderModeController
@@ -196,6 +200,8 @@ import org.mozilla.fenix.components.FindInPageIntegration
 import org.mozilla.fenix.components.accounts.FxaWebChannelIntegration
 import org.mozilla.fenix.components.appstate.AppAction
 import org.mozilla.fenix.components.appstate.AppAction.MessagingAction.MicrosurveyAction
+import org.mozilla.fenix.components.metrics.MetricsUtils
+import org.mozilla.fenix.components.metrics.toSearchAccessPoint
 import org.mozilla.fenix.components.share.ShareSource
 import org.mozilla.fenix.components.toolbar.BottomToolbarContainerIntegration
 import org.mozilla.fenix.components.toolbar.BottomToolbarContainerView
@@ -244,9 +250,13 @@ import org.mozilla.fenix.settings.downloads.DownloadLocationManager
 import org.mozilla.fenix.snackbar.FenixSnackbarDelegate
 import org.mozilla.fenix.snackbar.SnackbarBinding
 import org.mozilla.fenix.tabgroups.TabGroupsStrip
+import org.mozilla.fenix.tabgroups.navigateToExpandedTabGroup
+import org.mozilla.fenix.tabgroups.strip.TabGroupsStripScrollViewModel
+import org.mozilla.fenix.tabgroups.strip.observeSelectedTabForNavigation
 import org.mozilla.fenix.tabgroups.strip.redux.TabGroupsStripAction
 import org.mozilla.fenix.tabgroups.strip.redux.TabGroupsStripMiddleware
 import org.mozilla.fenix.tabgroups.strip.redux.TabGroupsStripStore
+import org.mozilla.fenix.tabgroups.strip.redux.TabGroupsStripTelemetryMiddleware
 import org.mozilla.fenix.tabstray.ext.toDisplayTitle
 import org.mozilla.fenix.tabstray.redux.state.Page
 import org.mozilla.fenix.theme.FirefoxTheme
@@ -316,6 +326,7 @@ abstract class BaseBrowserFragment :
     private val contextMenuFeature = ViewBoundFeatureWrapper<ContextMenuFeature>()
     private val downloadsFeature = ViewBoundFeatureWrapper<DownloadsFeature>()
     private val appLinksFeature = ViewBoundFeatureWrapper<AppLinksFeature>()
+    private val browserFirstHosts by lazy { BrowserFirstHosts(requireComponents.settings) }
     private val shareResourceFeature = ViewBoundFeatureWrapper<ShareResourceFeature>()
     private val copyDownloadsFeature = ViewBoundFeatureWrapper<CopyDownloadFeature>()
     private val promptsFeature = ViewBoundFeatureWrapper<PromptFeature>()
@@ -344,6 +355,7 @@ abstract class BaseBrowserFragment :
     private val snackbarBinding = ViewBoundFeatureWrapper<SnackbarBinding>()
     private val standardSnackbarErrorBinding = ViewBoundFeatureWrapper<StandardSnackbarErrorBinding>()
     private val ipProtectionWarningBinding = ViewBoundFeatureWrapper<IPProtectionWarningBinding>()
+    private val browsingModeObserver = ViewBoundFeatureWrapper<BrowsingModeObserver>()
 
     protected val summarizeToolbarCfrBinding = ViewBoundFeatureWrapper<SummarizeToolbarCFRBinding>()
 
@@ -418,13 +430,9 @@ abstract class BaseBrowserFragment :
         binding.engineView.setActivityContext(originalContext)
 
         startForResult = registerForActivityResult { result ->
-            listOf(
-                    promptsFeature,
-                    webAuthnFeature,
-                )
-                .any {
-                    it.onActivityResult(PIN_REQUEST, result.data, result.resultCode)
-                }
+            for (feature in listOf(promptsFeature, webAuthnFeature)) {
+                if (feature.onActivityResult(PIN_REQUEST, result.data, result.resultCode)) break
+            }
         }
 
         // DO NOT MOVE ANYTHING BELOW THIS addMarker CALL!
@@ -450,13 +458,10 @@ abstract class BaseBrowserFragment :
                     fragmentManager = parentFragmentManager,
                     sessionId = customTabSessionId,
                     dialog = appLinksPromptDialog(),
-                    launchInApp = { _ -> requireComponents.settings.shouldOpenLinksInApp(customTabSessionId != null) },
+                    launchInApp = ::shouldLaunchAppLinkInApp,
                     loadUrlUseCase = requireComponents.useCases.sessionUseCases.loadUrl,
-                    shouldPrompt = { _ -> requireComponents.settings.shouldPromptOpenLinksInApp() },
-                    alwaysOpenCheckboxAction = {
-                        requireComponents.settings.openLinksInExternalApp =
-                            requireContext().getString(R.string.pref_key_open_links_in_apps_always)
-                    },
+                    shouldPrompt = ::shouldPromptAppLink,
+                    alwaysOpenCheckboxAction = ::setAlwaysOpenInAppPreferences,
                     failedToLaunchAction = { fallbackUrl ->
                         fallbackUrl?.let {
                             val appLinksUseCases = requireComponents.useCases.appLinksUseCases
@@ -470,21 +475,20 @@ abstract class BaseBrowserFragment :
             view = binding.root,
         )
 
-        if (customTabSessionId == null) {
-            // We currently only need this observer to navigate to home
-            // in case all tabs have been removed on startup. No need to
-            // this if we have a known session to display.
-            observeRestoreComplete(requireComponents.core.store, findNavController())
-        }
+        observeTabState()
 
-        observeTabSelection(
-            requireComponents.core.store,
-            isCustomTabSession = customTabSessionId != null,
+        browsingModeObserver.set(
+            feature =
+                BrowsingModeObserver(
+                    store = requireComponents.core.store,
+                    customTabSessionId = customTabSessionId,
+                    onSelectedTabChanged = { tab ->
+                        activity?.runOnUiThread { updateThemeForSession(tab) }
+                    },
+                ),
+            owner = viewLifecycleOwner,
+            view = view,
         )
-
-        if (customTabSessionId == null) {
-            tabGroupsStripStore.dispatch(TabGroupsStripAction.InitializeDataObservation)
-        }
 
         observePrivateModeLock {
             findNavController()
@@ -1193,6 +1197,15 @@ abstract class BaseBrowserFragment :
                             override val onSelectCreditCard = {
                                 showBiometricPrompt(context)
                             }
+                            override val isSecurityCodeSaveEnabled = {
+                                context.components.settings.isCreditCardSecurityCodeEnabled
+                            }
+                            override val saveSecurityCode = {
+                                context.components.settings.shouldSaveCreditCardSecurityCode
+                            }
+                            override val onSaveSecurityCodeChanged = { enabled: Boolean ->
+                                context.components.settings.shouldSaveCreditCardSecurityCode = enabled
+                            }
                         },
                     addressDelegate =
                         object : AddressDelegate {
@@ -1323,11 +1336,32 @@ abstract class BaseBrowserFragment :
                             requireComponents.useCases.searchUseCases.newTabSearch
                         }
 
+                    store.state.search.selectedOrDefaultSearchEngine(request.isPrivate)?.let { searchEngine ->
+                        MetricsUtils.recordSearchMetrics(
+                            engine = searchEngine,
+                            // The context menu offers no engine to choose, so this is always the default for the
+                            // current browsing mode.
+                            isDefault = true,
+                            searchAccessPoint = MetricsUtils.Source.CONTEXT,
+                            nimbusEventStore = requireComponents.nimbus.events,
+                        )
+                    }
+
+                    val accessPoint = MetricsUtils.Source.CONTEXT.toSearchAccessPoint()
                     if (parentSession is CustomTabSessionState) {
-                        useCase.invoke(request.query)
+                        useCase.invoke(
+                            searchTerms = request.query,
+                            source = SessionState.Source.Internal.None,
+                            accessPoint = accessPoint,
+                        )
                         requireActivity().startActivity(openInFenixIntent)
                     } else {
-                        useCase.invoke(request.query, parentSessionId = parentSession?.id)
+                        useCase.invoke(
+                            searchTerms = request.query,
+                            source = SessionState.Source.Internal.None,
+                            parentSessionId = parentSession?.id,
+                            accessPoint = accessPoint,
+                        )
                     }
                 },
             owner = this,
@@ -1613,6 +1647,17 @@ abstract class BaseBrowserFragment :
         appStore: AppStore,
         settings: org.mozilla.fenix.utils.Settings,
     ): @Composable () -> Unit = {
+        val isSearchActive = appStore.observeAsComposableState { it.searchState.isSearchActive }.value
+        if (!isSearchActive) {
+            BrowserTabStripContent(appStore, settings)
+        }
+    }
+
+    @Composable
+    private fun BrowserTabStripContent(
+        appStore: AppStore,
+        settings: org.mozilla.fenix.utils.Settings,
+    ) {
         FirefoxTheme {
             TabStrip(
                 showTabCounterButton = false,
@@ -1659,13 +1704,49 @@ abstract class BaseBrowserFragment :
                 listOf(
                     TabGroupsStripMiddleware(
                         tabDataCoordinator = requireComponents.tabDataCoordinator,
+                        isHomepageAsNewTabEnabled = { context?.components?.settings?.enableHomepageAsNewTab ?: false },
+                        expandGroup = { navigateToExpandedTabGroup(it) },
                         scope = lifecycleScope,
-                    )
+                    ),
+                    TabGroupsStripTelemetryMiddleware(
+                        isHomepageAsNewTabEnabled = { context?.components?.settings?.enableHomepageAsNewTab ?: false }
+                    ),
                 )
         )
     }
 
-    private fun buildTabGroupsStrip(): @Composable () -> Unit = { TabGroupsStrip(store = tabGroupsStripStore) }
+    private val tabGroupsStripScrollViewModel: TabGroupsStripScrollViewModel by activityViewModels()
+
+    private fun buildTabGroupsStrip(): @Composable () -> Unit = {
+        TabGroupsStrip(
+            store = tabGroupsStripStore,
+            listState = tabGroupsStripScrollViewModel.listState,
+            showAddButton = requireComponents.settings.enableHomepageAsNewTab,
+        )
+    }
+
+    private fun observeTabState() {
+        if (customTabSessionId == null) {
+            // We currently only need this observer to navigate to home
+            // in case all tabs have been removed on startup. No need to
+            // this if we have a known session to display.
+            observeRestoreComplete(requireComponents.core.store, findNavController())
+        }
+
+        observeTabSelection(requireComponents.core.store)
+
+        if (customTabSessionId == null) {
+            tabGroupsStripStore.dispatch(TabGroupsStripAction.InitializeDataObservation)
+            if (requireComponents.settings.shouldShowTabGroupsStrip) {
+                observeSelectedTabForNavigation(
+                    fragment = this,
+                    store = requireComponents.core.store,
+                    currentDestinationId = R.id.browserFragment,
+                    directions = NavGraphDirections.actionGlobalHome(),
+                )
+            }
+        }
+    }
 
     private fun buildAwesomeBar(
         activity: HomeActivity,
@@ -1907,7 +1988,7 @@ abstract class BaseBrowserFragment :
             val messagingFeature =
                 MessagingFeature(
                     appStore = requireComponents.appStore,
-                    surface = FenixMessageSurfaceId.MICROSURVEY,
+                    surfaces = listOf(FenixMessageSurfaceId.MICROSURVEY),
                 )
             messagingFeatureMicrosurvey.set(
                 feature = messagingFeature,
@@ -2060,7 +2141,6 @@ abstract class BaseBrowserFragment :
     @VisibleForTesting
     internal fun observeTabSelection(
         store: BrowserStore,
-        isCustomTabSession: Boolean,
         mainDispatcher: CoroutineDispatcher = Dispatchers.Main,
     ) {
         consumeFlow(store, mainDispatcher = mainDispatcher) { flow ->
@@ -2074,7 +2154,7 @@ abstract class BaseBrowserFragment :
                 .collect {
                     dismissDownloadDialogs()
                     dismissRenameDialog()
-                    handleTabSelected(it, isCustomTabSession)
+                    handleTabSelected(it)
                 }
         }
     }
@@ -2091,11 +2171,7 @@ abstract class BaseBrowserFragment :
         downloadDialog?.dismiss()
     }
 
-    private fun handleTabSelected(selectedTab: TabSessionState, isCustomTabSession: Boolean) {
-        if (!this.isRemoving && !isCustomTabSession) {
-            updateThemeForSession(selectedTab)
-        }
-
+    private fun handleTabSelected(selectedTab: TabSessionState) {
         if (browserInitialized) {
             view?.let {
                 fullScreenChanged(false)
@@ -2303,7 +2379,7 @@ abstract class BaseBrowserFragment :
     @VisibleForTesting
     internal fun updateThemeForSession(session: SessionState) {
         val sessionMode = BrowsingMode.fromBoolean(session.content.private)
-        (activity as HomeActivity).browsingModeManager.mode = sessionMode
+        (activity as HomeActivity?)?.browsingModeManager?.mode = sessionMode
     }
 
     /** A safe version of [getCurrentTab] that safely checks for context nullability. */
@@ -2702,6 +2778,22 @@ abstract class BaseBrowserFragment :
 
         return downloadDialog == null && !isRenameFragmentShowing && isAdded
     }
+
+    /** Sets every open-links-in-app preference to "always" when the user ticks the always-open checkbox. */
+    @VisibleForTesting
+    internal fun setAlwaysOpenInAppPreferences() {
+        requireComponents.settings.openLinksInExternalApp =
+            requireContext().getString(R.string.pref_key_open_links_in_apps_always)
+        requireComponents.settings.openLinksInYoutube =
+            requireContext().getString(R.string.pref_key_open_links_in_youtube_always)
+    }
+
+    private fun shouldLaunchAppLinkInApp(url: String): Boolean =
+        browserFirstHosts.launchInApp(url)
+            ?: requireComponents.settings.shouldOpenLinksInApp(isCustomTab = customTabSessionId != null)
+
+    private fun shouldPromptAppLink(url: String): Boolean =
+        browserFirstHosts.shouldPrompt(url) ?: requireComponents.settings.shouldPromptOpenLinksInApp()
 
     private fun appLinksPromptDialog(): ((RedirectDialogData) -> AppLinksPromptFragment)? {
         if (!FxNimbus.features.appLinks.value().showNewPrompt) {

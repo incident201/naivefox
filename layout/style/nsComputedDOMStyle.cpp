@@ -31,6 +31,7 @@
 #include "mozilla/dom/Document.h"
 #include "mozilla/dom/Element.h"
 #include "mozilla/dom/ElementInlines.h"
+#include "nsBlockFrame.h"
 #include "nsCSSProps.h"
 #include "nsContentUtils.h"
 #include "nsDOMCSSDeclaration.h"
@@ -565,11 +566,7 @@ nsComputedDOMStyle::DoGetComputedStyleNoFlush(const Element* aElement,
     return nullptr;
   }
 
-  // XXX the !aElement->IsHTMLElement(nsGkAtoms::area)
-  // check is needed due to bug 135040 (to avoid using
-  // mPrimaryFrame). Remove it once that's fixed.
-  if (inDocWithShell && aStyleType == StyleType::All &&
-      !aElement->IsHTMLElement(nsGkAtoms::area)) {
+  if (inDocWithShell && aStyleType == StyleType::All) {
     if (const Element* element = aElement->GetPseudoElement(aPseudo)) {
       if (element->HasServoData()) {
         const ComputedStyle* result =
@@ -875,15 +872,6 @@ bool nsComputedDOMStyle::NeedsToFlushStyle(
   return false;
 }
 
-static bool IsNonReplacedInline(nsIFrame* aFrame) {
-  // FIXME: this should be IsInlineInsideStyle() since width/height
-  // doesn't apply to ruby boxes.
-  return aFrame->StyleDisplay()->IsInlineFlow() && !aFrame->IsReplaced() &&
-         !aFrame->IsFieldSetFrame() && !aFrame->IsBlockFrame() &&
-         !aFrame->IsScrollContainerFrame() &&
-         !aFrame->IsColumnSetWrapperFrame();
-}
-
 static Side SideForPaddingOrMarginOrInsetProperty(
     NonCustomCSSPropertyId aPropId) {
   switch (aPropId) {
@@ -951,7 +939,7 @@ bool nsComputedDOMStyle::NeedsToFlushLayout(
              frame->StylePosition()->mMinHeight.HasAnchorPositioningFunction();
     case eCSSProperty_width:
     case eCSSProperty_height:
-      return !IsNonReplacedInline(frame);
+      return !frame->IsNonReplacedInline();
     case eCSSProperty_grid_template_rows:
     case eCSSProperty_grid_template_columns:
       return !!nsGridContainerFrame::GetGridContainerFrame(frame);
@@ -991,6 +979,7 @@ bool nsComputedDOMStyle::NeedsToFlushLayout(
       // anchor-dependent values here.
       Side side = SideForPaddingOrMarginOrInsetProperty(aPropId);
       return !style->StyleMargin()->mMargin.Get(side).ConvertsToLength() ||
+             MarginMayBeTrimmed(outerFrame, side) ||
              HasPositionFallbacks(frame);
     }
     default:
@@ -1099,10 +1088,7 @@ void nsComputedDOMStyle::UpdateCurrentStyleSources(
 
   mComputedStyle = nullptr;
 
-  // XXX the !mElement->IsHTMLElement(nsGkAtoms::area) check is needed due to
-  // bug 135040 (to avoid using mPrimaryFrame). Remove it once that's fixed.
-  if (mStyleType == StyleType::All &&
-      !mElement->IsHTMLElement(nsGkAtoms::area)) {
+  if (mStyleType == StyleType::All) {
     mOuterFrame = GetOuterFrame();
     mInnerFrame = mOuterFrame;
     if (mOuterFrame) {
@@ -1806,7 +1792,7 @@ already_AddRefed<CSSValue> nsComputedDOMStyle::DoGetMarginRight() {
 }
 
 already_AddRefed<CSSValue> nsComputedDOMStyle::DoGetHeight() {
-  if (mInnerFrame && !IsNonReplacedInline(mInnerFrame)) {
+  if (mInnerFrame && !mInnerFrame->IsNonReplacedInline()) {
     AssertFlushedPendingReflows();
     const nsMargin adjustedValues = GetAdjustedValuesForBoxSizing();
     return AppUnitsToCSSValue(mInnerFrame->GetContentRect().height +
@@ -1819,7 +1805,7 @@ already_AddRefed<CSSValue> nsComputedDOMStyle::DoGetHeight() {
 }
 
 already_AddRefed<CSSValue> nsComputedDOMStyle::DoGetWidth() {
-  if (mInnerFrame && !IsNonReplacedInline(mInnerFrame)) {
+  if (mInnerFrame && !mInnerFrame->IsNonReplacedInline()) {
     AssertFlushedPendingReflows();
     nsMargin adjustedValues = GetAdjustedValuesForBoxSizing();
     return AppUnitsToCSSValue(mInnerFrame->GetContentRect().width +
@@ -2114,11 +2100,54 @@ already_AddRefed<CSSValue> nsComputedDOMStyle::GetPaddingWidthFor(
   return AppUnitsToCSSValue(mInnerFrame->GetUsedPadding().Side(aSide));
 }
 
+/* static */
+bool nsComputedDOMStyle::MarginMayBeTrimmed(const nsIFrame* aFrame,
+                                            Side aSide) {
+  if (!aFrame->IsBlockOutside() ||
+      aFrame->HasAnyStateBits(NS_FRAME_OUT_OF_FLOW)) {
+    return false;
+  }
+
+  for (const nsIFrame* parent = aFrame->GetParent(); parent;
+       parent = parent->GetParent()) {
+    const nsBlockFrame* block = do_QueryFrame(parent);
+    if (!block) {
+      return false;
+    }
+    const WritingMode wm = parent->GetWritingMode();
+    const StyleMarginTrim trim = parent->StyleMargin()->mMarginTrim;
+    if ((bool(trim & StyleMarginTrim::BLOCK_START) &&
+         aSide == wm.PhysicalSide(LogicalSide::BStart)) ||
+        (bool(trim & StyleMarginTrim::BLOCK_END) &&
+         aSide == wm.PhysicalSide(LogicalSide::BEnd))) {
+      return true;
+    }
+    // A further ancestor can only discard our margin if the margin collapses
+    // out through this block to reach that ancestor's content edge.
+    const bool isBStart = aSide == wm.PhysicalSide(LogicalSide::BStart);
+    const bool isBEnd = aSide == wm.PhysicalSide(LogicalSide::BEnd);
+    if (!isBStart && !isBEnd) {
+      return false;
+    }
+    bool bStartMarginRoot, bEndMarginRoot;
+    block->IsMarginRoot(&bStartMarginRoot, &bEndMarginRoot);
+    if ((isBStart && bStartMarginRoot) || (isBEnd && bEndMarginRoot) ||
+        parent->StyleBorder()->GetComputedBorderWidth(aSide) != 0 ||
+        !nsLayoutUtils::IsPaddingZero(
+            parent->StylePadding()->mPadding.Get(aSide))) {
+      return false;
+    }
+  }
+  return false;
+}
+
 already_AddRefed<CSSValue> nsComputedDOMStyle::GetMarginFor(Side aSide) {
   // Use raw margin here, layout-dependent margins should be stored in used
-  // margin.
+  // margin. Note that a plain length can be layout-dependent too, since
+  // `margin-trim` on an ancestor may have discarded it.
   const auto& margin = StyleMargin()->mMargin.Get(aSide);
-  if (!mInnerFrame || margin.ConvertsToLength()) {
+  if (!mInnerFrame ||
+      (margin.ConvertsToLength() && !MarginMayBeTrimmed(mOuterFrame, aSide))) {
     auto val = MakeRefPtr<nsROCSSPrimitiveValue>();
     SetValueToMargin(val, margin);
     return val.forget();
@@ -2449,13 +2478,10 @@ void nsComputedDOMStyle::RegisterPrefChangeCallbacks() {
     }
   }
 
-  prefs.AppendElement(nullptr);
-
   MOZ_ASSERT(!gCallbackPrefs);
   gCallbackPrefs = new nsTArray<const char*>(std::move(prefs));
 
-  Preferences::RegisterCallbacks(MarkComputedStyleMapDirty,
-                                 gCallbackPrefs->Elements(),
+  Preferences::RegisterCallbacks(MarkComputedStyleMapDirty, *gCallbackPrefs,
                                  GetComputedStyleMap());
 }
 
@@ -2465,8 +2491,7 @@ void nsComputedDOMStyle::UnregisterPrefChangeCallbacks() {
     return;
   }
 
-  Preferences::UnregisterCallbacks(MarkComputedStyleMapDirty,
-                                   gCallbackPrefs->Elements(),
+  Preferences::UnregisterCallbacks(MarkComputedStyleMapDirty, *gCallbackPrefs,
                                    GetComputedStyleMap());
   gCallbackPrefs = nullptr;
 }

@@ -363,6 +363,7 @@ static void PatchBaselineFramesForDebugMode(
             // For CallVM (case B) the assumption is that all callVMs which can
             // trigger debug mode OSR are the *only* callVMs generated for their
             // respective pc locations in the Baseline JIT code.
+            MOZ_ASSERT(CanResumeBaselineScriptAfterDebugModeOSR(kind));
             const RetAddrEntry* retAddrEntry = nullptr;
             switch (kind) {
               case RetAddrEntry::Kind::IC:
@@ -390,6 +391,7 @@ static void PatchBaselineFramesForDebugMode(
             // Resume in the Baseline Interpreter because these callVMs are not
             // present in the new BaselineScript if we recompiled without debug
             // instrumentation.
+            MOZ_ASSERT(CanResumeBaselineInterpreterAfterDebugModeOSR(kind));
             if (kind == RetAddrEntry::Kind::DebugPrologue) {
               frame.baselineFrame()->switchFromJitToInterpreterAtPrologue(cx);
             } else {
@@ -518,7 +520,8 @@ bool js::jit::RecompileBaselineScriptForDebugMode(
   BaselineScript* oldBaselineScript =
       script->jitScript()->clearBaselineScript(cx->gcContext(), script);
 
-  BaselineOptions options({BaselineOption::ForceMainThreadCompilation});
+  BaselineOptions options({BaselineOption::ForceMainThreadCompilation,
+                           BaselineOption::CompileDebugModeOSRResumeTargets});
   if (observing) {
     options.setFlag(BaselineOption::ForceDebugInstrumentation);
   }
@@ -580,7 +583,7 @@ static void UndoRecompileBaselineScriptsForDebugMode(
       BaselineScript* baselineScript =
           script->jitScript()->clearBaselineScript(cx->gcContext(), script);
       script->jitScript()->setBaselineScript(script, entry.oldBaselineScript);
-      BaselineScript::Destroy(cx->gcContext(), baselineScript);
+      BaselineScript::Destroy(script->zone(), baselineScript);
     }
   }
 }
@@ -678,7 +681,7 @@ bool jit::RecompileOnStackBaselineScriptsForDebugMode(
   for (UniqueScriptOSREntryIter iter(entries); !iter.done(); ++iter) {
     const DebugModeOSREntry& entry = iter.entry();
     if (entry.recompiled()) {
-      BaselineScript::Destroy(cx->gcContext(), entry.oldBaselineScript);
+      BaselineScript::Destroy(entry.script->zone(), entry.oldBaselineScript);
     }
   }
 

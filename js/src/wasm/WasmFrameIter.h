@@ -94,6 +94,26 @@ class WasmFrameIter {
   // this iteration (its only frame was torn down by a trapping return_call).
   // Exception unwinding must free it even though no iterated frame is on it.
   ContStack* unwoundContStack_ = nullptr;
+  // The initial function's instance, recovered from the continuation base
+  // frame's callee-instance slot when crossing it, so GC traces it even if a
+  // return_call collapsed the initial function's frame. Only set for the frame
+  // reached by crossing the base frame.
+  Instance* contBaseInstance_ = nullptr;
+#endif
+#ifdef JS_HW_SHADOW_STACK
+  // These fields track the shadow stack pointer while unwinding the stack for
+  // exception handling. They are nullptr if we're not unwinding or if the
+  // shadow stack is disabled.
+  //
+  // The shadow stack pointer to the entry corresponding to the current frame
+  // (i.e., the entry containing fp_->returnAddress()).
+  uintptr_t* shadowStackPointer_ = nullptr;
+  // The shadow stack pointer corresponding to the resume/exit point of the
+  // current frame's continuation stack. In case we do need to resume in this
+  // stack to handle the exception, we switch to the continuation's shadow stack
+  // using this pointer. It is nullptr if the current frame is on the main
+  // stack.
+  uintptr_t* shadowStackSwitchPointer_ = nullptr;
 #endif
 
   //
@@ -122,9 +142,22 @@ class WasmFrameIter {
   void popContBaseFrame();
 #endif
 
+#ifdef JS_HW_SHADOW_STACK
+  // Advance the shadow stack pointer by exactly one entry with the provided
+  // return address.
+  void unwindShadowStackEntry(const void* returnAddress);
+#endif
+
  public:
   // See comment above this class definition.
-  explicit WasmFrameIter(jit::JitActivation* activation, Frame* fp = nullptr);
+  //
+  // When unwinding, `shadowStackPointer` is either the value read on entry to
+  // the exception handler, or handed over from the JSJitFrameIter. It's
+  // internally adjusted to point to the shadow stack entry corresponding to
+  // the current frame's return address, popping the entry for the Wasm exit
+  // frame, or for the frame wasm::StartUnwinding() unwound on a trap.
+  explicit WasmFrameIter(jit::JitActivation* activation, Frame* fp = nullptr,
+                         uintptr_t* shadowStackPointer = nullptr);
 
   // Iterate over frames from a known starting (instance, fp, ra).
   WasmFrameIter(Instance* instance, Frame* fp, void* returnAddress);
@@ -214,7 +247,26 @@ class WasmFrameIter {
   // See unwoundContStack_. Null in all cases except the trapping return_call
   // described there.
   ContStack* unwoundContStack() const { return unwoundContStack_; }
+
+  // See contBaseInstance_.
+  Instance* contBaseInstance() const { return contBaseInstance_; }
 #endif
+
+  uintptr_t* shadowStackPointer() const {
+#ifdef JS_HW_SHADOW_STACK
+    return shadowStackPointer_;
+#else
+    return nullptr;
+#endif
+  }
+
+  uintptr_t* shadowStackSwitchPointer() const {
+#ifdef JS_HW_SHADOW_STACK
+    return shadowStackSwitchPointer_;
+#else
+    return nullptr;
+#endif
+  }
 
   //
   // Debug information about the current frame

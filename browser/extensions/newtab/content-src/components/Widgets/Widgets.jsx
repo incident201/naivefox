@@ -12,6 +12,8 @@ import React, {
 } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { BaseContext } from "content-src/lib/BaseContext";
+import { CUSTOMIZE_PANEL_SOURCES } from "content-src/lib/constants.mjs";
+import { OrderedSlots } from "content-src/lib/OrderedSlots.jsx";
 // Bug 2034542: these per-widget imports can be removed once the non-Nova render
 // path (@nova-cleanup) is gone and all widgets render via WIDGET_ROW_COMPONENTS.
 import { Lists } from "./Lists/Lists";
@@ -30,11 +32,14 @@ import {
   isWidgetAddable,
   isWidgetEnabled,
   resolveWidgetSize,
+  resolveWidgetDisplaySize,
   resolveWidgetOrder,
   resolveWidgetHasSidebar,
-  resolveWidgetSrc,
+  resolveWidgetFrame,
   resolveSidebarWidget,
   getHideAllTargets,
+  PREF_HOME_WIDGETS,
+  WIDGET_SOURCES,
 } from "common/WidgetsRegistry.mjs";
 import {
   isAutoMinimizeWidgetsAssigned,
@@ -45,18 +50,24 @@ import {
   selectFirstSlotWidgetIds,
   selectWidgetsRowAd,
   SPACE_IDS,
+  WIDGET_PLACEMENTS,
 } from "common/PageLayoutVariants.mjs";
-import { WIDGET_ROW_COMPONENTS } from "./WidgetsComponentRegistry.jsx";
+import {
+  WIDGET_CARD_COMPONENTS,
+  WIDGET_ROW_COMPONENTS,
+} from "./WidgetsComponentRegistry.jsx";
 import { WidgetWrapper } from "./WidgetWrapper";
 import { MozWidgetCard } from "./MozWidgetCard";
 // @experiment(remove) { bug 2069496 }
 import { WidgetsRowAd } from "./WidgetsRowAd.jsx";
 import { ErrorBoundary } from "content-src/components/ErrorBoundary/ErrorBoundary";
 import { useWidgetDnD } from "./useWidgetDnD.jsx";
+import { WidgetPlacementProvider } from "./WidgetPlacement";
 import { usePageVisible } from "./usePageVisible.jsx";
 
 const CONTAINER_ACTION_TYPES = {
   HIDE_ALL: "hide_all",
+  REMOVE_ALL_FROM_HOME: "remove_all_from_home",
   CHANGE_SIZE_ALL: "change_size_all",
   CHANGE_ROW_VISIBILITY: "change_row_visibility",
   FEEDBACK: "feedback",
@@ -143,10 +154,14 @@ function renderWeather({
 }
 
 // eslint-disable-next-line complexity, max-statements
-function Widgets({ widgetIds }) {
+function Widgets({ widgetIds, placement }) {
   const prefs = useSelector(state => state.Prefs.values);
+  const isForStartupCache = useSelector(
+    state => state.App.isForStartupCache.App
+  );
   const extensionWidgets = useSelector(state => state.ExtensionWidgets);
   const widgets = getWidgets(WIDGET_REGISTRY, extensionWidgets);
+  const framedWidgets = useSelector(state => state.FramedWidgets);
   const weatherData = useSelector(state => state.Weather);
   const { messageData } = useSelector(state => state.Messages);
   const timerType = useSelector(state => state.TimerWidget.timerType);
@@ -170,6 +185,7 @@ function Widgets({ widgetIds }) {
   );
 
   const novaEnabled = prefs[PREF_NOVA_ENABLED];
+  const slotted = novaEnabled && !isForStartupCache;
   const isMaximized = prefs[PREF_WIDGETS_MAXIMIZED];
   const spacesActive = isSpacesActive(prefs);
   // A space is a full page of its own, so there is nothing to be conservative
@@ -261,13 +277,13 @@ function Widgets({ widgetIds }) {
     weatherBase && weatherData?.initialized && isWeatherEnabled;
 
   const weatherSize = resolveWidgetSize(weatherWidget, prefs);
+  const frameById = {};
   const widgetEnabledMap = {};
   for (const widget of widgets) {
-    widgetEnabledMap[widget.id] = isWidgetEnabled(
-      widget,
-      prefs,
-      widgetsEnabled
-    );
+    frameById[widget.id] = resolveWidgetFrame(widget, prefs, framedWidgets);
+    widgetEnabledMap[widget.id] =
+      isWidgetEnabled(widget, prefs, widgetsEnabled) &&
+      frameById[widget.id].state !== "hidden";
   }
   widgetEnabledMap.weather = weatherEnabled;
 
@@ -454,6 +470,20 @@ function Widgets({ widgetIds }) {
   }, [showsMozWidget]);
 
   function hideAllWidgets() {
+    // Home only unpins its widgets, which move back to the library.
+    if (placement === WIDGET_PLACEMENTS.HOME) {
+      dispatch(ac.SetPref(PREF_HOME_WIDGETS, "[]"));
+      dispatch(
+        ac.OnlyToMain({
+          type: at.WIDGETS_CONTAINER_ACTION,
+          data: {
+            action_type: CONTAINER_ACTION_TYPES.REMOVE_ALL_FROM_HOME,
+            widget_size: widgetSize,
+          },
+        })
+      );
+      return;
+    }
     const targets = getHideAllTargets(widgets, prefs, widgetEnabledMap);
     for (const target of targets) {
       dispatch(ac.SetPref(target.enabledPref, false));
@@ -476,7 +506,7 @@ function Widgets({ widgetIds }) {
           type: at.WIDGETS_ENABLED,
           data: {
             widget_name: "weather",
-            widget_source: "widget",
+            widget_source: WIDGET_SOURCES.WIDGET,
             enabled: false,
             widget_size: widgetSize,
           },
@@ -570,7 +600,7 @@ function Widgets({ widgetIds }) {
 
   function handleManageWidgetsClick(e) {
     e.preventDefault();
-    openWidgetsPanel();
+    openWidgetsPanel(CUSTOMIZE_PANEL_SOURCES.MANAGE_WIDGETS);
   }
 
   function toggleRowExpanded() {
@@ -840,220 +870,234 @@ function Widgets({ widgetIds }) {
   };
   const isCollapsed = novaEnabled && !rowExpanded;
 
-  return (
-    <div className="widgets-wrapper">
-      <div className="widgets-section-container" {...overflowAttrs}>
-        <div className="widgets-title-container">
-          <div className="widgets-title-container-text">
-            {renderWidgetsTitle()}
-            {messageData?.content?.messageType === "WidgetMessage" && (
-              <MessageWrapper dispatch={dispatch}>
-                <WidgetsFeatureHighlight dispatch={dispatch} />
-              </MessageWrapper>
-            )}
-          </div>
-
-          <div className="widgets-title-actions">{renderWidgetsActions()}</div>
-        </div>
-        {novaEnabled && (
-          <OMCHighlightSlot slot={SLOTS.WIDGETS_ROW} dispatch={dispatch} />
-        )}
-        <div
-          id="widgets-container"
-          ref={widgetsContainerRef}
-          className={`widgets-container${isMaximized ? " is-maximized" : ""}`}
-          data-row-collapsed={isCollapsed ? "" : undefined}
-          data-section-collapsed={sectionCollapsed ? "" : undefined}
-          inert={sectionCollapsed}
-        >
-          {withRowAd(
-            effectiveOrder.map(id => {
-              if (novaEnabled) {
-                const Component = WIDGET_ROW_COMPONENTS[id];
-                const entry = widgets.find(w => w.id === id);
-                if (!widgetEnabledMap[id]) {
-                  return null;
-                }
-                const size = entry ? resolveWidgetSize(entry, prefs) : null;
-                const renderIdx = enabledWidgetIds.indexOf(id);
-                const hiddenAttrs = {
-                  "data-hidden-1": hiddenAtCols[1].has(renderIdx)
-                    ? ""
-                    : undefined,
-                  "data-hidden-2": hiddenAtCols[2].has(renderIdx)
-                    ? ""
-                    : undefined,
-                  "data-hidden-3": hiddenAtCols[3].has(renderIdx)
-                    ? ""
-                    : undefined,
-                  "data-hidden-4": hiddenAtCols[4].has(renderIdx)
-                    ? ""
-                    : undefined,
-                  "data-hidden-5": hiddenAtCols[5].has(renderIdx)
-                    ? ""
-                    : undefined,
-                };
-                const wrapperClassName = [
-                  size && `${size}-widget`,
-                  "widget-draggable",
-                ]
-                  .filter(Boolean)
-                  .join(" ");
-                return (
-                  <WidgetWrapper
-                    key={id}
-                    className={wrapperClassName}
-                    data-widget-id={id}
-                    {...hiddenAttrs}
-                    {...getItemProps(id)}
-                  >
-                    {/* Contain a crash to this widget's cell so one failing
-                      widget can't tear down the whole widgets section. */}
-                    <ErrorBoundary className="widget-error-fallback">
-                      {Component ? (
-                        <Component
-                          dispatch={dispatch}
-                          handleUserInteraction={handleUserInteraction}
-                          isMaximized={isMaximized}
-                          widgetsMayBeMaximized={widgetsMayBeMaximized}
-                          widgetEnabledMap={widgetEnabledMap}
-                        />
-                      ) : (
-                        <MozWidgetCard
-                          dispatch={dispatch}
-                          entry={entry}
-                          size={size}
-                          src={resolveWidgetSrc(entry, prefs)}
-                          widgetEnabledMap={widgetEnabledMap}
-                        />
-                      )}
-                    </ErrorBoundary>
-                  </WidgetWrapper>
-                );
-              }
-              // @nova-cleanup: remove below
-              return (
-                <React.Fragment key={id}>
-                  {id === "lists" && listsEnabled && (
-                    <ErrorBoundary className="widget-error-fallback">
-                      <Lists
-                        dispatch={dispatch}
-                        handleUserInteraction={handleUserInteraction}
-                        isMaximized={isMaximized}
-                        widgetsMayBeMaximized={widgetsMayBeMaximized}
-                      />
-                    </ErrorBoundary>
-                  )}
-                  {id === "focusTimer" && timerEnabled && (
-                    <ErrorBoundary className="widget-error-fallback">
-                      <FocusTimer
-                        dispatch={dispatch}
-                        handleUserInteraction={handleUserInteraction}
-                        isMaximized={isMaximized}
-                        widgetsMayBeMaximized={widgetsMayBeMaximized}
-                      />
-                    </ErrorBoundary>
-                  )}
-                  {id === "weather" && weatherForecastEnabled && (
-                    <ErrorBoundary className="widget-error-fallback">
-                      {renderWeather({
-                        novaEnabled,
-                        weatherEnabled,
-                        weatherForecastEnabled,
-                        weatherSize,
-                        dispatch,
-                        handleUserInteraction,
-                        isMaximized,
-                        widgetsMayBeMaximized,
-                      })}
-                    </ErrorBoundary>
-                  )}
-                </React.Fragment>
-              );
-            }),
-            // Slot at two or more card columns comes from grid-column in
-            // _WidgetsRowAd.scss. No getItemProps and no data-hidden-N: it
-            // never drags or gives way.
-            rowAd && (
-              <WidgetWrapper
-                key="widgets-row-ad"
-                className="large-widget widgets-row-ad-cell"
-                // How many widgets sit ahead of the card, so CSS can put it
-                // right after the last one rather than at a fixed slot. Four
-                // is the most any width can show ahead of it. Counts widgets,
-                // not slots, so a pair of smalls sharing one still reads as
-                // two.
-                data-widgets-before={Math.min(widgetCount, 4)}
-                // The card is a link, so it is natively draggable and would
-                // peel off as a link drag. Widgets reorder instead, so cancel.
-                onDragStart={event => event.preventDefault()}
-              >
-                <ErrorBoundary className="widget-error-fallback">
-                  {/* Stays large even when the row is minimized: there is no
-                      half-height sponsored card yet. Bug 2069496 follow-up. */}
-                  <WidgetsRowAd
-                    spoc={rowAd}
+  // Suppressed wherever the widgets sit in a one-card-wide column
+  // (side-by-side, and any caller passing an explicit list). This tile's
+  // at-content-cols() reveal rules resolve against the band, so there
+  // it takes a row of its own and reads as blank space under the last
+  // widget. Those layouts put an add button in the section header
+  // instead.
+  const addButton = novaEnabled &&
+    !sideBySideActive &&
+    !widgetIds &&
+    !allWidgetsAdded && (
+      <button
+        key="widgets-add-button"
+        type="button"
+        className={`widgets-add-button col-4 ${addButtonSize}-widget`}
+        style={{ order: WIDGET_REGISTRY.length + 1 }}
+        data-l10n-id="newtab-widget-add-widgets-button"
+        onClick={handleManageWidgetsClick}
+        tabIndex={-1}
+      >
+        <span className="widgets-add-button-icon" />
+      </button>
+    );
+  const cells = [
+    ...withRowAd(
+      effectiveOrder.map(id => {
+        if (novaEnabled) {
+          const Component = WIDGET_ROW_COMPONENTS[id];
+          const entry = widgets.find(w => w.id === id);
+          const Card = WIDGET_CARD_COMPONENTS[entry?.card] ?? MozWidgetCard;
+          if (!widgetEnabledMap[id]) {
+            return null;
+          }
+          const size = entry ? resolveWidgetSize(entry, prefs) : null;
+          const displaySize = entry
+            ? resolveWidgetDisplaySize(entry, prefs, widgetsMayBeMaximized)
+            : null;
+          const renderIdx = enabledWidgetIds.indexOf(id);
+          const hiddenAttrs = {
+            "data-hidden-1": hiddenAtCols[1].has(renderIdx) ? "" : undefined,
+            "data-hidden-2": hiddenAtCols[2].has(renderIdx) ? "" : undefined,
+            "data-hidden-3": hiddenAtCols[3].has(renderIdx) ? "" : undefined,
+            "data-hidden-4": hiddenAtCols[4].has(renderIdx) ? "" : undefined,
+            "data-hidden-5": hiddenAtCols[5].has(renderIdx) ? "" : undefined,
+          };
+          const wrapperClassName = [
+            displaySize && `${displaySize}-widget`,
+            "widget-draggable",
+          ]
+            .filter(Boolean)
+            .join(" ");
+          return (
+            <WidgetWrapper
+              key={id}
+              className={wrapperClassName}
+              data-widget-id={id}
+              {...hiddenAttrs}
+              {...getItemProps(id)}
+            >
+              {/* Contain a crash to this widget's cell so one failing
+              widget can't tear down the whole widgets section. */}
+              <ErrorBoundary className="widget-error-fallback">
+                {Component ? (
+                  <Component
                     dispatch={dispatch}
-                    type="widgets_row_ad"
+                    handleUserInteraction={handleUserInteraction}
+                    isMaximized={isMaximized}
+                    widgetsMayBeMaximized={widgetsMayBeMaximized}
+                    widgetEnabledMap={widgetEnabledMap}
                   />
-                </ErrorBoundary>
-              </WidgetWrapper>
-            )
-          )}
-          {/* Suppressed wherever the widgets sit in a one-card-wide column --
-              side-by-side, and any caller passing an explicit list. This tile's
-              at-content-cols() reveal rules resolve against the band, so there
-              it takes a row of its own and reads as blank space under the last
-              widget. Those layouts put an add button in the section header
-              instead. */}
-          {novaEnabled &&
-            !sideBySideActive &&
-            !widgetIds &&
-            !allWidgetsAdded && (
-              <button
-                type="button"
-                className={`widgets-add-button col-4 ${addButtonSize}-widget`}
-                style={{ order: WIDGET_REGISTRY.length + 1 }}
-                data-l10n-id="newtab-widget-add-widgets-button"
-                onClick={handleManageWidgetsClick}
-                tabIndex={-1}
-              >
-                <span className="widgets-add-button-icon" />
-              </button>
+                ) : (
+                  <Card
+                    dispatch={dispatch}
+                    entry={entry}
+                    size={size}
+                    displaySize={displaySize}
+                    src={frameById[id]?.src}
+                    widgetEnabledMap={widgetEnabledMap}
+                  />
+                )}
+              </ErrorBoundary>
+            </WidgetWrapper>
+          );
+        }
+        // @nova-cleanup: remove below
+        return (
+          <React.Fragment key={id}>
+            {id === "lists" && listsEnabled && (
+              <ErrorBoundary className="widget-error-fallback">
+                <Lists
+                  dispatch={dispatch}
+                  handleUserInteraction={handleUserInteraction}
+                  isMaximized={isMaximized}
+                  widgetsMayBeMaximized={widgetsMayBeMaximized}
+                />
+              </ErrorBoundary>
             )}
-        </div>
-        {novaEnabled && !spacesActive && (
-          <moz-button
-            className="widgets-row-toggle"
-            type="muted"
-            size="small"
-            aria-expanded={rowExpanded}
-            aria-controls="widgets-container"
-            onClick={handleToggleRowExpandedClick}
-            data-l10n-id={
-              rowExpanded
-                ? "newtab-widget-section-show-less"
-                : "newtab-widget-section-show-more"
-            }
-          />
-        )}
-        {messageData?.content?.messageType === "NovaWidgetMessage" && (
-          <div className="widgets-row-highlight-anchor">
-            <MessageWrapper dispatch={dispatch}>
-              <WidgetsRowFeatureHighlight dispatch={dispatch} />
-            </MessageWrapper>
+            {id === "focusTimer" && timerEnabled && (
+              <ErrorBoundary className="widget-error-fallback">
+                <FocusTimer
+                  dispatch={dispatch}
+                  handleUserInteraction={handleUserInteraction}
+                  isMaximized={isMaximized}
+                  widgetsMayBeMaximized={widgetsMayBeMaximized}
+                />
+              </ErrorBoundary>
+            )}
+            {id === "weather" && weatherForecastEnabled && (
+              <ErrorBoundary className="widget-error-fallback">
+                {renderWeather({
+                  novaEnabled,
+                  weatherEnabled,
+                  weatherForecastEnabled,
+                  weatherSize,
+                  dispatch,
+                  handleUserInteraction,
+                  isMaximized,
+                  widgetsMayBeMaximized,
+                })}
+              </ErrorBoundary>
+            )}
+          </React.Fragment>
+        );
+      }),
+      // Slot at two or more card columns comes from grid-column in
+      // _WidgetsRowAd.scss. No getItemProps and no data-hidden-N: it
+      // never drags or gives way.
+      rowAd && (
+        <WidgetWrapper
+          key="widgets-row-ad"
+          className="large-widget widgets-row-ad-cell"
+          // How many widgets sit ahead of the card, so CSS can put it
+          // right after the last one rather than at a fixed slot. Four
+          // is the most any width can show ahead of it. Counts widgets,
+          // not slots, so a pair of smalls sharing one still reads as
+          // two.
+          data-widgets-before={Math.min(widgetCount, 4)}
+          // The card is a link, so it is natively draggable and would
+          // peel off as a link drag. Widgets reorder instead, so cancel.
+          onDragStart={event => event.preventDefault()}
+        >
+          <ErrorBoundary className="widget-error-fallback">
+            {/* Stays large even when the row is minimized: there is no
+              half-height sponsored card yet. Bug 2069496 follow-up. */}
+            <WidgetsRowAd
+              spoc={rowAd}
+              dispatch={dispatch}
+              type="widgets_row_ad"
+            />
+          </ErrorBoundary>
+        </WidgetWrapper>
+      )
+    ),
+    addButton,
+  ].filter(Boolean);
+  const containerProps = {
+    id: "widgets-container",
+    className: `widgets-container${isMaximized ? " is-maximized" : ""}`,
+    "data-row-collapsed": isCollapsed ? "" : undefined,
+    "data-section-collapsed": sectionCollapsed ? "" : undefined,
+    inert: sectionCollapsed,
+  };
+
+  return (
+    <WidgetPlacementProvider placement={placement}>
+      <div className="widgets-wrapper">
+        <div className="widgets-section-container" {...overflowAttrs}>
+          <div className="widgets-title-container">
+            <div className="widgets-title-container-text">
+              {renderWidgetsTitle()}
+              {messageData?.content?.messageType === "WidgetMessage" && (
+                <MessageWrapper dispatch={dispatch}>
+                  <WidgetsFeatureHighlight dispatch={dispatch} />
+                </MessageWrapper>
+              )}
+            </div>
+
+            <div className="widgets-title-actions">
+              {renderWidgetsActions()}
+            </div>
           </div>
-        )}
-        {feedbackEnabled && !novaEnabled && (
-          <a
-            className="widgets-feedback-link"
-            href={feedbackUrl}
-            data-l10n-id="newtab-widget-section-feedback"
-            onClick={handleFeedbackClick}
-          />
-        )}
+          {novaEnabled && (
+            <OMCHighlightSlot slot={SLOTS.WIDGETS_ROW} dispatch={dispatch} />
+          )}
+          {slotted && (
+            <OrderedSlots
+              items={cells}
+              containerRef={widgetsContainerRef}
+              {...containerProps}
+            />
+          )}
+          {!slotted && (
+            <div ref={widgetsContainerRef} {...containerProps}>
+              {cells}
+            </div>
+          )}
+          {novaEnabled && !spacesActive && (
+            <moz-button
+              className="widgets-row-toggle"
+              type="muted"
+              size="small"
+              aria-expanded={rowExpanded}
+              aria-controls="widgets-container"
+              onClick={handleToggleRowExpandedClick}
+              data-l10n-id={
+                rowExpanded
+                  ? "newtab-widget-section-show-less"
+                  : "newtab-widget-section-show-more"
+              }
+            />
+          )}
+          {messageData?.content?.messageType === "NovaWidgetMessage" && (
+            <div className="widgets-row-highlight-anchor">
+              <MessageWrapper dispatch={dispatch}>
+                <WidgetsRowFeatureHighlight dispatch={dispatch} />
+              </MessageWrapper>
+            </div>
+          )}
+          {feedbackEnabled && !novaEnabled && (
+            <a
+              className="widgets-feedback-link"
+              href={feedbackUrl}
+              data-l10n-id="newtab-widget-section-feedback"
+              onClick={handleFeedbackClick}
+            />
+          )}
+        </div>
       </div>
-    </div>
+    </WidgetPlacementProvider>
   );
 }
 

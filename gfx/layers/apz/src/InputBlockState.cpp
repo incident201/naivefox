@@ -243,6 +243,32 @@ bool CancelableBlockState::ShouldDropEvents() const {
   return InputBlockState::ShouldDropEvents() || IsDefaultPrevented();
 }
 
+BrowserGesturableBlockState::BrowserGesturableBlockState(
+    const RefPtr<AsyncPanZoomController>& aTargetApzc,
+    TargetConfirmationFlags aFlags)
+    : CancelableBlockState(aTargetApzc, aFlags),
+      mWaitingForBrowserGestureResponse(false),
+      mStartedBrowserGesture(false) {}
+
+void BrowserGesturableBlockState::SetNeedsToWaitForBrowserGestureResponse(
+    bool aWaitForBrowserGestureResponse) {
+  mWaitingForBrowserGestureResponse = aWaitForBrowserGestureResponse;
+}
+
+bool BrowserGesturableBlockState::IsWaitingForBrowserGestureResponse() const {
+  return mWaitingForBrowserGestureResponse;
+}
+
+void BrowserGesturableBlockState::SetBrowserGestureResponse(
+    const BrowserGestureResponse aResponse) {
+  mWaitingForBrowserGestureResponse = false;
+  mStartedBrowserGesture = bool(aResponse);
+}
+
+bool BrowserGesturableBlockState::ShouldDropEvents() const {
+  return CancelableBlockState::ShouldDropEvents() || mStartedBrowserGesture;
+}
+
 DragBlockState::DragBlockState(
     const RefPtr<AsyncPanZoomController>& aTargetApzc,
     TargetConfirmationFlags aFlags, const MouseInput& aInitialEvent)
@@ -521,11 +547,9 @@ void WheelBlockState::EndTransaction() {
 PanGestureBlockState::PanGestureBlockState(
     const RefPtr<AsyncPanZoomController>& aTargetApzc,
     TargetConfirmationFlags aFlags, const PanGestureInput& aInitialEvent)
-    : CancelableBlockState(aTargetApzc, aFlags),
+    : BrowserGesturableBlockState(aTargetApzc, aFlags),
       mInterrupted(false),
-      mWaitingForContentResponse(false),
-      mWaitingForBrowserGestureResponse(false),
-      mStartedBrowserGesture(false) {
+      mWaitingForContentResponse(false) {
   if (aFlags.mTargetConfirmed) {
     // Find the nearest APZC in the overscroll handoff chain that is scrollable.
     // If we get a content confirmation later that the apzc is different, then
@@ -588,10 +612,6 @@ bool PanGestureBlockState::IsReadyForHandling() const {
          (!mWaitingForContentResponse || IsContentResponseTimerExpired());
 }
 
-bool PanGestureBlockState::ShouldDropEvents() const {
-  return CancelableBlockState::ShouldDropEvents() || mStartedBrowserGesture;
-}
-
 bool PanGestureBlockState::TimeoutContentResponse() {
   // Reset mWaitingForBrowserGestureResponse here so that we will not wait for
   // the response forever.
@@ -604,17 +624,6 @@ bool PanGestureBlockState::AllowScrollHandoff() const { return false; }
 void PanGestureBlockState::SetNeedsToWaitForContentResponse(
     bool aWaitForContentResponse) {
   mWaitingForContentResponse = aWaitForContentResponse;
-}
-
-void PanGestureBlockState::SetNeedsToWaitForBrowserGestureResponse(
-    bool aWaitForBrowserGestureResponse) {
-  mWaitingForBrowserGestureResponse = aWaitForBrowserGestureResponse;
-}
-
-void PanGestureBlockState::SetBrowserGestureResponse(
-    BrowserGestureResponse aResponse) {
-  mWaitingForBrowserGestureResponse = false;
-  mStartedBrowserGesture = bool(aResponse);
 }
 
 Maybe<LayersId> PanGestureBlockState::WheelTransactionLayersId() const {
@@ -660,7 +669,7 @@ void PinchGestureBlockState::SetNeedsToWaitForContentResponse(
 TouchBlockState::TouchBlockState(
     const RefPtr<AsyncPanZoomController>& aTargetApzc,
     TargetConfirmationFlags aFlags, TouchCounter& aCounter)
-    : CancelableBlockState(aTargetApzc, aFlags),
+    : BrowserGesturableBlockState(aTargetApzc, aFlags),
       mAllowedTouchBehaviorSet(false),
       mDuringFastFling(false),
       mInSlop(false),
@@ -684,6 +693,7 @@ bool TouchBlockState::SetAllowedTouchBehaviors(
           aBehaviors.Length());
   mAllowedTouchBehaviors.AppendElements(aBehaviors);
   mAllowedTouchBehaviorSet = true;
+  MaybeNotifyTouchSwipableDirections();
   return true;
 }
 
@@ -713,7 +723,7 @@ bool TouchBlockState::IsReadyForHandling() const {
     return false;
   }
 
-  if (mIsWaitingLongTapResult) {
+  if (mIsWaitingLongTapResult || mWaitingForBrowserGestureResponse) {
     return false;
   }
 
@@ -746,10 +756,8 @@ TimeDuration TouchBlockState::GetTimeSinceBlockStart() const {
   return GetTargetApzc()->GetFrameTime().Time() - mStartTime;
 }
 
-void TouchBlockState::DispatchEvent(const InputData& aEvent) const {
-  MOZ_ASSERT(aEvent.mInputType == MULTITOUCH_INPUT);
-  mTouchCounter.Update(aEvent.AsMultiTouchInput());
-  CancelableBlockState::DispatchEvent(aEvent);
+void TouchBlockState::UpdateTouchCounter(const MultiTouchInput& aInput) const {
+  mTouchCounter.Update(aInput);
 }
 
 bool TouchBlockState::TouchActionAllowsPinchZoom() const {
@@ -918,6 +926,71 @@ bool TouchBlockState::NeedsContentResponseAfterLongTap(
     return false;
   }
   return !HasContentResponded() || !IsDefaultPrevented();
+}
+
+SideBits TouchBlockState::GetSwipableDirections(
+    const AsyncPanZoomController* aTarget) const {
+  MOZ_ASSERT(aTarget, "A confirmed target should be non-null here");
+  MOZ_ASSERT(HasAllowedTouchBehaviors(), "touch action should be confirmed");
+  if (TouchActionAllowsPanningX()) {
+    return GetOverscrollHandoffChain()->GetSwipableDirections(*aTarget);
+  }
+  return SideBits::eNone;
+}
+
+bool TouchBlockState::HasTouchSwipeInfo() const {
+  return (IsTargetConfirmed() && HasAllowedTouchBehaviors() &&
+          HasContentResponded()) ||
+         IsContentResponseTimerExpired();
+}
+
+bool TouchBlockState::SetConfirmedTargetApzc(
+    const RefPtr<AsyncPanZoomController>& aTargetApzc,
+    TargetConfirmationState aState, InputQueueIterator aFirstInput,
+    bool aForScrollbarDrag) {
+  const bool confirmed = InputBlockState::SetConfirmedTargetApzc(
+      aTargetApzc, aState, aFirstInput, aForScrollbarDrag);
+  if (confirmed) {
+    MaybeNotifyTouchSwipableDirections();
+  }
+  return confirmed;
+}
+
+bool TouchBlockState::TimeoutContentResponse() {
+  const bool timeout = CancelableBlockState::TimeoutContentResponse();
+  if (timeout) {
+    MaybeNotifyTouchSwipableDirections();
+  }
+  return timeout;
+}
+
+bool TouchBlockState::SetContentResponse(bool aPreventDefault) {
+  const auto contentResponded =
+      CancelableBlockState::SetContentResponse(aPreventDefault);
+  if (contentResponded) {
+    MaybeNotifyTouchSwipableDirections();
+  }
+  return contentResponded;
+}
+
+void TouchBlockState::MaybeNotifyTouchSwipableDirections() {
+  if (!mTouchSwipableDirectionsCallback || !HasTouchSwipeInfo()) {
+    return;
+  }
+
+  // If the main thread did not respond in time, reject swipe rather than
+  // navigate based on APZ's guess, because navigation discards the current
+  // page.
+  const RefPtr<AsyncPanZoomController>& target = GetTargetApzc();
+  const SideBits swipableDirections =
+      target && !IsContentResponseTimerExpired() && !IsDefaultPrevented()
+          ? GetSwipableDirections(target)
+          : SideBits::eNone;
+
+  TouchSwipableDirectionsCallback callback =
+      std::move(mTouchSwipableDirectionsCallback);
+  mTouchSwipableDirectionsCallback = nullptr;
+  callback(GetBlockId(), swipableDirections);
 }
 
 KeyboardBlockState::KeyboardBlockState(

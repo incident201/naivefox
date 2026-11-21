@@ -23,6 +23,7 @@
 #  include "mozilla/URLPreloader.h"
 #endif
 #include "mozilla/Variant.h"
+#include "mozilla/ipc/IPCModule.h"
 #include "nsArray.h"
 #include "nsCOMPtr.h"
 #include "nsCategoryManager.h"
@@ -363,6 +364,8 @@ nsresult nsComponentManagerImpl::Init() {
 
   RegisterWeakMemoryReporter(this);
 
+  mozilla::ipc::InitIPCModule();
+
   // NB: The logging preference watcher needs to be registered late enough in
   // startup that it's okay to use the preference system, but also as soon as
   // possible so that log modules enabled via preferences are turned on as
@@ -447,7 +450,7 @@ void nsComponentManagerImpl::RereadChromeManifests(bool aChromeOnly) {
 
   nsCOMPtr<nsIObserverService> obs = services::GetObserverService();
   if (obs) {
-    obs->NotifyObservers(nullptr, "chrome-manifests-loaded", nullptr);
+    obs->NotifyWhenScriptSafe(nullptr, "chrome-manifests-loaded", nullptr);
   }
 }
 

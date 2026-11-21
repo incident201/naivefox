@@ -19,15 +19,13 @@ transforms:
     - gecko_taskgraph.transforms.task:transforms
 
 task-defaults:
-    run-on-repo-type: [hg]
     attributes:
         artifact_map: taskcluster/gecko_taskgraph/manifests/fennec_geckoview.yml
     index:
         product: mobile
     worker-type: b-linux-docker-amd
     use-python: default
-    # Online in order to download the per-architecture AARs.
-    use-gradle: online
+    use-gradle: offline
     worker:
         docker-image: {in-tree: android-build}
         max-run-time: 7200
@@ -78,7 +76,6 @@ task-defaults:
                 default: nightly-fat-aar
         platform: android-arm
     run:
-        clone-with: hg
         using: mozharness
         script: "mozharness/scripts/fx_desktop_build.py"
         secrets: true
@@ -252,6 +249,7 @@ tasks:
 
     android-geckoview-fat-aar/opt:
         description: "Android GeckoView multi-architecture fat AAR Opt"
+        use-gradle-cache: true
         attributes:
             maven_packages:
                 - geckoview
@@ -280,6 +278,7 @@ tasks:
 
     android-geckoview-fat-aar-appservices/opt:
         description: "Android GeckoView multi-architecture fat AAR Opt with an in-tree app-services"
+        use-gradle-cache: true
         attributes:
             maven_packages:
                 - geckoview

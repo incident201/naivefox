@@ -90,6 +90,7 @@ namespace jit {
   _(BigIntLeftShift, JS::BigInt::lsh)                                          \
   _(BigIntMod, JS::BigInt::mod)                                                \
   _(BigIntMul, JS::BigInt::mul)                                                \
+  _(BigIntMulMod, JS::BigInt::mulMod)                                          \
   _(BigIntNeg, JS::BigInt::neg)                                                \
   _(BigIntPow, JS::BigInt::pow)                                                \
   _(BigIntRightShift, JS::BigInt::rsh)                                         \
@@ -308,6 +309,7 @@ namespace jit {
   _(RegExpHasCaptureGroups, js::RegExpHasCaptureGroups)                        \
   _(RegExpMatcherRaw, js::RegExpMatcherRaw)                                    \
   _(RegExpSearcherRaw, js::RegExpSearcherRaw)                                  \
+  _(ResumeGeneratorFromJit, js::jit::ResumeGeneratorFromJit)                   \
   _(SameValue, js::SameValue)                                                  \
   _(SetArrayLength, js::jit::SetArrayLength)                                   \
   _(SetElementMegamorphicNoCache, js::jit::SetElementMegamorphic<false>)       \

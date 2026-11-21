@@ -29,8 +29,12 @@ LOCAL_INCLUDES += [
     "/toolkit/components/url-classifier",
 ]
 
-EXTRA_JS_MODULES += [
+MOZ_SRC_FILES += [
     "ContentClassifierRemoteSettingsClient.sys.mjs",
+]
+
+TESTING_JS_MODULES += [
+    "test/ContentClassifierTestUtils.sys.mjs",
 ]
 
 XPCOM_MANIFESTS += [

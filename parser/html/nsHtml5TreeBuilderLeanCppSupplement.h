@@ -258,6 +258,13 @@ void nsHtml5TreeBuilder::appendCharacters(nsIContentHandle*, char16_t*, int32_t,
 void nsHtml5TreeBuilder::appendComment(nsIContentHandle*, char16_t*, int32_t,
                                        int32_t) {}
 void nsHtml5TreeBuilder::appendCommentToDocument(char16_t*, int32_t, int32_t) {}
+void nsHtml5TreeBuilder::appendProcessingInstruction(nsIContentHandle*,
+                                                     nsHtml5String, char16_t*,
+                                                     int32_t, int32_t) {}
+void nsHtml5TreeBuilder::appendProcessingInstructionToDocument(nsHtml5String,
+                                                               char16_t*,
+                                                               int32_t,
+                                                               int32_t) {}
 void nsHtml5TreeBuilder::addAttributesToElement(nsIContentHandle*,
                                                 nsHtml5HtmlAttributes*) {}
 void nsHtml5TreeBuilder::markMalformedIfScript(nsIContentHandle*) {}

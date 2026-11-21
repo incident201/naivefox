@@ -79,13 +79,18 @@ static uint32_t FuncIndexForBytecodeOffset(const Code& code,
 /*****************************************************************************/
 // WasmFrameIter implementation
 
-WasmFrameIter::WasmFrameIter(JitActivation* activation, wasm::Frame* fp)
+WasmFrameIter::WasmFrameIter(JitActivation* activation, wasm::Frame* fp,
+                             uintptr_t* shadowStackPointer)
     : cx_(activation->cx()),
       activation_(activation),
       fp_(fp ? fp : activation->wasmExitFP())
 #ifdef ENABLE_WASM_JSPI
       ,
       contStack_(nullptr)
+#endif
+#ifdef JS_HW_SHADOW_STACK
+      ,
+      shadowStackPointer_(shadowStackPointer)
 #endif
 {
   MOZ_ASSERT(fp_);
@@ -98,6 +103,17 @@ WasmFrameIter::WasmFrameIter(JitActivation* activation, wasm::Frame* fp)
   // Exit frames dynamically switch to the main stack. We need to mark this as
   // a stack switch.
   bool dynamicSwitchToMainStack = contStack_ && fp_ == activation->wasmExitFP();
+#  ifdef JS_HW_SHADOW_STACK
+  if (shadowStackPointer_ && dynamicSwitchToMainStack) {
+    // Since VM exits always switch to the main stack, the shadowStackPointer
+    // passed to this constructor does not correspond to the stack where the
+    // exception/trap actually occurred. We begin unwinding from the exit shadow
+    // stack pointer saved in wasm::GenerateExitPrologueMainStackSwitch.
+    shadowStackPointer_ = contStack_->exitShadowStackPointer();
+    MOZ_RELEASE_ASSERT(shadowStackPointer_);
+    shadowStackSwitchPointer_ = shadowStackPointer_;
+  }
+#  endif
 #endif
 
   // When the stack is captured during a trap (viz., to create the .stack
@@ -114,6 +130,13 @@ WasmFrameIter::WasmFrameIter(JitActivation* activation, wasm::Frame* fp)
     const wasm::Code* unwoundCode = LookupCode(unwoundPC, &unwoundCodeRange);
     MOZ_RELEASE_ASSERT(unwoundCode);
     MOZ_RELEASE_ASSERT(unwoundCodeRange);
+
+#ifdef JS_HW_SHADOW_STACK
+    if (trapData.unwoundFrame) {
+      // wasm::StartUnwinding() unwound the frame where the trap occurred.
+      unwindShadowStackEntry(unwoundPC);
+    }
+#endif
 
 #ifdef ENABLE_WASM_JSPI
     MOZ_RELEASE_ASSERT(unwoundCodeRange->isFunction() ||
@@ -283,6 +306,13 @@ static inline void AssertDirectJitCall(const void* fp) {
 
 #ifdef ENABLE_WASM_JSPI
 void WasmFrameIter::popContBaseFrame() {
+  // Recover the initial function's instance from the base frame's callee slot
+  // so GC traces it while crossing this frame. When a return_call collapsed the
+  // initial function's frame (e.g. a return_call_indirect that trapped on a
+  // signature mismatch) this is the only remaining reference to it.
+  contBaseInstance_ =
+      const_cast<Instance*>(ExtractCalleeInstanceFromFrameWithInstances(fp_));
+
   ContStack* stack = ContStack::fromBaseFrameFP(fp_);
   MOZ_ASSERT(cx()->wasm().findStackForAddress(
                  cx(), reinterpret_cast<uintptr_t>(fp_)) == stack);
@@ -291,6 +321,19 @@ void WasmFrameIter::popContBaseFrame() {
   const Handlers* handlers = stack->handlers();
   fp_ = (wasm::Frame*)handlers->returnTarget.framePointer;
   uint8_t* returnAddress = (uint8_t*)handlers->returnTarget.resumePC;
+#  ifdef JS_HW_SHADOW_STACK
+  if (shadowStackPointer_) {
+    MOZ_RELEASE_ASSERT(handlers->returnTarget.shadowStackPointer);
+    // Continue unwinding on our handler's shadow stack, from where the switch
+    // to the stack the previous frame was on took place. Additionally, if this
+    // is not the main stack's shadow stack, we save the switch point in case we
+    // find a catch handler on this stack and need to switch to it on the
+    // exception resume path.
+    shadowStackPointer_ = handlers->returnTarget.shadowStackPointer;
+    shadowStackSwitchPointer_ =
+        handlers->returnTarget.stack->stack ? shadowStackPointer_ : nullptr;
+  }
+#  endif
   instance_ = handlers->returnTarget.instance;
   const CodeRange* codeRange;
   code_ = LookupCode(returnAddress, &codeRange);
@@ -315,8 +358,9 @@ void WasmFrameIter::popContBaseFrame() {
 
 void WasmFrameIter::popFrame(bool isLeavingFrame) {
 #ifdef ENABLE_WASM_JSPI
-  // Clearing unwound continuation stack here.
+  // Clearing unwound continuation stack and base frame instance here.
   unwoundContStack_ = nullptr;
+  contBaseInstance_ = nullptr;
 #endif
 
   // If we're visiting inlined frames, see if this frame was inlined.
@@ -354,6 +398,15 @@ void WasmFrameIter::popFrame(bool isLeavingFrame) {
   code_ = LookupCode(returnAddress, &codeRange);
 #ifdef ENABLE_WASM_JSPI
   currentFrameStackSwitched_ = false;
+#endif
+
+#ifdef JS_HW_SHADOW_STACK
+  // Unwind the shadow stack entry pushed by the call that created the current
+  // frame, except when the caller is the interpreter entry stub, which the
+  // WasmInterpEntry exception resume returns into.
+  if (!code_ || !codeRange->isInterpEntry()) {
+    unwindShadowStackEntry(returnAddress);
+  }
 #endif
 
   if (isLeavingFrame) {
@@ -590,6 +643,18 @@ DebugFrame* WasmFrameIter::debugFrame() const {
   return DebugFrame::from(fp_);
 }
 
+#ifdef JS_HW_SHADOW_STACK
+void WasmFrameIter::unwindShadowStackEntry(const void* returnAddress) {
+  if (!shadowStackPointer_) {
+    return;
+  }
+
+  MOZ_RELEASE_ASSERT(*shadowStackPointer_ ==
+                     reinterpret_cast<uintptr_t>(returnAddress));
+  shadowStackPointer_++;
+}
+#endif
+
 /*****************************************************************************/
 // Prologue/epilogue code generation
 
@@ -597,9 +662,10 @@ DebugFrame* WasmFrameIter::debugFrame() const {
 // prologue/epilogue. The offsets are dynamically asserted during code
 // generation.
 #if defined(JS_CODEGEN_X64)
-static const unsigned PushedRetAddr = 0;
-static const unsigned PushedFP = 1;
-static const unsigned SetFP = 4;
+static const unsigned PushedRetAddr =
+    IndirectTargetLandingPadSize(TargetKind::Call);
+static const unsigned PushedFP = PushedRetAddr + 1;
+static const unsigned SetFP = PushedRetAddr + 4;
 static const unsigned PoppedFP = 0;
 static const unsigned PoppedFPJitEntry = 0;
 #elif defined(JS_CODEGEN_X86)
@@ -621,9 +687,10 @@ static const unsigned PoppedFPJitEntry = 0;
 // PushedRetAddr and PushedFP are used in some restricted contexts
 // and must be superficially meaningful.
 static const unsigned BeforePushRetAddr = 0;
-static const unsigned PushedRetAddr = 4;
-static const unsigned PushedFP = 4;
-static const unsigned SetFP = 8;
+static const unsigned PushedRetAddr =
+    IndirectTargetLandingPadSize(TargetKind::Call) + 4;
+static const unsigned PushedFP = PushedRetAddr;
+static const unsigned SetFP = PushedRetAddr + 4;
 static const unsigned PoppedFP = 4;
 static const unsigned PoppedFPJitEntry = 4;
 static_assert(BeforePushRetAddr == 0, "Required by StartUnwinding");
@@ -740,7 +807,7 @@ void wasm::GenerateEnterWasmFPEnvironment(MacroAssembler& masm,
 #ifndef JS_CODEGEN_ARM64
 static void GenerateCommonPrologue(MacroAssembler& masm, uint32_t* entry) {
 #  if defined(JS_CODEGEN_X86) || defined(JS_CODEGEN_X64)
-  *entry = masm.currentOffset();
+  *entry = masm.indirectTarget(TargetKind::Call).offset();
 
   // The x86/x64 call instruction pushes the return address.
   MOZ_ASSERT_IF(!masm.oom(), PushedRetAddr == masm.currentOffset() - *entry);
@@ -828,9 +895,9 @@ static void GenerateCallablePrologue(MacroAssembler& masm, uint32_t* entry) {
     masm.SetStackPointer64(vixl::sp);
 
     AutoForbidPoolsAndNops afp(&masm,
-                               /* number of instructions in scope = */ 2);
+                               /* number of instructions in scope = */ 3);
 
-    *entry = masm.currentOffset();
+    *entry = masm.indirectTarget(TargetKind::Call).offset();
 
     static_assert(Frame::callerFPOffset() == 0 &&
                   Frame::returnAddressOffset() == 8);
@@ -1008,10 +1075,10 @@ void wasm::GenerateFunctionPrologue(MacroAssembler& masm,
     // Generate checked call entry. The BytecodeOffset of the trap is fixed up
     // to be the bytecode offset of the callsite by
     // JitActivation::startWasmTrap.
-    MOZ_ASSERT_IF(!masm.oom(), masm.currentOffset() - offsets->begin ==
+    uint32_t checkedCallEntry;
+    GenerateCallablePrologue(masm, &checkedCallEntry);
+    MOZ_ASSERT_IF(!masm.oom(), checkedCallEntry - offsets->begin ==
                                    WasmCheckedCallEntryOffset);
-    uint32_t dummy;
-    GenerateCallablePrologue(masm, &dummy);
 
     switch (callIndirectId.kind()) {
       case CallIndirectIdKind::Global: {
@@ -1141,7 +1208,7 @@ void wasm::GenerateFunctionPrologue(MacroAssembler& masm,
     masm.jump(Address(scratch, *tier1FuncIndex * sizeof(uintptr_t)));
   }
 
-  offsets->tierEntry = masm.currentOffset();
+  offsets->tierEntry = masm.indirectTarget(TargetKind::Jump).offset();
 
   MOZ_ASSERT(masm.framePushed() == 0);
 }
@@ -1230,6 +1297,28 @@ void wasm::GenerateExitPrologueMainStackSwitch(
   masm.moveToStackPtr(scratch3);
   masm.assertStackAlignment(WasmStackAlignment);
 
+#  ifdef JS_HW_SHADOW_STACK
+  masm.moveShadowStackPtrTo(scratch3);
+
+  Label noHardwareShadowStack;
+  masm.branchTestPtr(Assembler::Zero, scratch3, scratch3,
+                     &noHardwareShadowStack);
+
+  masm.storePtr(
+      scratch3,
+      Address(scratch2, wasm::ContStack::offsetOfExitShadowStackPointer()));
+
+  // SP points at the base handlers, which has a SwitchTarget where we can grab
+  // the shadow stack pointer for the main stack.
+  masm.loadPtr(Address(masm.getStackPointer(),
+                       offsetof(wasm::Handlers, returnTarget) +
+                           offsetof(wasm::SwitchTarget, shadowStackPointer)),
+               scratch3);
+  masm.switchToShadowStackPtr(scratch3);
+
+  masm.bind(&noHardwareShadowStack);
+#  endif
+
   // Reset the stack limit on wasm::Context to the main stack limit. This
   // clobbers scratch2.
   masm.loadPtr(Address(scratch1, JSContext::offsetOfWasm() +
@@ -1305,6 +1394,16 @@ void wasm::GenerateExitEpilogueMainStackReturn(MacroAssembler& masm,
   Label originallyOnSystemStack;
   masm.branchTestPtr(Assembler::Zero, scratch2, scratch2,
                      &originallyOnSystemStack);
+
+#  ifdef JS_HW_SHADOW_STACK
+  masm.loadPtr(
+      Address(scratch2, wasm::ContStack::offsetOfExitShadowStackPointer()),
+      scratch1);
+  masm.storePtr(
+      ImmWord(0),
+      Address(scratch2, wasm::ContStack::offsetOfExitShadowStackPointer()));
+  masm.switchToShadowStackPtr(scratch1);
+#  endif
 
   // Load the JSContext.
   masm.loadPtr(Address(InstanceReg, wasm::Instance::offsetOfCx()), scratch1);
@@ -1532,9 +1631,9 @@ void wasm::GenerateJitExitPrologue(MacroAssembler& masm,
   {
 #  if defined(JS_CODEGEN_ARM64)
     AutoForbidPoolsAndNops afp(&masm,
-                               /* number of instructions in scope = */ 3);
+                               /* number of instructions in scope = */ 4);
 #  endif
-    offsets->begin = masm.currentOffset();
+    offsets->begin = masm.indirectTarget(TargetKind::Call).offset();
     Label fallback;
     masm.bind(&fallback, BufferOffset(fallbackOffset));
 
@@ -1586,7 +1685,7 @@ void wasm::GenerateJitEntryPrologue(MacroAssembler& masm,
     // Push the return address.
     AutoForbidPoolsAndNops afp(&masm,
                                /* number of instructions in scope = */ 3);
-    offsets->begin = masm.currentOffset();
+    offsets->begin = masm.indirectTarget(TargetKind::Call).offset();
 
     static_assert(BeforePushRetAddr == 0);
     static_assert(JitFrameLayout::offsetOfCallerFramePtr() == 0);
@@ -2040,9 +2139,9 @@ bool js::wasm::StartUnwinding(const RegisterState& registers,
         AssertMatchesCallSite(fixedPC, fixedFP);
       } else
 #endif
-          if (offsetFromEntry == PushedRetAddr || codeRange->isThunk()) {
+          if (offsetFromEntry <= PushedRetAddr || codeRange->isThunk()) {
         // The return address has been pushed on the stack but fp still
-        // points to the caller's fp.
+        // points to the caller's fp. This includes the entry's landing pad.
         fixedPC = sp[0];
         fixedFP = fp;
         AssertMatchesCallSite(fixedPC, fixedFP);

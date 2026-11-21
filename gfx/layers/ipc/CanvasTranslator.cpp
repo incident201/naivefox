@@ -33,6 +33,10 @@
 #include "mozilla/layers/TextureClient.h"
 #include "mozilla/layers/VideoBridgeParent.h"
 
+#ifdef MOZ_WIDGET_ANDROID
+#  include "mozilla/layers/TextureHostOGL.h"
+#endif
+
 #if defined(XP_WIN)
 #  include "mozilla/gfx/DeviceManagerDx.h"
 #  include "mozilla/layers/TextureD3D11.h"
@@ -826,6 +830,12 @@ bool CanvasTranslator::TranslateRecording() {
       }
     }
 
+    // Playing the event may have deactivated us, in which case we must stop
+    // before ReadNextEvent overwrites the Failed state.
+    if (mHeader->readerState == State::Failed) {
+      return false;
+    }
+
     mHeader->processedCount++;
 
     if (mHeader->readerState == State::Paused || PauseUntilSync()) {
@@ -1233,7 +1243,8 @@ already_AddRefed<gfx::DrawTarget> CanvasTranslator::CreateFallbackDrawTarget(
 
 already_AddRefed<gfx::DrawTarget> CanvasTranslator::CreateDrawTarget(
     gfx::ReferencePtr aRefPtr, const RemoteTextureOwnerId aTextureOwnerId,
-    const gfx::IntSize& aSize, gfx::SurfaceFormat aFormat) {
+    const gfx::IntSize& aSize, gfx::SurfaceFormat aFormat,
+    bool aPreferAcceleration) {
   if (!aTextureOwnerId.IsValid()) {
 #ifndef FUZZING_SNAPSHOT
     MOZ_DIAGNOSTIC_CRASH("No texture owner set");
@@ -1260,7 +1271,7 @@ already_AddRefed<gfx::DrawTarget> CanvasTranslator::CreateDrawTarget(
       mSharedContext->EnterTlsScope();
     }
     if (RefPtr<gfx::DrawTargetWebgl> webgl = gfx::DrawTargetWebgl::Create(
-            aSize, aFormat, mSharedContext, mContentId)) {
+            aSize, aFormat, mSharedContext, mContentId, aPreferAcceleration)) {
       webgl->BeginFrame(true);
       dt = webgl.forget().downcast<gfx::DrawTarget>();
       if (dt) {
@@ -1565,6 +1576,12 @@ static bool SDIsSupportedRemoteDecoder(const SurfaceDescriptor& sd) {
 
   const auto& sdrd = sdv.get_SurfaceDescriptorRemoteDecoder();
 
+#ifdef MOZ_WIDGET_ANDROID
+  if (sdrd.videoType() == RemoteDecoderVideoType::AndroidImageReaderImage) {
+    return true;
+  }
+#endif
+
   if (sdrd.videoType() == RemoteDecoderVideoType::Buffer ||
       sdrd.videoType() == RemoteDecoderVideoType::MacIOSurface ||
       sdrd.videoType() == RemoteDecoderVideoType::D3D10 ||
@@ -1747,6 +1764,12 @@ CanvasTranslator::LookupSourceSurfaceFromSurfaceDescriptor(
     usedDescriptor = Some(sdrd);
 
     return do_AddRef(usedSurf);
+  }
+#endif
+
+#ifdef MOZ_WIDGET_ANDROID
+  if (sdrd.videoType() == RemoteDecoderVideoType::AndroidImageReaderImage) {
+    return GetAndroidImageReaderSurfaceForCanvas(texture);
   }
 #endif
 

@@ -973,6 +973,9 @@ nsresult CryptoKey::PrivateKeyToJwk(SECKEYPrivateKey* aPrivKey,
         // SECKEY_ConvertToPublicKey will try to derive public key
         UniqueSECKEYPublicKey pubKey =
             UniqueSECKEYPublicKey(SECKEY_ConvertToPublicKey(aPrivKey));
+        if (!pubKey) {
+          return NS_ERROR_DOM_OPERATION_ERR;
+        }
         rv = PK11_ReadRawAttribute(PK11_TypePubKey, pubKey.get(), CKA_EC_POINT,
                                    &ecPoint);
 
@@ -1022,6 +1025,30 @@ nsresult CryptoKey::PrivateKeyToJwk(SECKEYPrivateKey* aPrivKey,
         return NS_ERROR_DOM_OPERATION_ERR;
       }
 
+      return NS_OK;
+    }
+
+    case kyberKey: {
+      CryptoBuffer seed;
+      nsresult rv = PrivateMLKEMKeyToSeed(aPrivKey, seed);
+      if (NS_FAILED(rv)) {
+        return rv;
+      }
+
+      UniqueSECKEYPublicKey pubKey(SECKEY_ConvertToPublicKey(aPrivKey));
+      if (!pubKey || pubKey->keyType != kyberKey) {
+        return NS_ERROR_DOM_OPERATION_ERR;
+      }
+
+      rv = PublicKeyToJwk(pubKey.get(), aRetVal);
+      if (NS_FAILED(rv)) {
+        return rv;
+      }
+
+      aRetVal.mPriv.Construct();
+      if (NS_FAILED(seed.ToJwkBase64(aRetVal.mPriv.Value()))) {
+        return NS_ERROR_DOM_OPERATION_ERR;
+      }
       return NS_OK;
     }
     default:
@@ -1244,6 +1271,17 @@ nsresult CryptoKey::PublicKeyToJwk(SECKEYPublicKey* aPubKey,
                       &aPubKey->u.ec.publicValue, aRetVal)) {
         return NS_ERROR_DOM_OPERATION_ERR;
       }
+      return NS_OK;
+    }
+    case kyberKey: {
+      CryptoBuffer pub;
+      aRetVal.mPub.Construct();
+      if (NS_FAILED(PublicMLKEMKeyToRaw(aPubKey, pub)) ||
+          NS_FAILED(pub.ToJwkBase64(aRetVal.mPub.Value()))) {
+        return NS_ERROR_DOM_OPERATION_ERR;
+      }
+
+      aRetVal.mKty = NS_LITERAL_STRING_FROM_CSTRING(JWK_TYPE_AKP);
       return NS_OK;
     }
     default:

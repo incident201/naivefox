@@ -125,25 +125,27 @@ add_task(async function test_link_contextmenu() {
 
   const expectedArray = [
     "context-openlinkintab",
-    ...(expectSplitView ? ["context-openlinkinsplitview"] : []),
     ...(expectOpenLinkInUserContextMenu
       ? ["context-openlinkinusercontext-menu"]
       : []),
     "context-openlink",
+    "context-openlinkminiwindow",
     "context-openlinkprivate",
-    "context-previewlink",
     "context-sep-open",
-    "context-bookmarklink",
-    "context-savelink",
+    ...(expectSplitView
+      ? ["context-openlinkinsplitview", "context-sep-splitview"]
+      : []),
     "context-copylink",
     ...(expectStripOnShareLink ? ["context-stripOnShareLink"] : []),
     "context-sep-copylink",
+    "context-savelink",
+    "context-bookmarklink",
     "context-sendlinktodevice",
     "context-sep-sendlinktodevice",
     "context-searchselect",
     ...(expectTranslateSelection ? ["context-translate-selection"] : []),
-    "context-ask-chat",
-    "frame-sep",
+    "context-previewlink",
+    "context-sep-search",
     ...(expectInspectAccessibility ? ["context-inspect-a11y"] : []),
     "context-inspect",
   ];
@@ -175,7 +177,7 @@ add_task(async function test_link_contextmenu() {
   );
   is(
     document.getElementById("context-sendlinktodevice").label,
-    "Send Link to Device",
+    "Send to Your Devices",
     "Send link to device is enabled"
   );
   contextMenu.activateItem(
@@ -387,25 +389,27 @@ add_task(async function test_link_contextmenu_mobile() {
 
   const expectedArray = [
     "context-openlinkintab",
-    ...(expectSplitView ? ["context-openlinkinsplitview"] : []),
     ...(expectOpenLinkInUserContextMenu
       ? ["context-openlinkinusercontext-menu"]
       : []),
     "context-openlink",
+    "context-openlinkminiwindow",
     "context-openlinkprivate",
-    "context-previewlink",
     "context-sep-open",
-    "context-bookmarklink",
-    "context-savelink",
+    ...(expectSplitView
+      ? ["context-openlinkinsplitview", "context-sep-splitview"]
+      : []),
     "context-copylink",
     ...(expectStripOnShareLink ? ["context-stripOnShareLink"] : []),
     "context-sep-copylink",
+    "context-savelink",
+    "context-bookmarklink",
     "context-sendlinktodevice",
     "context-sep-sendlinktodevice",
     "context-searchselect",
     ...(expectTranslateSelection ? ["context-translate-selection"] : []),
-    "context-ask-chat",
-    "frame-sep",
+    "context-previewlink",
+    "context-sep-search",
     ...(expectInspectAccessibility ? ["context-inspect-a11y"] : []),
     "context-inspect",
   ];
@@ -437,7 +441,7 @@ add_task(async function test_link_contextmenu_mobile() {
   );
   is(
     document.getElementById("context-sendlinktodevice").label,
-    "Send Link to Mobile",
+    "Send to Your Devices",
     "Send link to mobile is enabled"
   );
   contextMenu.activateItem(

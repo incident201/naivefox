@@ -20,8 +20,8 @@
  */
 
 /**
- * pdfjsVersion = 6.5.422
- * pdfjsBuild = 22f5df126
+ * pdfjsVersion = 7.0.189
+ * pdfjsBuild = 81b2255fe
  */
 /******/ (() => { // webpackBootstrap
 /******/ 	"use strict";
@@ -1894,6 +1894,7 @@ class Doc {
         break;
       case "WillPrint":
         this.#userActivationData.disablePrinting = true;
+        this.#userActivationData.disableSaving = true;
         try {
           this.#runActions(name);
         } catch (error) {
@@ -1903,6 +1904,7 @@ class Doc {
           command: "WillPrintFinished"
         });
         this.#userActivationData.disablePrinting = false;
+        this.#userActivationData.disableSaving = false;
         break;
       case "WillSave":
         this.#userActivationData.disableSaving = true;
@@ -2745,7 +2747,9 @@ class EventDispatcher {
     const source = this.#objects[id];
     const event = globalThis.event = createEvent(baseEvent);
     let savedChange;
-    this.#userActivation();
+    if (!baseEvent.scripted) {
+      this.#userActivation();
+    }
     FieldInternals.prepareEvent(source, id, event);
     switch (name) {
       case "Keystroke":

@@ -79,9 +79,10 @@ void JitRuntime::generateEnterJIT(JSContext* cx, MacroAssembler& masm,
   AutoCreatedBy acb(masm, "JitRuntime::generateEnterJIT");
 
   if (mode == EnterJitMode::GeneratorResume) {
-    enterJITGeneratorResumeOffset_ = startTrampolineCode(masm);
+    enterJITGeneratorResumeOffset_ =
+        startTrampolineCode(masm, TargetKind::Call);
   } else {
-    enterJITOffset_ = startTrampolineCode(masm);
+    enterJITOffset_ = startTrampolineCode(masm, TargetKind::Call);
   }
 
   masm.assertStackAlignment(ABIStackAlignment,
@@ -352,12 +353,12 @@ void JitRuntime::generateInvalidator(MacroAssembler& masm, Label* bailoutTail) {
 
   // Make space for InvalidationBailout's bailoutInfo outparam.
   masm.reserveStack(sizeof(void*));
-  masm.movq(rsp, rbx);
+  masm.movq(rsp, r11);
 
   using Fn = bool (*)(InvalidationBailoutStack* sp, BaselineBailoutInfo** info);
   masm.setupUnalignedABICall(rdx);
   masm.passABIArg(rax);
-  masm.passABIArg(rbx);
+  masm.passABIArg(r11);
   masm.callWithABI<Fn, InvalidationBailout>(
       ABIType::General, CheckUnsafeCallWithABI::DontCheckOther);
 
@@ -532,11 +533,15 @@ uint32_t JitRuntime::generatePreBarrier(JSContext* cx, MacroAssembler& masm,
                                         MIRType type) {
   AutoCreatedBy acb(masm, "JitRuntime::generatePreBarrier");
 
-  uint32_t offset = startTrampolineCode(masm);
+  // WASM stores the address of the pre-barrier in the Instance and performs
+  // an indirect call.
+  TargetKind targetKind =
+      type == MIRType::WasmAnyRef ? TargetKind::Call : TargetKind::None;
+  uint32_t offset = startTrampolineCode(masm, targetKind);
 
   static_assert(PreBarrierReg == rdx);
   Register temp1 = rax;
-  Register temp2 = rbx;
+  Register temp2 = r11;
   Register temp3 = rcx;
   masm.pushRegs(temp1, temp2, temp3);
 

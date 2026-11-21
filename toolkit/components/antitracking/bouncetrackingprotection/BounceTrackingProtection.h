@@ -9,11 +9,8 @@
 #include "mozilla/Logging.h"
 #include "mozilla/MozPromise.h"
 #include "nsIBounceTrackingProtection.h"
-#include "nsIBTPRemoteExceptionList.h"
 #include "mozilla/Maybe.h"
 #include "nsIObserver.h"
-#include "nsWeakReference.h"
-#include "nsTHashSet.h"
 
 inline const char* format_as(nsIBounceTrackingProtection::Modes aMode) {
   switch (aMode) {
@@ -53,8 +50,7 @@ using ClearDataMozPromise =
 extern LazyLogModule gBounceTrackingProtectionLog;
 
 class BounceTrackingProtection final : public nsIBounceTrackingProtection,
-                                       public nsIObserver,
-                                       public nsSupportsWeakReference {
+                                       public nsIObserver {
   NS_DECL_ISUPPORTS
   NS_DECL_NSIOBSERVER
   NS_DECL_NSIBOUNCETRACKINGPROTECTION
@@ -98,11 +94,10 @@ class BounceTrackingProtection final : public nsIBounceTrackingProtection,
       BounceTrackingStateGlobal* aStateGlobal = nullptr);
 
   // Logs a warning to the DevTools website console if we recently purged a site
-  // matching the given principal. Purge log data is not persisted across
-  // restarts so we only know whether a purge happened during this session. For
-  // private browsing mode closing the last private browsing window clears purge
-  // information.
-  void MaybeLogPurgedWarningForSite(nsIPrincipal* aPrincipal,
+  // matching aSite. Purge log data is not persisted across restarts so we only
+  // know whether a purge happened during this session. For private browsing
+  // mode closing the last private browsing window clears purge information.
+  void MaybeLogPurgedWarningForSite(const BounceTrackingSite& aSite,
                                     BounceTrackingState* aBounceTrackingState);
 
  private:
@@ -134,16 +129,6 @@ class BounceTrackingProtection final : public nsIBounceTrackingProtection,
   // Storage for user agent globals.
   RefPtr<BounceTrackingProtectionStorage> mStorage;
 
-  // Interface to remote settings exception list.
-  nsCOMPtr<nsIBTPRemoteExceptionList> mRemoteExceptionList;
-  RefPtr<GenericNonExclusivePromise> mRemoteExceptionListInitPromise;
-
-  // In-memory copy of the remote settings exception list.
-  nsTHashSet<nsCStringHashKey> mRemoteSiteHostExceptions;
-
-  // Lazily initializes the remote exception list.
-  RefPtr<GenericNonExclusivePromise> EnsureRemoteExceptionListService();
-
   // Clear state for classified bounce trackers. To be called on an interval.
   using PurgeBounceTrackersMozPromise =
       MozPromise<nsTArray<RefPtr<BounceTrackingPurgeEntry>>, nsresult, true>;
@@ -161,13 +146,12 @@ class BounceTrackingProtection final : public nsIBounceTrackingProtection,
       BounceTrackingAllowList& aBounceTrackingAllowList,
       nsTArray<RefPtr<ClearDataMozPromise>>& aClearPromises);
 
-  // Helper which calls nsIClearDataService to clear data for given host and
-  // OriginAttributes.
+  // Helper which calls nsIClearDataService to clear data for given site.
   // After a successful call aClearPromise will be populated.
-  [[nodiscard]] nsresult PurgeStateForHostAndOriginAttributes(
-      const nsACString& aHost, PRTime bounceTime,
-      const OriginAttributes& aOriginAttributes,
-      BounceTrackingRecord* aChainRecord, ClearDataMozPromise** aClearPromise);
+  [[nodiscard]] nsresult PurgeStateForSite(const BounceTrackingSite& aSite,
+                                           PRTime bounceTime,
+                                           BounceTrackingRecord* aChainRecord,
+                                           ClearDataMozPromise** aClearPromise);
 
   // Whether a purge operation is currently in progress. This avoids running
   // multiple purge operations at the same time.

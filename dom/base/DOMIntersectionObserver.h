@@ -6,12 +6,15 @@
 #define DOMIntersectionObserver_h
 
 #include "mozilla/Attributes.h"
+#include "mozilla/DoublyLinkedList.h"
 #include "mozilla/LinkedList.h"
 #include "mozilla/ServoStyleConsts.h"
 #include "mozilla/Variant.h"
 #include "mozilla/dom/DOMRect.h"
 #include "mozilla/dom/Document.h"
+#include "mozilla/dom/ECMACollections.h"
 #include "mozilla/dom/IntersectionObserverBinding.h"
+#include "mozilla/dom/NodeOwnedObjectList.h"
 #include "nsDOMNavigationTiming.h"
 #include "nsTArray.h"
 #include "nsTHashSet.h"
@@ -114,8 +117,12 @@ struct IntersectionOutput {
 class DOMIntersectionObserver final
     : public nsISupports,
       public nsWrapperCache,
-      public LinkedListElement<DOMIntersectionObserver> {
-  ~DOMIntersectionObserver() { Disconnect(); }
+      public LinkedListElement<DOMIntersectionObserver>,
+      public DoublyLinkedListElement<DOMIntersectionObserver> {
+  ~DOMIntersectionObserver() {
+    NodeOwnedObjectList<DOMIntersectionObserver>::Remove(this);
+    Disconnect();
+  }
 
   using NativeCallback = void (*)(
       const Sequence<OwningNonNull<DOMIntersectionObserverEntry>>& aEntries);
@@ -156,6 +163,9 @@ class DOMIntersectionObserver final
 
   void UnlinkTarget(Element& aTarget);
   void Disconnect();
+
+  bool HasOwnerInCCGenerationDocument() const;
+  void MarkForCC();
 
   void TakeRecords(nsTArray<RefPtr<DOMIntersectionObserverEntry>>& aRetVal);
 
@@ -207,19 +217,14 @@ class DOMIntersectionObserver final
   StyleRect<LengthPercentage> mScrollMargin;
   AutoTArray<double, 1> mThresholds;
 
-  // These hold raw pointers which are explicitly cleared by UnlinkTarget().
-  //
-  // We keep a set and an array because we need ordered access, but also
-  // constant time lookup.
-  nsTArray<Element*> mObservationTargets;
-
   // Value can be:
   //   -2:   Makes sure next calculated threshold always differs, leading to a
   //         notification task being scheduled.
   //   -1:   Non-intersecting.
   //   >= 0: Intersecting, valid index of aObserver->mThresholds.
   enum ObservationState : int32_t { Uninitialized = -2, NotIntersecting = -1 };
-  nsTHashMap<Element*, int32_t> mObservationTargetMap;
+  // Raw target pointers are explicitly cleared by UnlinkTarget().
+  ECMAMap<Element*, int32_t> mObservationTargets;
 
   nsTArray<RefPtr<DOMIntersectionObserverEntry>> mQueuedEntries;
   bool mConnected = false;

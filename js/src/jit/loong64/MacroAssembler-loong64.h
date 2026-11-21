@@ -53,6 +53,16 @@ struct ImmTagSignExt : public Imm32 {
   explicit ImmTagSignExt(JSValueTag mask) : Imm32(signExtend(mask)) {}
 };
 
+// The upper 32 bits of a Value whose payload fits in 32 bits are its tag
+// shifted left by 15. Sign-extended, as LD.W loads them, they are a multiple of
+// |1 << (JSVAL_TAG_SHIFT - 32)|, which LU12I.W loads in one instruction.
+struct ImmTagUpperWord : public Imm32 {
+  static_assert(JSVAL_TAG_SHIFT - 32 >= 12, "LU12I.W loads the shifted tag");
+
+  explicit ImmTagUpperWord(JSValueTag tag)
+      : Imm32(static_cast<int32_t>(tag << (JSVAL_TAG_SHIFT - 32))) {}
+};
+
 static const int defaultShift = 3;
 static_assert(1 << defaultShift == sizeof(JS::Value),
               "The defaultShift is wrong");
@@ -147,6 +157,9 @@ class MacroAssemblerLOONG64 : public Assembler {
   FaultingCodeRange ma_store(Register data, Address address,
                              LoadStoreSize size = SizeWord,
                              LoadStoreExtension extension = SignExtend);
+  FaultingCodeRange ma_store(Imm32 imm, Address address,
+                             LoadStoreSize size = SizeWord,
+                             LoadStoreExtension extension = SignExtend);
 
   // arithmetic based ops
   // add
@@ -231,8 +244,8 @@ class MacroAssemblerLOONG64 : public Assembler {
   FaultingCodeRange ma_fld_d(FloatRegister ft, Address address);
   FaultingCodeRange ma_fst_d(FloatRegister ft, Address address);
   FaultingCodeRange ma_fst_s(FloatRegister ft, Address address);
-  FaultingCodeRange ma_vld(FloatRegister vd, Address address);
-  FaultingCodeRange ma_vst(FloatRegister vd, Address address);
+  FaultingCodeRange ma_vld(VRegister vd, Address address);
+  FaultingCodeRange ma_vst(VRegister vd, Address address);
 
   void ma_pop(FloatRegister f);
   void ma_push(FloatRegister f);
@@ -280,10 +293,13 @@ class MacroAssemblerLOONG64 : public Assembler {
                 Register rk);
 
   void ma_and(Register rd, Register rj, Imm32 imm);
+  void ma_and(Register rd, Register rj, ImmWord imm);
 
   void ma_or(Register rd, Register rj, Imm32 imm);
+  void ma_or(Register rd, Register rj, ImmWord imm);
 
   void ma_xor(Register rd, Register rj, Imm32 imm);
+  void ma_xor(Register rd, Register rj, ImmWord imm);
 
   void ma_nor(Register rd, Register rj, Imm32 imm);
 
@@ -296,8 +312,9 @@ class MacroAssemblerLOONG64 : public Assembler {
   FaultingCodeRange ma_store(Register data, const BaseIndex& dest,
                              LoadStoreSize size = SizeWord,
                              LoadStoreExtension extension = SignExtend);
-  void ma_store(Imm32 imm, const BaseIndex& dest, LoadStoreSize size = SizeWord,
-                LoadStoreExtension extension = SignExtend);
+  FaultingCodeRange ma_store(Imm32 imm, const BaseIndex& dest,
+                             LoadStoreSize size = SizeWord,
+                             LoadStoreExtension extension = SignExtend);
 
   // arithmetic based ops
   // add
@@ -555,6 +572,9 @@ class MacroAssemblerLOONG64Compat : public MacroAssemblerLOONG64 {
 
   Address computeScaledAddress(const BaseIndex& address,
                                UseScratchRegisterScope& temps);
+
+  Address computeAbsoluteAddress(AbsoluteAddress address,
+                                 UseScratchRegisterScope& temps);
 
   void j(Label* dest) { ma_b(dest); }
 
@@ -876,6 +896,20 @@ class MacroAssemblerLOONG64Compat : public MacroAssemblerLOONG64 {
                                     Register scratch) {
     splitSignExtTag(value, scratch);
     return scratch;
+  }
+
+  // Branch on the tag of a Value in memory by comparing its upper word with
+  // ImmTagUpperWord(tag), which takes one instruction fewer than loading the
+  // Value and extracting the sign-extended tag.
+  template <typename T>
+  void branchTestTagUpperWord(Condition cond, const T& address, JSValueTag tag,
+                              Label* label) {
+    T upperWord = address;
+    upperWord.offset += static_cast<int32_t>(sizeof(uint32_t));
+    UseScratchRegisterScope temps(*this);
+    const Register scratch = temps.Acquire();
+    load32(upperWord, scratch);
+    ma_b(scratch, ImmTagUpperWord(tag), label, cond);
   }
 
   void loadInt32OrDouble(const Address& src, FloatRegister dest);

@@ -177,6 +177,11 @@ add_task(async function test_tabs() {
       const tabData = client.tabs[j];
       Assert.equal(row.title, tabData.title, `Tab ${j + 1} has correct title.`);
       Assert.equal(row.url, tabData.url, `Tab ${j + 1} has correct URL.`);
+      await assertRowTooltip(
+        row,
+        `${tabData.title}\n${tabData.url}`,
+        `Tab ${j + 1} tooltip shows the title and URL.`
+      );
 
       // We need to wait for the document to flush to ensure it's completely opened
       await content.promiseDocumentFlushed(() => {});
@@ -657,14 +662,6 @@ add_task(async function test_open_in_new_tab_context_menu() {
   info("Verify 'Open in new Tab' context menu item.");
   const [, secondTab] = await waitForSyncedTabListInCard(component, 0, 2);
 
-  // Wait for new tab to open when activating menu item
-  // Use the URL from the second tab in our test data
-  const promiseTabOpened = BrowserTestUtils.waitForNewTab(
-    gBrowser,
-    "https://example.org/",
-    true
-  );
-
   await openAndWaitForContextMenu(contextMenu, secondTab.mainEl, () => {
     const openInNewTabMenuItem = contextMenu.querySelector(
       "#sidebar-synced-tabs-context-open-in-tab"
@@ -674,23 +671,19 @@ add_task(async function test_open_in_new_tab_context_menu() {
       !openInNewTabMenuItem.disabled,
       "'Open in new Tab' menu item is enabled."
     );
-
-    // click the menu item to test functionality
-    contextMenu.activateItem(openInNewTabMenuItem);
   });
-
-  // Wait for the new tab to be created
-  const newTab = await promiseTabOpened;
-
-  // Verify the newly opened tab has the correct URL
-  is(
-    newTab.linkedBrowser.currentURI.spec,
-    "https://example.org/",
-    "The opened tab should have the correct URL"
+  const promiseHidden = BrowserTestUtils.waitForPopupEvent(
+    contextMenu,
+    "hidden"
   );
+  contextMenu.hidePopup();
+  await promiseHidden;
 
-  // Clean up: close the newly opened tab
-  BrowserTestUtils.removeTab(newTab);
+  await assertOpenInNewTabRespectsLoadInBackground(
+    secondTab.mainEl,
+    "sidebar-synced-tabs-context-open-in-tab",
+    "https://example.org/"
+  );
 
   SidebarController.hide();
   sandbox.restore();

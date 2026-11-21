@@ -79,6 +79,7 @@ import org.mozilla.fenix.helpers.TestHelper.packageName
 import org.mozilla.fenix.home.topsites.TopSitesTestTag
 import org.mozilla.fenix.home.topsites.TopSitesTestTag.TOP_SITE_CARD_FAVICON
 import org.mozilla.fenix.home.ui.HomepageTestTag.HOMEPAGE
+import org.mozilla.fenix.home.ui.HomepageTestTag.HOMEPAGE_GRADIENT_WALLPAPER
 import org.mozilla.fenix.home.ui.HomepageTestTag.HOMEPAGE_PRIVATE_BROWSING_LEARN_MORE_LINK
 import org.mozilla.fenix.home.ui.HomepageTestTag.HOMEPAGE_STORY
 import org.mozilla.fenix.home.ui.HomepageTestTag.HOMEPAGE_WORDMARK_LOGO
@@ -159,20 +160,21 @@ class HomeScreenRobot(private val composeTestRule: ComposeTestRule) {
         }
     }
 
-    fun <A : androidx.activity.ComponentActivity, R : org.junit.rules.TestRule> verifyEdgeToEdgeWallpaperApplied(
+    @OptIn(ExperimentalTestApi::class)
+    fun <A : androidx.activity.ComponentActivity, R : org.junit.rules.TestRule> verifyGradientWallpaperApplied(
         composeTestRule: AndroidComposeTestRule<R, A>
     ) {
-        Log.i(TAG, "verifyEdgeToEdgeWallpaperApplied: Verifying edge-to-edge wallpaper background")
-        verifyWindowBackgroundDrawable(composeTestRule, R.drawable.home_background_gradient)
-        Log.i(TAG, "verifyEdgeToEdgeWallpaperApplied: Verified edge-to-edge wallpaper background")
+        Log.i(TAG, "verifyGradientWallpaperApplied: Verifying gradient wallpaper background")
+        composeTestRule.waitUntilAtLeastOneExists(hasTestTag(HOMEPAGE_GRADIENT_WALLPAPER), timeoutMillis = 5_000)
+        Log.i(TAG, "verifyGradientWallpaperApplied: Verified gradient wallpaper background")
     }
 
-    fun <A : androidx.activity.ComponentActivity, R : org.junit.rules.TestRule> verifyDefaultWallpaperApplied(
+    fun <A : androidx.activity.ComponentActivity, R : org.junit.rules.TestRule> verifySolidWallpaperApplied(
         composeTestRule: AndroidComposeTestRule<R, A>
     ) {
-        Log.i(TAG, "verifyDefaultWallpaperApplied: Verifying default wallpaper background")
+        Log.i(TAG, "verifySolidWallpaperApplied: Verifying solid wallpaper background")
         verifyWindowBackgroundDrawable(composeTestRule, R.color.fx_mobile_surface)
-        Log.i(TAG, "verifyDefaultWallpaperApplied: Verified default wallpaper background")
+        Log.i(TAG, "verifySolidWallpaperApplied: Verified solid wallpaper background")
     }
 
     fun <A : androidx.activity.ComponentActivity, R : org.junit.rules.TestRule> verifyPrivateModeBackgroundApplied(

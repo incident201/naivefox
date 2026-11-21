@@ -13,6 +13,7 @@
 #include "CacheControlParser.h"
 #include "HttpLog.h"
 #include "PLDHashTable.h"
+#include "mozilla/CheckedInt.h"
 #include "mozilla/DataMutex.h"
 #include "mozilla/OriginAttributes.h"
 #include "mozilla/Preferences.h"
@@ -560,7 +561,11 @@ void localEnsureBuffer(UniquePtr<T[]>& buf, uint32_t newSize, uint32_t preserve,
   // what we need and then round the result up to a 4KB (page)
   // boundary.
 
-  objSize = (newSize + 2048 + 4095) & ~4095;
+  CheckedInt<uint32_t> size = CheckedInt<uint32_t>(newSize) + 2048 + 4095;
+  if (!size.isValid()) {
+    NS_ABORT_OOM(newSize);
+  }
+  objSize = size.value() & ~4095;
 
   static_assert(sizeof(T) == 1, "sizeof(T) must be 1");
   auto tmp = std::make_unique<T[]>(objSize);
@@ -1185,6 +1190,40 @@ nsIHttpChannelInternal::ProxyDNSStrategy GetProxyDNSStrategyHelper(
   }
 
   return nsIHttpChannelInternal::PROXY_DNS_STRATEGY_PROXY;
+}
+
+nsIHttpChannelInternal::ProxyType GetProxyTypeHelper(nsIProxyInfo* aProxyInfo) {
+  if (!aProxyInfo) {
+    return nsIHttpChannelInternal::PROXY_TYPE_DIRECT;
+  }
+
+  nsAutoCString type;
+  uint32_t flags = 0;
+  aProxyInfo->GetType(type);
+  aProxyInfo->GetFlags(&flags);
+  bool proxyResolvesHost =
+      flags & nsIProxyInfo::TRANSPARENT_PROXY_RESOLVES_HOST;
+  if (type.EqualsLiteral("direct")) {
+    return nsIHttpChannelInternal::PROXY_TYPE_DIRECT;
+  }
+  if (type.EqualsLiteral("http")) {
+    return nsIHttpChannelInternal::PROXY_TYPE_HTTP;
+  }
+  if (type.EqualsLiteral("https")) {
+    return nsIHttpChannelInternal::PROXY_TYPE_HTTPS;
+  }
+  if (type.EqualsLiteral("socks4")) {
+    return proxyResolvesHost ? nsIHttpChannelInternal::PROXY_TYPE_SOCKS4A
+                             : nsIHttpChannelInternal::PROXY_TYPE_SOCKS4;
+  }
+  if (type.EqualsLiteral("socks") || type.EqualsLiteral("socks5")) {
+    return proxyResolvesHost ? nsIHttpChannelInternal::PROXY_TYPE_SOCKS5H
+                             : nsIHttpChannelInternal::PROXY_TYPE_SOCKS5;
+  }
+  if (type.EqualsLiteral("masque")) {
+    return nsIHttpChannelInternal::PROXY_TYPE_MASQUE;
+  }
+  return nsIHttpChannelInternal::PROXY_TYPE_UNKNOWN;
 }
 
 }  // namespace net

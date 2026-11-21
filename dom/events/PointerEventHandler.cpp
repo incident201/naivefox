@@ -19,6 +19,7 @@
 #include "nsIContentInlines.h"
 #include "nsIFrame.h"
 #include "nsIWeakReferenceUtils.h"
+#include "nsLayoutUtils.h"
 #include "nsRFPService.h"
 #include "nsUserCharacteristics.h"
 
@@ -539,7 +540,7 @@ void PointerEventHandler::ReleasePointerCaptureById(uint32_t aPointerId) {
 /* static */
 void PointerEventHandler::ReleaseAllPointerCapture() {
   for (const auto& entry : *sPointerCaptureList) {
-    PointerCaptureInfo* data = entry.GetWeak();
+    PointerCaptureInfo* data = entry.GetRawPtr();
     if (data && data->mPendingElement) {
       ReleasePointerCaptureById(entry.GetKey());
     }
@@ -967,7 +968,7 @@ void PointerEventHandler::ReleaseIfCaptureByDescendant(nsIContent* aContent) {
   // If it does we should release the pointer capture for the elements.
   if (!sPointerCaptureList->IsEmpty() && aContent->IsElement()) {
     for (const auto& entry : *sPointerCaptureList) {
-      PointerCaptureInfo* data = entry.GetWeak();
+      PointerCaptureInfo* data = entry.GetRawPtr();
       if (data && data->mPendingElement &&
           data->mPendingElement->IsInclusiveDescendantOf(aContent)) {
         ReleasePointerCaptureById(entry.GetKey());
@@ -1445,7 +1446,7 @@ void PointerEventHandler::DispatchPointerFromMouseOrTouch(
           continue;
         }
 
-        nsIFrame* frame = content->GetPrimaryFrame();
+        nsIFrame* frame = nsLayoutUtils::GetPrimaryOrAreaImageFrame(content);
         shell = PresShell::GetShellForEventTarget(frame, content);
         if (!shell) {
           continue;
@@ -1614,7 +1615,8 @@ void PointerEventHandler::DispatchGotOrLostPointerCaptureEvent(
   localEvent.AssignPointerEventData(*aPointerEvent, /* aCopyTargets */ true,
                                     /* aCopyCoalescedEvents */ false);
   DebugOnly<nsresult> rv = presShell->HandleEventWithTarget(
-      &localEvent, aCaptureTarget->GetPrimaryFrame(), aCaptureTarget, &status);
+      &localEvent, nsLayoutUtils::GetPrimaryOrAreaImageFrame(aCaptureTarget),
+      aCaptureTarget, &status);
 
   NS_WARNING_ASSERTION(NS_SUCCEEDED(rv),
                        "DispatchGotOrLostPointerCaptureEvent failed");

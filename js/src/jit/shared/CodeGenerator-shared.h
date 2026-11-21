@@ -51,6 +51,11 @@ class CodeGeneratorShared : public LElementVisitor {
   uint32_t pushedArgs_;
 #endif
   uint32_t lastOsiPointOffset_;
+#ifdef DEBUG
+  // OOL paths added while visiting the most recent non-OsiPoint instruction.
+  js::Vector<OutOfLineCode*, 4, BackgroundSystemAllocPolicy>
+      currentInstructionOols_;
+#endif
   SafepointWriter safepoints_;
   Label invalidate_;
   CodeOffset invalidateEpilogueData_;
@@ -252,12 +257,7 @@ class CodeGeneratorShared : public LElementVisitor {
   // given block, and it's trivial, return the ultimate block we should
   // actually branch directly to.
   MBasicBlock* skipTrivialBlocks(MBasicBlock* block) {
-    while (block->lir()->isTrivial()) {
-      LGoto* ins = block->lir()->rbegin()->toGoto();
-      MOZ_ASSERT(ins->numSuccessors() == 1);
-      block = ins->getSuccessor(0);
-    }
-    return block;
+    return block->lir()->skipTrivialBlocks()->mir();
   }
 
   // Test whether the given block can be reached via fallthrough from the
@@ -409,7 +409,9 @@ class CodeGeneratorShared : public LElementVisitor {
     return deoptLabel_.used() || deoptJumpPending_;
   }
 
-  // Pushes the snapshot offset and jumps to deoptLabel_.
+  // Pushes the snapshot offset and jumps to deoptLabel_. On arm64 the snapshot
+  // offset is passed in BailoutSnapshotOffsetReg and pushed at deoptLabel_
+  // instead.
   void emitBailoutOOL(LSnapshot* snapshot);
 
 // MIPS64, Loong64, and RISC-V64 have no flags register and can't implement

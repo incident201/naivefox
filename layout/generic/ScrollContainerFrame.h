@@ -1182,7 +1182,6 @@ class ScrollContainerFrame : public nsContainerFrame,
   MOZ_CAN_RUN_SCRIPT nsresult FireScrollPortEvent();
   void PostScrollEndEvent();
   void PostOrDeferScrollEndEvent();
-  MOZ_CAN_RUN_SCRIPT void FireScrollEndEvent();
   void PostOverflowEvent();
 
   // Add display items for the top-layer (which includes things like
@@ -1205,10 +1204,12 @@ class ScrollContainerFrame : public nsContainerFrame,
                            bool aPositioned);
 
   void PostScrollEvent(const nsPoint& aOldScrollPosition);
-  MOZ_CAN_RUN_SCRIPT void FireScrollEvent();
   void PostScrolledAreaEvent();
   MOZ_CAN_RUN_SCRIPT void FireScrolledAreaEvent();
 
+  bool IsScrollbarPartShown(const nsIFrame* aPart) const;
+  // The scrollbar, if it's shown.
+  nsScrollbarFrame* GetShownScrollbarBox(bool aVertical) const;
   void FinishReflowForScrollbar(nsScrollbarFrame*, nscoord aMinXY,
                                 nscoord aMaxXY, nscoord aCurPosXY,
                                 nscoord aPageIncrement);

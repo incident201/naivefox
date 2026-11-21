@@ -5,11 +5,14 @@
 #ifndef PolicyContainer_h_
 #define PolicyContainer_h_
 
+#include "mozilla/AlreadyAddRefed.h"
+#include "mozilla/Result.h"
 #include "nsCOMPtr.h"
 #include "nsIContentSecurityPolicy.h"
 #include "nsIIntegrityPolicy.h"
 #include "nsILoadInfo.h"
 #include "nsIPolicyContainer.h"
+#include "nsString.h"
 
 namespace mozilla::ipc {
 class PolicyContainerArgs;
@@ -24,7 +27,10 @@ class IntegrityPolicyWAICT;
 #define NS_POLICYCONTAINER_CONTRACTID "@mozilla.org/policycontainer;1"
 
 class nsIContentSecurityPolicy;
+class nsIHttpChannel;
 class nsIIntegrityPolicy;
+class nsIPrincipal;
+class nsIURI;
 
 /**
   Implementation of
@@ -39,6 +45,33 @@ class PolicyContainer : public nsIPolicyContainer {
   NS_DECL_NSIPOLICYCONTAINER
 
   PolicyContainer();
+
+  // Raw values of the response headers that populate a Policy-Container.
+  // Empty values mean the header is absent.
+  struct Headers {
+    nsCString mContentSecurityPolicy;
+    nsCString mContentSecurityPolicyReportOnly;
+    nsCString mConnectionAllowlist;
+    nsCString mConnectionAllowlistReportOnly;
+
+    static Headers FromChannel(nsIHttpChannel* aChannel);
+    bool IsEmpty() const;
+  };
+
+  // Creates a Policy-Container for non-documents by parsing the provided
+  // security headers like Content-Security-Policy etc.
+  static mozilla::Result<already_AddRefed<PolicyContainer>, nsresult>
+  CreateForNonDocument(nsIPrincipal* aPrincipal, nsIURI* aSelfURI,
+                       const Headers& aHeaders);
+
+  // Creates a Policy-Container for a subdocument or object load, which is only
+  // used for checking frame-ancestors before the document is created. Parser
+  // warnings are suppressed, because the headers get parsed again later.
+  static mozilla::Result<already_AddRefed<PolicyContainer>, nsresult>
+  CreateForFrameAncestorsCheck(nsIPrincipal* aPrincipal, nsIURI* aSelfURI,
+                               const nsACString& aReferrer,
+                               uint64_t aInnerWindowID,
+                               const Headers& aHeaders);
 
   static void ToArgs(const PolicyContainer* aPolicy,
                      mozilla::ipc::PolicyContainerArgs& aArgs);
@@ -80,7 +113,7 @@ class PolicyContainer : public nsIPolicyContainer {
       const nsIPolicyContainer* aPolicyContainer);
 
   // == Connection Allowlists ==
-  // https://wicg.github.io/connection-allowlists/
+  // https://w3c.github.io/connection-allowlists/
   mozilla::dom::ConnectionAllowlists* GetConnectionAllowlists() const;
   void SetConnectionAllowlists(mozilla::dom::ConnectionAllowlists* aAllowlists);
   static mozilla::dom::ConnectionAllowlists* GetConnectionAllowlists(
@@ -95,6 +128,16 @@ class PolicyContainer : public nsIPolicyContainer {
   void SetIPAddressSpace(nsILoadInfo::IPAddressSpace aIPAddressSpace);
 
  private:
+  struct Options {
+    nsCString mReferrer;
+    uint64_t mInnerWindowID = 0;
+    bool mSuppressParserLogMessages = false;
+  };
+
+  static mozilla::Result<already_AddRefed<PolicyContainer>, nsresult>
+  CreateFromHeaders(nsIPrincipal* aPrincipal, nsIURI* aSelfURI,
+                    const Headers& aHeaders, const Options& aOptions);
+
   nsCOMPtr<nsIContentSecurityPolicy> mCSP;
   nsCOMPtr<nsIIntegrityPolicy> mIntegrityPolicy;
   RefPtr<mozilla::dom::IntegrityPolicyWAICT> mIntegrityPolicyWAICT;

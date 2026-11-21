@@ -50,7 +50,6 @@ legacy.telemetry:
       - 'baseline'
       - 'nimbus-targeting-context'
       - 'third-party-modules'
-      - 'temp-fog-initial-state'
       - 'captcha-detection'
       - 'health'
       - 'addons'
@@ -97,6 +96,9 @@ legacy.telemetry:
       - chutten@mozilla.com
       - glean-team@mozilla.com
     expires: never
+    send_in_pings:
+      - metrics
+      - events # Temporary until bug 2087139
 
   session_start_date:
     type: datetime
@@ -1096,13 +1098,13 @@ browser.engagement:
       scalar browser.engagement.session_time_including_suspend.
     bugs:
       - https://bugzil.la/1205985
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2089195
     data_reviews:
       - https://bugzil.la/1205985
     notification_emails:
       - padenot@mozilla.com
     expires: never
     unit: ms
-    telemetry_mirror: BROWSER_ENGAGEMENT_SESSION_TIME_INCLUDING_SUSPEND
 
   session_time_excluding_suspend:
     type: quantity
@@ -1113,13 +1115,13 @@ browser.engagement:
       scalar browser.engagement.session_time_excluding_suspend.
     bugs:
       - https://bugzil.la/1205985
+      - https://bugzilla.mozilla.org/show_bug.cgi?id=2089195
     data_reviews:
       - https://bugzil.la/1205985
     notification_emails:
       - padenot@mozilla.com
     expires: never
     unit: ms
-    telemetry_mirror: BROWSER_ENGAGEMENT_SESSION_TIME_EXCLUDING_SUSPEND
 
 browser.timings:
   last_shutdown:

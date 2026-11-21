@@ -36,14 +36,13 @@ task-defaults:
         docker-image:
             in-tree: "partner-repack"
         chain-of-trust: true
-        max-run-time: 7200
+        max-run-time: 10800
         artifacts:
             - name: releng/partner
               path: /builds/worker/artifacts/
               type: directory
     run:
         using: run-task
-        clone-with: hg
         cwd: '{checkout}'
         command: $GECKO_PATH/taskcluster/scripts/release/partner-repack.sh
     extra:

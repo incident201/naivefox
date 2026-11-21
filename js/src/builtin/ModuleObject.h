@@ -218,6 +218,8 @@ class RequestedModule {
   const JS::ColumnNumberOneOrigin columnNumber_;
 
  public:
+  static constexpr uint32_t WasmDefaultLineNumber = 1;
+
   RequestedModule(Handle<ModuleRequestObject*> moduleRequest,
                   uint32_t lineNumber, JS::ColumnNumberOneOrigin columnNumber);
   ModuleRequestObject* moduleRequest() const { return moduleRequest_; }
@@ -229,11 +231,17 @@ class RequestedModule {
 
 using RequestedModuleVector = GCVector<RequestedModule, 0, SystemAllocPolicy>;
 
+// Possible value types of [[BindingName]] in ResolvedBinding Records.
+enum class BindingNameType : uint8_t { String, Namespace, DeferredNamespace };
+
+// https://tc39.es/ecma262/#resolvedbinding-record
 class ResolvedBindingObject : public NativeObject {
   enum { ModuleSlotIndex = 0, BindingNameSlotIndex, SlotCount };
 
   JS_DEFINE_TYPED_SLOT(ModuleSlotIndex, MODULE_SLOT, Object);
-  JS_DEFINE_TYPED_SLOT(BindingNameSlotIndex, BINDING_NAME_SLOT, String);
+  // Holds the binding name as a String, or the BindingNameType as an Int32 for
+  // a namespace binding.
+  JS_DEFINE_TYPED_SLOT(BindingNameSlotIndex, BINDING_NAME_SLOT, String, Int32);
   static constexpr uint32_t SLOT_COUNT = SlotCount;
 
  public:
@@ -242,8 +250,17 @@ class ResolvedBindingObject : public NativeObject {
   static ResolvedBindingObject* create(JSContext* cx,
                                        Handle<ModuleObject*> module,
                                        Handle<JSAtom*> bindingName);
+  static ResolvedBindingObject* createNamespace(JSContext* cx,
+                                                Handle<ModuleObject*> module,
+                                                ImportPhase phase);
   ModuleObject* module() const;
+  BindingNameType bindingNameType() const;
+  bool isNamespace() const;
+  // Only valid when bindingNameType() is BindingNameType::String.
   JSAtom* bindingName() const;
+  // Only valid when isNamespace() is true.
+  ImportPhase namespacePhase() const;
+  bool isSameBinding(const ResolvedBindingObject* other) const;
 };
 
 class IndirectBindingMap {
@@ -251,7 +268,7 @@ class IndirectBindingMap {
   void trace(JSTracer* trc);
 
   bool put(JSContext* cx, HandleId name,
-           Handle<ModuleEnvironmentObject*> environment, HandleId targetName);
+           Handle<ResolvedBindingObject*> binding);
 
   size_t count() const { return map_ ? map_->count() : 0; }
 
@@ -275,12 +292,18 @@ class IndirectBindingMap {
   struct Binding {
     Binding(ModuleEnvironmentObject* environment, jsid targetName,
             PropertyInfo prop);
+    Binding(ModuleEnvironmentObject* environment, uint32_t slot);
     HeapPtr<ModuleEnvironmentObject*> environment;
 #ifdef DEBUG
     HeapPtr<jsid> targetName;
+    // Whether this binds to a reserved slot of the environment rather than to
+    // the property named `targetName`.
+    bool isReservedSlot;
 #endif
     PropertyInfo prop;
   };
+
+  bool putBinding(JSContext* cx, HandleId name, Binding&& binding);
 
   using Map = mozilla::HashMap<PreBarriered<jsid>, Binding,
                                mozilla::DefaultHasher<PreBarriered<jsid>>,
@@ -316,8 +339,7 @@ class ModuleNamespaceObject : public ProxyObject {
   bool isDeferred() const;
 
   bool addBinding(JSContext* cx, Handle<JSAtom*> exportedName,
-                  Handle<ModuleObject*> targetModule,
-                  Handle<JSAtom*> targetName);
+                  Handle<ResolvedBindingObject*> binding);
 
  private:
   struct ProxyHandler : public BaseProxyHandler {
@@ -481,6 +503,9 @@ class ModuleObject : public NativeObject {
     PreloadSlotIndex,
 #endif
     ModuleSourceSlotIndex,
+#ifdef NIGHTLY_BUILD
+    WasmInstanceSlotIndex,
+#endif
     SlotCount
   };
 
@@ -500,9 +525,14 @@ class ModuleObject : public NativeObject {
 #ifdef DEBUG
   JS_DEFINE_TYPED_SLOT(PreloadSlotIndex, PRELOAD_SLOT, Boolean, Undefined);
 #endif
-  // Module Source object for source phase imports. Otherwise `undefined`.
+  // Module Source object if present. Otherwise `undefined`.
   JS_DEFINE_TYPED_SLOT(ModuleSourceSlotIndex, MODULE_SOURCE_SLOT, Object,
                        Undefined);
+#ifdef NIGHTLY_BUILD
+  // WebAssembly.Instance of an evaluated wasm module. Otherwise `undefined`.
+  JS_DEFINE_TYPED_SLOT(WasmInstanceSlotIndex, WASM_INSTANCE_SLOT, Object,
+                       Undefined);
+#endif
   static constexpr uint32_t SLOT_COUNT = SlotCount;
 
   static const JSClass class_;
@@ -542,7 +572,11 @@ class ModuleObject : public NativeObject {
   ModuleNamespaceObject* maybeDeferredNamespace() const;
   void setDeferredNamespace(Handle<ModuleNamespaceObject*> ns);
   JSObject* moduleSource() const;
-  bool isSourcePhaseModule() const { return moduleSource() != nullptr; }
+  bool isWasmModule() const;
+#ifdef NIGHTLY_BUILD
+  JSObject* wasmInstance() const;
+  void setWasmInstance(JSObject* instance);
+#endif
   ModuleStatus status() const;
   mozilla::Maybe<uint32_t> maybeDfsAncestorIndex() const;
   uint32_t dfsAncestorIndex() const;
@@ -613,7 +647,11 @@ class ModuleObject : public NativeObject {
   static bool createSyntheticEnvironment(JSContext* cx,
                                          Handle<ModuleObject*> self,
                                          JS::HandleVector<Value> values);
-  static bool createWasmEnvironment(JSContext* cx, Handle<ModuleObject*> self);
+  static bool createWasmEnvironment(JSContext* cx, Handle<ModuleObject*> self,
+                                    Handle<ExportNameVector> exportNames);
+
+  static void initWasmExportBindings(JSContext* cx, Handle<ModuleObject*> self,
+                                     JS::HandleVector<Value> values);
 
   void initAsyncSlots(JSContext* cx, bool hasTopLevelAwait,
                       Handle<ListObject*> asyncParentModules);
@@ -705,6 +743,8 @@ JSObject* GetOrCreateModuleMetaObject(JSContext* cx, HandleObject module);
 JSObject* StartDynamicModuleImport(JSContext* cx, HandleScript script,
                                    HandleValue specifier, HandleValue options,
                                    ImportPhase phase);
+
+void ReportUninitializedModuleBinding(JSContext* cx, HandleId id);
 }  // namespace js
 
 template <>

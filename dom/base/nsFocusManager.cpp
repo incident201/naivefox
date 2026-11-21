@@ -25,6 +25,7 @@
 #include "mozilla/PresShell.h"
 #include "mozilla/Services.h"
 #include "mozilla/StaticPrefs_accessibility.h"
+#include "mozilla/StaticPrefs_dom.h"
 #include "mozilla/StaticPrefs_full_screen_api.h"
 #include "mozilla/dom/BrowserBridgeChild.h"
 #include "mozilla/dom/BrowserParent.h"
@@ -185,7 +186,7 @@ bool nsFocusManager::sTestMode = false;
 uint64_t nsFocusManager::sFocusActionCounter = 0;
 
 static const char* kObservedPrefs[] = {"accessibility.browsewithcaret",
-                                       "focusmanager.testmode", nullptr};
+                                       "focusmanager.testmode"};
 
 nsFocusManager::nsFocusManager()
     : mActionIdForActiveBrowsingContextInContent(0),
@@ -402,6 +403,12 @@ nsFocusManager::GetFocusedContentBrowsingContext(
 }
 
 NS_IMETHODIMP
+nsFocusManager::GetReservedFocusActionIdCount(uint64_t* aCount) {
+  *aCount = sFocusActionCounter;
+  return NS_OK;
+}
+
+NS_IMETHODIMP
 nsFocusManager::GetActiveContentBrowsingContext(
     BrowsingContext** aBrowsingContext) {
   MOZ_DIAGNOSTIC_ASSERT(
@@ -456,7 +463,8 @@ nsresult nsFocusManager::SetFocusedWindowWithCallerType(
                                 ? existingActionId.value()
                                 : sInstance->GenerateFocusActionId();
   if (rootWindow) {
-    RaiseWindow(rootWindow, aCallerType, actionId);
+    LazyFocusActionId lazyActionId(actionId);
+    RaiseWindow(rootWindow, aCallerType, lazyActionId);
   }
 
   LOGFOCUS(("<<SetFocusedWindow end actionid: %" PRIu64 ">>", actionId));
@@ -2050,10 +2058,11 @@ Maybe<uint64_t> nsFocusManager::SetFocusInner(Element* aNewContent,
         if (XRE_IsParentProcess() || newRootBrowsingContext->IsInProcess()) {
           nsCOMPtr<nsPIDOMWindowOuter> outerWindow =
               newRootBrowsingContext->GetDOMWindow();
+          LazyFocusActionId lazyActionId(actionId);
           RaiseWindow(outerWindow,
                       aFlags & FLAG_NONSYSTEMCALLER ? CallerType::NonSystem
                                                     : CallerType::System,
-                      actionId);
+                      lazyActionId);
         } else {
           mozilla::dom::ContentChild* contentChild =
               mozilla::dom::ContentChild::GetSingleton();
@@ -3237,7 +3246,8 @@ void nsFocusManager::ScrollIntoView(PresShell* aPresShell, nsIContent* aContent,
 }
 
 void nsFocusManager::RaiseWindow(nsPIDOMWindowOuter* aWindow,
-                                 CallerType aCallerType, uint64_t aActionId) {
+                                 CallerType aCallerType,
+                                 LazyFocusActionId& aActionId) {
   // don't raise windows that are already raised or are in the process of
   // being lowered
 
@@ -3250,7 +3260,7 @@ void nsFocusManager::RaiseWindow(nsPIDOMWindowOuter* aWindow,
       if (!mFocusedWindow ||
           !IsSameOrAncestor(aWindow->GetBrowsingContext(),
                             mFocusedWindow->GetBrowsingContext())) {
-        MoveFocusToWindowAfterRaise(aWindow, aActionId);
+        MoveFocusToWindowAfterRaise(aWindow, aActionId.Get());
       }
       return;
     }
@@ -3288,7 +3298,7 @@ void nsFocusManager::RaiseWindow(nsPIDOMWindowOuter* aWindow,
       // in this process to make the focus event that is observable in this
       // process fire in the right order relative to mouseup when we are here
       // thanks to a mousedown.
-      WindowRaised(aWindow, aActionId);
+      WindowRaised(aWindow, aActionId.Get());
     }
   }
 
@@ -3459,7 +3469,7 @@ nsresult nsFocusManager::SetCaretVisible(PresShell* aPresShell, bool aVisible,
   if (aContent) {
     NS_ASSERTION(aContent->GetComposedDoc() == aPresShell->GetDocument(),
                  "Wrong document?");
-    nsIFrame* focusFrame = aContent->GetPrimaryFrame();
+    nsIFrame* focusFrame = nsLayoutUtils::GetPrimaryOrAreaImageFrame(aContent);
     if (focusFrame) {
       frameSelection = focusFrame->GetFrameSelection();
     }
@@ -3742,10 +3752,16 @@ nsresult nsFocusManager::DetermineElementToMoveFocus(
   nsCOMPtr<nsIContent> focusedContent = startContent;
   bool startingFromDescendantOfFocusedContent = false;
   if (startContent) {
+    // Deliberately not GetPrimaryOrAreaImageFrame: an <area> must use its own
+    // tabindex, not the image's.
     nsIFrame* frame = startContent->GetPrimaryFrame();
-    tabIndex = (frame && !startContent->IsHTMLElement(nsGkAtoms::area))
-                   ? frame->IsFocusable().mTabIndex
-                   : startContent->IsFocusableWithoutStyle().mTabIndex;
+    auto startFlags = IsFocusableFlags(0);
+    if (StaticPrefs::dom_forms_retain_focus_on_disabled_enabled()) {
+      startFlags |= IsFocusableFlags::IgnoreDisabled;
+    }
+    tabIndex =
+        frame ? frame->IsFocusable(startFlags).mTabIndex
+              : startContent->IsFocusableWithoutStyle(startFlags).mTabIndex;
 
     if (!aStartContent &&
         (aType == MOVEFOCUS_FORWARD || aType == MOVEFOCUS_BACKWARD)) {
@@ -4461,7 +4477,8 @@ nsIContent* nsFocusManager::GetNextTabbableContentInScope(
       if (IsScopeOwner(iterContent)) {
         tabIndex = ScopeOwnerTabIndexValue(iterContent);
       } else {
-        nsIFrame* frame = iterContent->GetPrimaryFrame();
+        nsIFrame* frame =
+            nsLayoutUtils::GetPrimaryOrAreaImageFrame(iterContent);
         if (!frame) {
           continue;
         }
@@ -4567,7 +4584,8 @@ nsIContent* nsFocusManager::GetNextTabbableContentInAncestorScopes(
     int32_t tabIndex = 0;
     if (IsScopeOwner(startContent)) {
       tabIndex = ScopeOwnerTabIndexValue(startContent);
-    } else if (nsIFrame* frame = startContent->GetPrimaryFrame()) {
+    } else if (nsIFrame* frame =
+                   nsLayoutUtils::GetPrimaryOrAreaImageFrame(startContent)) {
       tabIndex = frame->IsFocusable().mTabIndex;
     } else {
       tabIndex = startContent->IsFocusableWithoutStyle().mTabIndex;
@@ -4589,7 +4607,8 @@ nsIContent* nsFocusManager::GetNextTabbableContentInAncestorScopes(
   aStartContent = startContent;
   if (IsScopeOwner(startContent)) {
     *aCurrentTabIndex = ScopeOwnerTabIndexValue(startContent);
-  } else if (nsIFrame* frame = startContent->GetPrimaryFrame()) {
+  } else if (nsIFrame* frame =
+                 nsLayoutUtils::GetPrimaryOrAreaImageFrame(startContent)) {
     *aCurrentTabIndex = frame->IsFocusable().mTabIndex;
   } else {
     *aCurrentTabIndex = startContent->IsFocusableWithoutStyle().mTabIndex;
@@ -4710,7 +4729,8 @@ nsresult nsFocusManager::GetNextTabbableContent(
   nsIContent* topLevelScopeStartContent = startContent;
   // Iterate tab index to find corresponding contents
   while (true) {
-    nsIFrame* frame = iterStartContent->GetPrimaryFrame();
+    nsIFrame* frame =
+        nsLayoutUtils::GetPrimaryOrAreaImageFrame(iterStartContent);
     // if there is no frame, look for another content node that has a frame
     while (!frame) {
       // if the root content doesn't have a frame, just return
@@ -4725,7 +4745,7 @@ nsresult nsFocusManager::GetNextTabbableContent(
         break;
       }
 
-      frame = iterStartContent->GetPrimaryFrame();
+      frame = nsLayoutUtils::GetPrimaryOrAreaImageFrame(iterStartContent);
       // Host without frame, enter its scope.
       if (!frame && IsScopeOwner(iterStartContent)) {
         int32_t tabIndex = ScopeOwnerTabIndexValue(iterStartContent);
@@ -5713,21 +5733,20 @@ void nsFocusManager::InsertNewFocusActionId(uint64_t aActionId) {
   mPendingFocusedBrowsingContextActions.AppendElement(aActionId);
 }
 
+// Removes the content-initiated actions among the first aUntil elements of
+// aPendingActions, preserving the order of the remaining ones. This is done in
+// a single pass to avoid quadratic behavior when there are many pending
+// content-initiated actions.
 static void RemoveContentInitiatedActionsUntil(
     nsTArray<uint64_t>& aPendingActions,
     nsTArray<uint64_t>::index_type aUntil) {
-  nsTArray<uint64_t>::index_type i = 0;
-  while (i < aUntil) {
-    auto [actionProc, actionId] =
-        nsContentUtils::SplitProcessSpecificId(aPendingActions[i]);
-    (void)actionId;
-    if (actionProc) {
-      aPendingActions.RemoveElementAt(i);
-      --aUntil;
-      continue;
-    }
-    ++i;
-  }
+  MOZ_ASSERT(aUntil <= aPendingActions.Length());
+  uint64_t* begin = aPendingActions.Elements();
+  uint64_t* end = begin + aUntil;
+  uint64_t* newEnd = std::remove_if(begin, end, [](uint64_t aActionId) {
+    return std::get<0>(nsContentUtils::SplitProcessSpecificId(aActionId)) != 0;
+  });
+  aPendingActions.RemoveElementsAt(newEnd - begin, end - newEnd);
 }
 
 bool nsFocusManager::ProcessPendingActiveBrowsingContextActionId(
@@ -5946,8 +5965,14 @@ static IsFocusableFlags FocusManagerFlagsToIsFocusableFlags(uint32_t aFlags) {
 Element* nsFocusManager::GetTheFocusableArea(Element* aTarget,
                                              uint32_t aFlags) {
   MOZ_ASSERT(aTarget);
-  nsIFrame* frame = aTarget->GetPrimaryFrame();
-  if (!frame) {
+
+  // If focus target is an area element with one or more shapes that are
+  // focusable areas.
+  if (auto* area = HTMLAreaElement::FromNode(aTarget)) {
+    return IsAreaElementFocusable(*area) ? area : nullptr;
+  }
+
+  if (!aTarget->IsRendered()) {
     return nullptr;
   }
 
@@ -5958,12 +5983,6 @@ Element* nsFocusManager::GetTheFocusableArea(Element* aTarget,
     return aTarget;
   }
 
-  // If focus target is an area element with one or more shapes that are
-  // focusable areas.
-  if (auto* area = HTMLAreaElement::FromNode(aTarget)) {
-    return IsAreaElementFocusable(*area) ? area : nullptr;
-  }
-
   // For these 3 steps mentioned in the spec
   //   1. If focus target is an element with one or more scrollable regions that
   //   are focusable areas
@@ -5972,7 +5991,8 @@ Element* nsFocusManager::GetTheFocusableArea(Element* aTarget,
   //   navigable
   // nsIFrame::IsFocusable will effectively perform the checks for them.
   IsFocusableFlags flags = FocusManagerFlagsToIsFocusableFlags(aFlags);
-  if (frame->IsFocusable(flags)) {
+  nsIFrame* frame = aTarget->GetPrimaryFrame();
+  if (frame && frame->IsFocusable(flags)) {
     return aTarget;
   }
 
@@ -6002,13 +6022,13 @@ Element* nsFocusManager::GetTheFocusableArea(Element* aTarget,
 
 /* static */
 bool nsFocusManager::IsAreaElementFocusable(HTMLAreaElement& aArea) {
-  nsIFrame* frame = aArea.GetPrimaryFrame();
+  nsIFrame* frame = aArea.GetImageFrame();
   if (!frame) {
     return false;
   }
-  // HTML areas do not have their own frame, and the img frame we get from
-  // GetPrimaryFrame() is not relevant as to whether it is focusable or
-  // not, so we have to do all the relevant checks manually for them.
+  // HTML areas do not have their own frame, and the img frame is not relevant
+  // as to whether the area is focusable or not, so we have to do all the
+  // relevant checks manually for them.
   return frame->IsVisibleConsideringAncestors() &&
          aArea.IsFocusableWithoutStyle();
 }

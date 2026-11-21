@@ -3,13 +3,17 @@ subsuite = "mozbuild"
 
 ["action/test_assemble_macos_bundle.py"]
 
-["action/test_buildlist.py"]
+["action/test_check_binary.py"]
+
+["action/test_dumpsymbols.py"]
 
 ["action/test_fat_aar.py"]
 
 ["action/test_generate_archive_symbols.py"]
 
 ["action/test_html_fragment_preprocessor.py"]
+
+["action/test_l10n_merge.py"]
 
 ["action/test_l10n_stage.py"]
 
@@ -21,6 +25,8 @@ subsuite = "mozbuild"
 
 ["action/test_nsis_stage.py"]
 
+["action/test_preprocess_locale.py"]
+
 ["action/test_node.py"]
 
 ["action/test_package.py"]
@@ -28,6 +34,10 @@ subsuite = "mozbuild"
 ["action/test_process_install_manifest.py"]
 
 ["action/test_run_cargo.py"]
+
+["action/test_wine_exe.py"]
+
+["action/test_xpi_archive.py"]
 
 ["action/test_zip.py"]
 
@@ -43,6 +53,8 @@ subsuite = "mozbuild"
 
 ["backend/test_l10n_manifest.py"]
 
+["backend/test_l10n_stage.py"]
+
 ["backend/test_partialconfigenvironment.py"]
 
 ["backend/test_recursivemake.py"]
@@ -51,9 +63,13 @@ subsuite = "mozbuild"
 
 ["backend/test_visualstudio.py"]
 
+["backend/test_xpi_archive.py"]
+
 ["code_analysis/test_mach_commands.py"]
 
 ["codecoverage/test_lcov_rewrite.py"]
+
+["compilation/test_util.py"]
 
 ["compilation/test_warnings.py"]
 
@@ -83,9 +99,17 @@ subsuite = "mozbuild"
 
 ["controller/test_build_output.py"]
 
+["controller/test_build_times.py"]
+
+["controller/test_buildid.py"]
+
 ["controller/test_ccachestats.py"]
 
 ["controller/test_clobber.py"]
+
+["controller/test_jobserver.py"]
+
+["controller/test_source_repo.py"]
 
 ["frontend/test_context.py"]
 
@@ -94,6 +118,8 @@ subsuite = "mozbuild"
 ["frontend/test_file_info_reviewers.py"]
 
 ["frontend/test_gyp_reader.py"]
+
+["frontend/test_jar_manifest.py"]
 
 ["frontend/test_l10n_manifest.py"]
 
@@ -126,8 +152,6 @@ subsuite = "mozbuild"
 ["test_expression.py"]
 
 ["test_generate_sbom.py"]
-
-["test_jarmaker.py"]
 
 ["test_legacy_test.py"]
 

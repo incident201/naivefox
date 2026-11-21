@@ -6,12 +6,19 @@ package org.mozilla.fenix.utils
 
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
+import android.os.Looper
 import androidx.core.content.edit
 import io.mockk.every
 import io.mockk.spyk
 import io.mockk.verify
 import java.io.File
 import java.util.Calendar
+import kotlin.test.assertNull
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.runTest
 import mozilla.components.concept.engine.Engine.HttpsOnlyMode.DISABLED
 import mozilla.components.concept.engine.Engine.HttpsOnlyMode.ENABLED
 import mozilla.components.concept.engine.Engine.HttpsOnlyMode.ENABLED_PRIVATE_ONLY
@@ -35,7 +42,6 @@ import org.mozilla.fenix.nimbus.AutomotiveSensitiveData
 import org.mozilla.fenix.nimbus.DefaultBrowserPrompt
 import org.mozilla.fenix.nimbus.FakeNimbusEventStore
 import org.mozilla.fenix.nimbus.FxNimbus
-import org.mozilla.fenix.nimbus.HomescreenEdgeToEdgeBackground
 import org.mozilla.fenix.settings.PhoneFeature
 import org.mozilla.fenix.settings.ShortcutType
 import org.mozilla.fenix.settings.deletebrowsingdata.DeleteBrowsingDataOnQuitType
@@ -155,23 +161,25 @@ class SettingsTest {
     }
 
     @Test
-    fun defaultWallpaperIsEdgeToEdgeWhenEdgeToEdgeFeatureEnabled() {
-        FxNimbus.features.homescreenEdgeToEdgeBackground.withCachedValue(HomescreenEdgeToEdgeBackground(enabled = true))
+    fun defaultWallpaperIsGradient() {
         val settings = Settings(testContext)
 
         // Then
-        assertEquals(Wallpaper.EdgeToEdge.name, settings.currentWallpaperName)
+        assertEquals(Wallpaper.Gradient.name, settings.currentWallpaperName)
     }
 
     @Test
-    fun defaultWallpaperIsDefaultWhenEdgeToEdgeDisabled() {
-        FxNimbus.features.homescreenEdgeToEdgeBackground.withCachedValue(
-            HomescreenEdgeToEdgeBackground(enabled = false)
-        )
+    fun legacyWallpaperNamesAreMigratedWhenRead() {
         val settings = Settings(testContext)
+        val key = testContext.getString(R.string.pref_key_current_wallpaper)
 
-        // Then
-        assertEquals(Wallpaper.Default.name, settings.currentWallpaperName)
+        settings.preferences.edit().putString(key, "default").apply()
+        assertEquals(Wallpaper.SOLID, settings.currentWallpaperName)
+        assertEquals(Wallpaper.SOLID, settings.preferences.getString(key, null))
+
+        settings.preferences.edit().putString(key, "edge-to-edge").apply()
+        assertEquals(Wallpaper.GRADIENT, settings.currentWallpaperName)
+        assertEquals(Wallpaper.GRADIENT, settings.preferences.getString(key, null))
     }
 
     @Test
@@ -767,10 +775,29 @@ class SettingsTest {
     }
 
     @Test
-    fun `GIVEN startOnHomeNever is selected WHEN calling shouldStartOnHome THEN return be false`() {
+    fun `GIVEN startOnHomeNever is selected and the homepage was accessed more recently than a webpage WHEN calling shouldStartOnHome THEN return true`() {
+        settings.enableHomepageAsNewTab = false
+
         settings.alwaysOpenTheLastTabWhenOpeningTheApp = true
         settings.alwaysOpenTheHomepageWhenOpeningTheApp = false
         settings.openHomepageAfterFourHoursOfInactivity = false
+
+        settings.lastHomeActivity = 100
+        settings.lastBrowseActivity = 99
+
+        assertTrue(settings.shouldStartOnHome())
+    }
+
+    @Test
+    fun `GIVEN startOnHomeNever is selected and a webpage was accessed more recently than the homepage WHEN calling shouldStartOnHome THEN return false`() {
+        settings.enableHomepageAsNewTab = false
+
+        settings.alwaysOpenTheLastTabWhenOpeningTheApp = true
+        settings.alwaysOpenTheHomepageWhenOpeningTheApp = false
+        settings.openHomepageAfterFourHoursOfInactivity = false
+
+        settings.lastHomeActivity = 99
+        settings.lastBrowseActivity = 100
 
         assertFalse(settings.shouldStartOnHome())
     }
@@ -807,6 +834,20 @@ class SettingsTest {
         every { localSetting.timeNowInMillis() } returns now
 
         assertFalse(localSetting.shouldStartOnHome())
+    }
+
+    @Test
+    fun `GIVEN homepage as new tab is enabled and startOnHomeNever is selected WHEN calling shouldStartOnHome THEN return false`() {
+        settings.enableHomepageAsNewTab = true
+
+        settings.openHomepageAfterFourHoursOfInactivity = false
+        settings.alwaysOpenTheLastTabWhenOpeningTheApp = true
+        settings.alwaysOpenTheHomepageWhenOpeningTheApp = false
+
+        settings.lastHomeActivity = 100
+        settings.lastBrowseActivity = 99
+
+        assertFalse(settings.shouldStartOnHome())
     }
 
     @Test
@@ -1407,6 +1448,25 @@ class SettingsTest {
     }
 
     @Test
+    fun `WHEN user has accepted the ToU and the app installed time is unavailable THEN termsOfUseAcceptedTimeInMillis returns 0L`() {
+        val settings =
+            Settings(
+                appContext = testContext,
+                packageName = "test",
+                packageManagerCompatHelper =
+                    FakePackageManagerCompatHelper(
+                        packageInfo = PackageInfo().apply { firstInstallTime = 12345L },
+                        getPackageInfoThrowable = PackageManager.NameNotFoundException(),
+                    ),
+            )
+        settings.hasAcceptedTermsOfService = true
+
+        val result = settings.termsOfUseAcceptedTimeInMillis
+
+        assertEquals(0L, result)
+    }
+
+    @Test
     fun `WHEN user has not accepted the ToU THEN termsOfUseAcceptedTimeInMillis returns 0L`() {
         val installTime = 12345L
         val settings =
@@ -1624,5 +1684,53 @@ class SettingsTest {
         settings.openLinksInYoutube = never
 
         assertEquals(never, settings.openLinksInYoutube)
+    }
+
+    @Test
+    fun `GIVEN no data limit notice has been shown WHEN reading the reset time THEN it is null`() {
+        assertNull(settings.ipProtectionLastDataLimitNoticeCycleResetTime)
+    }
+
+    @Test
+    fun `GIVEN a data limit notice has been shown WHEN setting the reset time THEN it is persisted and returned`() {
+        settings.ipProtectionLastDataLimitNoticeCycleResetTime = "2026-11-01T00:00:00Z"
+
+        assertEquals("2026-11-01T00:00:00Z", settings.ipProtectionLastDataLimitNoticeCycleResetTime)
+    }
+
+    @Test
+    fun `GIVEN a fresh install WHEN reading the last auth flow entrypoint THEN it is null`() {
+        assertNull(settings.lastAuthFlowEntrypoint)
+    }
+
+    @Test
+    fun `GIVEN no last auth flow entrypoint WHEN setting it THEN it is persisted`() {
+        settings.lastAuthFlowEntrypoint = "newuser-onboarding"
+
+        assertEquals("newuser-onboarding", settings.lastAuthFlowEntrypoint)
+    }
+
+    @Test
+    fun `GIVEN a last auth flow entrypoint is set WHEN clearing it THEN it is null`() {
+        settings.lastAuthFlowEntrypoint = "newuser-onboarding"
+
+        settings.lastAuthFlowEntrypoint = null
+
+        assertNull(settings.lastAuthFlowEntrypoint)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `WHEN showTabGroupsInMenu changes THEN showTabGroupsInMenuFlow emits the new value`() = runTest {
+        settings.showTabGroupsInMenu = false
+        val values = mutableListOf<Boolean>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            settings.showTabGroupsInMenuFlow.toList(values)
+        }
+
+        settings.showTabGroupsInMenu = true
+        shadowOf(Looper.getMainLooper()).idle()
+
+        assertEquals(listOf(false, true), values)
     }
 }

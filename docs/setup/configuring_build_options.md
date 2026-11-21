@@ -212,14 +212,28 @@ When using sccache, because of the operation on the files and storage,
 the initial build of Firefox will be slower.
 :::
 
-From version 0.14, the build system automatically sets `SCCACHE_BASEDIRS` to
-the object and source directories, as well as the sysroot and SDKs. sccache
-rewrites paths under those prefixes to be relative before computing cache keys,
-so builds performed in different worktrees (or in automation versus locally)
-share cache entries instead of missing on differing absolute paths. If you run a
-persistent sccache server, stop it once (`sccache --stop-server`) after
-upgrading so the new server picks up the setting. Set `SCCACHE_BASEDIRS`
-yourself at configure time to override the default.
+In automation, the build system sets `SCCACHE_BASEDIRS` to the object and
+source directories, as well as the sysroot and SDKs. sccache rewrites paths
+under those prefixes to be relative before computing cache keys, so builds in
+different checkouts share cache entries instead of missing on differing
+absolute paths.
+
+Local builds don't set it by default. With the local disk cache's preprocessor
+cache mode, sccache can return an object file built in another checkout whose
+headers differ ([sccache issue 2863](https://github.com/mozilla/sccache/issues/2863)).
+If you set `SCCACHE_BASEDIRS` yourself, also set `SCCACHE_DIRECT=false` and
+delete the `preprocessor` directory in your sccache cache. sccache reads both
+variables when its server starts, so stop it (`sccache --stop-server`) after
+changing them.
+
+The build system also sets the local cache directory of sccache, ccache or
+buildcache to `cache/<tool>` in the mozbuild state directory (`~/.mozbuild` by
+default). Set `SCCACHE_DIR`, `CCACHE_DIR` or `BUILDCACHE_DIR` at configure
+time to override it. With the default directory, sccache ignores the
+`[cache.disk]` section of its configuration file, so set the cache size with
+`SCCACHE_CACHE_SIZE`. ccache and buildcache read their configuration from
+`ccache.conf` and `config.json` in that directory, and ccache commands run
+from a shell, such as `ccache -M`, need `CCACHE_DIR` set there too.
 
 ### buildcache
 
@@ -290,11 +304,6 @@ with Debug Symbols](building_with_debug_symbols.md).
 
 - `beta`
 - `release`
-
-`early-beta` and `late-beta` are deprecated aliases of `beta`, accepted only
-transitionally so that existing mozconfigs keep working. The distinct early and
-late beta periods are being phased out, so both do exactly what `beta` does.
-Update your mozconfig to `--as-milestone=beta`; the aliases will be removed.
 
 ### Tests
 

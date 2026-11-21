@@ -17,7 +17,6 @@ import org.mozilla.fenix.browser.browsingmode.BrowsingMode
 import org.mozilla.fenix.components.appstate.AppState
 import org.mozilla.fenix.home.bookmarks.Bookmark
 import org.mozilla.fenix.home.bookmarks.controller.BookmarksController
-import org.mozilla.fenix.home.logo.LogoController
 import org.mozilla.fenix.home.logo.TrackingProtectionController
 import org.mozilla.fenix.home.pocket.PocketRecommendedStoriesCategory
 import org.mozilla.fenix.home.pocket.controller.PocketStoriesController
@@ -49,7 +48,6 @@ class SessionControlInteractorTest {
     private val topSiteController: TopSiteController = mockk(relaxed = true)
     private val privacyNoticeBannerController: PrivacyNoticeBannerController = mockk(relaxed = true)
     private val trackingProtectionController: TrackingProtectionController = mockk(relaxed = true)
-    private val logoController: LogoController = mockk(relaxed = true)
 
     // Note: the recent visits tests are handled in [RecentVisitsInteractorTest] and [RecentVisitsControllerTest]
     private val recentVisitsController: RecentVisitsController = mockk(relaxed = true)
@@ -72,15 +70,7 @@ class SessionControlInteractorTest {
                 topSiteController,
                 privacyNoticeBannerController,
                 trackingProtectionController,
-                logoController,
             )
-    }
-
-    @Test
-    fun onCollectionAddTabTapped() {
-        val collection: TabCollection = mockk(relaxed = true)
-        interactor.onCollectionAddTabTapped(collection)
-        verify { controller.handleCollectionAddTabTapped(collection) }
     }
 
     @Test
@@ -126,23 +116,10 @@ class SessionControlInteractorTest {
     }
 
     @Test
-    fun onRenameCollectionTapped() {
-        val collection: TabCollection = mockk(relaxed = true)
-        interactor.onRenameCollectionTapped(collection)
-        verify { controller.handleRenameCollectionTapped(collection) }
-    }
-
-    @Test
     fun onToggleCollectionExpanded() {
         val collection: TabCollection = mockk(relaxed = true)
         interactor.onToggleCollectionExpanded(collection, true)
         verify { controller.handleToggleCollectionExpanded(collection, true) }
-    }
-
-    @Test
-    fun onAddTabsToCollection() {
-        interactor.onAddTabsToCollectionTapped()
-        verify { controller.handleCreateCollection() }
     }
 
     @Test

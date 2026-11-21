@@ -55,8 +55,6 @@ class HttpChannelSecurityWarningReporter;
 #ifdef MOZ_NAIVEFOX
 #endif
 
-using DNSPromise = MozPromise<nsCOMPtr<nsIDNSRecord>, nsresult, false>;
-
 //-----------------------------------------------------------------------------
 // nsHttpChannel
 //-----------------------------------------------------------------------------
@@ -221,6 +219,12 @@ class nsHttpChannel final : public HttpBaseChannel,
   void SetWarningReporter(HttpChannelSecurityWarningReporter* aReporter);
   HttpChannelSecurityWarningReporter* GetWarningReporter();
 
+  // Overrides when the cached response became available, for callers that
+  // waited on it before AsyncOpen (e.g. DocumentLoadListener waiting for an
+  // in-flight speculation-rules prefetch). Cleared if the load goes to the
+  // network.
+  void SetCacheReadStart(TimeStamp aTime) { mCacheReadStart = aTime; }
+
   enum class SnifferType { Media, Image };
   void DisableIsOpaqueResponseAllowedAfterSniffCheck(SnifferType aType);
 
@@ -231,6 +235,13 @@ class nsHttpChannel final : public HttpBaseChannel,
   const nsACString& GetLNAPromptAction() const { return mLNAPromptAction; }
 
   void AsyncOpenFinal(TimeStamp aTimeStamp);
+
+  // For a navigation activated from a speculation-rules prefetch record:
+  // read the response from the cache entry stored under aURI (the one the
+  // record holds) instead of looking up the request URI, which could pick a
+  // different No-Vary-Search-equivalent entry. Must be called before
+  // AsyncOpen().
+  nsresult SetNavigationalPrefetchCacheURI(nsIURI* aURI);
 
   [[nodiscard]] nsresult OpenCacheEntry(bool isHttps);
   [[nodiscard]] nsresult OpenCacheEntryInternal(bool isHttps);
@@ -411,6 +422,8 @@ class nsHttpChannel final : public HttpBaseChannel,
   void ProcessSSLInformation();
   bool IsHTTPS();
 
+  [[nodiscard]] nsresult ContinueOnStartRequestAfterFallback(nsresult);
+  [[nodiscard]] nsresult ContinueOnStartRequestWithoutFallback();
   [[nodiscard]] nsresult ContinueOnStartRequest1(nsresult);
   [[nodiscard]] nsresult ContinueOnStartRequest2(nsresult);
   [[nodiscard]] nsresult ContinueOnStartRequest3(nsresult);
@@ -450,6 +463,10 @@ class nsHttpChannel final : public HttpBaseChannel,
   void UpdateInhibitPersistentCachingFlag();
   bool ParseDictionary(nsICacheEntry* aEntry, nsHttpResponseHead* aResponseHead,
                        bool aModified);
+  // RFC 9842 section 9.3: dictionaries may only be registered from, and used
+  // for, responses that are readable by the requesting context.
+  // aCheckResponse also runs the CORS check on the received response.
+  bool IsReadableForDictionaries(bool aCheckResponse);
   [[nodiscard]] nsresult AddCacheEntryHeaders(nsICacheEntry* entry,
                                               bool aModified);
   [[nodiscard]] nsresult UpdateCacheEntryHeaders(nsICacheEntry* entry,
@@ -479,8 +496,6 @@ class nsHttpChannel final : public HttpBaseChannel,
           aContinueOnStopRequestFunc);
   [[nodiscard]] MOZ_NEVER_INLINE nsresult
   DoConnect(HttpTransactionShell* aTransWithStickyConn = nullptr);
-  [[nodiscard]] nsresult DoConnectActual(
-      HttpTransactionShell* aTransWithStickyConn);
   [[nodiscard]] nsresult ContinueOnStopRequestAfterAuthRetry(
       nsresult aStatus, bool aAuthRetry, bool aIsFromNet, bool aContentComplete,
       HttpTransactionShell* aTransWithStickyConn);
@@ -663,6 +678,7 @@ class nsHttpChannel final : public HttpBaseChannel,
   nsCOMPtr<nsICacheEntry> mORBValidationCacheEntry;
 
   nsCOMPtr<nsIURI> mCacheEntryURI;
+  nsCOMPtr<nsIURI> mNavigationalPrefetchCacheURI;
   nsCString mCacheIdExtension;
 
   // We must close mCacheInputStream explicitly to avoid leaks.
@@ -897,10 +913,12 @@ class nsHttpChannel final : public HttpBaseChannel,
   // cache entry callback never arrives we give up and race to the network.
   nsCOMPtr<nsITimer> mCacheWaitTimer;
   // Serializes OnCacheEntryCheck, which the cache may run on its I/O thread,
-  // with the main-thread backstop timeout.  OnCacheEntryCheck holds it for its
-  // whole run, so the timeout either fires before the check (which then sees
-  // mCacheWaitTimedOut and declines) or after it has completely armed the
-  // cached state (which the timeout then discards); never in between.
+  // with the main-thread backstop timeout and cancel.  OnCacheEntryCheck holds
+  // it for its whole run, so the timeout either fires before the check (which
+  // then sees mCacheWaitTimedOut and declines) or after it has completely armed
+  // the cached state (which the timeout then discards); never in between.
+  // Likewise a cancel sets mCanceled under it, so no check writes the cached
+  // state while the abort path reads it.
   Mutex mCacheWaitLock{"nsHttpChannel::mCacheWaitLock"};
   // Set once the cache-wait backstop has fired and we've forced the network,
   // so a late OnCacheEntryCheck or OnCacheEntryAvailable callback is declined.
@@ -932,14 +950,6 @@ class nsHttpChannel final : public HttpBaseChannel,
   bool mBypassCacheWriterSet{false};
 
   TimeStamp mNavigationStartTimeStamp;
-
-  // Promise that blocks connection creation when we want to resolve the
-  // origin host name to be able to give the configured proxy only the
-  // resolved IP to not leak names.
-  MozPromiseHolder<DNSPromise> mDNSBlockingPromise;
-  // When we hit DoConnect before the resolution is done, Then() will be set
-  // here to resume DoConnect.
-  RefPtr<DNSPromise> mDNSBlockingThenable;
 
   // We update the value of mProxyConnectResponseHead when OnStartRequest is
   // called and reset the value when we switch to another failover proxy. It is

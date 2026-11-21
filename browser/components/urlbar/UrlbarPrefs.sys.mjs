@@ -112,7 +112,8 @@ const PREF_URLBAR_DEFAULTS = /** @type {PreferenceDefinition[]} */ ([
   // unexpected issues in Release. We normally want this behavior.
   ["closeOtherPanelsOnOpen", true],
 
-  // Feature gate pref for context menu on the urlbar.
+  // Feature gate pref for whether a user interaction, such as right-clicking a
+  // result, opens the result's context menu.
   ["contextMenu.featureGate", false],
 
   // Whether to show a link for using the search functionality provided by the
@@ -357,9 +358,11 @@ const PREF_URLBAR_DEFAULTS = /** @type {PreferenceDefinition[]} */ ([
   // pick.
   ["quicksuggest.ampTopPickCharThreshold", 5],
 
-  // Whether or not use the Nova icon size for AMP suggestion.
-  // Otherwise, use standard rich-suggestion size.
-  ["quicksuggest.ampTopPickUseNovaIconSize", false],
+  // The minimum score a top-pick AMP suggestion must have to be shown with the
+  // large-icon UI treatment used for other top picks, as a decimal string
+  // (e.g., "1.0"). If it's an empty string or otherwise can't be parsed with
+  // parseFloat, the small-icon UI treatment will be used.
+  ["quicksuggest.ampTopPickScoreForLargeIcon", ""],
 
   // Comma-separated list of Suggest dynamic suggestion types to enable.
   ["quicksuggest.dynamicSuggestionTypes", ""],
@@ -451,6 +454,9 @@ const PREF_URLBAR_DEFAULTS = /** @type {PreferenceDefinition[]} */ ([
 
   // Allow the result menu button to be reached with the Tab key.
   ["resultMenu.keyboardAccessible", true],
+
+  // Feature gate pref for the "Open in ..." items in the urlbar result menu.
+  ["resultTargetMenu.featureGate", false],
 
   // Timeout in milliseconds before stale rows are removed from the view.
   ["removeStaleRowsTimeout", 400],
@@ -797,7 +803,7 @@ const PREF_OTHER_DEFAULTS = /** @type {PreferenceDefinition[]} */ ([
   ["browser.search.widget.new", true],
   ["browser.settings-redesign.enabled", true],
   ["browser.smartwindow.agent.enabled", false],
-  ["browser.smartwindow.smartbarMentions.loglevel", "Error"],
+  ["browser.smartwindow.smartbarMentions.logLevel", "Error"],
   ["keyword.enabled", true],
   ["privacy.query_stripping.strip_on_share.enabled", true],
   ["privacy.userContext.enabled", true],
@@ -883,14 +889,14 @@ let inParent =
  * @param {boolean} [options.separateSemanticGroup]
  *   If true, semantic history results get their own group that fills only the
  *   space left after the other general groups.
- * @param {boolean} [options.temporalZeroPrefix]
+ * @param {boolean} [options.showTemporalSuggestions]
  *   If true, the groups are flexed for the zero prefix view with temporal
  *   search suggestions.
  */
 function makeDefaultResultGroups({
   showSearchSuggestionsFirst,
   separateSemanticGroup = false,
-  temporalZeroPrefix = false,
+  showTemporalSuggestions = false,
 }) {
   /**
    * @type {ResultGroup}
@@ -1028,7 +1034,7 @@ function makeDefaultResultGroups({
   if (!showSearchSuggestionsFirst) {
     mainGroup.children.reverse();
   }
-  if (temporalZeroPrefix) {
+  if (showTemporalSuggestions) {
     // Top sites, then recent searches and temporal suggestions split 7:3:3.
     mainGroup.children[0].flex = 7;
     mainGroup.children[1].flex = 6;
@@ -1294,6 +1300,26 @@ class Preferences {
   }
 
   /**
+   * Returns whether a change to the given pref changes the results a search
+   * shows.
+   *
+   * @param {string} pref
+   *   The name of the pref, relative to `browser.urlbar.` if the pref is in
+   *   that branch.
+   * @returns {boolean}
+   */
+  affectsResults(pref) {
+    return (
+      pref.startsWith("suggest.") ||
+      pref == "browser.search.suggest.enabled" ||
+      pref == "browser.search.suggest.enabled.private" ||
+      pref == "showSearchSuggestionsFirst" ||
+      pref == "smartbar.showSearchSuggestionsFirst" ||
+      pref == "quicksuggest.online.enabled"
+    );
+  }
+
+  /**
    * Gets a pref but allows the `scotchBonnet.enableOverride` pref to
    * short circuit them so one pref can be used to enable multiple
    * features.
@@ -1306,7 +1332,23 @@ class Preferences {
     return this.get("scotchBonnet.enableOverride") || this.get(pref);
   }
 
-  getResultGroups({ context }) {
+  /**
+   * Returns the root result group to use for a query.
+   *
+   * @param {object} options
+   * @param {UrlbarQueryContext} options.context
+   *   The query context.
+   * @param {boolean} [options.showSearchSuggestionsFirst]
+   *   Whether search suggestions should be shown before general results.
+   * @param {boolean} [options.showTemporalSuggestions]
+   *   Whether to use the zero prefix layout for temporal search suggestions.
+   * @returns {ResultGroup}
+   */
+  getResultGroups({
+    context,
+    showSearchSuggestionsFirst = false,
+    showTemporalSuggestions = false,
+  }) {
     // We try to cache result groups so we don't have to rebuild them each time.
     // This key may be modified per each SAP, and will track the cached groups,
     // any additionally used condition must be added to the key.
@@ -1317,15 +1359,13 @@ class Preferences {
     key += separateSemanticGroup;
     switch (context.sapName) {
       case "urlbar": {
-        let temporalZeroPrefix = context.isTemporalZeroPrefix;
-        let showSearchSuggestionsFirst = context.showSearchSuggestionsFirst;
         key += showSearchSuggestionsFirst;
-        key += temporalZeroPrefix;
+        key += showTemporalSuggestions;
         return this.#getOrCacheResultGroups(key, () =>
           makeDefaultResultGroups({
             showSearchSuggestionsFirst,
             separateSemanticGroup,
-            temporalZeroPrefix,
+            showTemporalSuggestions,
           })
         );
       }
@@ -1340,7 +1380,6 @@ class Preferences {
         );
       }
       case "smartbar": {
-        let showSearchSuggestionsFirst = context.showSearchSuggestionsFirst;
         key += showSearchSuggestionsFirst;
         return this.#getOrCacheResultGroups(key, () =>
           makeSmartBarGroups({
@@ -1648,8 +1687,9 @@ class Preferences {
   }
 
   /**
-   * @type {Map<string, ResultGroup>}
    * Result groups cached by search access point and params used to build them.
+   *
+   * @type {Map<string, ResultGroup>}
    */
   #cachedResultGroups = new Map();
   #getOrCacheResultGroups(key, builder) {

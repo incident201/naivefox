@@ -13,6 +13,8 @@ ChromeUtils.defineESModuleGetters(this, {
   HighlightsFeed: "resource://newtab/lib/HighlightsFeed.sys.mjs",
   NewTabUtils: "resource://gre/modules/NewTabUtils.sys.mjs",
   PageThumbs: "resource://gre/modules/PageThumbs.sys.mjs",
+  PlacesTestUtils: "resource://testing-common/PlacesTestUtils.sys.mjs",
+  PlacesUtils: "resource://gre/modules/PlacesUtils.sys.mjs",
   sinon: "resource://testing-common/Sinon.sys.mjs",
   Screenshots: "resource://newtab/lib/Screenshots.sys.mjs",
   SectionsManager: "resource://newtab/lib/SectionsManager.sys.mjs",
@@ -402,46 +404,47 @@ add_task(async function test_fetchHighlights_chronological_order() {
   let sandbox = sinon.createSandbox();
   let feed = getHighlightsFeedForTest(sandbox);
 
+  let now = Date.now();
   let links = [
     {
       url: "https://site0.com",
       type: "bookmark",
       bookmarkGuid: "1234",
-      date_added: Date.now() - 80,
+      date_added: now - 80,
     }, // 3rd newest
     {
       url: "https://site1.com",
       type: "history",
       bookmarkGuid: "1234",
-      date_added: Date.now() - 60,
+      date_added: now - 60,
     }, // append at the end
     {
       url: "https://site2.com",
       type: "history",
-      date_added: Date.now() - 160,
+      date_added: now - 160,
     }, // append at the end
     {
       url: "https://site3.com",
       type: "history",
-      date_added: Date.now() - 60,
+      date_added: now - 60,
     }, // append at the end
     {
       url: "https://site4.com",
       type: "bookmark",
       bookmarkGuid: "1234",
-      date_added: Date.now(),
+      date_added: now,
     }, // newest highlight
     {
       url: "https://site5.com",
       type: "bookmark",
       bookmarkGuid: "12345",
-      date_added: Date.now() - 100,
+      date_added: now - 100,
     }, // 4th newest
     {
       url: "https://site6.com",
       type: "bookmark",
       bookmarkGuid: "1234",
-      date_added: Date.now() - 40,
+      date_added: now - 40,
     }, // 2nd newest
   ];
   let expectedChronological = [4, 6, 0, 5];
@@ -1341,4 +1344,30 @@ add_task(function test_orderHighlights_sorts_by_date_added_descending() {
   );
 
   sandbox.restore();
+});
+
+add_task(async function test_addLastVisitDates() {
+  info("_addLastVisitDates should set the Places last visit date on pages");
+  // Normalized like the URLs highlights read from Places
+  const url = "https://example.com/page";
+  const visitDate = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+  await PlacesTestUtils.addVisits({ uri: url, visitDate });
+
+  const highlights = [
+    { url, type: "history" },
+    { url: "https://example.com/file.pdf", type: "download", date_added: 1 },
+  ];
+  await new HighlightsFeed()._addLastVisitDates(highlights);
+
+  Assert.equal(
+    highlights[0].lastVisitDate,
+    visitDate.getTime(),
+    "History page gets its last visit date in ms"
+  );
+  Assert.ok(
+    !("lastVisitDate" in highlights[1]),
+    "Downloads keep only date_added"
+  );
+
+  await PlacesUtils.history.clear();
 });

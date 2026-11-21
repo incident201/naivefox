@@ -151,12 +151,12 @@ abstract class BaseTest(
                     finalFailure = t
                 } finally {
                     attemptFinalization.finishCleanup()
-                    runCatching {
+                    try {
                         reporter.record(
                             "attemptEnd",
                             attemptFinalization.terminalFields(description.displayName, finalFailure),
                         )
-                    }
+                    } catch (_: Throwable) {}
                 }
                 _executionContext = null
                 finalFailure?.let { throw it }
@@ -219,7 +219,6 @@ abstract class BaseTest(
                                 shouldUseExpandedToolbar = cfg.shouldUseExpandedToolbar,
                                 isTabStripEnabled = cfg.isTabStripEnabled,
                                 shakeToSummarizeFeatureFlagEnabled = cfg.shakeToSummarizeFeatureFlagEnabled,
-                                isPrivateModeAndStoriesEntryPointEnabled = cfg.isPrivateModeAndStoriesEntryPointEnabled,
                             )
                         ) {
                             it.activity

@@ -4,7 +4,11 @@ prefs = [
   "network.ohttp.relayURL='http://example.com/relay/'"
 ]
 
+["test_fpp_overrides_parsing.js"]
+
 ["test_ohttp_client.js"]
 run-if = [
   "os == 'android'",
 ]
+
+["test_sandbox_reduce_timer_precision.js"]

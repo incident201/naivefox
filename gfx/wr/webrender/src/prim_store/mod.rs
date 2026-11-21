@@ -5,6 +5,7 @@
 use api::ColorF;
 use api::{ImageRendering, LineOrientation, PrimitiveFlags};
 use api::units::*;
+use crate::path_tiler::PathPrimitive;
 use crate::clip::ClipNodeId;
 use crate::render_backend::{DataStores, DlStores};
 use crate::space::SnapRounding;
@@ -37,14 +38,15 @@ pub mod interned;
 pub mod storage;
 
 use backdrop::{BackdropCaptureDataHandle, BackdropRenderDataHandle};
-use borders::{ImageBorderDataHandle, NormalBorderDataHandle};
-use gradient::{LinearGradientDataHandle, RadialGradientDataHandle, ConicGradientDataHandle};
-use image::{ImageDataHandle, YuvImageDataHandle};
+use borders::{ImageBorderKey, NormalBorderKey};
+use gradient::{ConicGradientKey, LinearGradientKey, RadialGradientKey};
+use image::{ImagePrimKey, YuvImagePrimKey};
 use line_dec::LineDecorationKey;
 use picture::PictureDataHandle;
 use rectangle::RectangleKey;
 use crate::dl_interner::DlHandle;
-use text_run::{TextRunDataHandle, TextRunScratch};
+use text_run::TextRunScratch;
+use api::interned_prims::TextRunKey;
 use crate::box_shadow::BoxShadowKey;
 
 #[cfg_attr(feature = "capture", derive(Serialize))]
@@ -180,12 +182,25 @@ pub struct PrimPlacement {
     pub flags: PrimitiveFlags,
 }
 
-impl<T: malloc_size_of::MallocSizeOf> crate::dl_interner::DlResolve<PrimKey<T>> for PrimPlacement {
-    fn resolve(key: &PrimKey<T>, _ctx: &crate::dl_interner::DlResolveContext) -> Self {
+/// A primitive key, which whatever its shape starts from the common data
+/// every primitive carries.
+pub trait PrimKeyCommon {
+    fn key_common(&self) -> &PrimKeyCommonData;
+}
+
+impl<T: malloc_size_of::MallocSizeOf> PrimKeyCommon for PrimKey<T> {
+    fn key_common(&self) -> &PrimKeyCommonData {
+        &self.common
+    }
+}
+
+impl<K: PrimKeyCommon> crate::dl_interner::DlResolve<K> for PrimPlacement {
+    fn resolve(key: &K, _ctx: &crate::dl_interner::DlResolveContext) -> Self {
+        let common = key.key_common();
         PrimPlacement {
-            rect: key.common.prim_rect.into(),
-            clip_rect: key.common.local_clip_rect.into(),
-            flags: key.common.flags,
+            rect: common.prim_rect.into(),
+            clip_rect: common.local_clip_rect.into(),
+            flags: common.flags,
         }
     }
 }
@@ -234,8 +249,9 @@ pub enum PrimitiveKind {
     },
     /// A run of glyphs, with associated font parameters.
     TextRun {
-        /// Handle to the common interned data for this primitive.
-        data_handle: TextRunDataHandle,
+        /// Handle into the follower store fed by the content display list
+        /// builder.
+        handle: DlHandle<TextRunKey>,
     },
     /// A line decoration. cache_handle refers to a cached render
     /// task handle, if this line decoration is not a simple solid.
@@ -245,12 +261,14 @@ pub enum PrimitiveKind {
         handle: DlHandle<LineDecorationKey>,
     },
     NormalBorder {
-        /// Handle to the common interned data for this primitive.
-        data_handle: NormalBorderDataHandle,
+        /// Handle into the follower store fed by the content display list
+        /// builder.
+        handle: DlHandle<NormalBorderKey>,
     },
     ImageBorder {
-        /// Handle to the common interned data for this primitive.
-        data_handle: ImageBorderDataHandle,
+        /// Handle into the follower store fed by the content display list
+        /// builder.
+        handle: DlHandle<ImageBorderKey>,
     },
     Rectangle {
         /// Handle into the follower store fed by the content display list
@@ -258,24 +276,29 @@ pub enum PrimitiveKind {
         handle: DlHandle<RectangleKey>,
     },
     YuvImage {
-        /// Handle to the common interned data for this primitive.
-        data_handle: YuvImageDataHandle,
+        /// Handle into the follower store fed by the content display list
+        /// builder.
+        handle: DlHandle<YuvImagePrimKey>,
     },
     Image {
-        /// Handle to the common interned data for this primitive.
-        data_handle: ImageDataHandle,
+        /// Handle into the follower store fed by the content display list
+        /// builder.
+        handle: DlHandle<ImagePrimKey>,
     },
     LinearGradient {
-        /// Handle to the common interned data for this primitive.
-        data_handle: LinearGradientDataHandle,
+        /// Handle into the follower store fed by the content display list
+        /// builder.
+        handle: DlHandle<LinearGradientKey>,
     },
     RadialGradient {
-        /// Handle to the common interned data for this primitive.
-        data_handle: RadialGradientDataHandle,
+        /// Handle into the follower store fed by the content display list
+        /// builder.
+        handle: DlHandle<RadialGradientKey>,
     },
     ConicGradient {
-        /// Handle to the common interned data for this primitive.
-        data_handle: ConicGradientDataHandle,
+        /// Handle into the follower store fed by the content display list
+        /// builder.
+        handle: DlHandle<ConicGradientKey>,
     },
     /// Render a portion of a specified backdrop.
     BackdropCapture {
@@ -419,8 +442,8 @@ impl PrimitiveInstance {
                 horizontal: dl_stores.line_decorations[handle].kind.orientation
                     == LineOrientation::Horizontal,
             },
-            PrimitiveKind::NormalBorder { data_handle, .. } => SnapRounding::BorderInner {
-                widths: data_stores.normal_border[data_handle].kind.widths,
+            PrimitiveKind::NormalBorder { handle } => SnapRounding::BorderInner {
+                widths: dl_stores.normal_borders[handle].kind.widths,
             },
             _ => SnapRounding::Nearest,
         };
@@ -432,35 +455,35 @@ impl PrimitiveInstance {
             PrimitiveKind::Rectangle { handle } => {
                 dl_stores.rectangles.uid(*handle)
             }
-            PrimitiveKind::Image { data_handle, .. } => {
-                data_handle.uid()
+            PrimitiveKind::Image { handle } => {
+                dl_stores.images.uid(*handle)
             }
-            PrimitiveKind::ImageBorder { data_handle, .. } => {
-                data_handle.uid()
+            PrimitiveKind::ImageBorder { handle } => {
+                dl_stores.image_borders.uid(*handle)
             }
             PrimitiveKind::LineDecoration { handle } => {
                 dl_stores.line_decorations.uid(*handle)
             }
-            PrimitiveKind::LinearGradient { data_handle, .. } => {
-                data_handle.uid()
+            PrimitiveKind::LinearGradient { handle } => {
+                dl_stores.linear_gradients.uid(*handle)
             }
-            PrimitiveKind::NormalBorder { data_handle, .. } => {
-                data_handle.uid()
+            PrimitiveKind::NormalBorder { handle } => {
+                dl_stores.normal_borders.uid(*handle)
             }
             PrimitiveKind::Picture { data_handle, .. } => {
                 data_handle.uid()
             }
-            PrimitiveKind::RadialGradient { data_handle, .. } => {
-                data_handle.uid()
+            PrimitiveKind::RadialGradient { handle } => {
+                dl_stores.radial_gradients.uid(*handle)
             }
-            PrimitiveKind::ConicGradient { data_handle, .. } => {
-                data_handle.uid()
+            PrimitiveKind::ConicGradient { handle } => {
+                dl_stores.conic_gradients.uid(*handle)
             }
-            PrimitiveKind::TextRun { data_handle, .. } => {
-                data_handle.uid()
+            PrimitiveKind::TextRun { handle } => {
+                dl_stores.text_runs.uid(*handle)
             }
-            PrimitiveKind::YuvImage { data_handle, .. } => {
-                data_handle.uid()
+            PrimitiveKind::YuvImage { handle } => {
+                dl_stores.yuv_images.uid(*handle)
             }
             PrimitiveKind::BackdropCapture { data_handle, .. } => {
                 data_handle.uid()
@@ -546,6 +569,10 @@ pub struct PrimitiveFrameScratch {
     /// Temporary buffers for building segments in to during prepare pass
     pub quad_direct_segments: Vec<QuadSegment>,
     pub quad_indirect_segments: Vec<QuadSegment>,
+
+    /// Paths drawn with `QuadRenderStrategy::Path`, indexed by
+    /// `PrimitiveCommand::Path`.
+    pub path_prims: Vec<PathPrimitive>,
 }
 
 impl Default for PrimitiveFrameScratch {
@@ -564,6 +591,7 @@ impl Default for PrimitiveFrameScratch {
             required_backdrop_chains: FastHashSet::default(),
             quad_direct_segments: Vec::new(),
             quad_indirect_segments: Vec::new(),
+            path_prims: Vec::new(),
         }
     }
 }
@@ -663,6 +691,7 @@ impl PrimitiveFrameScratch {
         recycler.recycle_vec(&mut self.debug_items);
         recycler.recycle_vec(&mut self.quad_direct_segments);
         recycler.recycle_vec(&mut self.quad_indirect_segments);
+        recycler.recycle_vec(&mut self.path_prims);
     }
 
     pub fn begin_frame(&mut self) {
@@ -677,6 +706,7 @@ impl PrimitiveFrameScratch {
         self.clip_mask_instances.push(ClipMaskKind::None);
         self.quad_direct_segments.clear();
         self.quad_indirect_segments.clear();
+        self.path_prims.clear();
 
         self.required_backdrop_chains.clear();
 
@@ -948,7 +978,9 @@ fn device_text_runs_do_not_snap_their_clips() {
     use crate::intern::Handle;
 
     assert!(
-        !PrimitiveKind::TextRun { data_handle: Handle::INVALID }.snaps(),
+        !PrimitiveKind::TextRun {
+            handle: DlHandle::new(crate::dl_interner::DlNamespace(0), 0, 0),
+        }.snaps(),
         "device-space text must not snap its clips (bug 2050692)",
     );
 

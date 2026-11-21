@@ -2,15 +2,14 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use crate::ads::Ads;
+use crate::ads::Ad;
+use crate::ads::PlacementId;
 use crate::ads_store::connection_initializer::AdsStoreConnectionInitializer;
 use crate::bytesize::ByteSize;
 use crate::clock::Clock;
 use crate::mars::error::FetchAdsError;
-use crate::{ads::PlacementId, clock::CacheClock};
 use rusqlite::{params, OptionalExtension};
 use sql_support::{open_database, LazyDb};
-use std::sync::Arc;
 
 #[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -22,7 +21,7 @@ pub enum FaultKind {
 }
 
 pub struct AdsStoreHolder {
-    clock: Arc<dyn Clock>,
+    clock: Clock,
     db: LazyDb<AdsStoreConnectionInitializer>,
     #[cfg(test)]
     fault: parking_lot::Mutex<FaultKind>,
@@ -31,19 +30,7 @@ pub struct AdsStoreHolder {
 impl AdsStoreHolder {
     pub fn new(db: LazyDb<AdsStoreConnectionInitializer>) -> Self {
         Self {
-            clock: Arc::new(CacheClock),
-            db,
-            #[cfg(test)]
-            fault: parking_lot::Mutex::new(FaultKind::None),
-        }
-    }
-
-    #[cfg(test)]
-    pub fn new_with_test_clock(db: LazyDb<AdsStoreConnectionInitializer>) -> Self {
-        use crate::clock::TestClock;
-
-        Self {
-            clock: Arc::new(TestClock::new(chrono::Utc::now().timestamp())),
+            clock: Clock::default(),
             db,
             #[cfg(test)]
             fault: parking_lot::Mutex::new(FaultKind::None),
@@ -62,6 +49,13 @@ impl AdsStoreHolder {
         self.db.close(true);
     }
 
+    /// Returns whether the db is in memory rather than backed by a file.
+    pub fn is_memory(&self) -> Result<bool, open_database::Error> {
+        let (conn, _) = self.db.lock()?;
+        // SQLite reports an empty path for in-memory dbs.
+        Ok(conn.path() == Some(""))
+    }
+
     /// Returns total size of the cache in bytes.
     pub fn current_total_size_bytes(&self) -> Result<ByteSize, open_database::Error> {
         let (conn, _) = self.db.lock()?;
@@ -70,11 +64,6 @@ impl AdsStoreHolder {
                 row.get(0)
             })?;
         Ok(ByteSize::b(size_bytes_ads))
-    }
-
-    #[cfg(test)]
-    pub fn get_clock(&self) -> &dyn Clock {
-        &*self.clock
     }
 
     pub fn invalidate_ad_by_id(
@@ -88,17 +77,19 @@ impl AdsStoreHolder {
         )?)
     }
 
-    pub fn lookup(&self, placement_id: &PlacementId) -> Result<Option<Ads>, FetchAdsError> {
+    pub fn lookup(&self, placement_id: &PlacementId) -> Result<Option<Vec<Ad>>, FetchAdsError> {
         #[cfg(test)]
         if *self.fault.lock() == FaultKind::Lookup {
-            return Err(Self::forced_fault_error("forced lookup failure"))
-                .map_err(open_database::Error::from)?;
+            return Err(open_database::Error::from(Self::forced_fault_error(
+                "forced lookup failure",
+            )))?;
         }
         let (conn, _) = self.db.lock()?;
         let res = conn
             .query_row(
                 "SELECT placement_id, ad_body
-             FROM ads WHERE placement_id = ?1",
+                 FROM ads
+                 WHERE placement_id = ?1",
                 params![placement_id.as_ref()],
                 |row| {
                     let ad_body: Vec<u8> = row.get(1)?;
@@ -115,21 +106,28 @@ impl AdsStoreHolder {
         *self.fault.lock() = kind;
     }
 
-    /// Upsert the ads for a placement, replacing any ads already stored for it.
-    pub fn store_ad(&self, placement_id: &PlacementId, ad: Ads) -> Result<(), FetchAdsError> {
+    // Upsert multiple ads for a singular placement, replacing any ads already stored for it.
+    pub fn store_ads(&self, placement_id: &PlacementId, ads: &[Ad]) -> Result<(), FetchAdsError> {
+        self.store_batch_ads([(placement_id, ads)])
+    }
+
+    /// Upsert multiple ads for many placements, replacing any ads already stored for it.
+    pub fn store_batch_ads<'a, K: AsRef<str>, V: AsRef<[Ad]>>(
+        &self,
+        ads_map: impl IntoIterator<Item = (K, V)>,
+    ) -> Result<(), FetchAdsError> {
         #[cfg(test)]
         if *self.fault.lock() == FaultKind::Store {
-            return Err(Self::forced_fault_error("forced store failure"))
-                .map_err(open_database::Error::from)?;
+            return Err(open_database::Error::from(Self::forced_fault_error(
+                "forced store failure",
+            )))?;
         }
-        let placement_id_str: &str = placement_id.as_ref();
-        let ad_body = serde_json::to_vec(&ad)?;
-        let size_bytes = ad_body.len() as i64;
-        let now = self.clock.now_epoch_seconds();
 
-        let (conn, _) = self.db.lock()?;
-        conn.execute(
-            "INSERT INTO ads (
+        let (mut conn, _) = self.db.lock()?;
+        let tx = conn.transaction().map_err(open_database::Error::from)?;
+        let mut stmt = tx
+            .prepare(
+                "INSERT INTO ads (
                 stored_at,
                 placement_id,
                 ad_body,
@@ -140,9 +138,26 @@ impl AdsStoreHolder {
                 stored_at=excluded.stored_at,
                 ad_body=excluded.ad_body,
                 size_bytes=excluded.size_bytes",
-            params![now, placement_id_str, ad_body, size_bytes,],
-        )
-        .map_err(open_database::Error::from)?;
+            )
+            .map_err(open_database::Error::from)?;
+
+        let now = self.clock.now();
+        for (placement_id, ads) in ads_map {
+            let placement_id_str: &str = placement_id.as_ref();
+            let ads: &[Ad] = ads.as_ref();
+            let ad_body = serde_json::to_vec(&ads)?;
+            let size_bytes = ad_body.len();
+            stmt.execute(params![
+                now.timestamp(),
+                placement_id_str,
+                ad_body,
+                size_bytes,
+            ])
+            .map_err(open_database::Error::from)?;
+        }
+        stmt.finalize().map_err(open_database::Error::from)?;
+        tx.commit().map_err(open_database::Error::from)?;
+
         Ok(())
     }
 
@@ -151,19 +166,22 @@ impl AdsStoreHolder {
         if *self.fault.lock() == FaultKind::Trim {
             return Err(Self::forced_fault_error("forced trim failure"))?;
         }
-        loop {
-            let total = self.current_total_size_bytes()?;
-            if total.as_u64() <= max_size.as_u64() {
-                break;
-            }
-            let (conn, _) = self.db.lock()?;
-            conn.execute(
-                "DELETE FROM ads WHERE rowid IN (
-                    SELECT rowid FROM ads ORDER BY stored_at ASC LIMIT 1
-                )",
-                [],
-            )?;
-        }
+        // Keeps the newest rows that fit in `max_size` and deletes the rest,
+        // in one statement.
+        let (conn, _) = self.db.lock()?;
+        conn.execute(
+            "DELETE FROM ads
+             WHERE rowid IN (
+                 SELECT rowid
+                 FROM (
+                     SELECT rowid,
+                            SUM(size_bytes) OVER (ORDER BY stored_at DESC, rowid DESC) AS kept_bytes
+                     FROM ads
+                 )
+                 WHERE kept_bytes > ?1
+             )",
+            params![max_size.as_u64()],
+        )?;
         Ok(())
     }
 
@@ -185,7 +203,6 @@ mod tests {
 
     use super::*;
     use crate::{
-        ads::AdSpoc,
         ads_store::connection_initializer::AdsStoreConnectionInitializer,
         test_utils::{get_example_happy_image_ads, get_example_happy_spoc_response},
     };
@@ -195,11 +212,11 @@ mod tests {
     fn create_test_store() -> AdsStoreHolder {
         let initializer = AdsStoreConnectionInitializer {};
         let db = LazyDb::new(
-            Path::new(crate::ads_store::builder::IN_MEMORY_DB_PATH),
+            Path::new(crate::IN_MEMORY_DB_PATH),
             OpenFlags::default(),
             initializer,
         );
-        AdsStoreHolder::new_with_test_clock(db)
+        AdsStoreHolder::new(db)
     }
 
     #[test]
@@ -225,9 +242,9 @@ mod tests {
         let store = create_test_store();
         store.set_fault(FaultKind::Store);
 
-        let (placement, ad) = get_example_happy_image_ads("mock_billboard_1");
+        let (placement, ads) = get_example_happy_image_ads("mock_billboard_1");
 
-        let err = store.store_ad(&placement, ad).unwrap_err();
+        let err = store.store_ads(&placement, &ads).unwrap_err();
         match err {
             FetchAdsError::Sqlite(open_database::Error::SqlError(
                 rusqlite::Error::SqliteFailure(_, Some(msg)),
@@ -243,8 +260,8 @@ mod tests {
         let store = create_test_store();
         store.set_fault(FaultKind::Trim);
 
-        let (placement, ad) = get_example_happy_image_ads("mock_billboard_1");
-        store.store_ad(&placement, ad).unwrap();
+        let (placement, ads) = get_example_happy_image_ads("mock_billboard_1");
+        store.store_ads(&placement, &ads).unwrap();
 
         let err = store.trim_to_max_size(&ByteSize::b(1)).unwrap_err();
         match err {
@@ -258,27 +275,26 @@ mod tests {
     #[test]
     fn test_store_and_retrieve_ads() {
         let store = create_test_store();
-        let (placement, ad) = get_example_happy_image_ads("mock_billboard_1");
+        let (placement, ads) = get_example_happy_image_ads("mock_billboard_1");
 
-        store.store_ad(&placement, ad.clone()).unwrap();
+        store.store_ads(&placement, &ads).unwrap();
 
         let retrieved = store.lookup(&placement).unwrap().unwrap();
-        assert_eq!(retrieved, ad);
+        assert_eq!(retrieved, ads);
     }
 
     #[test]
     fn test_store_keeps_every_ad_for_a_placement() {
         let store = create_test_store();
         let placement = PlacementId::new("mock_spoc_1");
-        let spocs: Vec<AdSpoc> = get_example_happy_spoc_response()
+        let ads: Vec<Ad> = get_example_happy_spoc_response()
             .data
             .into_values()
             .flatten()
             .collect();
-        assert!(spocs.len() > 1);
-        let ads = Ads::Spocs(spocs);
+        assert!(ads.len() > 1);
 
-        store.store_ad(&placement, ads.clone()).unwrap();
+        store.store_ads(&placement, &ads).unwrap();
 
         assert_eq!(store.lookup(&placement).unwrap(), Some(ads));
     }
@@ -287,17 +303,15 @@ mod tests {
     fn test_store_replaces_ads_for_a_placement() {
         let store = create_test_store();
         let placement = PlacementId::new("mock_spoc_1");
-        let spocs: Vec<AdSpoc> = get_example_happy_spoc_response()
+        let ads: Vec<Ad> = get_example_happy_spoc_response()
             .data
             .into_values()
             .flatten()
             .collect();
-        store
-            .store_ad(&placement, Ads::Spocs(spocs.clone()))
-            .unwrap();
+        store.store_ads(&placement, &ads).unwrap();
 
-        let refreshed = Ads::Spocs(spocs[..1].to_vec());
-        store.store_ad(&placement, refreshed.clone()).unwrap();
+        let refreshed = ads[..1].to_vec();
+        store.store_ads(&placement, &refreshed).unwrap();
 
         assert_eq!(store.lookup(&placement).unwrap(), Some(refreshed));
     }
@@ -307,8 +321,8 @@ mod tests {
         let store = create_test_store();
 
         for i in 0..10 {
-            let (placement_id, ad) = get_example_happy_image_ads(&format!("mock_billboard_{i}"));
-            store.store_ad(&placement_id, ad.clone()).unwrap();
+            let (placement_id, ads) = get_example_happy_image_ads(&format!("mock_billboard_{i}"));
+            store.store_ads(&placement_id, &ads).unwrap();
         }
 
         let total_size = store.current_total_size_bytes().unwrap();
@@ -327,12 +341,12 @@ mod tests {
     #[test]
     fn test_clear_all_ads() {
         let store = create_test_store();
-        let (placement_1, ad_1) = get_example_happy_image_ads("mock_billboard_1");
+        let (placement_1, ads_1) = get_example_happy_image_ads("mock_billboard_1");
 
-        store.store_ad(&placement_1, ad_1.clone()).unwrap();
+        store.store_ads(&placement_1, &ads_1).unwrap();
 
-        let (placement_2, ad_2) = get_example_happy_image_ads("mock_billboard_2");
-        store.store_ad(&placement_2, ad_2.clone()).unwrap();
+        let (placement_2, ads_2) = get_example_happy_image_ads("mock_billboard_2");
+        store.store_ads(&placement_2, &ads_2).unwrap();
 
         assert!(store.lookup(&placement_1).unwrap().is_some());
         assert!(store.lookup(&placement_2).unwrap().is_some());
@@ -348,11 +362,11 @@ mod tests {
     fn test_invalidate_ad_by_placement_id() {
         let store = create_test_store();
 
-        let (placement_1, ad_1) = get_example_happy_image_ads("mock_billboard_1");
-        let (placement_2, ad_2) = get_example_happy_image_ads("mock_billboard_2");
+        let (placement_1, ads_1) = get_example_happy_image_ads("mock_billboard_1");
+        let (placement_2, ads_2) = get_example_happy_image_ads("mock_billboard_2");
 
-        store.store_ad(&placement_1, ad_1.clone()).unwrap();
-        store.store_ad(&placement_2, ad_2.clone()).unwrap();
+        store.store_ads(&placement_1, &ads_1).unwrap();
+        store.store_ads(&placement_2, &ads_2).unwrap();
 
         assert!(store.lookup(&placement_1).unwrap().is_some());
         assert!(store.lookup(&placement_2).unwrap().is_some());
@@ -361,6 +375,21 @@ mod tests {
         assert_eq!(deleted, 1);
 
         assert!(store.lookup(&placement_1).unwrap().is_none());
+        assert!(store.lookup(&placement_2).unwrap().is_some());
+    }
+
+    #[test]
+    fn batch_add_adds_all_ads() {
+        let store = create_test_store();
+        let (placement_1, ads_1) = get_example_happy_image_ads("mock_billboard_1");
+        let (placement_2, ads_2) = get_example_happy_image_ads("mock_billboard_2");
+
+        let mut map = std::collections::HashMap::new();
+        map.insert(&placement_1, ads_1);
+        map.insert(&placement_2, ads_2);
+
+        store.store_batch_ads(map).unwrap();
+        assert!(store.lookup(&placement_1).unwrap().is_some());
         assert!(store.lookup(&placement_2).unwrap().is_some());
     }
 }

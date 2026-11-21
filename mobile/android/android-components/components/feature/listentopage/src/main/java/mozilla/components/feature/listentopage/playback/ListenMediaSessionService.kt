@@ -4,16 +4,16 @@
 
 package mozilla.components.feature.listentopage.playback
 
+import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
 import android.content.res.Resources
 import android.os.Build
 import android.os.Bundle
-import androidx.annotation.DrawableRes
 import androidx.annotation.OptIn
 import androidx.annotation.PluralsRes
 import androidx.annotation.RequiresApi
-import androidx.annotation.StringRes
+import androidx.core.app.ServiceCompat
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
@@ -26,8 +26,9 @@ import androidx.media3.session.SessionCommand
 import androidx.media3.session.SessionResult
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
-import mozilla.components.feature.listentopage.PlaybackSpeed
 import mozilla.components.feature.listentopage.R
+import mozilla.components.feature.listentopage.facts.ListenToPageFacts
+import mozilla.components.feature.listentopage.facts.emitMediaControlFact
 import mozilla.components.support.base.log.logger.Logger
 import mozilla.components.ui.icons.R as iconsR
 
@@ -48,6 +49,7 @@ internal class ListenMediaSessionService : MediaSessionService() {
     private var listenPlayer: ListenPlayer? = null
     private var sessionPlayer: SessionPlayer? = null
     private var mediaSession: MediaSession? = null
+    private var isPlaybackEnding = false
 
     @OptIn(UnstableApi::class)
     override fun onCreate() {
@@ -71,7 +73,7 @@ internal class ListenMediaSessionService : MediaSessionService() {
         )
 
         setMediaNotificationProvider(
-            DefaultMediaNotificationProvider.Builder(this).build().apply {
+            DefaultMediaNotificationProvider.Builder(this).setNotificationId(LISTEN_NOTIFICATION_ID).build().apply {
                 setSmallIcon(iconsR.drawable.mozac_ic_logo_firefox_24)
             }
         )
@@ -100,8 +102,30 @@ internal class ListenMediaSessionService : MediaSessionService() {
         return started
     }
 
+    @OptIn(UnstableApi::class)
     override fun onTaskRemoved(rootIntent: Intent?) {
-        endPlayback()
+        if (!(rootIntent.isExcludedFromRecents() && isPlaybackOngoing)) {
+            endPlayback()
+        }
+    }
+
+    /**
+     * Takes the notification away once [endPlayback] has begun so that the notification doesn't stay behind with no
+     * session behind it.
+     */
+    @OptIn(UnstableApi::class)
+    override fun onUpdateNotificationAsync(
+        session: MediaSession,
+        startInForegroundRequired: Boolean,
+    ): ListenableFuture<Void?> {
+        if (!isPlaybackEnding) {
+            return super.onUpdateNotificationAsync(session, startInForegroundRequired)
+        }
+
+        // Stopping the foreground alone does not take the notification away on every API level.
+        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+        getSystemService(NotificationManager::class.java).cancel(LISTEN_NOTIFICATION_ID)
+        return Futures.immediateVoidFuture()
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = mediaSession
@@ -111,9 +135,10 @@ internal class ListenMediaSessionService : MediaSessionService() {
         super.onDestroy()
     }
 
-    /** Pauses the reading, takes the notification away and ends the service */
+    /** Pauses the reading, takes the notification away (see [onUpdateNotificationAsync]) and ends the service */
     @OptIn(UnstableApi::class)
     private fun endPlayback() {
+        isPlaybackEnding = true
         pauseAllPlayersAndStopSelf()
         releasePlayback()
     }
@@ -189,7 +214,11 @@ internal class ListenSessionCallback(
         args: Bundle,
     ): ListenableFuture<SessionResult> {
         when (customCommand.customAction) {
-            ACTION_CYCLE_SPEED -> session.player.setPlaybackSpeed(session.player.nextSpeed().multiplier)
+            ACTION_CYCLE_SPEED -> {
+                val speed = session.player.nextSpeed()
+                session.player.setPlaybackSpeed(speed.multiplier)
+                emitMediaControlFact(ListenToPageFacts.Items.SPEED_SELECTED, speed.multiplier.toString())
+            }
             COMMAND_SET_SESSION_ACTIVITY -> session.setSessionActivity(args.sessionActivity())
             COMMAND_SET_ARTICLE_DURATION -> sessionPlayer.setArticleDuration(args.getLong(KEY_DURATION_MS))
             COMMAND_STOP_AND_BUFFER_AT -> sessionPlayer.bufferAt(args.getLong(KEY_POSITION_MS))
@@ -199,6 +228,30 @@ internal class ListenSessionCallback(
         }
 
         return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+    }
+
+    @OptIn(UnstableApi::class)
+    override fun onPlayerInteractionFinished(
+        session: MediaSession,
+        controller: MediaSession.ControllerInfo,
+        playerCommands: Player.Commands,
+    ) {
+        // The player sheet's own controller, whose presses are recorded through the store.
+        if (controller.packageName == ownPackage && !session.isMediaNotificationController(controller)) return
+
+        val item =
+            when {
+                playerCommands.contains(Player.COMMAND_PLAY_PAUSE) ->
+                    if (session.player.playWhenReady) {
+                        ListenToPageFacts.Items.PLAY_PRESSED
+                    } else {
+                        ListenToPageFacts.Items.PAUSE_PRESSED
+                    }
+                playerCommands.contains(Player.COMMAND_SEEK_BACK) -> ListenToPageFacts.Items.SKIP_BACK_PRESSED
+                playerCommands.contains(Player.COMMAND_SEEK_FORWARD) -> ListenToPageFacts.Items.SKIP_FORWARD_PRESSED
+                else -> return
+            }
+        emitMediaControlFact(item)
     }
 }
 
@@ -251,35 +304,6 @@ private fun speedControl(resources: Resources, speed: PlaybackSpeed): CommandBut
         .setDisplayName(resources.getString(speed.contentDescription))
         .build()
 
-/** What a screen reader says for this step. */
-@get:StringRes
-internal val PlaybackSpeed.contentDescription: Int
-    get() =
-        when (this) {
-            PlaybackSpeed.X0_25 -> R.string.mozac_feature_listentopage_notification_playback_speed_0_25
-            PlaybackSpeed.X0_5 -> R.string.mozac_feature_listentopage_notification_playback_speed_0_5
-            PlaybackSpeed.X0_75 -> R.string.mozac_feature_listentopage_notification_playback_speed_0_75
-            PlaybackSpeed.X1 -> R.string.mozac_feature_listentopage_notification_playback_speed_1
-            PlaybackSpeed.X1_25 -> R.string.mozac_feature_listentopage_notification_playback_speed_1_25
-            PlaybackSpeed.X1_5 -> R.string.mozac_feature_listentopage_notification_playback_speed_1_5
-            PlaybackSpeed.X1_75 -> R.string.mozac_feature_listentopage_notification_playback_speed_1_75
-            PlaybackSpeed.X2 -> R.string.mozac_feature_listentopage_notification_playback_speed_2
-        }
-
-@get:DrawableRes
-internal val PlaybackSpeed.icon: Int
-    get() =
-        when (this) {
-            PlaybackSpeed.X0_25 -> iconsR.drawable.mozac_ic_playback_speed_0_2x_24
-            PlaybackSpeed.X0_5 -> iconsR.drawable.mozac_ic_playback_speed_0_5x_24
-            PlaybackSpeed.X0_75 -> iconsR.drawable.mozac_ic_playback_speed_0_7x_24
-            PlaybackSpeed.X1 -> iconsR.drawable.mozac_ic_playback_speed_1x_24
-            PlaybackSpeed.X1_25 -> iconsR.drawable.mozac_ic_playback_speed_1_2x_24
-            PlaybackSpeed.X1_5 -> iconsR.drawable.mozac_ic_playback_speed_1_5x_24
-            PlaybackSpeed.X1_75 -> iconsR.drawable.mozac_ic_playback_speed_1_7x_24
-            PlaybackSpeed.X2 -> iconsR.drawable.mozac_ic_playback_speed_2x_24
-        }
-
 private fun secondsLabel(resources: Resources, @PluralsRes label: Int, incrementMs: Long): String {
     val seconds = (incrementMs / MS_PER_SECOND).toInt()
 
@@ -287,6 +311,7 @@ private fun secondsLabel(resources: Resources, @PluralsRes label: Int, increment
 }
 
 private const val MS_PER_SECOND = 1000L
+internal const val LISTEN_NOTIFICATION_ID = 1001
 
 /**
  * Media3 records the dismissal and stops republishing the notification, but it leaves the service running, so the
@@ -295,3 +320,6 @@ private const val MS_PER_SECOND = 1000L
 @OptIn(UnstableApi::class)
 internal fun Intent.isNotificationDismissal(): Boolean =
     getBooleanExtra(MediaNotification.NOTIFICATION_DISMISSED_EVENT_KEY, false)
+
+internal fun Intent?.isExcludedFromRecents(): Boolean =
+    this != null && (flags and Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS) != 0

@@ -36,7 +36,7 @@ import {
   CountVectorizer,
   cosSim,
 } from "chrome://global/content/ml/NLPUtils.sys.mjs";
-import { EmbeddingsGenerator } from "chrome://global/content/ml/EmbeddingsGenerator.sys.mjs";
+import { embeddingsGeneratorFactory } from "chrome://global/content/ml/EmbeddingsGenerator.sys.mjs";
 import { SmartTabGroupingManager } from "moz-src:///browser/components/tabbrowser/SmartTabGrouping.sys.mjs";
 import { UI_TYPES } from "moz-src:///browser/components/aiwindow/ui/modules/ToolUI.sys.mjs";
 
@@ -67,7 +67,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
 
 ChromeUtils.defineLazyGetter(lazy, "console", () =>
   console.createInstance({
-    prefix: "Conversation",
+    logModule: "Conversation",
     maxLogLevelPref: "browser.smartwindow.conversation.logLevel",
   })
 );
@@ -94,7 +94,7 @@ const tokenizer = new CountVectorizer();
 let _embeddingsGenerator = null;
 function getEmbeddingsGenerator() {
   if (!_embeddingsGenerator) {
-    _embeddingsGenerator = EmbeddingsGenerator.forGeneral();
+    _embeddingsGenerator = embeddingsGeneratorFactory.forGeneral();
   }
   return _embeddingsGenerator;
 }
@@ -149,6 +149,8 @@ export const ADD_MEMORY = "add_memory";
 // in Chat.sys.mjs when the pref is off.
 export const AITAB_PREF = "browser.smartwindow.aitab.enabled";
 export const AITAB_TOOLS = new Set([GENERATE_AITAB]);
+export const INCLUDE_CHAT_TAB_PREF =
+  "browser.smartwindow.manageTabs.includeChatTab";
 export const SEARCH_QUERY_ENDPOINT_PREF =
   "browser.smartwindow.searchQuery.endpointURL";
 export const SEARCH_QUERY_APIKEY_PREF =
@@ -566,6 +568,16 @@ export const toolsConfig = [
             description:
               "List of URL tokens identifying the tabs the action should be taken on.",
           },
+          include_chat_tab: {
+            type: "boolean",
+            description:
+              "Whether to also put the tab this chat is open in into the new " +
+              "tab group. Only used when action is 'group_tabs'. Default to " +
+              "false. Only set to true when the user refers to this " +
+              "conversation (e.g. 'with this chat') or the conversation is " +
+              "about the same topic as the selected tabs. When in doubt, set " +
+              "to false.",
+          },
           label: {
             type: "string",
             description:
@@ -659,6 +671,7 @@ export function getTabList(amount = MAX_TABS) {
             title: sanitizeUntrustedContent(title),
             lastAccessed: tab.lastAccessed,
             windowId,
+            pinned: tab.pinned,
           });
         }
       }
@@ -678,6 +691,7 @@ export function getTabList(amount = MAX_TABS) {
  * @property {string} title - Title of the tab.
  * @property {number} lastAccessed - When the tab was last accessed in milliseconds.
  * @property {string|null} windowId - SessionStore ID of the browser window.
+ * @property {boolean} pinned - Whether the tab is pinned.
  */
 
 /**
@@ -1548,9 +1562,9 @@ export async function addMemory(
  * @param {ChatConversation} conversation - The chat that asked for the page.
  * @param {boolean} isModification - Whether `result` revises a stored page.
  * @returns {Promise<{uuid: string, convId: string, toolConvId: ?string,
- *   slug: string, version: number, title: string, createdAt: number,
- *   updatedAt: number, context: AITabContext, components: AITabResult,
- *   localState: ?object}>}
+ *   slug: string, version: number, pageType: number, title: string,
+ *   createdAt: number, updatedAt: number, context: AITabContext,
+ *   components: AITabResult, localState: ?object}>}
  *   The row that was written: `uuid` identifies this one version, `slug` the
  *   page across every version of it.
  */
@@ -1559,11 +1573,12 @@ async function persistAITabPage(
   conversation,
   isModification
 ) {
-  const { context, convId, toolConvId, ...pageMetadata } = metadata;
+  const { context, convId, pageType, toolConvId, ...pageMetadata } = metadata;
   const page = {
     convId: convId ?? conversation.id,
     toolConvId,
     slug: metadata.id,
+    pageType,
     title: metadata.title,
     context,
     components: { metadata: pageMetadata, surface },
@@ -1593,7 +1608,7 @@ async function persistAITabPage(
  * @param {ChatConversation} conversation
  * @param {boolean} isEdit - Whether the call modifies an existing page, which
  *   the tab menus never ask for.
- * @returns {"tab_list"|"tab_group"|"chat"|"chat_followup"}
+ * @returns {"tab_list"|"tab_group"|"fxms"|"chat"|"chat_followup"}
  */
 function getAITabInitiator(conversation, isEdit) {
   if (!isEdit && conversation.aitabSource) {
@@ -1613,6 +1628,8 @@ const AITAB_ERROR_GUIDANCE = Object.freeze({
     "Call the tool again with the pages or content to build from, or ask the user what the page should be about.",
   nothing_to_change:
     "Call the tool again with modify_instructions describing the change, or ask the user what they would like changed.",
+  page_not_editable:
+    "Tell the user this page cannot be edited, and offer to generate a new page from the same sources instead. Do not try to modify it again.",
   page_not_found:
     "Use the slug from an earlier successful page result in this conversation. If there is none, do not guess; create a new page instead or ask the user which page they mean.",
   conversation_unavailable:
@@ -1646,6 +1663,9 @@ export function isAITabModification(modify_slug) {
  * @param {string} [toolParams.modify_instructions]
  * @param {ChatConversation} conversation
  * @param {AbortSignal} [signal] - Cancels in-flight page extractions.
+ * @param {object} [options]
+ * @param {number} [options.pageType] - One of AITAB_PAGE_TYPES for a new
+ *   page; a modification keeps the type of the page it modifies.
  * @returns {Promise<
  *   {success: true,
  *    toolResult: {message: string, page: {slug: string}},
@@ -1658,7 +1678,8 @@ export function isAITabModification(modify_slug) {
 export async function createAITab(
   { url_list, focus, raw_content, modify_slug, modify_instructions },
   conversation,
-  signal
+  signal,
+  { pageType } = {}
 ) {
   lazy.console.log(
     "[Tool] aiTab",
@@ -1683,6 +1704,7 @@ export async function createAITab(
       rawContent: raw_content,
       modifySlug: modify_slug,
       modifyInstructions: modify_instructions,
+      pageType,
       howInitiated: getAITabInitiator(conversation, isModification),
       signal,
     },
@@ -1691,9 +1713,15 @@ export async function createAITab(
   if (result.error) {
     const guidance =
       AITAB_ERROR_GUIDANCE[result.code] ?? INTERNAL_ERROR_GUIDANCE;
+    // The page's type rules out any modification, so there is no "could not
+    // be updated" to report: the request itself was never possible.
+    const message =
+      result.code == "page_not_editable"
+        ? result.error
+        : `The page could not be ${action}: ${result.error}`;
     return {
       success: false,
-      toolResult: `The page could not be ${action}: ${result.error}. ${guidance}`,
+      toolResult: `${message}. ${guidance}`,
     };
   }
 
@@ -1822,6 +1850,7 @@ export async function manageTabs(
   const {
     action,
     ask_confirmation = true,
+    include_chat_tab = false,
     url_tokens = [],
     label = "",
   } = params;
@@ -1896,6 +1925,9 @@ export async function manageTabs(
       action,
       validUrls,
       ask_confirmation,
+      include_chat_tab:
+        include_chat_tab === true &&
+        Services.prefs.getBoolPref(INCLUDE_CHAT_TAB_PREF, false),
       label,
       baseTelemetryInfo,
       toolCallId,

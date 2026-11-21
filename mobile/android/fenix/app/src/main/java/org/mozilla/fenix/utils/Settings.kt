@@ -9,6 +9,7 @@ import android.appwidget.AppWidgetManager
 import android.content.Context
 import android.content.Context.MODE_PRIVATE
 import android.content.SharedPreferences
+import android.content.pm.PackageManager
 import android.content.res.Resources
 import android.os.Environment
 import android.view.accessibility.AccessibilityManager
@@ -20,6 +21,10 @@ import androidx.preference.PreferenceManager
 import java.io.File
 import java.security.InvalidParameterException
 import java.util.concurrent.TimeUnit.MILLISECONDS
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import mozilla.components.concept.engine.Engine
 import mozilla.components.concept.engine.Engine.HttpsOnlyMode
 import mozilla.components.feature.automotive.isAndroidAutomotiveAvailable
@@ -62,6 +67,7 @@ import org.mozilla.fenix.ext.WIDE_SCREEN_WIDTH_DP
 import org.mozilla.fenix.ext.components
 import org.mozilla.fenix.ext.getPreferenceKey
 import org.mozilla.fenix.home.pocket.ContentRecommendationsFeatureHelper
+import org.mozilla.fenix.home.topsites.FenixDefaultTopSitesProvider
 import org.mozilla.fenix.home.topsites.TopSitesConfigConstants.TOP_SITES_MAX_COUNT
 import org.mozilla.fenix.nimbus.DefaultBrowserPrompt
 import org.mozilla.fenix.nimbus.FxNimbus
@@ -75,11 +81,9 @@ import org.mozilla.fenix.settings.sitepermissions.AUTOPLAY_BLOCK_ALL
 import org.mozilla.fenix.settings.sitepermissions.AUTOPLAY_BLOCK_AUDIBLE
 import org.mozilla.fenix.tabstray.DefaultTabManagementFeatureHelper
 import org.mozilla.fenix.termsofuse.TOU_VERSION
-import org.mozilla.fenix.utils.Settings.Companion.LONGFOX_PEEK_ANIMATION_MAX_SHOWS
 import org.mozilla.fenix.wallpapers.Wallpaper
 
 private const val AUTOPLAY_USER_SETTING = "AUTOPLAY_USER_SETTING"
-private const val MAX_ANIMATION_FOREGROUND = 5
 
 /**
  * A simple wrapper for SharedPreferences that makes reading preference a little bit easier.
@@ -107,9 +111,6 @@ class Settings(
         private const val ASK_TO_ALLOW_INT = 1
         private const val ALLOWED_INT = 2
         private const val INACTIVE_TAB_MINIMUM_TO_SHOW_AUTO_CLOSE_DIALOG = 20
-
-        const val LONGFOX_PEEK_ANIMATION_MAX_SHOWS = 5
-        const val LONGFOX_PEEK_ANIMATION_LAUNCH_INTERVAL = 3
 
         const val THIRTY_SECONDS_MS = 30 * 1000L
         const val FOUR_HOURS_MS = 60 * 60 * 4 * 1000L
@@ -323,10 +324,6 @@ class Settings(
     private val homescreenSections: Map<HomeScreenSection, Boolean>
         get() = FxNimbus.features.homescreen.value().sectionsEnabled
 
-    /** Indicates whether or not the homepage should use edge to edge background */
-    val enableHomepageEdgeToEdgeBackgroundFeature: Boolean
-        get() = FxNimbus.features.homescreenEdgeToEdgeBackground.value().enabled
-
     var numberOfAppLaunches by
         intPreference(
             appContext.getPreferenceKey(R.string.pref_key_times_app_opened),
@@ -529,6 +526,16 @@ class Settings(
         )
 
     /**
+     * The [mozilla.components.concept.sync.FxAEntryPoint.entryName] of the latest authentication flow started by the
+     * app, or `null` if there is none. It is kept until a flow completes.
+     */
+    var lastAuthFlowEntrypoint: String?
+        get() = preferences.getString(lastAuthFlowEntrypointKey, null)
+        set(value) = preferences.edit { putString(lastAuthFlowEntrypointKey, value) }
+
+    private val lastAuthFlowEntrypointKey = appContext.getPreferenceKey(R.string.pref_key_last_auth_flow_entrypoint)
+
+    /**
      * Whether the `referrals` ping has already been submitted for this profile. A referral code must only ever be
      * reported once.
      */
@@ -570,16 +577,25 @@ class Settings(
             persistDefaultIfNotExists = true,
         )
 
-    var currentWallpaperName by
+    private var storedWallpaperName by
         stringPreference(
             appContext.getPreferenceKey(R.string.pref_key_current_wallpaper),
-            default =
-                if (enableHomepageEdgeToEdgeBackgroundFeature) {
-                    Wallpaper.EdgeToEdge.name
-                } else {
-                    Wallpaper.Default.name
-                },
+            default = Wallpaper.Gradient.name,
         )
+
+    /** The name of the selected wallpaper. A name stored before the wallpapers were renamed is migrated on read. */
+    var currentWallpaperName: String
+        get() {
+            val storedName = storedWallpaperName
+            val name = Wallpaper.migrateLegacyName(storedName)
+            if (name != storedName) {
+                storedWallpaperName = name
+            }
+            return name
+        }
+        set(value) {
+            storedWallpaperName = value
+        }
 
     /**
      * A cache of the text color to use on text overlaying the current wallpaper. The value will be `0` if the color is
@@ -746,7 +762,7 @@ class Settings(
                         packageManagerCompatHelper = packageManagerCompatHelper,
                         packageName = packageName,
                         logger = logger,
-                    )
+                    ) ?: 0L
                 } else {
                     0L
                 }
@@ -1121,11 +1137,7 @@ class Settings(
                 true
             }
             alwaysOpenTheLastTabWhenOpeningTheApp -> {
-                if (lastHomeActivity > lastBrowseActivity) {
-                    true
-                } else {
-                    false
-                }
+                !enableHomepageAsNewTab && lastHomeActivity > lastBrowseActivity
             }
             else -> {
                 false
@@ -1743,19 +1755,6 @@ class Settings(
      */
     fun shouldDeleteAnyDataOnQuit() = DeleteBrowsingDataOnQuitType.entries.any { getDeleteDataOnQuit(it) }
 
-    val passwordsEncryptionKeyGenerated by
-        booleanPreference(
-            appContext.getPreferenceKey(R.string.pref_key_encryption_key_generated),
-            false,
-        )
-
-    fun recordPasswordsEncryptionKeyGenerated() = preferences.edit {
-        putBoolean(
-            appContext.getPreferenceKey(R.string.pref_key_encryption_key_generated),
-            true,
-        )
-    }
-
     @VisibleForTesting(otherwise = PRIVATE)
     internal val loginsSecureWarningSyncCount =
         counterPreference(
@@ -1786,9 +1785,24 @@ class Settings(
             default = true,
         )
 
-    var defaultTopSitesAdded by
+    /**
+     * Whether default pinned top sites that are included in the application on the first run of the application have
+     * been added.
+     */
+    var defaultPinnedTopSitesAdded by
         booleanPreference(
             appContext.getPreferenceKey(R.string.default_top_sites_added),
+            default = false,
+        )
+
+    /**
+     * Whether the default top sites that the user had already removed have been migrated over to the homescreen
+     * blocklist. This applies to existing users that had their default top sites added to the user-pinned sites storage
+     * before they were served as backfills from [FenixDefaultTopSitesProvider].
+     */
+    var removedDefaultPinnedTopSitesMigrated by
+        booleanPreference(
+            appContext.getPreferenceKey(R.string.pref_key_removed_default_pinned_top_sites_migrated),
             default = false,
         )
 
@@ -2020,6 +2034,13 @@ class Settings(
             default = false,
         )
 
+    /** The IDs of the search widgets on the home screen at the last check, used to detect newly added widgets. */
+    var searchWidgetIds by
+        stringSetPreference(
+            appContext.getPreferenceKey(R.string.pref_key_search_widget_ids),
+            default = setOf(),
+        )
+
     /** The app version code that last published the generated search bar widget previews. */
     var searchBarWidgetPreviewsVersion by
         intPreference(
@@ -2110,6 +2131,20 @@ class Settings(
             key = appContext.getPreferenceKey(R.string.pref_key_open_links_in_youtube),
             default = appContext.getString(R.string.pref_key_open_links_in_youtube_never),
         )
+
+    /** Check to see if we should open a YouTube link in the YouTube app */
+    fun shouldOpenYoutubeInApp(): Boolean {
+        return when (openLinksInYoutube) {
+            appContext.getString(R.string.pref_key_open_links_in_youtube_always) -> true
+            appContext.getString(R.string.pref_key_open_links_in_youtube_ask) -> true
+            else -> false
+        }
+    }
+
+    /** Check to see if we need to prompt the user before opening a YouTube link in the YouTube app */
+    fun shouldPromptOpenYoutubeInApp(): Boolean {
+        return openLinksInYoutube == appContext.getString(R.string.pref_key_open_links_in_youtube_ask)
+    }
 
     /** Whether the in-development open links in YouTube app preference is revealed via secret settings. */
     var openLinksInYoutubeFeatureEnabled by
@@ -2371,6 +2406,23 @@ class Settings(
         )
 
     /**
+     * Feature flag that indicates if the save credit card prompt can save the security code. The same value is passed
+     * to the engine so that Gecko captures the security code only when this is true.
+     */
+    var isCreditCardSecurityCodeEnabled by
+        booleanPreference(
+            key = appContext.getPreferenceKey(R.string.pref_key_credit_cards_enable_security_code),
+            default = { FxNimbus.features.creditCardSecurityCode.value().enabled },
+        )
+
+    /** Stores the user choice from the "Save security codes" toggle in the save credit card prompt. */
+    var shouldSaveCreditCardSecurityCode by
+        booleanPreference(
+            key = appContext.getPreferenceKey(R.string.pref_key_credit_cards_save_security_code),
+            default = true,
+        )
+
+    /**
      * Stores the user choice from the "Autofill Addresses" settings for whether save and autofill addresses should be
      * enabled or not. If set to `true` when the user focuses on address fields in a webpage an Android prompt is shown,
      * allowing the selection of an address details to be automatically filled in the webpage fields.
@@ -2467,7 +2519,7 @@ class Settings(
         )
 
     /**
-     * Whether the Sync sign-in card can be shown during initial onboarding for users whose Firefox install is
+     * Whether the pairing sync card can be shown during initial onboarding for users whose Firefox install is
      * attributed to a pairing campaign link.
      */
     var isPairingSignInPromptEnabled by
@@ -2648,13 +2700,6 @@ class Settings(
             default = { FxNimbus.features.homepageAsNewTab.value().enabled },
         )
 
-    /** Whether the universal edge-to-edge wallpapers treatment is enabled. */
-    var enableUniversalEdgeToEdgeWallpapers by
-        booleanPreference(
-            key = appContext.getPreferenceKey(R.string.pref_key_enable_universal_edge_to_edge_wallpapers),
-            default = { FxNimbus.features.universalEdgeToEdgeWallpapers.value().enabled },
-        )
-
     /** Indicates if the Homepage Search Bar is enabled. */
     var enableHomepageSearchBar by
         booleanPreference(
@@ -2682,6 +2727,23 @@ class Settings(
             key = appContext.getPreferenceKey(R.string.pref_key_show_more_shortcuts),
             default = { FxNimbus.features.showMoreShortcuts.value().enabled },
         )
+
+    /** Indicates if the regional default shortcuts are enabled. */
+    val enableRegionalDefaultShortcuts: Boolean
+        get() = FxNimbus.features.regionalDefaultShortcuts.value().enabled
+
+    /** Indicates if videos are shown in picture-in-picture by cloning them into a window of their own. */
+    var enablePictureInPictureWindow by
+        booleanPreference(
+            key = appContext.getPreferenceKey(R.string.pref_key_enable_picture_in_picture_window),
+            default = { FxNimbus.features.pictureInPictureWindow.value().enabled },
+        )
+
+    /** Indicates if videos can be shown in a picture-in-picture window of their own on this device. */
+    val isPictureInPictureWindowAvailable: Boolean
+        get() =
+            enablePictureInPictureWindow &&
+                appContext.packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)
 
     /** Indicates if the Homepage Weather Widget is enabled. */
     var enableHomepageWeatherWidget by
@@ -2924,17 +2986,17 @@ class Settings(
      *
      * `true` makes the IPProtection UI elements visible across the app, while `false` hides them.
      */
-    var isIPProtectionEnabled by
+    var overrideIPProtectionEnabled by
         booleanPreference(
             key = appContext.getPreferenceKey(R.string.pref_key_enable_ip_protection),
             default = false,
         )
 
-    /** Forces GPI (Google Play Integrity) authentication for IPProtection, set through Secret Settings. */
+    /** Whether IPProtection uses GPI (Google Play Integrity) while signed out. */
     var ipProtectionUseGpi by
         booleanPreference(
             key = appContext.getPreferenceKey(R.string.pref_key_ip_protection_use_gpi),
-            default = false,
+            default = { FxNimbus.features.ipProtection.value().useGpiWhenSignedOut },
         )
 
     /** Indicates if the user has already toggled the VPN on. */
@@ -2957,6 +3019,17 @@ class Settings(
             default = false,
         )
 
+    /**
+     * The reset time of the most recent VPN allowance cycle for which the data limit notice was shown, or `null` if
+     * none has been shown yet. The notice occurs at most one time per cycle.
+     */
+    var ipProtectionLastDataLimitNoticeCycleResetTime: String?
+        get() = preferences.getString(lastDataLimitNoticeCycleResetTimeKey, null)
+        set(value) = preferences.edit { putString(lastDataLimitNoticeCycleResetTimeKey, value) }
+
+    private val lastDataLimitNoticeCycleResetTimeKey =
+        appContext.getPreferenceKey(R.string.pref_key_ip_protection_last_data_limit_notice_cycle_reset_time)
+
     /** Indicates if the IPProtection onboarding bottom sheet feature variable is enabled via Nimbus. */
     val shouldShowIPProtectionOnboardingBottomSheet: Boolean
         get() = FxNimbus.features.ipProtection.value().showOnboardingBottomSheet
@@ -2967,7 +3040,7 @@ class Settings(
      * The flag is backed by a Nimbus `ip-protection` feature, with an option to override it through secret settings.
      */
     val isIPProtectionAvailable: Boolean
-        get() = FxNimbus.features.ipProtection.value().enabled || isIPProtectionEnabled
+        get() = FxNimbus.features.ipProtection.value().enabled || overrideIPProtectionEnabled
 
     /**
      * Tracks how many times the summarize menu item has been shown. Used to control highlight/badge visibility for
@@ -3039,12 +3112,20 @@ class Settings(
             default = 0,
         )
 
-    /** Feature flag that indicates if the Import Passwords feature is enabled. */
-    var importPasswordsFeatureFlagEnabled by
+    /** Feature flag to enable or disable Import Passwords feature through Secret Setting */
+    var overrideImportPasswordsEnabled by
         booleanPreference(
             key = appContext.getPreferenceKey(R.string.pref_key_enable_import_passwords),
             default = false,
         )
+
+    /**
+     * Indicates if the Import Passwords feature is available for the user.
+     *
+     * The flag is backed by a nimbus flag, with an option to override it through secret settings.
+     */
+    val isImportPasswordsAvailable: Boolean
+        get() = FxNimbus.features.importPasswords.value().enabled || overrideImportPasswordsEnabled
 
     /** Feature flag that indicates if the "Check Archived Version" button is shown on eligible error pages. */
     var isWaybackMachineEnabled by
@@ -3281,54 +3362,6 @@ class Settings(
             default = { DefaultTabManagementFeatureHelper.openingAnimationEnabled },
         )
 
-    /** Whether the private mode and stories entry point experiment is enabled. */
-    var privateModeAndStoriesEntryPointEnabled by
-        booleanPreference(
-            key = appContext.getPreferenceKey(R.string.pref_key_private_mode_and_stories_entry_point),
-            default = { FxNimbus.features.privateModeAndStoriesEntryPoint.value().enabled },
-        )
-
-    /**
-     * The number of times the app has been brought to the foreground since the news button animation was last shown.
-     */
-    var newsButtonForegroundCount by
-        intPreference(
-            key = appContext.getPreferenceKey(R.string.pref_key_news_button_foreground_count),
-            default = 0,
-        )
-
-    /** The timestamp in milliseconds when the news button animation was last shown. */
-    var newsButtonAnimationLastShownMillis by
-        longPreference(
-            appContext.getPreferenceKey(R.string.pref_key_news_button_animation_last_shown),
-            default = 0L,
-        )
-
-    /** Increments [newsButtonForegroundCount] up to a maximum of 5. */
-    fun incrementNewsButtonForegroundCount() {
-        if (newsButtonForegroundCount < MAX_ANIMATION_FOREGROUND) {
-            newsButtonForegroundCount++
-        }
-    }
-
-    /**
-     * Returns whether the news button animation should be shown. The animation is shown every 5 foreground visits and
-     * at most once per week.
-     */
-    fun shouldShowNewsButtonAnimation(): Boolean {
-        return (newsButtonForegroundCount % MAX_ANIMATION_FOREGROUND == 0) &&
-            (currentTimeMillis() - newsButtonAnimationLastShownMillis >= ONE_WEEK_MS)
-    }
-
-    /**
-     * Records that the news button animation has been shown by updating the last shown timestamp and resetting
-     * [newsButtonForegroundCount].
-     */
-    fun recordNewsButtonAnimationShown() {
-        newsButtonAnimationLastShownMillis = currentTimeMillis()
-        newsButtonForegroundCount = 0
-    }
-
     /** Whether the Tab Groups feature is enabled. */
     var tabGroupsEnabled by
         booleanPreference(
@@ -3375,6 +3408,20 @@ class Settings(
             default = { DefaultTabManagementFeatureHelper.showTabGroupsInMenu },
         )
 
+    /** [showTabGroupsInMenu], emitting its current value and then every change. */
+    val showTabGroupsInMenuFlow: Flow<Boolean> = callbackFlow {
+        val key = appContext.getPreferenceKey(R.string.pref_key_show_tab_groups_in_menu)
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, changedKey ->
+            if (changedKey == null || changedKey == key) {
+                trySend(showTabGroupsInMenu)
+            }
+        }
+        preferences.registerOnSharedPreferenceChangeListener(listener)
+        send(showTabGroupsInMenu)
+        awaitClose { preferences.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
+        .distinctUntilChanged()
+
     /** Whether the Native Share Sheet feature is enabled. */
     var nativeShareSheetEnabled by
         booleanPreference(
@@ -3390,8 +3437,8 @@ class Settings(
 
     /**
      * User preference (local only) controlling whether the Google Lens integration is active when
-     * [googleLensIntegrationEnabled] is on. When false, the standard QR scanner is used and the "Open with Google Lens"
-     * image context menu entry is hidden.
+     * [googleLensIntegrationEnabled] is on. When false, the toolbar offers the QR scanner instead of Google Lens and
+     * the "Open with Google Lens" image context menu entry is hidden.
      */
     var googleLensIntegrationUserEnabled by
         booleanPreference(
@@ -3439,52 +3486,12 @@ class Settings(
             default = { FxNimbus.features.addressbarFocusMode.value().enabled },
         )
 
-    /** Whether customizing the browser menu is allowed. */
-    val isMenuCustomizationEnabled = true
-
     /** Whether entering the browser menu customization screen is allowed. */
     var isMenuCustomizationScreenEnabled by
         booleanPreference(
             key = appContext.getPreferenceKey(R.string.pref_key_enable_menu_customization_screen),
             default = { false },
         )
-
-    /** Whether Longfox is enabled. */
-    var longfoxEnabled by
-        booleanPreference(
-            key = appContext.getPreferenceKey(R.string.pref_key_enable_longfox),
-            default = { FxNimbus.features.longfox.value().enabled },
-        )
-
-    /**
-     * Number of times the app has been foregrounded (cold start or returned from background). Used to gate the longfox
-     * peek animation.
-     */
-    var appLaunchCount by
-        intPreference(
-            key = appContext.getPreferenceKey(R.string.pref_key_app_launch_count),
-            default = 0,
-        )
-
-    /**
-     * Number of times the longfox peek animation has been shown on the homepage. Capped at
-     * [LONGFOX_PEEK_ANIMATION_MAX_SHOWS]; once reached the animation is no longer shown.
-     */
-    var longfoxPeekAnimationShownCount by
-        intPreference(
-            key = appContext.getPreferenceKey(R.string.pref_key_longfox_peek_animation_shown_count),
-            default = 0,
-        )
-
-    /**
-     * Returns true when the longfox peek animation should be armed for the current app foreground: feature enabled, not
-     * yet reached the show cap, and on every Nth launch.
-     */
-    fun shouldShowLongfoxPeekAnimationThisTime(): Boolean =
-        longfoxEnabled &&
-            longfoxPeekAnimationShownCount < LONGFOX_PEEK_ANIMATION_MAX_SHOWS &&
-            appLaunchCount > 0 &&
-            appLaunchCount % LONGFOX_PEEK_ANIMATION_LAUNCH_INTERVAL == 0
 
     /** Indicates whether the app should automatically clean up downloaded files. */
     fun shouldCleanUpDownloadsAutomatically(): Boolean {
@@ -3537,12 +3544,13 @@ class Settings(
             default = { FxNimbus.features.homepageTrendingRecentSearch.value().enabled },
         )
 
-    /** Indicates if the Android PDF tools are enabled for the PDF viewer. */
-    var enablePdfTools by
-        booleanPreference(
-            key = appContext.getPreferenceKey(R.string.pref_key_enable_pdf_tools),
-            default = { FxNimbus.features.pdfViewer.value().androidUiTools },
-        )
+    /**
+     * Indicates if the Android PDF tools are enabled for the PDF viewer.
+     *
+     * When no experiment sets this value, it should follow the same build default as pdfjs.enableAndroidEditing.
+     */
+    val enablePdfTools: Boolean
+        get() = FxNimbus.features.pdfViewer.value().enablePdfSignatures ?: Config.channel.isNightlyOrDebug
 
     var accountSettingsNewUi by
         booleanPreference(

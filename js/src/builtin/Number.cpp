@@ -27,6 +27,7 @@
 #include <math.h>
 #include <string.h>  // memmove
 #include <string_view>
+#include <type_traits>
 
 #include "jstypes.h"
 
@@ -56,6 +57,7 @@
 #include "vm/JSContext.h"
 #include "vm/JSObject.h"
 #include "vm/StaticStrings.h"
+#include "zmij/zmij.h"
 
 #include "vm/Compartment-inl.h"  // For js::UnwrapAndTypeCheckThis
 #include "vm/GeckoProfiler-inl.h"
@@ -757,6 +759,10 @@ static_assert(DTOSTR_STANDARD_BUFFER_SIZE <= JS::MaximumNumberToStringLength,
               "MaximumNumberToStringLength is large enough to hold the longest "
               "string produced by a conversion");
 
+static_assert(zmij::ecmascript_buffer_size <= JS::MaximumNumberToStringLength,
+              "MaximumNumberToStringLength is large enough to hold the scratch "
+              "space required by Zmij");
+
 MOZ_ALWAYS_INLINE
 static JSLinearString* LookupInt32ToString(JSContext* cx, int32_t si) {
   if (StaticStrings::hasInt(si)) {
@@ -931,21 +937,51 @@ static_assert(CountDigits(1000000000) == 10);
 static_assert(CountDigits(INT32_MAX) == 10);
 static_assert(CountDigits(UINT32_MAX) == 10);
 
-static bool AppendInt32ToStringBuilder(StringBuilder& sb, int32_t i) {
-  MOZ_ASSERT(sb.isUnderlyingBufferLatin1());
+static constexpr auto DigitPairsTable = [] {
+  std::array<char, 200> table{};
+  for (size_t n = 0; n < 100; n++) {
+    table[2 * n] = '0' + n / 10;
+    table[2 * n + 1] = '0' + n % 10;
+  }
+  return table;
+}();
+static_assert(DigitPairsTable[0] == '0');
+static_assert(DigitPairsTable[1] == '0');
+static_assert(DigitPairsTable[42 * 2] == '4');
+static_assert(DigitPairsTable[42 * 2 + 1] == '2');
+static_assert(DigitPairsTable[198] == '9');
+static_assert(DigitPairsTable[199] == '9');
 
-  const size_t len = CountDigits(Abs(i)) + (i < 0);
+template <typename CharT>
+static bool AppendInt32ToStringBuilder(StringBuilder& sb, int32_t i) {
+  MOZ_ASSERT((std::is_same_v<CharT, Latin1Char>) ==
+             sb.isUnderlyingBufferLatin1());
+
+  uint32_t u = Abs(i);
+  const size_t len = CountDigits(u) + (i < 0);
   if (!sb.growByUninitialized(len)) {
     return false;
   }
 
-  char* end = reinterpret_cast<char*>(sb.end<Latin1Char>());
-  char* appendPtr = end - len;
-
-  mozilla::DebugOnly<std::to_chars_result> result =
-      std::to_chars(appendPtr, end, i);
-  MOZ_ASSERT(result.value.ec == std::errc());
-  MOZ_ASSERT(result.value.ptr == end);
+  CharT* ptr = sb.end<CharT>();
+  while (u >= 100) {
+    uint32_t n = u % 100;
+    u /= 100;
+    ptr -= 2;
+    ptr[0] = DigitPairsTable[2 * n];
+    ptr[1] = DigitPairsTable[2 * n + 1];
+  }
+  if (u >= 10) {
+    ptr -= 2;
+    ptr[0] = DigitPairsTable[2 * u];
+    ptr[1] = DigitPairsTable[2 * u + 1];
+  } else {
+    *--ptr = CharT('0' + u);
+  }
+  if (i < 0) {
+    *--ptr = '-';
+  }
+  MOZ_ASSERT(ptr == sb.end<CharT>() - len);
 
   return true;
 }
@@ -1605,24 +1641,12 @@ static size_t FracNumberToCString(ToCStringBuf* cbuf, double d) {
   }
 #endif
 
-  /*
-   * This is V8's implementation of the algorithm described in the
-   * following paper:
-   *
-   *   Printing floating-point numbers quickly and accurately with integers.
-   *   Florian Loitsch, PLDI 2010.
-   */
-  const double_conversion::DoubleToStringConverter& converter =
-      double_conversion::DoubleToStringConverter::EcmaScriptConverter();
-  double_conversion::StringBuilder builder(cbuf->sbuf, std::size(cbuf->sbuf));
-  MOZ_ALWAYS_TRUE(converter.ToShortest(d, &builder));
-
-  size_t len = builder.position();
-#ifdef DEBUG
-  char* result =
-#endif
-      builder.Finalize();
-  MOZ_ASSERT(cbuf->sbuf == result);
+  char* end = zmij::write_ecmascript(cbuf->sbuf, sizeof cbuf->sbuf, d);
+  size_t len = end - cbuf->sbuf;
+  // This is safe, because sizeof ToCStringBuf::sbuf includes scratch bytes, so
+  // there's always space left over for the terminator.
+  MOZ_ASSERT(len < JS::MaximumNumberToStringLength);
+  *end = '\0';
   return len;
 }
 
@@ -1649,20 +1673,9 @@ static bool AppendFracNumberToStringBuilder(StringBuilder& sb, double d) {
   char* end = reinterpret_cast<char*>(sb.end<Latin1Char>());
   char* appendPtr = end - maxSize;
 
-  const double_conversion::DoubleToStringConverter& converter =
-      double_conversion::DoubleToStringConverter::EcmaScriptConverter();
-  double_conversion::StringBuilder builder(appendPtr, maxSize);
-  MOZ_ALWAYS_TRUE(converter.ToShortest(d, &builder));
-
-  size_t len = builder.position();
-
-  // Unnecessarily adds a zero termination byte, which can't be avoided because
-  // builder's destructor will add it if we don't add it here. This byte is
-  // accounted for in JS::MaximumNumberToStringLength
-  mozilla::DebugOnly<char*> result = builder.Finalize();
-  MOZ_ASSERT(appendPtr == result);
-
-  sb.shrinkBy(maxSize - len);
+  char* written = zmij::write_ecmascript(appendPtr, maxSize, d);
+  MOZ_ASSERT(size_t(written - appendPtr) < maxSize);
+  sb.shrinkBy(maxSize - (written - appendPtr));
   return true;
 }
 
@@ -1674,17 +1687,11 @@ void JS::NumberToString(double d, char (&out)[MaximumNumberToStringLength]) {
     memmove(out, cbuf.sbuf, len);
     out[len] = '\0';
   } else {
-    const double_conversion::DoubleToStringConverter& converter =
-        double_conversion::DoubleToStringConverter::EcmaScriptConverter();
-
-    double_conversion::StringBuilder builder(out, sizeof(out));
-    MOZ_ALWAYS_TRUE(converter.ToShortest(d, &builder));
-
-#ifdef DEBUG
-    char* result =
-#endif
-        builder.Finalize();
-    MOZ_ASSERT(out == result);
+    char* end = zmij::write_ecmascript(out, MaximumNumberToStringLength, d);
+    // This is safe, because MaximumNumberToStringLength includes scratch bytes,
+    // so there's always space left over for the terminator
+    MOZ_ASSERT(size_t(end - out) < MaximumNumberToStringLength);
+    *end = '\0';
   }
 }
 
@@ -1701,8 +1708,9 @@ char* js::NumberToCString(ToCStringBuf* cbuf, double d, size_t* length) {
 static bool AppendNumberToStringBuilder(StringBuilder& sb, double d) {
   MOZ_ASSERT(sb.isUnderlyingBufferLatin1());
   int32_t i;
-  return NumberEqualsInt32(d, &i) ? AppendInt32ToStringBuilder(sb, i)
-                                  : AppendFracNumberToStringBuilder(sb, d);
+  return NumberEqualsInt32(d, &i)
+             ? AppendInt32ToStringBuilder<Latin1Char>(sb, i)
+             : AppendFracNumberToStringBuilder(sb, d);
 }
 
 char* js::Int32ToCString(Int32ToCStringBuf* cbuf, int32_t value,
@@ -1957,26 +1965,25 @@ bool js::NumberValueToStringBuilder(const Value& v, StringBuilder& sb) {
   // If we can, write directly into the string builder to save a copy.
   if (sb.isUnderlyingBufferLatin1()) {
     if (v.isInt32()) {
-      return AppendInt32ToStringBuilder(sb, v.toInt32());
+      return AppendInt32ToStringBuilder<Latin1Char>(sb, v.toInt32());
     }
     return AppendNumberToStringBuilder(sb, v.toDouble());
+  }
+  if (v.isInt32()) {
+    return AppendInt32ToStringBuilder<char16_t>(sb, v.toInt32());
+  }
+  double d = v.toDouble();
+  int32_t i;
+  if (NumberEqualsInt32(d, &i)) {
+    return AppendInt32ToStringBuilder<char16_t>(sb, i);
   }
 
   // Write into a stack C-string buffer and inflate.
   ToCStringBuf cbuf;
-  const char* cstr;
-  size_t cstrlen;
-  if (v.isInt32()) {
-    cstrlen = ::Int32ToCString(&cbuf, v.toInt32());
-    cstr = cbuf.sbuf;
-  } else {
-    cstr = NumberToCString(&cbuf, v.toDouble(), &cstrlen);
-  }
-  MOZ_ASSERT(cstr);
-  MOZ_ASSERT(cstrlen == strlen(cstr));
-
+  size_t cstrlen = FracNumberToCString(&cbuf, d);
+  MOZ_ASSERT(cstrlen == strlen(cbuf.sbuf));
   MOZ_ASSERT(cstrlen < std::size(cbuf.sbuf));
-  return sb.append(cstr, cstrlen);
+  return sb.append(cbuf.sbuf, cstrlen);
 }
 
 template <typename CharT>

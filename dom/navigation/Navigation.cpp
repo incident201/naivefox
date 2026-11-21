@@ -41,7 +41,6 @@
 #include "nsIMultiPartChannel.h"
 #include "nsIPrincipal.h"
 #include "nsISHistory.h"
-#include "nsIScriptChannel.h"
 #include "nsIStructuredCloneContainer.h"
 #include "nsIXULRuntime.h"
 #include "nsNetUtil.h"
@@ -335,11 +334,9 @@ bool Navigation::HasEntriesAndEventsDisabled() const {
   return !doc || !doc->IsCurrentActiveDocument() ||
          doc->IsEverInitialDocument() ||
          doc->GetPrincipal()->GetIsNullPrincipal() ||
-         // We explicitly disallow documents loaded through multipart and
-         // script channels from having events or entries. See bug 1996218
-         // and bug 1996221
+         // We explicitly disallow documents loaded through multipart channels
+         // from having events or entries. See bug 1996218
          SupportsInterface<nsIMultiPartChannel>(doc->GetChannel()) ||
-         SupportsInterface<nsIScriptChannel>(doc->GetChannel()) ||
          // We also disallow documents embedded using <object>/<embed>. See bug
          // 1996215.
          !doc->GetBrowsingContext() ||
@@ -643,6 +640,10 @@ struct NavigationWaitForAllScope final : public nsISupports,
         [browsingContext = RefPtr{GetBrowsingContext()},
          loadState = RefPtr{mLoadState}]() MOZ_CAN_RUN_SCRIPT_BOUNDARY_LAMBDA {
           if (browsingContext && loadState) {
+            // Resuming the history step reuses a load state that has already
+            // been targeted by InternalLoad. Clear the target because LoadURI
+            // expects targeting to happen in InternalLoad.
+            loadState->SetTargetBrowsingContext(nullptr);
             browsingContext->LoadURI(loadState, /* aSetNavigating */ false);
           }
         });
@@ -752,13 +753,6 @@ struct NavigationWaitForAllScope final : public nsISupports,
                             mNavigation->mOngoingAPIMethodTracker);
       // Step 11
       mAPIMethodTracker->CleanUp();
-      mNavigation->mOngoingNavigateEvent = nullptr;
-    } else {
-      // It needs to be ensured that the ongoing navigate event is cleared in
-      // every code path (e.g. for download events), so that we don't keep
-      // intermediate state around.
-      // See also https://github.com/whatwg/html/issues/11802
-      mNavigation->mOngoingNavigateEvent = nullptr;
     }
 
     return;
@@ -2010,6 +2004,23 @@ void Navigation::InnerInformAboutAbortingNavigation(JSContext* aCx) {
 
   while (HasOngoingNavigateEvent()) {
     AbortOngoingNavigation(aCx);
+  }
+}
+
+// https://html.spec.whatwg.org/#apply-the-history-step step 8.3
+void Navigation::ClearOngoingNavigationForHistoryStep() {
+  if (mOngoingNavigateEvent && mOngoingNavigateEvent->InterceptionState() !=
+                                   NavigateEvent::InterceptionState::None) {
+    return;
+  }
+
+  // 8.3.2 Set navigation's ongoing navigate event to null.
+  mOngoingNavigateEvent = nullptr;
+
+  // 8.3.3 Set navigation's ongoing API method tracker to null.
+  if (mOngoingAPIMethodTracker) {
+    mOngoingAPIMethodTracker = nullptr;
+    UpdateNeedsTraverse();
   }
 }
 

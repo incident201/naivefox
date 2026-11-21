@@ -39,7 +39,7 @@ const lazy = XPCOMUtils.declareLazy({
   console: () =>
     console.createInstance({
       maxLogLevelPref: "browser.ml.logLevel",
-      prefix: "GeckoMLEngineParent",
+      logModule: "GeckoMLEngineParent",
     }),
   mlUtils: { service: "@mozilla.org/ml-utils;1", iid: Ci.nsIMLUtils },
   CHECK_FOR_MEMORY: { pref: "browser.ml.checkForMemory" },
@@ -56,6 +56,7 @@ export const LLAMA_CPP_VERSION = "74ade52741203e5c8f81eaf06a96cb1cfe15f2a3";
 const RS_INFERENCE_OPTIONS_COLLECTION = "ml-inference-options";
 const RS_ALLOW_DENY_COLLECTION = "ml-model-allow-deny-list";
 const TERMINATE_TIMEOUT = 5000;
+const MAX_CONSECUTIVE_CRASHES = 3;
 
 const RUNTIME_ROOT_IN_OPFS = "mlRuntimeFiles";
 
@@ -448,7 +449,8 @@ export class MLEngineParent extends JSProcessActorParent {
             await MLEngine.removeInstance(
               message.json.engineId,
               message.json.shutdown,
-              /* replacement */ false
+              /* replacement */ false,
+              message.json.idle
             );
           } catch (e) {
             lazy.console.error("Failed to remove instance", e);
@@ -500,7 +502,7 @@ export class MLEngineParent extends JSProcessActorParent {
    * the model hub root or an absolute URL.
    * @param {string} config.featureId - The engine id.
    * @param {string} config.sessionId - Shared across the same model download session.
-   * @returns {Promise<[string, object]>} The file local path and headers
+   * @returns {Promise<[File, object]>} The model file and headers
    */
   async getModelFile({
     engineId,
@@ -534,7 +536,7 @@ export class MLEngineParent extends JSProcessActorParent {
     // if this errors out, it will be caught in the worker
     const parsedUrl = this.modelHub.parseUrl(url, { rootUrl, urlTemplate });
 
-    const [data, headers] = await this.modelHub.getModelDataAsFile({
+    const [filePath, headers] = await this.modelHub.getModelDataAsFile({
       engineId,
       taskName,
       model: parsedUrl.model,
@@ -554,7 +556,7 @@ export class MLEngineParent extends JSProcessActorParent {
       ...parsedUrl,
     });
 
-    const sizeMB = Math.round(headers.fileSize / (1024 * 1024));
+    const sizeMB = Math.round((headers.fileSize ?? 0) / (1024 * 1024));
     lazy.console.debug(
       `Model ${parsedUrl.model} was fetched from ${url}, size ${sizeMB}MiB`
     );
@@ -565,7 +567,8 @@ export class MLEngineParent extends JSProcessActorParent {
       `Downloaded model ${parsedUrl.file}: ${sizeMB}MB`
     );
 
-    return [data, headers];
+    const handle = await lazy.OPFS.getFileHandle(filePath);
+    return [await handle.getFile(), headers];
   }
 
   /**
@@ -798,10 +801,10 @@ export class MLEngineParent extends JSProcessActorParent {
     const fileObject = await lazy.OPFS.download({
       savePath: `${RUNTIME_ROOT_IN_OPFS}/${localRoot}/${version}/${filename}`,
       deletePreviousVersions: true,
-      skipIfExists: true,
+      useCache: true,
       source: baseURL + location,
-      sha256Hash: hash,
-      fileSize: size,
+      expectedHash: hash,
+      expectedFileSize: size,
     });
 
     return fileObject.arrayBuffer();
@@ -1058,6 +1061,14 @@ export class MLEngine {
   static #instances = new Map();
 
   /**
+   * Inference process crashes per engineId since its last successful run.
+   * Counted per engineId because reopening hands runs to a new engine.
+   *
+   * @type {Map<string, number>}
+   */
+  static #consecutiveCrashes = new Map();
+
+  /**
    * @type {MessagePort | null}
    */
   #port = null;
@@ -1074,8 +1085,27 @@ export class MLEngine {
    */
   #requests = new Map();
 
+  /** @type {Set<number>} */
+  #canceledRequests = new Set();
+
+  /** @type {Promise<MLEngine<FeatureID>> | null} */
+  #liveEnginePromise = null;
+
   /**
-   * @type {"uninitialized" | "ready" | "error" | "closed" | "crashed"}
+   * The live engine this engine created, as opposed to one another holder
+   * already had, which terminate() must leave running.
+   *
+   * @type {MLEngine<FeatureID> | null}
+   */
+  #ownedLiveEngine = null;
+
+  /**
+   * "suspended" means the inference process shut the engine down for being
+   * idle or crashed, and runs are forwarded to a live engine with the same
+   * options. "crashed" means it crashed MAX_CONSECUTIVE_CRASHES times in a row
+   * without a successful run, and runs are no longer forwarded.
+   *
+   * @type {"uninitialized" | "ready" | "error" | "closed" | "crashed" | "suspended"}
    */
   engineStatus = "uninitialized";
 
@@ -1108,13 +1138,25 @@ export class MLEngine {
    * @param {string} engineId - The ID of the engine instance to be removed.
    * @param {boolean} shutdown - Flag indicating whether to shutdown the engine.
    * @param {boolean} replacement - Flag indicating whether the engine is being replaced.
+   * @param {boolean} [idle] - Whether the inference process removed the engine for being idle.
    * @returns {Promise<void>} A promise that resolves once the engine is removed.
    */
-  static async removeInstance(engineId, shutdown, replacement) {
+  static async removeInstance(engineId, shutdown, replacement, idle = false) {
     for (const [id, engine] of MLEngine.#instances.entries()) {
       if (engine.engineId == engineId) {
         lazy.console.debug(`Removing engine ${engineId}`);
-        await engine.terminate(shutdown, replacement);
+        if (idle) {
+          // The port message reporting the idle shutdown can arrive after this
+          // one, and terminating here would close the port before it does.
+          if (engine.engineStatus !== "closed") {
+            engine.setEngineStatus("suspended");
+          }
+        } else if (engine.#port !== null) {
+          // Engines without a port are suspended or already gone. Terminating a
+          // suspended engine waits on its reopen, which may be the getEngine
+          // call that is replacing it here.
+          await engine.terminate(shutdown, replacement);
+        }
         // Abort any pending operations for the engine
         MLEngineParent.engineCreationAbortControllers.get(engineId)?.abort();
         MLEngine.#instances.delete(id);
@@ -1186,17 +1228,30 @@ export class MLEngine {
 
     if (
       aTopic === "ipc:content-shutdown" &&
-      childID === this.mlEngineParent.childID
+      childID === this.mlEngineParent.childID &&
+      this.engineStatus !== "closed"
     ) {
       const pid = aSubject.get("osPid");
       lazy.console.error(
         `Got abnormal shutdown of the inference process (pid=${pid})`
       );
+      if (this.#port !== null) {
+        MLEngine.#consecutiveCrashes.set(
+          this.engineId,
+          (MLEngine.#consecutiveCrashes.get(this.engineId) ?? 0) + 1
+        );
+      }
       this.#port = null;
       const err = new Error(
         `The inference process was shutdown (pid=${pid}), childId=${childID}`
       );
-      this.setEngineStatus("crashed");
+      this.setEngineStatus(
+        MLEngine.#consecutiveCrashes.get(this.engineId) >=
+          MAX_CONSECUTIVE_CRASHES
+          ? "crashed"
+          : "suspended"
+      );
+      this.#rejectRequests(err);
       throw err;
     }
   }
@@ -1311,7 +1366,7 @@ export class MLEngine {
   /**
    * Sets the engine status and emits a statusChanged event.
    *
-   * @param {"uninitialized" | "ready" | "error" | "closed" | "crashed"} status - The new status of the engine.
+   * @param {"uninitialized" | "ready" | "error" | "closed" | "crashed" | "suspended"} status - The new status of the engine.
    */
   setEngineStatus(status) {
     this.engineStatus = status;
@@ -1444,6 +1499,9 @@ export class MLEngine {
           resourcesBefore,
           resourcesAfter,
         } = data;
+        if (this.#canceledRequests.delete(requestId)) {
+          break;
+        }
         const request = this.#requests.get(requestId);
         if (request) {
           if (error) {
@@ -1453,6 +1511,7 @@ export class MLEngine {
             this.telemetry.recordRunInferenceFailure(error);
             request.reject(error);
           } else if (response) {
+            MLEngine.#consecutiveCrashes.delete(this.engineId);
             this.telemetry.recordRunInferenceSuccessFlow(
               this.engineId,
               response.metrics
@@ -1475,9 +1534,14 @@ export class MLEngine {
       case "EnginePort:EngineTerminated": {
         // The engine was terminated, and if a new run is needed a new port
         // will need to be requested.
-        this.setEngineStatus("closed");
+        this.setEngineStatus(
+          data.idle && this.engineStatus !== "closed" ? "suspended" : "closed"
+        );
         newPortResolvers?.reject(
           new Error("Engine was terminated before initialization completed.")
+        );
+        this.#rejectRequests(
+          new Error("Engine was terminated before the request completed.")
         );
 
         this.discardPort();
@@ -1517,9 +1581,22 @@ export class MLEngine {
   };
 
   /**
+   * Rejects every request still waiting for a response.
+   *
+   * @param {Error} error
+   */
+  #rejectRequests(error) {
+    for (const request of this.#requests.values()) {
+      request.reject(error);
+    }
+    this.#requests.clear();
+  }
+
+  /**
    * Discards the current port and closes the connection.
    */
   discardPort() {
+    this.#canceledRequests.clear();
     if (this.#port !== null) {
       this.#port.postMessage({ type: "EnginePort:Discard" });
       this.#port.close();
@@ -1535,6 +1612,16 @@ export class MLEngine {
    * @returns {Promise<void>} A promise that resolves once the engine is terminated.
    */
   async terminate(shutdown, replacement) {
+    if (this.engineStatus === "suspended") {
+      this.setEngineStatus("closed");
+    }
+    if (this.#liveEnginePromise) {
+      const liveEngine = await this.#liveEnginePromise.catch(() => null);
+      if (liveEngine === this.#ownedLiveEngine) {
+        await liveEngine?.terminate(shutdown, replacement);
+      }
+      this.#liveEnginePromise = null;
+    }
     if (this.#port !== null) {
       lazy.console.debug(`Terminating engine ${this.engineId}`);
       this.#port.postMessage({
@@ -1542,7 +1629,14 @@ export class MLEngine {
         shutdown,
         replacement,
       });
-      await this.#waitForStatus("closed");
+      try {
+        await this.#waitForStatus("closed");
+      } catch (error) {
+        this.#rejectRequests(
+          new Error("Engine was terminated before the request completed.")
+        );
+        throw error;
+      }
     }
   }
 
@@ -1584,12 +1678,63 @@ export class MLEngine {
   }
 
   /**
+   * Returns the live engine for this engine's options, reused or created
+   * through getEngine so holders of the same engineId don't evict each other.
+   *
+   * @returns {Promise<MLEngine<FeatureID>>}
+   */
+  async #resolveLiveEngine() {
+    if (
+      MLEngine.#consecutiveCrashes.get(this.engineId) >= MAX_CONSECUTIVE_CRASHES
+    ) {
+      this.setEngineStatus("crashed");
+      throw new Error(
+        `The inference process crashed ${MAX_CONSECUTIVE_CRASHES} times in a row, not reopening the engine.`
+      );
+    }
+    const liveEnginePromise = lazy.EngineProcess.getMLEngineParent().then(
+      async mlEngineParent => {
+        const existingEngine = MLEngine.getInstance(this.engineId);
+        // Coerce the return type since getEngine can't key off of the engineId.
+        const liveEngine = /** @type {MLEngine<FeatureID>} */ (
+          await mlEngineParent.getEngine({
+            pipelineOptions: this.pipelineOptions,
+            notificationsCallback: this.notificationsCallback,
+            abortSignal: null,
+          })
+        );
+        if (liveEngine !== existingEngine) {
+          this.#ownedLiveEngine = liveEngine;
+        }
+        return liveEngine;
+      }
+    );
+    this.#liveEnginePromise = liveEnginePromise;
+    const liveEngine = await liveEnginePromise;
+    if (this.engineStatus === "closed") {
+      throw new Error("Engine was terminated before the request completed.");
+    }
+    return liveEngine;
+  }
+
+  /**
    * Run the inference request
    *
    * @param {EngineRequests[FeatureID]} request
+   * @param {object} [options]
+   * @param {AbortSignal} [options.signal]
    * @returns {Promise<EngineResponses[FeatureID]>}
    */
-  async run(request) {
+  async run(request, { signal } = {}) {
+    signal?.throwIfAborted();
+    if (this.engineStatus === "suspended") {
+      return (await this.#resolveLiveEngine()).run(request, { signal });
+    }
+    // If the port is null maybe the inference process has shut down
+    if (this.#port === null) {
+      throw new Error("Port does not exist");
+    }
+
     /** @type {PromiseWithResolvers<EngineResponses[FeatureID]>} */
     const resolvers = Promise.withResolvers();
     const requestId = this.#nextRequestId++;
@@ -1604,11 +1749,6 @@ export class MLEngine {
       transferables.push(request.data);
     }
 
-    // If the port is null maybe the inference process has shut down
-    if (this.#port === null) {
-      throw new Error("Port does not exist");
-    }
-
     const beforeRun = ChromeUtils.now();
 
     this.#port.postMessage(
@@ -1621,7 +1761,23 @@ export class MLEngine {
       transferables
     );
 
-    const result = await resolvers.promise;
+    const onAbort = () => {
+      if (this.#requests.get(requestId) !== resolvers) {
+        return;
+      }
+      this.#canceledRequests.add(requestId);
+      this.#requests.delete(requestId);
+      resolvers.reject(signal.reason);
+      this.#port?.postMessage({ type: "EnginePort:Cancel", requestId });
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+
+    let result;
+    try {
+      result = await resolvers.promise;
+    } finally {
+      signal?.removeEventListener("abort", onAbort);
+    }
 
     this.telemetry.recordEngineRun({
       beforeRun,
@@ -1645,7 +1801,15 @@ export class MLEngine {
    */
   async *runWithGenerator(request) {
     lazy.console.debug(`runWithGenerator called for request ${request}`);
+    if (this.engineStatus === "suspended") {
+      return yield* (await this.#resolveLiveEngine()).runWithGenerator(request);
+    }
     const startTime = ChromeUtils.now();
+
+    // If the port is null maybe the inference process has shut down
+    if (this.#port === null) {
+      throw new Error("The port is null");
+    }
 
     // Create a promise to track when the engine has fully completed all runs
     const responseChunkResolvers = new ResponseOrChunkResolvers();
@@ -1676,11 +1840,6 @@ export class MLEngine {
       request.data instanceof ArrayBuffer
     ) {
       transferables.push(request.data);
-    }
-
-    // If the port is null maybe the inference process has shut down
-    if (this.#port === null) {
-      throw new Error("The port is null");
     }
 
     // Send the request to the engine via postMessage with optional transferables

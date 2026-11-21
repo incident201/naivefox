@@ -24,22 +24,16 @@ sealed class ServiceResult {
 /** Describes available interactions with the current device and other devices associated with an [OAuthAccount]. */
 interface DeviceConstellation : Observable<AccountEventsObserver> {
     /**
-     * Perform actions necessary to finalize device initialization following an authentication that may have caused a
-     * change in device keys.
+     * Ensures the [capabilities] advertised for the device & account are up-to-date.
      *
-     * @param config A [DeviceConfig] that describes current device.
+     * It is expected to call this after authentication when the account's scopes or keys may have changed.
+     *
+     * @param capabilities List of capabilities to update. The caller is responsible that the list here are correct
+     *   based on the state of the account. When the account does not have a sync scope/key, then this list should be
+     *   empty.
      * @return [ServiceResult] that tells if the operation was successful.
      */
-    suspend fun finalizeDevice(config: DeviceConfig): ServiceResult
-
-    /**
-     * Initializing the device with the given [config].
-     *
-     * This is expected to be called only once per session.
-     *
-     * @return [ServiceResult] that tells if the operation was successful.
-     */
-    suspend fun initializeDevice(config: DeviceConfig): ServiceResult
+    suspend fun ensureCapabilities(capabilities: Set<DeviceCapability>): ServiceResult
 
     /**
      * Current state of the constellation. May be missing if state was never queried.
@@ -92,9 +86,10 @@ interface DeviceConstellation : Observable<AccountEventsObserver> {
     /**
      * Refreshes [ConstellationState]. Registered [DeviceConstellationObserver] observers will be notified.
      *
+     * @param [ignoreCache] Whether to ignore the cache and refresh from the server.
      * @return A boolean success flag.
      */
-    suspend fun refreshDevices(): Boolean
+    suspend fun refreshDevices(ignoreCache: Boolean = false): Boolean
 
     /**
      * Polls for any pending [DeviceCommandIncoming] commands. In case of new commands, registered
@@ -139,17 +134,23 @@ data class DevicePushSubscription(
  *   changed later via [DeviceConstellation.setDeviceName].
  * @property type Type of a device - mobile, desktop - used for displaying identifying icons on other devices. This
  *   cannot be changed once device record is created.
- * @property capabilities A set of device capabilities, such as SEND_TAB. These capabilities require the sync scope, so
- *   it is important to verify the declared capabilities are usable before using it.
+ * @property capabilities The configured device capabilities, exposed through [getCapabilities].
  * @property secureStateAtRest A flag indicating whether or not to use encrypted storage for the persisted account
  *   state.
  */
 data class DeviceConfig(
     val name: String,
     val type: DeviceType,
-    val capabilities: Set<DeviceCapability>,
+    private val capabilities: Set<DeviceCapability>,
     val secureStateAtRest: Boolean = false,
-)
+) {
+    /**
+     * Returns the configured capabilities when [hasSyncScope] is true, or an empty set otherwise.
+     *
+     * All current device capabilities require the Sync scope.
+     */
+    fun getCapabilities(hasSyncScope: Boolean): Set<DeviceCapability> = if (hasSyncScope) capabilities else emptySet()
+}
 
 /** Capabilities that a [Device] may have. */
 enum class DeviceCapability {

@@ -59,6 +59,7 @@ XPIDL_SOURCES += [
     "nsINetworkConnectivityService.idl",
     "nsINetworkInfoService.idl",
     "nsINetworkInterceptController.idl",
+    "nsINetworkInterface.idl",
     "nsINetworkLinkService.idl",
     "nsINullChannel.idl",
     "nsIParentChannel.idl",
@@ -278,6 +279,10 @@ if not CONFIG["MOZ_NAIVEFOX"]:
         "Dashboard.cpp",
         "ProxyAutoConfig.cpp",
     ]
+
+if CONFIG["MOZ_ENTERPRISE"]:
+    EXPORTS += ["nsNetworkInterface.h"]
+    UNIFIED_SOURCES += ["nsNetworkInterface.cpp"]
 
 if CONFIG["FUZZING"]:
     SOURCES += [

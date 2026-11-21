@@ -152,11 +152,11 @@ abstract class Settings {
     /** Setting to control login autofill. */
     open var loginAutofillEnabled: Boolean by UnsupportedSetting()
 
+    /** Setting to control whether credit card security codes (CVV) are captured from web forms. */
+    open var creditCardSecurityCodeEnabled: Boolean by UnsupportedSetting()
+
     /** Setting to control the Firefox Relay feature state. */
     open var firefoxRelay: Engine.FirefoxRelayMode? by UnsupportedSetting()
-
-    /** Setting to control the IP Protection auth provider ("fxa" or "gpi"). */
-    open var ipProtectionAuthProvider: String? by UnsupportedSetting()
 
     /** Setting to force the ability to scale the content */
     open var forceUserScalableContent: Boolean by UnsupportedSetting()
@@ -313,11 +313,11 @@ data class DefaultSettings(
     override var testingModeEnabled: Boolean = false,
     override var suspendMediaWhenInactive: Boolean = false,
     override var firefoxRelay: Engine.FirefoxRelayMode? = null,
-    override var ipProtectionAuthProvider: String? = null,
     override var fontInflationEnabled: Boolean? = null,
     override var fontSizeFactor: Float? = null,
     override var forceUserScalableContent: Boolean = false,
     override var loginAutofillEnabled: Boolean = false,
+    override var creditCardSecurityCodeEnabled: Boolean = false,
     override var clearColor: Int? = null,
     override var enterpriseRootsEnabled: Boolean = false,
     override var httpsOnlyMode: Engine.HttpsOnlyMode = Engine.HttpsOnlyMode.DISABLED,

@@ -23,6 +23,7 @@
 #include "gc/GCContext-inl.h"
 #include "gc/ObjectKind-inl.h"
 #include "gc/TraceMethods-inl.h"
+#include "vm/JSAtomUtils-inl.h"
 #include "vm/JSContext-inl.h"
 #include "wasm/WasmInstance-inl.h"
 
@@ -111,6 +112,8 @@ static bool AddToEnvironmentMap(JSContext* cx, const JSClass* clasp,
     case BindingKind::Const:
     case BindingKind::Using:
     case BindingKind::NamedLambdaCallee:
+    case BindingKind::Synthetic:
+    case BindingKind::PrivateMethod:
       // Non-writable.
       break;
     default:
@@ -127,6 +130,9 @@ SharedShape* js::CreateEnvironmentShape(JSContext* cx, BindingIter& bi,
                                         ObjectFlags objectFlags) {
   Rooted<SharedPropMap*> map(cx);
   uint32_t mapLength = 0;
+#ifdef DEBUG
+  bool sawNonWritable = false;
+#endif
 
   RootedId id(cx);
   for (; bi; bi++) {
@@ -139,7 +145,47 @@ SharedShape* js::CreateEnvironmentShape(JSContext* cx, BindingIter& bi,
                                &mapLength, &objectFlags)) {
         return nullptr;
       }
+#ifdef DEBUG
+      // Immutable bindings must be stored after all mutable bindings. We rely
+      // on this in WarpOracle::isImmutableEnvironmentSlot.
+      bool writable = map->getPropertyInfo(mapLength - 1).writable();
+      MOZ_ASSERT_IF(sawNonWritable, !writable);
+      if (!writable) {
+        sawNonWritable = true;
+      }
+#endif
     }
+  }
+
+  uint32_t numFixed = gc::GetGCKindSlots(gc::GetGCObjectKind(numSlots));
+  return SharedShape::getInitialOrPropMapShape(cx, cls, cx->realm(),
+                                               TaggedProto(nullptr), numFixed,
+                                               map, mapLength, objectFlags);
+}
+
+static SharedShape* CreateEnvironmentShapeForModuleExports(
+    JSContext* cx, const JSClass* cls, uint32_t numSlots,
+    const ExportNameVector& exportNames) {
+  Rooted<SharedPropMap*> map(cx);
+  uint32_t mapLength = 0;
+
+  PropertyFlags propFlags = {PropertyFlag::Enumerable};
+  ObjectFlags objectFlags = ModuleEnvironmentObject::OBJECT_FLAGS;
+
+  RootedId id(cx);
+  uint32_t slotIndex = numSlots;
+
+  auto addProperty = [&](JSAtom* name) {
+    id = AtomToId(name);
+    return SharedPropMap::addPropertyWithKnownSlot(
+        cx, cls, &map, &mapLength, id, propFlags, slotIndex, &objectFlags);
+  };
+
+  for (JSAtom* exportName : exportNames) {
+    if (!addProperty(exportName)) {
+      return nullptr;
+    }
+    slotIndex++;
   }
 
   uint32_t numFixed = gc::GetGCKindSlots(gc::GetGCObjectKind(numSlots));
@@ -151,39 +197,14 @@ SharedShape* js::CreateEnvironmentShape(JSContext* cx, BindingIter& bi,
 SharedShape* js::CreateEnvironmentShapeForSyntheticModule(
     JSContext* cx, const JSClass* cls, uint32_t numSlots,
     Handle<ModuleObject*> module) {
-  Rooted<SharedPropMap*> map(cx);
-  uint32_t mapLength = 0;
+  return CreateEnvironmentShapeForModuleExports(cx, cls, numSlots,
+                                                module->syntheticExportNames());
+}
 
-  PropertyFlags propFlags = {PropertyFlag::Enumerable};
-  ObjectFlags objectFlags = ModuleEnvironmentObject::OBJECT_FLAGS;
-
-  RootedId id(cx);
-  uint32_t slotIndex = numSlots;
-
-  auto addProperty = [&](PropertyName* name) {
-    id = NameToId(name);
-    return SharedPropMap::addPropertyWithKnownSlot(
-        cx, cls, &map, &mapLength, id, propFlags, slotIndex, &objectFlags);
-  };
-
-  // Add internal *namespace* property.
-  if (!addProperty(cx->names().star_namespace_star_)) {
-    return nullptr;
-  }
-  slotIndex++;
-
-  // Add synthetic exports.
-  for (JSAtom* exportName : module->syntheticExportNames()) {
-    if (!addProperty(exportName->asPropertyName())) {
-      return nullptr;
-    }
-    slotIndex++;
-  }
-
-  uint32_t numFixed = gc::GetGCKindSlots(gc::GetGCObjectKind(numSlots));
-  return SharedShape::getInitialOrPropMapShape(cx, cls, cx->realm(),
-                                               TaggedProto(nullptr), numFixed,
-                                               map, mapLength, objectFlags);
+SharedShape* js::CreateEnvironmentShapeForWasmModule(
+    JSContext* cx, const JSClass* cls, uint32_t numSlots,
+    Handle<ExportNameVector> exportNames) {
+  return CreateEnvironmentShapeForModuleExports(cx, cls, numSlots, exportNames);
 }
 
 template <class DataT>

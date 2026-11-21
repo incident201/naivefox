@@ -444,6 +444,10 @@ var FullScreen = {
       "macOSNativeFullscreen",
       enterFS &&
         AppConstants.platform == "macosx" &&
+        // A locked down kiosk window opts out of native fullscreen, see
+        // gBrowserInit.onBeforeInitialXULLayout().
+        document.documentElement.getAttribute("macnativefullscreen") !=
+          "false" &&
         (Services.prefs.getBoolPref(
           "full-screen-api.macos-native-full-screen"
         ) ||
@@ -533,8 +537,18 @@ var FullScreen = {
       gNavToolbox,
       document.getElementById("vertical-tabs"),
     ];
+    if (
+      !Services.prefs.getBoolPref(
+        "layout.css.anchor-positioning.follows-transforms.enabled"
+      )
+    ) {
+      let searchbar = document.getElementById("searchbar-new");
+      elementsToTranslate.push(gURLBar.panel, searchbar?.panel);
+    }
     for (let element of elementsToTranslate) {
-      element.style.translate = translate;
+      if (element) {
+        element.style.translate = translate;
+      }
     }
     this._currentToolbarShift = shiftSize;
   },
@@ -552,6 +566,9 @@ var FullScreen = {
         break;
       case "MacFullscreenMenubarRevealUpdate":
         this.shiftMacToolbarDown(event.detail);
+        break;
+      case "mouseout":
+        this._onWindowMouseOut(event);
         break;
     }
   },
@@ -703,6 +720,7 @@ var FullScreen = {
       this._collapsedToolboxObserver?.disconnect();
       MousePosTracker.removeListener(this);
       MousePosTracker.removeListener(this._launcherEdgeListener);
+      window.removeEventListener("mouseout", this);
       document.removeEventListener("keypress", this._keyToggleCallback);
       document.removeEventListener("popupshown", this._setPopupOpen);
       document.removeEventListener("popuphidden", this._setPopupOpen);
@@ -983,6 +1001,15 @@ var FullScreen = {
     this.hideNavToolbox();
   },
 
+  // The pointer can leave the window from the toolbox without crossing the
+  // content area, e.g. onto a monitor above it. On macOS that is also how it
+  // reaches the revealed menubar, which should keep the toolbox up.
+  _onWindowMouseOut(aEvent) {
+    if (!aEvent.relatedTarget && !this._menubarShift) {
+      this.hideNavToolbox(true);
+    }
+  },
+
   _keyToggleCallback(aEvent) {
     // if we can use the keyboard (eg Ctrl+L or Ctrl+E) to open the toolbars, we
     // should provide a way to collapse them too.
@@ -1041,13 +1068,13 @@ var FullScreen = {
   updateAutohideMenuitem(aItem) {
     aItem.toggleAttribute(
       "checked",
-      Services.prefs.getBoolPref("browser.fullscreen.autohide")
+      Services.prefs.getBoolPref("browser.fullscreen.autohide", false)
     );
   },
   setAutohide() {
     Services.prefs.setBoolPref(
       "browser.fullscreen.autohide",
-      !Services.prefs.getBoolPref("browser.fullscreen.autohide")
+      !Services.prefs.getBoolPref("browser.fullscreen.autohide", false)
     );
     // Try again to hide toolbar when we change the pref.
     FullScreen.hideNavToolbox(true);
@@ -1125,6 +1152,7 @@ var FullScreen = {
       // transitions, so leaving it be would keep the chrome up for good
       // (bug 2064638).
       this._hover = false;
+      window.addEventListener("mouseout", this);
     }
 
     this._isChromeCollapsed = false;
@@ -1143,7 +1171,14 @@ var FullScreen = {
     if (this._isChromeCollapsed) {
       return;
     }
-    if (!Services.prefs.getBoolPref("browser.fullscreen.autohide")) {
+    // showNavToolbox() returns early for a kiosk window, so toolbars left up
+    // stay up for good. From lockdown level 1 the pref is therefore ignored.
+    // It is off by default on macOS, where honoring it would leave the tab
+    // strip and the URL bar on screen for the whole session.
+    if (
+      gBrowserInit.kioskLockdown < 1 &&
+      !Services.prefs.getBoolPref("browser.fullscreen.autohide", false)
+    ) {
       return;
     }
     // a popup menu is open in chrome: don't collapse chrome
@@ -1225,6 +1260,7 @@ var FullScreen = {
 
     this._mouseTargetRectObserver?.disconnect();
     MousePosTracker.removeListener(this);
+    window.removeEventListener("mouseout", this);
     this._watchLauncherEdge();
 
     // The toolbox can still change height after it has been collapsed, which

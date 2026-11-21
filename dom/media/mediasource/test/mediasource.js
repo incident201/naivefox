@@ -29,7 +29,9 @@ function addMSEPrefs(...prefs) {
 }
 
 async function runWithMSE(testFunction) {
-  await once(window, "load");
+  if (document.readyState !== "complete") {
+    await once(window, "load");
+  }
   await SpecialPowers.pushPrefEnv({ set: gMSETestPrefs });
 
   const ms = new MediaSource();
@@ -249,4 +251,24 @@ function logEvents(el) {
   ].forEach(type =>
     el.addEventListener(type, e => info(`got ${e.type} event`))
   );
+}
+
+// Splits a fragmented MP4 file into the init segment and one media segment per
+// moof.
+function splitIntoFragments(buffer) {
+  const view = new DataView(buffer);
+  const segments = [];
+  let segmentStart = 0;
+  let offset = 0;
+  while (offset < buffer.byteLength) {
+    const size = view.getUint32(offset);
+    const type = String.fromCharCode(...new Uint8Array(buffer, offset + 4, 4));
+    if (type == "moof" && offset > segmentStart) {
+      segments.push(buffer.slice(segmentStart, offset));
+      segmentStart = offset;
+    }
+    offset += size;
+  }
+  segments.push(buffer.slice(segmentStart));
+  return segments;
 }

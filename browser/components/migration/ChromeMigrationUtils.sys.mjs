@@ -10,10 +10,12 @@ ChromeUtils.defineESModuleGetters(lazy, {
   LoginHelper: "resource://gre/modules/LoginHelper.sys.mjs",
   MigrationUtils:
     "moz-src:///browser/components/migration/MigrationUtils.sys.mjs",
+  PlacesUtils: "resource://gre/modules/PlacesUtils.sys.mjs",
 });
 
 const S100NS_FROM1601TO1970 = 0x19db1ded53e8000;
 const S100NS_PER_MS = 10;
+const CHROME_PAGE_TRANSITION_CORE_MASK = 0xff;
 
 export var ChromeMigrationUtils = {
   // Supported browsers with importable logins.
@@ -272,6 +274,19 @@ export var ChromeMigrationUtils = {
 
     const SUB_DIRECTORIES = {
       win: {
+        Arc: [
+          [
+            "LocalAppData",
+            "Packages",
+            // The package family name suffix is a hash of the publisher, so
+            // match on the package name instead of hardcoding it.
+            { prefix: "TheBrowserCompany.Arc_" },
+            "LocalCache",
+            "Local",
+            "Arc",
+            "User Data",
+          ],
+        ],
         Brave: [
           ["LocalAppData", "BraveSoftware", "Brave-Browser", "User Data"],
         ],
@@ -287,6 +302,7 @@ export var ChromeMigrationUtils = {
         Vivaldi: [["LocalAppData", "Vivaldi", "User Data"]],
       },
       macosx: {
+        Arc: [["ULibDir", "Application Support", "Arc", "User Data"]],
         Brave: [
           ["ULibDir", "Application Support", "BraveSoftware", "Brave-Browser"],
         ],
@@ -346,13 +362,56 @@ export var ChromeMigrationUtils = {
           targetPath = Services.dirsvc.get(rootDir, Ci.nsIFile).path;
         }
 
-        targetPath = PathUtils.join(targetPath, ...subfolders.slice(1));
-        if (await IOUtils.exists(targetPath)) {
+        targetPath = await this._resolveSubfolders(
+          targetPath,
+          subfolders.slice(1)
+        );
+        if (targetPath) {
           return targetPath;
         }
       } catch (ex) {
         // The path logic here shouldn't error, so log it:
         console.error(ex);
+      }
+    }
+    return null;
+  },
+
+  /**
+   * Joins path components onto a base path and returns the result if it
+   * exists, or null otherwise.
+   *
+   * @param {string} basePath
+   * @param {Array<string|{prefix: string}>} components
+   *   Path components. A `{ prefix }` component matches any child directory
+   *   whose name starts with that prefix; each match is tried in turn.
+   * @returns {Promise<string|null>}
+   */
+  async _resolveSubfolders(basePath, components) {
+    let index = components.findIndex(c => typeof c !== "string");
+    if (index === -1) {
+      let path = PathUtils.join(basePath, ...components);
+      return (await IOUtils.exists(path)) ? path : null;
+    }
+
+    let parent = PathUtils.join(basePath, ...components.slice(0, index));
+    let { prefix } = components[index];
+    let children;
+    try {
+      children = await IOUtils.getChildren(parent);
+    } catch {
+      return null;
+    }
+    for (let child of children.sort()) {
+      if (!PathUtils.filename(child).startsWith(prefix)) {
+        continue;
+      }
+      let resolved = await this._resolveSubfolders(
+        child,
+        components.slice(index + 1)
+      );
+      if (resolved) {
+        return resolved;
       }
     }
     return null;
@@ -423,6 +482,44 @@ export var ChromeMigrationUtils = {
    */
   dateToChromeTime(aDate) {
     return (aDate * 10000 + S100NS_FROM1601TO1970) / S100NS_PER_MS;
+  },
+
+  /**
+   * Convert a Chrome visit transition to the closest Places transition type.
+   * Only the core transition (the low byte) is considered; qualifier bits are
+   * ignored. The Chrome core transition values are defined in:
+   * https://source.chromium.org/chromium/chromium/src/+/main:ui/base/page_transition_types.h;l=29-113;drc=23246e7a66e250e1221b9488c0ff3a44d83af097
+   *
+   * @param {number|null} chromeTransition
+   *   The `transition` column of the Chrome `visits` table, or null if
+   *   unavailable.
+   * @param {number} typedCount
+   *   The `typed_count` of the URL, used as a fallback when
+   *   `chromeTransition` is null.
+   * @returns {number} One of `PlacesUtils.history.TRANSITIONS`.
+   */
+  chromeTransitionToPlaces(chromeTransition, typedCount) {
+    const { TRANSITIONS } = lazy.PlacesUtils.history;
+    if (chromeTransition == null) {
+      return typedCount > 0 ? TRANSITIONS.TYPED : TRANSITIONS.LINK;
+    }
+    switch (chromeTransition & CHROME_PAGE_TRANSITION_CORE_MASK) {
+      case 1: // TYPED
+      case 5: // GENERATED
+      case 9: // KEYWORD
+      case 10: // KEYWORD_GENERATED
+        return TRANSITIONS.TYPED;
+      case 2: // AUTO_BOOKMARK
+        return TRANSITIONS.BOOKMARK;
+      case 3: // AUTO_SUBFRAME
+        return TRANSITIONS.EMBED;
+      case 4: // MANUAL_SUBFRAME
+        return TRANSITIONS.FRAMED_LINK;
+      case 8: // RELOAD
+        return TRANSITIONS.RELOAD;
+      default:
+        return TRANSITIONS.LINK;
+    }
   },
 
   /**

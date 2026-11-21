@@ -75,7 +75,7 @@ use crate::style_resolver::{PrimaryStyle, ResolvedElementStyles};
 use crate::stylist::Stylist;
 use crate::values::AtomIdent;
 use atomic_refcell::{AtomicRefCell, AtomicRefMut};
-use selectors::matching::{NeedsSelectorFlags, SelectorCaches, VisitedHandlingMode};
+use selectors::matching::{NeedsSelectorFlags, SelectorCaches};
 use smallbitvec::SmallBitVec;
 use smallvec::SmallVec;
 use std::marker::PhantomData;
@@ -210,11 +210,8 @@ impl ValidationData {
     {
         self.pres_hints.get_or_insert_with(|| {
             // This should basically never spill.
-            let mut pres_hints = SmallVec::<[_; 5]>::new();
-            element.synthesize_presentational_hints_for_legacy_attributes(
-                VisitedHandlingMode::AllLinksUnvisited,
-                &mut pres_hints,
-            );
+            let mut pres_hints = SmallVec::<[_; 3]>::new();
+            element.synthesize_presentational_hints_for_legacy_attributes(&mut pres_hints);
             ThinVec::from_iter(pres_hints.drain(..).map(|d| d.source.to_owned()))
         })
     }
@@ -644,6 +641,11 @@ impl<E: TElement> StyleSharingCache<E> {
             return;
         }
 
+        if element.has_unique_presentational_hints() {
+            debug!("Failing to insert into the cache: unique presentational hints");
+            return;
+        }
+
         // If the element has running animations, we can't share style.
         //
         // This is distinct from the specifies_{animations,transitions} check below,
@@ -720,6 +722,14 @@ impl<E: TElement> StyleSharingCache<E> {
 
         if !target.matches_user_and_content_rules() {
             debug!("{:?} Cannot share style: content rules", target.element);
+            return None;
+        }
+
+        if target.element.has_unique_presentational_hints() {
+            debug!(
+                "{:?} Cannot share style: unique presentational hints",
+                target.element
+            );
             return None;
         }
 

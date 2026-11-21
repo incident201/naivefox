@@ -20,12 +20,14 @@ use selectors::parser::PseudoElement as PseudoElementTrait;
 use selectors::{Element, OpaqueElement};
 use servo_arc::{Arc, ArcBorrow};
 use smallvec::SmallVec;
+use std::cell::UnsafeCell;
 use std::collections::{BTreeSet, HashSet};
 use std::fmt::Write;
 use std::iter;
 use std::os::raw::c_void;
 use std::ptr;
 use std::sync::LazyLock;
+use std::sync::atomic::Ordering;
 use style::color::mix::ColorInterpolationMethod;
 use style::color::{AbsoluteColor, ColorComponents, ColorSpace};
 use style::computed_value_flags::ComputedValueFlags;
@@ -229,6 +231,7 @@ pub unsafe extern "C" fn Servo_Initialize(
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn Servo_Shutdown() {
+    drop_deferred_data();
     unsafe {
         DUMMY_URL_DATA = ptr::null_mut();
         DUMMY_CHROME_URL_DATA = ptr::null_mut();
@@ -355,9 +358,6 @@ pub extern "C" fn Servo_TraverseSubtree(
         }
     }
 
-    let needs_animation_only_restyle =
-        element.has_animation_only_dirty_descendants() || element.has_animation_restyle_hints();
-
     let per_doc_data = raw_data.borrow();
     debug_assert!(!per_doc_data.stylist.stylesheets_have_changed());
 
@@ -365,21 +365,6 @@ pub extern "C" fn Servo_TraverseSubtree(
     let guard = global_style_data.shared_lock.read();
 
     let was_initial_style = !element.has_data();
-
-    if needs_animation_only_restyle {
-        debug!(
-            "Servo_TraverseSubtree doing animation-only restyle (aodd={})",
-            element.has_animation_only_dirty_descendants()
-        );
-        traverse_subtree(
-            element,
-            &global_style_data,
-            &per_doc_data,
-            &guard,
-            traversal_flags | TraversalFlags::AnimationOnly,
-            unsafe { &*snapshots },
-        );
-    }
 
     traverse_subtree(
         element,
@@ -391,9 +376,8 @@ pub extern "C" fn Servo_TraverseSubtree(
     );
 
     debug!(
-        "Servo_TraverseSubtree complete (dd={}, aodd={}, lfcd={}, lfc={}, data={:?})",
+        "Servo_TraverseSubtree complete (dd={}, lfcd={}, lfc={}, data={:?})",
         element.has_dirty_descendants(),
-        element.has_animation_only_dirty_descendants(),
         element.descendants_need_frames(),
         element.needs_frame(),
         element.borrow_data().unwrap()
@@ -412,8 +396,11 @@ pub extern "C" fn Servo_TraverseSubtree(
 /// if so, frees them.
 #[unsafe(no_mangle)]
 pub extern "C" fn Servo_MaybeGCRuleTree(raw_data: &PerDocumentStyleData) {
+    debug_assert!(is_main_thread());
     let per_doc_data = raw_data.borrow_mut();
-    per_doc_data.stylist.rule_tree().maybe_gc();
+    unsafe {
+        per_doc_data.stylist.rule_tree().root().maybe_gc();
+    }
 }
 
 #[unsafe(no_mangle)]
@@ -1134,10 +1121,10 @@ pub extern "C" fn Servo_StyleSet_GetBaseComputedValuesForElement(
     };
 
     let doc_data = raw_style_set.borrow();
-    let without_animations_rules = doc_data.stylist.rule_tree().remove_animation_rules(rules);
-    if without_animations_rules == *rules {
+    let Some(without_animations_rules) = doc_data.stylist.rule_tree().remove_animation_rules(rules)
+    else {
         return computed_values.clone_arc().into();
-    }
+    };
 
     let element = GeckoElement(element);
 
@@ -1178,12 +1165,6 @@ fn is_transitionable(prop: PropertyDeclarationId, behavior: computed::Transition
     if !prop.is_animatable() {
         return false;
     }
-    // TODO(bug 1885995): Return `false` in is_discrete_animatable for interpolatable custom
-    // property types.
-    if matches!(prop, PropertyDeclarationId::Custom(..)) {
-        return true;
-    }
-
     match behavior {
         computed::TransitionBehavior::Normal => !prop.is_discrete_animatable(),
         // If transition-behavior is allow-discrete, transitionable is the same as animatable.
@@ -1478,9 +1459,65 @@ pub extern "C" fn Servo_Property_IsDiscreteAnimatable(property: NonCustomCSSProp
     }
 }
 
+static mut DEFERRED_ELEMENT_DATA: UnsafeCell<Vec<Box<data::ElementDataWrapper>>> =
+    UnsafeCell::new(Vec::new());
+
+/// Upper bound on the amount of element data waiting to be dropped. Past it,
+/// element data is dropped synchronously.
+const MAX_DEFERRED_ELEMENT_DATA: usize = 20000;
+
+#[inline]
+fn schedule_deferred_data_drop() -> bool {
+    unsafe {
+        bindings::Gecko_ScheduleIdle(Some(drop_deferred_data), 1000 /* ms */)
+    }
+}
+
+/// Clears the element's style data, potentially deferred until drop_deferred_data() runs.
 #[unsafe(no_mangle)]
 pub extern "C" fn Servo_Element_ClearData(element: &RawGeckoElement) {
-    unsafe { GeckoElement(element).clear_data() };
+    debug_assert!(is_main_thread());
+    let Some(data) = (unsafe { GeckoElement(element).take_data() }) else {
+        return;
+    };
+
+    // As narrow of a static borrow as a it can get.
+    // Ideally we'd use something like [1] but that's not stable yet.
+    //
+    // [1]: https://doc.rust-lang.org/edition-guide/rust-2024/static-mut-references.html#unsafecell-with-sync
+    #[allow(static_mut_refs)]
+    {
+        let deferred = unsafe { DEFERRED_ELEMENT_DATA.get_mut() };
+        if deferred.is_empty() && !schedule_deferred_data_drop() {
+            return;
+        }
+        if deferred.len() < MAX_DEFERRED_ELEMENT_DATA {
+            deferred.push(data);
+            return;
+        }
+    }
+
+    drop_deferred_data();
+}
+
+/// Drops the element data detached by Servo_Element_ClearData.
+extern "C" fn drop_deferred_data() {
+    debug_assert!(is_main_thread());
+    // Similarly, as narrow of a borrow as it can get.
+    #[allow(static_mut_refs)]
+    let old = unsafe { std::mem::take(DEFERRED_ELEMENT_DATA.get_mut()) };
+
+    let mut roots_to_gc = HashSet::new();
+    for data in old {
+        let root = data.borrow().styles.primary().rules().root();
+        roots_to_gc.insert(root);
+        drop(data);
+    }
+    for root in roots_to_gc {
+        unsafe {
+            root.maybe_gc();
+        }
+    }
 }
 
 #[unsafe(no_mangle)]
@@ -2673,7 +2710,6 @@ pub extern "C" fn Servo_NestedDeclarationsRule_SetStyle(
 pub extern "C" fn Servo_DeclarationBlock_IsImmutable(
     declarations: &LockedDeclarationBlock,
 ) -> bool {
-    use std::sync::atomic::Ordering;
     // SAFETY: See StyleSource::mark_in_rule_tree. This boolean is conceptually not part of the
     // locked data, and it's a relaxed atomic, so it's sound to read.
     unsafe {
@@ -4856,14 +4892,13 @@ pub unsafe extern "C" fn Servo_ComputedValues_Inherit(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn Servo_ComputedValues_SpecifiesAnimationsOrTransitions(
-    values: &ComputedValues,
-) -> bool {
+pub extern "C" fn Servo_ComputedValues_NeedsAnimationTraversal(values: &ComputedValues) -> bool {
     let ui = values.get_ui();
     ui.specifies_animations()
         || ui.specifies_transitions()
         || ui.specifies_scroll_timelines()
         || ui.specifies_view_timelines()
+        || ui.specifies_timeline_scope()
 }
 
 #[repr(u8)]
@@ -7039,6 +7074,7 @@ pub unsafe extern "C" fn Servo_DeclarationBlock_SetBackgroundImage(
     declarations: &LockedDeclarationBlock,
     value: &nsACString,
     raw_extra_data: *mut URLExtraData,
+    initiator: url::UrlInitiator,
 ) {
     use style::properties::PropertyDeclaration;
     use style::properties::longhands::background_image::SpecifiedValue as BackgroundImage;
@@ -7059,7 +7095,8 @@ pub unsafe extern "C" fn Servo_DeclarationBlock_SetBackgroundImage(
         None,
         /* attr_taint */ Default::default(),
     );
-    let url = SpecifiedUrl::new_from_untainted_string(string.into(), &context, CorsMode::None);
+    let url =
+        SpecifiedUrl::new_from_untainted_string(string.into(), &context, CorsMode::None, initiator);
     let decl = PropertyDeclaration::BackgroundImage(BackgroundImage(vec![Image::Url(url)].into()));
     write_locked_arc(declarations, |decls: &mut PropertyDeclarationBlock| {
         decls.push(decl, Importance::Normal);
@@ -7368,22 +7405,22 @@ pub extern "C" fn Servo_ResolveStyleLazily(
 
 #[unsafe(no_mangle)]
 pub extern "C" fn Servo_ReparentStyle(
-    style_to_reparent: &ComputedValues,
+    base_style: &ComputedValues,
     parent_style: &ComputedValues,
     layout_parent_style: &ComputedValues,
     element: Option<&RawGeckoElement>,
     raw_data: &PerDocumentStyleData,
 ) -> Strong<ComputedValues> {
-    use style::properties::FirstLineReparenting;
+    use style::properties::CascadeReparenting;
 
     let global_style_data = &*GLOBAL_STYLE_DATA;
     let guard = global_style_data.shared_lock.read();
     let doc_data = raw_data.borrow();
-    let inputs = CascadeInputs::new_from_style(style_to_reparent);
+    let inputs = CascadeInputs::new_from_style(base_style);
     let element = element.map(GeckoElement);
     // We need the pseudo-type to reparent stuff like anonymous boxes, but we don't store pseudo
     // identifiers in the style itself, so if there's no pseudo try the element as well.
-    let pseudo = style_to_reparent
+    let pseudo = base_style
         .pseudo()
         .or_else(|| element.and_then(|e| e.implemented_pseudo_element()));
 
@@ -7396,7 +7433,7 @@ pub extern "C" fn Servo_ReparentStyle(
             &StylesheetGuards::same(&guard),
             Some(parent_style),
             Some(layout_parent_style),
-            FirstLineReparenting::Yes { style_to_reparent },
+            CascadeReparenting::FirstLine { base_style },
             /* try_tactic = */ &Default::default(),
             /* rule_cache = */ None,
             &mut RuleCacheConditions::default(),
@@ -7791,13 +7828,7 @@ pub extern "C" fn Servo_AssertTreeIsClean(root: &RawGeckoElement) {
     debug!("{:?}", ShowSubtreeData(root.as_node()));
 
     fn assert_subtree_is_clean<'le>(el: GeckoElement<'le>) {
-        debug_assert!(
-            !el.has_dirty_descendants() && !el.has_animation_only_dirty_descendants(),
-            "{:?} has still dirty bit {:?} or animation-only dirty bit {:?}",
-            el,
-            el.has_dirty_descendants(),
-            el.has_animation_only_dirty_descendants()
-        );
+        debug_assert!(!el.has_dirty_descendants(), "{:?} has still dirty bit", el);
         for child in el.traversal_children() {
             if let Some(child) = child.as_element() {
                 assert_subtree_is_clean(child);
@@ -8358,12 +8389,12 @@ fn relative_selector_invalidated_at(element: GeckoElement, result: &Invalidation
     }
 }
 
-fn add_relative_selector_attribute_dependency<'a>(
+fn add_relative_selector_attribute_dependency<'a, 'b>(
     element: &GeckoElement<'a>,
     scope: &Option<OpaqueElement>,
     invalidation_map: &'a InvalidationMap,
     attribute: &AtomIdent,
-    collector: &mut RelativeSelectorDependencyCollector<'a, GeckoElement<'a>>,
+    collector: &mut RelativeSelectorDependencyCollector<'a, 'b, GeckoElement<'a>>,
 ) {
     match invalidation_map
         .other_attribute_affecting_selectors
@@ -9214,14 +9245,14 @@ pub extern "C" fn Servo_CssUrl_IsLocalRef(url: &url::CssUrl) -> bool {
     url.is_fragment()
 }
 
-fn relative_selector_dependencies_for_id<'a>(
+fn relative_selector_dependencies_for_id<'a, 'b>(
     old_id: *const nsAtom,
     new_id: *const nsAtom,
     element: &GeckoElement<'a>,
     scope: Option<OpaqueElement>,
     quirks_mode: QuirksMode,
     invalidation_map: &'a InvalidationMap,
-    collector: &mut RelativeSelectorDependencyCollector<'a, GeckoElement<'a>>,
+    collector: &mut RelativeSelectorDependencyCollector<'a, 'b, GeckoElement<'a>>,
 ) {
     [old_id, new_id]
         .iter()
@@ -9240,13 +9271,13 @@ fn relative_selector_dependencies_for_id<'a>(
         });
 }
 
-fn relative_selector_dependencies_for_class<'a>(
+fn relative_selector_dependencies_for_class<'a, 'b>(
     classes_changed: &SmallVec<[Atom; 8]>,
     element: &GeckoElement<'a>,
     scope: Option<OpaqueElement>,
     quirks_mode: QuirksMode,
     invalidation_map: &'a InvalidationMap,
-    collector: &mut RelativeSelectorDependencyCollector<'a, GeckoElement<'a>>,
+    collector: &mut RelativeSelectorDependencyCollector<'a, 'b, GeckoElement<'a>>,
 ) {
     classes_changed.iter().for_each(|atom| {
         match invalidation_map.class_to_selector.get(atom, quirks_mode) {
@@ -9260,12 +9291,12 @@ fn relative_selector_dependencies_for_class<'a>(
     });
 }
 
-fn relative_selector_dependencies_for_custom_state<'a>(
+fn relative_selector_dependencies_for_custom_state<'a, 'b>(
     state: *const nsAtom,
     element: GeckoElement<'a>,
     scope: Option<OpaqueElement>,
     invalidation_map: &'a InvalidationMap,
-    collector: &mut RelativeSelectorDependencyCollector<'a, GeckoElement<'a>>,
+    collector: &mut RelativeSelectorDependencyCollector<'a, 'b, GeckoElement<'a>>,
 ) {
     unsafe {
         AtomIdent::with(state, |atom| {
@@ -10786,7 +10817,6 @@ pub unsafe extern "C" fn Servo_Value_Matches_Syntax(
         &mut input,
         &syntax,
         url_data,
-        None,
         AllowComputationallyDependent::Yes,
         /* attr_taint */ Default::default(),
         property_id_ref,
@@ -11522,6 +11552,7 @@ pub extern "C" fn Servo_GetShadowRootForScoped(
 }
 
 fn compute_arbritrary_substitution_functions(
+    property_id: Option<PropertyIdRef>,
     string: &str,
     element: GeckoElement,
     style: &ComputedValues,
@@ -11536,46 +11567,51 @@ fn compute_arbritrary_substitution_functions(
 
     // Let's check if we have substitution functions (`var()`, `attr()`, `env()`) to handle.
     parser.look_for_arbitrary_substitution_functions(ARBITRARY_SUBSTITUTION_FUNCTIONS);
-    let Ok(variable_value) = VariableValue::parse(
-        &mut parser,
-        Some(&parser_context.namespaces.prefixes),
-        &parser_context.url_data,
-    ) else {
+    let Ok(variable_value) = VariableValue::parse(parser_context, &mut parser) else {
         return None;
     };
 
-    if !parser.seen_arbitrary_substitution_functions() {
+    if !parser.seen_arbitrary_substitution_functions() || !variable_value.has_references() {
         return None;
     }
 
     // Build the attributes Map that ComputedSubstitutionFunctions needs
     let stylist = &data.stylist;
     let mut attribute_tracker = AttributeTracker::new(&element);
+    let mut substitution_functions = custom_properties::ComputedSubstitutionFunctions::new(
+        Some(style.custom_properties().clone()),
+        None,
+    );
     let attributes: style::custom_properties_map::OwnMap = variable_value
         .references
         .refs
         .iter()
         .filter_map(|reference| {
-            let attr = match &reference.function {
-                style::substitution::SubstitutionFunction::Attr(attr) if attr.has_type() => attr,
-                _ => return None,
+            let style::substitution::SubstitutionFunction::Attr(attr) = &reference.function else {
+                return None;
             };
-            let value = attr
-                .value_for_cycle_resolution(&variable_value.url_data, &mut attribute_tracker)
+            let mut replacement_context = style::substitution::SubstitutionReplacementContext::new(
+                None,
+                &substitution_functions,
+                stylist,
+                context,
+                &mut attribute_tracker,
+                parser_context.url_data,
+            );
+            let arg = attr.replace_arg(&variable_value, &mut replacement_context);
+            let arg = arg.value.filter(|arg| arg.has_type())?;
+            let value = arg
+                .name
+                .value_for_cycle_resolution(&mut replacement_context, &variable_value.url_data)
                 .ok()?;
-            Some((attr.name.clone(), Some(value)))
+            Some((arg.name.name.clone(), Some(value)))
         })
         .collect();
-    let substitution_functions = custom_properties::ComputedSubstitutionFunctions::new(
-        Some(style.custom_properties().clone()),
-        Some(attributes),
-    );
+    substitution_functions.attributes = attributes;
 
     let Ok(result) = style::substitution::substitute(
         &variable_value,
-        // TODO(Bug 2071366) - Thread the property being explained through InspectorUtils so
-        // that random() resolves the same way it does in the cascade.
-        None,
+        property_id,
         &substitution_functions,
         stylist,
         &context,
@@ -11654,6 +11690,7 @@ fn dummy_author_style_rule_context() -> ParserContext<'static> {
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn Servo_GetSubstitutedValue(
+    property: &nsACString,
     str: &nsACString,
     raw_element: &RawGeckoElement,
     pseudo_type: PseudoStyleType,
@@ -11665,7 +11702,13 @@ pub unsafe extern "C" fn Servo_GetSubstitutedValue(
     let data = raw_data.borrow();
     let mut context = ContextForSubstitution::new(element, pseudo_type);
     let parser_context = dummy_author_style_rule_context();
+
+    let property = unsafe { property.as_str_unchecked() };
+    let property_id = PropertyId::parse(&property, &parser_context).ok();
+    let property_id_ref = property_id.as_ref().map(PropertyIdRef::from);
+
     match compute_arbritrary_substitution_functions(
+        property_id_ref,
         unsafe { str.as_str_unchecked() },
         element,
         style,
@@ -11685,14 +11728,23 @@ pub unsafe extern "C" fn Servo_GetComputationStepsSupportedCSSFunctions(
     out: &mut nsTArray<nsCString>,
 ) {
     use style::properties::ARBITRARY_SUBSTITUTION_FUNCTIONS;
+    use style::substitution::SubstitutionFunctionKind;
     use style::values::specified::calc::MathFunction;
 
     for func in ARBITRARY_SUBSTITUTION_FUNCTIONS {
-        out.push(nsCString::from(*func));
+        if SubstitutionFunctionKind::from_ident(func).is_ok() {
+            out.push(nsCString::from(*func));
+        }
     }
     for func in MathFunction::variants() {
         out.push(nsCString::from(func.as_ref()));
     }
+}
+
+#[derive(Clone)]
+enum ComputationStepComponent<'a> {
+    Node(style::values::specified::calc::CalcNode),
+    String(&'a str),
 }
 
 #[unsafe(no_mangle)]
@@ -11716,69 +11768,102 @@ pub unsafe extern "C" fn Servo_GetComputationSteps(
     let mut parser_context = dummy_author_style_rule_context();
     let property_id = PropertyId::parse(&property, &parser_context).ok();
     let mut substituted = None;
+    let mut last_computation_step_string;
     let element = GeckoElement(raw_element);
     let data = raw_data.borrow();
     let mut context = ContextForSubstitution::new(element, pseudo_type);
     let context = context.computed_context(&data, style);
 
-    let mut parse_node = |parser_context: &ParserContext| {
-        if let Some(s) = compute_arbritrary_substitution_functions(
+    let property_id_ref = property_id.as_ref().map(PropertyIdRef::from);
+
+    let substitution_result = parser_context.with_property_id(property_id_ref, |parser_context| {
+        compute_arbritrary_substitution_functions(
+            property_id_ref,
             &string,
             element,
             style,
             &data,
-            &parser_context,
+            parser_context,
             &context,
-        ) {
-            // We successfully substituted, let's add the initial string to the result array
-            out.push(nsCString::from(string));
-            // …as well as the substituted string.
-            out.push(nsCString::from(&s));
-            substituted = Some(s.clone());
-        };
+        )
+    });
+    if let Some(s) = substitution_result {
+        // We successfully substituted, let's add the initial string to the result array
+        out.push(nsCString::from(string));
+        // …as well as the substituted string.
+        out.push(nsCString::from(&s));
+        substituted = Some(s.clone());
+    };
 
-        let substituted_str = substituted.as_deref().unwrap_or(&string);
-        let mut parser = Parser::new(substituted_str);
+    let substituted_str = substituted.as_deref().unwrap_or(&string);
+    let mut parser = Parser::new(substituted_str);
 
+    let mut components: Vec<ComputationStepComponent> = Vec::new();
+
+    parser_context.with_property_id(property_id_ref, |parser_context| {
         let flags = CalcParseFlags {
             percentage_context: PercentageContext::allowed(),
             in_place_operations: CalcNodeParseInPlaceOperations::No,
             ..Default::default()
         };
 
-        // Initial parsing
-        Some(match parser.next().ok()? {
-            Token::Function(name) => {
-                let math_func = CalcNode::math_function(&parser_context, name).ok()?;
-                CalcNode::parse(&parser_context, &mut parser, math_func, flags).ok()?
-            },
-            Token::Percentage { unit_value, .. } => CalcNode::Leaf(Leaf::Percentage(
-                CalcPercentageLeaf::new(*unit_value, Optional::None),
-            )),
-            Token::Dimension { value, unit, .. } => {
-                let length =
+        // First we want to parse the whole expression to fill the `components` Vec,
+        // so we can handle space and comma separated expressions
+        while !parser.is_exhausted() {
+            let parser_start_pos = parser.position();
+            let Ok(token) = parser.next_including_whitespace_and_comments() else {
+                break;
+            };
+
+            let node = match token {
+                Token::Comment(_) => continue,
+                Token::Function(name) => match CalcNode::math_function(&parser_context, name) {
+                    Ok(math_func) => {
+                        CalcNode::parse(&parser_context, &mut parser, math_func, flags).ok()
+                    },
+                    Err(_) => {
+                        // This isn't a function we support, we just want to move until
+                        // the closing parenthesis so we can put the whole function text
+                        // in the ComputationStepComponent::String item.
+                        let _ = parser.parse_nested_block(
+                            |_| -> Result<(), CssParseError<BasicParseError>> { Ok(()) },
+                        );
+                        None
+                    },
+                },
+                Token::Percentage { unit_value, .. } => Some(CalcNode::Leaf(Leaf::Percentage(
+                    CalcPercentageLeaf::new(*unit_value, Optional::None),
+                ))),
+                Token::Dimension { value, unit, .. } => {
                     NoCalcLength::parse_dimension_with_context(&parser_context, *value, unit)
-                        .ok()?;
-                CalcNode::Leaf(Leaf::Length(length))
-            },
-            _ => return None,
-        })
-    };
+                        .ok()
+                        .map(|length| CalcNode::Leaf(Leaf::Length(length)))
+                },
+                _ => None,
+            };
 
-    let node = match property_id {
-        Some(ref id) => {
-            parser_context.with_property_declaration(PropertyIdRef::from(id), parse_node)
-        },
-        None => parse_node(&parser_context),
-    };
-    let Some(mut node) = node else {
+            components.push(match node {
+                Some(node) => ComputationStepComponent::Node(node),
+                None => ComputationStepComponent::String(parser.slice_from(parser_start_pos)),
+            });
+        }
+    });
+
+    if components.is_empty()
+        || (
+            // if the expression wasn't substituted, and all the components are strings,
+            // i.e. we can't compute any steps, then we shouldn't return anything.
+            substituted.is_none()
+                && components
+                    .iter()
+                    .all(|c| matches!(c, ComputationStepComponent::String(_)))
+        )
+    {
         return;
-    };
+    }
 
-    let mut value = match node.as_leaf() {
-        Some(l) => l.to_css_string(),
-        None => node.to_css_string(),
-    };
+    // The serialized components are the baseline to detect whether a later step changed something.
+    let value = computation_steps_components_vec_to_css_string(&components);
 
     // If we didn't perform a substitution, we need to add the original string to the
     // output (if we did a substitution, the original string was already added to `out`)
@@ -11792,81 +11877,104 @@ pub unsafe extern "C" fn Servo_GetComputationSteps(
         }
         out.push(nsCString::from(&value));
     }
+    last_computation_step_string = value;
 
-    // Go through the leaves so we have consistent units to run the computation
-    node = node.map_leaves(|leaf| match *leaf {
-        Leaf::Percentage(p) => {
-            // If percentage_basis is NaN, that means we couldn't compute it (see
-            // InspectorUtils.cpp `GetPercentageBasisFor`).
-            if percentage_basis.is_nan() {
-                return leaf.clone();
-            }
+    // Then we'll go over all the components so we can compute steps for the
+    // ComputationStepComponent::Node items.
+    for i in 0..components.len() {
+        let ComputationStepComponent::Node(mut node) = components[i].clone() else {
+            // No need to do anything if we have a ComputationStepComponent::String
+            continue;
+        };
 
-            Leaf::Length(NoCalcLength::from_px(p.get() * percentage_basis))
-        },
-        Leaf::Length(l) => {
-            let result = l.to_computed_value(&context);
-            Leaf::Length(NoCalcLength::from_computed_value(&result))
-        },
-        Leaf::TreeCountingFunction(t) => {
-            let result = t.to_computed_value(&context) as f32;
-            Leaf::Number(NoCalcNumber::from_computed_value(&result))
-        },
-        Leaf::RandomKey(ref key) => {
-            let base_value = *key.to_computed_value(&context) as f32;
-            Leaf::Number(NoCalcNumber::from_computed_value(&base_value))
-        },
-        ref l => l.clone(),
-    });
+        // Go through the leaves so we have consistent units to run the computation
+        node = node.map_leaves(|leaf| match *leaf {
+            Leaf::Percentage(p) => {
+                // If percentage_basis is NaN, that means we couldn't compute it (see
+                // InspectorUtils.cpp `GetPercentageBasisFor`).
+                if percentage_basis.is_nan() {
+                    return leaf.clone();
+                }
 
-    let mut new_value = match node.as_leaf() {
-        Some(l) => l.to_css_string(),
-        None => node.to_css_string(),
-    };
-    if new_value != value {
-        value = new_value;
-        out.push(nsCString::from(&value));
-    }
-
-    // We don't want to call node.simplify_and_sort() since it simplifies the whole tree
-    // in one swoop. We do want to have it done incrementally to have the different steps.
-    // So until we get a single leaf…
-    while node.as_leaf().is_none() {
-        // …use visit_depth_first to get to the first inner non-leaf node
-        let mut res = SimplificationResult::Unchanged;
-        node.visit_depth_first(|n| {
-            // we don't have a way to stop this function to be called, so just bail
-            // out when we already handled a node
-            match res {
-                SimplificationResult::Simplified => return,
-                _ => {},
-            }
-
-            match n.as_leaf() {
-                None => {
-                    res = n.simplify_and_sort_direct_children();
-                },
-                _ => {},
-            }
+                Leaf::Length(NoCalcLength::from_px(p.get() * percentage_basis))
+            },
+            Leaf::Length(l) => {
+                let result = l.to_computed_value(&context);
+                Leaf::Length(NoCalcLength::from_computed_value(&result))
+            },
+            Leaf::TreeCountingFunction(t) => {
+                let result = t.to_computed_value(&context) as f32;
+                Leaf::Number(NoCalcNumber::from_computed_value(&result))
+            },
+            Leaf::RandomKey(ref key) => {
+                let base_value = *key.to_computed_value(&context) as f32;
+                Leaf::Number(NoCalcNumber::from_computed_value(&base_value))
+            },
+            ref l => l.clone(),
         });
 
-        // If we didn't simplify any node during the last call to visit_depth_first,
-        // consider we can't do better and break out of the loop
-        match res {
-            SimplificationResult::Unchanged => return,
-            SimplificationResult::Simplified => {
-                // If we did simplify something, we have a new step to put in our output.
-                new_value = match node.as_leaf() {
-                    Some(l) => l.to_css_string(),
-                    None => node.to_css_string(),
-                };
-                if new_value != value {
-                    value = new_value;
-                    out.push(nsCString::from(&value));
+        // Swap the current item in the Vec with the new node so we can get the correct
+        // step string from computation_steps_components_vec_to_css_string.
+        components[i] = ComputationStepComponent::Node(node.clone());
+        let computation_step_string = computation_steps_components_vec_to_css_string(&components);
+        if computation_step_string != last_computation_step_string {
+            last_computation_step_string = computation_step_string.clone();
+            out.push(nsCString::from(&computation_step_string));
+        }
+
+        // We don't want to call node.simplify_and_sort() since it simplifies the whole tree
+        // in one swoop. We do want to have it done incrementally to have the different steps.
+        // So until we get a single leaf…
+        while node.as_leaf().is_none() {
+            // …use visit_depth_first to get to the first inner non-leaf node
+            let mut res = SimplificationResult::Unchanged;
+            node.visit_depth_first(|n| {
+                // we don't have a way to stop this function to be called, so just bail
+                // out when we already handled a node
+                if matches!(res, SimplificationResult::Simplified) {
+                    return;
                 }
-            },
+
+                if n.as_leaf().is_none() {
+                    res = n.simplify_and_sort_direct_children();
+                }
+            });
+
+            // If we didn't simplify any node during the last call to visit_depth_first,
+            // consider we can't do better and break out of the loop
+            match res {
+                SimplificationResult::Unchanged => {
+                    break;
+                },
+                SimplificationResult::Simplified => {
+                    // Swap the current item in the Vec with the new node so we can get the correct
+                    // step string from computation_steps_components_vec_to_css_string.
+                    components[i] = ComputationStepComponent::Node(node.clone());
+
+                    // If we did simplify something, we have a new step to put in our
+                    // output
+                    let computation_step_string =
+                        computation_steps_components_vec_to_css_string(&components);
+                    if computation_step_string != last_computation_step_string {
+                        last_computation_step_string = computation_step_string.clone();
+                        out.push(nsCString::from(&computation_step_string));
+                    }
+                },
+            }
         }
     }
+}
+
+fn computation_steps_components_vec_to_css_string(vec: &[ComputationStepComponent]) -> String {
+    vec.iter()
+        .map(|component| match component {
+            ComputationStepComponent::Node(node) => match node.as_leaf() {
+                Some(l) => l.to_css_string(),
+                None => node.to_css_string(),
+            },
+            ComputationStepComponent::String(s) => s.to_string(),
+        })
+        .collect()
 }
 
 #[unsafe(no_mangle)]

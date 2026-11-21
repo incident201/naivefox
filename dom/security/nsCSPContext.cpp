@@ -202,7 +202,7 @@ bool nsCSPContext::permitsInternal(
   nsAutoString violatedDirectiveString;
   for (uint32_t p = 0; p < mPolicies.Length(); p++) {
     if (!mPolicies[p]->permits(aDir, aLoadInfo, aContentLocation,
-                               !!aOriginalURIIfRedirect, aSpecific,
+                               aOriginalURIIfRedirect, aSpecific,
                                violatedDirective, violatedDirectiveString)) {
       // If the policy is violated and not report-only, reject the load and
       // report to the console
@@ -488,6 +488,22 @@ nsCSPContext::AppendPolicy(const nsAString& aPolicyString, bool aReportOnly,
   return NS_OK;
 }
 
+// Bug 2072122: Trusted Types readiness experiment only, to be removed.
+Maybe<nsCSPPolicy::Disposition> nsCSPContext::GetStrictPolicyDisposition() {
+  EnsureIPCPoliciesRead();
+  Maybe<nsCSPPolicy::Disposition> result;
+  for (const nsCSPPolicy* policy : mPolicies) {
+    if (!policy->isStrict()) {
+      continue;
+    }
+    if (policy->getDisposition() == nsCSPPolicy::Disposition::Enforce) {
+      return Some(nsCSPPolicy::Disposition::Enforce);
+    }
+    result = Some(nsCSPPolicy::Disposition::Report);
+  }
+  return result;
+}
+
 NS_IMETHODIMP
 nsCSPContext::GetRequireTrustedTypesForDirectiveState(
     RequireTrustedTypesForDirectiveState*
@@ -519,9 +535,8 @@ nsCSPContext::GetAllowsEval(bool* outShouldReportViolation,
 
   for (uint32_t i = 0; i < mPolicies.Length(); i++) {
     if (!(trustedTypesRequired &&
-          mPolicies[i]->allows(SCRIPT_SRC_DIRECTIVE, CSP_TRUSTED_TYPES_EVAL,
-                               u""_ns)) &&
-        !mPolicies[i]->allows(SCRIPT_SRC_DIRECTIVE, CSP_UNSAFE_EVAL, u""_ns)) {
+          mPolicies[i]->allows(SCRIPT_SRC_DIRECTIVE, CSP_TRUSTED_TYPES_EVAL)) &&
+        !mPolicies[i]->allows(SCRIPT_SRC_DIRECTIVE, CSP_UNSAFE_EVAL)) {
       // policy is violated: must report the violation and allow the inline
       // script if the policy is report-only.
       *outShouldReportViolation = true;
@@ -542,9 +557,8 @@ nsCSPContext::GetAllowsWasmEval(bool* outShouldReportViolation,
 
   for (uint32_t i = 0; i < mPolicies.Length(); i++) {
     // Either 'unsafe-eval' or 'wasm-unsafe-eval' can allow this
-    if (!mPolicies[i]->allows(SCRIPT_SRC_DIRECTIVE, CSP_WASM_UNSAFE_EVAL,
-                              u""_ns) &&
-        !mPolicies[i]->allows(SCRIPT_SRC_DIRECTIVE, CSP_UNSAFE_EVAL, u""_ns)) {
+    if (!mPolicies[i]->allows(SCRIPT_SRC_DIRECTIVE, CSP_WASM_UNSAFE_EVAL) &&
+        !mPolicies[i]->allows(SCRIPT_SRC_DIRECTIVE, CSP_UNSAFE_EVAL)) {
       // policy is violated: must report the violation and allow the inline
       // script if the policy is report-only.
       *outShouldReportViolation = true;
@@ -678,7 +692,7 @@ nsCSPContext::GetAllowsInline(CSPDirective aDirective, bool aHasUnsafeHash,
 #endif
 
       // Step 2.1. For each expression of list: [...]
-      if (mPolicies[i]->allows(aDirective, CSP_NONCE, aNonce)) {
+      if (mPolicies[i]->allowsByNonce(aDirective, aNonce)) {
         continue;
       }
     }
@@ -707,15 +721,14 @@ nsCSPContext::GetAllowsInline(CSPDirective aDirective, bool aHasUnsafeHash,
 
     // Step 3. Let unsafe-hashes flag be false.
     // Step 4. For each expression of list: [...]
-    bool unsafeHashesFlag =
-        mPolicies[i]->allows(aDirective, CSP_UNSAFE_HASHES, u""_ns);
+    bool unsafeHashesFlag = mPolicies[i]->allows(aDirective, CSP_UNSAFE_HASHES);
 
     // Step 5. If type is "script" or "style", or unsafe-hashes flag is true:
     //
     // aHasUnsafeHash is true for event handlers (type "script attribute"),
     // style= attributes (type "style attribute") and the javascript: protocol.
     if (!aHasUnsafeHash || unsafeHashesFlag) {
-      if (mPolicies[i]->allows(aDirective, CSP_HASH, content)) {
+      if (mPolicies[i]->allowsByHash(aDirective, content)) {
         continue;
       }
     }
@@ -725,7 +738,7 @@ nsCSPContext::GetAllowsInline(CSPDirective aDirective, bool aHasUnsafeHash,
     bool allowed = false;
     if ((aDirective == SCRIPT_SRC_ELEM_DIRECTIVE ||
          aDirective == SCRIPT_SRC_ATTR_DIRECTIVE) &&
-        mPolicies[i]->allows(aDirective, CSP_STRICT_DYNAMIC, u""_ns)) {
+        mPolicies[i]->allows(aDirective, CSP_STRICT_DYNAMIC)) {
       allowed = !aParserCreated;
     }
 
@@ -803,7 +816,7 @@ nsCSPContext::LogViolationDetails(
   for (uint32_t p = 0; p < mPolicies.Length(); p++) {
     NS_ASSERTION(mPolicies[p], "null pointer in nsTArray<nsCSPPolicy>");
 
-    if (mPolicies[p]->allows(SCRIPT_SRC_DIRECTIVE, keyword, u""_ns)) {
+    if (mPolicies[p]->allows(SCRIPT_SRC_DIRECTIVE, keyword)) {
       continue;
     }
 

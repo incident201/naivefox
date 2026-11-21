@@ -17,6 +17,7 @@
 #include "mozilla/DebugOnly.h"
 #include "mozilla/EventDispatcher.h"
 #include "mozilla/EventStateManager.h"
+#include "mozilla/FocusModel.h"
 #include "mozilla/MappedDeclarationsBuilder.h"
 #include "mozilla/Maybe.h"
 #include "mozilla/MouseEvents.h"
@@ -875,6 +876,10 @@ nsresult HTMLInputElement::InitColorPicker() {
   // GeckoView to handle MozOpenColorPicker and let it keep using its current
   // picker, but for now this is ok.
 #ifndef ANDROID
+  if (EyeDropper()) {
+    OpenEyeDropper();
+    return NS_OK;
+  }
   if (StaticPrefs::dom_forms_html_color_picker_enabled()) {
     OpenColorPicker();
     return NS_OK;
@@ -1352,10 +1357,9 @@ void HTMLInputElement::BeforeSetAttr(int32_t aNameSpaceID, nsAtom* aName,
     }
 
     // When name or type changes, radio should be removed from radio group.
-    // If we are not done creating the radio, we also should not do it.
     if (mType == FormControlType::InputRadio) {
-      if ((aName == nsGkAtoms::name || (aName == nsGkAtoms::type && !mForm)) &&
-          (mForm || mDoneCreating)) {
+      if (aName == nsGkAtoms::name || (aName == nsGkAtoms::type && !mForm)) {
+        mRemovedFromRadioGroupForAttrChange = !!GetCurrentRadioGroupContainer();
         RemoveFromRadioGroup();
       } else if (aName == nsGkAtoms::required) {
         auto* container = GetCurrentRadioGroupContainer();
@@ -1548,10 +1552,13 @@ void HTMLInputElement::AfterSetAttr(int32_t aNameSpaceID, nsAtom* aName,
     }
 
     // When name or type changes, radio should be added to radio group.
-    // If we are not done creating the radio, we also should not do it.
+    // If we are not done creating the radio, we also should not do it, unless
+    // the radio was in a group before the change.
+    const bool wasInRadioGroup = mRemovedFromRadioGroupForAttrChange;
+    mRemovedFromRadioGroupForAttrChange = false;
     if (mType == FormControlType::InputRadio) {
       if ((aName == nsGkAtoms::name || (aName == nsGkAtoms::type && !mForm)) &&
-          (mForm || mDoneCreating)) {
+          (mForm || mDoneCreating || GetParentNode() || wasInRadioGroup)) {
         AddToRadioGroup();
         UpdateValueMissingValidityStateForRadio(false);
         needValidityUpdate = true;
@@ -1628,6 +1635,13 @@ bool HTMLInputElement::Alpha() const {
     return false;
   }
   return HasAttr(nsGkAtoms::alpha);
+}
+
+bool HTMLInputElement::EyeDropper() const {
+  if (!StaticPrefs::dom_input_color_eyedropper_enabled()) {
+    return false;
+  }
+  return HasAttr(nsGkAtoms::eyedropper);
 }
 
 void HTMLInputElement::GetAutocomplete(nsAString& aValue) {
@@ -2511,6 +2525,15 @@ void HTMLInputElement::OpenColorPicker() {
                                       CanBubble::eYes, Cancelable::eYes);
 }
 
+void HTMLInputElement::OpenEyeDropper() {
+  if (NS_WARN_IF(mType != FormControlType::InputColor)) {
+    return;
+  }
+  MOZ_ASSERT(StaticPrefs::dom_input_color_eyedropper_enabled());
+  nsContentUtils::DispatchChromeEvent(this, u"MozOpenEyeDropper"_ns,
+                                      CanBubble::eYes, Cancelable::eYes);
+}
+
 void HTMLInputElement::SetFocusState(bool aIsFocused) {
   if (NS_WARN_IF(!IsDateTimeInputType(mType))) {
     return;
@@ -3150,8 +3173,14 @@ RadioGroupContainer* HTMLInputElement::FindTreeRadioGroupContainer() const {
               ->OwnedRadioGroupContainer();
 }
 
-void HTMLInputElement::DisconnectRadioGroupContainer() {
-  mRadioGroupContainer = nullptr;
+void HTMLInputElement::DisconnectRadioGroupContainer(
+    RadioGroupContainer* aContainer) {
+  MOZ_ASSERT(mRadioGroupContainer == aContainer,
+             "Requested unlink by container that does not really contain this "
+             "element.");
+  if (mRadioGroupContainer == aContainer) {
+    mRadioGroupContainer = nullptr;
+  }
 }
 
 HTMLInputElement* HTMLInputElement::GetSelectedRadioButton() const {
@@ -3889,13 +3918,20 @@ nsresult HTMLInputElement::PostHandleEvent(EventChainPostVisitor& aVisitor) {
 
   bool preventDefault =
       aVisitor.mEventStatus == nsEventStatus_eConsumeNoDefault;
-  if (IsDisabled() && oldType != FormControlType::InputCheckbox &&
-      oldType != FormControlType::InputRadio) {
-    // Behave as if defaultPrevented when the element becomes disabled by event
-    // listeners. Checkboxes and radio buttons should still process clicks for
-    // web compat. See:
-    // https://html.spec.whatwg.org/multipage/input.html#the-input-element:activation-behaviour
-    preventDefault = true;
+  if (IsDisabled()) {
+    if (oldType != FormControlType::InputCheckbox &&
+        oldType != FormControlType::InputRadio) {
+      // Behave as if defaultPrevented when the element becomes disabled by
+      // event listeners. Checkboxes and radio buttons should still process
+      // clicks for web compat. See:
+      // https://html.spec.whatwg.org/multipage/input.html#the-input-element:activation-behaviour
+      preventDefault = true;
+    }
+    if (StaticPrefs::dom_forms_retain_focus_on_disabled_enabled() &&
+        aVisitor.mEvent->AsKeyboardEvent()) {
+      UnsetFlags(HTML_ELEMENT_ACTIVE_FOR_KEYBOARD);
+      preventDefault = true;
+    }
   }
 
   if (NS_SUCCEEDED(rv)) {
@@ -4588,12 +4624,8 @@ void HTMLInputElement::SetupShadowTree(bool aNotify) {
   TextControlElement::SetupShadowTree(*shadow, aNotify);
 }
 
-ShadowRoot* HTMLInputElement::CreateShadowTreeFromLayoutIfNeeded() {
-  if (!CreatesUAShadowTree()) {
-    return nullptr;
-  }
-  auto* existing = GetShadowRoot();
-  if (existing) {
+ShadowRoot* HTMLInputElement::CreateShadowTreeBeforeLayoutIfNeeded() {
+  if (!CreatesUAShadowTree() || GetShadowRoot()) {
     return nullptr;
   }
   if (HasChildren()) [[unlikely]] {
@@ -6649,7 +6681,7 @@ bool HTMLInputElement::IsHTMLFocusable(IsFocusableFlags aFlags,
     return true;
   }
 
-  if (IsDisabled()) {
+  if (!(aFlags & IsFocusableFlags::IgnoreDisabled) && IsDisabled()) {
     *aIsFocusable = false;
     return true;
   }
@@ -6721,7 +6753,7 @@ bool HTMLInputElement::IsHTMLFocusable(IsFocusableFlags aFlags,
 
 template <typename VisitCallback>
 void HTMLInputElement::VisitGroup(VisitCallback&& aCallback, bool aSkipThis) {
-  if (auto* container = GetCurrentRadioGroupContainer()) {
+  if (RefPtr container = GetCurrentRadioGroupContainer()) {
     nsAutoString name;
     GetAttr(nsGkAtoms::name, name);
     container->WalkRadioGroup(name, aCallback, aSkipThis ? this : nullptr);

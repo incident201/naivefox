@@ -24,6 +24,7 @@
 #include "mozilla/CORSMode.h"
 #include "mozilla/CallState.h"
 #include "mozilla/ContentBlockingNotifier.h"
+#include "mozilla/EnumSet.h"
 #include "mozilla/FlushType.h"
 #include "mozilla/FunctionRef.h"
 #include "mozilla/LinkedList.h"
@@ -564,6 +565,25 @@ enum class LoadedAsData : uint8_t {
   // The "loaded as data" case: scripting disabled and CSS loader creation made
   // lazy
   AsData,
+};
+
+// Signals for the security.trusted_types_readiness telemetry.
+// Bug 2072122: Trusted Types readiness experiment only, to be removed.
+enum class TrustedTypesReadinessSignal : uint8_t {
+  UsedHTMLSinkWithTrustedHTML,
+  UsedHTMLSinkWithString,
+  UsedWriteSinkWithTrustedHTML,
+  UsedWriteSinkWithString,
+  CreatedPolicy,
+  UsedPolicy,
+  // A library that eases Trusted Types adoption was detected.
+  HasTrustedTypesLibrary,
+  // Script of the page itself ran: a script element, an event handler
+  // attribute or a javascript: URL.
+  RanScript,
+  // Tracks whether React code looked for the DevTools hook via `typeof` while
+  // that global variable did not exist. Finished by DetectTrustedTypesLibrary.
+  LookedUpReactDevToolsHook,
 };
 
 // Document interface.  This is implemented by all document objects in
@@ -2140,12 +2160,6 @@ class Document : public nsINode,
   MOZ_CAN_RUN_SCRIPT void RunFullscreenSteps();
 
   /**
-   * When Esc key is pressed, cancel the dialog element if the document is
-   * blocked by the dialog or hide popover if popover is shown.
-   */
-  MOZ_CAN_RUN_SCRIPT void HandleEscKey();
-
-  /**
    * Process any active CloseWatchers in the document, such
    * as fullscreen elements, popovers, dialogs.
    */
@@ -2835,18 +2849,7 @@ class Document : public nsINode,
    * Returns whether this document is cookie averse. See
    * https://html.spec.whatwg.org/multipage/dom.html#cookie-averse-document-object
    */
-  bool IsCookieAverse() const {
-    // If we are a document that "has no browsing context."
-    if (!GetInnerWindow()) {
-      return true;
-    }
-
-    // If we are a document "whose URL's scheme is not a network scheme."
-    // NB: Explicitly allow file: URIs to store cookies.
-
-    return !net::SchemeIsHttpOrHttps(NodePrincipal()) &&
-           !NodePrincipal()->SchemeIs("file");
-  }
+  bool IsCookieAverse() const;
 
   bool IsLoadedAsData() const { return mLoadedAsData; }
 
@@ -3541,6 +3544,34 @@ class Document : public nsINode,
     mPageloadEventData.SetDocumentFeature(aFeature);
   }
 
+  // Bug 2072122: Trusted Types readiness experiment only, to be removed.
+  void SetTrustedTypesReadinessSignal(TrustedTypesReadinessSignal aSignal);
+
+  bool HasTrustedTypesReadinessSignal(
+      TrustedTypesReadinessSignal aSignal) const {
+    return mTrustedTypesReadinessSignals.contains(aSignal);
+  }
+
+  // Whether DetectTrustedTypesLibrary is reading the window's globals, so that
+  // its own lookups are not mistaken for a library's.
+  bool IsDetectingTrustedTypesLibrary() const {
+    return mDetectingTrustedTypesLibrary;
+  }
+
+  void RecordTrustedTypesHTMLSink(bool aIsTrustedHTML) {
+    SetTrustedTypesReadinessSignal(
+        aIsTrustedHTML
+            ? TrustedTypesReadinessSignal::UsedHTMLSinkWithTrustedHTML
+            : TrustedTypesReadinessSignal::UsedHTMLSinkWithString);
+  }
+
+  void RecordTrustedTypesWriteSink(bool aIsTrustedHTML) {
+    SetTrustedTypesReadinessSignal(
+        aIsTrustedHTML
+            ? TrustedTypesReadinessSignal::UsedWriteSinkWithTrustedHTML
+            : TrustedTypesReadinessSignal::UsedWriteSinkWithString);
+  }
+
   ContentList* ImageMapList();
 
   // Add aLink to the set of links that need their status resolved.
@@ -3712,6 +3743,9 @@ class Document : public nsINode,
   void GetReferrer(nsACString& aReferrer) const;
   void GetLastModified(nsAString& aLastModified) const;
   void GetReadyState(nsAString& aReadyState) const;
+  Promise* GetParsed(ErrorResult& aRv);
+  Promise* GetContentLoaded(ErrorResult& aRv);
+  Promise* GetLoaded(ErrorResult& aRv);
 
   void GetTitle(nsAString& aTitle);
   void SetTitle(const nsAString& aTitle, ErrorResult& rv);
@@ -4083,6 +4117,17 @@ class Document : public nsINode,
   // Reports document use counters via telemetry.  This method only has an
   // effect once per document, and so is called during document destruction.
   void ReportDocumentUseCounters();
+
+  // Bug 2072122: Trusted Types readiness experiment only, to be removed.
+  // Reports the security.trusted_types_readiness telemetry. Called from
+  // ReportDocumentUseCounters so that it is reported exactly once for every
+  // document counted in use.counter.content_documents_destroyed.
+  void ReportTrustedTypesReadiness();
+
+  // Bug 2072122: Trusted Types readiness experiment only, to be removed.
+  // Detects libraries from the window's globals and from Angular's ng-version
+  // attribute on body or one of its first children.
+  void DetectTrustedTypesLibrary();
 
   // Reports largest contentful paint via telemetry. We want the most up to
   // date value for LCP and so this is called during document destruction.
@@ -4460,15 +4505,10 @@ class Document : public nsINode,
   void OnParsingCompleted();
 
   /**
-   * This method is called when the initial translation
-   * of the document is completed.
-   *
-   * It unblocks the load event if translation was blocking it.
-   *
-   * If the `aL10nCached` is set to `true`, and the document has
-   * a prototype, it will set the `isL10nCached` flag on it.
+   * This method is called when the initial translation of the document is
+   * completed. It unblocks the load event if translation was blocking it.
    */
-  void InitialTranslationCompleted(bool aL10nCached);
+  void InitialTranslationCompleted();
 
   /**
    * Returns whether the document allows localization.
@@ -5054,6 +5094,11 @@ class Document : public nsINode,
 
   void MaybeResolveReadyForIdle();
 
+  // Returns aPromise, creating it if needed. A promise created after the
+  // point it should have been resolved is resolved right away.
+  Promise* GetReadinessPromise(RefPtr<Promise>& aPromise, bool aResolved,
+                               ErrorResult& aRv);
+
   using AutomaticStorageAccessPermissionGrantPromise =
       MozPromise<bool, bool, true>;
   [[nodiscard]] RefPtr<AutomaticStorageAccessPermissionGrantPromise>
@@ -5190,6 +5235,13 @@ class Document : public nsINode,
   DocumentState mState{DocumentState::LTR_LOCALE};
 
   RefPtr<Promise> mReadyForIdle;
+
+  // https://html.spec.whatwg.org/#current-document-readiness
+  // Created lazily by GetParsed(), GetContentLoaded() and GetLoaded(). Reset
+  // when the readyState goes back to "loading".
+  RefPtr<Promise> mParsedPromise;
+  RefPtr<Promise> mContentLoadedPromise;
+  RefPtr<Promise> mLoadedPromise;
 
   // Lazily created in PermissionsPolicy().
   mutable RefPtr<mozilla::dom::PermissionsPolicy> mPermissionsPolicy;
@@ -6089,6 +6141,13 @@ class Document : public nsINode,
   // Collection of data used by the pageload event.
   PageloadEventData mPageloadEventData;
 
+  // Bug 2072122: Trusted Types readiness experiment only, to be removed.
+  EnumSet<TrustedTypesReadinessSignal, uint16_t> mTrustedTypesReadinessSignals;
+  // Whether the pref was on when this document was created. Library detection
+  // only runs while it is on, so earlier documents can't report a wrong lib.
+  bool mRecordTrustedTypesReadiness = false;
+  bool mDetectingTrustedTypesLibrary = false;
+
   // Whether AccumulatePageLoadTelemetry() collected metrics, and whether the
   // tab was foreground when the load event started. Background loads are still
   // reported, but are left out of the paint and load timing histograms, as is
@@ -6163,8 +6222,10 @@ class Document : public nsINode,
 
   bool HasPendingInitialTranslation();
 
-  nsRefPtrHashtable<nsRefPtrHashKey<Element>, nsXULPrototypeElement>
-      mL10nProtoElements;
+  using ElementToProtoMap =
+      nsRefPtrHashtable<nsRefPtrHashKey<Element>, nsXULPrototypeElement>;
+  // The map from untranslated elements to their prototype.
+  ElementToProtoMap mUntranslatedL10nProtoElements;
 
   void LoadEventFired();
 

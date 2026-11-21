@@ -1306,21 +1306,15 @@ gfxFloat gfxTextRun::GetAdvanceWidth(
 
   // Account for all remaining spacing here. This is more efficient than
   // processing it along with the glyphs.
-  if (aProvider && (mFlags & gfx::ShapedTextFlags::TEXT_ENABLE_SPACING)) {
-    uint32_t i;
-    AutoTArray<PropertyProvider::Spacing, 200> spacingBuffer;
-    if (spacingBuffer.AppendElements(aRange.Length(), fallible)) {
-      if (GetAdjustedSpacing(this, ligatureRange, *aProvider,
-                             spacingBuffer.Elements())) {
-        for (i = 0; i < ligatureRange.Length(); ++i) {
-          PropertyProvider::Spacing* space = &spacingBuffer[i];
-          result += space->mBefore + space->mAfter;
-        }
-        if (aSpacing) {
-          aSpacing->mBefore = spacingBuffer[0].mBefore;
-          aSpacing->mAfter = spacingBuffer.LastElement().mAfter;
-        }
-      }
+  AutoTArray<PropertyProvider::Spacing, 200> spacingBuffer;
+  if (GetAdjustedSpacingArray(aRange, aProvider, ligatureRange,
+                              &spacingBuffer)) {
+    for (const PropertyProvider::Spacing& space : spacingBuffer) {
+      result += space.mBefore + space.mAfter;
+    }
+    if (aSpacing) {
+      aSpacing->mBefore = spacingBuffer[0].mBefore;
+      aSpacing->mAfter = spacingBuffer.LastElement().mAfter;
     }
   }
 
@@ -2217,8 +2211,7 @@ bool gfxFontGroup::FamilyFace::EqualsUserFont(
   gfxFontEntry* fe = FontEntry();
   // if there's a font, the entry is the underlying platform font
   if (mFontCreated) {
-    gfxFontEntry* pfe = aUserFont->GetPlatformFontEntry();
-    if (pfe == fe) {
+    if (aUserFont->PlatformFontEntryEquals(fe)) {
       return true;
     }
   } else if (fe == aUserFont) {
@@ -2360,7 +2353,7 @@ already_AddRefed<gfxFont> gfxFontGroup::GetFirstValidFont(
   // we want the first font whose unicode-range does not exclude <space>,
   // regardless of whether it in fact supports the <space> character.
   auto isValidForChar = [](gfxFont* aFont, uint32_t aCh) -> bool {
-    if (!aFont) {
+    if (!aFont || !aFont->Valid()) {
       return false;
     }
     if (aCh == kCSSFirstAvailableFont) {

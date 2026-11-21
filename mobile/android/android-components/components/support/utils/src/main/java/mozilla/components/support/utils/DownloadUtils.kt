@@ -126,6 +126,9 @@ object DownloadUtils {
      */
     private const val MAX_FILE_NAME_LENGTH = 255
 
+    /** The generic file name [extractFileNameFromUrl] falls back to when no file name can be found. */
+    const val DEFAULT_FILE_NAME = "downloadfile"
+
     /**
      * The maximum allowable length for a file name, including the directory path, file extension, and a version suffix
      * (e.g., "(1)"). This value is set to 250 to reserve space for a version suffix up to "(999)" and ensure the total
@@ -227,14 +230,15 @@ object DownloadUtils {
      */
     fun makePdfContentDisposition(filename: String): String {
         val pdfExtension = ".pdf"
-        return if (filename.endsWith(pdfExtension)) {
+        return if (filename.endsWith(pdfExtension, ignoreCase = true)) {
                 filename.substringBeforeLast('.')
             } else {
                 filename
             }
             .take(MAX_FILE_NAME_LENGTH - pdfExtension.length)
+            // Escapes existing quotes and apostrophes, and puts the filename in quotes
             .run {
-                "attachment; filename=$this$pdfExtension;"
+                "attachment; filename=\"${"$this$pdfExtension".replace("\"", "\\\"").replace("'", "\\'")}\";"
             }
     }
 
@@ -243,15 +247,34 @@ object DownloadUtils {
      *
      * @param contentDisposition The 'Content-Disposition' HTTP header value, if available.
      * @param url The URL from which the file is being downloaded.
-     * @return The extracted file name or a default fallback name.
+     * @return The extracted filename, or [DEFAULT_FILE_NAME] when no usable filename is found.
      */
-    fun extractFileNameFromUrl(contentDisposition: String?, url: String?): String {
-        var filename: String? = null
+    fun extractFileNameFromUrl(contentDisposition: String?, url: String?): String =
+        extractFileNameFromUrlOrNull(contentDisposition, url) ?: DEFAULT_FILE_NAME
 
-        // Extract file name from content disposition header field
-        if (contentDisposition != null) {
-            filename = parseContentDisposition(contentDisposition)?.substringAfterLast('/')
+    /**
+     * Extracts a file name from the Content-Disposition header only.
+     *
+     * @param contentDisposition The 'Content-Disposition' HTTP header value.
+     * @return The extracted filename, or null when no usable filename is found.
+     */
+    fun fileNameFromContentDisposition(contentDisposition: String?): String? {
+        if (contentDisposition == null) {
+            return null
         }
+        return parseContentDisposition(contentDisposition)?.substringAfterLast('/')
+    }
+
+    /**
+     * Extracts a file name from either the Content-Disposition header or the URL.
+     *
+     * @param contentDisposition The 'Content-Disposition' HTTP header value, if available.
+     * @param url The URL from which the file is being downloaded.
+     * @return The extracted filename, or null when no usable filename is found.
+     */
+    fun extractFileNameFromUrlOrNull(contentDisposition: String?, url: String?): String? {
+        // Extract file name from content disposition header field
+        var filename: String? = fileNameFromContentDisposition(contentDisposition)
 
         // If all the other http-related approaches failed, use the plain uri
         if (filename.isNullOrEmpty()) {
@@ -264,7 +287,7 @@ object DownloadUtils {
 
         // Finally, if couldn't get filename from URI, get a generic filename
         if (filename.isNullOrEmpty() || filename.startsWith(".")) {
-            filename = "downloadfile"
+            return null
         }
 
         return filename

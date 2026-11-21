@@ -514,6 +514,74 @@ add_task(async function test_handleUpdate_toggle_all_telemetry() {
 });
 
 /**
+ * Test that the prompt and prompt-response events record where the card came
+ * from
+ */
+add_task(async function test_prompt_and_response_entrypoint_telemetry() {
+  const originalPrompt = ToolUITelemetry.recordBrowserActionPrompt;
+  const originalResponse = ToolUITelemetry.recordBrowserActionPromptResponse;
+  let prompts = [];
+  let responses = [];
+  ToolUITelemetry.recordBrowserActionPrompt = data => prompts.push(data);
+  ToolUITelemetry.recordBrowserActionPromptResponse = data =>
+    responses.push(data);
+
+  const showAndCancel = async toolUIData => {
+    const conversation = new ChatConversation({});
+    const message = conversation.addAssistantMessage("text", "Confirm?");
+    message.toolUIData = { toolCallId: "entrypoint", ...toolUIData };
+    ToolUI.handleUIDisplayTelemetry(message.toolUIData, {
+      location: "fullpage",
+      chat_id: conversation.id,
+      message_seq: conversation.messageCount,
+    });
+    await ToolUI.handleUpdate(
+      {
+        messageId: message.id,
+        toolCallId: "entrypoint",
+        updateType: "cancel-tab-selection",
+        updateData: { actionType: toolUIData.properties.actionType },
+      },
+      conversation,
+      null,
+      "fullpage"
+    );
+  };
+
+  try {
+    await showAndCancel({
+      uiType: "tab-group-confirmation",
+      isResumeActivity: true,
+      properties: { actionType: "open_tabs", tabs: [{}, {}] },
+    });
+    await showAndCancel({
+      uiType: "website-confirmation",
+      properties: { actionType: "close_tabs", tabs: [{}] },
+    });
+
+    Assert.deepEqual(
+      prompts.map(({ action, entrypoint }) => ({ action, entrypoint })),
+      [
+        { action: "open_tabs", entrypoint: "resume" },
+        { action: "close_tabs", entrypoint: "browser_action" },
+      ],
+      "The prompt records the card's entrypoint"
+    );
+    Assert.deepEqual(
+      responses.map(({ action, entrypoint }) => ({ action, entrypoint })),
+      [
+        { action: "open_tabs", entrypoint: "resume" },
+        { action: "close_tabs", entrypoint: "browser_action" },
+      ],
+      "The response records the card's entrypoint"
+    );
+  } finally {
+    ToolUITelemetry.recordBrowserActionPrompt = originalPrompt;
+    ToolUITelemetry.recordBrowserActionPromptResponse = originalResponse;
+  }
+});
+
+/**
  * Test that ToolUI.handleUpdate fails confirmation without valid window
  */
 add_task(async function test_handleUpdate_confirmation_no_window() {
@@ -1710,6 +1778,31 @@ add_task(async function test_findOriginalUserPrompt_is_public() {
   );
 });
 
+add_task(
+  async function test_findOriginalUserPrompt_after_several_tool_rounds() {
+    const conversation = new ChatConversation({});
+    const message = "Close my duplicate tabs";
+    conversation.addUserMessage(message, {});
+    conversation.addAssistantMessage("text", "");
+    for (const id of ["call_1", "call_2"]) {
+      conversation.addAssistantMessage("function", {
+        tool_calls: [
+          { id, type: "function", function: { name: "get_open_tabs" } },
+        ],
+      });
+      conversation.addToolCallMessage({ tool_call_id: id, body: [] });
+      conversation.addAssistantMessage("text", "");
+    }
+    const reply = conversation.messages.at(-1);
+
+    Assert.equal(
+      ToolUI.findOriginalUserPrompt(conversation.messages, reply),
+      message,
+      "Finds the prompt from a reply after multiple tool calls"
+    );
+  }
+);
+
 /**
  * Test that originalUserPrompt is added to website confirmations
  */
@@ -2808,14 +2901,14 @@ add_task(async function test_confirm_tab_group_skips_a_closed_tab() {
  * grouped, so we do not end up creating a group that holds only the chat tab
  */
 add_task(async function test_openAndGroupTabs_skips_chat_tab_when_none_group() {
-  const pinnedTab = makeTab("https://example.com/pinned");
+  const closingTab = makeTab("https://example.com/closing");
   const chatTab = makeTab("chrome://browser/content/aiwindow/aiWindow.html");
-  const win = makeWindow([chatTab, pinnedTab], chatTab);
-  pinnedTab.pinned = true;
+  const win = makeWindow([chatTab, closingTab], chatTab);
+  closingTab.closing = true;
 
   const { groupedTabs } = await captureGroupedTabs({
-    resolvedTabs: [pinnedTab],
-    tabs: [{ url: "https://example.com/pinned" }],
+    resolvedTabs: [closingTab],
+    tabs: [{ url: "https://example.com/closing" }],
     window: win,
     label: "L",
     originTab: chatTab,
@@ -2823,7 +2916,7 @@ add_task(async function test_openAndGroupTabs_skips_chat_tab_when_none_group() {
 
   Assert.deepEqual(
     groupedTabs,
-    [pinnedTab],
+    [closingTab],
     "Should not add the chat tab when no requested tab can be grouped"
   );
 });
@@ -2833,14 +2926,14 @@ add_task(async function test_openAndGroupTabs_skips_chat_tab_when_none_group() {
  * grouped
  */
 add_task(async function test_openAndGroupTabs_adds_chat_tab_when_some_group() {
-  const pinnedTab = makeTab("https://example.com/pinned");
+  const closingTab = makeTab("https://example.com/closing");
   const openTab = makeTab("https://example.com/ok");
   const chatTab = makeTab("chrome://browser/content/aiwindow/aiWindow.html");
-  const win = makeWindow([chatTab, pinnedTab, openTab], chatTab);
-  pinnedTab.pinned = true;
+  const win = makeWindow([chatTab, closingTab, openTab], chatTab);
+  closingTab.closing = true;
 
   const { groupedTabs } = await captureGroupedTabs({
-    resolvedTabs: [pinnedTab, openTab],
+    resolvedTabs: [closingTab, openTab],
     tabs: [{ url: "https://example.com/ok" }],
     window: win,
     label: "L",
@@ -2849,9 +2942,38 @@ add_task(async function test_openAndGroupTabs_adds_chat_tab_when_some_group() {
 
   Assert.deepEqual(
     groupedTabs,
-    [chatTab, pinnedTab, openTab],
+    [chatTab, closingTab, openTab],
     "Should add the chat tab when at least one requested tab can be grouped"
   );
+});
+
+/**
+ * Test a pinned or grouped chat tab is not moved into the group
+ */
+add_task(async function test_openAndGroupTabs_keeps_chat_tab_in_place() {
+  for (const [name, state] of [
+    ["pinned", { pinned: true }],
+    ["grouped", { group: { id: "other" } }],
+  ]) {
+    const openTab = makeTab("https://example.com/ok");
+    const chatTab = makeTab("chrome://browser/content/aiwindow/aiWindow.html");
+    const win = makeWindow([chatTab, openTab], chatTab);
+    Object.assign(chatTab, state);
+
+    const { groupedTabs } = await captureGroupedTabs({
+      resolvedTabs: [openTab],
+      tabs: [{ url: "https://example.com/ok" }],
+      window: win,
+      label: "L",
+      originTab: chatTab,
+    });
+
+    Assert.deepEqual(
+      groupedTabs,
+      [openTab],
+      `Should not move a ${name} chat tab`
+    );
+  }
 });
 
 /**
@@ -2859,14 +2981,14 @@ add_task(async function test_openAndGroupTabs_adds_chat_tab_when_some_group() {
  * the user confirmed turns out to be ungroupable
  */
 add_task(async function test_createTabGroup_drops_a_lone_chat_tab() {
-  const groupedTab = makeTab("https://example.com/a");
+  const closingTab = makeTab("https://example.com/a");
   const chatTab = makeTab("chrome://browser/content/aiwindow/aiWindow.html");
-  const win = makeWindow([chatTab, groupedTab]);
-  // The tab the user asked for is already in another group.
-  groupedTab.group = { id: "other" };
+  const win = makeWindow([chatTab, closingTab]);
+  // The tab the user asked for is closing.
+  closingTab.closing = true;
 
   const { selectedTabs, tokenToKey } = registerSelection("lone-chat", [
-    groupedTab,
+    closingTab,
     chatTab,
   ]);
   selectedTabs.at(-1).isChatTab = true;

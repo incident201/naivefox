@@ -28,7 +28,7 @@ import org.mozilla.fenix.wallpapers.Wallpaper.Companion.SUNRISE
 class LegacyWallpaperMigration(
     private val storageRootDirectory: File,
     private val settings: Settings,
-    private val downloadWallpaper: suspend (Wallpaper) -> Wallpaper.ImageFileState,
+    private val downloadWallpaper: suspend (Wallpaper) -> Unit,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     /**
@@ -45,7 +45,7 @@ class LegacyWallpaperMigration(
                 SUNRISE,
                 AMETHYST -> {
                     downloadWallpaper(
-                        Wallpaper.Default.copy(
+                        Wallpaper.Solid.copy(
                             name = wallpaperName,
                             collection = Wallpaper.ClassicFirefoxCollection,
                             thumbnailFileState = Wallpaper.ImageFileState.Unavailable,

@@ -11,6 +11,8 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHasNoClickAction
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -39,6 +41,15 @@ class MenuListItemTest {
         composeTestRule.onNodeWithText(TITLE).assertHasClickAction().performClick()
 
         assertEquals(listOf<MenuEvent>(Clicked), events)
+    }
+
+    @Test
+    fun `GIVEN an item with a click event WHEN clicking it twice in quick succession THEN dispatch that event twice`() {
+        setItem(onClickEvent = Clicked)
+
+        repeat(2) { composeTestRule.onNodeWithText(TITLE).performClick() }
+
+        assertEquals(listOf<MenuEvent>(Clicked, Clicked), events)
     }
 
     @Test
@@ -76,6 +87,30 @@ class MenuListItemTest {
         composeTestRule.onNodeWithText(TITLE).assertHasNoClickAction().performClick()
 
         assertTrue(events.isEmpty())
+    }
+
+    @Test
+    fun `GIVEN an enabled item WHEN reading it THEN announce it as enabled`() {
+        setItem(onClickEvent = Clicked)
+
+        composeTestRule.onNodeWithText(TITLE).assertIsEnabled()
+    }
+
+    @Test
+    fun `GIVEN a disabled item WHEN reading it THEN announce it as disabled`() {
+        setItem(onClickEvent = Clicked, state = MenuItemState.DISABLED)
+
+        composeTestRule.onNodeWithText(TITLE).assertIsNotEnabled()
+    }
+
+    @Test
+    fun `GIVEN a disabled switch WHEN reading it THEN announce it as a disabled switch`() {
+        setItem(onClickEvent = Clicked, role = Role.Switch, state = MenuItemState.DISABLED)
+
+        composeTestRule
+            .onNodeWithText(TITLE)
+            .assertIsNotEnabled()
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Switch))
     }
 
     @Test

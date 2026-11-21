@@ -58,6 +58,7 @@ import mozilla.appservices.places.BookmarkRoot
 import mozilla.components.browser.state.action.MediaSessionAction
 import mozilla.components.browser.state.action.SearchAction
 import mozilla.components.browser.state.action.WebExtensionAction
+import mozilla.components.browser.state.search.SearchAccessPoint
 import mozilla.components.browser.state.search.SearchEngine
 import mozilla.components.browser.state.selector.getNormalOrPrivateTabs
 import mozilla.components.browser.state.selector.selectedTab
@@ -107,7 +108,8 @@ import org.mozilla.fenix.addons.ExtensionsProcessDisabledForegroundController
 import org.mozilla.fenix.automation.AutomatedLaunch
 import org.mozilla.fenix.bindings.ExternalAppLinkStatusBinding
 import org.mozilla.fenix.bindings.HomepageTabBinding
-import org.mozilla.fenix.bindings.SummarizeToolbarHighlightBinding
+import org.mozilla.fenix.bindings.NormalTabToolbarMenuHighlightBinding
+import org.mozilla.fenix.bindings.PendingExtensionUpdateBinding
 import org.mozilla.fenix.bookmarks.DesktopFolders
 import org.mozilla.fenix.browser.BrowserFragment
 import org.mozilla.fenix.browser.BrowserFragmentDirections
@@ -120,6 +122,7 @@ import org.mozilla.fenix.components.accounts.FenixFxAEntryPoint
 import org.mozilla.fenix.components.appstate.AppAction
 import org.mozilla.fenix.components.appstate.AppAction.ShareAction
 import org.mozilla.fenix.components.appstate.OrientationMode
+import org.mozilla.fenix.components.appstate.SupportedMenuNotifications
 import org.mozilla.fenix.components.menu.MenuAccessPoint
 import org.mozilla.fenix.components.menu.share.QRCodeDialogFragment
 import org.mozilla.fenix.components.metrics.BreadcrumbsRecorder
@@ -150,6 +153,7 @@ import org.mozilla.fenix.ext.getIntentSource
 import org.mozilla.fenix.ext.getNavDirections
 import org.mozilla.fenix.ext.hasTopDestination
 import org.mozilla.fenix.ext.isAllowedDuringOnboardingIntent
+import org.mozilla.fenix.ext.isSystemInDarkTheme
 import org.mozilla.fenix.ext.nav
 import org.mozilla.fenix.ext.openSetDefaultBrowserOption
 import org.mozilla.fenix.ext.recordEventInNimbus
@@ -167,6 +171,7 @@ import org.mozilla.fenix.home.intent.OpenHomeIntentProcessor
 import org.mozilla.fenix.home.intent.OpenPasswordManagerIntentProcessor
 import org.mozilla.fenix.home.intent.OpenRecentlyClosedIntentProcessor
 import org.mozilla.fenix.home.intent.OpenSpecificTabIntentProcessor
+import org.mozilla.fenix.home.intent.OpenTabsTrayIntentProcessor
 import org.mozilla.fenix.home.intent.SpeechProcessingIntentProcessor
 import org.mozilla.fenix.home.intent.StartSearchIntentProcessor
 import org.mozilla.fenix.home.topsites.DefaultPinnedSitesBinding
@@ -200,8 +205,8 @@ import org.mozilla.fenix.splashscreen.SplashScreenOperation
 import org.mozilla.fenix.tabhistory.TabHistoryDialogFragment
 import org.mozilla.fenix.theme.DefaultThemeManager
 import org.mozilla.fenix.theme.StatusBarColorManager
-import org.mozilla.fenix.theme.TabStripStatusBarView
 import org.mozilla.fenix.theme.ThemeManager
+import org.mozilla.fenix.theme.getTheme
 import org.mozilla.fenix.translations.TranslationsAIControllableFeatureRegistrar
 import org.mozilla.fenix.translations.TranslationsEnabledSettings
 import org.mozilla.fenix.utils.AccessibilityUtils.announcePrivateModeForAccessibility
@@ -274,6 +279,7 @@ open class HomeActivity : LocaleAwareAppCompatActivity(), NavHostActivity, Crash
                             FxNimbus.features.ipProtection.value().dataLimitGigabyte,
                         )
                 ),
+            repository = components.ipProtection.ipProtectionRepository,
         )
     }
 
@@ -292,6 +298,9 @@ open class HomeActivity : LocaleAwareAppCompatActivity(), NavHostActivity, Crash
         DefaultPinnedSitesBinding(
             browserStore = components.core.store,
             topSitesStorage = components.core.topSitesStorage,
+            pinnedSitesStorage = components.core.pinnedSiteStorage,
+            defaultTopSitesProvider = components.core.defaultTopSitesProvider,
+            blocklistHandler = components.blocklistHandler,
             settings = components.settings,
             resources = resources,
             crashReporter = components.analytics.crashReporter,
@@ -338,10 +347,28 @@ open class HomeActivity : LocaleAwareAppCompatActivity(), NavHostActivity, Crash
         )
     }
 
-    private val summarizeToolbarHighlightBinding by lazy {
-        SummarizeToolbarHighlightBinding(
+    private val pendingExtensionUpdateBinding by lazy {
+        PendingExtensionUpdateBinding(
             appStore = components.appStore,
-            featureDiscoverySettings = components.core.summarizeFeatureSettings,
+            browserStore = components.core.store,
+        )
+    }
+
+    private val summarizeToolbarHighlightBinding by lazy {
+        NormalTabToolbarMenuHighlightBinding(
+            appStore = components.appStore,
+            notification = SupportedMenuNotifications.Summarize,
+            highlight = components.core.summarizeFeatureSettings.toolbarMenuButtonHighlight,
+            browserStore = components.core.store,
+            mainDispatcher = Main,
+        )
+    }
+
+    private val tabGroupsToolbarHighlightBinding by lazy {
+        NormalTabToolbarMenuHighlightBinding(
+            appStore = components.appStore,
+            notification = SupportedMenuNotifications.TabGroups,
+            highlight = components.core.tabGroupDiscoveryFeatureConfiguration.toolbarMenuButtonHighlight,
             browserStore = components.core.store,
             mainDispatcher = Main,
         )
@@ -401,6 +428,7 @@ open class HomeActivity : LocaleAwareAppCompatActivity(), NavHostActivity, Crash
             OpenSpecificTabIntentProcessor(this),
             OpenPasswordManagerIntentProcessor(),
             OpenRecentlyClosedIntentProcessor(),
+            OpenTabsTrayIntentProcessor(browsingModeManager = browsingModeManager),
         )
     }
 
@@ -564,6 +592,7 @@ open class HomeActivity : LocaleAwareAppCompatActivity(), NavHostActivity, Crash
                                 loginsStorage = components.core.passwordsStorage,
                                 tabGroupRepository = components.core.tabGroupRepository,
                                 listenStore = components.listenToPage.store,
+                                listenDebugController = components.listenToPage.debugController,
                             )
                         }
                     } else {
@@ -652,7 +681,9 @@ open class HomeActivity : LocaleAwareAppCompatActivity(), NavHostActivity, Crash
             downloadSnackbar,
             privateBrowsingLockFeature,
             externalAppLinkStatusBinding,
+            pendingExtensionUpdateBinding,
             summarizeToolbarHighlightBinding,
+            tabGroupsToolbarHighlightBinding,
             components.core.summarizationSettingsBinding,
             translationsAIControllableFeatureRegistrar,
             ipProtectionPrompter,
@@ -691,13 +722,6 @@ open class HomeActivity : LocaleAwareAppCompatActivity(), NavHostActivity, Crash
             StatusBarColorManager(
                 themeManager = themeManager,
                 activity = this,
-                appStore = components.appStore,
-                settings = components.settings,
-                tabStripStatusBarView =
-                    TabStripStatusBarView(
-                        rootView = window.decorView as ViewGroup,
-                        lifecycle = lifecycle,
-                    ),
             ),
             true,
         )
@@ -902,13 +926,6 @@ open class HomeActivity : LocaleAwareAppCompatActivity(), NavHostActivity, Crash
         breadcrumb(message = "onStart()")
 
         ProfilerMarkers.homeActivityOnStart(binding.rootContainer, components.core.engine.profiler)
-
-        if (components.settings.longfoxPeekAnimationShownCount < Settings.LONGFOX_PEEK_ANIMATION_MAX_SHOWS) {
-            components.settings.appLaunchCount++
-            components.appStore.dispatch(
-                AppAction.UpdateShowFoxPeekAnimation(components.settings.shouldShowLongfoxPeekAnimationThisTime())
-            )
-        }
 
         components.core.engine.profiler?.addMarker(
             MarkersActivityLifecycleCallbacks.MARKER_NAME,
@@ -1349,7 +1366,6 @@ open class HomeActivity : LocaleAwareAppCompatActivity(), NavHostActivity, Crash
                     event = event,
                     currentFragment = currentFragment,
                     navController = navHost.navController,
-                    isMenuCustomizationEnabled = getSettings().isMenuCustomizationEnabled,
                 )
             ) {
                 return true
@@ -1543,6 +1559,7 @@ open class HomeActivity : LocaleAwareAppCompatActivity(), NavHostActivity, Crash
      * @param flags Flags that will be used when loading the URL (not applied to searches).
      * @param historyMetadata The [HistoryMetadataKey] of the new tab in case this tab was opened from history.
      * @param additionalHeaders The extra headers to use when loading the URL.
+     * @param accessPoint The search access point the search is performed from. Only applies when a search is performed.
      */
     @Deprecated(
         message =
@@ -1560,6 +1577,7 @@ open class HomeActivity : LocaleAwareAppCompatActivity(), NavHostActivity, Crash
         flags: EngineSession.LoadUrlFlags = EngineSession.LoadUrlFlags.none(),
         historyMetadata: HistoryMetadataKey? = null,
         additionalHeaders: Map<String, String>? = null,
+        accessPoint: String = SearchAccessPoint.DEFAULT,
     ) {
         openToBrowser(from, customTabSessionId)
 
@@ -1570,6 +1588,7 @@ open class HomeActivity : LocaleAwareAppCompatActivity(), NavHostActivity, Crash
             private = browsingModeManager.mode.isPrivate,
             searchEngine = engine,
             flags = flags,
+            accessPoint = accessPoint,
             historyMetadata = historyMetadata,
             additionalHeaders = additionalHeaders,
         )
@@ -1670,8 +1689,11 @@ open class HomeActivity : LocaleAwareAppCompatActivity(), NavHostActivity, Crash
             onModeChange = { newMode ->
                 updateSecureWindowFlags(newMode)
 
-                if (::themeManager.isInitialized) {
-                    themeManager.currentTheme = newMode
+                // Browsing mode only determines whether the theme should be private so only update the theme when
+                // private browsing changes.
+                if (::themeManager.isInitialized && newMode.isPrivate != themeManager.isPrivate) {
+                    themeManager.currentTheme =
+                        getTheme(newMode, isSystemInDarkTheme(), components.settings.shouldUseOledTheme)
                 }
 
                 components.appStore.dispatch(AppAction.BrowsingModeManagerModeChanged(mode = newMode))
@@ -1688,7 +1710,10 @@ open class HomeActivity : LocaleAwareAppCompatActivity(), NavHostActivity, Crash
     }
 
     private fun createThemeManager(): ThemeManager {
-        return DefaultThemeManager(browsingModeManager.mode, this)
+        return DefaultThemeManager(
+            getTheme(browsingModeManager.mode, isSystemInDarkTheme(), components.settings.shouldUseOledTheme),
+            this,
+        )
     }
 
     private fun openPopup(webExtensionState: WebExtensionState) {
@@ -1855,6 +1880,7 @@ open class HomeActivity : LocaleAwareAppCompatActivity(), NavHostActivity, Crash
         const val OPEN_TO_BROWSER_AND_LOAD = "open_to_browser_and_load"
         const val LENS_RESULT_URL = "lens_result_url"
         const val OPEN_TO_SEARCH = "open_to_search"
+        const val OPEN_TO_TABS_TRAY = "open_to_tabs_tray"
         const val PRIVATE_BROWSING_MODE = "private_browsing_mode"
         const val START_IN_RECENTS_SCREEN = "start_in_recents_screen"
         const val OPEN_PASSWORD_MANAGER = "open_password_manager"
@@ -1897,26 +1923,16 @@ open class HomeActivity : LocaleAwareAppCompatActivity(), NavHostActivity, Crash
             event: KeyEvent,
             currentFragment: Fragment?,
             navController: NavController,
-            isMenuCustomizationEnabled: Boolean,
         ): Boolean {
             val (expectedDestinationId, directions) =
                 when (currentFragment) {
                     is HomeFragment ->
                         R.id.homeFragment to
-                            when (isMenuCustomizationEnabled) {
-                                true -> HomeFragmentDirections.actionHomeFragmentToMenuFragment(MenuAccessPoint.Home)
-                                else -> NavGraphDirections.actionGlobalMenuDialogFragment(MenuAccessPoint.Home)
-                            }
+                            HomeFragmentDirections.actionHomeFragmentToMenuFragment(MenuAccessPoint.Home)
 
                     is BrowserFragment ->
                         R.id.browserFragment to
-                            when (isMenuCustomizationEnabled) {
-                                true ->
-                                    BrowserFragmentDirections.actionBrowserFragmentToMenuFragment(
-                                        MenuAccessPoint.Browser
-                                    )
-                                else -> NavGraphDirections.actionGlobalMenuDialogFragment(MenuAccessPoint.Browser)
-                            }
+                            BrowserFragmentDirections.actionBrowserFragmentToMenuFragment(MenuAccessPoint.Browser)
 
                     else -> return false
                 }

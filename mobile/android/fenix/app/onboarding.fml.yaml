@@ -2,7 +2,12 @@
 features:
 
   juno-onboarding:
+    no-lint:
+      - DEEP_NESTING  # Messaging is inherently complex and warrants highly structured data.
+
     description: A feature that shows the onboarding flow.
+    contacts:
+      - twhite@mozilla.com
 
     variables:
       conditions:
@@ -12,10 +17,10 @@ features:
           Each entry maps to a valid JEXL expression.
         type: Map<ConditionName, String>
         string-alias: ConditionName
-        default: {
-          ALWAYS: "true",
+        default:
+          ALWAYS: "true"
           NEVER: "false"
-        }
+
       cards:
         description: Collection of user facing onboarding cards.
         type: Map<OnboardingCardKey, OnboardingCardData>
@@ -48,12 +53,22 @@ features:
 
             sync-sign-in:
               card-type: sync-sign-in
+              enabled: false
               ordering: 15
               title: nova_onboarding_sync_title
               body: nova_onboarding_sync_subtitle
               image-res: nova_onboarding_sync
               primary-button-label: nova_onboarding_sync_button
               secondary-button-label: nova_onboarding_negative_button
+
+            sync-pairing:
+              card-type: sync-pairing
+              ordering: 16
+              title: nova_onboarding_sync_pairing_title
+              body: nova_onboarding_sync_pairing_body
+              image-res: nova_onboarding_sync_qr
+              primary-button-label: nova_onboarding_sync_pairing_scan_button
+              secondary-button-label: nova_onboarding_sync_pairing_email_button
 
             marketing:
               card-type: marketing-data
@@ -71,6 +86,8 @@ features:
     description: >
       Feature to enable the continuous onboarding flow. This feature reduces the number of upfront
       onboarding cards and distributes the cards and other prompts progressively over a number of days.
+    contacts:
+      - twhite@mozilla.com
     variables:
       enabled:
         description: If true, the feature is enabled.
@@ -83,6 +100,8 @@ features:
       completed initial onboarding before continuous onboarding was enabled. See
       Onboarding-state-migration-and-reconciliation.md in the onboarding package for the affected
       user cohorts.
+    contacts:
+      - twhite@mozilla.com
     variables:
       enabled:
         description: If true, the feature is enabled.
@@ -96,6 +115,40 @@ features:
         value:
           enabled: true
       - channel: beta
+        value:
+          enabled: true
+
+  onboarding-haptics:
+    no-lint: [MISSING_CONTACTS]
+    description: Feature to enable haptic feedback during onboarding.
+    variables:
+      enabled:
+        description: If true, the feature is enabled.
+        type: Boolean
+        default: false
+    defaults:
+      - channel: developer
+        value:
+          enabled: true
+      - channel: nightly
+        value:
+          enabled: true
+
+  onboarding-kit-animation:
+    no-lint: [MISSING_CONTACTS]
+    description: >
+      Feature to show the animated kit illustration instead of the static one on the onboarding
+      terms of use page.
+    variables:
+      enabled:
+        description: If true, the feature is enabled.
+        type: Boolean
+        default: false
+    defaults:
+      - channel: developer
+        value:
+          enabled: true
+      - channel: nightly
         value:
           enabled: true
 
@@ -264,6 +317,10 @@ enums:
         description: Allows user to set Firefox as the default browser.
       sync-sign-in:
         description: Allows user to sync with a Firefox account.
+      sync-pairing:
+        description: >
+          Lets a user who installed from a pairing campaign link scan the pairing QR code or sign
+          in with email.
       terms-of-service:
         description: Page to display the terms of services.
       marketing-data:

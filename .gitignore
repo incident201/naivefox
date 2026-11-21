@@ -113,7 +113,6 @@ tools/terser/node_modules/
 browser/components/asrouter/node_modules/
 browser/components/aboutwelcome/node_modules/
 browser/extensions/newtab/node_modules/
-tools/ts/node_modules/
 testing/xpcshell/moz-http2/node_modules/
 
 # Ignore newtab component build assets
@@ -433,3 +432,6 @@ CLAUDE.local.md
 # Ignore .json.gz (typically profiles) in the root directory
 # lint-ignore-next-line: git-only
 /*.json.gz
+
+# MFBT test result logs
+mfbt/zmij/test/output

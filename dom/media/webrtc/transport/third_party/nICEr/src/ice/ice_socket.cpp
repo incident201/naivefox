@@ -118,6 +118,14 @@ static void nr_ice_socket_readable_cb(NR_SOCKET s, int how, void *cb_arg)
             break;
 
           case NR_ICE_STUN_SERVER:
+            // A pooled socket has no peer yet and only placeholder
+            // credentials, so it does not answer connectivity checks until a
+            // component takes it and re-keys its STUN server context.
+            if (is_req && sock->component->stream->defer_gathering_events) {
+              r_log(LOG_ICE, LOG_DEBUG, "ICE(%s): ignoring STUN request on a pooled socket from %s",
+                    sock->ctx->label, addr.as_string);
+              break;
+            }
             if(is_req){
               r=nr_stun_server_process_request(sc1->u.server,stun_srv_sock,(char *)buf,len,&addr,NR_STUN_AUTH_RULE_SHORT_TERM);
             }
@@ -244,13 +252,13 @@ int nr_ice_socket_create(nr_ice_ctx *ctx,nr_ice_component *comp, nr_socket *nsoc
   }
 
 
-int nr_ice_socket_destroy(nr_ice_socket **isockp)
+void nr_ice_socket_destroy(nr_ice_socket **isockp)
   {
     nr_ice_stun_ctx *s1,*s2;
     nr_ice_socket *isock;
 
     if(!isockp || !*isockp)
-      return(0);
+      return;
 
     isock=*isockp;
     *isockp=0;
@@ -268,8 +276,6 @@ int nr_ice_socket_destroy(nr_ice_socket **isockp)
     }
 
     free(isock);
-
-    return(0);
   }
 
 int nr_ice_socket_close(nr_ice_socket *isock)

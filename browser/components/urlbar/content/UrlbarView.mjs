@@ -109,6 +109,7 @@ export class UrlbarView {
     // This is used by autoOpen to avoid flickering results when reopening
     // previously abandoned searches.
     this.queryContextCache = new QueryContextCache(5);
+    UrlbarPrefs.addObserver(this);
 
     // We cache l10n strings to avoid Fluent's async lookup.
     this.#l10nCache = new L10nCache();
@@ -157,6 +158,7 @@ export class UrlbarView {
    */
   #canReuseResults(queryContext) {
     return (
+      !this.#resultsInvalidated &&
       queryContext.searchString == this.input.value &&
       queryContext.currentPage == this.#currentPage
     );
@@ -738,7 +740,7 @@ export class UrlbarView {
     // focus) we should discard the telemetry event created when the view was
     // opened.
     if (!this.input.focused && !elementPicked) {
-      this.controller.engagementEvent.discard();
+      this.controller.session.discard();
     }
 
     window.removeEventListener("resize", this);
@@ -915,7 +917,7 @@ export class UrlbarView {
       }
     }
 
-    this.controller.engagementEvent.discard();
+    this.controller.session.discard();
     queryOptions.searchString = this.input.value;
     queryOptions.autofillIgnoresSelection = true;
     queryOptions.interactionType = "returned";
@@ -1039,6 +1041,7 @@ export class UrlbarView {
   onQueryResults(queryContext) {
     this.queryContextCache.put(queryContext);
     this.#queryContext = queryContext;
+    this.#resultsInvalidated = false;
 
     if (!this.isOpen) {
       this.clear();
@@ -1246,6 +1249,27 @@ export class UrlbarView {
   }
 
   /**
+   * Called when a urlbar or urlbar related pref changes.
+   *
+   * @param {string} pref
+   *   The name of the pref. Relative to `browser.urlbar` for urlbar prefs.
+   */
+  onPrefChanged(pref) {
+    if (UrlbarPrefs.affectsResults(pref)) {
+      this.invalidateResults();
+    }
+  }
+
+  /**
+   * Discards the cached query contexts and marks the current results as stale,
+   * so that the view runs a new query the next time it opens.
+   */
+  invalidateResults() {
+    this.queryContextCache.clear();
+    this.#resultsInvalidated = true;
+  }
+
+  /**
    * Passes DOM events for the view to the on_<event type> methods.
    *
    * @param {Event} event
@@ -1284,6 +1308,7 @@ export class UrlbarView {
   #queryWasCancelled = false;
   /** @type {?number} */
   #removeStaleRowsTimer = null;
+  #resultsInvalidated = false;
   /** @type {?UrlbarResult} */
   #resultMenuResult = null;
   /** @type {WeakMap<UrlbarResult, UrlbarResultCommand[]>} */
@@ -1457,7 +1482,7 @@ export class UrlbarView {
 
     // Discard tentative exposures. This is analogous to marking the
     // hypothetical hidden rows of hidden-exposure results as stale.
-    this.controller.engagementEvent.discardTentativeExposures();
+    this.controller.session.discardTentativeExposures();
 
     // Walk rows and find an insertion index for results. To avoid flicker, we
     // skip rows until we find one compatible with the result we want to apply.
@@ -1497,10 +1522,7 @@ export class UrlbarView {
           if (result.isHiddenExposure) {
             // Don't increment `rowIndex` because we're not actually updating
             // the row. We'll visit it again in the next iteration.
-            this.controller.engagementEvent.addExposure(
-              result,
-              this.#queryContext
-            );
+            this.controller.session.addExposure(result, this.#queryContext);
             continue;
           }
 
@@ -1570,19 +1592,17 @@ export class UrlbarView {
           includeHiddenExposures: true,
         });
       let canBeVisible =
-        newSpanCount <= this.#queryContext.maxResults && !seenMisplacedResult;
+        newSpanCount <= this.#queryContext.maxResultsActual &&
+        !seenMisplacedResult;
       if (result.isHiddenExposure) {
         if (canBeVisible) {
-          this.controller.engagementEvent.addExposure(
-            result,
-            this.#queryContext
-          );
+          this.controller.session.addExposure(result, this.#queryContext);
         } else {
           // Add a tentative exposure: The hypothetical row for this
           // hidden-exposure result can't be visible now, but as long as it were
           // not marked stale in a later update, it would be shown when stale
           // rows are removed.
-          this.controller.engagementEvent.addTentativeExposure(
+          this.controller.session.addTentativeExposure(
             result,
             this.#queryContext
           );
@@ -2518,7 +2538,11 @@ export class UrlbarView {
 
     item._content.id = item.id + "-inner";
 
-    item.toggleAttribute("is-top-pick", !!result.isBestMatch);
+    if (result.bestMatchType) {
+      item.setAttribute("top-pick-type", result.bestMatchType);
+    } else {
+      item.removeAttribute("top-pick-type");
+    }
 
     if (result.isBottomUrlSuggestion) {
       this.#updateRowContentForBottomUrl(item, result);
@@ -3138,10 +3162,7 @@ export class UrlbarView {
           (result.type == UrlbarShared.RESULT_TYPE.SEARCH &&
             result.payload.suggestion);
         if (result.exposureTelemetry) {
-          this.controller.engagementEvent.addExposure(
-            result,
-            this.#queryContext
-          );
+          this.controller.session.addExposure(result, this.#queryContext);
         }
 
         for (let target of item.querySelectorAll(
@@ -3389,7 +3410,7 @@ export class UrlbarView {
 
     // Accept tentative exposures. This is analogous to unhiding the
     // hypothetical non-stale hidden rows of hidden-exposure results.
-    this.controller.engagementEvent.acceptTentativeExposures();
+    this.controller.session.acceptTentativeExposures();
   }
 
   #startRemoveStaleRowsTimer() {
@@ -4279,16 +4300,23 @@ export class UrlbarView {
 
   /**
    * The commands that open a result in a new tab or window. They're offered
-   * alongside a result's own menu commands, gated on `contextMenu.featureGate`.
+   * alongside a result's own menu commands, gated on
+   * `resultTargetMenuFeatureGate`.
    *
+   * @param {UrlbarResult} result
    * @returns {UrlbarResultCommand[]}
    */
-  get #openInCommands() {
+  #getOpenInCommands(result) {
+    let isSearch = result.type == UrlbarShared.RESULT_TYPE.SEARCH;
     /** @type {UrlbarResultCommand[]} */
     let commands = [
       {
         openIn: "tab",
-        l10n: { id: "urlbar-view-context-menu-open-in-tab2" },
+        l10n: {
+          id: isSearch
+            ? "urlbar-view-context-menu-search-in-tab"
+            : "urlbar-view-context-menu-open-in-tab2",
+        },
       },
     ];
     if (
@@ -4298,17 +4326,29 @@ export class UrlbarView {
       commands.push({
         openIn: "container-tab",
         submenu: true,
-        l10n: { id: "urlbar-view-context-menu-open-in-container-tab2" },
+        l10n: {
+          id: isSearch
+            ? "urlbar-view-context-menu-search-in-container-tab"
+            : "urlbar-view-context-menu-open-in-container-tab2",
+        },
       });
     }
     commands.push(
       {
         openIn: "window",
-        l10n: { id: "urlbar-view-context-menu-open-in-window2" },
+        l10n: {
+          id: isSearch
+            ? "urlbar-view-context-menu-search-in-window"
+            : "urlbar-view-context-menu-open-in-window2",
+        },
       },
       {
         openIn: "private-window",
-        l10n: { id: "urlbar-view-context-menu-open-in-private-window2" },
+        l10n: {
+          id: isSearch
+            ? "urlbar-view-context-menu-search-in-private-window"
+            : "urlbar-view-context-menu-open-in-private-window2",
+        },
       }
     );
     return commands;
@@ -4351,7 +4391,7 @@ export class UrlbarView {
    */
   #canOpenInNewTarget(result) {
     return (
-      UrlbarPrefs.get("contextMenu.featureGate") &&
+      UrlbarPrefs.get("resultTargetMenuFeatureGate") &&
       this.input.handlesOpenInCommands &&
       result.type != UrlbarShared.RESULT_TYPE.TAB_SWITCH &&
       !!UrlbarShared.getLoadRequestFromResult(result)
@@ -4374,7 +4414,7 @@ export class UrlbarView {
   #getMenuCommands(result, { showSkipMenuWithTabItem = false } = {}) {
     let commands = this.#getResultMenuCommands(result);
     if (this.#canOpenInNewTarget(result)) {
-      let openInCommands = this.#openInCommands;
+      let openInCommands = this.#getOpenInCommands(result);
       commands = commands
         ? [...openInCommands, { name: "separator" }, ...commands]
         : openInCommands;
@@ -4491,6 +4531,8 @@ export class UrlbarView {
       if (data.type == "checkbox") {
         menuitem.type = "checkbox";
         menuitem.checked = data.checked;
+      } else {
+        menuitem.toggleAttribute("no-icon", true);
       }
       panel.appendChild(menuitem);
     }
@@ -4553,6 +4595,7 @@ export class UrlbarView {
   #createContainerMenuItem(l10nId, onPick) {
     let menuitem = document.createElement("panel-item");
     document.l10n.setAttributes(menuitem, l10nId);
+    menuitem.toggleAttribute("no-icon", true);
     menuitem.addEventListener("click", onPick);
     return menuitem;
   }
@@ -4907,11 +4950,18 @@ export class UrlbarView {
 
   on_hidden(event) {
     if (event.target != event.currentTarget) {
+      // Ignore submenus.
       return;
     }
-    event.currentTarget.lastAnchorNode
-      ?.closest(".urlbarView-row")
-      ?.toggleAttribute("menu-trigger", false);
+
+    let row = event.detail.anchorNode?.closest(".urlbarView-row");
+    // If the row isn't still the menu trigger, remove the attribute.
+    if (
+      !this.resultMenu.open ||
+      row != this.resultMenu.lastAnchorNode?.closest(".urlbarView-row")
+    ) {
+      row?.toggleAttribute("menu-trigger", false);
+    }
   }
 
   on_contextmenu(event) {
@@ -4925,7 +4975,7 @@ export class UrlbarView {
 
     event.preventDefault();
 
-    if (!UrlbarPrefs.get("contextMenu.featureGate")) {
+    if (!UrlbarPrefs.get("contextMenuFeatureGate")) {
       return;
     }
 

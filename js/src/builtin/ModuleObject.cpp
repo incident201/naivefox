@@ -28,6 +28,7 @@
 #include "vm/SharedStencil.h"  // js::GCThingIndex
 #include "vm/StringType.h"     // js::IdToPrintableUTF8
 #include "wasm/WasmJS.h"       // js::WasmModuleObject
+#include "wasm/WasmModule.h"   // js::wasm::Module
 
 #include "gc/GCContext-inl.h"
 #include "gc/StableCellHasher-inl.h"
@@ -177,9 +178,36 @@ ModuleObject* ResolvedBindingObject::module() const {
   return &value.toObject().as<ModuleObject>();
 }
 
+BindingNameType ResolvedBindingObject::bindingNameType() const {
+  Value value = getReservedSlotTyped(BINDING_NAME_SLOT);
+  if (value.isString()) {
+    return BindingNameType::String;
+  }
+  return static_cast<BindingNameType>(value.toInt32());
+}
+
+bool ResolvedBindingObject::isNamespace() const {
+  return bindingNameType() != BindingNameType::String;
+}
+
 JSAtom* ResolvedBindingObject::bindingName() const {
+  MOZ_ASSERT(bindingNameType() == BindingNameType::String);
   Value value = getReservedSlotTyped(BINDING_NAME_SLOT);
   return &value.toString()->asAtom();
+}
+
+ImportPhase ResolvedBindingObject::namespacePhase() const {
+  MOZ_ASSERT(isNamespace());
+  return bindingNameType() == BindingNameType::DeferredNamespace
+             ? ImportPhase::Deferred
+             : ImportPhase::Evaluation;
+}
+
+bool ResolvedBindingObject::isSameBinding(
+    const ResolvedBindingObject* other) const {
+  return module() == other->module() &&
+         getReservedSlotTyped(BINDING_NAME_SLOT) ==
+             other->getReservedSlotTyped(BINDING_NAME_SLOT);
 }
 
 /* static */
@@ -198,6 +226,25 @@ ResolvedBindingObject* ResolvedBindingObject::create(
 
   self->initReservedSlotTyped(MODULE_SLOT, ObjectValue(*module));
   self->initReservedSlotTyped(BINDING_NAME_SLOT, StringValue(bindingName));
+  return self;
+}
+
+/* static */
+ResolvedBindingObject* ResolvedBindingObject::createNamespace(
+    JSContext* cx, Handle<ModuleObject*> module, ImportPhase phase) {
+  MOZ_ASSERT(phase == ImportPhase::Evaluation ||
+             phase == ImportPhase::Deferred);
+  ResolvedBindingObject* self =
+      NewObjectWithGivenProto<ResolvedBindingObject>(cx, nullptr);
+  if (!self) {
+    return nullptr;
+  }
+
+  BindingNameType type = phase == ImportPhase::Deferred
+                             ? BindingNameType::DeferredNamespace
+                             : BindingNameType::Namespace;
+  self->initReservedSlotTyped(MODULE_SLOT, ObjectValue(*module));
+  self->initReservedSlotTyped(BINDING_NAME_SLOT, Int32Value(int32_t(type)));
   return self;
 }
 
@@ -329,8 +376,20 @@ IndirectBindingMap::Binding::Binding(ModuleEnvironmentObject* environment,
     : environment(environment),
 #ifdef DEBUG
       targetName(targetName),
+      isReservedSlot(false),
 #endif
       prop(prop) {
+}
+
+IndirectBindingMap::Binding::Binding(ModuleEnvironmentObject* environment,
+                                     uint32_t slot)
+    : environment(environment),
+#ifdef DEBUG
+      targetName(JS::PropertyKey::Void()),
+      isReservedSlot(true),
+#endif
+      prop({PropertyFlag::Enumerable}, slot) {
+  MOZ_ASSERT(ModuleEnvironmentObject::isNamespaceSlot(slot));
 }
 
 void IndirectBindingMap::trace(JSTracer* trc) {
@@ -351,15 +410,28 @@ void IndirectBindingMap::trace(JSTracer* trc) {
 }
 
 bool IndirectBindingMap::put(JSContext* cx, HandleId name,
-                             Handle<ModuleEnvironmentObject*> environment,
-                             HandleId targetName) {
+                             Handle<ResolvedBindingObject*> binding) {
+  Rooted<ModuleEnvironmentObject*> environment(
+      cx, &binding->module()->initialEnvironment());
+  if (binding->isNamespace()) {
+    uint32_t slot =
+        ModuleEnvironmentObject::namespaceSlotIndex(binding->namespacePhase());
+    return putBinding(cx, name, Binding(environment, slot));
+  }
+
+  RootedId targetName(cx, AtomToId(binding->bindingName()));
+  mozilla::Maybe<PropertyInfo> prop = environment->lookup(cx, targetName);
+  MOZ_ASSERT(prop.isSome());
+  return putBinding(cx, name, Binding(environment, targetName, *prop));
+}
+
+bool IndirectBindingMap::putBinding(JSContext* cx, HandleId name,
+                                    Binding&& binding) {
   if (!map_) {
     map_.emplace(cx->zone());
   }
 
-  mozilla::Maybe<PropertyInfo> prop = environment->lookup(cx, targetName);
-  MOZ_ASSERT(prop.isSome());
-  if (!map_->put(name, Binding(environment, targetName, *prop))) {
+  if (!map_->put(name, std::move(binding))) {
     ReportOutOfMemory(cx);
     return false;
   }
@@ -380,8 +452,14 @@ bool IndirectBindingMap::lookup(jsid name, ModuleEnvironmentObject** envOut,
 
   const Binding& binding = ptr->value();
   MOZ_ASSERT(binding.environment);
-  MOZ_ASSERT(
-      binding.environment->containsPure(binding.targetName, binding.prop));
+#ifdef DEBUG
+  if (binding.isReservedSlot) {
+    MOZ_ASSERT(ModuleEnvironmentObject::isNamespaceSlot(binding.prop.slot()));
+  } else {
+    MOZ_ASSERT(
+        binding.environment->containsPure(binding.targetName, binding.prop));
+  }
+#endif
   *envOut = binding.environment;
   *propOut = Some(binding.prop);
   return true;
@@ -506,18 +584,14 @@ bool ModuleNamespaceObject::hasBindings() const {
 
 bool ModuleNamespaceObject::addBinding(JSContext* cx,
                                        Handle<JSAtom*> exportedName,
-                                       Handle<ModuleObject*> targetModule,
-                                       Handle<JSAtom*> targetName) {
-  Rooted<ModuleEnvironmentObject*> environment(
-      cx, &targetModule->initialEnvironment());
+                                       Handle<ResolvedBindingObject*> binding) {
   RootedId exportedNameId(cx, AtomToId(exportedName));
-  RootedId targetNameId(cx, AtomToId(targetName));
-  return bindings().put(cx, exportedNameId, environment, targetNameId);
+  return bindings().put(cx, exportedNameId, binding);
 }
 
 constexpr char ModuleNamespaceObject::ProxyHandler::family = 0;
 
-static void ReportUninitializedModuleBinding(JSContext* cx, HandleId id) {
+void js::ReportUninitializedModuleBinding(JSContext* cx, HandleId id) {
   // Module export names are property keys and may not be identifier names,
   // so use IdIsPropertyKey rather than IdIsIdentifier.
   if (UniqueChars printable =
@@ -1308,6 +1382,25 @@ JSObject* ModuleObject::moduleSource() const {
   return &value.toObject();
 }
 
+bool ModuleObject::isWasmModule() const {
+  JSObject* source = moduleSource();
+  return source && source->is<WasmModuleObject>();
+}
+
+#ifdef NIGHTLY_BUILD
+JSObject* ModuleObject::wasmInstance() const {
+  Value value = getReservedSlotTyped(WASM_INSTANCE_SLOT);
+  if (value.isUndefined()) {
+    return nullptr;
+  }
+  return &value.toObject();
+}
+
+void ModuleObject::setWasmInstance(JSObject* instance) {
+  setReservedSlotTyped(WASM_INSTANCE_SLOT, ObjectValue(*instance));
+}
+#endif
+
 void ModuleObject::initAsyncSlots(JSContext* cx, bool hasTopLevelAwait,
                                   Handle<ListObject*> asyncParentModules) {
   cyclicModuleFields()->hasTopLevelAwait = hasTopLevelAwait;
@@ -1400,9 +1493,11 @@ const char* ModuleObject::filename() const {
   }
   ScriptSourceObject* sso = cyclicModuleFields()->scriptSourceObject;
   if (!sso->hasSource()) {
-    // TODO: Bug 2030454: Return the wasm module filename once we support
-    // evaluation phase imports.
-    return "(unknown)";
+    MOZ_ASSERT(isWasmModule());
+    const wasm::Module& module =
+        moduleSource()->as<WasmModuleObject>().module();
+    const char* source = module.codeMeta().scriptedCaller().source.get();
+    return source ? source : "(unknown)";
   }
   return sso->source()->filename();
 }
@@ -1682,6 +1777,11 @@ bool ModuleObject::execute(JSContext* cx, Handle<ModuleObject*> self) {
     return false;
   }
 #endif
+#ifdef NIGHTLY_BUILD
+  if (self->isWasmModule()) {
+    return WasmModuleExecute(cx, self);
+  }
+#endif
 
   RootedScript script(cx, self->script());
 
@@ -1773,9 +1873,8 @@ bool ModuleObject::createSyntheticEnvironment(JSContext* cx,
     return false;
   }
 
-  // We expect one property per synthetic value plus one for the *namespace*
-  // binding.
-  MOZ_ASSERT(env->shape()->propMapLength() == values.length() + 1);
+  // We expect one property per synthetic value.
+  MOZ_ASSERT(env->shape()->propMapLength() == values.length());
 
   for (uint32_t i = 0; i < values.length(); i++) {
     env->setAliasedBinding(env->firstSyntheticValueSlot() + i, values[i]);
@@ -1787,13 +1886,37 @@ bool ModuleObject::createSyntheticEnvironment(JSContext* cx,
 }
 
 /* static */
+void ModuleObject::initWasmExportBindings(JSContext* cx,
+                                          Handle<ModuleObject*> self,
+                                          JS::HandleVector<Value> values) {
+  Rooted<ModuleEnvironmentObject*> env(cx, &self->initialEnvironment());
+
+  // The exports occupy the slots after the reserved slots.
+  MOZ_ASSERT(env->slotSpan() ==
+             env->firstSyntheticValueSlot() + values.length());
+
+  for (uint32_t i = 0; i < values.length(); i++) {
+    env->setAliasedBinding(env->firstSyntheticValueSlot() + i, values[i]);
+  }
+}
+
+/* static */
 bool ModuleObject::createWasmEnvironment(JSContext* cx,
-                                         Handle<ModuleObject*> self) {
+                                         Handle<ModuleObject*> self,
+                                         Handle<ExportNameVector> exportNames) {
   Rooted<ModuleEnvironmentObject*> env(
-      cx, ModuleEnvironmentObject::createForWasmModule(cx, self));
+      cx, ModuleEnvironmentObject::createForWasmModule(cx, self, exportNames));
   if (!env) {
     return false;
   }
+
+  // The export bindings are immutable and remain uninitialized until the
+  // module is executed, so that reading one before then is a reference error.
+  for (uint32_t slot = env->firstSyntheticValueSlot(); slot < env->slotSpan();
+       slot++) {
+    env->setAliasedBinding(slot, MagicValue(JS_UNINITIALIZED_LEXICAL));
+  }
+
   self->setInitialEnvironment(env);
   return true;
 }

@@ -222,6 +222,20 @@ object ToolbarSelectors : SelectorContainer {
             description = "Simple toolbar summarize pages button",
         )
 
+    val SIMPLE_TOOLBAR_NEW_TAB_BUTTON =
+        Selector(
+            strategy = SelectorStrategy.COMPOSE_BY_CONTENT_DESCRIPTION,
+            value = getStringResource(R.string.home_screen_shortcut_open_new_tab_2),
+            description = "Simple toolbar new tab button",
+        )
+
+    val EDIT_SHORTCUT_BUTTON =
+        Selector(
+            strategy = SelectorStrategy.COMPOSE_BY_CONTENT_DESCRIPTION,
+            value = getStringResource(R.string.toolbar_shortcut_menu_edit_option),
+            description = "Edit shortcut button",
+        )
+
     val SITE_INFO_BUTTON =
         Selector(
             strategy = SelectorStrategy.UIAUTOMATOR_WITH_DESCRIPTION_CONTAINS,
@@ -262,9 +276,10 @@ object ToolbarSelectors : SelectorContainer {
             groups = setOf(Group.HOME_SCREEN_TOOLBAR),
         )
 
+    // Substring to support selecting Reader View whether "Listen to Page" is enabled or disabled.
     val READER_VIEW_BUTTON =
         Selector(
-            strategy = SelectorStrategy.COMPOSE_BY_CONTENT_DESCRIPTION,
+            strategy = SelectorStrategy.COMPOSE_BY_CONTENT_DESCRIPTION_SUBSTRING,
             value = getStringResource(R.string.browser_menu_read),
             description = "Reader view toolbar button",
         )

@@ -7,6 +7,8 @@
 #include <stdint.h>
 
 #include <algorithm>
+#include <cstdint>
+#include <ios>
 #include <iterator>
 #include <set>
 #include <sstream>
@@ -425,12 +427,25 @@ nsTArray<RefPtr<dom::RTCStatsPromise>> RTCRtpSender::GetStatsInternal(
               mozalloc_handle_oom(0);
             }
 
-            // TODO(bug 1804678): Use RTCAudioSourceStats
-            if (audioStats) {
-              RTCMediaSourceStats mediaSourceStats;
-              constructCommonMediaSourceStats(mediaSourceStats);
-              if (!report->mMediaSourceStats.AppendElement(
-                      std::move(mediaSourceStats), fallible)) {
+            if (audioStats && !trackName.IsEmpty()) {
+              RTCAudioSourceStats audioSourceStats;
+              constructCommonMediaSourceStats(audioSourceStats);
+              constexpr auto kMaxRawAudio =
+                  std::numeric_limits<decltype(audioStats->audio_level)>::max();
+              static_assert(
+                  std::is_same_v<decltype(audioStats->audio_level), int16_t>,
+                  "audio_level must be int16_t");
+              audioSourceStats.mAudioLevel.Construct(
+                  std::clamp(audioStats->audio_level, static_cast<int16_t>(0),
+                             kMaxRawAudio) /
+                  static_cast<double>(kMaxRawAudio));
+
+              audioSourceStats.mTotalAudioEnergy.Construct(
+                  audioStats->total_input_energy);
+              audioSourceStats.mTotalSamplesDuration.Construct(
+                  audioStats->total_input_duration);
+              if (!report->mAudioSourceStats.AppendElement(
+                      std::move(audioSourceStats), fallible)) {
                 mozalloc_handle_oom(0);
               }
             }
@@ -998,9 +1013,9 @@ already_AddRefed<Promise> RTCRtpSender::SetParameters(
   // If the media stack is successfully configured with parameters,
   // queue a task to run the following steps:
   GetMainThreadSerialEventTarget()->Dispatch(NS_NewRunnableFunction(
-      __func__,
-      [this, self = RefPtr<RTCRtpSender>(this), p, paramsCopy, serialNumber,
-       keyFrameRids = std::move(keyFrameRids)]() mutable {
+      __func__, [this, self = RefPtr<RTCRtpSender>(this), p,
+                 paramsCopy = std::move(paramsCopy), serialNumber,
+                 keyFrameRids = std::move(keyFrameRids)]() mutable {
         // Requested here so it reaches the call thread after the new config.
         if (keyFrameRids && mPipeline) {
           mPipeline->mConduit->AsVideoSessionConduit().apply(
@@ -1011,7 +1026,7 @@ already_AddRefed<Promise> RTCRtpSender::SetParameters(
         // Set sender.[[LastReturnedParameters]] to null.
         mLastReturnedParameters = Nothing();
         // Set sender.[[SendEncodings]] to parameters.encodings.
-        mParameters.mEncodings = paramsCopy.mEncodings;
+        mParameters.mEncodings = std::move(paramsCopy.mEncodings);
         UpdateRestorableEncodings(mParameters.mEncodings);
         // If we had a valid degradation preference passed in store it in
         // mParameters so we can return it if needed via GetParameters calls.

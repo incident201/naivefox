@@ -167,6 +167,7 @@ export const UrlbarShared = {
       "clearL10nCache",
       "clearTopSitesCache",
       "close",
+      "invalidateResults",
       "startTail150",
       "updateResultMenuCommands",
     ]),
@@ -184,12 +185,10 @@ export const UrlbarShared = {
     RESTRICT_TAG: 6,
     RESTRICT_OPENPAGE: 7,
     RESTRICT_SEARCH: 8,
-    RESTRICT_TITLE: 9,
-    RESTRICT_URL: 10,
-    RESTRICT_ACTION: 11,
+    RESTRICT_ACTION: 9,
     // `looksLikeOrigin()` returned `LOOKS_LIKE_ORIGIN.OTHER` for this token.
     // It may or may not be an origin.
-    POSSIBLE_ORIGIN_BUT_SEARCH_ALLOWED: 12,
+    POSSIBLE_ORIGIN_BUT_SEARCH_ALLOWED: 10,
   }),
 
   /**
@@ -207,8 +206,6 @@ export const UrlbarShared = {
     TAG: "+",
     OPENPAGE: "%",
     SEARCH: "?",
-    TITLE: "#",
-    URL: "$",
     ACTION: ">",
   }),
 
@@ -372,6 +369,14 @@ export const UrlbarShared = {
   // Size in `px` of icons in top-pick rows in the view. Should be kept in sync
   // with the `--urlbarview-top-pick-icon-size` CSS variable.
   TOP_PICK_ICON_SIZE: 58,
+
+  // Possible best-match types for results. These types map to the
+  // `top-pick-type` attribute that `UrlbarView` sets on rows.
+  BEST_MATCH_TYPE: {
+    NONE: "",
+    SMALL: "small",
+    LARGE: "large",
+  },
 
   // The number of results by which Page Up/Down move the selection.
   PAGE_UP_DOWN_DELTA: 5,
@@ -575,11 +580,10 @@ export const UrlbarShared = {
       return logger;
     }
 
-    let fullPrefix = `URLBar${prefix ? " - " + prefix : ""}`;
     if (console.createInstance) {
-      logger = createLoggerChrome(fullPrefix, maxLogLevelPref);
+      logger = createLoggerChrome(prefix, maxLogLevelPref);
     } else {
-      logger = createLoggerContent(fullPrefix, maxLogLevelPref);
+      logger = createLoggerContent(prefix, maxLogLevelPref);
     }
     loggers.set(prefix, logger);
     return logger;
@@ -1881,14 +1885,19 @@ export const UrlbarShared = {
 };
 
 /**
- * Create a logger that uses `console.createInstance`.
+ * Create a logger that uses `console.createInstance`
+ * and logs to the "URLBar" MOZ_LOG module.
  *
- * @param {string} prefix
+ * @param {string} prefix Can be empty, for no prefix.
  * @param {string} maxLogLevelPref
  * @returns {Console}
  */
 function createLoggerChrome(prefix, maxLogLevelPref) {
-  let logger = console.createInstance({ prefix, maxLogLevelPref });
+  let logger = console.createInstance({
+    logModule: "URLBar",
+    prefix,
+    maxLogLevelPref,
+  });
   // Casting from ConsoleInstance to Console. Note that it is technically not a
   // `Console` because it is missing the chrome-only property `createInstance`.
   return /** @type {Console} */ (/** @type {unknown} */ (logger));
@@ -1897,12 +1906,17 @@ function createLoggerChrome(prefix, maxLogLevelPref) {
 /**
  * Create a logger that uses the global `console`.
  *
- * @param {string} prefix
+ * Its tag matches the MOZ_LOG output of the "URLBar" module, but it logs to
+ * the "console" module, and the "URLBar" module doesn't control it: the
+ * `console.createInstance` that names a module is chrome-only, so a content
+ * realm can't create a console that logs to it.
+ *
+ * @param {string} prefix Can be empty, for no prefix.
  * @param {string} maxLogLevelPref
  * @returns {Console}
  */
 function createLoggerContent(prefix, maxLogLevelPref) {
-  let tag = `[${prefix}]`;
+  let tag = prefix ? `URLBar: ${prefix}:` : "URLBar:";
   const LEVEL_NUMBERS = {
     all: 0,
     trace: 1,

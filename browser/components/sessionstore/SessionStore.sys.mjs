@@ -101,14 +101,10 @@
  * @typedef {object} ClosedTabsOptions
  *   Selects the windows to include closed tabs from.
  * @property {BrowserWindow} [sourceWindow]
- *   The window to include closed tabs from when `closedTabsFromAllWindows` is
- *   false. When `private` is not set, this window's privateness is used.
- *   Defaults to the top window.
- * @property {boolean} [private]
- *   Restricts the query to private windows (true) or to non-private windows
- *   (false). Defaults to the privateness of `sourceWindow`.
- * @property {boolean} [closedTabsFromAllWindows]
- *   Overrides the `browser.sessionstore.closedTabsFromAllWindows` pref.
+ *   The window to include closed tabs from when the
+ *   `browser.sessionstore.closedTabsFromAllWindows` pref is false. Its
+ *   privateness selects private or non-private windows. Defaults to the top
+ *   window.
  * @property {boolean} [closedTabsFromClosedWindows]
  *   Overrides the `browser.sessionstore.closedTabsFromClosedWindows` pref.
  */
@@ -321,6 +317,11 @@ const BROWSER_STARTUP_RESUME_SESSION = 3;
 // Used by SessionHistoryListener.
 const kNoIndex = Number.MAX_SAFE_INTEGER;
 const kLastIndex = Number.MAX_SAFE_INTEGER - 1;
+
+const WARN_LEVEL_FORGET_SAVED_GROUP_REASONS = new Set([
+  "unknown",
+  "deferred-session-restored",
+]);
 
 import { PrivateBrowsingUtils } from "resource://gre/modules/PrivateBrowsingUtils.sys.mjs";
 
@@ -944,6 +945,9 @@ class _SessionStore {
           );
 
           this.#savedGroups = state?.savedGroups ?? [];
+          this.#log.debug(
+            `initSession, loaded ${this.#savedGroups.length} saved groups: [${this.#savedGroups.map(g => g.id).join(", ")}]`
+          );
         } catch (ex) {
           decision.initError = ex.name;
           this.#log.error("The session file is invalid: ", ex);
@@ -2628,81 +2632,24 @@ class _SessionStore {
       //
       // We end spinning once:
       // 1. the flush duration exceeds 10 seconds before DELAY_CRASH_MS, or
-      // 2. 'oop-frameloader-crashed' (issued by BrowserParent::ActorDestroy
-      //    on abnormal frame shutdown) is observed, or
-      // 3. 'ipc:content-shutdown' (issued by ContentParent::ActorDestroy on
-      //    abnormal shutdown) is observed, or
-      // 4. #flushAllWindowsAsync completes (hopefully the normal case).
+      // 2. #flushAllWindowsAsync completes (hopefully the normal case).
+      //
+      // A content process crash does not end the wait. The flushes of the
+      // affected browsers settle, and the other browsers still flush.
 
       Glean.sessionRestore.shutdownType.async.add(1);
 
-      // Set up the list of promises that will signal a complete sessionstore
-      // shutdown: either all data is saved, or we crashed or the message IPC
-      // channel went away in the meantime.
-      let promises = [this.#flushAllWindowsAsync(progress)];
-
-      const observeTopic = topic => {
-        let deferred = Promise.withResolvers();
-        const observer = subject => {
-          // Skip abort on ipc:content-shutdown if not abnormal/crashed
-          subject.QueryInterface(Ci.nsIPropertyBag2);
-          switch (topic) {
-            case "ipc:content-shutdown":
-              if (subject.get("abnormal")) {
-                this.#log.debug(
-                  "Observed abnormal ipc:content-shutdown during shutdown"
-                );
-                Glean.sessionRestore.shutdownFlushAllOutcomes.abnormal_content_shutdown.add(
-                  1
-                );
-                deferred.resolve();
-              }
-              break;
-            case "oop-frameloader-crashed":
-              this.#log.debug(`Observed topic: ${topic} during shutdown`);
-              Glean.sessionRestore.shutdownFlushAllOutcomes.oop_frameloader_crashed.add(
-                1
-              );
-              deferred.resolve();
-              break;
-          }
-        };
-        const cleanup = () => {
-          try {
-            Services.obs.removeObserver(observer, topic);
-          } catch (ex) {
-            this.#log.error("Exception whilst flushing all windows", ex);
-          }
-        };
-        Services.obs.addObserver(observer, topic);
-        deferred.promise.then(cleanup, cleanup);
-        return deferred;
-      };
-
-      // Build a list of deferred executions that require cleanup once the
-      // Promise race is won.
       // Ensure that the timer fires earlier than the AsyncShutdown crash timer.
       let waitTimeMaxMs = Math.max(
         0,
         lazy.AsyncShutdown.DELAY_CRASH_MS - 10000
       );
-      let defers = [
-        this.#looseTimer(waitTimeMaxMs),
-
-        // FIXME: We should not be aborting *all* flushes when a single
-        // content process crashes here.
-        observeTopic("oop-frameloader-crashed"),
-        observeTopic("ipc:content-shutdown"),
-      ];
-      // Add these monitors to the list of Promises to start the race.
-      promises.push(...defers.map(deferred => deferred.promise));
+      let timer = this.#looseTimer(waitTimeMaxMs);
 
       let isDone = false;
-      Promise.race(promises)
+      Promise.race([this.#flushAllWindowsAsync(progress), timer.promise])
         .then(() => {
-          // When a Promise won the race, make sure we clean up the running
-          // monitors.
-          defers.forEach(deferred => deferred.reject());
+          timer.reject();
         })
         .finally(() => {
           isDone = true;
@@ -4271,30 +4218,25 @@ class _SessionStore {
 
   /**
    * @param {ClosedTabsOptions} [aOptions]
-   * @returns {ClosedTabsOptions}
+   * @returns {Required<ClosedTabsOptions> &
+   *   {private: boolean, closedTabsFromAllWindows: boolean}}
    *   The options with every property filled in.
    */
   #prepareClosedTabOptions(aOptions = {}) {
-    const sourceOptions = Object.assign(
-      {
-        closedTabsFromAllWindows: this.#closedTabsFromAllWindowsEnabled,
-        closedTabsFromClosedWindows: this.#closedTabsFromClosedWindowsEnabled,
-        sourceWindow: null,
-      },
-      aOptions
-    );
-    if (!sourceOptions.sourceWindow) {
-      sourceOptions.sourceWindow = this.#getTopWindow(sourceOptions.private);
-    }
+    const sourceOptions = {
+      closedTabsFromAllWindows: this.#closedTabsFromAllWindowsEnabled,
+      closedTabsFromClosedWindows:
+        aOptions.closedTabsFromClosedWindows ??
+        this.#closedTabsFromClosedWindowsEnabled,
+      sourceWindow: aOptions.sourceWindow || this.#getTopWindow(),
+      private: false,
+    };
     /*
     _getTopWindow may return null on MacOS when the last window has been closed.
     Since private browsing windows are irrelevant after they have been closed we
     don't need to check if it was a private browsing window.
     */
-    if (!sourceOptions.sourceWindow) {
-      sourceOptions.private = false;
-    }
-    if (!sourceOptions.hasOwnProperty("private")) {
+    if (sourceOptions.sourceWindow) {
       sourceOptions.private = PrivateBrowsingUtils.isWindowPrivate(
         sourceOptions.sourceWindow
       );
@@ -4417,7 +4359,7 @@ class _SessionStore {
           ...this.#getClonedDataForWindow(win, w => w.closedGroups ?? [])
         );
       }
-    } else if (sourceOptions.sourceWindow.closedGroups) {
+    } else {
       closedTabGroups.push(
         ...this.#getClonedDataForWindow(
           sourceOptions.sourceWindow,
@@ -4791,8 +4733,11 @@ class _SessionStore {
    *
    * @param {string} savedTabGroupId
    *   The ID of the tab group to remove
+   * @param {string} [reason]
+   *   Why the group is being forgotten, for logging. For example
+   *   "user-deleted" or "reopened".
    */
-  forgetSavedTabGroup(savedTabGroupId) {
+  forgetSavedTabGroup(savedTabGroupId, reason = "unknown") {
     let savedGroupIndex = this.#savedGroups.findIndex(
       savedTabGroup => savedTabGroup.id == savedTabGroupId
     );
@@ -4804,6 +4749,12 @@ class _SessionStore {
     }
 
     let savedGroup = this.#savedGroups[savedGroupIndex];
+    const logLevel = WARN_LEVEL_FORGET_SAVED_GROUP_REASONS.has(reason)
+      ? "warn"
+      : "debug";
+    this.#log[logLevel](
+      `forgetSavedTabGroup, removing ${savedGroup.id} with ${savedGroup.tabs.length} tabs, reason: ${reason}`
+    );
     while (savedGroup.tabs.length) {
       this.#removeClosedTabData({}, savedGroup.tabs, 0);
     }
@@ -4960,6 +4911,16 @@ class _SessionStore {
     this.#windows[this.#windowIds.get(aWindow)]._maybeDontRestoreTabs = true;
   }
 
+  /**
+   * Removes the mark that maybeDontRestoreTabs puts on a window.
+   *
+   * @param {BrowserWindow} aWindow
+   *        Window reference
+   */
+  clearMaybeDontRestoreTabs(aWindow) {
+    delete this.#windows[this.#windowIds.get(aWindow)]._maybeDontRestoreTabs;
+  }
+
   #isLastRestorableWindow() {
     return (
       Object.values(this.#windows).filter(
@@ -4998,7 +4959,7 @@ class _SessionStore {
     this.#trimSavedTabGroupMetadataInClosedWindow(state.windows[0]);
     for (let tabGroup of state.windows[0].groups ?? []) {
       if (this.getSavedTabGroup(tabGroup.id)) {
-        this.forgetSavedTabGroup(tabGroup.id);
+        this.forgetSavedTabGroup(tabGroup.id, "closed-window-reopened");
       }
     }
 
@@ -5563,7 +5524,7 @@ class _SessionStore {
       group => group.removeAfterRestore
     );
     for (let group of groupsToRemove) {
-      this.forgetSavedTabGroup(group.id);
+      this.forgetSavedTabGroup(group.id, "deferred-session-restored");
     }
 
     // Set data that persists between sessions
@@ -6128,8 +6089,9 @@ class _SessionStore {
    *
    * @param {ClosedTabStateData[]} tabData
    *        an array of data to be restored
-   * @param {string} windowId
-   *        The SessionStore id for the window these tabs should be associated with
+   * @param {WindowID|number} windowId
+   *        The SessionStore id for the window these tabs should be associated
+   *        with, or the `closedId` of the closed window they belong to
    * @returns {ClosedTabStateData[]}
    *          The updated tabData array
    */
@@ -6333,8 +6295,17 @@ class _SessionStore {
       const openTabGroupIdsInWindow = new Set(
         tabbrowser.tabGroups.map(group => group.id)
       );
+      const savedGroupIds = new Set(this.#savedGroups.map(group => group.id));
+      const savedGroupsToRemove = savedGroupIds.intersection(
+        openTabGroupIdsInWindow
+      );
+      if (savedGroupsToRemove.size) {
+        this.#log.warn(
+          `restoreWindow, removing ${savedGroupsToRemove.size} saved groups that are open in this window: [${[...savedGroupsToRemove].join(", ")}]`
+        );
+      }
       this.#savedGroups = this.#savedGroups.filter(
-        savedTabGroup => !openTabGroupIdsInWindow.has(savedTabGroup.id)
+        savedTabGroup => !savedGroupsToRemove.has(savedTabGroup.id)
       );
     }
 
@@ -6454,9 +6425,6 @@ class _SessionStore {
    */
   #prepareConnectionToHost(tab, url) {
     if (url && !url.startsWith("about:")) {
-      let principal = Services.scriptSecurityManager.createNullPrincipal({
-        userContextId: tab.userContextId,
-      });
       let browsingContext = tab.linkedBrowser.browsingContext;
       let callbacks = /** @type {nsIInterfaceRequestor} */ ({
         QueryInterface: ChromeUtils.generateQI(["nsIInterfaceRequestor"]),
@@ -6470,7 +6438,20 @@ class _SessionStore {
       });
       try {
         let uri = Services.io.newURI(url);
-        Services.io.speculativeConnect(uri, principal, callbacks, false);
+        let isPrivate = PrivateBrowsingUtils.isBrowserPrivate(
+          tab.linkedBrowser
+        );
+        Services.io.speculativeConnectWithOriginAttributes(
+          uri,
+          {
+            userContextId: tab.userContextId,
+            privateBrowsingId: isPrivate ? 1 : 0,
+            // Necko doesn't add the partitionKey when given origin attributes.
+            partitionKey: ChromeUtils.getPartitionKeyFromURL(url, "", false),
+          },
+          callbacks,
+          false
+        );
         return true;
       } catch (error) {
         // Can't setup speculative connection for this url.
@@ -8844,10 +8825,34 @@ class _SessionStore {
 
     // We have a user typed value, load that with fixup:
     let loadPromise = this.#waitForStateStop(browser, tabData.userTypedValue);
-    browser.browsingContext.fixupAndLoadURIString(tabData.userTypedValue, {
-      loadFlags: Ci.nsIWebNavigation.LOAD_FLAGS_ALLOW_THIRD_PARTY_FIXUP,
-      triggeringPrincipal,
-    });
+    try {
+      browser.browsingContext.fixupAndLoadURIString(tabData.userTypedValue, {
+        loadFlags: Ci.nsIWebNavigation.LOAD_FLAGS_ALLOW_THIRD_PARTY_FIXUP,
+        triggeringPrincipal,
+      });
+    } catch (ex) {
+      // Bug 1986173: userTypedValue is the raw text that the user typed, not
+      // the search URL that the address bar built from it. If the text is a
+      // search term, fixup can fail if the search service, which is
+      // lazy-loaded, is not ready. In this case, restore the history entry and
+      // show the typed value in the address bar.
+      this.#log.warn(`Could not load the typed value: ${ex}`);
+      this.#restoreListeners.get(browser.permanentKey)?.unregister(false);
+      let { userTypedValue } = tabData;
+      return this.#restoreTabEntry(browser, {
+        ...tabData,
+        userTypedValue: null,
+      }).then(() => {
+        if (browser.userTypedValue) {
+          return;
+        }
+        browser.userTypedValue = userTypedValue;
+        let win = browser.documentGlobal;
+        if (win.gBrowser.selectedBrowser == browser) {
+          win.gURLBar.setURI();
+        }
+      });
+    }
 
     return loadPromise;
   }
@@ -9123,6 +9128,9 @@ class _SessionStore {
       return;
     }
     this.#savedGroups.push(savedTabGroupState);
+    this.#log.debug(
+      `recordSavedTabGroupState, saved ${savedTabGroupState.id} with ${savedTabGroupState.tabs.length} tabs`
+    );
     this.#notifyOfSavedTabGroupsChange();
   }
 
@@ -9304,9 +9312,12 @@ class _SessionStore {
       tabGroupData,
       targetWindow
     );
-    this.forgetSavedTabGroup(tabGroupId);
+    this.forgetSavedTabGroup(tabGroupId, "reopened");
 
     group.select();
+    this.#log.debug(
+      `openSavedTabGroup, reopened ${group.id} with ${group.tabs.length} tabs`
+    );
     return group;
   }
 
@@ -9410,6 +9421,14 @@ class _SessionStore {
   }
 
   /**
+   * The parsed contents of session.schema.json, loaded by the first
+   * validateState call.
+   *
+   * @type {Promise<object>|null}
+   */
+  #stateSchemaPromise = null;
+
+  /**
    * Validates that a state object matches the schema
    * defined in browser/components/sessionstore/session.schema.json
    *
@@ -9425,19 +9444,14 @@ class _SessionStore {
       // Don't include any deferred initial state.
       delete state.deferredInitialState;
     }
-    const schema = await fetch(
+    this.#stateSchemaPromise ??= fetch(
       "moz-src:///browser/components/sessionstore/session.schema.json"
     ).then(rsp => rsp.json());
+    const schema = await this.#stateSchemaPromise;
 
     let result;
     try {
       result = lazy.JsonSchema.validate(state, schema);
-      if (!result.valid) {
-        console.warn(
-          "Session state didn't validate against the schema",
-          result.errors
-        );
-      }
     } catch (ex) {
       console.error(`Error validating session state: ${ex.message}`, ex);
     }

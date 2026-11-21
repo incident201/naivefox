@@ -311,7 +311,7 @@ public final class ElementName
         // CPPONLY: this.htmlCreator = nullptr;
         // CPPONLY: #else
         // CPPONLY: if (custom) {
-        // CPPONLY: this.htmlCreator = NS_NewCustomElement;
+        // CPPONLY: this.htmlCreator = null;
         // CPPONLY: } else {
         // CPPONLY: this.htmlCreator = NS_NewHTMLUnknownElement;
         // CPPONLY: }
@@ -326,7 +326,7 @@ public final class ElementName
     // CPPONLY: #ifdef MOZ_NAIVEFOX
     // CPPONLY: return this.mCustom;
     // CPPONLY: #else
-    // CPPONLY: return this.htmlCreator == NS_NewCustomElement;
+    // CPPONLY: return this.htmlCreator == null;
     // CPPONLY: #endif
     // CPPONLY: }
 

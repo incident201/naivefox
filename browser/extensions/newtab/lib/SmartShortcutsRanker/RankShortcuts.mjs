@@ -18,6 +18,10 @@ These prefs can be accessed at prefValues.trainhopConfig.smartShortcuts
 * negative_prior: thompson sampling beta
 * min_exp_clicks: minimum recent clicks before exploration is enabled
 * min_exp_impressions: minimum recent impressions before exploration is enabled
+* rerank_interval_ms: minimum interval between organic rerankings triggered by
+*          SYSTEM_TICK or sponsored tile updates, in milliseconds; defaults to
+*          0, which reranks every time like before the interval existed. Other
+*          refresh triggers bypass the interval.
 * tau: seasonality smoothing strength
 * thom_weight: weight of thompson sampling. divided by 100
 * frec_weight: weight of frecency. divided by 100
@@ -30,6 +34,15 @@ These prefs can be accessed at prefValues.trainhopConfig.smartShortcuts
 * open_weight: weight of is_open. divided by 100
 * unid_weight: weight of unique days visited. divided by 100
 * ctr_weight: weight of ctr. divided by 100
+* ctr2_weight: weight of ctr2. divided by 100
+* ctr2_decay: ctr2 per-day exponential decay rate for clicks and impressions
+* ctr2_positive_prior: ctr2 alpha
+* ctr2_negative_prior: ctr2 beta
+* ctr2_empirical_priors: derive ctr2 alpha/beta from the median decayed ctr
+*          and impressions of the current shortcut candidates with at least
+*          one click
+* ctr2_prior_full_clicks: decayed clicks at which the ctr2 prior is fully
+*          empirical; below this it blends linearly from the default prior
 * bias_weight: weight of bias. divided by 100
 
 */
@@ -39,8 +52,8 @@ const PLACES_TABLE = "moz_places";
 const VISITS_TABLE = "moz_historyvisits";
 const BOOKMARK_TABLE = "moz_bookmarks";
 const BASE_SEASONALITY_CACHE_EXPIRATION = 1e3 * 60 * 60 * 24 * 7; // 7 day in miliseconds
-const ETA = 0;
-const CLICK_BONUS = 10;
+const ETA = 10;
+const CLICK_BONUS = 20;
 const PREF_SYSTEM_SHORTCUTS_PERSONALIZATION =
   "discoverystream.shortcuts.personalization.enabled";
 
@@ -56,16 +69,57 @@ const FEATURE_META = {
   open: { pref: "open_weight", def: 0 },
   unid: { pref: "unid_weight", def: 0 },
   ctr: { pref: "ctr_weight", def: 954 },
+  ctr2: { pref: "ctr2_weight", def: 954 },
   bias: { pref: "bias_weight", def: 0 },
 };
 
-const FEATURES = ["thom", "rece", "freq", "ctr"];
+const DEFAULT_FEATURE_LISTS = {
+  // Features in the training score and whose weights are updated.
+  training_features: ["thom", "rece", "freq", "bmark", "ctr"],
+  // Features in the ranking score used to sort shortcuts.
+  ranking_features: ["thom", "rece", "freq", "bmark", "ctr"],
+  // Features whose scores and weights are attached for telemetry.
+  reporting_features: [
+    "thom",
+    "rece",
+    "freq",
+    "bmark",
+    "ctr",
+    "training",
+    "ranking",
+  ],
+};
+// Combined scores computed from the features; never inputs themselves.
+const SCORE_KEYS = ["training", "ranking"];
 const SHORTCUT_POSITIVE_PRIOR = 1;
 const SHORTCUT_NEGATIVE_PRIOR = 1000;
 const SHORTCUT_TAU = 100;
+const CTR2_DECAY = 0.05;
+const CTR2_POSITIVE_PRIOR = 1;
+const CTR2_NEGATIVE_PRIOR = 1000;
+const CTR2_EMPIRICAL_PRIORS = false;
+const CTR2_MIN_PRIOR = 1e-3;
+const CTR2_PRIOR_FULL_CLICKS = 100;
+const SMART_SHORTCUTS_TICK_INTERVAL = 0;
 const SMART_TELEM = false;
 const MIN_EXP_IMPRESSIONS = 1000;
 const MIN_EXP_CLICKS = 10;
+const INTERACTION_LOOKBACK_DAYS = 61;
+const INTERACTION_PRUNE_MARGIN_DAYS = 1;
+const SECONDS_PER_DAY = 24 * 60 * 60;
+
+/**
+ * Start of the interaction lookback window, in seconds.
+ *
+ * @param {number} now Current time in milliseconds
+ * @param {number} [extraDays] Days to extend the window by
+ */
+function interactionCutoffS(now, extraDays = 0) {
+  return (
+    Math.round(now / 1000) -
+    (INTERACTION_LOOKBACK_DAYS + extraDays) * SECONDS_PER_DAY
+  );
+}
 
 const lazy = {};
 
@@ -79,6 +133,76 @@ ChromeUtils.defineESModuleGetters(lazy, {
 });
 
 import { sortKeysValues } from "resource://newtab/lib/SmartShortcutsRanker/ThomSample.mjs";
+
+/**
+ * Refresh reasons that keep the previous organic order until the rerank
+ * interval elapses. These fire on timers or for sponsored-only changes, so
+ * reranking on them would reshuffle shortcuts without any user action.
+ *
+ * Every other refresh reranks immediately, because the visible set or the
+ * user's intent changed: startup, pin/unpin, block, history cleared, pages or
+ * bookmarks changed, prefs (rows, search shortcuts, sponsored toggles),
+ * default sites, region or search engine changes, and developer ticks.
+ */
+const INTERVAL_GATED_REASONS = new Set([
+  "SYSTEM_TICK",
+  "SPONSORED_TILES_UPDATED",
+]);
+
+/**
+ * Whether a refresh should run the full ranking, or reuse the accepted order.
+ *
+ * @param {object} options
+ * @param {object} [options.acceptedOrder] ranked_state from the accepted cache.
+ * @param {string} [options.reason] What triggered the refresh.
+ * @param {number} options.now
+ * @param {number} options.interval Minimum time between gated reranks, in ms.
+ * @returns {boolean}
+ */
+export function shouldRerank({ acceptedOrder, reason, now, interval }) {
+  const previousOrder = acceptedOrder?.guids;
+  const lastRerank = acceptedOrder?.lastRerank;
+  // Even a gated refresh reranks when there's no prior order to keep, or the
+  // clock moved backwards, or the interval has elapsed.
+  return (
+    !INTERVAL_GATED_REASONS.has(reason) ||
+    !Array.isArray(previousOrder) ||
+    !lastRerank ||
+    now < lastRerank ||
+    now - lastRerank >= interval
+  );
+}
+
+/**
+ * Orders sites by the accepted GUID order without rescoring them.
+ *
+ * @param {Array<object>} sites Current sites with a guid, in frecency order.
+ * @param {string[]} previousOrder GUIDs of the last full ranking, best first.
+ * @param {number} [numItems] Visible slots available to ranked sites.
+ * @returns {Array<object>}
+ */
+export function reorderFromAcceptedOrder(sites, previousOrder, numItems) {
+  const byGuid = new Map(sites.map(site => [site.guid, site]));
+  const known = new Set(previousOrder);
+  // Only the prefix that can be visible is frozen. Sites that dropped out of
+  // the input since the last ranking leave gaps in it.
+  const frozen = previousOrder.slice(0, numItems).map(guid => byGuid.get(guid));
+  // The accepted order covers every ranked candidate, not just the visible
+  // ones, so gaps take the next best site from the last ranking. Sites new
+  // since then have no score and queue behind it in frecency order until the
+  // next full rerank.
+  const candidates = previousOrder
+    .slice(numItems ?? previousOrder.length)
+    .map(guid => byGuid.get(guid))
+    .filter(Boolean)
+    .concat(sites.filter(site => !known.has(site.guid)));
+  let next = 0;
+  // Unfilled gaps only remain when there are fewer sites than slots.
+  return frozen
+    .map(site => site ?? candidates[next++])
+    .filter(Boolean)
+    .concat(candidates.slice(next));
+}
 
 /**
  * Gates exploration-related runtime config until local shortcut engagement
@@ -160,6 +284,45 @@ export const roundNum = (x, sig = 4, eps = 1e-6) => {
   // normalize -0 to 0
   return Object.is(n, -0) ? 0 : n;
 };
+
+/**
+ * Copies rounded scores and weights onto sites so telemetry can report them.
+ *
+ * @param {Array<object>} sites
+ * @param {object|undefined} scoreMap guid -> feature, training and ranking
+ *   scores.
+ * @param {object|undefined} weights Learned feature weights.
+ * @param {string[]} reportingFeatures Features whose scores and weights are
+ *   reported.
+ */
+function attachTelemetryScores(sites, scoreMap, weights, reportingFeatures) {
+  const reported = new Set(reportingFeatures);
+  const roundWeights = Object.fromEntries(
+    Object.entries(weights ?? {})
+      .filter(([key]) => reported.has(key))
+      .map(([key, v]) => [
+        key,
+        typeof v === "number" && isFinite(v) ? roundNum(v) : (v ?? null),
+      ])
+  );
+  sites.forEach(s => {
+    const raw = scoreMap?.[s.guid];
+    s.scores =
+      raw && typeof raw === "object"
+        ? Object.fromEntries(
+            Object.entries(raw)
+              .filter(([key]) => reported.has(key))
+              .map(([k, v]) => [
+                k,
+                typeof v === "number" && isFinite(v)
+                  ? roundNum(v)
+                  : (v ?? null),
+              ])
+          )
+        : null;
+    s.weights = roundWeights;
+  });
+}
 
 export async function getOpenTabURLsFromSessionLive() {
   // Ensure SessionStore is ready (important at early startup)
@@ -297,8 +460,7 @@ export async function fetchLast10VisitsByGuid(topsites, table, placeTable) {
       v.visit_type
     FROM input i
     JOIN ${placeTable} h ON h.guid = i.guid
-    JOIN ${table} v ON v.place_id = h.id
-    WHERE v.id IN (
+    JOIN ${table} v ON v.id IN (
       SELECT vv.id
       FROM ${table} vv
       WHERE vv.place_id = h.id
@@ -402,13 +564,9 @@ export async function fetchDailyVisitsSpecific(topsites, table, placeTable) {
   }
   const guidList = topsites.map(site => site.guid);
 
-  const valuesClause = guidList
-    .map(guid => `('${guid.replace(/'/g, "''")}')`)
-    .join(", ");
-
   const sql = `
       WITH input_keys(guid) AS (
-        VALUES ${valuesClause}
+        SELECT value FROM json_each(:guids)
       ),
       place_ids AS (
         SELECT input_keys.guid, pTable.id AS place_id
@@ -422,12 +580,17 @@ export async function fetchDailyVisitsSpecific(topsites, table, placeTable) {
       FROM place_ids
       LEFT JOIN ${table} as dTable
         ON dTable.place_id = place_ids.place_id
-        AND dTable.visit_date >= 1e6 * strftime('%s', 'now', '-2 months')
+        AND dTable.visit_date >= :cutoff
       GROUP BY place_ids.guid, day_of_week
       ORDER BY place_ids.guid, day_of_week;
       `;
   const { activityStreamProvider } = lazy.NewTabUtils;
-  const rows = await activityStreamProvider.executePlacesQuery(sql);
+  const rows = await activityStreamProvider.executePlacesQuery(sql, {
+    params: {
+      cutoff: interactionCutoffS(Date.now()) * 1e6,
+      guids: JSON.stringify(guidList),
+    },
+  });
   const histograms = {};
   for (const [key, day_of_week, visit_count] of rows) {
     if (!histograms[key]) {
@@ -486,13 +649,9 @@ export async function fetchHourlyVisitsSpecific(topsites, table, placeTable) {
   }
   const guidList = topsites.map(site => site.guid);
 
-  const valuesClause = guidList
-    .map(guid => `('${guid.replace(/'/g, "''")}')`)
-    .join(", ");
-
   const sql = `
       WITH input_keys(guid) AS (
-        VALUES ${valuesClause}
+        SELECT value FROM json_each(:guids)
       ),
       place_ids AS (
         SELECT input_keys.guid, pTable.id AS place_id
@@ -506,12 +665,17 @@ export async function fetchHourlyVisitsSpecific(topsites, table, placeTable) {
       FROM place_ids
       LEFT JOIN ${table} as hTable
         ON hTable.place_id = place_ids.place_id
-        AND hTable.visit_date >= 1e6 * strftime('%s', 'now', '-2 months')
+        AND hTable.visit_date >= :cutoff
       GROUP BY place_ids.guid, hour_of_day
       ORDER BY place_ids.guid, hour_of_day;
       `;
   const { activityStreamProvider } = lazy.NewTabUtils;
-  const rows = await activityStreamProvider.executePlacesQuery(sql);
+  const rows = await activityStreamProvider.executePlacesQuery(sql, {
+    params: {
+      cutoff: interactionCutoffS(Date.now()) * 1e6,
+      guids: JSON.stringify(guidList),
+    },
+  });
   const histograms = {};
   for (const [key, hour_of_day, visit_count] of rows) {
     if (!histograms[key]) {
@@ -597,13 +761,22 @@ function checkWeights(all_weights, features) {
   }
   for (const fkey of features) {
     if (
-      !Number.isFinite(all_weights.current[fkey]) ||
-      all_weights.old_init[fkey] !== all_weights.new_init[fkey]
+      Object.hasOwn(all_weights.old_init, fkey) &&
+      (!Number.isFinite(all_weights.current[fkey]) ||
+        all_weights.old_init[fkey] !== all_weights.new_init[fkey])
     ) {
       return [all_weights.new_init, all_weights.new_init];
     }
   }
-  return [all_weights.current, all_weights.old_init];
+  const weights = { ...all_weights.current };
+  const initWeights = { ...all_weights.old_init };
+  for (const fkey of features) {
+    if (!Object.hasOwn(initWeights, fkey)) {
+      weights[fkey] = all_weights.new_init[fkey];
+      initWeights[fkey] = all_weights.new_init[fkey];
+    }
+  }
+  return [weights, initWeights];
 }
 
 /**
@@ -614,7 +787,7 @@ function checkWeights(all_weights, features) {
  * @param {string} placeTable moz_places table
  * @returns {Promise<Array>} Clicks and impressions for each site in topsites
  */
-async function fetchShortcutInteractions(topsites, table, placeTable) {
+export async function fetchShortcutInteractions(topsites, table, placeTable) {
   if (!topsites.length) {
     // Return empty clicks and impressions arrays
     return [[], []];
@@ -622,15 +795,11 @@ async function fetchShortcutInteractions(topsites, table, placeTable) {
 
   const guidList = topsites.map(site => site.guid);
 
-  const valuesClause = guidList
-    .map(guid => `('${guid.replace(/'/g, "''")}')`)
-    .join(", ");
-
-  // Only get records in the last 2 months!
+  // Only get records within the lookback window!
   // Join no places table to map guid to place_id
   const sql = `
     WITH input_keys(guid) AS (
-      VALUES ${valuesClause}
+      SELECT value FROM json_each(:guids)
     ),
     place_ids AS (
       SELECT input_keys.guid, ${placeTable}.id AS place_id
@@ -643,12 +812,17 @@ async function fetchShortcutInteractions(topsites, table, placeTable) {
       COALESCE(SUM(1 - ${table}.event_type), 0) AS total_impressions
     FROM place_ids
     LEFT JOIN ${table} ON ${table}.place_id = place_ids.place_id
-      AND ${table}.timestamp_s >= strftime('%s', 'now', '-2 months')
+      AND ${table}.timestamp_s >= :cutoff
     GROUP BY place_ids.guid;
   `;
 
   const { activityStreamProvider } = lazy.NewTabUtils;
-  const interactions = await activityStreamProvider.executePlacesQuery(sql);
+  const interactions = await activityStreamProvider.executePlacesQuery(sql, {
+    params: {
+      cutoff: interactionCutoffS(Date.now()),
+      guids: JSON.stringify(guidList),
+    },
+  });
   const interactionMap = new Map(
     interactions.map(row => {
       // Destructure the array into variables
@@ -668,10 +842,148 @@ async function fetchShortcutInteractions(topsites, table, placeTable) {
   return [clicks, impressions];
 }
 
+/**
+ * Deletes interactions older than the lookback window.
+ *
+ * @param {number} now Current time in milliseconds
+ */
+export async function pruneShortcutInteractions(now) {
+  const cutoff = interactionCutoffS(now, INTERACTION_PRUNE_MARGIN_DAYS);
+  try {
+    await lazy.PlacesUtils.withConnectionWrapper(
+      "newtab/lib/SmartShortcutsRanker/RankShortcuts.mjs: pruneShortcutInteractions",
+      async db => {
+        await db.execute(
+          `DELETE FROM ${SHORTCUT_TABLE} WHERE timestamp_s < :cutoff`,
+          { cutoff }
+        );
+      }
+    );
+  } catch (ex) {
+    console.error(`Error pruning shortcut interactions ${ex}`);
+  }
+}
+
+export function median(values) {
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+/**
+ * CTR with clicks and impressions exponentially decayed by age in days
+ *
+ * @param {object[]} topsites Array of topsites objects
+ * @param {string} table Table for shortcuts interactions
+ * @param {string} placeTable moz_places table
+ * @param {object} [cfg] trainhopConfig.smartShortcuts, for ctr2_decay,
+ *   ctr2_positive_prior, ctr2_negative_prior, ctr2_empirical_priors and
+ *   ctr2_prior_full_clicks
+ * @returns {Promise<number[]>} ctr2 for each site in topsites
+ */
+export async function computeCtr2(topsites, table, placeTable, cfg = {}) {
+  if (!topsites.length) {
+    return [];
+  }
+  const decay = cfg.ctr2_decay ?? CTR2_DECAY;
+  let alpha = Math.max(
+    cfg.ctr2_positive_prior ?? CTR2_POSITIVE_PRIOR,
+    CTR2_MIN_PRIOR
+  );
+  let beta = Math.max(
+    cfg.ctr2_negative_prior ?? CTR2_NEGATIVE_PRIOR,
+    CTR2_MIN_PRIOR
+  );
+  const guidList = topsites.map(site => site.guid);
+  const now = Date.now();
+
+  // the exponential decay is applied in the query
+  const sql = `
+    WITH input_keys(guid) AS (
+      SELECT value FROM json_each(:guids)
+    ),
+    place_ids AS (
+      SELECT input_keys.guid, ${placeTable}.id AS place_id
+      FROM input_keys
+      JOIN ${placeTable} ON ${placeTable}.guid = input_keys.guid
+    ),
+    decayed AS (
+      SELECT place_ids.guid AS guid, ${table}.event_type AS event_type,
+        exp(-:decay * (:now_s - ${table}.timestamp_s) / ${SECONDS_PER_DAY}.0) AS w
+      FROM place_ids
+      LEFT JOIN ${table} ON ${table}.place_id = place_ids.place_id
+        AND ${table}.timestamp_s >= :cutoff
+    )
+    SELECT
+      guid,
+      COALESCE(SUM(event_type * w), 0) AS clicks,
+      COALESCE(SUM((1 - event_type) * w), 0) AS impressions
+    FROM decayed
+    GROUP BY guid;
+  `;
+
+  const { activityStreamProvider } = lazy.NewTabUtils;
+  const rows = await activityStreamProvider.executePlacesQuery(sql, {
+    params: {
+      decay,
+      now_s: Math.round(now / 1000),
+      cutoff: interactionCutoffS(now),
+      guids: JSON.stringify(guidList),
+    },
+  });
+  const counts = new Map(rows.map(([guid, c, i]) => [guid, [c, i]]));
+
+  if (cfg.ctr2_empirical_priors ?? CTR2_EMPIRICAL_PRIORS) {
+    // empirical prior from the current candidates the user has clicked on:
+    // mean is their median ctr, strength is their median impressions
+    const clicked = [...counts.values()].filter(([c]) => c > 0);
+    const ctrs = clicked
+      .filter(([, i]) => i > 0)
+      .map(([c, i]) => Math.min(c / i, 1));
+    const strength = clicked.length ? median(clicked.map(([, i]) => i)) : 0;
+    if (ctrs.length && strength >= CTR2_MIN_PRIOR) {
+      // trust the empirical prior more as decayed clicks accumulate, blending
+      // mean and strength separately so the stronger prior doesn't swamp the
+      // mean
+      const clicks = clicked.reduce((sum, [c]) => sum + c, 0);
+      // at fullClicks, we only use empirical, before that, its a blend
+      const fullClicks = cfg.ctr2_prior_full_clicks ?? CTR2_PRIOR_FULL_CLICKS;
+      // weight on the blend between empirical and constant prior
+      const w = fullClicks > 0 ? Math.min(clicks / fullClicks, 1) : 1;
+      // mean of the beta distribution, this is a blend
+      const mean = w * median(ctrs) + (1 - w) * (alpha / (alpha + beta));
+      // strength of the prior in the CTR calc
+      const blendedStrength = w * strength + (1 - w) * (alpha + beta);
+      // the final priors
+      alpha = mean * blendedStrength;
+      beta = (1 - mean) * blendedStrength;
+    }
+  }
+  // guard against negatives and tiny values
+  alpha = Math.max(alpha, CTR2_MIN_PRIOR);
+  beta = Math.max(beta, CTR2_MIN_PRIOR);
+
+  return guidList.map(guid => {
+    const [c, i] = counts.get(guid) ?? [0, 0];
+    // apply prior
+    const ctr = (c + alpha) / (i + alpha + beta);
+    return Number.isFinite(ctr) ? ctr : 0;
+  });
+}
+
 export class RankShortcutsProvider {
   constructor() {
     this.sc_obj = new lazy.PersistentCache("shortcut_cache", true);
   }
+  commitSnapshot(snapshot) {
+    this._acceptedCache = snapshot;
+    // Serialize snapshots so an older write cannot replace a newer accepted state.
+    this._cacheWrite = (this._cacheWrite ?? Promise.resolve())
+      .catch(() => {})
+      .then(() => this.sc_obj.set("snapshot", snapshot));
+    return this._cacheWrite;
+  }
+
   get rankShortcutsWorker() {
     if (!this._rankShortcutsWorker) {
       this._rankShortcutsWorker = new lazy.BasePromiseWorker(
@@ -706,11 +1018,13 @@ export class RankShortcutsProvider {
       hourly_prob = await this.rankShortcutsWorker.post("sumNorm", [
         all_hourly_hist,
       ]);
-      // persist fresh prior
-      await this.sc_obj.set("hourly_seasonality", {
+      // Stage the fresh prior in this refresh's snapshot. Persisting it here,
+      // even with await, could let a superseded refresh update the cache.
+      // TopSitesFeed commits the snapshot only after accepting the refresh.
+      shortcut_cache.hourly_seasonality = {
         pvec: hourly_prob,
         timestamp: Date.now(),
-      });
+      };
     } else {
       // safe read with optional chaining + null fallback
       hourly_prob = cache?.pvec ?? null;
@@ -750,11 +1064,13 @@ export class RankShortcutsProvider {
       daily_prob = await this.rankShortcutsWorker.post("sumNorm", [
         all_daily_hist,
       ]);
-      // persist fresh prior
-      await this.sc_obj.set("daily_seasonality", {
+      // Stage the fresh prior in this refresh's snapshot. Persisting it here,
+      // even with await, could let a superseded refresh update the cache.
+      // TopSitesFeed commits the snapshot only after accepting the refresh.
+      shortcut_cache.daily_seasonality = {
         pvec: daily_prob,
         timestamp: Date.now(),
-      });
+      };
     } else {
       daily_prob = cache?.pvec ?? null;
     }
@@ -814,7 +1130,7 @@ export class RankShortcutsProvider {
       dict[guid] = { clicks, impressions };
     }
 
-    await this.sc_obj.set("time_last_update", now_s);
+    cache_data.time_last_update = now_s;
 
     return dict;
   }
@@ -846,16 +1162,40 @@ export class RankShortcutsProvider {
    *
    * @param {Array<object>} topsites
    * @param {object} prefValues
-   * @param {object} isStartup stores the boolean isStartup
+   * @param {object} options
+   * @param {boolean} [options.isStartup] Whether this is the startup refresh.
+   * @param {string} [options.reason] Action that triggered the refresh.
+   * @param {number} [options.numItems] Visible slots available to ranked sites,
+   *   i.e. the shortcut count minus pinned tiles.
+   * @param {Function} [options.onRankedSnapshot] Receives the proposed cache snapshot.
    * @returns {Promise<{}>} topsites reordered
    */
-  async rankTopSites(topsites, prefValues, isStartup) {
+  async rankTopSites(topsites, prefValues, options = {}) {
     if (!smartshortcutsEnabled(prefValues)) {
       return topsites;
     }
     // get our feature set
-    const features =
-      prefValues.trainhopConfig?.smartShortcuts?.features ?? FEATURES;
+    const config = prefValues.trainhopConfig?.smartShortcuts;
+    const featureLists = {
+      training_features:
+        config?.training_features ??
+        config?.features ??
+        DEFAULT_FEATURE_LISTS.training_features,
+      ranking_features:
+        config?.ranking_features ??
+        config?.features ??
+        DEFAULT_FEATURE_LISTS.ranking_features,
+      reporting_features:
+        config?.reporting_features ??
+        (config?.features && [...config.features, ...SCORE_KEYS]) ??
+        DEFAULT_FEATURE_LISTS.reporting_features,
+    };
+    const weightFeatures = [
+      ...new Set([
+        ...featureLists.training_features,
+        ...featureLists.ranking_features,
+      ]),
+    ];
 
     // split topsites into two arrays, we only rank those with guid
     const [withGuid, withoutGuid] = topsites.reduce(
@@ -870,6 +1210,48 @@ export class RankShortcutsProvider {
       [[], []]
     );
 
+    // cache stores weights and the last feature values used to produce ranking
+    // PersistentCache r/w cant be on promise
+    const persistedCache = await this.sc_obj.get();
+    const sc_cache = structuredClone(
+      this._acceptedCache ?? persistedCache.snapshot ?? persistedCache
+    );
+    const telemEnabled =
+      prefValues?.trainhopConfig?.smartShortcuts?.telem || SMART_TELEM;
+
+    // Inside the rerank interval, skip all scoring and reuse the accepted
+    // order. No snapshot is proposed, so score_map stays paired with the order
+    // the user is seeing, and interactions since time_last_update are left for
+    // the next full ranking to learn from.
+    const now = Date.now();
+    const interval =
+      prefValues.trainhopConfig?.smartShortcuts?.rerank_interval_ms ??
+      SMART_SHORTCUTS_TICK_INTERVAL;
+    if (
+      !shouldRerank({
+        acceptedOrder: sc_cache.ranked_state,
+        reason: options.reason,
+        now,
+        interval,
+      })
+    ) {
+      const sites = reorderFromAcceptedOrder(
+        withGuid,
+        sc_cache.ranked_state.guids,
+        options.numItems
+      );
+      const combined = sites.concat(withoutGuid);
+      if (telemEnabled) {
+        attachTelemetryScores(
+          combined,
+          sc_cache.score_map,
+          sc_cache.weights,
+          featureLists.reporting_features
+        );
+      }
+      return combined;
+    }
+
     // query for interactions, sql cant be on promise
     // always do this but only used for thompson and ctr
     const [clicks, impressions] = await fetchShortcutInteractions(
@@ -878,18 +1260,14 @@ export class RankShortcutsProvider {
       PLACES_TABLE
     );
 
-    // cache stores weights and the last feature values used to produce ranking
-    // PersistentCache r/w cant be on promise
-    const sc_cache = await this.sc_obj.get();
-
     // check for bad weights (numerical) or change in init configs
     let [weights, init_weights] = checkWeights(
       {
         current: sc_cache.weights,
-        new_init: initShortcutWeights(prefValues, features),
+        new_init: initShortcutWeights(prefValues, weightFeatures),
         old_init: sc_cache.init_weights,
       },
-      features
+      weightFeatures
     );
 
     // update our weights
@@ -910,7 +1288,7 @@ export class RankShortcutsProvider {
       {
         data: latest_interaction_data,
         scores: sc_cache.score_map,
-        features,
+        features: featureLists.training_features,
         weights,
         eta: learningConfig.eta,
         click_bonus:
@@ -919,36 +1297,44 @@ export class RankShortcutsProvider {
       },
     ]);
 
-    const rankingConfig = gateRuntimeConfigByEngagement(
+    const scoringConfig = gateRuntimeConfigByEngagement(
       { weights },
       prefValues.trainhopConfig?.smartShortcuts,
       engagement
     );
-    const rankingWeights = rankingConfig.weights;
+    const scoringWeights = scoringConfig.weights;
 
     // write the weights and init... sometimes redundant
-    await this.sc_obj.set("weights", weights);
-    await this.sc_obj.set("init_weights", init_weights);
+    sc_cache.weights = weights;
+    sc_cache.init_weights = init_weights;
 
     // feature data
-    const hourly_seasonality = features?.includes?.("hour")
-      ? await this.getHourlySeasonalityData(withGuid, sc_cache, isStartup)
+    const allFeatures = new Set(
+      Object.values(featureLists)
+        .flat()
+        .filter(f => !SCORE_KEYS.includes(f))
+    );
+    const hourly_seasonality = allFeatures.has("hour")
+      ? await this.getHourlySeasonalityData(withGuid, sc_cache, options)
       : null;
-    const daily_seasonality = features?.includes?.("daily")
-      ? await this.getDailySeasonalityData(withGuid, sc_cache, isStartup)
+    const daily_seasonality = allFeatures.has("daily")
+      ? await this.getDailySeasonalityData(withGuid, sc_cache, options)
       : null;
-    const bmark_scores = features?.includes?.("bmark")
+    const ctr2_scores = allFeatures.has("ctr2")
+      ? await computeCtr2(withGuid, SHORTCUT_TABLE, PLACES_TABLE, config)
+      : null;
+    const bmark_scores = allFeatures.has("bmark")
       ? await fetchBookmarkedFlags(withGuid, BOOKMARK_TABLE, PLACES_TABLE)
       : null;
     const refrec_scores = ["rece", "freq", "refre", "unid"].some(f =>
-      features.includes(f)
+      allFeatures.has(f)
     )
       ? await this.fetchRefreFeatures(withGuid)
       : { rece: null, freq: null, refre: null, unid: null };
-    const open_scores = features?.includes?.("open")
+    const open_scores = allFeatures.has("open")
       ? await getIsOpen(
           withGuid.map(t => t.guid),
-          isStartup
+          options
         )
       : null;
     // call to the promise worker to do the ranking
@@ -957,7 +1343,10 @@ export class RankShortcutsProvider {
       "weightedSampleTopSites",
       [
         {
-          features,
+          features: [...allFeatures],
+          training_features: featureLists.training_features,
+          ranking_features: featureLists.ranking_features,
+          training_weights: scoringWeights,
           alpha:
             prefValues.trainhopConfig?.smartShortcuts?.positive_prior ??
             SHORTCUT_POSITIVE_PRIOR,
@@ -970,8 +1359,8 @@ export class RankShortcutsProvider {
           impressions,
           norms:
             sc_cache.norms ??
-            Object.fromEntries(features.map(key => [key, null])),
-          weights: rankingWeights,
+            Object.fromEntries([...allFeatures].map(key => [key, null])),
+          weights: scoringWeights,
           frecency: frecency_scores,
           hourly_seasonality,
           daily_seasonality,
@@ -981,53 +1370,39 @@ export class RankShortcutsProvider {
           freq_scores: refrec_scores?.freq,
           refre_scores: refrec_scores?.refre,
           unid_scores: refrec_scores?.unid,
+          ctr2_scores,
         },
       ]
     );
     // update the cache
-    await this.sc_obj.set("norms", output.norms);
-    await this.sc_obj.set("score_map", output.score_map);
+    sc_cache.norms = output.norms;
+    sc_cache.score_map = output.score_map;
 
     // final score for ranking as an array
-    let final_scores = withGuid.map(g => output.score_map[g.guid].final);
+    let rankingScores = withGuid.map(g => output.score_map[g.guid].ranking);
     //catch nan errors
-    if (final_scores.some(x => Number.isNaN(x))) {
-      final_scores = frecency_scores;
+    if (rankingScores.some(x => Number.isNaN(x))) {
+      rankingScores = frecency_scores;
     }
 
-    // sort by scores
-    const sortedSitesVals = sortKeysValues(final_scores, withGuid);
-    let [sortedSites] = sortedSitesVals;
-
+    const [sortedSites] = sortKeysValues(rankingScores, withGuid);
     // grab topsites without guid
     const combined = sortedSites.concat(withoutGuid);
 
     // tack weights and scores so they can pass through to telemetry
-    if (prefValues?.trainhopConfig?.smartShortcuts?.telem || SMART_TELEM) {
-      // store a version of weights that is rounded
-      const roundWeights = Object.fromEntries(
-        Object.entries(rankingWeights ?? {}).map(([key, v]) => [
-          key,
-          typeof v === "number" && isFinite(v) ? roundNum(v) : (v ?? null),
-        ])
+    if (telemEnabled) {
+      attachTelemetryScores(
+        combined,
+        output.score_map,
+        weights,
+        featureLists.reporting_features
       );
-      // do the tacking
-      combined.forEach(s => {
-        const raw = output?.score_map?.[s.guid];
-        s.scores =
-          raw && typeof raw === "object"
-            ? Object.fromEntries(
-                Object.entries(raw).map(([k, v]) => [
-                  k,
-                  typeof v === "number" && isFinite(v)
-                    ? roundNum(v)
-                    : (v ?? null),
-                ])
-              )
-            : null;
-        s.weights = roundWeights;
-      });
     }
+    sc_cache.ranked_state = {
+      guids: sortedSites.map(site => site.guid),
+      lastRerank: now,
+    };
+    options.onRankedSnapshot?.(sc_cache);
     return combined;
   }
 }

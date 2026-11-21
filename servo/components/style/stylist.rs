@@ -17,7 +17,6 @@ use crate::custom_properties::{SpecifiedValue, parse_name};
 use crate::derives::*;
 use crate::device::Device;
 use crate::dom::TElement;
-#[cfg(feature = "gecko")]
 use crate::dom::TShadowRoot;
 #[cfg(feature = "gecko")]
 use crate::gecko_bindings::structs::{ServoStyleSetSizes, StyleRuleInclusion};
@@ -29,10 +28,10 @@ use crate::invalidation::media_queries::{
     EffectiveMediaQueryResults, MediaListKey, ToMediaListKey,
 };
 use crate::invalidation::stylesheets::{RuleChangeKind, StylesheetInvalidationSet};
-#[cfg(feature = "gecko")]
+use crate::parser::ParserContext;
 use crate::properties::StyleBuilder;
 use crate::properties::{
-    self, AnimationDeclarations, CascadeMode, ComputedValues, FirstLineReparenting,
+    self, AnimationDeclarations, CascadeMode, CascadeReparenting, ComputedValues,
     PropertyDeclarationBlock, PropertyIdRef,
 };
 use crate::properties_and_values::registry::{
@@ -72,7 +71,7 @@ use crate::stylesheets::{
     ViewTransitionRule,
 };
 use crate::stylesheets::{CustomMediaEvaluator, CustomMediaMap};
-#[cfg(feature = "gecko")]
+use crate::substitution::AttrTaint;
 use crate::values::specified::position::PositionTryFallbacksItem;
 use crate::values::specified::position::PositionTryFallbacksTryTactic;
 use crate::values::{AtomIdent, Parser, SourceLocation, computed};
@@ -84,8 +83,8 @@ use malloc_size_of::{MallocShallowSizeOf, MallocSizeOf, MallocSizeOfOps};
 use selectors::attr::{CaseSensitivity, NamespaceConstraint};
 use selectors::bloom::BloomFilter;
 use selectors::matching::{
-    MatchingContext, MatchingMode, NeedsSelectorFlags, SelectorCaches, SubjectOrPseudoElement,
-    matches_complex_selector, matches_selector, selector_may_match,
+    ElementSelectorFlags, MatchingContext, MatchingMode, NeedsSelectorFlags, SelectorCaches,
+    SubjectOrPseudoElement, matches_complex_selector, matches_selector, selector_may_match,
 };
 use selectors::matching::{MatchingForInvalidation, VisitedHandlingMode};
 use selectors::parser::{
@@ -99,6 +98,7 @@ use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
 use std::mem;
 use std::sync::{LazyLock, Mutex};
+use style_traits::ParsingMode;
 
 /// The type of the stylesheets that the stylist contains.
 #[cfg(feature = "servo")]
@@ -1405,7 +1405,7 @@ impl Stylist {
             guards,
             parent_style,
             parent_style,
-            FirstLineReparenting::No,
+            CascadeReparenting::No,
             &PositionTryFallbacksTryTactic::default(),
             /* rule_cache = */ None,
             &mut RuleCacheConditions::default(),
@@ -1414,7 +1414,6 @@ impl Stylist {
     }
 
     /// Computes a fallback style lazily given the current and parent styles, and name.
-    #[cfg(feature = "gecko")]
     pub fn resolve_position_try<E>(
         &self,
         style: &ComputedValues,
@@ -1457,24 +1456,17 @@ impl Stylist {
             let mut inputs = CascadeInputs::new_from_style(style);
             // @position-try doesn't care about any :visited-dependent property.
             inputs.visited_rules = None;
-            let rules = inputs.rules.as_ref().unwrap_or(self.rule_tree.root());
-            let mut important_rules_changed = false;
             if let Some(fallback_block) = fallback_block {
-                let new_rules = self.rule_tree.update_rule_at_level(
+                let mut rules = inputs
+                    .rules
+                    .unwrap_or_else(|| self.rule_tree.root().clone());
+                self.rule_tree.replace_single_rule_at_level(
                     CascadeLevel::new(CascadeOrigin::PositionFallback),
                     LayerOrder::root(),
                     Some(fallback_block.borrow_arc()),
-                    rules,
-                    guards,
-                    &mut important_rules_changed,
+                    &mut rules,
                 );
-                if new_rules.is_some() {
-                    inputs.rules = new_rules;
-                } else {
-                    // This will return an identical style to `style`. We could consider optimizing
-                    // this a bit more but for now just perform the cascade, this can only happen with
-                    // the same position-try name repeated multiple times anyways.
-                }
+                inputs.rules = Some(rules);
             }
             inputs
         };
@@ -1488,7 +1480,7 @@ impl Stylist {
                     guards,
                     parent_style,
                     layout_parent_style,
-                    FirstLineReparenting::No,
+                    CascadeReparenting::PositionTry { base_style: style },
                     &name_and_try_tactic.try_tactic,
                     /* rule_cache = */ None,
                     &mut RuleCacheConditions::default(),
@@ -1518,7 +1510,7 @@ impl Stylist {
         guards: &StylesheetGuards,
         parent_style: Option<&ComputedValues>,
         layout_parent_style: Option<&ComputedValues>,
-        first_line_reparenting: FirstLineReparenting,
+        first_line_reparenting: CascadeReparenting,
         try_tactic: &PositionTryFallbacksTryTactic,
         rule_cache: Option<&RuleCache>,
         rule_cache_conditions: &mut RuleCacheConditions,
@@ -1871,7 +1863,6 @@ impl Stylist {
 
     /// Returns the registered `@position-try-rule` animation for the specified name.
     #[inline]
-    #[cfg(feature = "gecko")]
     fn lookup_position_try<'a, E>(
         &'a self,
         name: &Atom,
@@ -2053,7 +2044,7 @@ impl Stylist {
             }),
             Some(parent_style),
             Some(parent_style),
-            FirstLineReparenting::No,
+            CascadeReparenting::No,
             &PositionTryFallbacksTryTactic::default(),
             CascadeMode::Unvisited {
                 visited_rules: None,
@@ -2155,10 +2146,21 @@ impl Stylist {
 
         let initial_value = match initial_value {
             Some(value) => {
+                let parser_context = ParserContext::new(
+                    Origin::Author,
+                    url_data,
+                    None,
+                    ParsingMode::DISALLOW_COMPUTATIONALLY_DEPENDENT,
+                    self.quirks_mode,
+                    /* namespaces = */ Default::default(),
+                    None,
+                    None,
+                    AttrTaint::default(),
+                );
                 let parsed = Parser::new(value)
                     .parse_entirely(|input| {
                         input.skip_whitespace();
-                        SpecifiedValue::parse(input, None, url_data).map(Arc::new)
+                        SpecifiedValue::parse(&parser_context, input).map(Arc::new)
                     })
                     .ok();
                 if parsed.is_none() {
@@ -3456,7 +3458,15 @@ pub struct CascadeData {
     /// A map of attributes that are referenced by `attr()` functions in container queries.
     /// The attribute exists as a key if it is referenced inside a style container query.
     /// The enum value tells us whether or not the container query condition is named.
-    attr_function_dependencies: PrecomputedHashMap<LocalName, ContainerAttributeDependencyKind>,
+    container_attr_function_dependencies:
+        PrecomputedHashMap<LocalName, ContainerAttributeDependencyKind>,
+
+    /// Container rules where a condition contains `attr()` functions with attribute names
+    /// that are not known at parse time (due to nested substitution functions).
+    ///
+    /// TODO: Measure the Vec's shallow size.
+    #[ignore_malloc_size_of = "Arc, primary refs in the container rules"]
+    container_unparsed_attr_conditions: Vec<ArcSlice<ContainerCondition>>,
 
     /// The list of scope conditions, indexed by their id.
     scope_conditions: SmallVec<[ScopeConditionReference; 1]>,
@@ -3534,7 +3544,8 @@ impl CascadeData {
             custom_media: Default::default(),
             layers: CascadeLayers::default(),
             container_conditions: smallvec::smallvec![ContainerConditionReference::none()],
-            attr_function_dependencies: PrecomputedHashMap::default(),
+            container_attr_function_dependencies: PrecomputedHashMap::default(),
+            container_unparsed_attr_conditions: Vec::new(),
             scope_conditions: smallvec::smallvec![ScopeConditionReference::none()],
             scope_subject_map: Default::default(),
             extra_data: ExtraStyleData::default(),
@@ -3652,8 +3663,8 @@ impl CascadeData {
         self.nth_of_state_dependencies.intersects(state)
     }
 
-    /// Returns whether the given attribute might appear in an attribute
-    /// selector of some rule.
+    /// Returns whether the given attribute might appear in an attribute selector
+    /// of some rule or a container query with `attr()` functions.
     #[inline]
     pub fn might_have_attribute_dependency(&self, local_name: &LocalName) -> bool {
         self.attribute_dependencies.contains(local_name)
@@ -3672,14 +3683,54 @@ impl CascadeData {
     /// that the value is used in a named container rule. None means the value
     /// is not used in a style container prelude at all.
     #[inline]
-    pub fn might_have_attribute_dependency_in_container(
+    pub fn might_have_attribute_dependency_in_container<E: TElement>(
         &self,
+        stylist: &Stylist,
+        element: E,
         local_name: &LocalName,
     ) -> ContainerAttributeDependencyKind {
-        self.attr_function_dependencies
+        let kind = self
+            .container_attr_function_dependencies
             .get(local_name)
             .copied()
-            .unwrap_or(ContainerAttributeDependencyKind::None)
+            .unwrap_or(ContainerAttributeDependencyKind::None);
+        if kind == ContainerAttributeDependencyKind::NamedContainer {
+            return kind;
+        }
+        kind.max(
+            self.might_have_unparsed_attr_dependency_in_container(stylist, element, local_name),
+        )
+    }
+
+    /// Returns whether the element was evaluated as a container by a query
+    /// condition that had an unparsed `attr()` function, and which might
+    /// depend on the given attribute. Since the specific condition that
+    /// was evaluated is not known, this evaluates and checks all conditions
+    /// with unparsed `attr()` functions.
+    fn might_have_unparsed_attr_dependency_in_container<E: TElement>(
+        &self,
+        stylist: &Stylist,
+        element: E,
+        local_name: &LocalName,
+    ) -> ContainerAttributeDependencyKind {
+        if self.container_unparsed_attr_conditions.is_empty()
+            || !element.has_selector_flags(ElementSelectorFlags::CONTAINER_QUERY_WITH_UNPARSED_ATTR)
+        {
+            return ContainerAttributeDependencyKind::None;
+        }
+        let mut result = ContainerAttributeDependencyKind::None;
+        for condition in self
+            .container_unparsed_attr_conditions
+            .iter()
+            .flat_map(|c| c.iter())
+        {
+            let kind = condition.evaluate_unparsed_attr_dependency(stylist, element, local_name);
+            if kind == ContainerAttributeDependencyKind::NamedContainer {
+                return kind;
+            }
+            result = result.max(kind);
+        }
+        result
     }
 
     /// Returns whether the given ID might appear in an ID selector in the
@@ -4410,11 +4461,17 @@ impl CascadeData {
                     containing_rule_state.container_condition_id = id;
 
                     if rebuild_kind.should_rebuild_invalidation() {
+                        let mut has_unparsed = false;
                         for condition in rule.conditions.0.iter() {
                             condition.insert_attribute_references_in_dependency_map(
-                                &mut self.attr_function_dependencies,
+                                &mut self.container_attr_function_dependencies,
                                 &mut self.attribute_dependencies,
                             );
+                            has_unparsed |= condition.has_unparsed_attr_references();
+                        }
+                        if has_unparsed {
+                            self.container_unparsed_attr_conditions
+                                .push(rule.conditions.0.clone());
                         }
                     }
                 },
@@ -4819,7 +4876,8 @@ impl CascadeData {
         self.relative_selector_invalidation_map.clear();
         self.additional_relative_selector_invalidation_map.clear();
         self.attribute_dependencies.clear();
-        self.attr_function_dependencies.clear();
+        self.container_attr_function_dependencies.clear();
+        self.container_unparsed_attr_conditions.clear();
         self.nth_of_attribute_dependencies.clear();
         self.nth_of_custom_state_dependencies.clear();
         self.nth_of_class_dependencies.clear();

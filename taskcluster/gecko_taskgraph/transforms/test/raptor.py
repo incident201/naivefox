@@ -422,13 +422,11 @@ def add_extra_options(config, tests):
                 )
 
         if (
-            ("android-hw-p6" in test_platform or "android-hw-s24" in test_platform)
-            and "speedometer2-" not in test["test-name"]
-            # Bug 1943674 resolve why --power-test causes permafails on certain mobile platforms and browsers
-        ):
-            # Bug 2037511 Temporarily disable power-test option for tp6m on a55s
-            if "--power-test" not in extra_options:
-                extra_options.append("--power-test")
+            "android-hw-p6" in test_platform or "android-hw-s24" in test_platform
+        ) and not test["test-name"].startswith("browsertime-power-"):
+            # Bug 2089570 - USB power meters are disabled on p6 and s24
+            if "--power-test" in extra_options:
+                extra_options.remove("--power-test")
         elif "windows" in test_platform and (
             uses_speedometer_3_harness(test) or "tp6" in test["test-name"]
         ):
@@ -647,7 +645,7 @@ def add_etw_profile(config, tests):
         extra_options.extend([
             "--etw-profile",
             "--setenv ETW_ENABLED=1",
-            "--setenv JIT_OPTION_enableICFramePointers=true",
+            "--setenv JIT_OPTION_enableStubFramePointers=true",
             "--setenv JIT_OPTION_onlyInlineSelfHosted=true",
             "--setenv JIT_OPTION_emitInterpreterEntryTrampoline=true",
         ])
@@ -843,6 +841,32 @@ def handle_native_profiling_symbol(config, tests):
         if any(arg in extra_options for arg in native_profiling_args):
             group, symbol = split_symbol(test["treeherder-symbol"])
             test["treeherder-symbol"] = join_symbol(group, f"{symbol}-p")
+        yield test
+
+
+@transforms.add
+def mark_ab_profiles_support(config, tests):
+    """Mark the tasks that an AB task can be derived from.
+
+    An AB task reuses one of these task definitions to run the test twice on
+    the same machine, so that the two profiles can be compared without the
+    machine-to-machine differences that separate tasks suffer from. See
+    ``mozharness/mozilla/testing/raptor_ab.py``.
+
+    Simpleperf is left out on purpose: ``simpleperf.py`` extracts symbols to a
+    directory beside the zip that ``raptor_ab.py`` swaps between runs, so the
+    second run would symbolicate against the first run's symbols.
+    """
+    profiling_args = ("--etw-profile", "--samply-profile", "--perf-profile")
+
+    for test in tests:
+        extra_options = test.get("mozharness", {}).get("extra-options", [])
+        if (
+            any(arg in extra_options for arg in profiling_args)
+            and test.get("app") == "firefox"
+            and uses_speedometer_3_harness(test)
+        ):
+            test.setdefault("attributes", {})["supports_ab_profiles"] = True
         yield test
 
 

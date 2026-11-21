@@ -14,6 +14,7 @@
 #include "PresShell.h"
 #include "StickyScrollContainer.h"
 #include "mozilla/ScrollContainerFrame.h"
+#include "mozilla/ViewportFrame.h"
 #include "mozilla/WritingModes.h"
 #include "mozilla/dom/HTMLInputElement.h"
 #include "nsBlockFrame.h"
@@ -303,6 +304,9 @@ ReflowInput::ReflowInput(nsPresContext* aPresContext,
   mFlags.mDummyParentReflowInput = false;
   mFlags.mStaticPosIsCBOrigin = aFlags.contains(InitFlag::StaticPosIsCBOrigin);
   mFlags.mIOffsetsNeedCSSAlign = mFlags.mBOffsetsNeedCSSAlign = false;
+
+  mFlags.mTrimBStartMargin = aFlags.contains(InitFlag::TrimBStartMargin);
+  mFlags.mTrimBEndMargin = aFlags.contains(InitFlag::TrimBEndMargin);
 
   // We don't want the mOrthogonalCellFinalReflow flag to be inherited; it's up
   // to the table row frame to set it for its direct children as needed.
@@ -891,7 +895,14 @@ void ReflowInput::InitResizeFlags(nsPresContext* aPresContext,
   // of table cells) can cause not just a single percentage height to
   // become fixed, but an entire descendant chain of percentage height
   // to become fixed.
-  if (dependsOnCBBSize && mCBReflowInput) {
+  //
+  // We skip this for absolutely positioned frames: they are reflowed by their
+  // containing block's AbsoluteContainingBlock after the containing block's
+  // size is final, and that code checks FrameDependsOnContainer() itself when
+  // the containing block's size changes. So their block-size dependency
+  // doesn't need to be recorded on the containing block or its ancestors.
+  if (dependsOnCBBSize && mCBReflowInput &&
+      !mFrame->IsAbsolutelyPositioned(mStyleDisplay)) {
     const ReflowInput* rs = this;
     bool hitCBReflowInput = false;
     do {
@@ -1507,18 +1518,21 @@ void ReflowInput::CalculateHypotheticalPosition(
   if (cbFrame->IsViewportFrame()) {
     // When the containing block is the ViewportFrame, i.e. we are calculating
     // the static position for a fixed-positioned frame, we need to adjust the
-    // origin to exclude the scrollbar or scrollbar-gutter area. The
-    // ViewportFrame's containing block rect is adjusted in
-    // AbsoluteContainingBlock::ReflowAbsoluteFrame(), and it will add the
-    // rect's origin to the fixed-positioned frame's final position if needed.
+    // origin to exclude the scrollbar or scrollbar-gutter area for frames
+    // that don't cover them. The ViewportFrame's containing block rect is
+    // adjusted in AbsoluteContainingBlock::ReflowAbsoluteFrame(), and it will
+    // add the rect's origin to the fixed-positioned frame's final position if
+    // needed.
     //
     // Note: The origin of the containing block rect is adjusted in
-    // ViewportFrame::AdjustReflowInputForScrollbars(). Ensure the code there
-    // remains in sync with the logic here.
-    if (ScrollContainerFrame* sf =
-            do_QueryFrame(cbFrame->PrincipalChildList().FirstChild())) {
-      const nsMargin scrollbarSizes = sf->GetActualScrollbarSizes();
-      cbOffset.MoveBy(-scrollbarSizes.left, -scrollbarSizes.top);
+    // ViewportFrame::GetContainingBlockAdjustedForScrollbars(). Ensure the code
+    // there remains in sync with the logic here.
+    if (!ViewportFrame::ShouldCoverScrollbars(mFrame)) {
+      if (ScrollContainerFrame* sf =
+              do_QueryFrame(cbFrame->PrincipalChildList().FirstChild())) {
+        const nsMargin scrollbarSizes = sf->GetActualScrollbarSizes();
+        cbOffset.MoveBy(-scrollbarSizes.left, -scrollbarSizes.top);
+      }
     }
 
     // ViewportFrame has no border or padding, so the padding-box size is equal
@@ -2088,8 +2102,16 @@ void ReflowInput::InitConstraints(
     // For calculating positioning offsets, margins, borders and
     // padding, we use the writing mode of the containing block
     WritingMode cbwm = cbri->GetWritingMode();
+    EnumSet<LogicalSide> trimmedMarginSides;
+    if (mFlags.mTrimBStartMargin) {
+      trimmedMarginSides += LogicalSide::BStart;
+    }
+    if (mFlags.mTrimBEndMargin) {
+      trimmedMarginSides += LogicalSide::BEnd;
+    }
     InitOffsets(cbwm, cbSize.ConvertTo(cbwm, wm).ISize(cbwm), aFrameType,
-                mComputeSizeFlags, aBorder, aPadding, mStyleDisplay);
+                mComputeSizeFlags, aBorder, aPadding, mStyleDisplay,
+                trimmedMarginSides);
 
     // For calculating the size of this box, we use its own writing mode
     const auto blockSize =
@@ -2360,12 +2382,11 @@ static void UpdateProp(nsIFrame* aFrame,
   }
 }
 
-void SizeComputationInput::InitOffsets(WritingMode aCBWM, nscoord aPercentBasis,
-                                       LayoutFrameType aFrameType,
-                                       ComputeSizeFlags aFlags,
-                                       const Maybe<LogicalMargin>& aBorder,
-                                       const Maybe<LogicalMargin>& aPadding,
-                                       const nsStyleDisplay* aDisplay) {
+void SizeComputationInput::InitOffsets(
+    WritingMode aCBWM, nscoord aPercentBasis, LayoutFrameType aFrameType,
+    ComputeSizeFlags aFlags, const Maybe<LogicalMargin>& aBorder,
+    const Maybe<LogicalMargin>& aPadding, const nsStyleDisplay* aDisplay,
+    EnumSet<LogicalSide> aTrimmedMarginSides) {
   nsPresContext* presContext = mFrame->PresContext();
 
   // Compute margins from the specified margin style information. These
@@ -2373,6 +2394,25 @@ void SizeComputationInput::InitOffsets(WritingMode aCBWM, nscoord aPercentBasis,
   // XXX fix to provide 0,0 for the top&bottom margins for
   // inline-non-replaced elements
   bool needMarginProp = ComputeMargin(aCBWM, aPercentBasis, aFrameType);
+  if (!aTrimmedMarginSides.isEmpty()) {
+    // Overwrite the logical margin so `UpdateProp` keeps the trimmed margin on
+    // the frame.
+    // https://drafts.csswg.org/css-box-4/#margin-trim
+    LogicalMargin margin = ComputedLogicalMargin(aCBWM);
+    bool marginChanged = false;
+    for (const LogicalSide side : aTrimmedMarginSides) {
+      auto& value = margin.Side(side, aCBWM);
+      if (value == 0) {
+        continue;
+      }
+      value = 0;
+      marginChanged = true;
+    }
+    if (marginChanged) {
+      SetComputedLogicalMargin(aCBWM, margin);
+      needMarginProp = true;
+    }
+  }
   // Note that ComputeMargin() simplistically resolves 'auto' margins to 0.
   // In formatting contexts where this isn't correct, some later code will
   // need to update the UsedMargin() property with the actual resolved value.

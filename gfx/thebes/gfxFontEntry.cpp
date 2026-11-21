@@ -285,6 +285,9 @@ nsCString gfxFontEntry::RealFaceName() {
 
 already_AddRefed<gfxFont> gfxFontEntry::FindOrMakeFont(
     const gfxFontStyle* aStyle, gfxCharacterMap* aUnicodeRangeMap) {
+  if (mUnusable) {
+    return nullptr;
+  }
   RefPtr<gfxFont> font =
       gfxFontCache::GetCache()->Lookup(this, aStyle, aUnicodeRangeMap);
   if (font) {
@@ -1754,7 +1757,7 @@ bool gfxFontFamily::ContainsFace(gfxFontEntry* aFontEntry) {
     if (mAvailableFonts[i] && mAvailableFonts[i]->mIsUserFontContainer) {
       gfxUserFontEntry* ufe =
           static_cast<gfxUserFontEntry*>(mAvailableFonts[i].get());
-      if (ufe->GetPlatformFontEntry() == aFontEntry) {
+      if (ufe->PlatformFontEntryEquals(aFontEntry)) {
         return true;
       }
     }

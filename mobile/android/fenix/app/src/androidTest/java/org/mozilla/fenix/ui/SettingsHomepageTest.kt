@@ -7,7 +7,6 @@ package org.mozilla.fenix.ui
 import androidx.compose.ui.test.junit4.v2.AndroidComposeTestRule as AndroidComposeTestRuleV2
 import org.junit.Rule
 import org.junit.Test
-import org.mozilla.fenix.R
 import org.mozilla.fenix.customannotations.Converted
 import org.mozilla.fenix.customannotations.SmokeTest
 import org.mozilla.fenix.helpers.AppAndSystemHelper.isDefaultPinnedShortcutsOnHomepage
@@ -253,8 +252,8 @@ class SettingsHomepageTest {
             .clickWallpapersMenuOption {
                 verifyTheWallpapersSettingsPageHeader()
                 verifyClassicFirefoxSection(retryableComposeTestRule.current)
-                verifyEdgeToEdgeWallpaperIsDisplayed(retryableComposeTestRule.current)
-                verifyDefaultWallpaperIsDisplayed(retryableComposeTestRule.current)
+                verifyGradientWallpaperIsDisplayed(retryableComposeTestRule.current)
+                verifySolidWallpaperIsDisplayed(retryableComposeTestRule.current)
             }
     }
 
@@ -266,33 +265,33 @@ class SettingsHomepageTest {
             .clickSettingsButton {}
             .openHomepageSubMenu {}
             .clickWallpapersMenuOption {
-                verifyEdgeToEdgeWallpaperIsSelected(retryableComposeTestRule.current)
-                verifyDefaultWallpaperIsNotSelected(retryableComposeTestRule.current)
-                clickTheDefaultWallpaper(retryableComposeTestRule.current)
-                verifyDefaultWallpaperIsSelected(retryableComposeTestRule.current)
-                verifyEdgeToEdgeWallpaperIsNotSelected(retryableComposeTestRule.current)
+                verifyGradientWallpaperIsSelected(retryableComposeTestRule.current)
+                verifySolidWallpaperIsNotSelected(retryableComposeTestRule.current)
+                clickTheSolidWallpaper(retryableComposeTestRule.current)
+                verifySolidWallpaperIsSelected(retryableComposeTestRule.current)
+                verifyGradientWallpaperIsNotSelected(retryableComposeTestRule.current)
             }
             .goBack {}
             .goBack(retryableComposeTestRule.current) {
                 exitMenu()
-                verifyDefaultWallpaperApplied(retryableComposeTestRule.current)
+                verifySolidWallpaperApplied(retryableComposeTestRule.current)
             }
     }
 
     // TestRail link: https://mozilla.testrail.io/index.php?/cases/view/3375726
     @Test
-    fun verifyEdgeToEdgeWallpaperBackgroundAdaptation() {
+    fun verifyGradientWallpaperBackgroundAdaptation() {
         homeScreen(retryableComposeTestRule.current) {}
             .openThreeDotMenu {}
             .clickSettingsButton {}
             .openHomepageSubMenu {}
             .clickWallpapersMenuOption {
-                verifyEdgeToEdgeWallpaperIsSelected(retryableComposeTestRule.current)
+                verifyGradientWallpaperIsSelected(retryableComposeTestRule.current)
             }
             .goBack {}
             .goBack(retryableComposeTestRule.current) {
                 exitMenu()
-                verifyWindowBackgroundDrawable(retryableComposeTestRule.current, R.drawable.home_background_gradient)
+                verifyGradientWallpaperApplied(retryableComposeTestRule.current)
             }
 
         homeScreen(retryableComposeTestRule.current) {}
@@ -303,7 +302,7 @@ class SettingsHomepageTest {
             }
             .goBack {}
             .goBack(retryableComposeTestRule.current) {
-                verifyWindowBackgroundDrawable(retryableComposeTestRule.current, R.drawable.home_background_gradient)
+                verifyGradientWallpaperApplied(retryableComposeTestRule.current)
             }
             .togglePrivateBrowsingMode()
 

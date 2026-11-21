@@ -8,6 +8,8 @@
    :glob:
    :hidden:
 
+   nss_3_134.md
+   nss_3_133.md
    nss_3_132.md
    nss_3_131_1.md
    nss_3_131.md
@@ -17,6 +19,7 @@
    nss_3_127.md
    nss_3_126_1.md
    nss_3_126.md
+   nss_3_125_1.md
    nss_3_125.md
    nss_3_124.md
    nss_3_123_1.md
@@ -70,6 +73,7 @@
    nss_3_93.md
    nss_3_92.md
    nss_3_91.md
+   nss_3_90_7.md
    nss_3_90_6.md
    nss_3_90_5.md
    nss_3_90_4.md
@@ -122,9 +126,9 @@
 ```
 
 :::{note}
-**NSS 3.132** is the latest version of NSS.
-Complete release notes are available here: {ref}`mozilla-projects-nss-nss-3-132-release-notes`
+**NSS 3.134** is the latest version of NSS.
+Complete release notes are available here: {ref}`mozilla-projects-nss-nss-3-134-release-notes`
 
-**NSS 3.125 (ESR)** is the latest ESR version of NSS.
-Complete release notes are available here: {ref}`mozilla-projects-nss-nss-3-125-release-notes`
+**NSS 3.125.1 (ESR)** is the latest ESR version of NSS.
+Complete release notes are available here: {ref}`mozilla-projects-nss-nss-3-125-1-release-notes`
 :::

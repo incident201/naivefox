@@ -240,9 +240,6 @@ static MOZ_GLIBCXX_CONSTINIT xpstring eventsDirectory;
 // If this is false, we don't launch the crash reporter
 static bool doReport = true;
 
-// if this is true, we pass the exception on to the OS crash reporter
-static bool showOSCrashReporter = false;
-
 // The time of the last recorded crash, as a time_t value.
 static time_t lastCrashTime = 0;
 // The pathname of a file to store the crash time in
@@ -1580,8 +1577,6 @@ bool MinidumpCallback(
     EXCEPTION_POINTERS* exinfo, MDRawAssertionInfo* assertion,
 #endif
     const phc::AddrInfo* addrInfo, bool succeeded) {
-  bool returnValue = showOSCrashReporter ? false : succeeded;
-
   static XP_CHAR minidumpPath[XP_PATH_MAX];
   size_t size = XP_PATH_MAX;
   XP_CHAR* p;
@@ -1645,6 +1640,7 @@ bool MinidumpCallback(
 
   SetUpMemtestEnv();
 
+  bool returnValue = succeeded;
   bool isBackgroundTaskMode = false;
 #ifdef MOZ_BACKGROUNDTASKS
   isBackgroundTaskMode = BackgroundTasks::IsBackgroundTaskMode();
@@ -1850,8 +1846,7 @@ static ExceptionHandler::FilterResult ChildFilter(
 
 static MINIDUMP_TYPE GetMinidumpType() {
   MINIDUMP_TYPE minidump_type = static_cast<MINIDUMP_TYPE>(
-      MiniDumpWithFullMemoryInfo | MiniDumpWithUnloadedModules |
-      MiniDumpWithHandleData);
+      MiniDumpWithFullMemoryInfo | MiniDumpWithUnloadedModules);
 
 #  ifdef NIGHTLY_BUILD
   minidump_type = static_cast<MINIDUMP_TYPE>(
@@ -2048,14 +2043,6 @@ nsresult SetExceptionHandler(nsIFile* aXREDirectory, bool force /*=false*/) {
   // Pre-load psapi.dll to prevent it from being loaded during exception
   // handling.
   ::LoadLibraryW(L"psapi.dll");
-
-  // Pre-load verifier.dll for the same reason: when MiniDumpWithHandleData is
-  // set, dbgcore loads it mid-dump (Win32LiveSystemProvider) to enumerate
-  // handle operations. Because MiniDumpWriteDump has already suspended every
-  // other thread, that LoadLibrary deadlocks in LdrpDrainWorkQueue waiting on
-  // the loader worker threads it just suspended, wedging the crashing process
-  // (bug 1760099). Loading it now turns the mid-dump load into a refcount bump.
-  ::LoadLibraryW(L"verifier.dll");
 #endif  // XP_WIN
 
 #ifdef MOZ_WIDGET_ANDROID
@@ -2141,17 +2128,6 @@ nsresult SetExceptionHandler(nsIFile* aXREDirectory, bool force /*=false*/) {
   RecordAnnotationU64(Annotation::StartupTime,
                       static_cast<uint64_t>(time(nullptr)));
 
-#if defined(XP_MACOSX)
-  // On OS X, many testers like to see the OS crash reporting dialog
-  // since it offers immediate stack traces.  We allow them to set
-  // a default to pass exceptions to the OS handler.
-  Boolean keyExistsAndHasValidFormat = false;
-  Boolean prefValue = ::CFPreferencesGetAppBooleanValue(
-      CFSTR("OSCrashReporter"), kCFPreferencesCurrentApplication,
-      &keyExistsAndHasValidFormat);
-  if (keyExistsAndHasValidFormat) showOSCrashReporter = prefValue;
-#endif
-
   oldTerminateHandler = std::set_terminate(&TerminateHandler);
 
   return NS_OK;
@@ -2162,13 +2138,21 @@ bool GetEnabled() { return gExceptionHandler != nullptr; }
 bool GetMinidumpPath(nsAString& aPath) {
   if (!gExceptionHandler) return false;
 
-#ifndef XP_LINUX
-  aPath = CONVERT_XP_CHAR_TO_UTF16(gExceptionHandler->dump_path().c_str());
+  BreakpadChar* path = nullptr;
+  StaticMutexAutoLock lock(gCrashHelperClientMutex);
+  if (gCrashHelperClient) {
+    path = get_crash_report_path(gCrashHelperClient);
+
+#if defined(XP_WIN)
+    aPath.Assign(BitwiseCast<wchar_t*>(path));
 #else
-  aPath = CONVERT_XP_CHAR_TO_UTF16(
-      gExceptionHandler->minidump_descriptor().directory().c_str());
-#endif
-  return true;
+    aPath = NS_ConvertUTF8toUTF16(path);
+#endif  // defined(XP_WIN)
+
+    release_path(path);
+  }
+
+  return !aPath.IsEmpty();
 }
 
 nsresult SetMinidumpPath(const nsAString& aPath) {
@@ -3484,6 +3468,19 @@ bool SetRemoteExceptionHandler(int& aArgc, char** aArgv) {
   return gExceptionHandler->IsOutOfProcess();
 }  // namespace CrashReporter
 
+static void AppendDumperError(AnnotationTable& aAnnotations,
+                              const nsACString& aError) {
+  if (aError.IsEmpty()) {
+    return;
+  }
+
+  nsCString& dumperError = aAnnotations[Annotation::DumperError];
+  if (!dumperError.IsEmpty()) {
+    dumperError.AppendLiteral("; ");
+  }
+  dumperError.Append(aError);
+}
+
 bool TakeMinidumpForChild(GeckoChildID aChildId, nsIFile** dump,
                           AnnotationTable& aAnnotations) {
   if (!GetEnabled()) {
@@ -3533,9 +3530,7 @@ bool TakeMinidumpForChild(GeckoChildID aChildId, nsIFile** dump,
     return false;
   }
 
-  if (error.Length() > 0) {
-    aAnnotations[Annotation::DumperError] = std::move(error);
-  }
+  AppendDumperError(aAnnotations, error);
 
   return true;
 }
@@ -3699,9 +3694,7 @@ bool CreateMinidumpsAndPair(GeckoChildID aId, ThreadId aTargetBlamedThread,
     return false;
   }
 
-  if (error.Length() > 0) {
-    aTargetAnnotations[Annotation::DumperError] = std::move(error);
-  }
+  AppendDumperError(aTargetAnnotations, error);
 
   targetMinidump.forget(aMainDumpOut);
 

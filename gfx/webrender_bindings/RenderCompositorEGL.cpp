@@ -139,6 +139,8 @@ RenderedFrameId RenderCompositorEGL::EndFrame(
     sync = egl->fCreateSyncKHR(LOCAL_EGL_SYNC_NATIVE_FENCE_ANDROID, nullptr);
   }
   if (sync) {
+    // Materialize the native fence before exporting its file descriptor.
+    gl()->fFlush();
     int fenceFd = egl->fDupNativeFenceFDANDROID(sync);
     if (fenceFd >= 0) {
       mReleaseFence = new layers::FenceFileHandle(UniqueFileHandle(fenceFd));
@@ -316,7 +318,7 @@ LayoutDeviceIntSize RenderCompositorEGL::GetBufferSize() {
   return mWidget->GetClientSize();
 }
 
-bool RenderCompositorEGL::UsePartialPresent() {
+bool RenderCompositorEGL::UseWindowPartialPresent() {
   return gfx::gfxVars::WebRenderMaxPartialPresentRects() > 0;
 }
 
@@ -324,10 +326,6 @@ bool RenderCompositorEGL::RequestFullRender() { return false; }
 
 uint32_t RenderCompositorEGL::GetMaxPartialPresentRects() {
   return gfx::gfxVars::WebRenderMaxPartialPresentRects();
-}
-
-bool RenderCompositorEGL::ShouldDrawPreviousPartialPresentRegions() {
-  return true;
 }
 
 size_t RenderCompositorEGL::GetBufferAge() const {

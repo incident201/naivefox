@@ -14,18 +14,28 @@ import { useSelector } from "react-redux";
 import { actionCreators as ac, actionTypes as at } from "common/Actions.mjs";
 import { useSizeSubmenu } from "../../../lib/utils";
 import {
+  FRAMED_WIDGET_SANDBOX,
   WIDGET_REGISTRY,
+  resolveWidgetFrame,
   resolveWidgetSize,
-  resolveCrosswordEndpoint,
+  WIDGET_USER_ACTIONS,
+  WIDGET_SOURCES,
 } from "common/WidgetsRegistry.mjs";
 import { MoveSubmenu } from "../MoveSubmenu";
+import { WidgetHideMenuItem } from "../WidgetPlacement";
 import { useWidgetTelemetry } from "../useWidgetTelemetry";
 import { WidgetMenuButton } from "../WidgetMenuButton";
 import { WidgetMenuPoweredBy } from "../WidgetMenuPoweredBy";
+import { useSrcAfterPageShown } from "../usePageVisible";
 
 const USER_ACTION_TYPES = {
-  CHANGE_SIZE: "change_size",
+  ...WIDGET_USER_ACTIONS,
   POWERED_BY_PARTICLE: "powered_by_particle",
+  PUZZLE_COMPLETED: "puzzle_completed",
+  // Also sent to the Particle bundle as menu_action commands, so changing
+  // either value breaks that menu item.
+  REVEAL_GRID: "reveal_grid",
+  SHOW_ALL_CLUES: "show_all_clues",
 };
 
 const PARTICLE_URL = "https://particle.news";
@@ -94,15 +104,15 @@ const EVENT_PAYLOAD_VALIDATORS = {
 const MENU_ACTION_ITEMS = [
   {
     key: "show-all-clues",
-    label: "Show clues",
-    action: "show_all_clues",
+    l10nId: "newtab-crossword-widget-menu-show-clues",
+    action: USER_ACTION_TYPES.SHOW_ALL_CLUES,
   },
   {
     // "Solve puzzle" only shows when the crossword is in the intro state or
     // in-progress, so it is hidden once the puzzle is completed.
     key: "solve-puzzle",
-    label: "Solve puzzle",
-    action: "reveal_grid",
+    l10nId: "newtab-crossword-widget-menu-solve-puzzle",
+    action: USER_ACTION_TYPES.REVEAL_GRID,
     hideWhenCompleted: true,
   },
 ];
@@ -131,9 +141,15 @@ function Crossword({
   widgetEnabledMap,
 }) {
   const prefs = useSelector(state => state.Prefs.values);
+  const framedWidgets = useSelector(state => state.FramedWidgets);
+  const { src: frameSrc, state: frameState } = resolveWidgetFrame(
+    CROSSWORD_ENTRY,
+    prefs,
+    framedWidgets
+  );
+  const src = useSrcAfterPageShown(frameSrc);
   const widgetSize = resolveWidgetSize(CROSSWORD_ENTRY, prefs);
   const hasInteracted = prefs[PREF_CROSSWORD_INTERACTION];
-  const crosswordEndpoint = resolveCrosswordEndpoint(prefs);
   const iframeRef = useRef(null);
 
   const { impressionRef, recordUserAction, recordEnabled } = useWidgetTelemetry(
@@ -169,11 +185,11 @@ function Crossword({
   // ones.
   const merinoOrigin = useMemo(() => {
     try {
-      return new URL(crosswordEndpoint).origin;
+      return new URL(src).origin;
     } catch {
       return null;
     }
-  }, [crosswordEndpoint]);
+  }, [src]);
 
   // requestId -> action for menu_action commands awaiting a command_ack, so an
   // incoming ack can be matched back to the action the user selected. A
@@ -234,8 +250,8 @@ function Crossword({
           break;
         case EVENT_TYPES.PUZZLE_COMPLETED:
           setPuzzleCompleted(true);
-          recordUserAction("puzzle_completed", {
-            source: "iframe",
+          recordUserAction(USER_ACTION_TYPES.PUZZLE_COMPLETED, {
+            source: WIDGET_SOURCES.IFRAME,
             value: payload.hintsTaken,
             alsoToMain: true,
           });
@@ -251,7 +267,7 @@ function Crossword({
           handleInteraction();
           if (INTERACTION_TELEMETRY_ALLOWLIST.has(payload.action)) {
             recordUserAction(payload.action, {
-              source: "iframe",
+              source: WIDGET_SOURCES.IFRAME,
               alsoToMain: true,
             });
           }
@@ -299,7 +315,7 @@ function Crossword({
     action => {
       handleInteraction();
       postMenuAction(action);
-      recordUserAction(action, { source: "context_menu" });
+      recordUserAction(action, { source: WIDGET_SOURCES.CONTEXT_MENU });
     },
     [handleInteraction, postMenuAction, recordUserAction]
   );
@@ -311,7 +327,7 @@ function Crossword({
         data: { name: CROSSWORD_ENTRY.enabledPref, value: false },
       })
     );
-    recordEnabled(false, { source: "context_menu" });
+    recordEnabled(false, { source: WIDGET_SOURCES.CONTEXT_MENU });
   }
 
   const handleChangeSize = useCallback(
@@ -324,7 +340,7 @@ function Crossword({
         })
       );
       recordUserAction(USER_ACTION_TYPES.CHANGE_SIZE, {
-        source: "context_menu",
+        source: WIDGET_SOURCES.CONTEXT_MENU,
         value: size,
         size,
       });
@@ -344,7 +360,13 @@ function Crossword({
         },
       })
     );
-    recordUserAction("learn_more", { source: "context_menu" });
+    recordUserAction(USER_ACTION_TYPES.LEARN_MORE, {
+      source: WIDGET_SOURCES.CONTEXT_MENU,
+    });
+  }
+
+  if (frameState === "hidden") {
+    return null;
   }
 
   return (
@@ -360,9 +382,10 @@ function Crossword({
               data-l10n-id="newtab-widget-lists-label-new"
             ></moz-badge>
           )}
-          <h3 className="newtab-widget-title newtab-crossword-title">
-            Daily crossword
-          </h3>
+          <h3
+            className="newtab-widget-title newtab-crossword-title"
+            data-l10n-id="newtab-crossword-widget-title"
+          />
         </div>
         <div className="crossword-context-menu-wrapper">
           <WidgetMenuButton
@@ -380,10 +403,9 @@ function Crossword({
               <panel-item
                 key={item.key}
                 className={item.key}
+                data-l10n-id={item.l10nId}
                 onClick={() => handleMenuAction(item.action)}
-              >
-                {item.label}
-              </panel-item>
+              />
             ))}
 
             <WidgetMenuPoweredBy
@@ -423,13 +445,15 @@ function Crossword({
               widgetEnabledMap={widgetEnabledMap}
             />
 
-            <panel-item
-              data-l10n-id="newtab-widget-menu-hide"
-              onClick={handleCrosswordHide}
+            <WidgetHideMenuItem
+              widgetId="crossword"
+              onHide={handleCrosswordHide}
             />
-            <panel-item className="learn-more" onClick={handleLearnMore}>
-              Learn more
-            </panel-item>
+            <panel-item
+              className="learn-more"
+              data-l10n-id="newtab-crossword-widget-menu-learn-more"
+              onClick={handleLearnMore}
+            />
           </panel-list>
         </div>
       </div>
@@ -438,11 +462,9 @@ function Crossword({
         <iframe
           ref={iframeRef}
           className="crossword-frame"
-          title="Crossword"
-          src={crosswordEndpoint}
-          // allow-same-origin is required for the crossword to work, but is
-          // currently under security review to see if it's safe to keep in our codebase right now.
-          sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+          data-l10n-id="newtab-crossword-widget-frame"
+          src={src}
+          sandbox={FRAMED_WIDGET_SANDBOX}
         />
       </div>
     </article>

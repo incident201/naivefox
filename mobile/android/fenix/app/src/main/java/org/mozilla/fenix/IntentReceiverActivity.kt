@@ -12,10 +12,12 @@ import android.os.Bundle
 import android.os.StrictMode
 import android.view.ContextThemeWrapper
 import androidx.annotation.VisibleForTesting
+import mozilla.appservices.fxaclient.contentUrl
 import mozilla.components.feature.intent.ext.sanitize
 import mozilla.components.feature.intent.processing.IntentProcessor
 import mozilla.components.feature.intent.processing.TabIntentProcessor.Companion.EXTRA_APP_LINK_LAUNCH_TYPE
 import mozilla.components.support.base.log.logger.Logger
+import mozilla.components.support.ktx.kotlin.isSameOriginAs
 import mozilla.components.support.utils.EXTRA_ACTIVITY_REFERRER_CATEGORY
 import mozilla.components.support.utils.EXTRA_ACTIVITY_REFERRER_PACKAGE
 import mozilla.components.support.utils.INTENT_TYPE_PDF
@@ -24,6 +26,7 @@ import mozilla.components.support.utils.toSafeIntent
 import org.mozilla.fenix.GleanMetrics.Events
 import org.mozilla.fenix.GleanMetrics.SyncAuth
 import org.mozilla.fenix.HomeActivity.Companion.PRIVATE_BROWSING_MODE
+import org.mozilla.fenix.components.FxaServer
 import org.mozilla.fenix.components.IntentProcessorType
 import org.mozilla.fenix.components.getType
 import org.mozilla.fenix.ext.components
@@ -31,6 +34,7 @@ import org.mozilla.fenix.ext.isIntentInternal
 import org.mozilla.fenix.perf.MarkersActivityLifecycleCallbacks
 import org.mozilla.fenix.perf.StartupTimeline
 import org.mozilla.fenix.settings.SupportUtils
+import org.mozilla.fenix.settings.account.AuthCustomTabActivity
 import org.mozilla.fenix.shortcut.NewTabShortcutIntentProcessor
 import org.mozilla.fenix.shortcut.UninstallShortcutIntentProcessor
 
@@ -76,13 +80,8 @@ class IntentReceiverActivity : Activity() {
 
     fun processIntent(intent: Intent) {
         val data = intent.toSafeIntent().data
-        if (intent.action == Intent.ACTION_VIEW && data != null && isFxaPairingLink(data)) {
-            SyncAuth.pairingLinkOpened.record(
-                SyncAuth.PairingLinkOpenedExtra(
-                    campaignAttributed = components.settings.isUserPairingCampaignAttributed
-                )
-            )
-            launchAuthCustomTab(data)
+        if (intent.action == Intent.ACTION_VIEW && data != null && isFxaPairingLink(data, fxaServerUrl())) {
+            processPairingLink(data)
             return
         }
 
@@ -120,6 +119,35 @@ class IntentReceiverActivity : Activity() {
         launch(intent, intentProcessorType)
     }
 
+    /**
+     * Opens a Firefox Accounts pairing link in the pairing flow if onboarding is complete. Otherwise, the link is
+     * dropped and onboarding is shown instead.
+     */
+    private fun processPairingLink(data: Uri) {
+        if (hasCompletedOnboarding()) {
+            SyncAuth.pairingLinkOpened.record(
+                SyncAuth.PairingLinkOpenedExtra(
+                    campaignAttributed = components.settings.isUserPairingCampaignAttributed
+                )
+            )
+            launchAuthCustomTab(data)
+        } else {
+            launchHome()
+        }
+    }
+
+    /** Opens [HomeActivity] without forwarding the incoming intent. */
+    private fun launchHome() {
+        startActivityAndFinish(Intent(this, HomeActivity::class.java))
+    }
+
+    /** Returns whether onboarding is complete. If onboarding is disabled, it is treated as onboarded. */
+    private fun hasCompletedOnboarding(): Boolean =
+        components.fenixOnboarding.userHasBeenOnboarded() || !components.settings.onboardingFeatureEnabled
+
+    /** Returns the configured Firefox Accounts server URL. */
+    private fun fxaServerUrl(): String = FxaServer.config(this).server.contentUrl()
+
     private fun persistUriReadPermission(uri: Uri) {
         try {
             val takeFlags: Int = Intent.FLAG_GRANT_READ_URI_PERMISSION
@@ -139,24 +167,33 @@ class IntentReceiverActivity : Activity() {
                 intentProcessorType.shouldOpenToBrowser(intent),
             )
         }
-        // StrictMode violation on certain devices such as Samsung
-        components.strictMode.allowViolation(StrictMode::allowThreadDiskReads) {
-            startActivity(intent)
-        }
-        finish() // must finish() after starting the other activity
+        startActivityAndFinish(intent)
     }
 
-    /** Opens a scanned Firefox Accounts pairing link in [org.mozilla.fenix.settings.account.AuthCustomTabActivity]. */
+    /**
+     * Opens a scanned Firefox Accounts pairing link in [AuthCustomTabActivity] with `embed=customtab` appended so the
+     * page can adapt its wording.
+     */
     @VisibleForTesting
     internal fun launchAuthCustomTab(pairingUrl: Uri) {
         // Neither the receiver's transparent theme nor the application context defines colorSurface, which the custom
         // tab intent reads, so resolve it against the app theme explicitly.
         val themedContext = ContextThemeWrapper(this, R.style.NormalTheme)
-        val intent = SupportUtils.createAuthCustomTabIntent(themedContext, pairingUrl.toString())
+        val pairingCustomTabUrl =
+            pairingUrl.buildUpon().appendQueryParameter(FXA_EMBED_PARAM, FXA_EMBED_CUSTOM_TAB).build()
+        val intent =
+            SupportUtils.createAuthCustomTabIntent(themedContext, pairingCustomTabUrl.toString())
+                .putExtra(AuthCustomTabActivity.EXTRA_OPEN_HOME_ON_AUTHENTICATED, true)
+        startActivityAndFinish(intent)
+    }
+
+    private fun startActivityAndFinish(intent: Intent) {
         // StrictMode violation on certain devices such as Samsung
         components.strictMode.allowViolation(StrictMode::allowThreadDiskReads) {
             startActivity(intent)
         }
+        // Finish after starting the next activity, or intents from other apps won't reuse the existing activity
+        // (https://github.com/mozilla-mobile/fenix/issues/8544).
         finish()
     }
 
@@ -219,12 +256,14 @@ private fun Intent.stripUnwantedFlags() {
     flags = flags and Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS.inv()
 }
 
-private val FXA_PAIRING_HOSTS = setOf("accounts.firefox.com", "accounts.stage.mozaws.net")
-private const val FXA_PAIRING_PATH_PREFIX = "/pair"
+private const val FXA_PAIRING_PATH = "/pair"
+private const val FXA_EMBED_PARAM = "embed"
+private const val FXA_EMBED_CUSTOM_TAB = "customtab"
 
-/** Whether [uri] is a Firefox Accounts pairing link on the production or stage server. */
+/**
+ * Returns whether [uri] has the same origin as [fxaServerUrl] and the Firefox Accounts pairing path. [fxaServerUrl] is
+ * the origin of the configured account server, as returned by `FxaServer.contentUrl()`.
+ */
 @VisibleForTesting
-internal fun isFxaPairingLink(uri: Uri): Boolean =
-    uri.scheme == "https" &&
-        uri.host?.lowercase() in FXA_PAIRING_HOSTS &&
-        uri.path.orEmpty().startsWith(FXA_PAIRING_PATH_PREFIX)
+internal fun isFxaPairingLink(uri: Uri, fxaServerUrl: String): Boolean =
+    uri.toString().lowercase().isSameOriginAs(fxaServerUrl) && uri.path == FXA_PAIRING_PATH

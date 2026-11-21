@@ -8,7 +8,7 @@ package mozilla.components.feature.ipprotection.store.state
 
 import mozilla.components.ExperimentalAndroidComponentsApi
 import mozilla.components.concept.engine.ipprotection.ServiceState
-import mozilla.components.feature.ipprotection.buildIPProtectionState
+import mozilla.components.feature.ipprotection.storage.buildIPProtectionState
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -109,28 +109,24 @@ class IPProtectionStatusTest {
     }
 
     @Test
-    fun `GIVEN a pending request THEN only an activation requested from an idle proxy shows as Activating`() {
+    fun `GIVEN a running proxy request THEN only an activation from an idle proxy shows as Activating`() {
         val cases =
             listOf(
-                Triple(Authorized.Idle, PendingActivationRequest.Activate(null), IPProtectionStatus.Activating),
-                Triple(Authorized.Idle, PendingActivationRequest.Deactivate, IPProtectionStatus.Disabled),
-                Triple(
-                    Authorized.Active,
-                    PendingActivationRequest.Activate("CA", isLocationSwitch = true),
-                    IPProtectionStatus.Enabled,
-                ),
+                Triple(Authorized.Idle, ProxyRequest.Activate(null), IPProtectionStatus.Activating),
+                Triple(Authorized.Idle, ProxyRequest.Deactivate, IPProtectionStatus.Disabled),
+                Triple(Authorized.Active, ProxyRequest.SwitchLocation("CA"), IPProtectionStatus.Enabled),
             )
 
-        cases.forEach { (proxyStatus, request, expected) ->
+        cases.forEach { (proxyStatus, proxyRequest, expected) ->
             val state =
                 buildIPProtectionState(
                     eligibilityStatus = EligibilityStatus.Eligible,
                     serviceStatus = ServiceState.Ready,
                     proxyStatus = proxyStatus,
-                    pendingActivationRequest = request,
+                    proxyRequest = proxyRequest,
                 )
 
-            assertEquals("$proxyStatus with $request", expected, state.ipProtectionStatus)
+            assertEquals("$proxyStatus with $proxyRequest", expected, state.ipProtectionStatus)
         }
     }
 }

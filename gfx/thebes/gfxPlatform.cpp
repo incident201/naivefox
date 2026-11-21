@@ -85,6 +85,7 @@
 #endif
 #if defined(MOZ_WIDGET_ANDROID)
 #  include "mozilla/java/HardwareCodecCapabilityUtilsWrappers.h"
+#  include "mozilla/layers/AndroidImageReader.h"
 #endif
 
 #ifdef XP_WIN
@@ -397,12 +398,9 @@ void CrashStatsLogForwarder::CrashAction(LogReason aReason) {
 #define GFX_PREF_WORD_CACHE_MAXENTRIES "gfx.font_rendering.wordcache.maxentries"
 
 #define GFX_PREF_GRAPHITE_SHAPING "gfx.font_rendering.graphite.enabled"
-#if defined(XP_DARWIN)
-#  define GFX_PREF_CORETEXT_SHAPING "gfx.font_rendering.coretext.enabled"
-#endif
 
 static const char* kObservedPrefs[] = {"gfx.downloadable_fonts.",
-                                       "gfx.font_rendering.", nullptr};
+                                       "gfx.font_rendering."};
 
 static void FontPrefChanged(const char* aPref, void* aData) {
   MOZ_ASSERT(aPref);
@@ -845,10 +843,6 @@ void gfxPlatform::Init() {
     nsAutoCString path;
     Preferences::GetCString("layers.windowrecording.path", path);
     gfxVars::SetLayersWindowRecordingPath(path);
-
-    if (gFxREmbedded) {
-      gfxVars::SetFxREmbedded(true);
-    }
   }
 
   // Drop a note in the crash report if we end up forcing an option that could
@@ -874,7 +868,7 @@ void gfxPlatform::Init() {
     forcedPrefs.AppendPrintf(
         "-W%d%d%d%d%d%d%d", StaticPrefs::webgl_angle_force_d3d11(),
         StaticPrefs::webgl_angle_force_warp(), StaticPrefs::webgl_disabled(),
-        StaticPrefs::webgl_disable_angle(),
+        StaticPrefs::webgl_disable_angle_AtStartup(),
 #ifdef XP_WIN
         StaticPrefs::webgl_dxgl_enabled(),
 #else
@@ -1366,6 +1360,11 @@ void gfxPlatform::InitLayersIPC() {
 #endif
       RemoteTextureMap::Init();
       wr::RenderThread::Start(GPUProcessManager::Get()->AllocateNamespace());
+#ifdef MOZ_WIDGET_ANDROID
+      if (gfxVars::ForceAImageReaderAndroid()) {
+        layers::GpuProcessAndroidImageReaderMap::Init();
+      }
+#endif
       image::ImageMemoryReporter::InitForWebRender();
     }
 
@@ -1402,6 +1401,11 @@ void gfxPlatform::ShutdownLayersIPC() {
     gfx::CanvasRenderThread::Shutdown();
     // This has to happen after shutting down the child protocols.
     layers::CompositorThreadHolder::Shutdown();
+#ifdef MOZ_WIDGET_ANDROID
+    if (layers::GpuProcessAndroidImageReaderMap::Get()) {
+      layers::GpuProcessAndroidImageReaderMap::Shutdown();
+    }
+#endif
     RemoteTextureMap::Shutdown();
     image::ImageMemoryReporter::ShutdownForWebRender();
     // There is a case that RenderThread exists when UseWebRender() is
@@ -2164,11 +2168,7 @@ void gfxPlatform::FontsPrefsChanged(const char* aPref) {
              !strcmp(GFX_PREF_WORD_CACHE_MAXENTRIES, aPref) ||
              !strcmp(GFX_PREF_GRAPHITE_SHAPING, aPref)) {
     FlushFontAndWordCaches();
-  } else if (
-#if defined(XP_DARWIN)
-      !strcmp(GFX_PREF_CORETEXT_SHAPING, aPref) ||
-#endif
-      !strcmp("gfx.font_rendering.ahem_antialias_none", aPref)) {
+  } else if (!strcmp("gfx.font_rendering.ahem_antialias_none", aPref)) {
     FlushFontAndWordCaches();
   } else if (!strcmp(GFX_PREF_OPENTYPE_SVG, aPref)) {
     gfxFontCache::GetCache()->Flush();
@@ -3214,6 +3214,18 @@ void gfxPlatform::InitWebGPUConfig() {
   nsCString failureId;
 
   FeatureState& featureWebGPU = gfxConfig::GetFeature(Feature::WEBGPU);
+
+#ifndef HAVE_64BIT_BUILD
+  featureWebGPU.DisableByDefault(
+      FeatureStatus::Unavailable,
+      "WebGPU is only available on 64-bit architectures.",
+      "FEATURE_WEBGPU_NOT_64_BIT"_ns);
+#elif defined(WIN32) && !defined(MOZ_DXCOMPILER)
+  featureWebGPU.DisableByDefault(
+      FeatureStatus::Unavailable,
+      "DirectX Shader Compiler (DXC) unavailable in this build",
+      "FEATURE_WEBGPU_NO_DXC"_ns);
+#else
   featureWebGPU.EnableByDefault();
 
   if (!gfxConfig::IsEnabled(Feature::GPU_PROCESS) &&
@@ -3232,6 +3244,12 @@ void gfxPlatform::InitWebGPUConfig() {
                             failureId);
     }
   }
+#endif
+
+  // Don't check `dom.webgpu.enabled` or `dom.webgpu.service-workers-enabled`
+  // here. We would like those prefs to take effect without restarting Firefox,
+  // and these checks only run at startup. Instead, the prefs should be checked
+  // along with `gfxVars::AllowWebGPU`.
 
   gfxVars::SetAllowWebGPU(featureWebGPU.IsEnabled());
 
@@ -4166,6 +4184,12 @@ void gfxPlatform::DisableGPUProcess() {
   // We need to initialize the parent process to prepare for WebRender if we
   // did not end up disabling it, despite losing the GPU process.
   wr::RenderThread::Start(GPUProcessManager::Get()->AllocateNamespace());
+#ifdef MOZ_WIDGET_ANDROID
+  if (gfxVars::ForceAImageReaderAndroid() &&
+      !layers::GpuProcessAndroidImageReaderMap::Get()) {
+    layers::GpuProcessAndroidImageReaderMap::Init();
+  }
+#endif
   gfx::CanvasRenderThread::Start();
   image::ImageMemoryReporter::InitForWebRender();
 }

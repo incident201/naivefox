@@ -161,7 +161,7 @@ add_task(async function () {
     info("Performing a CORS request");
     const requestUrl = "https://example.com" + CORS_SJS_PATH;
 
-    const wait = waitForNetworkEvents(monitor, 1);
+    const onNetworkEvents = waitForNetworkEvents(monitor, 1);
     await SpecialPowers.spawn(
       tab.linkedBrowser,
       [requestUrl],
@@ -171,7 +171,7 @@ add_task(async function () {
     );
 
     info("Waiting until the requests appear in netmonitor");
-    await wait;
+    await onNetworkEvents;
 
     const { getSelectedRequest } = windowRequire(
       "devtools/client/netmonitor/src/selectors/index"
@@ -184,7 +184,7 @@ add_task(async function () {
     info("Fetch the Headers for the original XHR request");
     let originalRequest = getSelectedRequest(store.getState());
     await connector.requestData(originalRequest.id, "requestHeaders");
-    await waitForRequestData(store, ["requestHeaders"]);
+    await waitForRequestData(monitor, ["requestHeaders"]);
     originalRequest = getSelectedRequest(store.getState());
 
     info("Resend the XHR request");
@@ -196,7 +196,7 @@ add_task(async function () {
     info("Fetch the Headers for the resent XHR request");
     let resentRequest = getSelectedRequest(store.getState());
     await connector.requestData(resentRequest.id, "requestHeaders");
-    await waitForRequestData(store, ["requestHeaders"]);
+    await waitForRequestData(monitor, ["requestHeaders"]);
     resentRequest = getSelectedRequest(store.getState());
 
     const originalRequestSecFetchModeHeader =

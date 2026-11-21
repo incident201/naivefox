@@ -5,14 +5,16 @@
 // This helps you perform a sync of multiple engines and helps you manage
 // global and local state between syncs.
 
-use super::state::{EngineChangesNeeded, GlobalState, PersistedGlobalState, SetupStateMachine};
+use super::state::{
+    EngineChangesNeeded, GlobalState, PersistedGlobalState, SetupStateMachine, engine_version,
+};
 use super::status::{ServiceStatus, SyncResult};
 use super::storage_client::{BackoffListener, Sync15StorageClient, Sync15StorageClientInit};
-use crate::KeyBundle;
 use crate::clients_engine::{self, CLIENTS_TTL_REFRESH, CommandProcessor};
 use crate::engine::{EngineSyncAssociation, SyncEngine};
 use crate::error::{Error, debug, info, trace, warn};
 use crate::telemetry;
+use crate::{EngineChoicesModel, KeyBundle};
 use interrupt_support::Interruptee;
 use std::collections::HashMap;
 use std::result;
@@ -97,7 +99,7 @@ pub fn sync_multiple(
     storage_init: &Sync15StorageClientInit,
     root_sync_key: &KeyBundle,
     interruptee: &dyn Interruptee,
-    req_info: Option<SyncRequestInfo<'_>>,
+    req_info: Option<SyncRequestInfo>,
 ) -> SyncResult {
     sync_multiple_with_command_processor(
         None,
@@ -123,7 +125,7 @@ pub fn sync_multiple_with_command_processor(
     storage_init: &Sync15StorageClientInit,
     root_sync_key: &KeyBundle,
     interruptee: &dyn Interruptee,
-    req_info: Option<SyncRequestInfo<'_>>,
+    req_info: Option<SyncRequestInfo>,
 ) -> SyncResult {
     info!("Syncing {} engines", engines.len());
     let mut sync_result = SyncResult {
@@ -141,7 +143,7 @@ pub fn sync_multiple_with_command_processor(
         engines,
         storage_init,
         interruptee,
-        engines_to_state_change: req_info.engines_to_state_change,
+        engine_choices_model: req_info.engine_choices_model,
         backoff: backoff.clone(),
         root_sync_key,
         result: &mut sync_result,
@@ -177,8 +179,8 @@ pub fn sync_multiple_with_command_processor(
 /// otherwise we won't. It should probably be rethought if it gains many more
 /// fields.
 #[derive(Debug, Default)]
-pub struct SyncRequestInfo<'a> {
-    pub engines_to_state_change: Option<&'a HashMap<String, bool>>,
+pub struct SyncRequestInfo {
+    pub engine_choices_model: EngineChoicesModel,
     pub is_user_action: bool,
 }
 
@@ -190,7 +192,7 @@ struct SyncMultipleDriver<'info, 'res, 'pgs, 'mcs> {
     root_sync_key: &'info KeyBundle,
     interruptee: &'info dyn Interruptee,
     backoff: BackoffListener,
-    engines_to_state_change: Option<&'info HashMap<String, bool>>,
+    engine_choices_model: EngineChoicesModel,
     result: &'res mut SyncResult,
     persisted_global_state: &'pgs mut Option<String>,
     mem_cached_state: &'mcs mut MemoryCachedState,
@@ -274,6 +276,31 @@ impl SyncMultipleDriver<'_, '_, '_, '_> {
         Ok(())
     }
 
+    fn per_device(&self) -> bool {
+        matches!(self.engine_choices_model, EngineChoicesModel::Device)
+    }
+
+    /// With per-device engine choices, the engines the state machine must make
+    /// sure have sync IDs.
+    fn sync_id_engines(&self) -> Vec<(String, usize)> {
+        if !self.per_device() {
+            return vec![];
+        }
+        self.engines
+            .iter()
+            .filter_map(|e| {
+                let name = e.collection_name();
+                match engine_version(&name) {
+                    Some(version) => Some((name.to_string(), version)),
+                    None => {
+                        warn!("Unknown engine {}, so it has no sync ID", name);
+                        None
+                    }
+                }
+            })
+            .collect()
+    }
+
     fn was_interrupted(&mut self) -> bool {
         if self.interruptee.was_interrupted() {
             info!("Interrupted, bailing out");
@@ -301,7 +328,10 @@ impl SyncMultipleDriver<'_, '_, '_, '_> {
                 warn!("Got backoff, bailing out of sync early");
                 break;
             }
-            if global_state.global.declined.iter().any(|e| e == &*name) {
+            // With per-device engine choices, the account's declined engines
+            // are irrelevant - we sync whatever we were asked to.
+            if !global_state.per_device && global_state.global.declined.iter().any(|e| e == &*name)
+            {
                 info!("The {} engine is declined. Skipping", name);
                 continue;
             }
@@ -354,12 +384,14 @@ impl SyncMultipleDriver<'_, '_, '_, '_> {
         pgs: &mut PersistedGlobalState,
     ) -> result::Result<GlobalState, Error> {
         let last_state = self.mem_cached_state.last_global_state.take();
+        let sync_id_engines = self.sync_id_engines();
 
         let mut state_machine = SetupStateMachine::for_full_sync(
             &client_info.client,
             self.root_sync_key,
             pgs,
-            self.engines_to_state_change,
+            &self.engine_choices_model,
+            &sync_id_engines,
             self.interruptee,
         );
 
@@ -372,16 +404,35 @@ impl SyncMultipleDriver<'_, '_, '_, '_> {
         // update the caller's repr of it.
         *self.persisted_global_state = Some(serde_json::to_string(&pgs)?);
 
-        // Now that we've gone through the state machine, engine the declined list in
-        // the sync_result
-        self.result.declined = Some(pgs.get_declined().to_vec());
-        debug!(
-            "Declined engines list after state machine set to: {:?}",
-            self.result.declined,
-        );
+        // With per-device engine choices, the persisted declined engines make no sense.
+        // Consumers should ignore this in the result, but to be careful during the transition,
+        // don't report per-account declined engines if we are per-device.
+        if !self.per_device() {
+            // Now that we've gone through the state machine, update the declined list in
+            // the sync_result
+            self.result.declined = Some(pgs.get_declined().to_vec());
+            debug!(
+                "Declined engines list after state machine set to: {:?}",
+                self.result.declined,
+            );
+        }
 
         if let Some(c) = changes {
-            self.wipe_or_reset_engines(c, &client_info.client)?;
+            if self.per_device() {
+                // Per-device engine choices never affect other clients, so must
+                // never wipe engines on the server (nor reset them because of
+                // what's declined). The state machine never asks us to, but a
+                // wipe is too destructive to rely on that alone.
+                debug_assert_eq!(c, EngineChangesNeeded::default());
+                if c != EngineChangesNeeded::default() {
+                    warn!(
+                        "Ignoring engine changes for per-device engine choices: {:?}",
+                        c
+                    );
+                }
+            } else {
+                self.wipe_or_reset_engines(c, &client_info.client)?;
+            }
         }
         let state = match res {
             Err(e) => {
@@ -427,6 +478,10 @@ impl SyncMultipleDriver<'_, '_, '_, '_> {
                 // changed, courtesy of the 'kid' in the structure. Thus, we can't
                 // reuse the client or the memory cached state. We do keep the disk
                 // state as currently that's only the declined list.
+                // XXX - note that comparing the entire structure is sub-optimal,
+                // in particular, if only the access token has changed we throw away
+                // all that state, meaning the next sync does more work than strictly
+                // needed. We should investigate fixing that.
                 if client_info.client_init != *self.storage_init {
                     info!("Discarding all state as the account might have changed");
                     *self.mem_cached_state = MemoryCachedState::default();

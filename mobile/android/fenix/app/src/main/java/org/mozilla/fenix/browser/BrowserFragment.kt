@@ -54,7 +54,6 @@ import org.mozilla.fenix.browser.store.BrowserScreenAction.ReaderModeStatusUpdat
 import org.mozilla.fenix.components.Components
 import org.mozilla.fenix.components.LensFeature
 import org.mozilla.fenix.components.QrScanFenixFeature
-import org.mozilla.fenix.components.TabCollectionStorage
 import org.mozilla.fenix.components.VoiceSearchFeature
 import org.mozilla.fenix.components.accounts.FenixFxAEntryPoint
 import org.mozilla.fenix.components.appstate.AppAction
@@ -64,8 +63,6 @@ import org.mozilla.fenix.components.share.isSystemShareSheetSupported
 import org.mozilla.fenix.components.toolbar.ToolbarPosition
 import org.mozilla.fenix.components.toolbar.gestures.ToolbarHorizontalGesturesHandler
 import org.mozilla.fenix.components.toolbar.gestures.ToolbarVerticalGesturesHandler
-import org.mozilla.fenix.compose.snackbar.Snackbar
-import org.mozilla.fenix.compose.snackbar.SnackbarState
 import org.mozilla.fenix.e2e.SystemInsetsPaddedFragment
 import org.mozilla.fenix.ext.application
 import org.mozilla.fenix.ext.components
@@ -208,7 +205,11 @@ class BrowserFragment : BaseBrowserFragment(), UserInteractionHandler, SystemIns
     }
 
     private fun setupToolbarSwipeBehavior(settings: Settings, components: Components) {
-        if (!settings.isTabStripEnabled && settings.isSwipeToolbarToSwitchTabsEnabled) {
+        if (
+            !settings.isTabStripEnabled &&
+                !settings.shouldShowTabGroupsStrip &&
+                settings.isSwipeToolbarToSwitchTabsEnabled
+        ) {
             binding.gestureLayout.addGestureListener(
                 ToolbarHorizontalGesturesHandler(
                     activity = requireActivity(),
@@ -346,7 +347,8 @@ class BrowserFragment : BaseBrowserFragment(), UserInteractionHandler, SystemIns
 
     private fun initListenSheet(context: Context, rootView: View) {
         val settings = context.components.settings
-        if (!settings.listenToPageFeatureFlagEnabled) {
+        val listenSettings = context.components.listenToPage.settings
+        if (!listenSettings.available) {
             return
         }
 
@@ -358,10 +360,11 @@ class BrowserFragment : BaseBrowserFragment(), UserInteractionHandler, SystemIns
                     listenStore = context.components.listenToPage.store,
                     engineView = binding.engineView,
                     isAddressBarAtBottom = settings.toolbarPosition == ToolbarPosition.BOTTOM,
+                    isEnabled = listenSettings.enabled,
                     onListenClicked = {
                         context.components.core.store.state.selectedTab?.let { tab ->
                             context.components.listenToPage.store.dispatch(
-                                ListenAction.Session.ListenRequested(
+                                ListenAction.User.Session.ListenRequested(
                                     tabId = tab.id,
                                     url = tab.readerState.activeUrl ?: tab.content.url,
                                 )
@@ -393,8 +396,12 @@ class BrowserFragment : BaseBrowserFragment(), UserInteractionHandler, SystemIns
                             ),
                     )
             },
-            navigateToIpProtection = {
-                IPProtectionBottomSheetFragment.showPrompt(fragment = this, surface = IPProtectionSurface.BROWSER)
+            navigateToIpProtection = { promptDetails ->
+                IPProtectionBottomSheetFragment.showPrompt(
+                    fragment = this,
+                    surface = IPProtectionSurface.BROWSER,
+                    promptDetails = promptDetails,
+                )
             },
         )
     }
@@ -411,12 +418,6 @@ class BrowserFragment : BaseBrowserFragment(), UserInteractionHandler, SystemIns
 
     override fun onStart() {
         super.onStart()
-        val context = requireContext()
-
-        if (context.components.appStore.state.longfoxEntryPointReady) {
-            context.components.appStore.dispatch(AppAction.UpdateShowFoxPeekAnimation(false))
-        }
-
         subscribeToTabCollections()
         updateLastBrowseActivity()
 
@@ -446,11 +447,6 @@ class BrowserFragment : BaseBrowserFragment(), UserInteractionHandler, SystemIns
             .also { observer ->
                 requireComponents.core.tabCollectionStorage.getCollections().observe(viewLifecycleOwner, observer)
             }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        requireComponents.core.tabCollectionStorage.register(collectionStorageObserver, this)
     }
 
     override fun onBackPressed(): Boolean {
@@ -484,41 +480,6 @@ class BrowserFragment : BaseBrowserFragment(), UserInteractionHandler, SystemIns
         }
     }
 
-    private val collectionStorageObserver =
-        object : TabCollectionStorage.Observer {
-            override fun onCollectionCreated(
-                title: String,
-                sessions: List<TabSessionState>,
-                id: Long?,
-            ) {
-                showTabSavedToCollectionSnackbar(sessions.size, true)
-            }
-
-            override fun onTabsAdded(tabCollection: TabCollection, sessions: List<TabSessionState>) {
-                showTabSavedToCollectionSnackbar(sessions.size)
-            }
-
-            private fun showTabSavedToCollectionSnackbar(
-                tabSize: Int,
-                isNewCollection: Boolean = false,
-            ) {
-                val messageResId =
-                    when {
-                        isNewCollection -> R.string.create_collection_tabs_saved_new_collection_2
-                        tabSize == 1 -> R.string.create_collection_tab_saved_2
-                        else -> return // Don't show snackbar for multiple tabs
-                    }
-
-                view?.let {
-                    Snackbar.make(
-                            snackBarParentView = binding.dynamicSnackbarContainer,
-                            snackbarState = SnackbarState(message = getString(messageResId)),
-                        )
-                        .show()
-                }
-            }
-        }
-
     override fun getContextMenuCandidates(
         context: Context,
         view: View,
@@ -528,7 +489,7 @@ class BrowserFragment : BaseBrowserFragment(), UserInteractionHandler, SystemIns
                 requireContext(),
                 { true },
             )
-
+        val tabGroupCandidates = listOf(createOpenInNewTabInGroupCandidate(context))
         return if (requireComponents.settings.nativeShareSheetEnabled && isSystemShareSheetSupported) {
             NativeShareSheetContextMenuCandidate.defaultCandidates(
                 context = context,
@@ -547,14 +508,9 @@ class BrowserFragment : BaseBrowserFragment(), UserInteractionHandler, SystemIns
                 },
                 snackBarParentView = view,
                 snackbarDelegate = ContextMenuSnackbarDelegate(),
-                downloadsLocation = {
-                    DownloadLocationManager(
-                            requireComponents.settings,
-                            requireContext().contentResolver,
-                        )
-                        .defaultLocation
-                },
+                downloadsLocation = ::defaultDownloadsLocation,
                 navigateToShareFragment = ::navigateToShareFragment,
+                additionalTabCandidates = tabGroupCandidates,
             )
         } else {
             ContextMenuCandidate.defaultCandidates(
@@ -563,13 +519,8 @@ class BrowserFragment : BaseBrowserFragment(), UserInteractionHandler, SystemIns
                 contextMenuUseCases = context.components.useCases.contextMenuUseCases,
                 snackBarParentView = view,
                 snackbarDelegate = ContextMenuSnackbarDelegate(),
-                downloadsLocation = {
-                    DownloadLocationManager(
-                            requireComponents.settings,
-                            requireContext().contentResolver,
-                        )
-                        .defaultLocation
-                },
+                downloadsLocation = ::defaultDownloadsLocation,
+                additionalTabCandidates = tabGroupCandidates,
             )
         } +
             createOpenInExternalAppCandidate(
@@ -610,6 +561,20 @@ class BrowserFragment : BaseBrowserFragment(), UserInteractionHandler, SystemIns
                 navOptions = NavOptions.Builder().setPopUpTo(popUpToId, false).build(),
             )
     }
+
+    private fun defaultDownloadsLocation() =
+        DownloadLocationManager(requireComponents.settings, requireContext().contentResolver).defaultLocation
+
+    private fun createOpenInNewTabInGroupCandidate(context: Context) =
+        TabGroupContextMenuCandidate.createOpenInNewTabInGroupCandidate(
+            resources = context.resources,
+            tabGroupsEnabled = context.components.settings.tabGroupsEnabled,
+            tabGroupsStripEnabled = context.components.settings.tabGroupsStripEnabled,
+            tabsUseCases = context.components.useCases.tabsUseCases,
+            tabDataCoordinator = context.components.tabDataCoordinator,
+            appStore = context.components.appStore,
+            scope = viewLifecycleOwner.lifecycleScope,
+        )
 
     private fun createOpenWithGoogleLensCandidate(context: Context) =
         ContextMenuCandidate(

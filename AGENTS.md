@@ -8,12 +8,14 @@ If you see a good first bug that isn't directly related to your work, don't hesi
 The Firefox repository is very big and so it isn't advised to blindly run rg or grep commands without specifying a narrow set of directories to search. When local text search via shell is necessary, prefer `rg` over `grep` as it is faster. There are tools available to help, see next section.
 
 When working on anything under any of the following directories:
- - `js/`
+ - `browser/extensions/newtab/`
+ - `browser/themes/`
+ - `dom/media/`
  - `gfx/wr/`
+ - `js/`
  - `layout/`
  - `security/nss/`
- - `browser/extensions/newtab/`
- - `dom/media/`
+ - `toolkit/themes/`
 Open `AGENTS.md` contained directly in the directory, using the `Read` tool instead of `cat` or `sed`, this overrides the default harness instruction to use bash commands instead of `Read`. `security/nss/` is imported from upstream and has a `CLAUDE.md` instead; read that one.
 
 ## Tooling for Firefox work
@@ -32,6 +34,7 @@ searchfox-cli --id AudioSink -l 150 --cpp # search for identifier audio sink in 
 - Use the `searchfox-cli` tool, only using `rg` or usual local tools if you need to find information about something
 that has definitely changed locally. If you're unsure, ask.
 - If recommended tooling (e.g. `searchfox-cli`, `treeherder-cli`) is missing, run `./mach bootstrap` to install it; if it reports it needs updating, let the user know.
+- If one of these tools rejects an option that these instructions or a skill use (e.g. `unexpected argument '--permalink'`), the installed copy is outdated or is an old one shadowing the bootstrapped copy in `~/.mozbuild/bin`. Stop and tell the user, showing `command -v <tool>`, and propose running `./mach bootstrap`. Don't silently fall back to a workaround.
 - If you can't find something quickly, it is better to ask than run local searches.
 - `./mach` is the main interface to the Mozilla build system and common developer tasks. Important commands are listed here, and you can run `./mach help` for a full list of commands. If you want additional details for a given command, you can run `./mach COMMAND --help`
 - `./mach format`: Format code. Run it without additional parameters to format all the files you have modified
@@ -56,9 +59,6 @@ You can find the review identifier by inspecting the commit log with:
 
 - **Reference a name, not a position.** This text outlives the code it describes, so cite a selector, function, class, pref or flag name; name a file without a line, and avoid positional phrasing ("the rule above X").
 - **Where a location genuinely helps, use a Searchfox permalink.** Get it from `searchfox-cli -q <term> -p <path> --permalink`, which pins the revision Searchfox has indexed. Indexing lags landing by up to a day and an unindexed revision still answers HTTP 200, so a URL built by hand from `git log` has to be verified by grepping the page for content you expect. The form is `https://searchfox.org/firefox-main/rev/<sha>/<path>#<line>`, and the anchor also takes `#169-176` or `#9,12`. The `/source/<path>` form follows tip and rots like a bare line number, so where Searchfox cannot cite the code yet, name the file and quote the lines instead.
-
-## Code Style
-- Our style guide forbids the use of emoji.
 
 ## Workflow
 - This repository moves fast. If the local checkout looks old compared to `origin/main`, suggest pulling the latest changes before going further.

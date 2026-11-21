@@ -21,8 +21,8 @@ import mozilla.components.concept.sync.AccountEvent
 import mozilla.components.concept.sync.AccountEventsObserver
 import mozilla.components.concept.sync.ConstellationState
 import mozilla.components.concept.sync.Device
+import mozilla.components.concept.sync.DeviceCapability
 import mozilla.components.concept.sync.DeviceCommandOutgoing
-import mozilla.components.concept.sync.DeviceConfig
 import mozilla.components.concept.sync.DeviceConstellation
 import mozilla.components.concept.sync.DeviceConstellationObserver
 import mozilla.components.concept.sync.DevicePushSubscription
@@ -51,7 +51,7 @@ class FxaDeviceConstellation(
      * Continuation interceptor for this scope.
      *
      * This exists because we should not be using the entire coroutineContext that includes a job for structured
-     * concurrency. Instead, we want to the [ContinuationInterceptor] interceptor present in the scope's context.
+     * concurrency. Instead, we only want the [ContinuationInterceptor] present in the scope's context.
      *
      * See
      * [https://kotlinlang.org/docs/coroutine-context-and-dispatchers.html#children-of-a-coroutine](https://kotlinlang.org/docs/coroutine-context-and-dispatchers.html#children-of-a-coroutine)
@@ -65,28 +65,10 @@ class FxaDeviceConstellation(
     override fun state(): ConstellationState? = constellationState
 
     @Throws(FxaPanicException::class)
-    override suspend fun initializeDevice(config: DeviceConfig): ServiceResult {
-        return withContext(continuationContext) {
-            try {
-                val capabilities = config.capabilities.map { it.into() }.toSet()
-                account.initializeDevice(config.name, config.type.into(), capabilities)
-                ServiceResult.Ok
-            } catch (e: FxaPanicException) {
-                throw e
-            } catch (_: FxaUnauthorizedException) {
-                ServiceResult.AuthError
-            } catch (_: FxaException) {
-                ServiceResult.OtherError
-            }
-        }
-    }
-
-    @Throws(FxaPanicException::class)
-    override suspend fun finalizeDevice(config: DeviceConfig): ServiceResult =
+    override suspend fun ensureCapabilities(capabilities: Set<DeviceCapability>): ServiceResult =
         withContext(continuationContext) {
             try {
-                val capabilities = config.capabilities.map { it.into() }.toSet()
-                account.ensureCapabilities(capabilities)
+                account.ensureCapabilities(capabilities.map { it.into() }.toSet())
                 ServiceResult.Ok
             } catch (e: FxaPanicException) {
                 throw e
@@ -138,7 +120,7 @@ class FxaDeviceConstellation(
             FxaDeviceSettingsCache(context).updateCachedName(name)
             // See the latest device (name) changes after changing it.
 
-            rename && refreshDevices()
+            rename && refreshDevices(ignoreCache = true)
         }
 
     override suspend fun setDevicePushSubscription(subscription: DevicePushSubscription) =
@@ -227,12 +209,12 @@ class FxaDeviceConstellation(
         notifyObservers { onEvents(events) }
     }
 
-    override suspend fun refreshDevices(): Boolean {
+    override suspend fun refreshDevices(ignoreCache: Boolean): Boolean {
         return withContext(scope.coroutineContext) {
             logger.info("Refreshing device list...")
 
             // Attempt to fetch devices, or bail out on failure.
-            val allDevices = fetchAllDevices() ?: return@withContext false
+            val allDevices = fetchAllDevices(ignoreCache) ?: return@withContext false
 
             // Find the current device.
             val currentDevice =
@@ -272,11 +254,12 @@ class FxaDeviceConstellation(
     /**
      * Get all devices in the constellation.
      *
+     * @param ignoreCache Whether to ignore the cache and refresh from the server.
      * @return A list of all devices in the constellation, or `null` on failure.
      */
-    private suspend fun fetchAllDevices(): List<Device>? {
+    private suspend fun fetchAllDevices(ignoreCache: Boolean): List<Device>? {
         return handleFxaExceptions(logger, "fetching all devices", { null }) {
-            account.getDevices().map { it.into() }
+            account.getDevices(ignoreCache = ignoreCache).map { it.into() }
         }
     }
 }

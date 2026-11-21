@@ -17,6 +17,7 @@ import mozilla.components.browser.state.store.BrowserStore
 import mozilla.components.feature.ipprotection.store.IPProtectionStore
 import mozilla.components.feature.ipprotection.store.state.EligibilityStatus
 import mozilla.components.feature.ipprotection.store.state.IPProtectionState
+import mozilla.components.feature.tabdata.coordinator.fakes.FakeTabDataCoordinator
 import mozilla.components.service.fxa.store.SyncStore
 import mozilla.components.support.test.robolectric.testContext
 import org.junit.After
@@ -35,11 +36,14 @@ import org.mozilla.fenix.browser.applinks.OpenInAppMenuItemProvider
 import org.mozilla.fenix.browser.applinks.OpenInFirefoxMenuItemProvider
 import org.mozilla.fenix.browser.menu.MoreMenuItemsProvider
 import org.mozilla.fenix.browser.menu.MoveToNormalTabsMenuItemProvider
+import org.mozilla.fenix.browser.menu.NewPrivateTabMenuItemProvider
+import org.mozilla.fenix.browser.menu.NewTabMenuItemProvider
 import org.mozilla.fenix.browser.readermode.ReaderViewMenuItemProvider
-import org.mozilla.fenix.collections.SaveToCollectionMenuItemProvider
 import org.mozilla.fenix.components.AppStore
 import org.mozilla.fenix.components.FindInPageMenuItemProvider
 import org.mozilla.fenix.components.accounts.MozillaAccountMenuItemProvider
+import org.mozilla.fenix.components.menu.configuration.FenixMenuItem
+import org.mozilla.fenix.components.menu.configuration.HomeMenuConfiguration
 import org.mozilla.fenix.components.menu.fake.reachableEvents
 import org.mozilla.fenix.customtabs.CustomTabAppMenuItemProvider
 import org.mozilla.fenix.downloads.DownloadsMenuItemProvider
@@ -54,6 +58,8 @@ import org.mozilla.fenix.settings.deletebrowsingdata.QuitMenuItemProvider
 import org.mozilla.fenix.settings.logins.PasswordsMenuItemProvider
 import org.mozilla.fenix.shortcut.AddToHomeScreenMenuItemProvider
 import org.mozilla.fenix.summarization.SummarizePageMenuItemProvider
+import org.mozilla.fenix.tabgroups.TabGroupMenuItemProvider
+import org.mozilla.fenix.tabgroups.fake.FakeTabGroupsFeatureDiscoveryConfiguration
 import org.mozilla.fenix.translations.TranslationsMenuItemProvider
 import org.mozilla.fenix.utils.Settings
 import org.mozilla.fenix.webcompat.ReportBrokenSiteMenuItemProvider
@@ -95,7 +101,7 @@ class MenuItemProvidersFactoryTest {
                 settings = settings,
             )
         val registry =
-            MenuItemsRegistry(configuration = MenuConfigurations.home(), resolver = factory::buildProviderFor)
+            MenuItemsRegistry(configuration = HomeMenuConfiguration.sections(), resolver = factory::buildProviderFor)
 
         val shown = registry.providers.filterValues { it.itemsFlow.value.isNotEmpty() }.keys
         assertEquals(
@@ -149,7 +155,6 @@ class MenuItemProvidersFactoryTest {
             historyStorage = mockk(relaxed = true),
             bookmarksStorage = mockk(relaxed = true),
             pinnedSiteStorage = mockk(relaxed = true),
-            tabCollectionStorage = mockk(relaxed = true),
             permissionStorage = mockk(relaxed = true),
             useCases = mockk(relaxed = true),
             addonManager = mockk(relaxed = true),
@@ -159,15 +164,19 @@ class MenuItemProvidersFactoryTest {
             summarizeEligibilityChecker = mockk(relaxed = true),
             translationsSettings = mockk(relaxed = true),
             isAndroidAutomotiveAvailable = false,
-            materialAlertDialogBuilder = mockk(relaxed = true),
             quitApplicationDelegate = {},
             setAsDefaultBrowserDelegate = {},
             menuViewScope = scope,
             applicationScope = scope,
+            browsingModeManager = mockk(relaxed = true),
+            tabDataCoordinator = FakeTabDataCoordinator(),
+            tabGroupFeatureConfiguration = FakeTabGroupsFeatureDiscoveryConfiguration(),
         )
 
     private val expectedProviders: Map<KClass<out FenixMenuItem>, KClass<out MenuItemProvider>> =
         mapOf(
+            FenixMenuItem.NewTab::class to NewTabMenuItemProvider::class,
+            FenixMenuItem.NewPrivateTab::class to NewPrivateTabMenuItemProvider::class,
             FenixMenuItem.DefaultBrowserBanner::class to DefaultBrowserMenuItemProvider::class,
             FenixMenuItem.CustomizeReaderView::class to ReaderViewMenuItemProvider::class,
             FenixMenuItem.IPProtection::class to VpnMenuItemProvider::class,
@@ -182,7 +191,6 @@ class MenuItemProvidersFactoryTest {
             FenixMenuItem.ReportBrokenSite::class to ReportBrokenSiteMenuItemProvider::class,
             FenixMenuItem.Shortcut::class to ShortcutMenuItemProvider::class,
             FenixMenuItem.AddToHomeScreen::class to AddToHomeScreenMenuItemProvider::class,
-            FenixMenuItem.SaveToCollection::class to SaveToCollectionMenuItemProvider::class,
             FenixMenuItem.OpenInApp::class to OpenInAppMenuItemProvider::class,
             FenixMenuItem.OpenInFirefox::class to OpenInFirefoxMenuItemProvider::class,
             FenixMenuItem.CustomTabAppItems::class to CustomTabAppMenuItemProvider::class,
@@ -200,5 +208,6 @@ class MenuItemProvidersFactoryTest {
             FenixMenuItem.Forward::class to ForwardMenuItemProvider::class,
             FenixMenuItem.Share::class to ShareMenuItemProvider::class,
             FenixMenuItem.Refresh::class to RefreshMenuItemProvider::class,
+            FenixMenuItem.TabGroup::class to TabGroupMenuItemProvider::class,
         )
 }

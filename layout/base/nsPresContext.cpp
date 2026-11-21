@@ -343,7 +343,6 @@ static const char* gExactCallbackPrefs[] = {
     "layout.css.text-autospace-size.enabled",
     "layout.css.text-transform.uppercase-eszett.enabled",
     "privacy.trackingprotection.enabled",
-    nullptr,
 };
 
 static const char* gPrefixCallbackPrefs[] = {
@@ -352,7 +351,6 @@ static const char* gPrefixCallbackPrefs[] = {
     "font.",
     "gfx.font_rendering.",
     "layout.css.font-visibility.",
-    nullptr,
 };
 
 void nsPresContext::Destroy() {
@@ -1195,6 +1193,10 @@ nsRootPresContext* nsPresContext::GetRootPresContext() const {
     pc = parent;
   }
   return pc->IsRoot() ? static_cast<nsRootPresContext*>(pc) : nullptr;
+}
+
+bool nsPresContext::IsInPrivateBrowsing() const {
+  return mDocument && mDocument->IsInPrivateBrowsing();
 }
 
 bool nsPresContext::UserInputEventsAllowed() {
@@ -2682,11 +2684,11 @@ bool nsPresContext::CheckForInterrupt(nsIFrame* aFrame) {
   return mHasPendingInterrupt;
 }
 
-nsIFrame* nsPresContext::GetPrimaryFrameFor(nsIContent* aContent) {
+nsIFrame* nsPresContext::GetPrimaryOrAreaImageFrameFor(nsIContent* aContent) {
   MOZ_ASSERT(aContent, "Don't do that");
   if (GetPresShell() &&
       GetPresShell()->GetDocument() == aContent->GetComposedDoc()) {
-    return aContent->GetPrimaryFrame();
+    return nsLayoutUtils::GetPrimaryOrAreaImageFrame(aContent);
   }
   return nullptr;
 }

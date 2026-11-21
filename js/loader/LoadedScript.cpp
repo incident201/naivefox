@@ -40,6 +40,14 @@ size_t ScriptFetchInfo::SizeOfIncludingThis(
          mFetchOptions->SizeOfIncludingThis(aMallocSizeOf);
 }
 
+ResolvedModuleSet* ScriptFetchInfo::GetPreloadedResolvedSet() {
+  if (!mPreloadedResolvedSet) {
+    mPreloadedResolvedSet = std::make_unique<ResolvedModuleSet>();
+  }
+
+  return mPreloadedResolvedSet.get();
+}
+
 static bool IsInternalURIScheme(nsIURI* uri) {
   return uri->SchemeIs("moz-extension") || uri->SchemeIs("resource") ||
          uri->SchemeIs("moz-src") || uri->SchemeIs("chrome");
@@ -263,7 +271,13 @@ bool LoadedScript::ReadFromEncodingHeader(const EncodingHeader* aHeader) {
   mDependsOnClassicScriptHintEncoding =
       aHeader->mDependsOnClassicScriptHintEncoding;
 
-  size_t encodingStringLen = strlen(aHeader->mClassicScriptEncoding);
+  size_t encodingStringLen =
+      strnlen(aHeader->mClassicScriptEncoding,
+              EncodingHeader::ClassicScriptEncodingMaxLength);
+  if (encodingStringLen == EncodingHeader::ClassicScriptEncodingMaxLength) {
+    return false;
+  }
+
   if (encodingStringLen == 0) {
     mClassicScriptEncoding = nullptr;
     return true;
@@ -306,7 +320,7 @@ NS_IMPL_CYCLE_COLLECTION_TRACE_BEGIN(ModuleScript)
 NS_IMPL_CYCLE_COLLECTION_TRACE_END
 
 ModuleScript::ModuleScript(ScriptFetchInfo* aFetchInfo)
-    : mFetchInfoForAccessingPreloadFlag(aFetchInfo) {
+    : mFetchInfo(aFetchInfo) {
   MOZ_ASSERT(!ModuleRecord());
   MOZ_ASSERT(!HasParseError());
   MOZ_ASSERT(!HasErrorToRethrow());
@@ -336,8 +350,7 @@ void ModuleScript::SetModuleRecord(Handle<JSObject*> aModuleRecord) {
 #ifdef DEBUG
   // Sync the [[PreloadSlot]] in ModuleObject.
   if (mModuleRecord) {
-    SetModulePreload(mModuleRecord,
-                     mFetchInfoForAccessingPreloadFlag->IsForModulePreload());
+    SetModulePreload(mModuleRecord, mFetchInfo->IsForModulePreload());
   }
 #endif
 
@@ -364,29 +377,10 @@ void ModuleScript::SetErrorToRethrow(const Value& aError) {
   mErrorToRethrow = aError;
 }
 
-void ModuleScript::SetForPreload(bool aValue) {
-  mFetchInfoForAccessingPreloadFlag->SetForModulePreload(aValue);
-#ifdef DEBUG
-  if (ModuleRecord()) {
-    SetModulePreload(ModuleRecord(), aValue);
-  }
-#endif
-}
 void ModuleScript::SetHadImportMap(bool aValue) { mHadImportMap = aValue; }
 
-ResolvedModuleSet* ModuleScript::GetPreloadedResolvedSet() {
-  if (!mPreloadedResolvedSet) {
-    mPreloadedResolvedSet = std::make_unique<ResolvedModuleSet>();
-  }
-
-  return mPreloadedResolvedSet.get();
-}
-
-void ModuleScript::ResetPreload() {
-  MOZ_ASSERT(mFetchInfoForAccessingPreloadFlag->IsForModulePreload());
-  if (mModuleRecord) {
-    ResetPreloadedModule(mModuleRecord);
-  }
+void ModuleScript::ResetPreloadErrors() {
+  MOZ_ASSERT(mFetchInfo->IsForModulePreload());
 
   if (HasParseError()) {
     mParseError = UndefinedValue();

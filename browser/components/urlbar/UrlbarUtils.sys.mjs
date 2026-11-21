@@ -2000,18 +2000,17 @@ export class UrlbarProvider {
   }
 
   /**
-   * @type {Query}
-   *   This can be used by the provider to check the query is still running
-   *   after executing async tasks:
+   * This can be used by the provider to check the query is still running
+   * after executing async tasks::
    *
-   * ```
    *   let instance = this.queryInstance;
    *   await ...
    *   if (instance != this.queryInstance) {
    *     // Query was canceled or a new one started.
    *     return;
    *   }
-   * ```
+   *
+   * @type {Query}
    */
   queryInstance;
 
@@ -2132,8 +2131,8 @@ export class UrlbarProvider {
    *   {number} selIndex
    *       The index of the picked result.
    *   {string} selType
-   *       The type of the selected result.  See TelemetryEvent.record() in
-   *       UrlbarParentController.sys.mjs.
+   *       The type of the selected result.  See UrlbarSession.record() in
+   *       UrlbarSession.sys.mjs.
    *   {string} provider
    *       The name of the provider that produced the picked result.
    *

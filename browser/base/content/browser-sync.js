@@ -1396,6 +1396,15 @@ var gSync = {
       ) {
         this.updateAllUI(state);
       }
+    } else if (
+      this._hasSignedOutOfSync &&
+      document.documentElement.getAttribute("fxastatus") == "not_configured"
+    ) {
+      // UIState only notifies once ready if the status changed from its
+      // not-configured default, so a signed-out user would never get an
+      // update. Start from that default unless startup guessed a signed-in
+      // user, who will be notified.
+      this.updateAllUI(UIState.get());
     }
   },
 
@@ -3479,15 +3488,8 @@ var gSync = {
     );
 
     let hasOnlyMobileTargets = this.hasOnlyMobileSendTabTargets();
-    let sendLinkToDevice = document.getElementById("context-sendlinktodevice");
     let sendPageToDevice = document.getElementById("context-sendpagetodevice");
 
-    sendLinkToDevice.setAttribute(
-      "data-l10n-id",
-      hasOnlyMobileTargets
-        ? "main-context-menu-link-send-to-mobile"
-        : "main-context-menu-link-send-to-device"
-    );
     sendPageToDevice.setAttribute(
       "data-l10n-id",
       hasOnlyMobileTargets

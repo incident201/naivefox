@@ -1935,6 +1935,7 @@ const CTAParagraph = props => {
     handleAction(event);
     event.preventDefault();
   }, [handleAction]);
+  const keyPressedRef = external_React_default().useRef(false);
   return /*#__PURE__*/external_React_default().createElement("h2", {
     className: `cta-paragraph ${content?.info_tile ? "info-tile" : ""}`,
     style: {
@@ -1951,7 +1952,15 @@ const CTAParagraph = props => {
   }, content.text.string_name && typeof handleAction === "function" ? /*#__PURE__*/external_React_default().createElement("span", {
     "data-l10n-id": content.text.string_id,
     onClick: onClick,
-    onKeyUp: event => ["Enter", " "].includes(event.key) ? onClick(event) : null,
+    onKeyDown: event => {
+      keyPressedRef.current = ["Enter", " "].includes(event.key);
+    },
+    onKeyUp: event => {
+      if (keyPressedRef.current && ["Enter", " "].includes(event.key)) {
+        onClick(event);
+      }
+      keyPressedRef.current = false;
+    },
     value: "cta_paragraph"
   }, " ", /*#__PURE__*/external_React_default().createElement("a", {
     "data-l10n-name": content.text.string_name,
@@ -2004,7 +2013,7 @@ const OnboardingVideo = props => {
     });
   };
   return /*#__PURE__*/external_React_default().createElement("div", null, /*#__PURE__*/external_React_default().createElement("video", {
-    // eslint-disable-line jsx-a11y/media-has-caption
+    // eslint-disable-line jsx-a11y-x/media-has-caption
     controls: true,
     autoPlay: autoplay,
     src: vidUrl,
@@ -2315,7 +2324,7 @@ function renderSegment(segment, index, handleAction) {
   if (segment?.link_key) {
     return (
       /*#__PURE__*/
-      // eslint-disable-next-line jsx-a11y/anchor-is-valid
+      // eslint-disable-next-line jsx-a11y-x/anchor-is-valid
       external_React_default().createElement("a", {
         key: index,
         value: segment.link_key,
@@ -2925,7 +2934,7 @@ const SingleSelect = ({
     }
   }, [activeSingleSelectSelections]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const CONFIGURABLE_STYLES = ["background", "border", "borderRadius", "height", "marginBlock", "marginBlockStart", "marginBlockEnd", "marginInline", "paddingBlock", "paddingBlockStart", "paddingBlockEnd", "paddingInline", "paddingInlineStart", "paddingInlineEnd", "width"];
+  const CONFIGURABLE_STYLES = ["background", "backgroundImage", "border", "borderRadius", "height", "marginBlock", "marginBlockStart", "marginBlockEnd", "marginInline", "paddingBlock", "paddingBlockStart", "paddingBlockEnd", "paddingInline", "paddingInlineStart", "paddingInlineEnd", "width"];
   return /*#__PURE__*/external_React_default().createElement("div", {
     className: `tiles-single-select-container ${isCarousel ? "carousel" : ""}`
   }, isCarousel ? /*#__PURE__*/external_React_default().createElement(CarouselNav, {
@@ -3047,23 +3056,6 @@ const SingleSelect = ({
 
 
 
-const MarketplaceButtons = props => {
-  return /*#__PURE__*/external_React_default().createElement("ul", {
-    className: "mobile-download-buttons"
-  }, props.buttons.includes("ios") ? /*#__PURE__*/external_React_default().createElement("li", {
-    className: "ios"
-  }, /*#__PURE__*/external_React_default().createElement("button", {
-    "data-l10n-id": "spotlight-ios-marketplace-button",
-    value: "ios",
-    onClick: props.handleAction
-  })) : null, props.buttons.includes("android") ? /*#__PURE__*/external_React_default().createElement("li", {
-    className: "android"
-  }, /*#__PURE__*/external_React_default().createElement("button", {
-    "data-l10n-id": "spotlight-android-marketplace-button",
-    value: "android",
-    onClick: props.handleAction
-  })) : null);
-};
 const MobileDownloads = props => {
   const {
     QR_code: QRCode
@@ -3083,10 +3075,7 @@ const MobileDownloads = props => {
     className: "email-link",
     value: "email_link",
     onClick: props.handleAction
-  }))) : null, props.data.marketplace_buttons ? /*#__PURE__*/external_React_default().createElement(MarketplaceButtons, {
-    buttons: props.data.marketplace_buttons,
-    handleAction: props.handleAction
-  }) : null);
+  }))) : null);
 };
 ;// ./content-src/components/MultiSelect.jsx
 /* This Source Code Form is subject to the terms of the Mozilla Public
@@ -3874,7 +3863,8 @@ const ConfirmationChecklist = props => {
 
 const EmbeddedBackupRestore = ({
   handleAction,
-  skipButton
+  skipButton,
+  layout
 }) => {
   const [recoveryInProgress, setRecoveryInProgress] = (0,external_React_namespaceObject.useState)(false);
   const ref = (0,external_React_namespaceObject.useRef)(null);
@@ -3913,6 +3903,7 @@ const EmbeddedBackupRestore = ({
   }, /*#__PURE__*/external_React_default().createElement("restore-from-backup", {
     aboutWelcomeEmbedded: "true",
     labelFontWeight: "600",
+    layout: layout,
     ref: ref
   }), skipButton ? /*#__PURE__*/external_React_default().createElement("div", {
     className: "action-buttons"
@@ -4379,7 +4370,8 @@ const ContentTiles = props => {
       content: {
         tiles: tile
       },
-      skipButton: props.content.skip_button
+      skipButton: props.content.skip_button,
+      layout: content.position
     }), tile.type === "fx_backup_file_path" && /*#__PURE__*/external_React_default().createElement(EmbeddedFxBackupOptIn, {
       handleAction: props.handleAction,
       isEncryptedBackup: content.isEncryptedBackup,
@@ -5249,7 +5241,24 @@ class ProtonScreen extends (external_React_default()).PureComponent {
     }
     return /*#__PURE__*/external_React_default().createElement((external_React_default()).Fragment, null, elements);
   }
-  renderRTAMOIcon(addonType, themeScreenshots, addonIconURL) {
+  renderRTAMOIcon(position, addonType, themeScreenshots, addonIconURL) {
+    if (position === "center-large") {
+      return /*#__PURE__*/external_React_default().createElement("div", {
+        className: "rtamo-icon-wrapper"
+      }, /*#__PURE__*/external_React_default().createElement("div", {
+        className: "rtamo-icon"
+      }, /*#__PURE__*/external_React_default().createElement("img", {
+        className: `${addonType?.includes("theme") ? "rtamo-theme-icon" : "brand-logo"}`,
+        src: addonType?.includes("theme") ? themeScreenshots[0].url : addonIconURL,
+        loading: MultiStageUtils.getLoadingStrategyFor(addonIconURL),
+        alt: "",
+        role: "presentation"
+      })), /*#__PURE__*/external_React_default().createElement("div", {
+        className: "logo-separator"
+      }), /*#__PURE__*/external_React_default().createElement("div", {
+        className: "rtamo-logo"
+      }, this.renderPicture({})));
+    }
     return /*#__PURE__*/external_React_default().createElement("div", {
       className: "rtamo-icon"
     }, /*#__PURE__*/external_React_default().createElement("img", {
@@ -5382,11 +5391,11 @@ class ProtonScreen extends (external_React_default()).PureComponent {
         paddingInline: content.split_content_padding_inline ? content.split_content_padding_inline : null,
         justifyContent: screenStyleJustifyContent
       }
-    }, isCenterLargeFullscreen ? secondaryCTATop : null, isCenterPosition && this.hasAnimatedContent(content) ? this.renderAnimationPlayPauseButton() : null, content.logo && !content.fullscreen ? this.renderPicture(content.logo) : null, isRtamo && !content.fullscreen ? this.renderRTAMOIcon(addonType, this.props.themeScreenshots, this.props.addonIconURL) : null, /*#__PURE__*/external_React_default().createElement("div", {
+    }, isCenterLargeFullscreen ? secondaryCTATop : null, isCenterPosition && this.hasAnimatedContent(content) ? this.renderAnimationPlayPauseButton() : null, content.logo && !content.fullscreen ? this.renderPicture(content.logo) : null, isRtamo && !content.fullscreen ? this.renderRTAMOIcon(content.position, addonType, this.props.themeScreenshots, this.props.addonIconURL) : null, /*#__PURE__*/external_React_default().createElement("div", {
       className: "main-content-inner",
       id: "mainContentInner",
       style: combinedStyles
-    }, content.logo && content.fullscreen ? this.renderPicture(content.logo) : null, isRtamo && content.fullscreen ? this.renderRTAMOIcon(addonType, this.props.themeScreenshots, this.props.addonIconURL) : null, content.title || content.subtitle ? /*#__PURE__*/external_React_default().createElement("div", {
+    }, content.logo && content.fullscreen ? this.renderPicture(content.logo) : null, isRtamo && content.fullscreen ? this.renderRTAMOIcon(content.position, addonType, this.props.themeScreenshots, this.props.addonIconURL) : null, content.title || content.subtitle ? /*#__PURE__*/external_React_default().createElement("div", {
       id: "multi-stage-message-welcome-text",
       className: `welcome-text ${content.title_style || ""}`
     }, content.title ? this.renderTitle(content) : null, content.layout === "last-card" ? this.renderLastCardImage(content) : null, content.subtitle ? /*#__PURE__*/external_React_default().createElement(Localized, {
@@ -6140,7 +6149,8 @@ const MultiStageAboutWelcome = props => {
   const [transition, setTransition] = (0,external_React_namespaceObject.useState)(props.transitions ? "in" : "");
   (0,external_React_namespaceObject.useEffect)(() => {
     if (transition === "in") {
-      requestAnimationFrame(() => requestAnimationFrame(() => setTransition("")));
+      // Don't clobber an "out" transition started in the meantime.
+      requestAnimationFrame(() => requestAnimationFrame(() => setTransition(prev => prev === "in" ? "" : prev)));
     }
   }, [transition]);
   const isCardStack = defaultScreens?.[0]?.content?.position === "card-stack";
@@ -7012,6 +7022,7 @@ function MultistageWithDismiss({
     message_id: config.id,
     transitions: transitions,
     backdrop: config.backdrop,
+    ariaRole: "dialog",
     startScreen: 0,
     updateHistory: false
   }));
@@ -7028,17 +7039,83 @@ window.mountMultistageMessage = function mountMultistageMessage(container, props
   const {
     messageData,
     handleDismiss,
-    handleBlock
+    handleBlock,
+    handleClose
   } = props;
   const config = messageData.content;
   const impressionListeners = new AbortController();
+  // Outcome of each screen that has a primary button, keyed by screen id:
+  // "completed" (primary button clicked)
+  // "skipped" (secondary button clicked)
+  // "expired" (dismissed without either)
+  const completionStatus = {};
+  let currentScreenId = null;
+  let dismissSent = false;
+  const sendTelemetry = data => window.ASRouterMessage({
+    type: "AS_ROUTER_TELEMETRY_USER_EVENT",
+    data: {
+      ...data,
+      action: "newtab_message_user_event"
+    }
+  });
+  const trackCards = (screens, shownScreens) => {
+    const shownIds = new Set(shownScreens.map(({
+      id
+    }) => id));
+    for (const {
+      id,
+      content
+    } of screens) {
+      if (!shownIds.has(id)) {
+        delete completionStatus[id];
+      } else if (content?.primary_button) {
+        completionStatus[id] ??= "expired";
+      }
+    }
+  };
+  const trackTelemetry = data => {
+    if (data.event === "IMPRESSION") {
+      currentScreenId = data.event_context?.screen_id ?? null;
+    } else if (data.event === "CLICK_BUTTON" && currentScreenId in completionStatus) {
+      if (data.event_context?.source === "primary_button") {
+        completionStatus[currentScreenId] = "completed";
+      } else if (data.event_context?.source === "secondary_button") {
+        completionStatus[currentScreenId] = "skipped";
+      }
+    }
+  };
+  const sendDismissTelemetry = () => {
+    if (dismissSent) {
+      return;
+    }
+    dismissSent = true;
+    const completionCount = Object.values(completionStatus).filter(cardStatus => cardStatus === "completed").length;
+    sendTelemetry({
+      event: "DISMISS",
+      event_context: {
+        source: "newtab",
+        page: "about:newtab",
+        reason: completionCount ? "engaged" : "not_engaged",
+        completion_status: completionStatus,
+        completion_count: completionCount
+      },
+      message_id: messageData.id
+    });
+  };
   const awHandlers = {
-    AWEvaluateScreenTargeting: screens => window.ASRouterMessage({
-      type: "AW_EVALUATE_SCREEN_TARGETING",
-      data: screens
-    }),
+    AWEvaluateScreenTargeting: async screens => {
+      const filtered = await window.ASRouterMessage({
+        type: "AW_EVALUATE_SCREEN_TARGETING",
+        data: screens
+      });
+      trackCards(screens, filtered ?? screens);
+      return filtered;
+    },
     AWGetFeatureConfig: () => config,
-    AWFinish: () => handleDismiss(),
+    AWFinish: () => {
+      sendDismissTelemetry();
+      handleClose();
+    },
     AWSendToParent: (handlerName, data) => window.ASRouterMessage({
       type: "USER_ACTION",
       data
@@ -7050,17 +7127,11 @@ window.mountMultistageMessage = function mountMultistageMessage(container, props
       });
     },
     AWSendEventTelemetry: data => {
-      const sendTelemetry = () => window.ASRouterMessage({
-        type: "AS_ROUTER_TELEMETRY_USER_EVENT",
-        data: {
-          ...data,
-          action: "newtab_message_user_event"
-        }
-      });
+      trackTelemetry(data);
       if (data.event !== "IMPRESSION" || document.visibilityState === "visible") {
-        sendTelemetry();
+        sendTelemetry(data);
       } else {
-        document.addEventListener("visibilitychange", sendTelemetry, {
+        document.addEventListener("visibilitychange", () => sendTelemetry(data), {
           once: true,
           signal: impressionListeners.signal
         });

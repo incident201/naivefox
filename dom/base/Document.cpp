@@ -300,6 +300,7 @@
 #include "mozilla/gfx/Point.h"
 #include "mozilla/gfx/ScaleFactor.h"
 #include "mozilla/glean/DomMetrics.h"
+#include "mozilla/glean/DomSecurityMetrics.h"
 #include "mozilla/glean/DomUseCounterMetrics.h"
 #include "mozilla/intl/EncodingToLang.h"
 #include "mozilla/intl/LocaleService.h"
@@ -360,7 +361,6 @@
 #include "nsIAuthPrompt.h"
 #include "nsIAuthPrompt2.h"
 #include "nsIBFCacheEntry.h"
-#include "nsIBaseWindow.h"
 #include "nsIBrowserChild.h"
 #include "nsIBrowserUsage.h"
 #include "nsICSSLoaderObserver.h"
@@ -1051,6 +1051,9 @@ Document* ExternalResourceMap::RequestResource(
     // chances are it failed for good reasons (security check, etc).
     // This must be done outside the WithEntryHandle functor, as it accesses
     // mPendingLoads.
+    // PendingLoad::StartLoad does the same if it had to defer AsyncOpen and
+    // that failed. It is called inside a script runnner (outside of
+    // WithEntryHandle functor) so it's safe.
     AddExternalResource(clone, nullptr, nullptr, aDisplayDocument);
   }
 
@@ -1089,7 +1092,7 @@ void ExternalResourceMap::Traverse(
   // mPendingLoads will get cleared out as the requests complete, so
   // no need to worry about those here.
   for (const auto& entry : mMap) {
-    ExternalResourceMap::ExternalResource* resource = entry.GetWeak();
+    ExternalResourceMap::ExternalResource* resource = entry.GetRawPtr();
 
     NS_CYCLE_COLLECTION_NOTE_EDGE_NAME(*aCallback,
                                        "mExternalResourceMap.mMap entry"
@@ -1348,7 +1351,27 @@ nsresult ExternalResourceMap::PendingLoad::StartLoad(
 
   mURI = aURI;
 
-  return channel->AsyncOpen(this);
+  if (nsContentUtils::IsSafeToRunScript()) {
+    return channel->AsyncOpen(this);
+  }
+
+  nsContentUtils::AddScriptRunner(NS_NewRunnableFunction(
+      "ExternalResourceMap::PendingLoad::StartLoad",
+      [self = RefPtr{this}, channel]() MOZ_CAN_RUN_SCRIPT_BOUNDARY_LAMBDA {
+        ExternalResourceMap& map =
+            self->mDisplayDocument->ExternalResourceMap();
+        if (map.HaveShutDown() || NS_SUCCEEDED(channel->AsyncOpen(self))) {
+          return;
+        }
+        // Same handling as for a synchronous AsyncOpen failure in
+        // ExternalResourceMap::RequestResource: make sure we don't thrash
+        // things by trying this load again, since chances are it failed for
+        // good reasons (security check, etc).
+        const nsCOMPtr<nsIURI> uri = self->mURI;
+        const RefPtr<Document> displayDocument = self->mDisplayDocument;
+        map.AddExternalResource(uri, nullptr, nullptr, displayDocument);
+      }));
+  return NS_OK;
 }
 
 NS_IMPL_ISUPPORTS(ExternalResourceMap::LoadgroupCallbacks,
@@ -1663,6 +1686,10 @@ Document::Document(const char* aContentType,
 
   mPreloadReferrerInfo = new dom::ReferrerInfo(nullptr);
   mReferrerInfo = new dom::ReferrerInfo(nullptr);
+
+  // Bug 2072122: Trusted Types readiness experiment only, to be removed.
+  mRecordTrustedTypesReadiness =
+      StaticPrefs::dom_security_trusted_types_readiness_telemetry_enabled();
 }
 
 #ifndef ANDROID
@@ -2433,6 +2460,11 @@ void Document::AccumulatePageLoadTelemetry() {
       mPageloadEventData.set_trrDomain(dnsKey);
     }
 
+    nsIHttpChannelInternal::ProxyType proxyType;
+    if (NS_SUCCEEDED(httpChannel->GetProxyType(&proxyType))) {
+      mPageloadEventData.set_proxyType(proxyType);
+    }
+
     uint32_t major;
     uint32_t minor;
     if (NS_SUCCEEDED(httpChannel->GetResponseVersion(&major, &minor))) {
@@ -2759,6 +2791,9 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INTERNAL(Document)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mFontFaceSet)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mPreviouslyFocusedContent)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mReadyForIdle)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mParsedPromise)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mContentLoadedPromise)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mLoadedPromise)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mDocumentL10n)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mFragmentDirective)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mHighlightRegistry)
@@ -2853,10 +2888,12 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INTERNAL(Document)
   }
 
   // XXX: This should be not needed once bug 1569185 lands.
-  for (const auto& entry : tmp->mL10nProtoElements) {
-    NS_CYCLE_COLLECTION_NOTE_EDGE_NAME(cb, "mL10nProtoElements key");
+  for (const auto& entry : tmp->mUntranslatedL10nProtoElements) {
+    NS_CYCLE_COLLECTION_NOTE_EDGE_NAME(cb,
+                                       "mUntranslatedL10nProtoElements key");
     cb.NoteXPCOMChild(entry.GetKey());
-    CycleCollectionNoteChild(cb, entry.GetWeak(), "mL10nProtoElements value");
+    CycleCollectionNoteChild(cb, entry.GetRawPtr(),
+                             "mUntranslatedL10nProtoElements value");
   }
 
   for (size_t i = 0; i < tmp->mPendingFrameStaticClones.Length(); ++i) {
@@ -2925,6 +2962,9 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(Document)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mFontFaceSet)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mPreviouslyFocusedContent)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mReadyForIdle)
+  NS_IMPL_CYCLE_COLLECTION_UNLINK(mParsedPromise)
+  NS_IMPL_CYCLE_COLLECTION_UNLINK(mContentLoadedPromise)
+  NS_IMPL_CYCLE_COLLECTION_UNLINK(mLoadedPromise)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mDocumentL10n)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mFragmentDirective)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mHighlightRegistry)
@@ -3045,7 +3085,7 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(Document)
 
   tmp->UnregisterFromMemoryReportingForDataDocument();
 
-  NS_IMPL_CYCLE_COLLECTION_UNLINK(mL10nProtoElements)
+  NS_IMPL_CYCLE_COLLECTION_UNLINK(mUntranslatedL10nProtoElements)
   NS_IMPL_CYCLE_COLLECTION_UNLINK_WEAK_PTR
   NS_IMPL_CYCLE_COLLECTION_UNLINK_WEAK_REFERENCE
 NS_IMPL_CYCLE_COLLECTION_UNLINK_END
@@ -3795,32 +3835,21 @@ nsresult Document::StartDocumentLoad(const char* aCommand, nsIChannel* aChannel,
     mChannel->GetSecurityInfo(getter_AddRefs(mSecurityInfo));
   }
 
-  // If this document is being loaded by a docshell, copy its sandbox flags
-  // to the document, and store the fullscreen enabled flag. These are
-  // immutable after being set here.
+  // Get our sandbox flags from the LoadInfo for this document.
+  // These are immutable after being set here.
   nsCOMPtr<nsIDocShell> docShell = do_QueryInterface(aContainer);
-
-  // If this is an error page, don't inherit sandbox flags
   nsCOMPtr<nsILoadInfo> loadInfo = aChannel->LoadInfo();
+  mSandboxFlags = loadInfo->GetSandboxFlags();
+  if (docShell) {
+    WarnIfSandboxIneffective(docShell, mSandboxFlags, aChannel);
+  }
 
   if (!IsTopLevelContentDocument()) {
     SetAncestorOriginsList(
         ProduceAncestorOriginsList(loadInfo->AncestorPrincipals()));
   }
 
-  if (docShell && !loadInfo->GetLoadErrorPage()) {
-    mSandboxFlags = loadInfo->GetSandboxFlags();
-    WarnIfSandboxIneffective(docShell, mSandboxFlags, GetChannel());
-  }
-
-  nsCOMPtr<nsIClassifiedChannel> classifiedChannel =
-      do_QueryInterface(aChannel);
-
-  if (classifiedChannel) {
-    mClassificationFlags = {
-        classifiedChannel->GetFirstPartyClassificationFlags(),
-        classifiedChannel->GetThirdPartyClassificationFlags()};
-  }
+  mClassificationFlags = AntiTrackingUtils::GetClassificationFlags(aChannel);
 
   // Set the opener policy for the top level content document.
   nsCOMPtr<nsIHttpChannelInternal> httpChan = do_QueryInterface(mChannel);
@@ -4626,6 +4655,9 @@ void Document::SetDocumentURI(nsIURI* aURI) {
   if (!equalBases) {
     mCachedURLData = nullptr;
     RefreshLinkHrefs();
+    if (mSpeculationRules) {
+      mSpeculationRules->UpdateForBaseURLChange();
+    }
   }
 
   // Tell our WindowGlobalParent that the document's URI has been changed.
@@ -5021,7 +5053,7 @@ void Document::OnParsingCompleted() {
   }
 }
 
-void Document::InitialTranslationCompleted(bool aL10nCached) {
+void Document::InitialTranslationCompleted() {
   if (mDocumentL10n && mDocumentL10n->mBlockingLayout) {
     // This means we blocked the load event in LocalizationLinkAdded.  It's
     // important that the load blocker removal here be async, because our caller
@@ -5031,12 +5063,7 @@ void Document::InitialTranslationCompleted(bool aL10nCached) {
     UnblockOnload(/* aFireSync = */ false);
   }
 
-  mL10nProtoElements.Clear();
-
-  nsXULPrototypeDocument* proto = GetPrototype();
-  if (proto) {
-    proto->SetIsL10nCached(aL10nCached);
-  }
+  mUntranslatedL10nProtoElements.Clear();
 }
 
 bool Document::AllowsL10n() const {
@@ -6596,7 +6623,9 @@ HTMLEditor* Document::GetHTMLEditor() const {
 }
 
 nsresult Document::EditingStateChanged() {
-  if (mRemovedFromDocShell) {
+  // Don't allow editing on non-HTML/XHTML documents.  Return NS_OK so that the
+  // setter of designMode on non-HTML documents does not fail.
+  if (mRemovedFromDocShell || !IsHTMLOrXHTML()) {
     return NS_OK;
   }
 
@@ -6694,13 +6723,6 @@ nsresult Document::EditingStateChanged() {
   bool makeWindowEditable = mEditingState == EditingState::eOff;
   bool spellRecheckAll = false;
   bool putOffToRemoveScriptBlockerUntilModifyingEditingState = false;
-
-  if (makeWindowEditable && NS_WARN_IF(!IsHTMLOrXHTML())) {
-    // Don't allow editing on non-HTML/XHTML documents.
-    // Return NS_OK so that the setter of designMode on non-HTML documents
-    // does not fail.
-    return NS_OK;
-  }
 
   RefPtr<HTMLEditor> htmlEditor;
   {
@@ -7131,6 +7153,18 @@ void Document::GetReferrer(nsACString& aReferrer) const {
   }
 
   URLDecorationStripper::StripTrackingIdentifiers(referrer, aReferrer);
+}
+
+bool Document::IsCookieAverse() const {
+  // If we are a document that "has no browsing context."
+  if (!GetInnerWindow()) {
+    return true;
+  }
+
+  // If we are a document "whose URL's scheme is not a network scheme."
+  // NB: Unlike the spec, file: URIs are allowed to store cookies unless
+  // network.cookie.blockFileScheme is set.
+  return !net::CookieCommons::IsSchemeSupported(NodePrincipal());
 }
 
 void Document::GetCookie(nsAString& aCookie, ErrorResult& aRv) {
@@ -7633,6 +7667,9 @@ void Document::SetBaseURI(nsIURI* aURI) {
   mDocumentBaseURI = aURI;
   mCachedURLData = nullptr;
   RefreshLinkHrefs();
+  if (mSpeculationRules) {
+    mSpeculationRules->UpdateForBaseURLChange();
+  }
 }
 
 Result<OwningNonNull<nsIURI>, nsresult> Document::ResolveWithBaseURI(
@@ -8961,11 +8998,24 @@ void Document::DispatchContentLoadedEvents(bool aFinishSync) {
                         nullptr);
   }
 
+  // Resolved after the event so that its reactions run after every
+  // DOMContentLoaded listener, whatever event target they are on. The promise
+  // is fetched first because a listener can call document.open(), which
+  // replaces it with one for the next load.
+  RefPtr<Promise> contentLoaded;
+  if (StaticPrefs::dom_document_load_promises_enabled()) {
+    contentLoaded = GetContentLoaded(IgnoreErrors());
+  }
+
   // Fire a DOM event notifying listeners that this document has been
   // loaded (excluding images and other loads initiated by this
   // document).
   nsContentUtils::DispatchTrustedEvent(this, this, u"DOMContentLoaded"_ns,
                                        CanBubble::eYes, Cancelable::eNo);
+
+  if (contentLoaded) {
+    contentLoaded->MaybeResolveWithUndefined();
+  }
 
   if (auto* const window = GetInnerWindow()) {
     const RefPtr<ServiceWorkerContainer> serviceWorker =
@@ -9710,11 +9760,7 @@ void Document::ScheduleForPresAttrEvaluation(Element* aElement) {
   DebugOnly<bool> inserted = mLazyPresElements.EnsureInserted(aElement);
   MOZ_ASSERT(inserted);
   if (aElement->HasServoData()) {
-    // TODO(emilio): RESTYLE_SELF is too strong, there should be no need to
-    // re-selector-match, but right now this is needed to pick up the new mapped
-    // attributes. We need something like RESTYLE_STYLE_ATTRIBUTE but for mapped
-    // attributes.
-    nsLayoutUtils::PostRestyleEvent(aElement, RestyleHint::RESTYLE_SELF,
+    nsLayoutUtils::PostRestyleEvent(aElement, RestyleHint::RESTYLE_PRES_HINTS,
                                     nsChangeHint(0));
   } else if (auto* presContext = GetPresContext()) {
     presContext->RestyleManager()->IncrementUndisplayedRestyleGeneration();
@@ -10392,14 +10438,11 @@ void Document::DoNotifyPossibleTitleChange() {
   nsAutoString title;
   GetTitle(title);
 
-  if (RefPtr<PresShell> presShell = GetPresShell()) {
-    nsCOMPtr<nsISupports> container =
-        presShell->GetPresContext()->GetContainerWeak();
-    if (container) {
-      if (nsCOMPtr<nsIBaseWindow> docShellWin = do_QueryInterface(container)) {
-        docShellWin->SetTitle(title);
-      }
-    }
+  if (RefPtr<nsDocShell> docShell = nsDocShell::Cast(GetDocShell())) {
+    docShell->SetTitle(title);
+  }
+  if (nsCOMPtr<nsIAppWindow> appWin = GetAppWindowIfToplevelChrome()) {
+    appWin->SetTitle(title);
   }
 
   if (WindowGlobalChild* child = GetWindowGlobalChild()) {
@@ -10429,6 +10472,10 @@ already_AddRefed<MediaQueryList> Document::MatchMedia(
 void Document::SetMayStartLayout(bool aMayStartLayout) {
   mMayStartLayout = aMayStartLayout;
   if (MayStartLayout()) {
+    if (NodePrincipal()->IsSystemPrincipal() && !mChromeObserver) {
+      mChromeObserver = new ChromeObserver(this);
+      mChromeObserver->Init();
+    }
     // Before starting layout, check whether we're a toplevel chrome
     // window.  If we are, setup some state so that we don't have to restyle
     // the whole tree after StartLayout.
@@ -10823,6 +10870,11 @@ Document* Document::Open(const Optional<nsAString>& /* unused */,
   // navigation.
   if (shell && IsCurrentActiveDocument()) {
     if (shell->GetIsAttemptingToNavigate()) {
+      // Stopping can abort our own load and set readyState to "complete",
+      // which must not settle the promises of the load being replaced.
+      mParsedPromise = nullptr;
+      mContentLoadedPromise = nullptr;
+      mLoadedPromise = nullptr;
       shell->Stop(nsIWebNavigation::STOP_NETWORK);
 
       // The Stop call may have cancelled the onload blocker request or
@@ -11024,6 +11076,14 @@ void Document::WriteCommon(const Sequence<OwningTrustedHTMLOrString>& aText,
                            bool aNewlineTerminate,
                            nsIPrincipal* aSubjectPrincipal,
                            mozilla::ErrorResult& rv) {
+  // Bug 2072122: Trusted Types readiness experiment only, to be removed.
+  if (!aText.IsEmpty()) {
+    RecordTrustedTypesWriteSink(std::all_of(
+        aText.begin(), aText.end(), [](const OwningTrustedHTMLOrString& aPart) {
+          return aPart.IsTrustedHTML();
+        }));
+  }
+
   bool isTrusted = true;
   auto getAsString =
       [&isTrusted](const OwningTrustedHTMLOrString& aTrustedHTMLOrString) {
@@ -13060,6 +13120,12 @@ void Document::OnPageShow(bool aPersisted, EventTarget* aDispatchStartTarget,
             ("Document::OnPageShow [%s] persisted=%i", uri.get(), aPersisted));
   }
 
+  // Bug 2072122: Trusted Types readiness experiment only, to be removed.
+  // Only on the first pageshow, not when restoring from the bfcache.
+  if (!aPersisted) {
+    DetectTrustedTypesLibrary();
+  }
+
   const bool inFrameLoaderSwap = !!aDispatchStartTarget;
   MOZ_DIAGNOSTIC_ASSERT(
       inFrameLoaderSwap ==
@@ -13191,11 +13257,11 @@ void Document::OnPageHide(bool aPersisted, EventTarget* aDispatchStartTarget,
     nsCOMPtr<nsIObserverService> os = mozilla::services::GetObserverService();
     if (os) {
       nsIPrincipal* principal = NodePrincipal();
-      os->NotifyObservers(ToSupports(this),
-                          principal->IsSystemPrincipal()
-                              ? "chrome-page-hidden"
-                              : "content-page-hidden",
-                          nullptr);
+      os->NotifyWhenScriptSafe(ToSupports(this),
+                               principal->IsSystemPrincipal()
+                                   ? "chrome-page-hidden"
+                                   : "content-page-hidden",
+                               nullptr);
     }
 
     // Now send out a PageHide event.
@@ -13246,20 +13312,6 @@ void Document::OnPageHide(bool aPersisted, EventTarget* aDispatchStartTarget,
     // reference to the root (in Document::mFullscreenRoot) since we can't
     // just traverse the doctree to get the root.
     Document::ExitFullscreenInDocTree(this);
-
-    // Since the document is removed from the doctree before OnPageHide() is
-    // called, ExitFullscreen() can't traverse from the root down to *this*
-    // document, so we must manually call CleanupFullscreenState() below too.
-    // Note that CleanupFullscreenState() clears Document::mFullscreenRoot,
-    // so we *must* call it after ExitFullscreen(), not before.
-    // OnPageHide() is called in every hidden (i.e. descendant) document,
-    // so calling CleanupFullscreenState() here will ensure all hidden
-    // documents have their fullscreen state reset.
-    CleanupFullscreenState();
-
-    // The fullscreenchange event is to be queued in the refresh driver,
-    // however a hidden page wouldn't trigger that again, so it makes no
-    // sense to dispatch such event here.
   }
 
   if (auto* element = HTMLVideoElement::FromNodeOrNull(
@@ -13492,6 +13544,31 @@ void Document::SetReadyStateInternal(ReadyState aReadyState,
   if (wasLoading && StaticPrefs::dom_element_blocking_enabled()) {
     MaybeScheduleRendering();
   }
+  switch (aReadyState) {
+    case READYSTATE_LOADING:
+      mParsedPromise = nullptr;
+      mContentLoadedPromise = nullptr;
+      mLoadedPromise = nullptr;
+      break;
+    case READYSTATE_INTERACTIVE:
+      if (mParsedPromise) {
+        mParsedPromise->MaybeResolveWithUndefined();
+      }
+      break;
+    case READYSTATE_COMPLETE:
+      if (mParsedPromise) {
+        mParsedPromise->MaybeResolveWithUndefined();
+      }
+      if (mContentLoadedPromise) {
+        mContentLoadedPromise->MaybeResolveWithUndefined();
+      }
+      if (mLoadedPromise) {
+        mLoadedPromise->MaybeResolveWithUndefined();
+      }
+      break;
+    default:
+      break;
+  }
   if (aUpdateTimingInformation && mTiming) {
     switch (aReadyState) {
       case READYSTATE_LOADING:
@@ -13515,10 +13592,6 @@ void Document::SetReadyStateInternal(ReadyState aReadyState,
     if (!mXULPersist && XRE_IsParentProcess()) {
       mXULPersist = new XULPersist(this);
       mXULPersist->Init();
-    }
-    if (!mChromeObserver) {
-      mChromeObserver = new ChromeObserver(this);
-      mChromeObserver->Init();
     }
   }
 
@@ -13752,6 +13825,19 @@ void Document::MaybePreLoadImage(nsIURI* aUri,
 void Document::MaybePreconnect(nsIURI* aOrigURI, mozilla::CORSMode aCORSMode) {
   if (!StaticPrefs::network_preconnect()) {
     return;
+  }
+
+  // https://w3c.github.io/connection-allowlists/#html-preconnect
+  if (RefPtr<ConnectionAllowlists> allowlists =
+          PolicyContainer::GetConnectionAllowlists(mPolicyContainer)) {
+    nsAutoCString origin;
+    nsCOMPtr<nsIURI> originURI;
+    if (NS_FAILED(nsContentUtils::GetWebExposedOriginSerialization(aOrigURI,
+                                                                   origin)) ||
+        NS_FAILED(NS_NewURI(getter_AddRefs(originURI), origin)) ||
+        allowlists->ShouldBlockConnection(originURI, InnerWindowID())) {
+      return;
+    }
   }
 
   NS_MutateURI mutator(aOrigURI);
@@ -15032,7 +15118,8 @@ void Document::WarnOnceAndReportAbout(
     return;
   }
 
-  nsContentUtils::ReportDeprecation(global, this, uri, aOperation, aLocation);
+  nsContentUtils::ReportDeprecation(global, this, uri, aOperation, aLocation,
+                                    aParams);
 }
 
 bool Document::HasWarnedAbout(DocumentWarnings aWarning) const {
@@ -15694,6 +15781,31 @@ void Document::MaybeResolveReadyForIdle() {
   }
 }
 
+Promise* Document::GetReadinessPromise(RefPtr<Promise>& aPromise,
+                                       bool aResolved, ErrorResult& aRv) {
+  if (!aPromise) {
+    nsIGlobalObject* global = GetScopeObject();
+    aPromise = aResolved ? Promise::CreateResolvedWithUndefined(global, aRv)
+                         : Promise::Create(global, aRv);
+  }
+  return aPromise;
+}
+
+Promise* Document::GetParsed(ErrorResult& aRv) {
+  return GetReadinessPromise(mParsedPromise,
+                             mReadyState >= READYSTATE_INTERACTIVE, aRv);
+}
+
+Promise* Document::GetContentLoaded(ErrorResult& aRv) {
+  return GetReadinessPromise(mContentLoadedPromise,
+                             mReadyState == READYSTATE_COMPLETE, aRv);
+}
+
+Promise* Document::GetLoaded(ErrorResult& aRv) {
+  return GetReadinessPromise(mLoadedPromise, mReadyState == READYSTATE_COMPLETE,
+                             aRv);
+}
+
 mozilla::dom::PermissionsPolicy* Document::PermissionsPolicy() const {
   if (!mPermissionsPolicy) {
     mPermissionsPolicy =
@@ -16041,56 +16153,6 @@ size_t Document::CountFullscreenElements() const {
   return count;
 }
 
-// https://github.com/whatwg/html/issues/9143
-// We need to consider the precedence between active modal dialog, topmost auto
-// popover and fullscreen element once it's specified.
-// TODO: https://bugzilla.mozilla.org/show_bug.cgi?id=1859702 This can be
-// removed after CloseWatcher has shipped.
-void Document::HandleEscKey() {
-  for (const nsWeakPtr& weakPtr : Reversed(mTopLayer)) {
-    nsCOMPtr<Element> element(do_QueryReferent(weakPtr));
-    if (RefPtr popoverHTMLEl = nsGenericHTMLElement::FromNodeOrNull(element)) {
-      if (element->IsPopoverOpenedInMode(PopoverAttributeState::Hint)) {
-        popoverHTMLEl->HidePopover(IgnoreErrors());
-        return;
-      }
-      if (element->IsPopoverOpenedInMode(PopoverAttributeState::Auto)) {
-        popoverHTMLEl->HidePopover(IgnoreErrors());
-        return;
-      }
-    }
-    if (RefPtr dialogElement = HTMLDialogElement::FromNodeOrNull(element)) {
-      if (StaticPrefs::dom_dialog_light_dismiss_enabled()) {
-        if (dialogElement->GetClosedBy() != HTMLDialogElement::ClosedBy::None) {
-          const mozilla::dom::Optional<nsAString> returnValue;
-          dialogElement->RequestClose(returnValue);
-        }
-      } else {
-        dialogElement->QueueCancelDialog();
-      }
-      // If the dialog element's `closedby` attribute is "none", then this
-      // means the dialog is effectively blocking the Esc key from
-      // functioning. Returning without closing is the correct behaviour - as
-      // this is the topmost element "handling" the esc key press.
-      return;
-    }
-  }
-  // Not all dialogs exist in the top layer, so despite already iterating
-  // through all top layer elements we also need to check open dialogs that are
-  // _not_ open via the top-layer (showModal).
-  // The top-most dialog in mOpenDialogs may need to be closed.
-  if (RefPtr<HTMLDialogElement> dialog =
-          mOpenDialogs.SafeLastElement(nullptr)) {
-    if (dialog->GetClosedBy() != HTMLDialogElement::ClosedBy::None) {
-      MOZ_ASSERT(StaticPrefs::dom_dialog_light_dismiss_enabled(),
-                 "Light Dismiss must have been enabled for GetClosedBy() "
-                 "returns != ClosedBy::None");
-      const mozilla::dom::Optional<nsAString> returnValue;
-      dialog->RequestClose(returnValue);
-    }
-  }
-}
-
 MOZ_CAN_RUN_SCRIPT void Document::ProcessCloseRequest() {
   if (RefPtr win = GetInnerWindow()) {
     if (win->IsFullyActive()) {
@@ -16238,12 +16300,19 @@ bool Document::IsFullscreenLeaf() {
   return GetFullscreenLeaf(*root);
 }
 
-static CallState ResetFullscreen(Document& aDocument) {
+enum class DispatchFullscreenChangeEvent : bool { No, Yes };
+
+static CallState ResetFullscreen(Document& aDocument,
+                                 DispatchFullscreenChangeEvent aDispatchEvent) {
   if (Element* fsElement = aDocument.GetUnretargetedFullscreenElement()) {
     aDocument.CleanupFullscreenState();
     NS_ASSERTION(!aDocument.Fullscreen(), "Should reset fullscreen");
-    DispatchFullscreenChange(aDocument, fsElement);
-    aDocument.EnumerateSubDocuments(ResetFullscreen);
+    if (aDispatchEvent == DispatchFullscreenChangeEvent::Yes) {
+      DispatchFullscreenChange(aDocument, fsElement);
+    }
+    aDocument.EnumerateSubDocuments([aDispatchEvent](Document& aSubDoc) {
+      return ResetFullscreen(aSubDoc, aDispatchEvent);
+    });
   }
   return CallState::Continue;
 }
@@ -16309,9 +16378,7 @@ void Document::ExitFullscreenInDocTree(Document* aMaybeNotARootDoc) {
     //
     // We still reset this document, otherwise it could keep a stale element
     // in its top layer with the fullscreen flag set.
-    if (aMaybeNotARootDoc->GetUnretargetedFullscreenElement()) {
-      aMaybeNotARootDoc->CleanupFullscreenState();
-    }
+    ResetFullscreen(*aMaybeNotARootDoc, DispatchFullscreenChangeEvent::No);
     return;
   }
 
@@ -16322,7 +16389,19 @@ void Document::ExitFullscreenInDocTree(Document* aMaybeNotARootDoc) {
   Document* fullscreenLeaf = GetFullscreenLeaf(root);
 
   // Walk the tree of fullscreen documents, and reset their fullscreen state.
-  ResetFullscreen(*root);
+  ResetFullscreen(*root, DispatchFullscreenChangeEvent::Yes);
+  // *aMaybeNotARootDoc* may have already been removed from the doctree, e.g.
+  // when ExitFullscreenInDocTree() is called from OnPageHide(). In that case
+  // we can't traverse from the root down to *aMaybeNotARootDoc*, so we must
+  // manually call ResetFullscreen() on it to ensure all hidden documents have
+  // their fullscreen state reset. If *aMaybeNotARootDoc* is reachable from
+  // the root, its fullscreen state has already been reset above and this call
+  // does nothing.
+  //
+  // The fullscreenchange event is to be queued in the refresh driver,
+  // however a hidden page wouldn't trigger that again, so it makes no
+  // sense to dispatch such event here.
+  ResetFullscreen(*aMaybeNotARootDoc, DispatchFullscreenChangeEvent::No);
 
   NS_ASSERTION(!root->Fullscreen(),
                "Fullscreen root should no longer be a fullscreen doc...");
@@ -16449,7 +16528,9 @@ void Document::RestorePreviousFullscreenState(UniquePtr<FullscreenExit> aExit) {
     if (!exitDoc->Fullscreen()) {
       // The document may have other fullscreen subdocuments which are not part
       // of the current fullscreen document chain, reset them as well.
-      exitDoc->EnumerateSubDocuments(ResetFullscreen);
+      exitDoc->EnumerateSubDocuments([](Document& aSubDoc) {
+        return ResetFullscreen(aSubDoc, DispatchFullscreenChangeEvent::Yes);
+      });
     }
   }
   aExit->MayResolvePromise();
@@ -17353,6 +17434,26 @@ Document::ElementReadyCheckResult Document::FullscreenElementReadyCheck(
   }
   if (!nsContentUtils::IsChromeDoc(this) && !IsInFocusedTab(this)) {
     aRequest.Reject("FullscreenDeniedNotFocusedTab");
+    return ElementReadyCheckResult::eErrorPromiseRejected;
+  }
+  const bool isActiveDocumentChainConsistent = ([self = this]() {
+    Document* doc = self;
+    while (doc) {
+      if (!doc->IsCurrentActiveDocument()) {
+        return false;
+      }
+      Element* embedder = doc->GetEmbedderElement();
+      Document* parent = doc->GetInProcessParentDocument();
+      if (!!embedder != !!parent ||
+          (embedder && embedder->GetComposedDoc() != parent)) {
+        return false;
+      }
+      doc = parent;
+    }
+    return true;
+  })();
+  if (!isActiveDocumentChainConsistent) {
+    aRequest.Reject("FullscreenDeniedHidden");
     return ElementReadyCheckResult::eErrorPromiseRejected;
   }
   return ElementReadyCheckResult::eOk;
@@ -18367,6 +18468,171 @@ void Document::InitUseCounters() {
   mShouldSendPageUseCounters = true;
 }
 
+// Bug 2072122: Trusted Types readiness experiment only, to be removed.
+// Continues React detection after its initial `typeof` check. The hook on the
+// window is by now one of three things:
+//  - undefined: only the typeof check, aLookedUpHook, can tell React was here;
+//  - a getter: the React DevTools extension's hook, present on every page;
+//  - a data property: set by page script, usually to disable DevTools.
+static bool IsReactGlobal(JSContext* aCx, JS::Handle<JSObject*> aGlobal,
+                          bool aLookedUpHook) {
+  JS::Rooted<Maybe<JS::PropertyDescriptor>> desc(aCx);
+  if (!JS_GetOwnPropertyDescriptor(aCx, aGlobal,
+                                   "__REACT_DEVTOOLS_GLOBAL_HOOK__", &desc)) {
+    JS_ClearPendingException(aCx);
+    return false;
+  }
+  if (desc.isNothing()) {
+    // undefined
+    return aLookedUpHook;
+  }
+  if (desc->isAccessorDescriptor()) {
+    // getter (DevTools extension), not React itself
+    return false;
+  }
+  // data property (page script), only React sites do this
+  return true;
+}
+
+static bool IsHtmxGlobal(JSContext* aCx, JS::Handle<JSObject*> aGlobal) {
+  bool found = false;
+  if (!JS_HasOwnProperty(aCx, aGlobal, "htmx", &found)) {
+    JS_ClearPendingException(aCx);
+    return false;
+  }
+  return found;
+}
+
+// Check for an "ng-version" attribute (Angular). Limited to body and its first
+// 16 children as a performance optimization. Our measurement focuses on web
+// apps that can reasonably apply Trusted Types, so undercounting and missing a
+// widget using the library is fine.
+static bool HasAngularRoot(Document& aDocument) {
+  Element* body = aDocument.GetBodyElement();
+  if (!body) {
+    return false;
+  }
+  RefPtr<nsAtom> ngVersion = NS_AtomizeMainThread(u"ng-version"_ns);
+  if (body->HasAttr(ngVersion)) {
+    return true;
+  }
+  uint32_t remaining = 16;
+  for (Element* child = body->GetFirstElementChild(); child && remaining--;
+       child = child->GetNextElementSibling()) {
+    if (child->HasAttr(ngVersion)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Called from the first pageshow of a document, the one after its load event
+// rather than a bfcache restore. Lit is detected while it loads instead.
+void Document::DetectTrustedTypesLibrary() {
+  if (!StaticPrefs::dom_security_trusted_types_readiness_telemetry_enabled() ||
+      HasTrustedTypesReadinessSignal(
+          TrustedTypesReadinessSignal::HasTrustedTypesLibrary)) {
+    return;
+  }
+  nsGlobalWindowInner* window = nsGlobalWindowInner::Cast(GetInnerWindow());
+  if (!window) {
+    return;
+  }
+  AutoJSAPI jsapi;
+  if (!jsapi.Init(window)) {
+    return;
+  }
+  JSContext* cx = jsapi.cx();
+  JS::Rooted<JSObject*> global(cx, window->GetGlobalJSObject());
+  MOZ_ASSERT(global);
+  AutoRestore<bool> restore(mDetectingTrustedTypesLibrary);
+  mDetectingTrustedTypesLibrary = true;
+  if (IsReactGlobal(
+          cx, global,
+          HasTrustedTypesReadinessSignal(
+              TrustedTypesReadinessSignal::LookedUpReactDevToolsHook)) ||
+      IsHtmxGlobal(cx, global) || HasAngularRoot(*this)) {
+    SetTrustedTypesReadinessSignal(
+        TrustedTypesReadinessSignal::HasTrustedTypesLibrary);
+  }
+}
+
+// Bug 2072122: Trusted Types readiness experiment only, to be removed.
+void Document::SetTrustedTypesReadinessSignal(
+    TrustedTypesReadinessSignal aSignal) {
+  if (MOZ_UNLIKELY(IsLoadedAsData())) {
+    nsIGlobalObject* scope = GetScopeObject();
+    nsPIDOMWindowInner* window = scope ? scope->GetAsInnerWindow() : nullptr;
+    if (Document* doc = window ? window->GetExtantDoc() : nullptr) {
+      doc->SetTrustedTypesReadinessSignal(aSignal);
+    }
+    return;
+  }
+  mTrustedTypesReadinessSignals += aSignal;
+}
+
+// Bug 2072122: Trusted Types readiness experiment only, to be removed.
+void Document::ReportTrustedTypesReadiness() {
+  // Re-check the pref so that disabling the study also stops pre-existing
+  // documents from reporting.
+  if (!mRecordTrustedTypesReadiness ||
+      !StaticPrefs::dom_security_trusted_types_readiness_telemetry_enabled()) {
+    return;
+  }
+
+  const char* ttcsp = "none";
+  const char* strict = "none";
+  if (nsIContentSecurityPolicy* policy =
+          PolicyContainer::GetCSP(GetPolicyContainer())) {
+    if (Maybe<nsCSPPolicy::Disposition> disposition =
+            nsCSPContext::Cast(policy)->GetStrictPolicyDisposition()) {
+      strict = *disposition == nsCSPPolicy::Disposition::Enforce ? "enforce"
+                                                                 : "report";
+    }
+    switch (policy->GetRequireTrustedTypesForDirectiveState()) {
+      case RequireTrustedTypesForDirectiveState::ENFORCE:
+        ttcsp = "enforce";
+        break;
+      case RequireTrustedTypesForDirectiveState::REPORT_ONLY:
+        ttcsp = "report";
+        break;
+      case RequireTrustedTypesForDirectiveState::NONE:
+        break;
+    }
+  }
+
+  // Without script of its own, nothing the page did can have set the other
+  // signals: sinks used by an extension's content script and an ng-version
+  // attribute in markup that never runs are not reported. A policy can only
+  // be used once created, possibly in an earlier document of the window. This
+  // keeps the label list to combinations that can occur.
+  const bool js = mTrustedTypesReadinessSignals.contains(
+      TrustedTypesReadinessSignal::RanScript);
+  const auto Has = [&](TrustedTypesReadinessSignal aSignal) -> uint32_t {
+    return js && mTrustedTypesReadinessSignals.contains(aSignal) ? 1 : 0;
+  };
+  const auto Sink = [&](TrustedTypesReadinessSignal aString,
+                        TrustedTypesReadinessSignal aTrustedHTML) {
+    return Has(aString) ? "string" : Has(aTrustedHTML) ? "trusted" : "none";
+  };
+  const uint32_t used = Has(TrustedTypesReadinessSignal::UsedPolicy);
+  const uint32_t created =
+      used || Has(TrustedTypesReadinessSignal::CreatedPolicy);
+  glean::security::trusted_types_readiness
+      .Get(nsPrintfCString(
+          "doc-%s_htmlsink-%s_writesink-%s_ttcsp-%s_strictcsp-%s_created-%u_"
+          "used-%u_lib-%u_js-%u",
+          IsTopLevelContentDocument() ? "top" : "sub",
+          Sink(TrustedTypesReadinessSignal::UsedHTMLSinkWithString,
+               TrustedTypesReadinessSignal::UsedHTMLSinkWithTrustedHTML),
+          Sink(TrustedTypesReadinessSignal::UsedWriteSinkWithString,
+               TrustedTypesReadinessSignal::UsedWriteSinkWithTrustedHTML),
+          ttcsp, strict, created, used,
+          Has(TrustedTypesReadinessSignal::HasTrustedTypesLibrary),
+          js ? 1u : 0u))
+      .Add();
+}
+
 // We keep separate counts for individual documents and top-level
 // pages to more accurately track how many web pages might break if
 // certain features were removed.  Consider the case of a single
@@ -18400,6 +18666,8 @@ void Document::ReportDocumentUseCounters() {
   // Note that a document is being destroyed.  See the comment above for how
   // use counter data are interpreted relative to this measurement.
   glean::use_counter::content_documents_destroyed.Add();
+  // Bug 2072122: Trusted Types readiness experiment only, to be removed.
+  ReportTrustedTypesReadiness();
 
   // Ask all of our resource documents to report their own document use
   // counters.
@@ -19764,20 +20032,28 @@ void Document::ScheduleResizeObserversNotification() {
   MaybeScheduleRenderingPhases({RenderingPhase::Layout});
 }
 
-static void FlushLayoutForWholeBrowsingContextTree(Document& aDoc,
-                                                   const ChangesToFlush& aCtf) {
+static MOZ_CAN_RUN_SCRIPT void FlushLayoutForSingleDocument(
+    Document& aDoc, const ChangesToFlush& aCtf) {
+  if (RefPtr ps = aDoc.GetPresShell(); ps && ps->DidInitialize()) {
+    ps->FlushPendingNotifications(aCtf);
+  }
+}
+
+static MOZ_CAN_RUN_SCRIPT void FlushLayoutForWholeBrowsingContextTree(
+    Document& aDoc, const ChangesToFlush& aCtf) {
   BrowsingContext* bc = aDoc.GetBrowsingContext();
   if (bc && bc->GetExtantDocument() == &aDoc) {
     RefPtr<BrowsingContext> top = bc->Top();
-    top->PreOrderWalk([aCtf](BrowsingContext* aCur) {
-      if (Document* doc = aCur->GetExtantDocument()) {
-        doc->FlushPendingNotifications(aCtf);
-      }
-    });
+    top->PreOrderWalk([aCtf](BrowsingContext* aCur)
+                          MOZ_CAN_RUN_SCRIPT_BOUNDARY_LAMBDA {
+                            if (RefPtr doc = aCur->GetExtantDocument()) {
+                              FlushLayoutForSingleDocument(*doc, aCtf);
+                            }
+                          });
   } else {
     // If there is no browsing context, or we're not the current document of the
     // browsing context, then we just flush this document itself.
-    aDoc.FlushPendingNotifications(aCtf);
+    FlushLayoutForSingleDocument(aDoc, aCtf);
   }
 }
 
@@ -21248,7 +21524,9 @@ Document::AutomaticStorageAccessPermissionCanBeGranted(
     ContentChild* cc = ContentChild::GetSingleton();
     MOZ_ASSERT(cc);
 
-    return cc->SendAutomaticStorageAccessPermissionCanBeGranted(NodePrincipal())
+    return cc
+        ->SendAutomaticStorageAccessPermissionCanBeGranted(
+            WrapNotNull(NodePrincipal()))
         ->Then(GetCurrentSerialEventTarget(), __func__,
                [](const ContentChild::
                       AutomaticStorageAccessPermissionCanBeGrantedPromise::
@@ -22100,6 +22378,12 @@ already_AddRefed<Document> Document::ParseHTMLUnsafe(
   // compliant string algorithm with TrustedHTML, this’s relevant global object,
   // html, "Document parseHTMLUnsafe", and "script".
   nsCOMPtr<nsIGlobalObject> global = do_QueryInterface(aGlobal.GetAsSupports());
+  // Bug 2072122: Trusted Types readiness experiment only, to be removed.
+  if (nsPIDOMWindowInner* window = global->GetAsInnerWindow()) {
+    if (Document* doc = window->GetExtantDoc()) {
+      doc->RecordTrustedTypesHTMLSink(aHTML.IsTrustedHTML());
+    }
+  }
   constexpr nsLiteralString sink = u"Document parseHTMLUnsafe"_ns;
   Maybe<nsAutoString> compliantStringHolder;
   const nsAString* compliantString =

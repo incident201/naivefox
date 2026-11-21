@@ -60,8 +60,6 @@ ICAttachResult AttachBaselineCacheIRStubLocked(
 // BaselineCacheIRCompiler compiles CacheIR to BaselineIC native code.
 class MOZ_RAII BaselineCacheIRCompiler : public CacheIRCompiler {
   struct CreateThisData {
-    uint32_t numFixedSlots;
-    uint32_t numDynamicSlots;
     gc::AllocKind allocKind;
     uint32_t thisShapeOffset;
     uint32_t allocSiteOffset;
@@ -75,7 +73,7 @@ class MOZ_RAII BaselineCacheIRCompiler : public CacheIRCompiler {
 
   // This register points to the baseline frame of the caller. It should only
   // be used before we enter a stub frame. This is normally the frame pointer
-  // register, but with --enable-ic-frame-pointers we have to allocate a
+  // register, but with --enable-stub-frame-pointers we have to allocate a
   // separate register.
   inline Register baselineFrameReg() {
     MOZ_ASSERT(!enteredStubFrame_);

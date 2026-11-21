@@ -65,11 +65,9 @@ $(foreach __d,$(__depth) .,$(eval __depth = $(wordlist 2,$(words $(__depth)),$(_
 
 # Sanity check some variables
 CHECK_VARS := \
- XPI_NAME \
  LIBRARY_NAME \
  MODULE \
  DEPTH \
- XPI_PKGNAME \
  SHARED_LIBRARY_NAME \
  SONAME \
  STATIC_LIBRARY_NAME \
@@ -91,60 +89,20 @@ RM = rm -f
 # build products (typelibs, components, chrome). It may already be specified by
 # a moz.build file.
 #
-# If XPI_NAME is set, the files will be shipped to $(DIST)/xpi-stage/$(XPI_NAME)
-# instead of $(DIST)/bin. In both cases, if DIST_SUBDIR is set, the files will be
-# shipped to a $(DIST_SUBDIR) subdirectory.
-FINAL_TARGET ?= $(if $(XPI_NAME),$(DIST)/xpi-stage/$(XPI_NAME),$(DIST)/bin)$(DIST_SUBDIR:%=/%)
+# If DIST_SUBDIR is set, the files will be shipped to a $(DIST_SUBDIR)
+# subdirectory of $(DIST)/bin.
+FINAL_TARGET ?= $(DIST)/bin$(DIST_SUBDIR:%=/%)
 # Override the stored value for the check to make sure that the variable is not
 # redefined in the Makefile.in value.
 FINAL_TARGET_FROZEN := '$(FINAL_TARGET)'
-
-ifdef XPI_NAME
-ACDEFINES += -DXPI_NAME=$(XPI_NAME)
-endif
 
 MKDIR ?= mkdir
 SLEEP ?= sleep
 TOUCH ?= touch
 
-# Don't build SIMPLE_PROGRAMS with PGO, since they don't need it anyway,
-# and we don't have the same build logic to re-link them in the second pass.
-ifdef SIMPLE_PROGRAMS
-NO_PROFILE_GUIDED_OPTIMIZE = 1
-endif
-
-# No sense in profiling unit tests
-ifdef CPP_UNIT_TESTS
-NO_PROFILE_GUIDED_OPTIMIZE = 1
-endif
-
-# Enable profile-based feedback
-ifdef MOZ_PROFILE_GENERATE
-ifneq (1,$(NO_PROFILE_GUIDED_OPTIMIZE))
-PGO_CFLAGS += -DNS_FREE_PERMANENT_DATA=1
-PGO_CFLAGS += $(if $(filter $(notdir $<),$(notdir $(NO_PROFILE_GUIDED_OPTIMIZE))),,$(PROFILE_GEN_CFLAGS))
-endif # NO_PROFILE_GUIDED_OPTIMIZE
-PGO_LDFLAGS += $(PROFILE_GEN_LDFLAGS)
-endif # MOZ_PROFILE_GENERATE
-
-ifdef MOZ_PROFILE_USE
-ifneq (1,$(NO_PROFILE_GUIDED_OPTIMIZE))
-PGO_CFLAGS += $(if $(filter $(notdir $<),$(notdir $(NO_PROFILE_GUIDED_OPTIMIZE))),,$(PROFILE_USE_CFLAGS))
-endif # NO_PROFILE_GUIDED_OPTIMIZE
-PGO_LDFLAGS += $(PROFILE_USE_LDFLAGS)
-endif # MOZ_PROFILE_USE
-
 # Overloaded by comm builds to refer to $(commtopsrcdir), so that
 # `mail` resolves in en-US builds and in repacks.
 LOCALE_TOPDIR ?= $(topsrcdir)
-MAKE_JARS_FLAGS = \
-	-t $(LOCALE_TOPDIR) \
-	-f $(MOZ_JAR_MAKER_FILE_FORMAT) \
-	$(NULL)
-
-ifdef USE_EXTENSION_MANIFEST
-MAKE_JARS_FLAGS += -e
-endif
 
 TAR_CREATE_FLAGS = -chf
 
@@ -160,19 +118,19 @@ INCLUDES = \
   -I$(ABS_DIST)/include \
   $(NULL)
 
-include $(MOZILLA_DIR)/config/static-checking-config.mk
+# Configured flags write the output and depfile paths as {target} and
+# {depfile}, and each build backend fills them in.
+subst_paths = $(subst {target},$@,$(subst {depfile},$(MDDEPDIR)/$(@F).pp,$(1)))
 
-ifndef MOZ_LTO
-MOZ_LTO_CFLAGS :=
-MOZ_LTO_LDFLAGS :=
-endif
+_DEPEND_CFLAGS = $(call subst_paths,$(DEPEND_CFLAGS))
+_HOST_DEPEND_CFLAGS = $(call subst_paths,$(HOST_DEPEND_CFLAGS))
 
-LDFLAGS		= $(MOZ_LTO_LDFLAGS) $(COMPUTED_LDFLAGS) $(PGO_LDFLAGS)
+LDFLAGS		= $(COMPUTED_LDFLAGS)
 
-COMPILE_CFLAGS	= $(MOZ_LTO_CFLAGS) $(COMPUTED_CFLAGS) $(PGO_CFLAGS) $(_DEPEND_CFLAGS)
-COMPILE_CXXFLAGS = $(MOZ_LTO_CFLAGS) $(COMPUTED_CXXFLAGS) $(PGO_CFLAGS) $(_DEPEND_CFLAGS)
-COMPILE_CMFLAGS = $(MOZ_LTO_CFLAGS) $(COMPUTED_CMFLAGS)
-COMPILE_CMMFLAGS = $(MOZ_LTO_CFLAGS) $(COMPUTED_CMMFLAGS)
+COMPILE_CFLAGS	= $(COMPUTED_CFLAGS) $(COMPUTED_PGO_CFLAGS) $(_DEPEND_CFLAGS)
+COMPILE_CXXFLAGS = $(COMPUTED_CXXFLAGS) $(COMPUTED_PGO_CFLAGS) $(_DEPEND_CFLAGS)
+COMPILE_CMFLAGS = $(COMPUTED_CMFLAGS)
+COMPILE_CMMFLAGS = $(COMPUTED_CMMFLAGS)
 ASFLAGS = $(COMPUTED_ASFLAGS)
 SFLAGS = $(COMPUTED_SFLAGS)
 
@@ -183,24 +141,6 @@ HOST_CXX_LDFLAGS = $(COMPUTED_HOST_LDFLAGS) $(COMPUTED_HOST_CXX_LDFLAGS)
 
 WASM_CFLAGS = $(COMPUTED_WASM_CFLAGS) $(_DEPEND_CFLAGS)
 WASM_CXXFLAGS = $(COMPUTED_WASM_CXXFLAGS) $(_DEPEND_CFLAGS)
-
-ifdef MOZ_LTO_OBJECT_PATH
-# When linking on macOS, debug info is not linked along with the final binary,
-# and the dwarf data stays in object files until they are "linked" with the
-# dsymutil tool.
-# With LTO, object files are temporary, and are not kept around, which
-# means there's no object file for dsymutil to do its job. Consequently,
-# there is no debug info for LTOed compilation units.
-# The macOS linker has however an option to explicitly keep those object
-# files, which dsymutil will then find.
-# The catch is that the linker uses sequential numbers for those object
-# files, and doesn't avoid conflicts from multiple linkers running at
-# the same time. So in directories with multiple binaries, object files
-# from the first linked binaries would be overwritten by those of the
-# last linked binary. So we use a subdirectory containing the name of the
-# linked binary.
-LDFLAGS += -Wl,-object_path_lto,$(@F).lto.o/
-endif
 
 # We only add color flags if neither the flag to disable color
 # (e.g. "-fno-color-diagnostics" nor a flag to control color
@@ -256,6 +196,18 @@ endif
 
 ifdef SCCACHE_CLIENT_SIDE
 export SCCACHE_CLIENT_SIDE
+endif
+
+ifdef SCCACHE_DIR
+export SCCACHE_DIR
+endif
+
+ifdef CCACHE_DIR
+export CCACHE_DIR
+endif
+
+ifdef BUILDCACHE_DIR
+export BUILDCACHE_DIR
 endif
 
 -include $(topsrcdir)/$(MOZ_BUILD_APP)/app-config.mk
@@ -317,20 +269,6 @@ ifdef LOCALE_RELATIVEDIR
 LOCALE_SRCDIR ?= $(call EXPAND_LOCALE_SRCDIR,$(LOCALE_RELATIVEDIR))
 endif
 
-ifdef relativesrcdir
-MAKE_JARS_FLAGS += --relativesrcdir=$(LOCALE_RELATIVEDIR)
-ifneq (en-US,$(AB_CD))
-ifdef IS_LANGUAGE_REPACK
-MAKE_JARS_FLAGS += --l10n-base=$(REAL_LOCALE_MERGEDIR)
-endif
-else
-MAKE_JARS_FLAGS += -c $(LOCALE_SRCDIR)
-endif # en-US
-else
-MAKE_JARS_FLAGS += -c $(LOCALE_SRCDIR)
-endif # ! relativesrcdir
-
-MERGE_FILE = $(LOCALE_SRCDIR)/$(1)
 MERGE_RELATIVE_FILE = $(call EXPAND_LOCALE_SRCDIR,$(2))/$(1)
 
 # Enable verbose logs when not using `make -s`

@@ -84,6 +84,10 @@ to exercise the localized repack logic in CI.
 Tests the Firefox Linux installer script (``browser/installer/linux/script/install-firefox.sh``)
 across distros, install methods, channels, locales, and architectures.
 
+## install-script-signing
+
+Signs ``install-firefox.sh`` with autograph GPG, producing a detached ``.asc`` signature.
+
 ## shippable-l10n
 
 The nightly l10n kind repacks a shippable build (from the same source code)
@@ -113,6 +117,15 @@ endpoint for notarizing apps.
 
 Downstream tasks switch to build-mac-signing in non-shippable builds or level 1
 environments.
+
+## source-artifact
+
+Exposes files from the source tree as artifacts for other tasks. Each task fetches
+its files from GitHub at the revision being built, without a checkout, and publishes
+them under ``public/build`` so downstream tasks can sign, test or publish them.
+
+For example, ``install-firefox.sh`` is fetched here, then signed by
+``install-script-signing`` and published by ``beetmover-install-script``.
 
 ## source-test
 
@@ -282,6 +295,12 @@ promotion.
 ## beetmover-source
 
 Beetmover-source publishes release source. This is part of release promotion.
+
+## beetmover-install-script
+
+Publishes the signed ``install-firefox.sh`` (and its detached signature) to the
+bucket backing ``linux.firefox.com``. Runs automatically on mozilla-central; the
+staging variant only runs via an explicit try selection.
 
 ## beetmover-geckoview
 
@@ -471,10 +490,6 @@ Generates attributed versions of releases for partners.
 
 Chunks the partner repacks by locale.
 
-## release-partner-repack-signing
-
-Internal signing of partner repacks.
-
 ## release-partner-repack-mac-signing
 
 Mac signing without notarization.
@@ -520,10 +535,6 @@ Utilises landoscript to perform tagging that should happen near the start of a r
 ## release-eme-free-repack
 
 Generates customized versions of releases for eme-free repacks.
-
-## release-eme-free-repack-signing
-
-Internal signing of eme-free repacks
 
 ## release-eme-free-repack-repackage
 
@@ -949,6 +960,9 @@ Push Focus, Klar and Fenix to the Android app stores: AABs to Google Play,
 Focus and Fenix APKs to the Samsung Galaxy Store, Fenix APKs to the Huawei
 AppGallery, and the Fenix universal APK to the vivo App Store.
 
+During release promotion's push phase at level 3, Samsung, Huawei and vivo
+submissions are scheduled for `release_eta`; without an ETA, they only upload.
+
 ## android-l10n
 
 Update android string resources from android-l10n repo.
@@ -968,6 +982,10 @@ Run baseline profile generation for Android on Firebase TestLab.
 ## dte-test
 
 Send payload for DTE testing Github Actions.
+
+## dte-ui-test
+
+Run DTE Pytest Selenium suite for UI.
 
 ## update-test
 

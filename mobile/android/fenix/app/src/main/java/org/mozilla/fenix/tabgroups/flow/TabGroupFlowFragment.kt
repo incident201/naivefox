@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.fragment.app.DialogFragment
@@ -24,12 +25,23 @@ import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.scene.DialogSceneStrategy
 import androidx.navigation3.ui.NavDisplay
 import mozilla.components.compose.base.theme.layout.AcornWindowSize
+import mozilla.components.compose.draggable.NoOpItemInteractionHandler
 import mozilla.components.lib.state.helpers.StoreProvider.Companion.storeProvider
+import mozilla.components.support.base.feature.ViewBoundFeatureWrapper
 import org.mozilla.fenix.R
 import org.mozilla.fenix.compose.navigation.BottomSheetSceneStrategy
 import org.mozilla.fenix.ext.requireComponents
 import org.mozilla.fenix.tabgroups.AddToTabGroup
+import org.mozilla.fenix.tabgroups.CloseLastTabAndDeleteTabGroupConfirmationDialog
+import org.mozilla.fenix.tabgroups.DeleteTabGroupConfirmationDialog
 import org.mozilla.fenix.tabgroups.EditTabGroup
+import org.mozilla.fenix.tabgroups.EnrichedTabGroupBinding
+import org.mozilla.fenix.tabgroups.ExpandedTabGroup
+import org.mozilla.fenix.tabgroups.UngroupTabGroupConfirmationDialog
+import org.mozilla.fenix.tabgroups.expandedTabGroupActions
+import org.mozilla.fenix.tabgroups.shareTabGroup
+import org.mozilla.fenix.tabstray.data.TabsTrayItem
+import org.mozilla.fenix.tabstray.data.toTabStorageUpdate
 import org.mozilla.fenix.tabstray.redux.action.TabGroupAction
 import org.mozilla.fenix.theme.FirefoxTheme
 import org.mozilla.fenix.utils.Settings
@@ -38,6 +50,7 @@ import org.mozilla.fenix.utils.Settings
 class TabGroupFlowFragment : DialogFragment() {
 
     @VisibleForTesting internal lateinit var store: TabGroupFlowStore
+    private val enrichedTabGroupBinding = ViewBoundFeatureWrapper<EnrichedTabGroupBinding>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -48,7 +61,7 @@ class TabGroupFlowFragment : DialogFragment() {
         inflater: LayoutInflater,
         container: ViewGroup?,
         savedInstanceState: Bundle?,
-    ): View? {
+    ): View {
         store = setupStore()
         return content {
             val state by store.stateFlow.collectAsStateWithLifecycle()
@@ -76,6 +89,20 @@ class TabGroupFlowFragment : DialogFragment() {
         }
     }
 
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+
+        enrichedTabGroupBinding.set(
+            feature =
+                EnrichedTabGroupBinding(
+                    tabDataCoordinator = requireComponents.tabDataCoordinator,
+                    store = store,
+                ),
+            owner = this,
+            view = view,
+        )
+    }
+
     @VisibleForTesting
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
@@ -92,60 +119,113 @@ class TabGroupFlowFragment : DialogFragment() {
                         skipPartiallyExpanded = true,
                         handleContentDescription =
                             stringResource(id = R.string.edit_tab_group_bottom_sheet_grabber_content_description),
-                        showBetaLabel = true,
                     )
             ) {
-                val formState = state.formState
-                requireNotNull(formState) {
-                    "Form state must not be null when navigating to the edit sheet"
-                }
-
-                EditTabGroup(
-                    formState = formState,
-                    onTabGroupNameChange = { newName ->
-                        store.dispatch(TabGroupAction.NameChanged(newName))
-                    },
-                    onTabGroupThemeChange = { newTheme ->
-                        store.dispatch(TabGroupAction.ThemeChanged(newTheme))
-                    },
-                    onConfirmSave = {
-                        store.dispatch(TabGroupAction.SaveClicked)
-                    },
-                )
+                RenderEditTabGroup(dispatcher = store::dispatch, state = state)
             }
 
             entry<TabGroupFlowDestination.AddToTabGroup>(
                 metadata =
                     BottomSheetSceneStrategy.bottomSheet(
                         handleContentDescription =
-                            stringResource(id = R.string.add_to_tab_group_bottom_sheet_grabber_content_description),
-                        showBetaLabel = true,
+                            stringResource(id = R.string.add_to_tab_group_bottom_sheet_grabber_content_description)
+                    )
+            ) { destination ->
+                RenderAddToTabGroup(state = state, dispatcher = store::dispatch, destination = destination)
+            }
+
+            entry<TabGroupFlowDestination.MoveToTabGroup>(
+                metadata =
+                    BottomSheetSceneStrategy.bottomSheet(
+                        handleContentDescription =
+                            stringResource(id = R.string.add_to_tab_group_bottom_sheet_grabber_content_description)
                     )
             ) {
-                AddToTabGroup(
-                    tabGroups = state.groups,
-                    onAddToNewTabGroup = {
-                        store.dispatch(TabGroupAction.TabAddedToNewTabGroup(tabId = it.tabId))
-                    },
-                    onAddToExistingTabGroup = { group ->
-                        store.dispatch(TabGroupAction.TabAddedToExistingTabGroup(groupId = group.id, tabId = it.tabId))
-                    },
-                )
+                RenderMoveToTabGroup(state = state, dispatcher = store::dispatch, destination = it)
             }
 
             entry<TabGroupFlowDestination.ExpandedTabGroup>(
                 metadata = { destination ->
                     BottomSheetSceneStrategy.bottomSheet(
                         handleContentDescription = resources.getString(R.string.tab_group_sheet_dismiss_description),
-                        showBetaLabel = true,
                         fullyExpandOnFirstOpen =
                             destination.group.shouldFullyExpandOnFirstOpen(windowSize = windowSize),
                     )
                 }
             ) { args ->
-                // todo-bug-2069525: support up the expanded group from this fragment
+                ExpandedTabGroupEntry(group = args.group, state = state)
+            }
+
+            entry<TabGroupFlowDestination.MoveLastTabAndDeleteGroupDialog>(metadata = DialogSceneStrategy.dialog()) {
+                args ->
+                RenderMoveLastTabAndDeleteTabGroupConfirmationDialog(dispatcher = store::dispatch, args = args)
+            }
+
+            entry<TabGroupFlowDestination.DeleteTabGroupConfirmationDialog>(metadata = DialogSceneStrategy.dialog()) {
+                RenderDeleteTabGroupConfirmationDialog(group = it.group)
+            }
+
+            entry<TabGroupFlowDestination.UngroupTabGroupConfirmationDialog>(metadata = DialogSceneStrategy.dialog()) {
+                RenderUngroupTabGroupConfirmationDialog(group = it.group)
+            }
+
+            entry<TabGroupFlowDestination.CloseTabAndDeleteGroupConfirmationDialog>(
+                metadata = DialogSceneStrategy.dialog()
+            ) {
+                RenderCloseTabAndDeleteGroupConfirmationDialog(group = it.group)
             }
         }
+    }
+
+    @Composable
+    private fun RenderDeleteTabGroupConfirmationDialog(group: TabsTrayItem.TabGroup) {
+        DeleteTabGroupConfirmationDialog(
+            onConfirmDelete = { store.dispatch(TabGroupAction.DeleteConfirmed(group)) },
+            onCancel = { store.dispatch(TabGroupAction.NavigateBackInvoked) },
+        )
+    }
+
+    @Composable
+    private fun RenderUngroupTabGroupConfirmationDialog(group: TabsTrayItem.TabGroup) {
+        UngroupTabGroupConfirmationDialog(
+            onConfirmUngroup = { dontAskAgain ->
+                store.dispatch(TabGroupAction.UngroupConfirmed(group = group, dontAskAgain = dontAskAgain))
+            },
+            onCancel = { store.dispatch(TabGroupAction.NavigateBackInvoked) },
+        )
+    }
+
+    @Composable
+    private fun RenderCloseTabAndDeleteGroupConfirmationDialog(group: TabsTrayItem.TabGroup) {
+        CloseLastTabAndDeleteTabGroupConfirmationDialog(
+            onConfirmDelete = { store.dispatch(TabGroupAction.CloseTabAndDeleteGroupConfirmed(group)) },
+            onCancel = { store.dispatch(TabGroupAction.NavigateBackInvoked) },
+        )
+    }
+
+    @Composable
+    private fun ExpandedTabGroupEntry(
+        group: TabsTrayItem.TabGroup,
+        state: TabGroupFlowState,
+    ) {
+        val expandedGroup = state.groups.find { it.id == group.id } ?: group
+        val dotColor = expandedGroup.theme.primary.toArgb()
+        ExpandedTabGroup(
+            group = expandedGroup,
+            actions =
+                expandedTabGroupActions(
+                    group = expandedGroup,
+                    homepageAsNewTabEnabled = state.config.homepageAsNewTabEnabled,
+                    dispatch = store::dispatch,
+                    onTabClick = {
+                        requireComponents.useCases.tabsUseCases.selectTab(it.id)
+                        store.dispatch(TabGroupAction.NavigateBackInvoked)
+                    },
+                    onShareClick = { shareTabGroup(group = expandedGroup, dotColor = dotColor) },
+                ),
+            displayTabsInGrid = state.config.displayTabsInGrid,
+            itemInteractionHandler = NoOpItemInteractionHandler,
+        )
     }
 
     private fun setupStore(): TabGroupFlowStore {
@@ -162,9 +242,110 @@ class TabGroupFlowFragment : DialogFragment() {
                                 homepageAsNewTabEnabled = settings.enableHomepageAsNewTab,
                             )
                     ) ?: createInitialState(settings = settings, args = args),
-                middlewares = listOf(TabGroupFlowTelemetryMiddleware()),
+                middlewares =
+                    listOf(
+                        TabGroupFlowTelemetryMiddleware(),
+                        TabGroupFlowSnackBarMiddleware(
+                            appStore = requireComponents.appStore,
+                            tabGroupStripEnabled = settings.shouldShowTabGroupsStrip,
+                        ),
+                        TabGroupFlowStorageMiddleware(
+                            tabDataCoordinator = requireComponents.tabDataCoordinator,
+                            uiStateRepository = requireComponents.core.tabManagerUiStateRepository,
+                        ),
+                    ),
             )
         }
+    }
+
+    @Composable
+    private fun RenderAddToTabGroup(
+        state: TabGroupFlowState,
+        dispatcher: (TabGroupAction) -> Unit,
+        destination: TabGroupFlowDestination.AddToTabGroup,
+    ) {
+        AddToTabGroup(
+            tabGroups = state.groups,
+            onAddToNewTabGroup = {
+                dispatcher(TabGroupAction.TabAddedToNewTabGroup(tabId = destination.tabId))
+            },
+            onAddToExistingTabGroup = { group ->
+                dispatcher(
+                    TabGroupAction.TabAddedToExistingTabGroup(
+                        groupId = group.id,
+                        tabId = destination.tabId,
+                        groupTitle = group.title,
+                    )
+                )
+            },
+        )
+    }
+
+    @Composable
+    private fun RenderMoveToTabGroup(
+        state: TabGroupFlowState,
+        dispatcher: (TabGroupAction) -> Unit,
+        destination: TabGroupFlowDestination.MoveToTabGroup,
+    ) {
+        AddToTabGroup(
+            tabGroups = state.moveTargetGroups(destination.tabId),
+            onAddToNewTabGroup = {
+                dispatcher(TabGroupAction.TabAddedToNewTabGroup(tabId = destination.tabId))
+            },
+            onAddToExistingTabGroup = { group ->
+                dispatcher(
+                    TabGroupAction.ExistingGroupSelectedForMove(
+                        groupId = group.id,
+                        tabId = destination.tabId,
+                        groupTitle = group.title,
+                    )
+                )
+            },
+        )
+    }
+
+    @Composable
+    private fun RenderEditTabGroup(dispatcher: (TabGroupAction) -> Unit, state: TabGroupFlowState) {
+        val formState = state.formState
+        requireNotNull(formState) {
+            "Form state must not be null when navigating to the edit sheet"
+        }
+
+        EditTabGroup(
+            formState = formState,
+            onTabGroupNameChange = { newName ->
+                dispatcher(TabGroupAction.NameChanged(newName))
+            },
+            onTabGroupThemeChange = { newTheme ->
+                dispatcher(TabGroupAction.ThemeChanged(newTheme))
+            },
+            onConfirmSave = {
+                dispatcher(TabGroupAction.SaveClicked)
+            },
+        )
+    }
+
+    @Composable
+    private fun RenderMoveLastTabAndDeleteTabGroupConfirmationDialog(
+        dispatcher: (TabGroupAction) -> Unit,
+        args: TabGroupFlowDestination.MoveLastTabAndDeleteGroupDialog,
+    ) {
+        MoveLastTabAndDeleteTabGroupConfirmationDialog(
+            sourceTabGroupTitle = args.sourceGroupTitle,
+            destinationTabGroupTitle = args.destinationGroupTitle,
+            onConfirmDelete = {
+                dispatcher(
+                    TabGroupAction.MoveTabAndDeleteGroupConfirmed(
+                        sourceGroupId = args.sourceGroupId,
+                        destinationGroupId = args.destinationGroupId,
+                        destinationGroupTitle = args.destinationGroupTitle,
+                    )
+                )
+            },
+            onCancel = {
+                dispatcher(TabGroupAction.MoveTabAndDeleteGroupCanceled)
+            },
+        )
     }
 
     @VisibleForTesting
@@ -179,6 +360,7 @@ class TabGroupFlowFragment : DialogFragment() {
                     homepageAsNewTabEnabled = settings.enableHomepageAsNewTab,
                     displayTabsInGrid = settings.gridTabView,
                 ),
+            entryPoint = args.entryPoint,
         )
     }
 
@@ -188,12 +370,18 @@ class TabGroupFlowFragment : DialogFragment() {
                 is TabGroupFlowEntryPoint.AddTabToGroup -> {
                     TabGroupFlowDestination.AddToTabGroup(tabId = tabGroupFlowEntryPoint.tabId)
                 }
+                is TabGroupFlowEntryPoint.MoveTabToGroup -> {
+                    TabGroupFlowDestination.MoveToTabGroup(tabId = tabGroupFlowEntryPoint.tabId)
+                }
                 is TabGroupFlowEntryPoint.EditGroup -> {
                     TabGroupFlowDestination.EditTabGroup
                 }
                 is TabGroupFlowEntryPoint.ViewGroup -> {
-                    // todo-bug-2069525: support up the expanded group from this fragment
-                    null
+                    requireComponents.tabDataCoordinator.tabsSnapshot.value
+                        ?.toTabStorageUpdate()
+                        ?.tabGroups
+                        ?.find { it.id == tabGroupFlowEntryPoint.groupId }
+                        ?.let { TabGroupFlowDestination.ExpandedTabGroup(group = it) }
                 }
             }
         return listOfNotNull(TabGroupFlowDestination.Root, destination)

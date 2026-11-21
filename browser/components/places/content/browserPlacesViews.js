@@ -9,6 +9,13 @@ XPCOMUtils.defineLazyPreferenceGetter(
   100
 );
 
+XPCOMUtils.defineLazyPreferenceGetter(
+  this,
+  "NATIVE_MENU_MAX_FOLDER_RESULTS",
+  "browser.places.nativeMenu.maxFolderResults",
+  500
+);
+
 /**
  * The base view implements everything that's common to all the views.
  * It should not be instanced directly, use a derived class instead.
@@ -114,22 +121,10 @@ class PlacesViewBase {
    *
    * @param {object} aPlacesNode
    *        a places result node.
-   * @param {boolean} aAllowMissing
-   *        whether the node may be missing
-   * @returns {object|null} The associated DOM node.
-   * @throws if there is no DOM node set for aPlacesNode.
+   * @returns {object|undefined} The associated DOM node, if there is one.
    */
-  _getDOMNodeForPlacesNode(aPlacesNode, aAllowMissing = false) {
-    let node = this._domNodes.get(aPlacesNode, null);
-    if (!node && !aAllowMissing) {
-      throw new Error(
-        "No DOM node set for aPlacesNode.\nnode.type: " +
-          aPlacesNode.type +
-          ". node.parent: " +
-          aPlacesNode
-      );
-    }
-    return node;
+  _getDOMNodeForPlacesNode(aPlacesNode) {
+    return this._domNodes.get(aPlacesNode);
   }
 
   get controller() {
@@ -317,7 +312,29 @@ class PlacesViewBase {
     aPopup._emptyMenuitem = aPopup._startMarker = aPopup._endMarker = null;
   }
 
-  _cleanPopup(aPopup, aDelay) {
+  /**
+   * Drops the _domNodes entries of an element that is being removed, and of
+   * the elements in its popup, so they don't keep stale nodes alive.
+   *
+   * @param {Element} aElt
+   *   A menu, menuitem, separator or button created for a Places node.
+   */
+  _forgetDOMNodes(aElt) {
+    let placesNode = aElt._placesNode;
+    if (placesNode) {
+      let mapped = this._domNodes.get(placesNode);
+      if (mapped === aElt || mapped?.parentNode === aElt) {
+        this._domNodes.delete(placesNode);
+      }
+    }
+    for (let child of aElt.menupopup?.children ?? []) {
+      if (child._placesNode) {
+        this._forgetDOMNodes(child);
+      }
+    }
+  }
+
+  _cleanPopup(aPopup) {
     // Ensure markers are here when `invalidateContainer` is called before the
     // popup is shown, which may the case for panelviews, for example.
     this._ensureMarkers(aPopup);
@@ -325,24 +342,16 @@ class PlacesViewBase {
     let child = aPopup._startMarker;
     while (child.nextElementSibling != aPopup._endMarker) {
       let sibling = child.nextElementSibling;
-      if (sibling._placesNode && !aDelay) {
+      if (sibling._placesNode) {
+        this._forgetDOMNodes(sibling);
         aPopup.removeChild(sibling);
-      } else if (sibling._placesNode && aDelay) {
-        // HACK (bug 733419): the popups originating from the OS X native
-        // menubar don't live-update while open, thus we don't clean it
-        // until the next popupshowing, to avoid zombie menuitems.
-        if (!aPopup._delayedRemovals) {
-          aPopup._delayedRemovals = [];
-        }
-        aPopup._delayedRemovals.push(sibling);
-        child = child.nextElementSibling;
       } else {
         child = child.nextElementSibling;
       }
     }
   }
 
-  _rebuildPopup(aPopup) {
+  _rebuildPopup(aPopup, maxResults = 0) {
     let resultNode = aPopup._placesNode;
     if (!resultNode.containerOpen) {
       return;
@@ -350,7 +359,10 @@ class PlacesViewBase {
 
     this._cleanPopup(aPopup);
 
-    let cc = resultNode.childCount;
+    let cc =
+      maxResults > 0
+        ? Math.min(resultNode.childCount, maxResults)
+        : resultNode.childCount;
     if (cc > 0) {
       this._setEmptyPopupStatus(aPopup, false);
       let fragment = document.createDocumentFragment();
@@ -472,6 +484,9 @@ class PlacesViewBase {
 
   toggleCutNode(aPlacesNode, aValue) {
     let elt = this._getDOMNodeForPlacesNode(aPlacesNode);
+    if (!elt) {
+      return;
+    }
 
     // We may get the popup for menus, but we need the menu itself.
     if (elt.localName == "menupopup") {
@@ -485,7 +500,7 @@ class PlacesViewBase {
   }
 
   nodeURIChanged(aPlacesNode) {
-    let elt = this._getDOMNodeForPlacesNode(aPlacesNode, true);
+    let elt = this._getDOMNodeForPlacesNode(aPlacesNode);
 
     // There's no DOM node, thus there's nothing to be done when the URI changes.
     if (!elt) {
@@ -504,7 +519,7 @@ class PlacesViewBase {
   }
 
   nodeIconChanged(aPlacesNode) {
-    let elt = this._getDOMNodeForPlacesNode(aPlacesNode, true);
+    let elt = this._getDOMNodeForPlacesNode(aPlacesNode);
 
     // There's no UI representation for the root node, or there's no DOM node,
     // thus there's nothing to be done when the icon changes.
@@ -524,9 +539,9 @@ class PlacesViewBase {
   nodeTitleChanged(aPlacesNode, aNewTitle) {
     let elt = this._getDOMNodeForPlacesNode(aPlacesNode);
 
-    // There's no UI representation for the root node, thus there's
-    // nothing to be done when the title changes.
-    if (elt == this._rootElt) {
+    // There's no UI representation for the root node or for nodes that have no
+    // DOM node, thus there's nothing to be done when the title changes.
+    if (!elt || elt == this._rootElt) {
       return;
     }
 
@@ -547,23 +562,31 @@ class PlacesViewBase {
 
   nodeRemoved(aParentPlacesNode, aPlacesNode) {
     let parentElt = this._getDOMNodeForPlacesNode(aParentPlacesNode);
+    if (!parentElt?._built) {
+      return;
+    }
+
     let elt = this._getDOMNodeForPlacesNode(aPlacesNode);
+    if (!elt) {
+      throw new Error(
+        `No DOM node for the removed node, type: ${aPlacesNode.type}`
+      );
+    }
 
     // Here we need the <menu>.
     if (elt.localName == "menupopup") {
       elt = elt.parentNode;
     }
 
-    if (parentElt._built) {
-      parentElt.removeChild(elt);
+    this._forgetDOMNodes(elt);
+    parentElt.removeChild(elt);
 
-      // Figure out if we need to show the "<Empty>" menu-item.
-      // TODO Bug 517701: This doesn't seem to handle the case of an empty
-      // root.
-      if (parentElt._startMarker.nextElementSibling == parentElt._endMarker) {
-        this._mayAddCommandsItems(parentElt);
-        this._setEmptyPopupStatus(parentElt, true);
-      }
+    // Figure out if we need to show the "<Empty>" menu-item.
+    // TODO Bug 517701: This doesn't seem to handle the case of an empty
+    // root.
+    if (parentElt._startMarker.nextElementSibling == parentElt._endMarker) {
+      this._mayAddCommandsItems(parentElt);
+      this._setEmptyPopupStatus(parentElt, true);
     }
   }
 
@@ -580,7 +603,7 @@ class PlacesViewBase {
 
   nodeInserted(aParentPlacesNode, aPlacesNode, aIndex) {
     let parentElt = this._getDOMNodeForPlacesNode(aParentPlacesNode);
-    if (!parentElt._built) {
+    if (!parentElt?._built) {
       return;
     }
 
@@ -609,6 +632,9 @@ class PlacesViewBase {
     // folder to another.  Instead, it calls nodeRemoved and nodeInserted
     // for the two folders.  Thus, we can assume old-parent == new-parent.
     let elt = this._getDOMNodeForPlacesNode(aPlacesNode);
+    if (!elt) {
+      return;
+    }
 
     // Here we need the <menu>.
     if (elt.localName == "menupopup") {
@@ -622,7 +648,7 @@ class PlacesViewBase {
     }
 
     let parentElt = this._getDOMNodeForPlacesNode(aNewParentPlacesNode);
-    if (parentElt._built) {
+    if (parentElt?._built) {
       // Move the node.
       parentElt.removeChild(elt);
       let index =
@@ -659,6 +685,9 @@ class PlacesViewBase {
 
   invalidateContainer(aPlacesNode) {
     let elt = this._getDOMNodeForPlacesNode(aPlacesNode);
+    if (!elt) {
+      return;
+    }
     elt._built = false;
 
     // If the menupopup is open we should live-update it.
@@ -843,13 +872,6 @@ class PlacesViewBase {
     let popup = aEvent.originalTarget;
 
     this._ensureMarkers(popup);
-
-    // Remove any delayed element, see _cleanPopup for details.
-    if ("_delayedRemovals" in popup) {
-      while (popup._delayedRemovals.length) {
-        popup.removeChild(popup._delayedRemovals.shift());
-      }
-    }
 
     if (popup._placesNode && PlacesUIUtils.getViewForNode(popup) == this) {
       if (this.#isPopupForRecursiveFolderShortcut(popup)) {
@@ -1081,6 +1103,7 @@ class PlacesToolbar extends PlacesViewBase {
 
     this._openedMenuButton = null;
     while (this._rootElt.hasChildNodes()) {
+      this._forgetDOMNodes(this._rootElt.firstChild);
       this._rootElt.firstChild.remove();
     }
 
@@ -1438,6 +1461,10 @@ class PlacesToolbar extends PlacesViewBase {
 
   nodeInserted(aParentPlacesNode, aPlacesNode, aIndex) {
     let parentElt = this._getDOMNodeForPlacesNode(aParentPlacesNode);
+    // Nothing to do if the parent is a never-visible node.
+    if (!parentElt) {
+      return;
+    }
     if (parentElt == this._rootElt) {
       // Node is on the toolbar.
       let children = this._rootElt.children;
@@ -1456,7 +1483,9 @@ class PlacesToolbar extends PlacesViewBase {
           return;
         }
         // Keep the number of built nodes consistent.
-        this._rootElt.removeChild(this._rootElt.lastElementChild);
+        let lastElt = this._rootElt.lastElementChild;
+        this._forgetDOMNodes(lastElt);
+        this._rootElt.removeChild(lastElt);
       }
 
       let button = this._insertNewItem(
@@ -1485,9 +1514,12 @@ class PlacesToolbar extends PlacesViewBase {
 
   nodeRemoved(aParentPlacesNode, aPlacesNode, aIndex) {
     let parentElt = this._getDOMNodeForPlacesNode(aParentPlacesNode);
+    if (!parentElt) {
+      return;
+    }
     if (parentElt == this._rootElt) {
       // Node is on the toolbar.
-      let elt = this._getDOMNodeForPlacesNode(aPlacesNode, true);
+      let elt = this._getDOMNodeForPlacesNode(aPlacesNode);
       // Nothing to do if it's a never-visible node.
       if (!elt) {
         return;
@@ -1499,6 +1531,7 @@ class PlacesToolbar extends PlacesViewBase {
       }
 
       let overflowed = elt.style.visibility == "hidden";
+      this._forgetDOMNodes(elt);
       this._removeChild(elt);
       if (this._resultNode.childCount > this._rootElt.children.length) {
         // A new node should be built to keep a coherent number of children.
@@ -1524,6 +1557,9 @@ class PlacesToolbar extends PlacesViewBase {
     aNewIndex
   ) {
     let parentElt = this._getDOMNodeForPlacesNode(aNewParentPlacesNode);
+    if (!parentElt) {
+      return;
+    }
     if (parentElt == this._rootElt) {
       // Node is on the toolbar.
       // Do nothing if the node will never be visible.
@@ -1532,7 +1568,7 @@ class PlacesToolbar extends PlacesViewBase {
         return;
       }
 
-      let elt = this._getDOMNodeForPlacesNode(aPlacesNode, true);
+      let elt = this._getDOMNodeForPlacesNode(aPlacesNode);
       if (elt) {
         // Here we need the <menu>.
         if (elt.localName == "menupopup") {
@@ -1542,6 +1578,9 @@ class PlacesToolbar extends PlacesViewBase {
       }
 
       if (aNewIndex > lastBuiltIndex + 1) {
+        if (elt) {
+          this._forgetDOMNodes(elt);
+        }
         if (this._resultNode.childCount > this._rootElt.children.length) {
           // If the element was built and becomes non built, another node should
           // be built to keep a coherent number of children.
@@ -1589,7 +1628,7 @@ class PlacesToolbar extends PlacesViewBase {
   }
 
   nodeTitleChanged(aPlacesNode, aNewTitle) {
-    let elt = this._getDOMNodeForPlacesNode(aPlacesNode, true);
+    let elt = this._getDOMNodeForPlacesNode(aPlacesNode);
 
     // Nothing to do if it's a never-visible node.
     if (!elt || elt == this._rootElt) {
@@ -1612,7 +1651,7 @@ class PlacesToolbar extends PlacesViewBase {
   }
 
   invalidateContainer(aPlacesNode) {
-    let elt = this._getDOMNodeForPlacesNode(aPlacesNode, true);
+    let elt = this._getDOMNodeForPlacesNode(aPlacesNode);
     // Nothing to do if it's a never-visible node.
     if (!elt) {
       return;
@@ -2165,6 +2204,11 @@ class PlacesMenu extends PlacesViewBase {
     );
     this._addEventListeners(window, ["unload"], false);
     this._addEventListeners(this._rootElt, ["mousedown"], false);
+    this._onPopupShowing(popupShowingEvent);
+  }
+
+  _init() {
+    this._viewElt._placesView = this;
     if (AppConstants.platform === "macosx") {
       // Must walk up to support views in sub-menus, like Bookmarks Toolbar menu.
       for (let elt = this._viewElt.parentNode; elt; elt = elt.parentNode) {
@@ -2174,16 +2218,115 @@ class PlacesMenu extends PlacesViewBase {
         }
       }
     }
-
-    this._onPopupShowing(popupShowingEvent);
   }
 
-  _init() {
-    this._viewElt._placesView = this;
+  _rebuildPopup(popup) {
+    popup._folderResultLimit =
+      this._nativeView && PlacesUtils.nodeIsFolderOrShortcut(popup._placesNode)
+        ? Math.max(0, NATIVE_MENU_MAX_FOLDER_RESULTS)
+        : 0;
+    super._rebuildPopup(popup, popup._folderResultLimit);
+  }
+
+  _getMenuItemForPlacesNode(node) {
+    let element = this._getDOMNodeForPlacesNode(node);
+    return element?.localName == "menupopup" ? element.parentNode : element;
+  }
+
+  _updateNativeFolder(node, changedNode, newIndex) {
+    if (!this._nativeView || !PlacesUtils.nodeIsFolderOrShortcut(node)) {
+      return false;
+    }
+    let popup = this._getDOMNodeForPlacesNode(node);
+    if (!popup) {
+      return true;
+    }
+    if (NATIVE_MENU_MAX_FOLDER_RESULTS <= 0 && !popup._folderResultLimit) {
+      return false;
+    }
+    if (!popup._built || !node.containerOpen) {
+      popup._built = false;
+      return true;
+    }
+
+    let limit = popup._folderResultLimit || NATIVE_MENU_MAX_FOLDER_RESULTS;
+    popup._folderResultLimit = limit;
+    let changedElement = this._getMenuItemForPlacesNode(changedNode);
+    if (!changedElement?.isConnected && (newIndex < 0 || newIndex >= limit)) {
+      this._mayAddCommandsItems(popup);
+      return true;
+    }
+    if (
+      changedElement?.parentNode == popup &&
+      newIndex >= 0 &&
+      newIndex < limit
+    ) {
+      return false;
+    }
+    let count = Math.min(node.childCount, limit);
+    if (count) {
+      this._setEmptyPopupStatus(popup, false);
+    }
+    let visibleNodes = new Set();
+    for (let i = 0; i < count; ++i) {
+      visibleNodes.add(node.getChild(i));
+    }
+    let child = popup._startMarker.nextElementSibling;
+    while (child != popup._endMarker) {
+      let next = child.nextElementSibling;
+      if (child._placesNode && !visibleNodes.has(child._placesNode)) {
+        this._forgetDOMNodes(child);
+        child.remove();
+      }
+      child = next;
+    }
+    child = popup._startMarker.nextElementSibling;
+    for (let placesNode of visibleNodes) {
+      let element = this._getMenuItemForPlacesNode(placesNode);
+      if (element?.parentNode != popup) {
+        element = this._createDOMNodeForPlacesNode(placesNode);
+      }
+      if (element != child) {
+        popup.insertBefore(element, child);
+      }
+      child = element.nextElementSibling;
+    }
+    this._mayAddCommandsItems(popup);
+    if (!count) {
+      this._setEmptyPopupStatus(popup, true);
+    }
+    return true;
+  }
+
+  nodeInserted(parent, node, index) {
+    if (!this._updateNativeFolder(parent, node, index)) {
+      super.nodeInserted(parent, node, index);
+    }
+  }
+
+  nodeRemoved(parent, node, index) {
+    if (!this._updateNativeFolder(parent, node, -1)) {
+      super.nodeRemoved(parent, node, index);
+    }
+  }
+
+  nodeMoved(node, oldParent, oldIndex, newParent, newIndex) {
+    if (!this._updateNativeFolder(newParent, node, newIndex)) {
+      super.nodeMoved(node, oldParent, oldIndex, newParent, newIndex);
+    }
   }
 
   _onPopupShowing(event) {
     let popup = event.originalTarget;
+    if (
+      this._nativeView &&
+      popup._placesNode &&
+      PlacesUIUtils.getViewForNode(popup) == this &&
+      PlacesUtils.nodeIsFolderOrShortcut(popup._placesNode) &&
+      popup._folderResultLimit != Math.max(0, NATIVE_MENU_MAX_FOLDER_RESULTS)
+    ) {
+      popup._built = false;
+    }
     if (
       this._nativeView &&
       popup != this._rootElt &&
@@ -2219,12 +2362,16 @@ class PlacesMenu extends PlacesViewBase {
 
   _mayAddCommandsItems(popup) {
     super._mayAddCommandsItems(popup);
-    if (!this._nativeView || popup == this._rootElt) {
+    if (!this._nativeView) {
       return;
     }
     let node = popup._placesNode;
     let hasMore =
-      popup._queryResultLimit > 0 && node.childCount >= popup._queryResultLimit;
+      (popup._folderResultLimit > 0 &&
+        node.childCount > popup._folderResultLimit) ||
+      (popup != this._rootElt &&
+        popup._queryResultLimit > 0 &&
+        node.childCount >= popup._queryResultLimit);
     if (hasMore && !popup._moreMenuitem) {
       popup._moreMenuitem = document.createXULElement("menuitem");
       document.l10n.setAttributes(
@@ -2232,7 +2379,7 @@ class PlacesMenu extends PlacesViewBase {
         "menu-places-show-more-in-sidebar"
       );
       popup._moreMenuitem.addEventListener("command", () => {
-        PlacesUIUtils.showSidebarForQuery(popup._placesNode).catch(
+        PlacesUIUtils.showSidebarForNode(popup._placesNode).catch(
           console.error
         );
       });
@@ -2244,6 +2391,9 @@ class PlacesMenu extends PlacesViewBase {
     } else if (!hasMore && popup._moreMenuitem) {
       popup._moreMenuitem.remove();
       popup._moreMenuitem = null;
+      if (!node.childCount) {
+        this._setEmptyPopupStatus(popup, true);
+      }
     }
   }
 
